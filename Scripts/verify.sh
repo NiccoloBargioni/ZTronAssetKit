@@ -9,9 +9,9 @@
 # Final line is exactly `VERIFY: PASS` or `VERIFY: FAIL (<n> failed: a,b,c)`; the exit code mirrors it.
 # Parallel agents: set SWIFTPM_SCRATCH=.build-<agent> so concurrent SwiftPM runs never share a build dir.
 #
-# STATUS: written without access to a Swift toolchain. The control flow and every Python gate are tested;
-# the exact swift/xcodebuild flags are NOT. Stage 0 must run this on the real toolchain and fix the
-# command lines — then freeze it (git tag harness-frozen). Do not weaken a gate to make it pass.
+# STATUS: Stage 0 ran this on Swift 6.4 / Xcode 27 (swiftbuild engine) and fixed two command lines:
+# coverage is exported over every per-target .xctest bundle, and the gates get absolute source paths.
+# Frozen afterwards (git tag harness-frozen). Do not weaken a gate to make it pass.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -91,15 +91,33 @@ build_ios() {
 }
 run_tests()      { swift test --scratch-path "$SCRATCH" --enable-code-coverage --skip Benchmarks; }
 coverage_gate() {
-  local json; json="$(swift test --scratch-path "$SCRATCH" --show-codecov-path 2>/dev/null | tail -1)"
-  [ -f "$json" ] || { echo "coverage JSON not found at '$json' (did a test run with --enable-code-coverage happen?)"; return 1; }
-  python3 Scripts/gates.py coverage --json "$json" --config "$CFG"
+  # SwiftPM's swiftbuild engine (Swift 6.4) builds one .xctest bundle per test target, but the JSON behind
+  # --show-codecov-path is exported from only ONE of them, so most targets would be missing. Re-export the
+  # merged profile over every bundle instead, so no target's coverage can silently disappear.
+  local json dir prof products out first="" objs=()
+  json="$(swift test --scratch-path "$SCRATCH" --show-codecov-path 2>/dev/null | tail -1)"
+  dir="$(dirname "$json")"
+  prof="$dir/default.profdata"
+  [ -f "$prof" ] || { echo "merged profile not found at '$prof' (did a test run with --enable-code-coverage happen?)"; return 1; }
+  products="$(dirname "$dir")"
+  while IFS= read -r bundle; do
+    local bin; bin="$bundle/Contents/MacOS/$(basename "$bundle" .xctest)"
+    [ -f "$bin" ] || continue
+    if [ -z "$first" ]; then first="$bin"; else objs+=(-object "$bin"); fi
+  done < <(find "$products" -maxdepth 1 -name '*.xctest' -type d | sort)
+  [ -n "$first" ] || { echo "no .xctest bundles found in '$products'"; return 1; }
+  echo "coverage export over $(( ${#objs[@]} / 2 + 1 )) test bundles"
+  out="$LOGS/coverage-export.json"
+  xcrun llvm-cov export -summary-only -instr-profile "$prof" "$first" "${objs[@]}" >"$out" || return 1
+  python3 Scripts/gates.py coverage --json "$out" --config "$CFG"
 }
 tsan_tests()     { swift test --scratch-path "$SCRATCH-tsan" --sanitize=thread --skip Benchmarks; }
 perf_tests()     { swift test -c release --scratch-path "$SCRATCH-perf" -Xswiftc -enable-testing --filter Benchmarks; }
-trace_gate()     { python3 Scripts/gates.py trace --spec SPEC.md --tests Tests --config "$CFG" --write docs/TRACEABILITY.md; }
-unsafe_gate()    { python3 Scripts/gates.py unsafe --sources Sources --audit docs/UNSAFE-AUDIT.md --config "$CFG"; }
-docs_gate()      { python3 Scripts/gates.py docs --sources Sources --config "$CFG"; }
+# Absolute paths: gates.py only inspects files whose path contains "/Sources/", which a relative
+# "Sources/…" path never does — with relative paths the unsafe and docs gates silently checked nothing.
+trace_gate()     { python3 Scripts/gates.py trace --spec SPEC.md --tests "$ROOT/Tests" --config "$CFG" --write docs/TRACEABILITY.md; }
+unsafe_gate()    { python3 Scripts/gates.py unsafe --sources "$ROOT/Sources" --audit docs/UNSAFE-AUDIT.md --config "$CFG"; }
+docs_gate()      { python3 Scripts/gates.py docs --sources "$ROOT/Sources" --config "$CFG"; }
 
 # ---------------------------------------------------------------------------------------------- modes
 case "$MODE" in
