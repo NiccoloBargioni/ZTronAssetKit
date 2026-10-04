@@ -3,7 +3,7 @@ import Foundation
 import Synchronization
 import Testing
 import ZTronAssetModel
-import ZTronAssetTestSupport
+@testable import ZTronAssetTestSupport
 
 /// The scripted engine network (R-NET-1, H-4, H-6): steps through the attached staging sink, holds and releases,
 /// attempts, the one ordered transport log, manifests, re-attachment and shutdown.
@@ -287,6 +287,34 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: after) == [.failed(.cancelled(.byClient))])
         #expect(await source.starts.last == late)
         #expect(await source.activeTransfers == 0)
+    }
+
+    /// An engine that pauses or cancels many parked attempts (window moves, R-CAR-3, R-SYN-4) without ever calling
+    /// `script` or `release` must not leave them in the source: the next interaction drops them.
+    @available(macOS 15.0, *)
+    @Test("Test support: attempts the engine paused or cancelled are dropped at the next census read or transfer", .timeLimit(.minutes(1)))
+    func stoppedAttemptsAreDropped() async {
+        let source = FakeRemoteSource()
+        await source.script(Self.other, [.hold])
+        for sequence in UInt32(1)...20 {
+            let handle = await source.transfer(Self.request(sequence == 1 ? Self.other : Self.id, sequence))
+            if sequence.isMultiple(of: 2) {
+                handle.pause()
+            } else {
+                handle.cancel()
+            }
+        }
+        #expect(await source.activeTransfers == 0)
+        #expect(await source.parkedAttempts == 0)
+        for sequence in UInt32(21)...40 {
+            await source.transfer(Self.request(Self.id, sequence)).cancel()
+        }
+        let live = await source.transfer(Self.request(Self.id, 41))
+        #expect(await source.parkedAttempts == 1)
+        #expect(await source.activeTransfers == 1)
+        await source.release(Self.id, with: .failed(.cancelled(.byClient)))
+        #expect(await Self.updates(of: live) == [.failed(.cancelled(.byClient))])
+        #expect(await source.parkedAttempts == 0)
     }
 
     @available(macOS 15.0, *)

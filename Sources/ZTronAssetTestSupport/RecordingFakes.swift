@@ -401,9 +401,15 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         self.invalidated
     }
 
-    /// Transfers not yet terminal.
+    /// Transfers not yet terminal. Reading it drops the parked attempts the engine paused or cancelled.
     public var activeTransfers: Int {
-        self.waiting.filter { !FakeRemoteSource.isStopped($0.handle) }.count
+        self.dropStopped()
+        return self.waiting.count
+    }
+
+    /// Parked attempts the source still holds, dead ones included (the fake's own growth tests).
+    var parkedAttempts: Int {
+        self.waiting.count
     }
 
     /// Scripted manifest response.
@@ -426,6 +432,7 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     /// Scripted transfer: records `.started(request)` in `transportLog`, then returns a `FakeTransferHandle` made
     /// with `transportLog`.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
+        self.dropStopped()
         self.transportLog.record(.started(request))
         let handle = FakeTransferHandle(id: request.id, attempt: request.attempt, transportLog: self.transportLog)
         if self.invalidated {
@@ -569,7 +576,9 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         }
     }
 
-    /// Drops parked attempts the engine paused or cancelled.
+    /// Drops parked attempts the engine paused or cancelled. Runs at every interaction that reads or adds parked
+    /// attempts (`transfer`, `script`, `release`, `activeTransfers`), so an engine that stops many attempts and never
+    /// scripts or releases does not keep them (each with its handle and request) for the source's lifetime.
     private func dropStopped() {
         self.waiting.removeAll { FakeRemoteSource.isStopped($0.handle) }
     }
