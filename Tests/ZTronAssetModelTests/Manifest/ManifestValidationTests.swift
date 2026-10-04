@@ -335,7 +335,7 @@ struct ManifestLexicalTests {
             #"[{"x":"\"#,                       // a backslash as the last byte
             #"[{"x":"\uD83D"}]"#,               // a high surrogate alone
             #"[{"x":"\uD83Dx"}]"#,              // a high surrogate followed by text
-            #"[{"x":"\uD83DA"}]"#,         // a high surrogate followed by a non-low escape
+            #"[{"x":"\uD83D\u0041"}]"#,         // a high surrogate followed by a non-low escape
             #"[{"x":"\uDE00"}]"#,               // a low surrogate alone
             #"[{"x":"\u12"#,                    // a \u escape cut short by the end of the payload
             #"[{"x":"\u12"}]"#,                 // a \u escape with too few hex digits
@@ -363,7 +363,7 @@ struct ManifestLexicalTests {
 
     @Test("R-MAN-1: unusual but valid spellings decode: empty containers, exponents, every escape and four-byte scalars")
     func unusualSpellingsDecode() throws {
-        let text = #"[{"x":{},"y":[[],{}],"z":[true,false,null,-0,1e+5,2.5E-3],"identifier":"a\b\f\n\r\t\/","fileExtension":"png","remotePath":"m/é😀中","localPathComponents":["􏿿"],"localFileName":"\"\\"}]"#
+        let text = #"[{"x":{},"y":[[],{}],"z":[true,false,null,-0,1e+5,2.5E-3],"identifier":"a\b\f\n\r\t\/","fileExtension":"png","remotePath":"m/\u00e9\uD83D\uDE00\u4E2D","localPathComponents":["\uDBFF\uDFFF"],"localFileName":"\"\\"}]"#
         let manifest = try ManifestDecoder.decode(Data(text.utf8))
         #expect(manifest.quarantined.map(\.violation) == [.identifierControlCharacter])
         #expect(manifest.quarantined.first?.identifier == AssetID("a\u{8}\u{C}\n\r\t/"))
@@ -407,6 +407,10 @@ struct ManifestLexicalTests {
         #expect(native == bridged)
         #expect(native.hashValue == bridged.hashValue)
         #expect(Set([native, bridged]).count == 1)
+        // A non-ASCII NSString is stored as UTF-16, so its UTF-8 is not contiguous: hashing copies it, alike.
+        let utf16Backed = AssetID(NSString(string: "caf\u{E9}.\u{65E5}") as String)
+        #expect(utf16Backed == AssetID("caf\u{E9}.\u{65E5}"))
+        #expect(utf16Backed.hashValue == AssetID("caf\u{E9}.\u{65E5}").hashValue)
         // Canonically equivalent but byte-different identifiers are different assets.
         #expect(AssetID("caf\u{E9}") != AssetID("cafe\u{301}"))
         #expect(Set([AssetID("caf\u{E9}"), AssetID("cafe\u{301}")]).count == 2)

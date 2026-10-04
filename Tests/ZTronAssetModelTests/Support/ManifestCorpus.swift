@@ -56,6 +56,44 @@ enum ManifestCorpus {
         return Data(("[" + entries.joined(separator: ",") + "]").utf8)
     }
 
+    // MARK: - Allocation worst cases
+
+    /// `count` minimal entries whose identifier, remote path and file name are each `length` bytes: just past the
+    /// 15-byte inline limit, every one is a heap string, the densest heap per payload byte a valid entry allows.
+    static func shortStringEntries(length: Int, count: Int) -> Data {
+        var text = "["
+        let filler = String(repeating: "f", count: length)
+        for index in 0..<count {
+            let prefix = "\(index)-"
+            let identifier = prefix + String(repeating: "i", count: max(0, length - prefix.utf8.count))
+            text += (index == 0 ? "" : ",")
+                + "{\"identifier\":\"\(identifier)\",\"fileExtension\":\"p\",\"remotePath\":\"\(filler)\","
+                + "\"localPathComponents\":[],\"localFileName\":\"\(filler)\"}"
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// Entries with 32 path components of `length` bytes each, up to `maxBytes`: array elements cost three JSON
+    /// bytes of punctuation but a 16-byte slot plus a heap string each.
+    static func shortComponentEntries(length: Int, maxBytes: Int) -> Data {
+        var text = "["
+        var index = 0
+        while index < 100_000 {
+            let components = (0..<32).map { component -> String in
+                let prefix = "\(index)-\(component)-"
+                return "\"" + prefix + String(repeating: "x", count: max(0, length - prefix.utf8.count)) + "\""
+            }
+            let entry = "{\"identifier\":\"i\(index)\",\"fileExtension\":\"p\",\"remotePath\":\"r\",\"localPathComponents\":["
+                + components.joined(separator: ",") + "]}"
+            guard text.utf8.count + entry.utf8.count + 2 <= maxBytes else {
+                break
+            }
+            text += (index == 0 ? "" : ",") + entry
+            index += 1
+        }
+        return Data((text + "]").utf8)
+    }
+
     /// Sixteen lowercase hex digits.
     static func hex16(_ value: UInt64) -> String {
         let digits = String(value, radix: 16)

@@ -84,6 +84,7 @@ struct LogIntervalTests {
             LogLine(category: .store, level: .debug, message: "interval upload began"),
             LogLine(category: .store, level: .debug, message: "interval commit began; x"),
             LogLine(category: .store, level: .debug, message: "interval commit began extra"),
+            LogLine(category: .store, level: .debug, message: "interval commit began:no space"),
         ]
         for line in notIntervals {
             #expect(LogIntervalEvent(line: line) == nil, "\(line.message)")

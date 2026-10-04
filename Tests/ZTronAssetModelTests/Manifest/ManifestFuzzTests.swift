@@ -16,7 +16,7 @@ import ZTronAssetModel
 /// an unoptimised build instead asserts that time grows linearly from 1 MiB to 32 MiB, the property that keeps the
 /// optimised bound (no quadratic path). Under Thread Sanitizer, whose allocator and instrumentation change both
 /// figures, the limit-scale cases shrink to 1 MiB and only the outcomes are checked.
-@Suite("Manifest fuzz")
+@Suite("Manifest fuzz", .serialized)
 struct ManifestFuzzTests {
     /// What a case must decode to.
     enum Expected {
@@ -28,6 +28,8 @@ struct ManifestFuzzTests {
         case quarantined(ManifestEntryViolation)
         /// This many entries, nothing quarantined.
         case accepted(Int)
+        /// Rejected before anything is built because the decoded form could exceed four times the payload.
+        case overAllocationBudget
     }
 
     /// One fuzz input.
@@ -70,6 +72,10 @@ struct ManifestFuzzTests {
             }
             let label = "\(fuzzCase.name) seed \(fuzzCase.seed): \(fuzzCase.payload.count) bytes, cpu \(cost.cpuSeconds) s, peak \(cost.peakHeapGrowth) B"
             #expect(cost.peakHeapGrowth <= 4 * fuzzCase.payload.count, "\(label)")
+            if case .overAllocationBudget = fuzzCase.expected {
+                // Rejected by the survey: the result was never built.
+                #expect(cost.peakHeapGrowth < fuzzCase.payload.count, "\(label)")
+            }
             #expect(cost.retainedHeapGrowth <= 4 * fuzzCase.payload.count, "\(label), retained \(cost.retainedHeapGrowth) B")
             print("R-MAN-3 limit case \(label), retained \(cost.retainedHeapGrowth) B")
             if DecodeMeasurement.isOptimized {
@@ -81,13 +87,36 @@ struct ManifestFuzzTests {
                 denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
             }
         }
-        #expect(limitCases == 19)
+        #expect(limitCases == 22)
         if !tsan {
             // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
             // cost about 1,000x).
             let dense = try #require(denseCPU)
             #expect(dense.limit <= 64 * dense.small, "dense 1 MiB \(dense.small) s vs limit \(dense.limit) s")
         }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-MAN-3: a manifest whose decoded form could exceed four times its payload is rejected before anything is built")
+    func overBudgetManifestIsRejectedEarly() throws {
+        let payload = ManifestCorpus.shortComponentEntries(length: 16, maxBytes: 2 << 20)
+        let (outcome, cost) = DecodeMeasurement.measure { Self.decode(payload) }
+        guard case .failure(.payloadTooLarge(let estimated, let limit)) = outcome else {
+            Issue.record("expected payloadTooLarge, got \(outcome)")
+            return
+        }
+        #expect(estimated > limit)
+        #expect(limit <= 4 * Int64(payload.count))
+        if !DecodeMeasurement.underThreadSanitizer {
+            // The over-budget result was never built (it would take more than 4x the payload); the sample may
+            // include what other suites allocate meanwhile, hence the generous bound.
+            #expect(cost.peakHeapGrowth < payload.count, "peak \(cost.peakHeapGrowth) B for \(payload.count) B")
+        }
+        // The same shape with 24-byte components fits, and is decoded whole.
+        let fitting = ManifestCorpus.shortComponentEntries(length: 24, maxBytes: 2 << 20)
+        let decoded = try ManifestDecoder.decode(fitting)
+        #expect(decoded.count > 0 && decoded.quarantined.isEmpty)
+        #expect(decoded.entries.allSatisfy { $0.localPathComponents.count == 32 })
     }
 
     @Test("R-MAN-3: every prefix of a shipped manifest is rejected as not JSON without trapping")
@@ -195,6 +224,15 @@ struct ManifestFuzzTests {
         for make in Self.hugeStringCases(count: payloadBytes - 256) {
             body(make())
         }
+
+        // The allocation worst cases: heap strings as dense as a valid manifest allows.
+        let entryCount = min(100_000, payloadBytes / 150)
+        body(Case(name: "minimal entries of 16-byte strings", seed: 0, payload: ManifestCorpus.shortStringEntries(length: 16, count: entryCount),
+            expected: .accepted(entryCount)))
+        body(Case(name: "16-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 16, maxBytes: payloadBytes),
+            expected: .overAllocationBudget))
+        body(Case(name: "24-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 24, maxBytes: payloadBytes),
+            expected: .anyOutcome))
     }
 
     /// One entry with a string of about `count` bytes in each place a manifest can hold one, each made on demand.
@@ -248,6 +286,14 @@ struct ManifestFuzzTests {
         case (.accepted(let count), .success(let manifest)):
             #expect(manifest.count == count, "\(label)")
             #expect(manifest.quarantined.isEmpty, "\(label): \(manifest.quarantined.prefix(3))")
+        case (.overAllocationBudget, .failure(let error)):
+            guard case .payloadTooLarge(let estimated, let limit) = error else {
+                Issue.record("\(label): expected the allocation bound, got \(error)")
+                break
+            }
+            #expect(estimated > limit && limit <= 4 * Int64(fuzzCase.payload.count), "\(label): \(error)")
+        case (.overAllocationBudget, .success(let manifest)):
+            Issue.record("\(label): expected the allocation bound, decoded \(manifest.count) entries")
         case (_, .failure(let error)):
             Issue.record("\(label): expected a manifest, got \(error)")
         case (.anyOutcome, .success):

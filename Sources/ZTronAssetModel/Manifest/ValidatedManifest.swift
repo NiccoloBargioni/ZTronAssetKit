@@ -101,9 +101,11 @@ public struct ValidatedManifest: Sendable, Hashable {
 public enum ManifestDecoder {
     /// Decodes either wire shape and validates every entry.
     ///
-    /// The payload size is checked before a byte is read; the bytes are then parsed in one pass by a reader that
-    /// materialises only what accepted entries need (`ManifestParser`, ADR draft A-1), and the digest is the
-    /// SHA-256 of `data` as received.
+    /// The payload size is checked before a byte is read. A survey pass then validates every byte and counts what
+    /// the result will hold, materialising nothing; a payload whose decoded form could need more than four times
+    /// its size (`ManifestFootprint.limit`) is rejected as `payloadTooLarge` with the estimated bytes and the limit,
+    /// before anything is built (R-MAN-3). Otherwise a build pass with exactly reserved buffers produces
+    /// the manifest (`ManifestParser`, ADR draft A-1, A-8). The digest is the SHA-256 of `data` as received.
     public static func decode(_ data: Data, options: ManifestDecodingOptions = ManifestDecodingOptions()) throws(ManifestError)
         -> ValidatedManifest
     {
@@ -111,9 +113,15 @@ public enum ManifestDecoder {
             throw .payloadTooLarge(bytes: Int64(data.count), limit: options.limits.maxPayloadBytes)
         }
         let parsed: Result<ManifestParser.Output, ManifestError> = data.withUnsafeBytes { bytes in
-            var parser = ManifestParser(bytes: bytes, options: options)
             do throws(ManifestError) {
-                return .success(try parser.parse())
+                var survey = ManifestParser(bytes: bytes, options: options, reserving: nil)
+                let counts = try survey.parse().survey
+                let limit = ManifestFootprint.limit(payloadBytes: bytes.count)
+                guard counts.estimatedBytes <= limit else {
+                    throw .payloadTooLarge(bytes: Int64(counts.estimatedBytes), limit: Int64(limit))
+                }
+                var build = ManifestParser(bytes: bytes, options: options, reserving: counts)
+                return .success(try build.parse())
             } catch {
                 return .failure(error)
             }

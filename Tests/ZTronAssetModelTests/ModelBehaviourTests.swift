@@ -170,6 +170,32 @@ struct ModelBehaviourTests {
         #expect(counts.offline == 1 && counts.storage == FailureClass.allCases.count)
     }
 
+    @Test("R-NET-6: a 403's hint reads the body first: XML is a missing object, empty is a rejected key, else the manifest leans to the key")
+    func forbiddenHintReadsTheBodyFirst() {
+        let hint = { (purpose: TransferPurpose, bytes: Int64, xml: Bool) in
+            ForbiddenEvidence(purpose: purpose, bodyBytes: bytes, contentTypeIsXML: xml, keyPresented: true, resumed: false).hint
+        }
+        #expect(hint(.manifest, 243, true) == .objectMissingLikely)
+        #expect(hint(.asset, 243, true) == .objectMissingLikely)
+        #expect(hint(.asset, 0, false) == .keyRejectedLikely)
+        #expect(hint(.manifest, 12, false) == .keyRejectedLikely)
+        #expect(hint(.asset, 12, false) == .undetermined)
+    }
+
+    @Test("R-MAN-5: content hashes parse hex in either case, order by their bytes and reject any other length")
+    func contentHashParsing() throws {
+        let lower = try #require(ContentHash(hex: String(repeating: "ab", count: 32)))
+        #expect(ContentHash(hex: String(repeating: "AB", count: 32)) == lower)
+        #expect(lower.description == String(repeating: "ab", count: 32))
+        #expect(ContentHash(hex: String(repeating: "g", count: 64)) == nil)
+        #expect(ContentHash(hex: String(repeating: "a", count: 63)) == nil)
+        #expect(ContentHash(bytes: [UInt8](repeating: 1, count: 31)) == nil)
+        let small = ContentHash(w0: 0, w1: 0, w2: 0, w3: 1)
+        let large = ContentHash(w0: 1, w1: 0, w2: 0, w3: 0)
+        #expect(small < large && [large, small].sorted() == [small, large])
+        #expect(ContentHash(bytes: large.bytes) == large)
+    }
+
     @Test("R-CAR-6: an entry's file name is its localFileName, else the last dot-segment of its identifier")
     func resolvedFileName() {
         #expect(ManifestEntry(identifier: "bo7.ri.map", fileExtension: "png", remotePath: "m", localFileName: "Temple Map").resolvedFileName == "Temple Map")

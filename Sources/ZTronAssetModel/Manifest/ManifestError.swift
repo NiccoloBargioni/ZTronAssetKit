@@ -1,6 +1,8 @@
 /// Why a whole manifest was rejected (R-MAN-2 structural violations). Nothing of a rejected manifest is applied.
 public enum ManifestError: Error, Sendable, Hashable {
-    /// The payload exceeds `ManifestLimits.maxPayloadBytes`.
+    /// The payload exceeds `ManifestLimits.maxPayloadBytes`; or its decoded form could need more memory than
+    /// R-MAN-3 allows (four times the payload), in which case `bytes` is the estimated decoded size and `limit` the
+    /// most the estimate may reach (ADR draft A-8).
     case payloadTooLarge(bytes: Int64, limit: Int64)
     /// More entries than `ManifestLimits.maxEntries`.
     case tooManyEntries(count: Int, limit: Int)

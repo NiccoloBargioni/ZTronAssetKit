@@ -1,30 +1,48 @@
 /// The manifest schema on top of `JSONCursor` (R-MAN-1, R-MAN-2): both wire shapes, unknown fields skipped,
 /// structural violations thrown, per-entry violations quarantined.
 ///
-/// One pass, no recursion. A value is checked against its field's rules on the payload's own bytes and
-/// materialised only when the entry may use it, so peak memory is the result plus a bounded scratch (R-MAN-3, ADR
-/// draft A-3). The identifier index the result needs is built here, once, and handed to `ValidatedManifest`.
+/// No recursion, two passes over the same code (ADR draft A-8). The *survey* pass validates the whole payload,
+/// applies every per-entry rule on the payload's own bytes and counts what the result will hold, materialising
+/// nothing; `ManifestDecoder` then refuses a payload whose decoded form would exceed its allocation budget
+/// (R-MAN-3). The *build* pass reserves exactly the surveyed capacities and materialises only the values an entry
+/// may use, so peak memory is the result plus one decoded string at most (ADR draft A-3). The identifier index
+/// the result needs is built once, here, and handed to `ValidatedManifest`.
 struct ManifestParser {
-    /// What one parse produced.
+    /// What one parse produced: the manifest (build pass) or only the tally (survey pass).
     struct Output {
         var entries: [ManifestEntry]
         var positions: [AssetID: Int]
         var quarantined: [QuarantinedEntry]
         var shape: ManifestWireShape
+        var survey: ManifestSurvey
     }
 
     private var cursor: JSONCursor
     private let options: ManifestDecodingOptions
+    /// Whether this is the build pass (values are materialised) rather than the survey.
+    private let building: Bool
+    /// The survey pass's counts.
+    private var tally = ManifestSurvey()
     private var entries: [ManifestEntry] = []
     private var quarantined: [QuarantinedEntry] = []
     /// Accepted identifiers and their positions: the result's index and the duplicate check (R-MAN-2, D-13).
     private var positions: [AssetID: Int] = [:]
     /// Valid identifiers of quarantined entries: a later entry repeating one is a duplicate too.
     private var quarantinedIdentifiers: Set<AssetID> = []
+    /// Reused element buffer for string arrays, so each array is built at its exact size.
+    private var scratch: [String] = []
 
-    init(bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions) {
+    /// A survey pass when `survey` is `nil`, else a build pass that reserves what the survey counted.
+    init(bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions, reserving survey: ManifestSurvey?) {
         self.cursor = JSONCursor(bytes: bytes, maxDepth: options.limits.maxNestingDepth)
         self.options = options
+        self.building = survey != nil
+        if let survey {
+            self.entries.reserveCapacity(survey.acceptedCount)
+            self.positions.reserveCapacity(survey.acceptedCount)
+            self.quarantined.reserveCapacity(survey.quarantinedCount)
+            self.quarantinedIdentifiers.reserveCapacity(survey.quarantinedCount)
+        }
     }
 
     /// Parses the whole payload.
@@ -44,7 +62,7 @@ struct ManifestParser {
             throw .undecodable(.unexpectedShape)
         }
         try self.requireEnd()
-        return Output(entries: self.entries, positions: self.positions, quarantined: self.quarantined, shape: shape)
+        return Output(entries: self.entries, positions: self.positions, quarantined: self.quarantined, shape: shape, survey: self.tally)
     }
 
     /// Only whitespace may follow the top-level value.
@@ -178,11 +196,20 @@ struct ManifestParser {
     }
 
     /// Applies the cross-field rules (required members, duplicate identifiers) and appends the entry to the
-    /// result or the quarantine.
+    /// result or the quarantine (build pass), or counts it (survey pass, which cannot see duplicates: identifiers
+    /// are not materialised there).
     private mutating func finish(_ draft: EntryDraft, index: Int) throws(ManifestError) {
         var draft = draft
         for field in EntryField.required where !draft.isPresent(field) {
             draft.reject(field, .malformedField(field.name))
+        }
+        guard self.building else {
+            if draft.firstViolation == nil {
+                self.tally.acceptedCount += 1
+            } else {
+                self.tally.quarantinedCount += 1
+            }
+            return
         }
         let id = draft.identifier.map { AssetID($0) }
         if let id, draft.identifierIsValid, self.positions[id] != nil || self.quarantinedIdentifiers.contains(id) {
@@ -220,6 +247,18 @@ struct ManifestParser {
         )
     }
 
+    /// The string's value in the build pass; in the survey pass, its heap cost is counted and `nil` returned.
+    private mutating func materialize(_ string: JSONString) -> String? {
+        guard self.building else {
+            self.tally.materializedBytes += ManifestFootprint.string(utf8Count: string.decodedCount)
+            if string.hasEscapes {
+                self.tally.largestEscapedString = max(self.tally.largestEscapedString, string.decodedCount)
+            }
+            return nil
+        }
+        return self.cursor.decodedString(of: string)
+    }
+
     // MARK: - Fields
 
     /// Reads one known member's value into the draft. Text is checked against the field's rules on the payload's
@@ -234,7 +273,7 @@ struct ManifestParser {
             guard string.decodedCount <= limits.maxIdentifierBytes else {
                 return draft.reject(field, .identifierTooLong(bytes: string.decodedCount))
             }
-            draft.identifier = self.cursor.decodedString(of: string)
+            draft.identifier = self.materialize(string)
             if let violation = self.firstViolation(of: string, ManifestRules.identifierViolations(utf8:limits:)) {
                 draft.reject(field, violation)
             } else {
@@ -247,7 +286,7 @@ struct ManifestParser {
             guard string.decodedCount <= 8, self.isValidFileExtension(string) else {
                 return draft.reject(field, .fileExtensionInvalid)
             }
-            draft.fileExtension = self.cursor.decodedString(of: string)
+            draft.fileExtension = self.materialize(string)
         case .remotePath:
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
@@ -258,7 +297,7 @@ struct ManifestParser {
             if let violation = self.firstViolation(of: string, ManifestRules.remotePathViolations(utf8:limits:)) {
                 return draft.reject(field, .remotePathInvalid(violation))
             }
-            draft.remotePath = self.cursor.decodedString(of: string)
+            draft.remotePath = self.materialize(string)
         case .localPathComponents:
             draft.localPathComponents = try self.stringArray(
                 field, &draft, depth: depth, maxCount: ManifestRules.maxPathComponents,
@@ -271,7 +310,7 @@ struct ManifestParser {
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            draft.localFileName = self.cursor.decodedString(of: string)
+            draft.localFileName = self.materialize(string)
         case .byteSize:
             if try self.cursor.consumeNull() {
                 return
@@ -339,7 +378,8 @@ struct ManifestParser {
 
     /// An array of strings with at most `maxCount` elements, each checked by `elementViolation` (on its decoded
     /// UTF-8 length) before it is materialised. Returns `nil` after rejecting the field; the rest of the array is
-    /// still validated as JSON but nothing more is materialised.
+    /// still validated as JSON but nothing more is materialised. The build pass collects the elements in `scratch`
+    /// and returns them in an array reserved at their exact count; the survey pass counts them and returns `[]`.
     private mutating func stringArray(
         _ field: EntryField,
         _ draft: inout EntryDraft,
@@ -354,7 +394,8 @@ struct ManifestParser {
         }
         try self.cursor.checkDepth(depth + 1)
         try self.cursor.expect(JSONByte.openBracket)
-        var result: [String] = []
+        self.scratch.removeAll(keepingCapacity: true)
+        var count = 0
         var violation: ManifestEntryViolation?
         if !self.cursor.consume(JSONByte.closeBracket) {
             repeat {
@@ -368,19 +409,26 @@ struct ManifestParser {
                     continue
                 }
                 let string = try self.cursor.scanString()
-                if result.count == maxCount {
+                if count == maxCount {
                     violation = countViolation
                 } else if let rejected = elementViolation(string.decodedCount) {
                     violation = rejected
                 } else {
-                    result.append(self.cursor.decodedString(of: string))
+                    if let element = self.materialize(string) {
+                        self.scratch.append(element)
+                    }
+                    count += 1
                 }
             } while try self.cursor.continueContainer(closing: JSONByte.closeBracket)
         }
+        self.tally.materializedBytes += self.building ? 0 : ManifestFootprint.array(count: count, stride: MemoryLayout<String>.stride)
         if let violation {
             draft.reject(field, violation)
             return nil
         }
+        var result: [String] = []
+        result.reserveCapacity(self.scratch.count)
+        result.append(contentsOf: self.scratch)
         return result
     }
 
