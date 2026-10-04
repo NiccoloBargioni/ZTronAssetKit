@@ -71,6 +71,41 @@ extension ModelSuites {
             #expect(b.entries.first?.remotePath == "media/a.png")
         }
 
+        @Test("R-MAN-1: an escaped key or policy names a field only when its decoded bytes spell the name, in every escape form")
+        func escapedKeysMatchByDecodedBytes() throws {
+            let head = #"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[]"#
+            func decode(_ members: String) throws -> ValidatedManifest {
+                try ManifestDecoder.decode(Data(("[" + head + "," + members + "}]").utf8))
+            }
+            // \u escapes spelling a known key of each length that two field names share (8, 10, 13), or a policy value.
+            let checksum = String(repeating: "ab", count: 32)
+            let spelled = try #require(try decode(
+                #""\u0062yteSize":7,"\u0063hecksum":""# + checksum + #"","t\u0061gs":["x"],"polic\u0079":"\u0065ssential","localFileNam\u0065":"n""#
+            ).entries.first)
+            #expect(spelled.byteSize == 7 && spelled.checksum?.hex == checksum && spelled.tags == ["x"])
+            #expect(spelled.policy == .essential && spelled.localFileName == "n")
+            let required = #"[{"\u0069dentifier":"a","fil\u0065Extension":"png","r\u0065motePath":"m/a.png","localPathComponent\u0073":[]}]"#
+            #expect(try ManifestDecoder.decode(Data(required.utf8)).entries.first?.remotePath == "m/a.png")
+
+            // The same decoded length as a field name but other bytes: an unknown member, ignored. Two-byte (U+00E9),
+            // three-byte (U+4E2D) and four-byte (a surrogate pair) scalars, and a simple or \u escape that differs only
+            // at the last byte.
+            let unknown = [
+                #""byteSi\u00e9":"x""#, #""chec\u4e2dm":"x""#, #""\ud83d\ude00\ud83d\ude00":"x""#, #""\ud83d\ude00":"x""#,
+                #""byteSiz\/":"x""#, #""checksu\u006e":"x""#, #""tag\u007a":"x""#, #""ta\u0067t":"x""#,
+                #""identifi\u00e9":"x""#, #""remotePat\u0069":"x""#, #""localFileNa\u00e9":"x""#, #""fileExtensio\/":"x""#,
+            ]
+            for member in unknown {
+                let manifest = try decode(member)
+                let entry = manifest.entries.first
+                #expect(manifest.quarantined.isEmpty && entry?.identifier == "a" && entry?.remotePath == "m/a.png", "\(member)")
+                #expect(entry?.byteSize == nil && entry?.checksum == nil && entry?.tags == [] && entry?.localFileName == nil, "\(member)")
+            }
+            // A policy value is compared the same way: one byte off is not a policy.
+            let quarantined = try decode(#""policy":"essentia\u006d""#).quarantined
+            #expect(quarantined.map(\.violation) == [.malformedField("policy")])
+        }
+
         @Test("R-MAN-1: non-ASCII text and surrogate-pair escapes decode to the same UTF-8 identifiers")
         func unicodeEscapesDecode() throws {
             let raw = #"[{"identifier":"caf\u00e9.\ud83d\ude00.\u4e2d","fileExtension":"png","remotePath":"m/x.png","localPathComponents":["Ünïcødé","日本"]}]"#

@@ -324,14 +324,17 @@ struct JSONCursor {
         return String(decoding: UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end]), as: UTF8.self)
     }
 
-    /// Whether the decoded string equals `literal` (ASCII keys and enumeration values), without allocating for
-    /// the common unescaped case.
+    /// Whether the decoded string equals `literal`, an ASCII key or enumeration value, without allocating.
+    ///
+    /// An escaped string is decoded while it is compared and the comparison stops at the first difference: every
+    /// unknown member of a manifest goes through here, and a key whose decoded length matches two field names
+    /// would otherwise cost two heap copies per occurrence (R-MAN-3's time bound, fix round 2).
     func string(_ string: JSONString, equals literal: [UInt8]) -> Bool {
         guard string.decodedCount == literal.count else {
             return false
         }
         if string.hasEscapes {
-            return self.decodedBytes(of: string) == literal
+            return self.escapedString(string, equals: literal)
         }
         var index = 0
         while index < literal.count {
@@ -341,6 +344,37 @@ struct JSONCursor {
             index += 1
         }
         return true
+    }
+
+    /// `string(_:equals:)` for a string with escapes, already validated by `scanString`: each escape is decoded in
+    /// place and compared byte by byte. The literal is ASCII, so a `\u` escape of a scalar beyond U+007F (a
+    /// surrogate pair included) can never match and ends the comparison at once.
+    private func escapedString(_ string: JSONString, equals literal: [UInt8]) -> Bool {
+        var index = string.start
+        var position = 0
+        while index < string.end {
+            var byte = self.bytes[index]
+            index += 1
+            if byte == JSONByte.backslash {
+                let escaped = self.bytes[index]
+                index += 1
+                if escaped == UInt8(ascii: "u") {
+                    let scalar = self.hexValue(at: index)
+                    index += 4
+                    guard scalar < 0x80 else {
+                        return false
+                    }
+                    byte = UInt8(scalar)
+                } else {
+                    byte = JSONByte.unescaped(escaped)
+                }
+            }
+            guard position < literal.count, literal[position] == byte else {
+                return false
+            }
+            position += 1
+        }
+        return position == literal.count
     }
 
     /// Scans one escape sequence at the backslash; returns its decoded UTF-8 length. (Plain comparisons throughout
