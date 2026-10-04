@@ -1,6 +1,6 @@
 import Foundation
 
-/// A point on the monotonic clock, in nanoseconds (H-8, ADR-024).
+/// A point on the monotonic clock, in nanoseconds (H-8, ARCHITECTURE §2).
 ///
 /// Used for every in-process deadline (backoff, breaker cooldown, `Retry-After`, aging, progress throttle,
 /// deletion grace, maintenance budgets). Never persisted: it is meaningless in another process. `Clock` and

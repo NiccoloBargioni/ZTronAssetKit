@@ -12,8 +12,6 @@ public enum StagingError: Error, Sendable, Hashable {
     case source(SourceFailure)
     /// The name is already taken (an exclusive rename found the destination): a uniqueness bug, never data loss.
     case nameInUse
-    /// The store is closed; nothing may be written (R-SYN-15).
-    case closed
 }
 
 /// Why a `ChunkSource` failed.
@@ -38,7 +36,15 @@ public protocol ChunkSource: Sendable {
 /// R-STO-6): the transport never touches `FileManager` (R-STO-1, ADR-019).
 ///
 /// The synchronous members run on URLSession's serial delegate queue, which is neither the main thread nor the
-/// cooperative pool (C2); each is one bounded unit. Every member fails with `.closed` once the store is closed.
+/// cooperative pool (C2); each is one bounded unit.
+///
+/// The sink is an immutable value and cannot observe that the store closed: that would need shared mutable state
+/// read from the delegate queue, i.e. a lock, which the iOS 15 floor offers only through an unsafe escape. No member
+/// promises to fail after close. Ordering protects the store instead (transport-2 T2-04, ADR-039): shutdown calls
+/// `RemoteSource.invalidate()` before `AssetStore.close()`, and invalidating the foreground session returns only
+/// after its delegate's last callback. The opt-in background session is released without waiting for the OS's
+/// tasks, so a background download may still be moved into staging after close; that file is an ordinary staged
+/// file for the next launch's reconciliation (ADR-028).
 public protocol StagingSink: Sendable {
     /// Creates (or truncates) the partial file of a fresh attempt.
     func createPartial(_ name: StagingFileName) throws(StagingError)

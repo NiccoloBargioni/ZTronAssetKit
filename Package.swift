@@ -77,6 +77,15 @@ let package = Package(
             dependencies: ["ZTronAssetKit", "ZTronAssetTestSupport"],
             swiftSettings: strictConcurrency
         ),
+        // R-CAR-6 (ADR-006, ADR-033): the prior art's public CDN symbols as compatibility shims over AssetClient,
+        // compiled and exercised here because this package never writes into ZTronCarouselCore. A test target, so
+        // the shims never ship in the product and Combine (CDNSyncCoordinator is an ObservableObject) stays out of
+        // every production target (R-CAR-9).
+        .testTarget(
+            name: "ZTronAssetCompatibilityTests",
+            dependencies: ["ZTronAssetKit", "ZTronAssetTestSupport"],
+            swiftSettings: strictConcurrency
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

@@ -118,7 +118,8 @@ public struct HTTPSourceConfiguration: Sendable, Hashable {
 public enum PackRetention: Sendable, Hashable {
     /// Keep packs (permanent double residency; never a whole-pack re-download).
     case keepPacks
-    /// Release a media pack once every entry mapped to it is adopted or excluded by the keep-scope (the default).
+    /// Release a media pack once every entry mapped to it is adopted or excluded by the keep-scope, the client's
+    /// retention scope (the default; ADR-027).
     case releaseAfterAdoption
 }
 

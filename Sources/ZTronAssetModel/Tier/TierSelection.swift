@@ -6,7 +6,7 @@ public enum AssetTier: String, Sendable, Hashable, CaseIterable, Codable {
     case appleHosted
 }
 
-/// Every input of the tier decision (R-APL-5). `osSupportsAppleTier` is the result of the module's single
+/// Every input of the tier decision (R-APL-5). `osSupportsAppleTier` is the result of the package's single
 /// `#available(iOS 26.0, macOS 26.0, *)` check, evaluated by `ZTronAssetAppleHosted` and passed in as data, so the
 /// decision itself is pure and exhaustively testable on a macOS 27 host where the check is always true
 /// (APPLE-API-VERIFICATION §2).

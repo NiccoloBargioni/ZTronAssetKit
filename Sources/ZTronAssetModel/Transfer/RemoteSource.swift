@@ -46,12 +46,17 @@ public struct ReattachedTransfer: Sendable, Hashable {
 }
 
 /// What the store holds, so a source can release duplicates it keeps (R-CLN-10, H-7).
+///
+/// Built atomically by `AssetStore.adoptionReport()`: the store captures its state synchronously, commits the
+/// generation holding it durably, and reports only what it captured, so a publish that lands during the commit is
+/// never reported as adopted (store-1 S1-10).
 public struct AdoptionReport: Sendable, Hashable {
     /// The `remotePath` of every entry of the applied manifest.
     public var manifestRemotePaths: [String]
-    /// The entries present, verified and **durably committed** in `blobs/` (store-1 S1-10).
+    /// The entries present at their current content in a **durably committed** generation (store-1 S1-10).
     public var adoptedRemotePaths: Set<String>
-    /// Entries the keep-scope excludes, which therefore never block a release (transport-2 T2-13).
+    /// Entries outside the client's retention scope (`AssetClientConfiguration.retentionScope`, ADR-027), which
+    /// therefore never block a release (transport-2 T2-13).
     public var excludedRemotePaths: Set<String>
 
     /// Creates a report.
@@ -97,8 +102,20 @@ public protocol RemoteSource: Sendable {
     func cancelTransfer(_ name: StagingFileName) async
     /// R-CLN-10: releases source-held duplicates of adopted content when policy allows. No-op for HTTP.
     func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport
-    /// Shutdown (R-SYN-15): cancels every transfer and returns only after the session's delegate callbacks have
-    /// stopped, so no staging write lands after `AssetStore.close()` (transport-2 T2-04).
+    /// R-CLN-9, H-7 (transport-2 T2-13): bytes the source still holds on the device for content the store adopted,
+    /// i.e. Apple packs not yet released (from `PackBackend.installedBytes`); 0 for HTTP. No network. The engine
+    /// adds it to `StorageReport.sourceCopyBytes`, because Sync reaches the Apple tier only through this protocol.
+    func sourceCopyBytes() async -> Int64
+    /// The app forwarded background-session events for `identifier` (R-NET-3): ensures that session exists so the
+    /// OS delivers them, and returns once every event delivered before `urlSessionDidFinishEvents` is staged. A
+    /// no-op for sources without a background session.
+    func handleBackgroundEvents(identifier: String) async
+    /// Shutdown (R-SYN-15): cancels every foreground transfer and returns only after the foreground session's
+    /// delegate callbacks have stopped, so no foreground staging write lands after `AssetStore.close()`
+    /// (transport-2 T2-04). Apple tier: returns after every in-flight `StagingSink.writeStaged` of the source has
+    /// returned. The opt-in background session is released **without** waiting for the OS's tasks
+    /// (`finishTasksAndInvalidate` delivers its last callback only when every task finished, possibly hours later);
+    /// a file it moves into staging after close is reconciled at the next launch (ADR-028).
     func invalidate() async
 }
 
