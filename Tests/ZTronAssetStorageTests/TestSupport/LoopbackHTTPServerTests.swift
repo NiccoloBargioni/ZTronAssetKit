@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Synchronization
 import Testing
 @testable import ZTronAssetTestSupport
@@ -227,8 +228,55 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
+    /// A `Data` slice keeps its parent's indices: a range indexes the body relative to its start (a zero-based index
+    /// into a slice whose `startIndex` is not 0 traps inside the server actor and ends the test process).
     @available(macOS 15.0, *)
-    @Test("Test support: scripted latency is awaited through the injected delay and never sleeps by default", .timeLimit(.minutes(1)))
+    @Test("Test support: a range request against a body that is a Data slice gets the slice's bytes", .timeLimit(.minutes(1)))
+    func rangeOverSlicedBody() async throws {
+        let parent = Data((0..<20).map { UInt8($0) })
+        let body = parent.dropFirst(10)
+        #expect(body.startIndex == 10)
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, body: body, rangeETag: "\"v1\"")
+        }) { _, port in
+            let client = try await Self.connect(port)
+            try await client.get("/r", headers: ["Range": "bytes=2-"])
+            let tail = try await client.response()
+            #expect(tail.status == 206 && tail.body == Data((12..<20).map { UInt8($0) }))
+            #expect(tail.headers["content-range"] == "bytes 2-9/10")
+
+            try await client.get("/r", headers: ["Range": "bytes=0-3"])
+            let head = try await client.response()
+            #expect(head.status == 206 && head.body == Data([10, 11, 12, 13]))
+            #expect(head.headers["content-range"] == "bytes 0-3/10")
+
+            try await client.get("/r")
+            let whole = try await client.response()
+            #expect(whole.status == 200 && whole.body == Data((10..<20).map { UInt8($0) }))
+            client.close()
+        }
+    }
+
+    /// The default delay is `NoLoopbackDelay`: a server built without one answers at once whatever latency is
+    /// scripted, so a correctness test can never sleep by accident (a sleeping default would hit the time limit).
+    @available(macOS 15.0, *)
+    @Test("Test support: a server with the default delay answers a response scripted with an hour of latency at once", .timeLimit(.minutes(1)))
+    func defaultDelayNeverSleeps() async throws {
+        let hour: UInt64 = 3_600 * 1_000_000_000
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, body: Data([7]), latencyNanoseconds: hour)
+        }) { server, port in
+            let client = try await Self.connect(port)
+            try await client.get("/slow")
+            let response = try await client.response()
+            #expect(response.status == 200 && response.body == Data([7]))
+            #expect(await server.requests.map(\.target) == ["/slow"])
+            client.close()
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: scripted latency is awaited through the injected delay, and a response without latency awaits nothing", .timeLimit(.minutes(1)))
     func latencyGoesThroughTheDelay() async throws {
         let delay = LoopbackRecordingDelay()
         try await Self.withServer(delay: delay, { request in
@@ -391,6 +439,45 @@ struct TestSupportLoopbackHTTPServerTests {
             #expect(rest.isEmpty && cleanClose)
             #expect(await server.requests.isEmpty)
         }
+    }
+
+    /// A caller cancelled while the listener comes up (a `.timeLimit`, a cancelled test task) must not stay suspended
+    /// until Network reports a state. The listener's states are held, so only the cancellation can end that start;
+    /// once they are released, the same listener serves a later start.
+    @available(macOS 15.0, *)
+    @Test("Test support: a start cancelled while the listener comes up throws CancellationError, and a later start gets the port", .timeLimit(.minutes(1)))
+    func cancelledStartEnds() async throws {
+        let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
+        await server.holdListenerStates()
+        let start = Task { try await server.start() }
+        start.cancel()
+        await #expect(throws: CancellationError.self) { try await start.value }
+        await server.releaseListenerStates()
+        let port = try await server.start()
+        #expect(await server.listenerGeneration == 1)
+        let client = try await Self.connect(port)
+        try await client.get("/after")
+        #expect(try await client.response().status == 204)
+        client.close()
+        await server.stop()
+    }
+
+    /// Network can report `.failed` for a listener that was ready. `start()` must then not keep returning the dead
+    /// port: the failed listener is dropped, and the next start makes a new one whose port serves.
+    @available(macOS 15.0, *)
+    @Test("Test support: a listener that fails after it was ready is replaced at the next start, whose port serves", .timeLimit(.minutes(1)))
+    func failedAfterReadyIsReplaced() async throws {
+        let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
+        _ = try await server.start()
+        let generation = await server.listenerGeneration
+        await server.listenerStateChanged(.failed(.posix(.ECONNABORTED)), generation: generation)
+        let port = try await server.start()
+        #expect(await server.listenerGeneration == generation + 1)
+        let client = try await Self.connect(port)
+        try await client.get("/after")
+        #expect(try await client.response().status == 204)
+        client.close()
+        await server.stop()
     }
 
     @Test("Test support: start is idempotent while running and a stopped server cannot start again", .timeLimit(.minutes(1)))

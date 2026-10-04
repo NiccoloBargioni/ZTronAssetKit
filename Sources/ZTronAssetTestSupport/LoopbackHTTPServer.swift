@@ -150,10 +150,17 @@ public actor LoopbackHTTPServer {
     private var perTarget: [String: Int] = [:]
     private var log: [LoopbackRequest] = []
     private var stopped = false
-    /// Starts waiting for the current listener to come up; resumed only through `resumeStartWaiters`.
-    private var startWaiters: [CheckedContinuation<UInt16, any Error>] = []
-    /// Numbers listeners, so a state change of a listener that is no longer the current one is ignored.
-    private var listenerGeneration = 0
+    /// Starts waiting for the current listener to come up, by id; each is resumed once, only by code that removed
+    /// it first (`resumeStartWaiters`, or `cancelStartWaiter` for a cancelled caller).
+    private var startWaiters: [(id: UInt64, continuation: CheckedContinuation<UInt16, any Error>)] = []
+    /// The id of the next waiting start.
+    private var nextStartWaiter: UInt64 = 0
+    /// Numbers listeners, so a state change of a listener that is no longer the current one is ignored (also the
+    /// number of listeners made, read by the server's own tests).
+    private(set) var listenerGeneration = 0
+    /// While non-`nil`, listener states are kept here in arrival order instead of applied (the server's own tests hold
+    /// a listener "coming up"; `releaseListenerStates()` applies them).
+    private var heldListenerStates: [(state: NWListener.State, generation: Int)]?
 
     /// The largest request body the server buffers (a larger `Content-Length` is answered with 400).
     static let maxRequestBodyBytes = 64 << 20
@@ -175,11 +182,14 @@ public actor LoopbackHTTPServer {
     }
 
     /// Starts listening; returns the port. Idempotent: a call while running returns the port, and calls made while
-    /// the listener is coming up wait for that one listener. Throws once `stop()` ran (also when it ran meanwhile).
+    /// the listener is coming up wait for that one listener. Throws once `stop()` ran (also when it ran meanwhile),
+    /// and `CancellationError` when the calling task is cancelled while it waits (the listener keeps coming up for
+    /// later calls). A listener that fails after it was ready is dropped, so the next call makes a new one.
     ///
     /// Each waiting call is resumed exactly once, by actor code: the listener's state changes are forwarded to the
-    /// actor (only the current listener's count), and `stop()` fails every waiter itself, so neither a state Network
-    /// reports twice nor one it never reports can resume a call twice or leave it hanging.
+    /// actor (only the current listener's count), `stop()` fails every waiter itself, and a cancelled caller's waiter
+    /// is removed before it is resumed, so neither a state Network reports twice nor one it never reports can resume
+    /// a call twice or leave it hanging.
     public func start() async throws -> UInt16 {
         guard !self.stopped else {
             throw LoopbackServerError.stopped
@@ -201,12 +211,23 @@ public actor LoopbackHTTPServer {
             self.listener = listener
             listener.start(queue: self.queue)
         }
+        self.nextStartWaiter += 1
+        let id = self.nextStartWaiter
         // REENTRANCY: h-6 (proposed) — `stopped` is re-read: a `stop()` between the resumption and this turn means
         // the port is dead, so the call throws. The waiter is registered synchronously in the continuation body
-        // (no state can change before it is in `startWaiters`) and resumed only by `resumeStartWaiters`, which
-        // empties the list first: once with the port, a listener failure, or `.stopped` from `stop()`.
-        let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
-            self.startWaiters.append(continuation)
+        // (no state can change before it is in `startWaiters`) and resumed only by code that removed it first:
+        // `resumeStartWaiters` (once with the port, a listener failure, or `.stopped` from `stop()`) or
+        // `cancelStartWaiter` (this task's cancellation, with `CancellationError`).
+        let port = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
+                self.startWaiters.append((id, continuation))
+            }
+        } onCancel: {
+            Task {
+                // REENTRANCY: h-9 (proposed) — nothing: this task is not the actor; `cancelStartWaiter` re-reads the
+                // table and is a no-op for a waiter already resumed.
+                await self.cancelStartWaiter(id)
+            }
         }
         guard !self.stopped else {
             throw LoopbackServerError.stopped
@@ -231,30 +252,57 @@ public actor LoopbackHTTPServer {
         return listener
     }
 
-    /// A state of listener `generation`. Only the current listener's states count, and only until it is ready:
-    /// `.ready` records the port and answers every waiting start; `.failed` or `.waiting` cancels the listener and
-    /// fails them (a later `start()` makes a new listener); `.cancelled` fails them with `.stopped`. Network may
-    /// report states late, twice, or not at all after a cancel: each waiter is still resumed exactly once.
-    private func listenerStateChanged(_ state: NWListener.State, generation: Int) {
-        guard generation == self.listenerGeneration, let listener = self.listener, self.port == nil else {
+    /// A state of listener `generation`. Only the current listener's states count: `.ready` (the first one) records
+    /// the port and answers every waiting start; `.failed` or `.waiting`, before or after it was ready, cancels the
+    /// listener, forgets its port and fails the waiting starts (a later `start()` makes a new listener, so it never
+    /// returns a dead port); `.cancelled` does the same with `.stopped`. Connections already accepted are kept. Network
+    /// may report states late, twice, or not at all after a cancel: each waiter is still resumed exactly once.
+    func listenerStateChanged(_ state: NWListener.State, generation: Int) {
+        if self.heldListenerStates != nil {
+            self.heldListenerStates?.append((state, generation))
+            return
+        }
+        guard generation == self.listenerGeneration, let listener = self.listener else {
             return
         }
         switch state {
         case .ready:
+            guard self.port == nil else {
+                return
+            }
             let port = listener.port?.rawValue ?? 0
             self.port = port
             self.resumeStartWaiters(with: .success(port))
         case .failed(let error), .waiting(let error):
             listener.cancel()
             self.listener = nil
+            self.port = nil
             self.resumeStartWaiters(with: .failure(LoopbackServerError.listener("\(error)")))
         case .cancelled:
             self.listener = nil
+            self.port = nil
             self.resumeStartWaiters(with: .failure(LoopbackServerError.stopped))
         case .setup:
             break
         @unknown default:
             break
+        }
+    }
+
+    /// Keeps every listener state that arrives from now on instead of applying it (a seam for the server's own tests:
+    /// a listener held "coming up", whatever Network's timing).
+    func holdListenerStates() {
+        if self.heldListenerStates == nil {
+            self.heldListenerStates = []
+        }
+    }
+
+    /// Applies the held listener states in arrival order and stops holding.
+    func releaseListenerStates() {
+        let held = self.heldListenerStates ?? []
+        self.heldListenerStates = nil
+        for (state, generation) in held {
+            self.listenerStateChanged(state, generation: generation)
         }
     }
 
@@ -264,8 +312,16 @@ public actor LoopbackHTTPServer {
         let waiters = self.startWaiters
         self.startWaiters = []
         for waiter in waiters {
-            waiter.resume(with: outcome)
+            waiter.continuation.resume(with: outcome)
         }
+    }
+
+    /// Removes the waiting start `id` and resumes it with `CancellationError`; nothing when it was already resumed.
+    private func cancelStartWaiter(_ id: UInt64) {
+        guard let index = self.startWaiters.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        self.startWaiters.remove(at: index).continuation.resume(throwing: CancellationError())
     }
 
     /// Stops the listener and every connection (stalled ones included); every start still waiting throws `.stopped`.
@@ -487,7 +543,8 @@ public actor LoopbackHTTPServer {
                 let total = body.count
                 if range.start < total {
                     let last = min(range.end ?? (total - 1), total - 1)
-                    body = body.subdata(in: range.start..<(last + 1))
+                    // A `Data` slice keeps its parent's indices: the range counts from the body's own `startIndex`.
+                    body = body.subdata(in: (body.startIndex + range.start)..<(body.startIndex + last + 1))
                     status = 206
                     set(&headers, "Content-Range", "bytes \(range.start)-\(last)/\(total)")
                 } else {
