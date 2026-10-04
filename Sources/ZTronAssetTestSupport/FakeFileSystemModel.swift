@@ -51,7 +51,7 @@ struct FSGraph: Sendable, Hashable {
     /// The longest chain of symbolic links a lookup follows (`ELOOP` past it).
     static let maxLinkExpansions = 32
 
-    /// Every inode reachable from the current or the durable namespace.
+    /// Every inode some mix of current and synced listings reaches from the root (see `collectGarbage`).
     var nodes: [UInt64: FSNode]
     /// The next inode number (never reused, so identities stay unique across lifetimes).
     var nextID: UInt64
@@ -206,7 +206,7 @@ struct FSGraph: Sendable, Hashable {
     /// Bytes held by files the current namespace reaches (each inode once).
     func currentUsage() -> Int64 {
         var total: Int64 = 0
-        for id in self.reachable(durable: false) {
+        for id in self.reachableCurrent() {
             if let node = self.nodes[id], node.kind == .file {
                 total += Int64(node.data.count)
             }
@@ -214,15 +214,15 @@ struct FSGraph: Sendable, Hashable {
         return total
     }
 
-    /// Inodes reachable from the root through current (or durable) listings.
-    func reachable(durable: Bool) -> Set<UInt64> {
+    /// Inodes reachable from the root through current listings.
+    func reachableCurrent() -> Set<UInt64> {
         var seen: Set<UInt64> = [FSGraph.rootID]
         var stack = [FSGraph.rootID]
         while let next = stack.popLast() {
             guard let node = self.nodes[next], node.kind == .directory else {
                 continue
             }
-            for child in (durable ? node.durableEntries : node.entries).values where seen.insert(child).inserted {
+            for child in node.entries.values where seen.insert(child).inserted {
                 stack.append(child)
             }
         }
@@ -235,16 +235,30 @@ struct FSGraph: Sendable, Hashable {
             self.nodes[id]?.links = 0
         }
         self.nodes[FSGraph.rootID]?.links = 1
-        for id in self.reachable(durable: false) {
+        for id in self.reachableCurrent() {
             for child in (self.nodes[id]?.entries ?? [:]).values {
                 self.nodes[child]?.links += 1
             }
         }
     }
 
-    /// Drops inodes neither namespace reaches (a crash discards open-but-unlinked files).
+    /// Drops inodes no mix of current and synced listings reaches (a crash discards open-but-unlinked files).
+    ///
+    /// The walk follows both listings of every directory it reaches, not the two namespaces separately: a directory
+    /// reachable only through current names (created and never synced into its parent) can still hold a synced
+    /// listing, and a later lifetime that syncs the parent makes that listing what a power loss restores (store-1
+    /// S1-01). Its synced-but-since-unlinked files must therefore survive a process kill.
     mutating func collectGarbage() {
-        let keep = self.reachable(durable: false).union(self.reachable(durable: true))
+        var keep: Set<UInt64> = [FSGraph.rootID]
+        var stack = [FSGraph.rootID]
+        while let next = stack.popLast() {
+            guard let node = self.nodes[next], node.kind == .directory else {
+                continue
+            }
+            for child in Array(node.entries.values) + Array(node.durableEntries.values) where keep.insert(child).inserted {
+                stack.append(child)
+            }
+        }
         for id in Array(self.nodes.keys) where !keep.contains(id) {
             self.nodes.removeValue(forKey: id)
         }

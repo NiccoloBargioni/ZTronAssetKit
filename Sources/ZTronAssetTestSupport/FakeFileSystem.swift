@@ -133,7 +133,8 @@ public struct FaultRule: Sendable, Hashable {
     public var occurrence: Occurrence
     /// The error thrown.
     public var error: FileSystemError
-    /// For `write`: how many bytes land before the error.
+    /// For `write`: how many bytes land before the error (`nil`: none). A write fault models `write(2)` failing
+    /// after `open(2)` succeeded, so the file exists afterwards and a `.truncate` write has emptied it first.
     public var partialBytes: Int?
 
     /// Creates a rule.
@@ -150,14 +151,22 @@ public struct FaultRule: Sendable, Hashable {
 /// R-SYN-11 tests prove "byte-identical, zero side effects".
 ///
 /// The four package fields are the observable state and are authoritative: a test may read them, or edit them to
-/// seed a disk or simulate an OS purge between launches (a file whose parent directory is not listed gets its
-/// parents implicitly). `files` and `directories` are the current namespace; `durableFiles` and
+/// seed a disk, corrupt a file or simulate an OS purge between launches (a file whose parent directory is not
+/// listed gets its parents implicitly). `files` and `directories` are the current namespace; `durableFiles` and
 /// `durableDirectories` are what a power loss that drops un-synced state would leave (names reached through synced
 /// listings, with each file's synced bytes). A disk taken from a `FakeFileSystem` also carries the exact inode
-/// graph behind those views (which name and which synced bytes belong to the same file across renames), so a
-/// process kill followed by a power loss in the next lifetime is modelled exactly (store-1 S1-01); after an edit,
-/// the edited paths fall back to "same path, same file". Equality compares the observable state only (namespaces,
-/// contents, symbolic links and attributes), never inode numbers.
+/// graph behind those views (which name and which synced bytes belong to the same file across renames, and the
+/// synced listing of a directory only current names reach), so a process kill followed by a power loss in the next
+/// lifetime is modelled exactly (store-1 S1-01).
+///
+/// An edit is applied to that graph path by path when the next fake loads the disk: a removed name is unlinked, a
+/// file whose content changed is rewritten in place (same identity, same synced bytes), new items are new, and
+/// every path the edit did not touch keeps its exact state. Only an edit the graph cannot take that way (new content
+/// for one of a file's two names) rebuilds the disk from the fields, "same path, same file". The two namespaces are
+/// edited separately: removing a path from `files` alone is a **volatile** removal that a later power loss undoes,
+/// because `durableFiles` still names it. An OS purge between launches is durable, so it removes the path from both
+/// namespaces: use `purge(_:)`. Equality compares the observable state only (namespaces, contents, symbolic links
+/// and attributes), never inode numbers.
 public struct DiskImage: Sendable, Hashable {
     /// Regular files by path, current content.
     package var files: [String: [UInt8]]
@@ -252,23 +261,41 @@ public struct DiskImage: Sendable, Hashable {
 
     /// Marks every current item durable, as if every file and every directory had been synced: a seeded disk
     /// (a legacy tree, a pre-existing store) then survives a power loss in its first lifetime. Keeps the inode
-    /// graph and modification times when the disk came from a fake.
+    /// graph and modification times when the disk came from a fake (an edit is applied first; items it creates are
+    /// modified at the latest time the graph records).
     public mutating func makeDurable() {
-        if var graph = self.graph, graph.views() == self.views {
-            for (id, node) in graph.nodes {
-                var synced = node
-                synced.durableEntries = node.entries
-                synced.durableData = node.data
-                graph.nodes[id] = synced
-            }
-            graph.collectGarbage()
-            self = DiskImage(graph: graph)
+        guard let carried = self.graph else {
+            self.durableFiles = self.files
+            self.durableDirectories = self.directories
+            self.durableSymbolicLinks = self.symbolicLinks
             return
         }
-        self.durableFiles = self.files
-        self.durableDirectories = self.directories
-        self.durableSymbolicLinks = self.symbolicLinks
-        self.graph = nil
+        let latest = carried.nodes.values.map(\.modifiedAt).max() ?? Date(timeIntervalSince1970: 0)
+        var graph = FSGraph.load(self, now: latest)
+        for (id, node) in graph.nodes {
+            var synced = node
+            synced.durableEntries = node.entries
+            synced.durableData = node.data
+            graph.nodes[id] = synced
+        }
+        graph.collectGarbage()
+        self = DiskImage(graph: graph)
+    }
+
+    /// Removes `path` and everything below it from both namespaces, with their attributes: what the OS does when it
+    /// purges a cache between launches (R-CLN-7). Unlike a removal from `files` alone, a later power loss does not
+    /// bring a purged item back. `"/"` purges everything.
+    public mutating func purge(_ path: String) {
+        let purged = FSGraph.path(FSGraph.components(of: path))
+        let prefix = purged == "/" ? "/" : purged + "/"
+        let isPurged = { (candidate: String) -> Bool in candidate == purged || candidate.hasPrefix(prefix) }
+        self.files = self.files.filter { !isPurged($0.key) }
+        self.directories = self.directories.filter { !isPurged($0) }
+        self.symbolicLinks = self.symbolicLinks.filter { !isPurged($0.key) }
+        self.durableFiles = self.durableFiles.filter { !isPurged($0.key) }
+        self.durableDirectories = self.durableDirectories.filter { !isPurged($0) }
+        self.durableSymbolicLinks = self.durableSymbolicLinks.filter { !isPurged($0.key) }
+        self.attributes = self.attributes.filter { !isPurged($0.key) }
     }
 
     /// Equal observable state: namespaces, contents, durable views, symbolic links and attributes.
@@ -327,7 +354,9 @@ public struct FakeFileSystemConfiguration: Sendable, Hashable {
 /// empty synced listing. Mutations are numbered from 0 in call order, failed ones included; `crashBefore: k` makes
 /// mutation k (and everything after it) never happen. Free space is the configured capacity minus the net bytes the
 /// lifetime added, and a write that does not fit lands what fits and throws `.noSpace`. `mtime` comes from the
-/// injected `TimeSource`; listings are sorted by name, so iteration order is deterministic.
+/// injected `TimeSource`; listings come in descending name order (deterministic, and never the ascending order a
+/// caller might wrongly rely on: the seam promises no order, so callers sort). Everything is held in memory, file
+/// bytes and the op log included, so no memory budget (P-6, P-7) is measured over this fake.
 @available(macOS 15.0, iOS 18.0, *)
 public final class FakeFileSystem: FileSystem {
     private let state: Mutex<FakeFileSystemState>
@@ -432,14 +461,15 @@ public final class FakeFileSystem: FileSystem {
         }
     }
 
-    /// Modelled listing.
+    /// Modelled listing, in **descending** name order: deterministic (crash enumeration repeats), yet never the
+    /// ascending order a caller might silently rely on, since the live order is arbitrary and the seam promises none.
     public func contentsOfDirectory(at url: URL) throws(FileSystemError) -> [FileItemInfo] {
         try self.perform(.contentsOfDirectory, url) { (state: inout FakeFileSystemState) throws(FileSystemError) -> [FileItemInfo] in
             let directory = try state.existing(url, followFinal: true)
             guard let node = state.graph.nodes[directory], node.kind == .directory else {
                 throw .other(errno: ENOTDIR)
             }
-            return node.entries.keys.sorted().compactMap { name in
+            return node.entries.keys.sorted(by: >).compactMap { name in
                 guard let child = node.entries[name], let item = state.graph.nodes[child] else {
                     return nil
                 }
@@ -741,8 +771,8 @@ public final class FakeFileSystem: FileSystem {
             state.mutations += 1
         }
         if let fired = state.fireFault(kind, url, offered: offered) {
-            if kind == .write, let landed = fired.landed {
-                partial(&state, landed)
+            if kind == .write {
+                partial(&state, fired.landed ?? 0)  // write(2) failed after open(2): created, and truncated for .truncate
             }
             throw fired.error
         }
@@ -891,148 +921,6 @@ struct FaultCursor: Sendable {
 }
 
 extension FSGraph {
-    /// The volume a lifetime starts on: the exact graph a fake left in `image`, or, when the image was built or
-    /// edited by hand, one rebuilt from its views (`rebuild`).
-    static func load(_ image: DiskImage, now: Date) -> FSGraph {
-        if let graph = image.graph, graph.views() == image.views {
-            return graph
-        }
-        return FSGraph.rebuild(image, hints: image.graph, now: now)
-    }
-
-    /// Rebuilds a graph from a disk's views: a durable path that equals a current path is the same file (its synced
-    /// bytes are `durableFiles[path]`); a current file without a durable path keeps the synced bytes and the
-    /// modification time the old graph (`hints`) had at that path when its content is unchanged, and has none
-    /// otherwise; every other durable path is a file only a power loss brings back.
-    static func rebuild(_ image: DiskImage, hints: FSGraph?, now: Date) -> FSGraph {
-        var graph = FSGraph(rootModifiedAt: now)
-        for path in image.directories.sorted() {
-            _ = graph.ensureDirectory(FSGraph.components(of: path), now: now)
-        }
-        for path in image.files.keys.sorted() {
-            let components = FSGraph.components(of: path)
-            guard let name = components.last, let bytes = image.files[path] else {
-                continue
-            }
-            let parent = graph.ensureDirectory(Array(components.dropLast()), now: now)
-            guard graph.nodes[parent]?.entries[name] == nil else {
-                continue
-            }
-            var node = FSNode(kind: .file, data: bytes, modifiedAt: now)
-            if let hint = hints?.currentNode(components), hint.kind == .file, hint.data == bytes {
-                node.durableData = hint.durableData
-                node.modifiedAt = hint.modifiedAt
-            }
-            let file = graph.allocate(node)
-            graph.link(file, as: name, in: parent)
-        }
-        for path in image.symbolicLinks.keys.sorted() {
-            let components = FSGraph.components(of: path)
-            guard let name = components.last, let target = image.symbolicLinks[path] else {
-                continue
-            }
-            let parent = graph.ensureDirectory(Array(components.dropLast()), now: now)
-            guard graph.nodes[parent]?.entries[name] == nil else {
-                continue
-            }
-            let link = graph.allocate(FSNode(kind: .symbolicLink, target: target, modifiedAt: now))
-            graph.link(link, as: name, in: parent)
-        }
-        for path in image.durableDirectories.sorted() {
-            _ = graph.ensureDurableDirectory(FSGraph.components(of: path), now: now)
-        }
-        for path in image.durableFiles.keys.sorted() {
-            let components = FSGraph.components(of: path)
-            guard let name = components.last, let bytes = image.durableFiles[path] else {
-                continue
-            }
-            let parent = graph.ensureDurableDirectory(Array(components.dropLast()), now: now)
-            guard graph.nodes[parent]?.durableEntries[name] == nil else {
-                continue
-            }
-            if let current = graph.nodes[parent]?.entries[name], graph.nodes[current]?.kind == .file {
-                graph.nodes[current]?.durableData = bytes
-                graph.nodes[parent]?.durableEntries[name] = current
-            } else {
-                let ghost = graph.allocate(FSNode(kind: .file, data: bytes, durableData: bytes, modifiedAt: now))
-                graph.nodes[parent]?.durableEntries[name] = ghost
-            }
-        }
-        for path in image.durableSymbolicLinks.keys.sorted() {
-            let components = FSGraph.components(of: path)
-            guard let name = components.last, let target = image.durableSymbolicLinks[path] else {
-                continue
-            }
-            let parent = graph.ensureDurableDirectory(Array(components.dropLast()), now: now)
-            guard graph.nodes[parent]?.durableEntries[name] == nil else {
-                continue
-            }
-            if let current = graph.nodes[parent]?.entries[name], graph.nodes[current]?.kind == .symbolicLink,
-                graph.nodes[current]?.target == target
-            {
-                graph.nodes[parent]?.durableEntries[name] = current
-            } else {
-                let ghost = graph.allocate(FSNode(kind: .symbolicLink, target: target, modifiedAt: now))
-                graph.nodes[parent]?.durableEntries[name] = ghost
-            }
-        }
-        for (path, attributes) in image.attributes {
-            if let location = try? graph.locate(FSGraph.components(of: path), followFinal: false), let id = location.node {
-                graph.nodes[id]?.attributes = attributes
-            }
-        }
-        graph.recountLinks()
-        return graph
-    }
-
-    /// The inode at `components` in the current namespace, without following links.
-    func currentNode(_ components: [String]) -> FSNode? {
-        var current = FSGraph.rootID
-        for name in components {
-            guard let child = self.nodes[current]?.entries[name] else {
-                return nil
-            }
-            current = child
-        }
-        return self.nodes[current]
-    }
-
-    /// Creates the current directories along `components` that are missing (no links followed).
-    mutating func ensureDirectory(_ components: [String], now: Date) -> UInt64 {
-        var current = FSGraph.rootID
-        for name in components {
-            if let child = self.nodes[current]?.entries[name], self.nodes[child]?.kind == .directory {
-                current = child
-                continue
-            }
-            let child = self.allocate(FSNode(kind: .directory, modifiedAt: now))
-            self.nodes[current]?.entries[name] = child
-            current = child
-        }
-        return current
-    }
-
-    /// Makes the durable directories along `components` exist: the current directory at the same path when there
-    /// is one, else a directory only a power loss brings back.
-    mutating func ensureDurableDirectory(_ components: [String], now: Date) -> UInt64 {
-        var current = FSGraph.rootID
-        for name in components {
-            if let child = self.nodes[current]?.durableEntries[name], self.nodes[child]?.kind == .directory {
-                current = child
-                continue
-            }
-            let child: UInt64
-            if let existing = self.nodes[current]?.entries[name], self.nodes[existing]?.kind == .directory {
-                child = existing
-            } else {
-                child = self.allocate(FSNode(kind: .directory, modifiedAt: now))
-            }
-            self.nodes[current]?.durableEntries[name] = child
-            current = child
-        }
-        return current
-    }
-
     /// The volume's root and its `Library/Application Support` and `Library/Caches` always exist and are durable
     /// (the OS created them long ago), so `standardDirectory` resolves to an existing directory.
     mutating func ensureStandardDirectories(volumeRoot: URL, now: Date) {

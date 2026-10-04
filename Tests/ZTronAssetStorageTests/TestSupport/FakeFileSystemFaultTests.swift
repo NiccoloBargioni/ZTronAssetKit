@@ -34,6 +34,20 @@ struct TestSupportFakeFileSystemFaultTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("Test support: a write fault fails after the open: a truncating write keeps only what landed, an appending one creates the file")
+    func faultedWriteHasOpenedTheFile() throws {
+        let fileSystem = FakeFSFixture.make()
+        let part = FakeFSFixture.url("/fake-volume/x.part")
+        try fileSystem.write(Data([1, 2, 3, 4]), to: Self.tmp, mode: .truncate)
+        fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: ".tmp"), occurrence: .nth(1), error: .io))
+        fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: ".part"), occurrence: .nth(1), error: .noSpace))
+        #expect(throws: FileSystemError.io) { try fileSystem.write(Data([5, 6]), to: Self.tmp, mode: .truncate) }
+        #expect(throws: FileSystemError.noSpace) { try fileSystem.write(Data([7]), to: part, mode: .append) }
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/index.tmp") == [])
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/x.part") == [])
+    }
+
+    @available(macOS 15.0, *)
     @Test("Test support: an afterBytes rule truncates the write that crosses the threshold and fails every later write")
     func afterBytesIsAShortWrite() throws {
         let fileSystem = FakeFSFixture.make()

@@ -80,8 +80,8 @@ struct TestSupportFakeFileSystemTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("Test support: listings are sorted by name and report sizes, kinds and the injected modification time")
-    func listingsAreSorted() throws {
+    @Test("Test support: listings come in descending name order, never the ascending order code might rely on, with sizes, kinds and modification times")
+    func listingsAreInDescendingOrder() throws {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(time: time)
         let directory = FakeFSFixture.url("/fake-volume/d")
@@ -91,11 +91,11 @@ struct TestSupportFakeFileSystemTests {
         try fileSystem.write(Data([1]), to: directory.appendingPathComponent("a.bin"), mode: .truncate)
         try fileSystem.createDirectory(at: directory.appendingPathComponent("b"))
         let listing = try fileSystem.contentsOfDirectory(at: directory)
-        #expect(listing.map(\.name) == ["a.bin", "b", "c.bin"])
+        #expect(listing.map(\.name) == ["c.bin", "b", "a.bin"])
         #expect(listing.map(\.kind) == [.file, .directory, .file])
-        #expect(listing.map(\.byteSize) == [1, 0, 2])
-        #expect(listing[0].modifiedAt == time.now())
-        #expect(listing[2].modifiedAt == time.now().addingTimeInterval(-5))
+        #expect(listing.map(\.byteSize) == [2, 0, 1])
+        #expect(listing[0].modifiedAt == time.now().addingTimeInterval(-5))
+        #expect(listing[2].modifiedAt == time.now())
         #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.contentsOfDirectory(at: directory.appendingPathComponent("a.bin")) }
     }
 
@@ -303,7 +303,7 @@ struct TestSupportFakeFileSystemTests {
             try fileSystem.rename(from: staged, to: directory.appendingPathComponent(name), mode: .exclusive)
         }
         var image = fileSystem.survivingDisk()
-        image.files.removeValue(forKey: "/fake-volume/blobs/a")  // the OS purged one blob between launches
+        image.files.removeValue(forKey: "/fake-volume/blobs/a")  // a current-namespace removal between launches
 
         let next = FakeFFSLifetime.next(image)
         #expect(try next.itemInfo(at: directory.appendingPathComponent("a")) == nil)

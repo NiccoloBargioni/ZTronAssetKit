@@ -147,6 +147,56 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(FakeFSFixture.powerLoss(both.survivingDisk()).files[Self.work + "/blobs/aa/h.png"] == [1, 2, 3, 4])
     }
 
+    /// Lifetime 1 of the store-1 S1-01 shapes below: `work/blobs` is durable; a fan-out `aa` is created and never
+    /// synced into `blobs`, while `aa/h.bin` is written, synced and synced into `aa`'s own listing.
+    @available(macOS 15.0, *)
+    private static func syncedIntoUnsyncedFanOut() throws -> FakeFileSystem {
+        let fileSystem = try Self.prepared()
+        let blobs = FakeFSFixture.url(Self.work + "/blobs")
+        let fanOut = blobs.appendingPathComponent("aa")
+        try fileSystem.createDirectory(at: blobs)
+        try fileSystem.synchronizeDirectory(at: FakeFSFixture.url(Self.work), level: .barrier)
+        try fileSystem.createDirectory(at: fanOut)
+        try fileSystem.write(Data([1, 2, 3]), to: fanOut.appendingPathComponent("h.bin"), mode: .truncate)
+        try fileSystem.synchronizeFile(at: fanOut.appendingPathComponent("h.bin"), level: .barrier)
+        try fileSystem.synchronizeDirectory(at: fanOut, level: .barrier)
+        return fileSystem
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: an unlink a process kill kept un-synced is undone by a power loss after the next lifetime syncs the parent")
+    func killKeepsSyncedListingOfAnUnsyncedDirectory() throws {
+        let blobs = FakeFSFixture.url(Self.work + "/blobs")
+        let path = Self.work + "/blobs/aa/h.bin"
+        let killed = try Self.syncedIntoUnsyncedFanOut()
+        try killed.removeItem(at: FakeFSFixture.url(path))
+        let next = FakeFFSLifetime.next(killed.survivingDisk())
+        try next.synchronizeDirectory(at: blobs, level: .barrier)
+
+        let alive = try Self.syncedIntoUnsyncedFanOut()
+        try alive.removeItem(at: FakeFSFixture.url(path))
+        try alive.synchronizeDirectory(at: blobs, level: .barrier)
+
+        #expect(FakeFSFixture.powerLoss(alive.survivingDisk()).files[path] == [1, 2, 3])
+        #expect(FakeFSFixture.powerLoss(next.survivingDisk()).files[path] == [1, 2, 3])
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: editing one path of a killed disk keeps the durable state of every path the edit did not touch")
+    func editedKilledDiskKeepsHiddenDurableState() throws {
+        let blobs = FakeFSFixture.url(Self.work + "/blobs")
+        let path = Self.work + "/blobs/aa/h.bin"
+        var edited = try Self.syncedIntoUnsyncedFanOut().survivingDisk()
+        edited.files["/fake-volume/Library/Caches/other.bin"] = [7]
+        let next = FakeFFSLifetime.next(edited)
+        #expect(FakeFSFixture.content(next, "/fake-volume/Library/Caches/other.bin") == [7])
+        try next.synchronizeDirectory(at: blobs, level: .barrier)
+
+        let afterPowerLoss = FakeFSFixture.powerLoss(next.survivingDisk())
+        #expect(afterPowerLoss.files[path] == [1, 2, 3])
+        #expect(afterPowerLoss.files["/fake-volume/Library/Caches/other.bin"] == nil)
+    }
+
     @available(macOS 15.0, *)
     @Test("Test support: a replacing rename keeps the replaced file durable under its name until the directory is synced")
     func replacedFileStaysDurableUntilDirectorySync() throws {

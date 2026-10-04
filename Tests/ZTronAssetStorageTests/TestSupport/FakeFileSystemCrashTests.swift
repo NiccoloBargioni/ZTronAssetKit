@@ -54,7 +54,7 @@ struct TestSupportFakeFileSystemCrashTests {
 
     @available(macOS 15.0, *)
     @Test("Test support: crash enumeration is deterministic: every crash point and mode repeats the clean run's prefix and its disk")
-    func crashEnumerationIsDeterministic() {
+    func crashEnumerationIsDeterministic() throws {
         let clean = FakeFSFixture.make()
         Self.scenario(clean)
         let cleanCalls = Self.calls(clean)
@@ -73,12 +73,36 @@ struct TestSupportFakeFileSystemCrashTests {
                 #expect(first.mutationCount == min(k, mutations), "k=\(k) mode=\(mode)")
                 #expect(first.survivingDisk() == second.survivingDisk(), "k=\(k) mode=\(mode)")
                 #expect(first.survivingDisk().digest() == second.survivingDisk().digest(), "k=\(k) mode=\(mode)")
-                let crashIndex = first.operations.firstIndex { $0.failure == .io }
-                if k < mutations, let crashIndex {
+                if k < mutations {
+                    let crashIndex = try #require(first.operations.firstIndex { $0.failure == .io }, "k=\(k) mode=\(mode)")
                     #expect(first.operations[crashIndex].kind.isMutation, "k=\(k) mode=\(mode)")
                     #expect(first.operations[crashIndex...].allSatisfy { $0.failure == .io || $0.kind == .releaseLock }, "k=\(k)")
                 }
             }
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a crash point under a power-loss mode leaves what a kill at that point followed by that power loss leaves")
+    func powerLossCrashPointsEqualKillThenPowerLoss() {
+        let clean = FakeFSFixture.make()
+        Self.scenario(clean)
+        let mutations = clean.mutationCount
+        for mode in [CrashMode.powerLossDropUnsynced, .powerLossKeepMetadata] {
+            var lostSomething = 0
+            for k in 0...mutations {
+                let crashed = FakeFSFixture.make(crashBefore: k, mode: mode)
+                let killed = FakeFSFixture.make(crashBefore: k, mode: .processKill)
+                Self.scenario(crashed)
+                Self.scenario(killed)
+                let killImage = killed.survivingDisk()
+                let expected = FakeFSFixture.powerLoss(killImage, mode)
+                #expect(crashed.survivingDisk() == expected, "k=\(k) mode=\(mode)")
+                if expected != killImage {
+                    lostSomething += 1
+                }
+            }
+            #expect(lostSomething > 0, "mode=\(mode): no crash point lost anything, so the comparison proves nothing")
         }
     }
 
