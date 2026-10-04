@@ -7,19 +7,26 @@ extension ModelSuites {
     /// (the I/O half is the source scan in `EnvironmentScanTests`).
     @Suite("Model values")
     struct ModelValueTests {
-        /// One value of a Codable Model type and a check that it survives a JSON round trip.
+        /// One value of a Codable Model type, whether it is a value type, and a check that it survives a JSON round trip.
         struct Sample: Sendable {
             var name: String
+            var isValueType: Bool
             var roundTrips: @Sendable () throws -> Bool
         }
 
         private static func sample<Value: Codable & Hashable & Sendable>(_ value: Value) -> Sample {
-            Sample(name: "\(Value.self)") {
+            Sample(name: "\(Value.self)", isValueType: Self.isValueType(value)) {
                 let data = try JSONEncoder().encode(value)
                 let decoded = try JSONDecoder().decode(Value.self, from: data)
                 // Equal, and hashing agrees with equality.
                 return decoded == value && Set([decoded, value]).count == 1
             }
+        }
+
+        /// Whether `value` is a struct, an enum or a tuple rather than an instance of a class (R-MAN-7's "value types":
+        /// a Model struct turned into a final class would still be Sendable and Codable).
+        private static func isValueType(_ value: Any) -> Bool {
+            Mirror(reflecting: value).displayStyle != .class
         }
 
         @Test("R-MAN-7: every Model value round-trips through Codable where declared and is usable across tasks without isolation", .timeLimit(.minutes(1)))
@@ -28,6 +35,7 @@ extension ModelSuites {
             #expect(samples.count >= 70)
             for sample in samples {
                 #expect(try sample.roundTrips(), "\(sample.name)")
+                #expect(sample.isValueType, "\(sample.name) is a class")
             }
             // The same values, sent to child tasks that run on the cooperative pool with no isolation.
             let results = await withTaskGroup(of: (String, Bool).self) { group in
@@ -47,6 +55,14 @@ extension ModelSuites {
             let manifest = try ManifestDecoder.decode(Data(#"[{"identifier":"a","fileExtension":"png","remotePath":"m/a","localPathComponents":[]}]"#.utf8))
             let sent = await Task.detached { manifest }.value
             #expect(sent == manifest)
+            // And value types too (fix round 3).
+            let quarantine = QuarantinedEntry(index: 0, identifier: nil, violation: .remotePathInvalid(.queryOrFragment))
+            let values: [Any] = [
+                manifest, ManifestDiff.compute(from: manifest, to: manifest), quarantine, ManifestError.decodedSizeExceeded(bytes: 2, limit: 1),
+                ManifestLimits(), ManifestDecodingOptions(), ManifestWireShape.bareArray, ContentIdentity.unverified(remotePath: "m"),
+                LogLine(category: .store, level: .info, message: "m"), LogRoute.tapOnly(nil),
+            ]
+            #expect(values.allSatisfy(Self.isValueType), "\(values.filter { !Self.isValueType($0) }.map { type(of: $0) })")
             // The real check is at compile time: `requireSendable` accepts only `Sendable` types.
             _ = [
                 Self.requireSendable(ValidatedManifest.self), Self.requireSendable(ManifestDiff.self),
