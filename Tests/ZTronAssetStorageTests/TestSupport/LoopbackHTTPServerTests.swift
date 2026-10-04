@@ -240,7 +240,7 @@ struct TestSupportLoopbackHTTPServerTests {
             try await client.get("/fast")
             #expect(try await client.response().status == 200)
             #expect(delay.waits == [5_000_000])
-                client.close()
+            client.close()
         }
     }
 
@@ -289,6 +289,58 @@ struct TestSupportLoopbackHTTPServerTests {
                 #expect(response.status == 200 && response.body == body, "\(range)")
             }
             client.close()
+        }
+    }
+
+    @Test("Test support: concurrent starts share one listener and report the same port", .timeLimit(.minutes(1)))
+    func concurrentStartsShareOneListener() async throws {
+        for round in 0..<5 {
+            let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
+            async let first = server.start()
+            async let second = server.start()
+            let ports = try await [first, second]
+            #expect(ports[0] == ports[1], "round \(round)")
+            #expect(try await server.start() == ports[0], "round \(round)")
+            await server.stop()
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test(
+        "Test support: a request whose Content-Length is not a bounded digit string gets 400 and the connection is closed",
+        .timeLimit(.minutes(1)),
+        arguments: ["-1000", "abc", "+5", "99999999999999999999", "67108865"]
+    )
+    func malformedContentLengthIsRejected(length: String) async throws {
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, body: Data("handled".utf8))
+        }) { server, port in
+            let client = try await Self.connect(port)
+            try await client.send("GET /a HTTP/1.1\r\nHost: x\r\nContent-Length: \(length)\r\n\r\n")
+            let response = try await client.response()
+            #expect(response.status == 400)
+            #expect(response.headers["connection"] == "close")
+            let (rest, cleanClose) = await client.untilClosed()
+            #expect(rest.isEmpty && cleanClose)
+            #expect(await server.requests.isEmpty)
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a scripted Content-Length wins whatever its case, and the server's Connection header replaces a scripted one", .timeLimit(.minutes(1)))
+    func scriptedHeadersMergeCaseInsensitively() async throws {
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, headers: ["content-length": "3", "CONNECTION": "keep-alive"], body: Data("abcdef".utf8))
+        }) { _, port in
+            let client = try await Self.connect(port)
+            try await client.get("/announced", headers: ["Connection": "close"])
+            let (raw, _) = await client.untilClosed()
+            let split = try #require(raw.range(of: Data("\r\n\r\n".utf8)))
+            let lines = String(decoding: raw[..<split.lowerBound], as: UTF8.self).components(separatedBy: "\r\n").dropFirst()
+            let lengths = lines.filter { $0.lowercased().hasPrefix("content-length:") }
+            let connections = lines.filter { $0.lowercased().hasPrefix("connection:") }
+            #expect(lengths == ["content-length: 3"])
+            #expect(connections == ["Connection: close"])
         }
     }
 

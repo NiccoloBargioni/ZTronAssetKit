@@ -127,12 +127,16 @@ public typealias LoopbackHandler = @Sendable (LoopbackRequest) -> LoopbackRespon
 ///
 /// Behaviour (transport.md §12, ARCHITECTURE §6.7): requests are parsed in arrival order (a `Content-Length` request
 /// body is consumed), numbered globally, per target and by 1-based connection, and answered by the handler on the
-/// actor. Responses carry `Content-Length` (unless `omitContentLength`, which closes the connection after the
-/// body), `Connection`, and, for `.gzip`, `Content-Encoding: gzip` over a `Gzip` body. With `rangeETag`, a 200
-/// becomes a 206 for `Range: bytes=a-` or `bytes=a-b` when `If-Range` is absent or equals the tag (416 when the start
-/// is past the end); any other `If-Range` gets the whole body. `.closeAfter(n)` sends n body bytes and a FIN (the
-/// deterministic "connection lost"; never RST, transport.md E-16); `.stallAfter(n)` sends n bytes and holds the
-/// connection until `stop()`. Latency goes through the injected `LoopbackDelay`, which never sleeps by default.
+/// actor. A request whose `Content-Length` is not a digit string of at most 64 MiB is answered `400` and its
+/// connection closed; it never reaches the handler or `requests`. Responses carry `Content-Length` (unless
+/// `omitContentLength`, which closes the connection after the body, or the script sets one: a scripted
+/// `Content-Length` in any case is sent as scripted), `Connection`, and, for `.gzip`, `Content-Encoding: gzip` over
+/// a `Gzip` body; header names merge case-insensitively, the server's own replacing scripted ones. With
+/// `rangeETag`, a 200 becomes a 206 for `Range: bytes=a-` or `bytes=a-b` when `If-Range` is absent or equals the tag
+/// (416 when the start is past the end); any other `If-Range` gets the whole body. `.closeAfter(n)` sends n body
+/// bytes and a FIN (the deterministic "connection lost"; never RST, transport.md E-16); `.stallAfter(n)` sends n
+/// bytes and holds the connection until `stop()`. Latency goes through the injected `LoopbackDelay`, which never
+/// sleeps by default.
 public actor LoopbackHTTPServer {
     private let delay: any LoopbackDelay
     private let handler: LoopbackHandler
@@ -145,6 +149,10 @@ public actor LoopbackHTTPServer {
     private var perTarget: [String: Int] = [:]
     private var log: [LoopbackRequest] = []
     private var stopped = false
+    private var starting: Task<UInt16, any Error>?
+
+    /// The largest request body the server buffers (a larger `Content-Length` is answered with 400).
+    static let maxRequestBodyBytes = 64 << 20
 
     /// Creates a server (not listening yet).
     public init(delay: any LoopbackDelay = NoLoopbackDelay(), handler: @escaping LoopbackHandler) {
@@ -159,7 +167,8 @@ public actor LoopbackHTTPServer {
         }
     }
 
-    /// Starts listening; returns the port.
+    /// Starts listening; returns the port. Idempotent: a call while running returns the port, and calls made while
+    /// the listener is coming up wait for that one listener. Throws once `stop()` ran (also when it ran meanwhile).
     public func start() async throws -> UInt16 {
         guard !self.stopped else {
             throw LoopbackServerError.stopped
@@ -167,6 +176,41 @@ public actor LoopbackHTTPServer {
         if let port = self.port {
             return port
         }
+        let starting: Task<UInt16, any Error>
+        if let inFlight = self.starting {
+            starting = inFlight
+        } else {
+            let listener = try self.makeListener()
+            self.listener = listener
+            let queue = self.queue
+            starting = Task {
+                // REENTRANCY: h-8 (proposed) — nothing: the bridge touches no actor state.
+                try await LoopbackHTTPServer.ready(listener, on: queue)
+            }
+            self.starting = starting
+        }
+        do {
+            // REENTRANCY: h-6 (proposed) — `stopped` is re-read: a `stop()` while the listener came up cancelled it,
+            // so every waiting start fails instead of reporting a dead port. Concurrent starts await this one task,
+            // so there is only ever one listener (no identity to re-check).
+            let port = try await starting.value
+            guard !self.stopped else {
+                throw LoopbackServerError.stopped
+            }
+            self.port = port
+            return port
+        } catch {
+            if self.starting == starting {
+                self.starting = nil
+                self.listener?.cancel()
+                self.listener = nil
+            }
+            throw error
+        }
+    }
+
+    /// A listener on 127.0.0.1, any port, loopback only, whose connections are accepted on the actor.
+    private func makeListener() throws -> NWListener {
         let parameters = NWParameters.tcp
         parameters.requiredInterfaceType = .loopback
         parameters.acceptLocalOnly = true
@@ -179,16 +223,7 @@ public actor LoopbackHTTPServer {
                 await self?.accept(connection)
             }
         }
-        self.listener = listener
-        // REENTRANCY: h-6 (proposed) — `stopped` and `listener` are re-read: a `stop()` that ran while the listener
-        // was coming up cancelled it, so the start fails instead of reporting a dead port.
-        let port = try await LoopbackHTTPServer.ready(listener, on: self.queue)
-        guard !self.stopped, self.listener === listener else {
-            listener.cancel()
-            throw LoopbackServerError.stopped
-        }
-        self.port = port
-        return port
+        return listener
     }
 
     /// Stops the listener and every connection (stalled ones included).
@@ -236,13 +271,23 @@ public actor LoopbackHTTPServer {
         var buffer = Data()
         var clientFinished = false
         while !self.stopped {
-            while let request = self.takeRequest(from: &buffer, connection: number) {
-                self.log.append(request)
-                // REENTRANCY: h-7 (proposed) — `stopped` is re-read: after `stop()` the connection was cancelled and
-                // the loop ends; the log entry was appended before the await, so it is never lost.
-                let keepOpen = await self.respond(to: request, on: connection, number: number)
-                guard keepOpen, !self.stopped else {
+            parsing: while true {
+                switch self.takeRequest(from: &buffer, connection: number) {
+                case .incomplete:
+                    break parsing
+                case .malformed:
+                    // REENTRANCY: h-7 (proposed) — nothing: the connection is closed right after, whatever happened.
+                    await LoopbackHTTPServer.send(LoopbackHTTPServer.badRequest, on: connection, final: true)
+                    self.close(connection, number: number)
                     return
+                case .request(let request):
+                    self.log.append(request)
+                    // REENTRANCY: h-7 (proposed) — `stopped` is re-read: after `stop()` the connection was cancelled
+                    // and the loop ends; the log entry was appended before the await, so it is never lost.
+                    let keepOpen = await self.respond(to: request, on: connection, number: number)
+                    guard keepOpen, !self.stopped else {
+                        return
+                    }
                 }
             }
             if clientFinished {
@@ -303,11 +348,21 @@ public actor LoopbackHTTPServer {
 
     // MARK: Parsing and rendering
 
-    /// Removes and returns the first complete request (head plus `Content-Length` body), or `nil` when the buffer
-    /// does not hold one yet.
-    private func takeRequest(from buffer: inout Data, connection: Int) -> LoopbackRequest? {
+    /// What the front of a connection's buffer holds.
+    private enum Parsed {
+        /// Not a whole request yet.
+        case incomplete
+        /// A request the server refuses to buffer: its `Content-Length` is not `1*DIGIT` within
+        /// `maxRequestBodyBytes` (a negative or oversized length must never index the buffer).
+        case malformed
+        /// A whole request, removed from the buffer.
+        case request(LoopbackRequest)
+    }
+
+    /// Removes and returns the first complete request (head plus `Content-Length` body).
+    private func takeRequest(from buffer: inout Data, connection: Int) -> Parsed {
         guard let end = buffer.range(of: Data("\r\n\r\n".utf8)) else {
-            return nil
+            return .incomplete
         }
         let head = String(decoding: buffer[buffer.startIndex..<end.lowerBound], as: UTF8.self)
         var lines = head.components(separatedBy: "\r\n")
@@ -319,35 +374,56 @@ public actor LoopbackHTTPServer {
             }
             headers[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
-        let bodyLength = headers["content-length"].flatMap { Int($0) } ?? 0
+        var bodyLength = 0
+        if let declared = headers["content-length"] {
+            guard !declared.isEmpty, declared.utf8.allSatisfy({ $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }),
+                let length = Int(declared), length <= LoopbackHTTPServer.maxRequestBodyBytes
+            else {
+                return .malformed
+            }
+            bodyLength = length
+        }
         guard buffer.distance(from: end.upperBound, to: buffer.endIndex) >= bodyLength else {
-            return nil
+            return .incomplete
         }
         buffer = Data(buffer[buffer.index(end.upperBound, offsetBy: bodyLength)...])
         let target = requestLine.count > 1 ? String(requestLine[1]) : "/"
         self.sequence += 1
         self.perTarget[target, default: 0] += 1
-        return LoopbackRequest(
-            connection: connection,
-            sequence: self.sequence,
-            pathSequence: self.perTarget[target, default: 1],
-            method: requestLine.first.map(String.init) ?? "",
-            target: target,
-            headers: headers
+        return .request(
+            LoopbackRequest(
+                connection: connection,
+                sequence: self.sequence,
+                pathSequence: self.perTarget[target, default: 1],
+                method: requestLine.first.map(String.init) ?? "",
+                target: target,
+                headers: headers
+            )
         )
     }
 
-    /// The response head and the body to send (encoded, and sliced for a range).
+    /// The answer to a request the server refuses to parse; the connection is closed after it.
+    private static let badRequest = Data("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".utf8)
+
+    /// The response head and the body to send (encoded, and sliced for a range). Header names merge
+    /// case-insensitively: a scripted `Content-Length` (in any case) is sent as scripted, so a test can announce a
+    /// length other than the body's; every other header the server sets replaces a scripted one of the same name.
     private static func render(_ response: LoopbackResponse, for request: LoopbackRequest) -> (Data, Data) {
         var status = response.status
         var body = response.encoding == .gzip ? Gzip.compress(response.body) : response.body
         var headers = response.headers
+        let set = { (headers: inout [String: String], name: String, value: String) in
+            for key in headers.keys where key.lowercased() == name.lowercased() {
+                headers.removeValue(forKey: key)
+            }
+            headers[name] = value
+        }
         if response.encoding == .gzip {
-            headers["Content-Encoding"] = "gzip"
+            set(&headers, "Content-Encoding", "gzip")
         }
         if let tag = response.rangeETag {
-            headers["ETag"] = tag
-            headers["Accept-Ranges"] = "bytes"
+            set(&headers, "ETag", tag)
+            set(&headers, "Accept-Ranges", "bytes")
             let ifRange = request.header("if-range")
             if status == 200, ifRange == nil || ifRange == tag, let range = request.header("range").flatMap(LoopbackHTTPServer.byteRange) {
                 let total = body.count
@@ -355,19 +431,19 @@ public actor LoopbackHTTPServer {
                     let last = min(range.end ?? (total - 1), total - 1)
                     body = body.subdata(in: range.start..<(last + 1))
                     status = 206
-                    headers["Content-Range"] = "bytes \(range.start)-\(last)/\(total)"
+                    set(&headers, "Content-Range", "bytes \(range.start)-\(last)/\(total)")
                 } else {
                     body = Data()
                     status = 416
-                    headers["Content-Range"] = "bytes */\(total)"
+                    set(&headers, "Content-Range", "bytes */\(total)")
                 }
             }
         }
-        if !response.omitContentLength {
-            headers["Content-Length"] = String(body.count)
+        if !response.omitContentLength, !headers.keys.contains(where: { $0.lowercased() == "content-length" }) {
+            set(&headers, "Content-Length", String(body.count))
         }
         let closes = response.omitContentLength || request.header("connection")?.lowercased() == "close"
-        headers["Connection"] = closes ? "close" : "keep-alive"
+        set(&headers, "Connection", closes ? "close" : "keep-alive")
         var head = "HTTP/1.1 \(status) \(LoopbackHTTPServer.reason(status))\r\n"
         for (name, value) in headers.sorted(by: { $0.key < $1.key }) {
             head += "\(name): \(value)\r\n"
