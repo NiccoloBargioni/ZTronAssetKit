@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 /// The scripted engine network (R-NET-1, H-4, H-6): steps through the attached staging sink, holds and releases,
 /// attempts, the one ordered transport log, manifests, re-attachment and shutdown.
 @Suite("Test support: FakeRemoteSource")
-struct FakeRemoteSourceTests {
+struct TestSupportFakeRemoteSourceTests {
     static let id = TransferID.content(ContentHash.sha256(of: Data([1, 2, 3, 4])))
     static let other = TransferID.content(ContentHash.sha256(of: Data([9])))
 
@@ -79,7 +79,7 @@ struct FakeRemoteSourceTests {
     @Test("Test support: a generated step streams the payload in bounded chunks that hash like GeneratedPayload.sha256", .timeLimit(.minutes(1)))
     func generatedPayloadStreamsInChunks() async {
         let source = FakeRemoteSource()
-        let sink = ChunkRecordingSink()
+        let sink = FakeSourceChunkRecordingSink()
         await source.attach(staging: sink)
         let size = Int64(GeneratedPayload.chunkBytes * 2 + 100)
         await source.script(Self.id, [.stageGenerated(seed: 77, byteCount: size)])
@@ -329,7 +329,7 @@ struct FakeRemoteSourceTests {
 
 /// A staging sink that records the size of every append and hashes what it receives (never storing it).
 @available(macOS 15.0, *)
-final class ChunkRecordingSink: StagingSink {
+final class FakeSourceChunkRecordingSink: StagingSink {
     private let state = Mutex<(sizes: [Int], hasher: SHA256, total: Int64)>(([], SHA256(), 0))
 
     var appendSizes: [Int] {

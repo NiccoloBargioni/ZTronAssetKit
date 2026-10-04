@@ -6,7 +6,7 @@ import Testing
 /// The loopback server's behaviours (ADR-011, ARCHITECTURE §6.7): scripted responses, connection counting, ranges,
 /// gzip, FIN truncation, stalls, close-delimited bodies and injected latency. One server per test, ephemeral port.
 @Suite("Test support: LoopbackHTTPServer")
-struct LoopbackHTTPServerTests {
+struct TestSupportLoopbackHTTPServerTests {
     /// Runs `body` against a started server and always stops it afterwards.
     @available(macOS 15.0, *)
     private static func withServer(
@@ -26,8 +26,8 @@ struct LoopbackHTTPServerTests {
     }
 
     @available(macOS 15.0, *)
-    private static func connect(_ port: UInt16) async throws -> LoopbackClient {
-        let client = LoopbackClient(port: port)
+    private static func connect(_ port: UInt16) async throws -> LoopbackRawClient {
+        let client = LoopbackRawClient(port: port)
         try await client.open()
         return client
     }
@@ -230,7 +230,7 @@ struct LoopbackHTTPServerTests {
     @available(macOS 15.0, *)
     @Test("Test support: scripted latency is awaited through the injected delay and never sleeps by default", .timeLimit(.minutes(1)))
     func latencyGoesThroughTheDelay() async throws {
-        let delay = RecordingDelay()
+        let delay = LoopbackRecordingDelay()
         try await Self.withServer(delay: delay, { request in
             LoopbackResponse(status: 200, body: Data([1]), latencyNanoseconds: request.target == "/slow" ? 5_000_000 : 0)
         }) { server, port in
@@ -325,7 +325,7 @@ struct LoopbackHTTPServerTests {
 
 /// A delay that records what it was asked to wait and returns at once.
 @available(macOS 15.0, *)
-final class RecordingDelay: LoopbackDelay {
+final class LoopbackRecordingDelay: LoopbackDelay {
     private let recorded = Mutex<[UInt64]>([])
 
     var waits: [UInt64] {

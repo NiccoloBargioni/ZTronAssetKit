@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 /// The test clock's ordering and its three clocks (H-8, ADR-017): time moves only on `advance`, sleepers wake in
 /// `(deadline, registration)` order, and a device sleep stops only the awake clock.
 @Suite("Test support: ManualTimeSource")
-struct ManualTimeSourceTests {
+struct TestSupportManualTimeSourceTests {
     /// Registers one sleeper per deadline, in order, waiting for each registration (so sequence numbers are fixed).
     @available(macOS 15.0, *)
     private static func sleepers(_ time: ManualTimeSource, _ offsets: [TimeInterval]) async -> [Task<Bool, Never>] {
@@ -63,7 +63,7 @@ struct ManualTimeSourceTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("R-ENV-1: a device sleep advances wall and monotonic time, wakes due sleepers, and keeps the awake clock still")
+    @Test("R-ENV-1: a device sleep advances wall and monotonic time, wakes due sleepers, and keeps the awake clock still", .timeLimit(.minutes(1)))
     func deviceSleepStopsTheAwakeClock() async {
         let time = ManualTimeSource()
         let wall = time.now()

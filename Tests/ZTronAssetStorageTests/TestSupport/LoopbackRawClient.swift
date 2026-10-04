@@ -5,7 +5,7 @@ import Synchronization
 /// A minimal raw HTTP/1.1 client over `NWConnection` (loopback only), so the server's tests see exactly the bytes
 /// and the connection close it sends: no URLSession, no cache, nothing written anywhere. Gated for `Mutex`.
 @available(macOS 15.0, *)
-final class LoopbackClient: Sendable {
+final class LoopbackRawClient: Sendable {
     /// One parsed response.
     struct Response: Sendable {
         var status: Int
@@ -19,7 +19,7 @@ final class LoopbackClient: Sendable {
     }
 
     private let connection: NWConnection
-    private let buffer = LoopbackClientBuffer()
+    private let buffer = LoopbackRawClientBuffer()
 
     init(port: UInt16) {
         self.connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
@@ -173,7 +173,7 @@ final class LoopbackClient: Sendable {
 
 /// The client's receive buffer (one connection, one reader at a time).
 @available(macOS 15.0, *)
-private final class LoopbackClientBuffer: Sendable {
+private final class LoopbackRawClientBuffer: Sendable {
     private let data = Mutex(Data())
     private let closed = Mutex(false)
 
@@ -215,12 +215,12 @@ private final class LoopbackClientBuffer: Sendable {
             return head
         }
         guard let head else {
-            throw LoopbackClient.ClientError.malformed
+            throw LoopbackRawClient.ClientError.malformed
         }
         var lines = head.components(separatedBy: "\r\n")
         let statusLine = lines.removeFirst().split(separator: " ")
         guard statusLine.count >= 2, let status = Int(statusLine[1]) else {
-            throw LoopbackClient.ClientError.malformed
+            throw LoopbackRawClient.ClientError.malformed
         }
         var headers: [String: String] = [:]
         for line in lines {

@@ -6,7 +6,7 @@ import ZTronAssetModel
 /// R-STO-6: the fake satisfies the shared conformance contract, and the contract catches a conformer that breaks
 /// any one of its clauses (so passing it means something).
 @Suite("Test support: FileSystem conformance")
-struct FileSystemConformanceTests {
+struct TestSupportFileSystemConformanceTests {
     @available(macOS 15.0, *)
     @Test("R-STO-6: FakeFileSystem satisfies the shared FileSystem conformance contract")
     func fakeConforms() throws {
@@ -19,12 +19,12 @@ struct FileSystemConformanceTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("R-STO-6: the conformance contract reports a conformer that breaks one of its clauses", arguments: BrokenConformer.Defect.allCases)
-    func brokenConformerIsReported(defect: BrokenConformer.Defect) throws {
+    @Test("R-STO-6: the conformance contract reports a conformer that breaks one of its clauses", arguments: BrokenFileSystemConformer.Defect.allCases)
+    func brokenConformerIsReported(defect: BrokenFileSystemConformer.Defect) throws {
         let base = FakeFSFixture.make()
         let root = FakeFSFixture.url("/fake-volume/conformance")
         try base.createDirectory(at: root)
-        let violations = FileSystemConformance.violations(of: BrokenConformer(base: base, defect: defect), in: root)
+        let violations = FileSystemConformance.violations(of: BrokenFileSystemConformer(base: base, defect: defect), in: root)
         #expect(violations.contains { $0.clause == defect.clause }, "\(violations.map(\.description))")
         #expect(violations.allSatisfy { !$0.description.contains("fixture") })
     }
@@ -32,7 +32,7 @@ struct FileSystemConformanceTests {
 
 /// A `FakeFileSystem` with exactly one deliberate defect.
 @available(macOS 15.0, *)
-struct BrokenConformer: FileSystem, FileSystemFixtureSeeding {
+struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     enum Defect: String, CaseIterable, Sendable {
         case createFailsWhenPresent
         case appendTruncates

@@ -5,7 +5,7 @@ import ZTronAssetTestSupport
 
 /// Fault injection (R-STO-6: ENOSPC, EIO, EACCES, EXDEV, rename failure, partial write) and the capacity model.
 @Suite("Test support: FakeFileSystem faults")
-struct FakeFileSystemFaultTests {
+struct TestSupportFakeFileSystemFaultTests {
     private static let tmp = FakeFSFixture.url("/fake-volume/index.tmp")
     private static let bin = FakeFSFixture.url("/fake-volume/index.bin")
 

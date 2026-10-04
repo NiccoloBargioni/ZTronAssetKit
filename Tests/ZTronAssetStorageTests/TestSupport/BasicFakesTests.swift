@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 
 /// The small value fakes every package's tests use.
 @Suite("Test support: basic fakes")
-struct BasicFakesTests {
+struct TestSupportBasicFakesTests {
     @available(macOS 15.0, *)
     @Test("Test support: FakeLegacyDefaults serves its seeded values and records every removal in order")
     func legacyDefaults() {

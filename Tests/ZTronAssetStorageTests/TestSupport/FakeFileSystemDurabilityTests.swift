@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 /// The durability model the store's crash proofs rest on (store.md §3.4 as amended by store-1 S1-01): names and
 /// data are durable separately, directories independently, and a process kill keeps the un-synced split.
 @Suite("Test support: FakeFileSystem durability")
-struct FakeFileSystemDurabilityTests {
+struct TestSupportFakeFileSystemDurabilityTests {
     private static let work = "/fake-volume/work"
 
     /// A fake with `/fake-volume/work` created and its entry synced into the (durable) volume root.

@@ -5,7 +5,7 @@ import ZTronAssetTestSupport
 
 /// Recording (R-STO-7 calling thread, R-STO-8 attributes), locks (R-STO-9), the namespace and disk images.
 @Suite("Test support: FakeFileSystem recording and namespace")
-struct FakeFileSystemTests {
+struct TestSupportFakeFileSystemTests {
     @available(macOS 15.0, *)
     @Test("Test support: every call records whether it ran on the main thread", .timeLimit(.minutes(1)))
     func recordsCallingThread() async throws {

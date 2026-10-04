@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 /// Deterministic, enumerable crash points (R-STO-5's machinery): mutation k never happens, every later call fails,
 /// and the same k and mode always leave the same disk.
 @Suite("Test support: FakeFileSystem crash points")
-struct FakeFileSystemCrashTests {
+struct TestSupportFakeFileSystemCrashTests {
     private static let root = "/fake-volume/Library/Application Support/ZTronAssetKit"
 
     /// A store-shaped scenario: layout, lock, a published blob, an index commit and a staging cleanup. Every step is

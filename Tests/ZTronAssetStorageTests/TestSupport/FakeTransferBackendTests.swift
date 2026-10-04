@@ -5,7 +5,7 @@ import ZTronAssetTestSupport
 
 /// The scripted URLSession side for `HTTPRemoteSource` tests (WP-D).
 @Suite("Test support: FakeTransferBackend")
-struct FakeTransferBackendTests {
+struct TestSupportFakeTransferBackendTests {
     static func job(_ sequence: UInt32) -> TransferJob {
         TransferJob(
             id: .content(ContentHash.sha256(of: Data([UInt8(sequence)]))),

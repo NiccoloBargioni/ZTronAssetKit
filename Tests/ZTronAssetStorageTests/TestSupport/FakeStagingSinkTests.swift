@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 
 /// The in-memory staging sink transport and Apple-tier tests use without a store (WP-D, WP-E).
 @Suite("Test support: FakeStagingSink")
-struct FakeStagingSinkTests {
+struct TestSupportFakeStagingSinkTests {
     static func name(_ sequence: UInt32, _ kind: StagingFileName.Kind = .partial) -> StagingFileName {
         StagingFileName(transfer: .content(ContentHash.sha256(of: Data([5]))), attempt: TransferAttempt(epoch: 1, sequence: sequence), kind: kind)
     }
@@ -56,13 +56,13 @@ struct FakeStagingSinkTests {
     @Test("Test support: writeStaged drains a chunk source and refuses a taken name, more than maxBytes and a failing source", .timeLimit(.minutes(1)))
     func writeStagedDrainsTheSource() async throws {
         let sink = FakeStagingSink()
-        #expect(try await sink.writeStaged(Self.name(1), from: ChunkList([Data([1, 2]), Data([3])]), maxBytes: 3) == 3)
+        #expect(try await sink.writeStaged(Self.name(1), from: FakeSinkChunkList([Data([1, 2]), Data([3])]), maxBytes: 3) == 3)
         #expect(sink.contents[Self.name(1)] == Data([1, 2, 3]))
-        await #expect(throws: StagingError.nameInUse) { try await sink.writeStaged(Self.name(1), from: ChunkList([Data([1])]), maxBytes: 3) }
-        await #expect(throws: StagingError.tooLarge(limit: 2)) { try await sink.writeStaged(Self.name(2), from: ChunkList([Data([1, 2, 3])]), maxBytes: 2) }
+        await #expect(throws: StagingError.nameInUse) { try await sink.writeStaged(Self.name(1), from: FakeSinkChunkList([Data([1])]), maxBytes: 3) }
+        await #expect(throws: StagingError.tooLarge(limit: 2)) { try await sink.writeStaged(Self.name(2), from: FakeSinkChunkList([Data([1, 2, 3])]), maxBytes: 2) }
         #expect(sink.contents[Self.name(2)] == nil)
         await #expect(throws: StagingError.source(.readFailed)) {
-            try await sink.writeStaged(Self.name(3), from: ChunkList([Data([1])], failing: .source(.readFailed)), maxBytes: 9)
+            try await sink.writeStaged(Self.name(3), from: FakeSinkChunkList([Data([1])], failing: .source(.readFailed)), maxBytes: 9)
         }
         #expect(sink.contents[Self.name(3)] == nil)
     }
@@ -101,7 +101,7 @@ struct FakeStagingSinkTests {
 
 /// A chunk source over fixed chunks, optionally failing after them.
 @available(macOS 15.0, *)
-final class ChunkList: ChunkSource {
+final class FakeSinkChunkList: ChunkSource {
     private let remaining: Mutex<[Data]>
     private let failure: StagingError?
 

@@ -5,7 +5,7 @@ import ZTronAssetModel
 
 /// Waiting for engine events without sleeping (sync.md §16): `EventProbe` consumes a stream in one owned task.
 @Suite("Test support: EventProbe")
-struct EventProbeTests {
+struct TestSupportEventProbeTests {
     static func isStarted(_ event: AssetEvent) -> Bool {
         if case .clientStarted = event {
             return true
