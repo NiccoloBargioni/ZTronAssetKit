@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 99,
+  "assets": [
+    {
+      "identifier": "bo7.menu.background",
+      "fileExtension": "heic",
+      "remotePath": "media/fe155aac5fc5f0e2/bo7.menu.background.heic",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Menus"
+      ],
+      "byteSize": 64,
+      "checksum": "fe155aac5fc5f0e2e797a0a5004d7107f30c60f0107892ca926593f47c0d2a3b"
+    },
+    {
+      "identifier": "bo7.ri.easter.egg.vehytherion.temple.map",
+      "fileExtension": "png",
+      "remotePath": "media/9221834f012ace4d/bo7.ri.easter.egg.vehytherion.temple.map.png",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Vehytherion Temple"
+      ],
+      "localFileName": "Temple Map",
+      "byteSize": 1236,
+      "checksum": "9221834f012ace4d8c4b2972bb29df92c42ee4693c5707c661e17cd6285645bc"
+    },
+    {
+      "identifier": "waw.ndu.title.card",
+      "fileExtension": "png",
+      "remotePath": "media/ae029dcf3d58c2bc/waw.ndu.title.card.png",
+      "localPathComponents": [
+        "World at War",
+        "Nacht der Untoten"
+      ],
+      "localFileName": "Title Card",
+      "byteSize": 460,
+      "checksum": "ae029dcf3d58c2bc200e889211cc595ae40315edfc3910b8a1c5c0f5f3612a25"
+    }
+  ]
+}

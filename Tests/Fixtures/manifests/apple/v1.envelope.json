@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "identifier": "bo7.ri.easter.egg.vehytherion.temple.icon",
+      "fileExtension": "heic",
+      "remotePath": "ZTronMedia/images/bo7.ri.easter.egg.vehytherion.temple.icon.heic",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Vehytherion Temple"
+      ],
+      "localFileName": "icon",
+      "byteSize": 1536,
+      "checksum": "a3da86d8e8d0c1b637e9577137e858aadb5030b54229db4672ec0d2e01ca7ba9",
+      "tags": [
+        "easter-egg",
+        "icon"
+      ],
+      "policy": "essential"
+    },
+    {
+      "identifier": "bo7.ri.easter.egg.vehytherion.temple.map",
+      "fileExtension": "png",
+      "remotePath": "ZTronMedia/images/bo7.ri.easter.egg.vehytherion.temple.map.png",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Vehytherion Temple"
+      ],
+      "localFileName": "Temple Map",
+      "byteSize": 1236,
+      "checksum": "9221834f012ace4d8c4b2972bb29df92c42ee4693c5707c661e17cd6285645bc",
+      "tags": [
+        "easter-egg",
+        "map"
+      ]
+    },
+    {
+      "identifier": "bo7.ri.easter.egg.vehytherion.temple.outline",
+      "fileExtension": "svg",
+      "remotePath": "ZTronMedia/vectors/bo7.ri.easter.egg.vehytherion.temple.outline.svg",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Vehytherion Temple"
+      ],
+      "byteSize": 375,
+      "checksum": "a5ff10c44f45daf204b2981b68c20e593337dfeb78a755d38f9cce3e925ec2ed",
+      "policy": "essential"
+    },
+    {
+      "identifier": "bo7.ri.cinematic.intro",
+      "fileExtension": "mp4",
+      "remotePath": "ZTronMedia/video/bo7.ri.cinematic.intro.mp4",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Cinematics"
+      ],
+      "localFileName": "Intro",
+      "byteSize": 4096,
+      "checksum": "088e1013639dbbcfe47fbe70681ba30579bbbd64a712d5dc7b15e29591193381",
+      "tags": [
+        "cinematic"
+      ],
+      "policy": "onDemand"
+    },
+    {
+      "identifier": "bo7.ri.music.main.theme",
+      "fileExtension": "mp3",
+      "remotePath": "ZTronMedia/audio/bo7.ri.music.main.theme.mp3",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Audio"
+      ],
+      "byteSize": 1312,
+      "checksum": "47a1445158b1da873e408818d5382015dd37cb53b8342af6ca770a8facf31a24"
+    },
+    {
+      "identifier": "bo7.ri.ambience.crypt",
+      "fileExtension": "wav",
+      "remotePath": "ZTronMedia/audio/bo7.ri.ambience.crypt.wav",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Audio"
+      ],
+      "localFileName": "Crypt Ambience",
+      "byteSize": 2044,
+      "checksum": "603fad3b8d9e0bac5fc6ab8c0a61dbb5127283460c868bef1ffe5374e4280d39"
+    },
+    {
+      "identifier": "bo7.ri.character.keeper.portrait",
+      "fileExtension": "jpg",
+      "remotePath": "ZTronMedia/images/bo7.ri.character.keeper.portrait.jpg",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Characters"
+      ],
+      "localFileName": "Keeper Portrait",
+      "byteSize": 963,
+      "checksum": "34daebb47a6eb1d6e10e5720c90f01527455d5d497cd1385818c5970f38ff245"
+    },
+    {
+      "identifier": "bo7.ri.character.keeper.card",
+      "fileExtension": "jpg",
+      "remotePath": "ZTronMedia/images/bo7.ri.character.keeper.card.jpg",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Rex Infernus",
+        "Characters"
+      ],
+      "localFileName": "Keeper Card",
+      "byteSize": 963,
+      "checksum": "34daebb47a6eb1d6e10e5720c90f01527455d5d497cd1385818c5970f38ff245"
+    },
+    {
+      "identifier": "bo7.menu.background",
+      "fileExtension": "heic",
+      "remotePath": "ZTronMedia/images/bo7.menu.background.heic",
+      "localPathComponents": [
+        "Black Ops 7",
+        "Menus"
+      ],
+      "byteSize": 64,
+      "checksum": "fe155aac5fc5f0e2e797a0a5004d7107f30c60f0107892ca926593f47c0d2a3b",
+      "policy": "essential"
+    },
+    {
+      "identifier": "bo6.tm.easter.egg.control.room.icon",
+      "fileExtension": "jpg",
+      "remotePath": "ZTronMedia/images/bo6.tm.easter.egg.control.room.icon.jpg",
+      "localPathComponents": [
+        "Black Ops 6",
+        "Terminus",
+        "Control Room"
+      ],
+      "localFileName": "icon",
+      "byteSize": 686,
+      "checksum": "418dc9bd76572bc23b33451eff6ee53abda29ff3e64b943f91ba751f40f9af68",
+      "blurHash": "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+    },
+    {
+      "identifier": "bo6.tm.easter.egg.control.room.outline",
+      "fileExtension": "svg",
+      "remotePath": "ZTronMedia/vectors/bo6.tm.easter.egg.control.room.outline.svg",
+      "localPathComponents": [
+        "Black Ops 6",
+        "Terminus",
+        "Control Room"
+      ],
+      "byteSize": 367,
+      "checksum": "50a4c45e1bd4061e1317b20b42ab60d34103a8edef6db0fd8ad7f2dbac98252e"
+    },
+    {
+      "identifier": "waw.ndu.title.card",
+      "fileExtension": "png",
+      "remotePath": "ZTronMedia/images/waw.ndu.title.card.png",
+      "localPathComponents": [
+        "World at War",
+        "Nacht der Untoten"
+      ],
+      "localFileName": "Title Card",
+      "byteSize": 460,
+      "checksum": "ae029dcf3d58c2bc200e889211cc595ae40315edfc3910b8a1c5c0f5f3612a25",
+      "tags": [
+        "title-card"
+      ],
+      "policy": "standard"
+    },
+    {
+      "identifier": "waw.ndu.round.start.sting",
+      "fileExtension": "wav",
+      "remotePath": "ZTronMedia/audio/waw.ndu.round.start.sting.wav",
+      "localPathComponents": [
+        "World at War",
+        "Nacht der Untoten",
+        "Audio"
+      ],
+      "byteSize": 644,
+      "checksum": "4854c15ea5afeb8fd86edb5bc9f25d5a3b8932bd8272d66596eafee389359933"
+    }
+  ],
+  "buildInfo": {
+    "commit": "0000000",
+    "pipeline": 1
+  }
+}

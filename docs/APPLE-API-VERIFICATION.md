@@ -1,0 +1,279 @@
+# Apple API verification (R-APL-2, SPEC Appendix B and C)
+
+Every claim below was checked against the **installed SDKs** on 2026-10-04: the `.swiftinterface`, the headers, or a
+compiler probe. Web documentation was used only as a cross-check, and is labelled as such where it appears.
+
+| Item | Value |
+|---|---|
+| Toolchain | Apple Swift 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1), Xcode 27.0 (27A266a), host macOS 27.0 |
+| iOS SDK (`$IOS_SDK`) | `/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.0.sdk` |
+| macOS SDK (`$MAC_SDK`) | `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk` |
+| BackgroundAssets interface, iOS | `$IOS_SDK/System/Library/Frameworks/BackgroundAssets.framework/Modules/BackgroundAssets.swiftmodule/arm64e-apple-ios.swiftinterface` (sha256 `bdcb3226…b32e96a`, `-user-module-version 279.0.5`) |
+| BackgroundAssets interface, macOS | `$MAC_SDK/System/Library/Frameworks/BackgroundAssets.framework/Versions/A/Modules/BackgroundAssets.swiftmodule/arm64e-apple-macos.swiftinterface` (sha256 `44ae43fc…71cfc43`) |
+| Interface parity | After the 4-line header (module flags) the iOS and macOS interfaces are **byte-identical** (`diff` is empty). `BAAssetPackManager.h` is identical in both SDKs, so line numbers below apply to both. |
+| Probe commands | `xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios15.0 -swift-version 6 -parse-as-library <probe>.swift` and `xcrun --sdk macosx swiftc -typecheck -target arm64-apple-macos12.0 -swift-version 6 -parse-as-library <probe>.swift`. `-parse-as-library` makes a probe compile like a file in a package target, not like a script. |
+| Probe sources and raw output | `.build-probe-apple/` (git-ignored). From inside `.build-probe-apple/`, run `bash run.sh <dir>` for `avail`, `tt`, `tt2`, `ba`, `ba2`, `net`, `del` and `clone`. Each `<dir>/out/<probe>.ios15.txt` and `<probe>.macos12.txt` holds the exact command, the full compiler output and the exit code. |
+
+"Yes" in the tables means the probe type-checked with exit code 0 and **zero warnings** on that target, so it also passes
+`-warnings-as-errors`. "No" quotes the compiler's error.
+
+---
+
+## 0. Summary
+
+| # | Question | Answer |
+|---|---|---|
+| R-APL-2a / D-12 | What is the payload type of `AssetPackManager.DownloadStatusUpdate.downloading`? | **`Foundation.Progress`**: `case downloading(BackgroundAssets::AssetPack, Foundation::Progress)`. The prior art's guess was right about the type. It is a live, mutable `NSProgress` reference, so convert it to a value at the backend boundary. |
+| R-APL-2b | Is there a stable file URL for a file inside a pack? | **No.** `url(for:)` exists (iOS 26 / macOS 26). Its documentation says *"Don't persist the returned URL beyond the lifetime of the current process"*. It cannot be scoped to one pack and is documented as less efficient. The supported ways to read a file are `contents(at:…)` (returns `Data`, memory-mapped by default) and `descriptor(for:…)` (returns a `FileDescriptor`). Serving in place is possible only through a URL resolved again in each process, off the main thread. |
+| R-APL-2c | What API removes a pack? | `func remove(assetPackWithID assetPackID: String) async throws` (iOS 26 / macOS 26). It removes the **whole pack**; there is no per-file removal. |
+| R-APL-2d | What are the update-check semantics? | `checkForUpdates() async throws -> (updatingIDs:, removedIDs:)` (26.0) schedules updates and removals and returns without waiting for the downloads. `AssetPack.version: Int` carries the version. `status(relativeTo:)` and `ensureLocalAvailability(of:requireLatestVersion:)` exist only from **26.4**. `AssetPackManager.manifest` exists from 27. The system also polls for updates in the background on its own. |
+| Q2 | Is BackgroundAssets importable at a floor-15/12 target? | **Yes.** `#if canImport(BackgroundAssets)` is true on both SDKs. Using the module without gating is an error. With `@available(iOS 26.0, macOS 26.0, *)` it compiles cleanly. The linker **weak-links** the framework on its own. The iOS 15.0 and 15.5 simulator runtimes have no `BackgroundAssets.framework`, so the weak link is what lets an iOS 15 app load. |
+| Q3 | Which floor traps are real? | Not available at the floor: `Task.immediate` (26), `Mutex` (18 / 15), `OSAllocatedUnfairLock` (16 / 13), Clock / Duration (16 / 13), `URL(filePath:)` (16 / 13), `Regex` (16 / 13), Observation (17 / 14), custom actor executors (17 / 14), task executors (18 / 15), `withDiscardingTaskGroup` (17 / 14), `some AsyncSequence<_, Never>` (18 / 15), the `NWPathMonitor` AsyncSequence conformance (17 / 14), and typed-throws **function-type metadata** (18 / 15). Swift Testing's `.timeLimit` needs **macOS 13**. Every other item on the list is available (§3). |
+
+---
+
+## 1. BackgroundAssets: the `AssetPackManager` surface (Q1)
+
+### 1.1 Declarations
+
+All declarations are from the iOS interface; the macOS interface is identical. `L` is the line number in the
+`.swiftinterface`.
+
+| L | Declaration (verbatim) | Availability (verbatim) |
+|---|---|---|
+| 71–73 | `@_hasMissingDesignatedInitializers … public actor AssetPackManager {` | `@available(iOS 26, macOS 26, tvOS 26, visionOS 26, *)` `@available(watchOS, unavailable)` |
+| 74–83 | `public enum DownloadStatusUpdate : Swift::CustomStringConvertible, Swift::Sendable {` `case began(BackgroundAssets::AssetPack)` `case paused(BackgroundAssets::AssetPack)` **`case downloading(BackgroundAssets::AssetPack, Foundation::Progress)`** `case finished(BackgroundAssets::AssetPack)` `case failed(BackgroundAssets::AssetPack, any Swift::Error)` | inherits 26 / 26 |
+| 84–94 | `public struct LocalAvailabilityError : Swift::CustomStringConvertible, Foundation::LocalizedError {` `public let successes: Swift::Set<BackgroundAssets::AssetPack>` `public let failures: [BackgroundAssets::AssetPack : any Swift::Error]` | `@available(iOS 27, macOS 27, tvOS 27, visionOS 27, *)` |
+| 95 | `public static let shared: BackgroundAssets::AssetPackManager` | 26 / 26 |
+| 96 | `final public let statusUpdates: some Swift::Sendable & _Concurrency::AsyncSequence<BackgroundAssets::AssetPackManager.BackgroundAssets::DownloadStatusUpdate, Swift::Never>` | 26 / 26 |
+| 97–100 | `public var manifest: BackgroundAssets::AssetPackManifest { get async throws }` | `@available(iOS 27, macOS 27, …)` |
+| 110–111 | `public func status(relativeTo assetPack: BackgroundAssets::AssetPack) async throws -> BackgroundAssets::AssetPack.BackgroundAssets::Status` | `@available(iOS 26.4, macOS 26.4, …)` |
+| 112–113 | `public func localStatus(ofAssetPackWithID assetPackID: Swift::String) async -> …Status` | `@available(iOS 26.4, macOS 26.4, …)` |
+| 114–115 | `nonisolated public func assetPackIsAvailableLocally(withID assetPackID: Swift::String) -> Swift::Bool` | `@available(iOS 26.4, macOS 26.4, …)` |
+| 118–119 | `public func ensureLocalAvailability(of assetPack: BackgroundAssets::AssetPack, requireLatestVersion shouldUpdate: Swift::Bool = false) async throws` | `@available(iOS 26.4, macOS 26.4, …)` |
+| 120–121 | `public func ensureLocalAvailability(of assetPacks: Swift::Set<BackgroundAssets::AssetPack>, requireLatestVersions shouldUpdate: Swift::Bool = false) async throws` | `@available(iOS 27, macOS 27, …)` |
+| 122–123 | `@discardableResult public func checkForUpdates() async throws -> (updatingIDs: Swift::Set<Swift::String>, removedIDs: Swift::Set<Swift::String>)` | 26 / 26 |
+| 124 | `nonisolated public func statusUpdates(forAssetPackWithID assetPackID: Swift::String) -> some Swift::Sendable & _Concurrency::AsyncSequence<…DownloadStatusUpdate, Swift::Never>` | 26 / 26 |
+| 126 | `nonisolated public func contents(at path: System::FilePath, searchingInAssetPackWithID assetPackID: Swift::String? = nil, options: Foundation::Data.Foundation::ReadingOptions = .mappedIfSafe) throws -> Foundation::Data` | 26 / 26 |
+| 129 | `nonisolated public func descriptor(for path: System::FilePath, searchingInAssetPackWithID assetPackID: Swift::String? = nil) throws -> System::FileDescriptor` | 26 / 26 |
+| 132 | `nonisolated public func url(for path: System::FilePath) throws -> Foundation::URL` | 26 / 26 |
+| 127–134 | `contents(at:asLocalizedFor:options:)`, `descriptor(for:asLocalizedFor:)`, `url(for:asLocalizedFor:)` | `@available(iOS 27, macOS 27, …)` |
+| 135 | `public func remove(assetPackWithID assetPackID: Swift::String) async throws` | 26 / 26 |
+| 136–142 | `public var allAssetPacks: Swift::Set<BackgroundAssets::AssetPack> { get async throws }` | `@available(iOS, introduced: 26, deprecated: 27, message: "Use the manager’s manifest property’s value’s assetPacks property.")` |
+| 143–147 | `public func assetPack(withID id: Swift::String) async throws -> BackgroundAssets::AssetPack` | `@available(iOS, introduced: 26, deprecated: 27, message: "Call assetPack(withID:) on the manager’s manifest property’s value.")` |
+| 148–152 | `public func status(ofAssetPackWithID assetPackID: Swift::String) async throws -> …Status` | `@available(iOS, introduced: 26, deprecated: 26.4, message: "Use status(relativeTo:) instead.")` |
+| 153–157 | `@_disfavoredOverload public func ensureLocalAvailability(of assetPack: BackgroundAssets::AssetPack) async throws` | `@available(iOS, introduced: 26, deprecated: 26.4, renamed: "ensureLocalAvailability(of:requireLatestVersion:)")` |
+| 163–174 | `public enum ManagedBackgroundAssetsError : Swift::CustomStringConvertible, Foundation::LocalizedError {` `case assetPackNotFound(withID: Swift::String)` `case fileNotFound(at: System::FilePath)` | `@available(iOS 26, macOS 26, tvOS 26, visionOS 26, *)` |
+| 256–300 | `public struct AssetPack : …CustomStringConvertible, Foundation::DecodableWithConfiguration, Swift::Encodable, Swift::Hashable, Swift::Identifiable, Swift::Sendable {` `public let id: Swift::String` `public let downloadSize: Swift::Int` `public let version: Swift::Int` `public let userInfo: Foundation::Data?` (`language` is 27). `public struct Status : Swift::OptionSet, Swift::Sendable` with `downloadAvailable, updateAvailable, upToDate, outOfDate, obsolete, downloading, downloaded` | 26 / 26 |
+| 301–338 | `public struct AssetPackManifest : … Swift::Sendable { public let assetPacks: Swift::Set<BackgroundAssets::AssetPack> …` `public func assetPack(withID id: Swift::String) -> BackgroundAssets::AssetPack?` (27) | 26 / 26; per-member 27 where marked |
+
+Supporting header evidence: `$IOS_SDK/System/Library/Frameworks/BackgroundAssets.framework/Headers/`, read verbatim.
+- `BAManagedAssetPackDownloadDelegate.h:33-34`: `- (void)downloadOfAssetPack:(BAAssetPack*)assetPack hasProgress:(NSProgress*)progress;`. This confirms the payload is `NSProgress` at the Objective-C level too.
+- `Foundation.framework/Headers/NSProgress.h:155-157`: `NS_SWIFT_SENDABLE … @interface NSProgress : NSObject`.
+- The Swift USR in the `.swiftdoc` is `s:16BackgroundAssets16AssetPackManagerC20DownloadStatusUpdateO11downloadingyAeA0cD0V_So10NSProgressCtcAEmF`, which mangles `So10NSProgressC`.
+- Cross-check: `developer.apple.com/…/assetpackmanager/downloadstatusupdate/downloading(_:_:)` gives `case downloading(AssetPack, Progress)` with availability iOS 26.0+ and macOS 26.0+. This agrees.
+
+### 1.2 Compiler probes of the surface (`.build-probe-apple/ba`, `ba2`)
+
+| Probe | iOS 15 | macOS 12 | Output |
+|---|---|---|---|
+| `ba02_ungated`: `AssetPackManager.shared.assetPack(withID:)` with no gate | **error** | **error** | `error: 'AssetPackManager' is only available in iOS 26 or newer` / `… macOS 26 or newer`; `error: 'assetPack(withID:)' is only available in iOS 26 or newer` |
+| `ba11_iosOnlyAnnotation`: the same call under `@available(iOS 26.0, *)` only | yes | **error** | `error: 'AssetPackManager' is only available in macOS 26 or newer`. **R-APL-1's `@available(iOS 26.0, *)` must be written `@available(iOS 26.0, macOS 26.0, *)`**, as ADR-005 already does. |
+| `ba03_surface26`: the whole 26.0 surface under `@available(iOS 26.0, macOS 26.0, *)`: `assetPack(withID:)`, `ensureLocalAvailability(of:)`, `contents(at:searchingInAssetPackWithID:)` with and without `.alwaysMapped`, `descriptor(for:searchingInAssetPackWithID:)`, `url(for:)`, `remove(assetPackWithID:)`, `checkForUpdates()`, `allAssetPacks`, `status(ofAssetPackWithID:)`, a switch over `statusUpdates(forAssetPackWithID:)` binding `let typed: Foundation.Progress = progress`, `ManagedBackgroundAssetsError` patterns, and `@Sendable` capture of `AssetPack` and `DownloadStatusUpdate` | yes | yes | exit 0, 0 warnings. The first version of this probe failed with the two errors below, which are now isolated in `ba09` and `ba10`. |
+| `ba09_frozenSwitch`: a switch over all five cases **without** `@unknown default` | **error** | **error** | `error: switch covers known cases, but 'AssetPackManager.DownloadStatusUpdate' may have additional unknown values, possibly added in future versions`. The module is built with `-enable-library-evolution`, so the enum is not frozen. Every switch needs `@unknown default`. |
+| `ba03` before the fix: `for await u in AssetPackManager.shared.statusUpdates` | **error** | **error** | `error: actor-isolated property 'statusUpdates' cannot be accessed from outside of the actor`. Write `await AssetPackManager.shared.statusUpdates` (an actor `let` read from another module). `statusUpdates(forAssetPackWithID:)` is `nonisolated` and needs no `await` (`ba10` compiles cleanly). |
+| `ba04_surface264`: `ensureLocalAvailability(of:requireLatestVersion: true)`, `status(relativeTo:)`, `localStatus(ofAssetPackWithID:)`, `assetPackIsAvailableLocally(withID:)`, every `Status` flag, under `@available(iOS 26.4, macOS 26.4, *)` | yes | yes | clean |
+| `ba05_surface27`: `manifest.assetPack(withID:)`, batch `ensureLocalAvailability(of:requireLatestVersions:)` catching `AssetPackManager.LocalAvailabilityError` | yes | yes | clean |
+| `ba07_ensureOverloadIn264`: `ensureLocalAvailability(of: p)` with no second argument in a 26.4 context | yes | yes | clean. The `@_disfavoredOverload` causes the 26.4 overload with its default argument to be chosen, so there is no deprecation warning. |
+| `ba06` and `ba03` re-run at higher deployment targets (`out/deprecation-by-target.txt`) | — | — | At `-target …ios26.0`: none. At `ios26.4`: `warning: 'status(ofAssetPackWithID:)' was deprecated in iOS 26.4: Use status(relativeTo:) instead.` At `ios27.0`: also `'assetPack(withID:)' was deprecated in iOS 27` and `'allAssetPacks' was deprecated in iOS 27`. **At the 15 / 12 floor no deprecation warnings appear**, even inside an `@available(iOS 27, *)` context, because Swift reports deprecation against the deployment target. |
+
+### 1.3 D-12, resolved
+`.downloading` carries `(AssetPack, Foundation.Progress)`.
+- **Consequence:** `NSProgress` is `NS_SWIFT_SENDABLE`, but it is a live object that keeps changing. `LiveAssetPackBackend` must read `completedUnitCount`, `totalUnitCount` and `fractionCompleted` at the boundary into a value type, for example `PackProgress { completed: Int64; total: Int64 }`.
+- The fake `PackBackend` protocol must never expose `Progress`. Rate-limiting then applies per R-SYN-12.
+- `statusUpdates(forAssetPackWithID:)` *"finishes after yielding ``DownloadStatusUpdate/finished(_:)`` or ``DownloadStatusUpdate/failed(_:_:)``"* (swiftdoc). The global `statusUpdates` *"never finishes"*, so only use it from a task the engine cancels on `shutdown()` (R-SYN-15).
+
+### 1.4 Stable file URL: does serving in place work?
+Evidence: `BAAssetPackManager.h:223-235` and the matching swiftdoc for `url(for:)`, quoted verbatim:
+- `/// - Warning: Don’t persist the returned URL beyond the lifetime of the current process.`
+- `/// - Note: This method will return a well formed URL even if no item exists at the specified relative path in any asset pack, …`
+- `/// All asset packs share the same namespace … If there’s a file-path collision across multiple asset packs, then it’s undefined from which asset pack an individual file will be resolved.`
+- `/// - Warning: This method is less efficient than are ``contents(at:searchingInAssetPackWithID:options:)`` and ``descriptor(for:searchingInAssetPackWithID:)``; use those methods instead if you can do so. … Don’t use this method to block the main thread.`
+
+The web cross-check (`url(for:)` documentation page) repeats both warnings. Apple's "Downloading Apple-hosted asset packs" article names only `contents(at:…)` and `descriptor(for:…)` for reading files.
+
+**Verdict.** A file URL exists, but it is **valid only for the current process**. It can be **dangling** (well-formed while nothing exists at the path), it is **not pack-scoped**, and resolving it **blocks**. So the index (§4.3) can never store pack URLs. The synchronous main-actor `lookup` (R-CAR-1, P-8: zero file-system calls on main) can return an in-place URL only if an off-main warm-up resolved it earlier in the same process and checked that it exists.
+
+The system can also replace pack contents on a background update (`BAAssetPackManager.h:58`: *"the system automatically polls for updates periodically in the background"*). The bytes behind an in-place path can therefore change between launches without any R-INT-2 verification. An in-place mode would have to record `(packID, AssetPack.version)` per asset and verify again whenever the version changes.
+
+**Recommendation for the R-APL-3 ADR, which belongs to the orchestrator** (**adopt-and-release** by default):
+1. Open `descriptor(for:searchingInAssetPackWithID:)`.
+2. Wrap it with `FileHandle(fileDescriptor: fd.rawValue, closeOnDealloc: true)`.
+3. Stream `read(upToCount:)` through incremental SHA-256 into `staging/`, verify, commit.
+4. Then `remove(assetPackWithID:)` (R-CLN-10).
+
+This path uses **no mutable pointer**. It compiles at the floor inside the `@available(iOS 26.0, macOS 26.0, *)` code of `.build-probe-apple/link/LinkProbe.swift`. Reading directly from a `FileDescriptor` would need an `UnsafeMutableRawBufferPointer`, which is avoidable and best avoided.
+
+An APFS clone variant, `fclonefileat(packFD, blobsDirFD, name, 0)`, compiles at the floor and clones a 1 MiB file on the macOS host (`.build-probe-apple/clone/output.txt`: `fclonefileat=0 errno=0 dst.size=1048576`). It would avoid physical double residency even before the pack is released. Whether the app sandbox allows cloning *from the OS-managed pack store* is **UNVERIFIED** (device only).
+
+All file access calls (`contents`, `descriptor`, `url`) are **`nonisolated` and synchronous**, so they block. They must run on the blocking-I/O executor of ADR-003, never on the main thread or the cooperative pool.
+
+### 1.5 Removing or releasing a pack
+- **API:** `public func remove(assetPackWithID assetPackID: Swift::String) async throws` (26.0). Header `BAAssetPackManager.h:257-263`: *"Removes the specified asset pack from the device."*
+- **Granularity is the pack.** Release is possible only after **every** file the manifest maps to that pack has been adopted. The catalog pack (R-APL-4) is never released while it is the source of the installed catalog.
+- **Re-download after removal:** "Downloading Apple-hosted asset packs" (summarised by the fetch tool, not quoted) says removed packs come back through `ensureLocalAvailability(of:)` and that the system does not remove packs on its own while the app is installed.
+- **UNVERIFIED:** whether a removed `essential` or `prefetch` pack is re-downloaded on the next `subsequentUpdate` installation event, or by `checkForUpdates()`. Tried: the headers, the swiftdoc, and three developer.apple.com pages; none states it. This goes into `DEVICE-TEST-PLAN.md`. Until then, R-CLN-10 is a policy-gated SHOULD, and the engine must tolerate a pack coming back.
+
+### 1.6 Update checks and version semantics
+- `checkForUpdates()` (26.0), swiftdoc verbatim:
+  - *"Gets the latest asset-pack information from the server, updates outdated asset packs, and removes obsolete asset packs."*
+  - *"This method waits for any downloads that it schedules to be registered with the download manager, but it doesn’t wait for those downloads to begin or to finish."*
+  - Returns *"the set of IDs of asset packs that are being updated and the set of IDs of asset packs that were removed as a result of the check for updates. Neither updates nor removals that weren’t triggered by the check for updates are taken into account."*
+- **Version:** `AssetPack.version: Int`. The `AssetPack` swiftdoc says *"An instance of this structure can be invalidated when the asset pack that it represents is updated on the server."*
+- **Status semantics:** `BAAssetPackManager.h:49-66`. `status(relativeTo:)` (26.4) reports `outOfDate` when the downloaded version ≠ the instance's version. It reports `updateAvailable` only when the server copy hasn't changed again since the instance was made. `localStatus(ofAssetPackWithID:)` (26.4) works offline, and for an unknown ID it returns an empty set that *"is indistinguishable from the situation in which the asset pack does indeed exist but hasn’t yet been downloaded"*. Per `BAAssetPackStatus.h:27`, `obsolete` packs *"can’t be updated, and they also can’t be redownloaded once removed."*
+- **Consequence for R-APL-4:**
+  - On 26.0–26.3 only `checkForUpdates()` and the deprecated `ensureLocalAvailability(of:)` exist. That method *"doesn’t check for updates"*. So "update check" there means: call `checkForUpdates()` (best effort; failures are swallowed into an event), then read whatever is installed.
+  - On ≥ 26.4, `ensureLocalAvailability(of:requireLatestVersion: true)` can wait for the update.
+  - The `PackBackend` protocol must offer both paths, and the choice must be data passed in, not a second `#available` (R-APL-5).
+  - When offline, fall back to the installed catalog (`assetPackIsAvailableLocally` on ≥ 26.4, otherwise a `contents(at:)` attempt that maps `fileNotFound`).
+  - `removedIDs` must feed prune: an asset whose pack was removed or became obsolete is `missing`, not `present`.
+
+### 1.7 Essential vs on-demand packs
+- **No runtime API.** `AssetPack` has no policy property (only `id`, `downloadSize`, `version`, `language`, `userInfo`; and for `userInfo`, *"This property is `nil` for Apple-hosted asset packs."*, `BAAssetPack.h:39-40`).
+- The policy is build-time data. The web cross-check ("Creating managed asset packs") says the pack manifest JSON sets `downloadPolicy` to one of `essential`, `prefetch` or `onDemand`, with `installationEventTypes` of `firstInstallation` and/or `subsequentUpdate`.
+- The framework landing page gives the semantics, quoted in two parts: essential packs download *"before launch"*, and others are *"prefetch[ed] … without blocking launch"*.
+- The only runtime hook is in the app's **downloader extension**. `ManagedDownloaderExtension.shouldDownload(_:)` (26), header `BAManagedDownloaderExtension.h:64-67`: *"By default, the system automatically downloads all applicable asset packs with either “essential” or “prefetch” download policies…"*. Apple hosting uses `StoreKit.StoreDownloaderExtension` (Swift; `SKDownloaderExtension` in Objective-C), `@available(iOS 26.0, macOS 26.0, …)`.
+- That extension is an app target. It is outside this package and outside the owner's "standalone package" boundary.
+- `BAAssetPackManager.h:17` says referring to `shared` opts the app into system management, and *"Not adopting the right protocol is a programmer error."*
+- **Consequences:**
+  - (a) The catalog pack's ID, and which packs are essential, are **configuration** of `ZTronAssetAppleHosted`, never queried from the system.
+  - (b) **`AssetPackManager.shared` must only be referenced lazily inside `LiveAssetPackBackend`**. Never touch it from `AssetClient.init`, from tier selection, or from any test.
+  - (c) `README`/`MIGRATION.md` must tell the app owner to add the downloader extension.
+
+### 1.8 Error types
+| Type | Declaration | Availability | Mapping suggestion |
+|---|---|---|---|
+| `ManagedBackgroundAssetsError` | `case assetPackNotFound(withID: String)`, `case fileNotFound(at: FilePath)` | 26 | `assetPackNotFound` → permanent-missing; `fileNotFound` → permanent-missing for that asset (the manifest and pack disagree) |
+| `AssetPackManager.LocalAvailabilityError` | `successes: Set<AssetPack>`, `failures: [AssetPack: any Error]` | 27 | per-asset partial success (R-SYN-6) |
+| `BAManagedErrorCode` (Objective-C, `NS_REFINED_FOR_SWIFT`) | `AssetPackNotFound`, `FileNotFound`, `LocalAvailabilityFailure` in `BAManagedErrorDomain` | 26 | reached only through the Objective-C API |
+| everything else | `ensureLocalAvailability`, `checkForUpdates` and `remove` document only *"Throws: When the system can’t ensure the asset pack’s local availability."* | — | **UNVERIFIED** concrete types (probably `NSError` from download or network domains). Map unknown errors to a transient or unknown `TransferError` case; never crash, never treat as integrity. |
+
+### 1.9 Concurrency facts
+- `AssetPackManager` is a public `actor`. `AssetPack`, `AssetPack.Status`, `AssetPackManifest` and `DownloadStatusUpdate` are `Sendable`. `ManagedBackgroundAssetsError` is an `Error`, so it is `Sendable` in Swift 6.
+- No `@preconcurrency` and no `@unchecked` are needed anywhere in `ba03`, `ba04` or `ba05`. **The Apple tier costs 0 of the 3 unsafe escapes.**
+
+---
+
+## 2. Importability, `canImport`, linking (Q2)
+
+| Check | iOS 15 | macOS 12 | Evidence |
+|---|---|---|---|
+| `#if canImport(BackgroundAssets)` | **true** | **true** | `ba01_canImport`: `warning: canImport(BackgroundAssets) == true` on both. The `#warning` is a deliberate marker. |
+| `import BackgroundAssets` at the floor | yes | yes | `ba01`, `ba03`, `ba08` compile. The module imports `ExtensionFoundation`, `OSLog`, `System`; none of them causes a diagnostic. |
+| Use without `@available` | error | error | §1.2 `ba02` |
+| Single tier gate `if #available(iOS 26.0, macOS 26.0, *)` inside `#if canImport(BackgroundAssets)` | yes | yes | `ba08_runtimeGate` |
+| **Link: is the framework weak?** | **weak** | **weak** | `swiftc -emit-library` of `link/LinkProbe.swift` for `arm64-apple-ios15.0` and `arm64-apple-macos12.0`, then `otool -l`: `LC_LOAD_WEAK_DYLIB /System/Library/Frameworks/BackgroundAssets.framework/BackgroundAssets` (macOS: `…/Versions/A/BackgroundAssets`). `ExtensionFoundation` adds no load command. This is automatic; no linker flag was needed. |
+| Is the framework absent on old OSes? | absent | n/a | The iOS 15.0 and 15.5 simulator runtime roots (`/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 15.{0,5}.simruntime/…/RuntimeRoot`) have **no** `System/Library/Frameworks/BackgroundAssets.framework`. The 16.0 runtime has it. The weak link is therefore what lets the module load on iOS 15. |
+| `libswiftSystem.dylib` (needed for `FilePath`/`FileDescriptor`) | strong, present | strong | It is linked **strong** (`LC_LOAD_DYLIB /usr/lib/swift/libswiftSystem.dylib`; `System.FilePath` is declared `@available(macOS 11.0, iOS 14.0, …)`). The iOS 15.0 runtime root contains `/usr/lib/swift/libswiftSystem.dylib`, and both `System` symbols the probe imports (`_$s6System8FilePathV13stringLiteralACSS_tcfC`, `_$s6System8FilePathVMa`) are exported by it (`comm` found nothing missing). |
+
+**Consequences:**
+- Keep the whole `ZTronAssetAppleHosted` target under `#if canImport(BackgroundAssets)`, with live types at `@available(iOS 26.0, macOS 26.0, *)`. That keeps it compiling for both the iOS build (Q-1) and the macOS 12 test host.
+- No `Package.swift` linker settings are needed.
+- On the macOS 27 test host `#available(… macOS 26 …)` is **always true**, so the "OS < 26 ⇒ AWS" branch of R-APL-5 cannot run in tests. Make the tier function take `osSupportsAppleTier: Bool`, with the module's single `#available` in a one-line live wrapper. Otherwise that branch is untestable and uncovered.
+- **Not verified:** actually launching a floor-15 binary on an iOS 15 device. iOS 15 simulators cannot boot on this host: `simctl` reports *"The iOS 15.5 simulator runtime is not supported on hosts after macOS 26.99.99."* This goes to `DEVICE-TEST-PLAN.md`.
+
+---
+
+## 3. iOS 15 / macOS 12 availability probes (Q3, Appendix B)
+
+Probe directory `.build-probe-apple/avail` unless noted. When an item is unavailable, the iOS and macOS diagnostics are
+identical apart from the version, and both are quoted.
+
+| # | API (probe) | iOS 15 | macOS 12 | Compiler output and SDK declaration | Design consequence |
+|---|---|---|---|---|---|
+| 1 | `AsyncStream.makeStream(of:bufferingPolicy:)`, `AsyncThrowingStream.makeStream(of:throwing:)` (`p01`) | **yes** | **yes** | clean. `_Concurrency.swiftinterface:853-855`: `@available(macOS 10.15, iOS 13.0, …)` `@backDeployed(before: macOS 14.0, iOS 17.0, …)` `public static func makeStream(of elementType: …, bufferingPolicy limit: … = .unbounded)` | Use it for event broadcast (R-SYN-12) and reachability bridging; no fallback needed. The throwing form needs `Failure == any Error`. |
+| 2 | `Task.immediate` (`p02`) | **no** | **no** | `error: 'immediate(name:priority:executorPreference:operation:)' is only available in iOS 26.0 or newer` / `macOS 26.0`. Declaration: `@available(anyAppleOS 26.0, *)` (`_Concurrency.swiftinterface:6858`). | Banned. Synchronous-start guarantees (P-12 init, "no lost first event") come from doing the state change synchronously in the actor or `@MainActor` before any `Task {}`, not from an immediate task. |
+| 3 | `func f() async throws(MyError)`; typed-throws protocol requirement used through `any RemoteSource`; `Result<_, E>.get()`; `catch .offline` patterns (`p03a`, `tt/t4`) | **yes** | **yes** | clean | ADR-004 confirmed: `throws(AssetError)` on public async API, `throws(TransferError)` and others on internal protocols. |
+| 4 | Typed throws with a **generic** error type (`p03b`, `tt/t1–t3,t5–t7`, `tt2/t8–t10`) | **partly** | **partly** | **OK:** generic functions `func withRetry<T, E: Error>(_ body: () async throws(E) -> T) async throws(E) -> T`; `struct Op<E: Error> { let body: () throws(E) -> Int }`; typed closures stored in struct properties, including `Optional`; `Array.map` with a typed closure. **Error** whenever a typed-throws *function type* becomes runtime metadata (`[() throws(Local) -> Void]`, conversion to `Any`): `error: runtime support for typed throws function types is only available in iOS 18.0.0 or newer` / `macOS 15.0.0`. | Never put typed-throws closures in collections, `Any`, existentials or `AsyncStream` elements. Store such work as untyped `() async throws -> T` or behind a protocol, and map errors at the boundary. |
+| 5 | `sending` parameter and result; `withCheckedContinuation` returning a non-Sendable value (`p04`) | **yes** | **yes** | clean | Usable for handing non-Sendable buffers to the I/O executor without `@unchecked`. |
+| 6 | `OSSignposter` (`beginInterval`, `endInterval`, `emitEvent`), `os.Logger` with privacy (`p05`) | **yes** | **yes** | clean. `os.swiftinterface:1900-1901`: `@available(macOS 12.0, iOS 15.0, …) public struct OSSignposter : @unchecked Swift::Sendable`. `:1623-1624`: `@available(macOS 11.0, iOS 14.0, …) public struct Logger : @unchecked Swift::Sendable`. | Usable as global `let`s. Their `@unchecked` sits in Apple's SDK, not in our `Sources/`, so it costs nothing against our budget. Redact the app key with `privacy: .private` (R-NET-4). |
+| 7 | `NWPathMonitor` + `pathUpdateHandler` → `AsyncStream`; `currentPath`; `isExpensive`/`isConstrained`; captured in `@Sendable` closures, a `Sendable` final class and an actor (`p06`, `net/n2`) | **yes** | **yes** | clean. `Network.swiftinterface:859`: `final public class NWPathMonitor`, with `@preconcurrency final public var pathUpdateHandler: (@Sendable (_ newPath: Network::NWPath) -> Swift::Void)?`. Its `Sendable` conformance is declared in `extension Network::NWPathMonitor : Swift::Sendable, …, _Concurrency::AsyncSequence` under **`@available(macOS 14.0, iOS 17.0, …)`** (`:890-891`). The compiler does **not** enforce availability of the marker `Sendable` conformance: no diagnostic at 15 / 12. | Bridge the handler into `AsyncStream` (event-driven, R-NET-9 / R-SYN-13). **`for await path in monitor` is not available**: `net/n1`: `error: for-in loop requires 'NWPathMonitor' to conform to 'AsyncSequence', which is only available in iOS 17.0 or newer` / `macOS 14.0`. |
+| 8 | `URLSession.data(for:delegate:)`, `download(for:)`, `bytes(for:)`, `download(resumeFrom:)` (`p07`) | **yes** | **yes** | clean. `Foundation.swiftinterface:16641-16670`: `@available(macOS 12.0, iOS 15.0, …) extension Foundation::URLSession { public func data(for request: …, delegate: (any …URLSessionTaskDelegate)? = nil) async throws -> (Data, URLResponse) … download(for:…) … download(resumeFrom:…) … bytes(for:…) }` | Async APIs are available, but they hide the `URLSessionTask`. To set priority and multiplex progress (R-NET-2, R-NET-10), use task-based APIs with the session delegate. |
+| 9 | `URLSessionTask.priority` with `highPriority`/`lowPriority`/`defaultPriority` (`p07`) | **yes** | **yes** | clean. `NSURLSession.h:828`: `@property float priority API_AVAILABLE(macos(10.10), ios(8.0), …)` | R-NET-10 table: userInitiated → `highPriority`, prefetch → `defaultPriority`, bulk → `lowPriority` (a hint only). Engine-level lanes stay authoritative. |
+| 10 | `URLSessionConfiguration.background(withIdentifier:)`, `isDiscretionary`, `sessionSendsLaunchEvents`; ephemeral config with `urlCache = nil` and `waitsForConnectivity` (`p07`) | **yes** | **yes** | clean | R-NET-3 can be built at the floor. Re-attachment is device-only (`BackgroundSessionBackend.swift`). |
+| 11 | `FileHandle.read(upToCount:)`, `write(contentsOf:)`, `synchronize()`, `seek(toOffset:)`, `seekToEnd()`, `offset()`, `truncate(atOffset:)`, `close()` (`p08`) | **yes** | **yes** | clean. `Foundation.swiftinterface:14337-14338`: `@available(macOS 10.15.4, iOS 13.4, …) public func read(upToCount count: Swift::Int) throws -> Foundation::Data?` | Streaming hash and copy in ≤ 1 MiB units (ADR-003) with no mutable pointer; `FileHandle(fileDescriptor:closeOnDealloc:)` also wraps a pack descriptor. |
+| 12 | `fcntl(fd, F_FULLFSYNC)`, `F_BARRIERFSYNC`, `flock(fd, LOCK_EX \| LOCK_NB)`, `rename`, `renamex_np(…, RENAME_EXCL / RENAME_SWAP)`, `open`, `fsync` on a directory fd, `errno` (`p09`) | **yes** | **yes** | clean. **No mutable pointer**: Swift `String` bridges to `UnsafePointer<CChar>` (immutable), and `Darwin.swiftinterface:26` has `public func fcntl(_ fd: Swift::Int32, _ cmd: Swift::Int32) -> Swift::Int32` (the pointer overload, `:30`, is avoidable). Headers: `sys/fcntl.h:260` `#define F_FULLFSYNC 51`, `:635` `int flock(int, int);`, `sys/stdio.h:52` `int renamex_np(const char *, const char *, unsigned int) __OSX_AVAILABLE(10.12) __IOS_AVAILABLE(10.0)`. **Run on the macOS 27 host** (`runtime/output.txt`): `F_FULLFSYNC=0 F_BARRIERFSYNC=0`; `flock.first=0 flock.second=-1 errno.second=35` (EWOULDBLOCK: a second descriptor in the *same process* is refused); `renamex_np.EXCL=-1 errno=17` (EEXIST); `renamex_np.SWAP=0`. | Index commit: write temp, `F_FULLFSYNC`, `rename`, then `fsync` the directory. `store.lock` uses `flock`; the "second opener hits the lock" test works in-process. `RENAME_EXCL` gives no-clobber blob publication. All of this costs 0 unsafe escapes. |
+| 13 | `URLResourceValues.isExcludedFromBackup` via `setResourceValues` (`p10`) | **yes** | **yes** | clean. `NSURL.h:443`: `NSURLIsExcludedFromBackupKey API_AVAILABLE(macos(10.8), ios(5.1), …)`. Host run: `excludedFromBackup.readback=Optional(true)`. | Needs a `var` URL. Read it back after `removeAllCachedResourceValues()` to prove the attribute was recorded (§7.3). |
+| 14 | `FileProtectionType.completeUntilFirstUserAuthentication` via `FileManager.setAttributes([.protectionKey: …])` (`p10`) | **yes** | **yes** | clean. `NSFileManager.h:1316`: `NSFileProtectionCompleteUntilFirstUserAuthentication API_AVAILABLE(macos(10.6), ios(5.0), …)`; `:1302`: `NSFileProtectionKey`. Host run: `protection.set=ok readback=Optional(NSFileProtectionCompleteUntilFirstUserAuthentication)`. | ADR-001 attribute is settable and testable on the macOS host. Enforcement while the device is locked is device-only. |
+| 15 | `volumeAvailableCapacityForImportantUsageKey` (and the opportunistic variant) (`p10`) | **yes** | **yes** | clean. `NSURL.h:640`: `API_AVAILABLE(macos(10.13), ios(11.0)) API_UNAVAILABLE(watchos, tvos)`. Host run: non-nil and positive. | `FreeSpaceSource` live conformer (R-SYN-11). Returns `Int64?`, so `nil` must be handled (treat it as unknown and fail closed). |
+| 16 | `ProcessInfo.isLowPowerModeEnabled`, `.NSProcessInfoPowerStateDidChange`, `thermalState`, `thermalStateDidChangeNotification` (`p11`) | **yes** | **yes** | clean. `NSProcessInfo.h:495`: `lowPowerModeEnabled API_AVAILABLE(macos(12.0), ios(9.0), …)`; `:513`: `NSProcessInfoPowerStateDidChangeNotification API_AVAILABLE(macos(12.0), ios(9.0), …)`; `:480` and `:508`: `thermalState` and its notification, `macosx(10.10.3), ios(11.0)`. | Low Power Mode on macOS starts at **exactly 12.0**, so the macOS 12 floor of ADR-005 is the lowest at which `PowerStateSource` compiles without gating. |
+| 17 | CryptoKit `SHA256()` incremental `update(data:)`, `update(bufferPointer: UnsafeRawBufferPointer)`, `finalize()` (`p12`) | **yes** | **yes** | clean. `CryptoKit.swiftinterface:306-307`: `@available(iOS 13.0, macOS 10.15, …) public struct SHA256 : Swift::Sendable`; `update(bufferPointer: Swift::UnsafeRawBufferPointer)` is **immutable** and does not match the unsafe gate. Host run: incremental equals one-shot. | P-6 streaming hash. `update(data:)` on each ≤ 1 MiB chunk needs no pointer at all. |
+| 18 | `Data(contentsOf:options: .alwaysMapped)`, `[.mappedIfSafe, .uncached]` (`p13`) | **yes** | **yes** | clean. Host run: `alwaysMapped.count=5`. | Mapped reads are fine for the one-shot comparison in P-6 and for small files. Streaming stays the default for memory deltas (P-6, P-7). |
+| 19 | `Synchronization.Mutex` (`p14a`) | **no** | **no** | `error: 'Mutex' is only available in iOS 18.0 or newer` / `macOS 15.0`. `Synchronization.swiftinterface:7838-7839`: `@available(macOS 15.0, iOS 18.0, …) @frozen @_staticExclusiveOnly public struct Mutex<Value> : ~Swift::Copyable` | Not allowed in production. Use actors, plus `DispatchQueue`-serialised state reached only through continuations (ADR-003). |
+| 20 | `OSAllocatedUnfairLock` (`p14b`) | **no** | **no** | `error: 'OSAllocatedUnfairLock' is only available in iOS 16.0 or newer` / `macOS 13.0`. `os.swiftinterface:2394-2395`. | Same as #19. |
+| 21 | **Test-fake option:** `Mutex` in a `final class …: Sendable` behind `@available(macOS 15.0, iOS 18.0, *)` (`p14c`; `testing/s3–s4`; real run in `testpkg`) | yes (gated) | yes (gated) | The gated class compiles at the floor. **But Swift Testing rejects `@available` on a suite *type***: `error: Attribute 'Suite' cannot be applied to this structure because it has been marked '@available(macOS 15.0, iOS 18.0, *)' (from macro 'Suite ')`, plus the same for `'Test'` inside it. Accepted forms: `@available(...)` on a **`@Test` function** inside an ungated suite, on a **free `@Test` function**, or `guard #available(...) else { return }` inside the body. All three ran and passed on macOS 27 (`swift test`: `✔ Test run with 4 tests in 3 suites passed`). | Fakes may use gated `Mutex` (0 unsafe escapes). The `@available` goes on each test function, not on the suite. An actor-based fake needs no gating and is still preferable for anything awaited. |
+| 22 | `final class Handle: NSObject, Sendable` with only `let` properties, one being an `AsyncStream.Continuation` (`p15`) | **yes** | **yes** | Accepted **without `@unchecked`**. Negative control `p15b` with a `var`: `error: stored property 'count' of 'Sendable'-conforming class 'Handle' is mutable`. | The URLSession delegate (R-NET-2) is a `final NSObject` subclass whose only state is `let` continuations or channels into an actor. |
+| 23 | `URLSessionDownloadDelegate`/`URLSessionDataDelegate`/`URLSessionTaskDelegate` conformance on that class with no `@preconcurrency`: `didFinishDownloadingTo`, `didWriteData`, `didCompleteWithError`, redirect with `@escaping @Sendable (URLRequest?) -> Void`, `didReceive response`, `urlSessionDidFinishEvents` (`p16`, `del/d1–d3`) | **yes** | **yes** | **No diagnostics.** `NSURLSession.h:1642-1644`: `NS_SWIFT_SENDABLE … @protocol NSURLSessionDelegate <NSObject>`, so every conformer must be `Sendable`. A non-Sendable conformer with a `var` (`p16b`) gives **`warning: stored property 'count' of 'Sendable'-conforming class 'SessionDelegate' is mutable`**, which is a build failure under `-warnings-as-errors`. Leaving `@Sendable` off the redirect completion handler (`d1`) or using the async variant (`d2`) also compiles cleanly. `urlSession(_:didCreateTask:)` is `API_AVAILABLE(macos(13.0), ios(16.0), …)` (`NSURLSession.h:1698-1699`): it compiles at 15 (`d3`) but **is never called on iOS 15**. | One long-lived session with a `Sendable` delegate and no escapes (R-NET-2). Strip the app key in `willPerformHTTPRedirection` (R-NET-4). Set priority on the task object you create; never rely on `didCreateTask`. |
+| 24 | `NWListener` / `NWConnection` loopback server owned by an actor: `acceptLocalOnly`, `requiredInterfaceType = .loopback`, `.any` port, `newConnectionHandler`, `receive`/`send` (`p17`) | **yes** | **yes** | clean. Handlers are `@preconcurrency final public var newConnectionHandler: (@Sendable (_ connection: Network::NWConnection) -> Swift::Void)?` (`Network.swiftinterface:653`). `extension Network::NWListener : Swift::Sendable` and `NWConnection : Sendable` are declared `@available(macOS 14.0, iOS 17.0, …)` (`:715-716`, `:2258-2259`). As with #7, there is no diagnostic at 15 / 12. | ADR-011's hand-written server in `ZTronAssetTestSupport` costs 0 escapes. The test host is macOS 27 anyway. |
+| 25 | `DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue:)` (`p18`) | **yes** | **yes** | clean. `Dispatch.swiftinterface:332`. | `MemoryPressureSource` (R-CLN-11) can have a Foundation-only live conformer, with no UIKit needed. |
+
+### 3.1 The rest of Appendix B (`b01`–`b14`)
+
+| Trap | iOS 15 | macOS 12 | Compiler output | Consequence |
+|---|---|---|---|---|
+| Observation (`@Observable`) | no | no | `error: 'Observable()' is only available in iOS 17.0 or newer` / `macOS 14.0` | Banned. Events go through `AsyncStream`. |
+| `ContinuousClock`, `Duration`, `.milliseconds`, `Task.sleep(for:)`, `duration(to:)` | no | no | e.g. `error: 'ContinuousClock' is only available in iOS 16.0 or newer`; `error: 'sleep(for:tolerance:clock:)' is only available in iOS 16.0 or newer` (macOS 13.0) | `TimeSource` speaks `UInt64` nanoseconds. The live conformer uses `Task.sleep(nanoseconds:)` and `DispatchTime`. |
+| `Task.sleep(nanoseconds:)`, `Task.yield()`, `withTaskCancellationHandler`, `withCheckedContinuation` | yes | yes | clean (`b03`) | ADR-003 bridge is available. |
+| `URL(filePath:)`, `appending(path:)` | no | no | `error: 'init(filePath:directoryHint:relativeTo:)' is only available in iOS 16.0 or newer`; `'appending(path:directoryHint:)' …` (macOS 13.0) | Use `URL(fileURLWithPath:isDirectory:)` and `appendingPathComponent(_:isDirectory:)`. `b05` shows these and `url.path` produce **no deprecation warning** at the floor. |
+| `Regex` | no | no | `error: 'Regex' is only available in iOS 16.0 or newer` (macOS 13.0) | Manifest validation (hex checksum, path segments) uses hand-written `UTF8` scanning, which is also faster for P-3. |
+| Custom actor executor (`SerialExecutor`, `ExecutorJob`, `asUnownedSerialExecutor()`) | no | no | `error: 'ExecutorJob' is only available in iOS 17.0 or newer`; `error: protocol 'SerialExecutor' requires 'enqueue' to be available in iOS 15.0 and newer` (macOS 14.0) | ADR-003 queue plus continuations instead. |
+| Task executors (`TaskExecutor`, `withTaskExecutorPreference`) | no | no | `error: 'TaskExecutor' is only available in iOS 18.0 or newer` (macOS 15.0) | Same. |
+| `withDiscardingTaskGroup` | **no** | **no** | `error: 'withDiscardingTaskGroup(returning:isolation:body:)' is only available in iOS 17.0 or newer` (macOS 14.0) | Use `withTaskGroup` / `withThrowingTaskGroup` and drain with `next()`, which is clean (`b10`). Long-lived groups must drain children so results don't build up (R-SYN-14). |
+| `some AsyncSequence<Int, Never>` (primary associated `Failure`) | **no** | **no** | `error: 'Failure' is only available in iOS 18.0 or newer` (macOS 15.0) | Public API returns the concrete `AsyncStream<AssetEvent>`, never `some AsyncSequence<…, Never>`. |
+| `isolated (any Actor)? = #isolation` | yes | yes | clean (`b11`) | Available for isolation-preserving helpers. |
+| `AsyncStream(_:bufferingPolicy:_:)` with `onTermination` | yes | yes | clean (`b14`) | R-SYN-12 subscriber clean-up. |
+| `import CryptoKit / Network / os` | yes | yes | clean (`b13`) | — |
+
+### 3.2 A trap outside the list: Swift Testing `.timeLimit` needs macOS 13
+`testing/s1` (macOS 12, `-F …/MacOSX.platform/Developer/Library/Frameworks -plugin-path …/host/plugins/testing`):
+`error: 'timeLimit' is only available in macOS 13.0 or newer`. The declaration is
+`$MAC_PLATFORM_DEV/Library/Frameworks/Testing.framework/Modules/Testing.swiftmodule/arm64e-apple-macos.swiftinterface:1226-1228` (`$MAC_PLATFORM_DEV` = `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer`), `@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) extension Testing::Trait where Self == Testing::TimeLimitTrait { public static func timeLimit(…) }`.
+
+A suite-level trait (`@Suite(.timeLimit(.minutes(1)))`, `s6`) fails the same way. The same probe at `-target arm64-apple-macos13.0` compiles cleanly. **Accepted at macOS 12** (`s5`, and a real `swift test` run in `testpkg`, which passed):
+
+```swift
+@available(macOS 13.0, iOS 16.0, *)
+@Test("R-…: …", .timeLimit(.minutes(1)))
+func t() async { … }
+```
+
+**Consequence:** SPEC §7.2 requires `.timeLimit(.minutes(1))` on every test that awaits, and with the macOS 12 package floor that fails to compile. Both options below are the orchestrator's call; it owns `Package.swift` and ADR-005.
+- **(a)** Put `@available(macOS 13.0, iOS 16.0, *)` on each such **test function**. This works; suites cannot carry it.
+- **(b)** Raise only the macOS floor to 13 in an ADR, tagged **NEEDS-HUMAN-REVIEW**. This weakens ADR-005's rationale that the macOS floor mirrors iOS 15's API set. The Q-1 iOS build would still catch iOS 16-only APIs.
+
+---
+
+## 4. Consequences for the design, consolidated
+
+1. **R-APL-1:** spell the gate `@available(iOS 26.0, macOS 26.0, *)` inside `#if canImport(BackgroundAssets)`. With iOS alone the macOS host build breaks (§1.2).
+2. **D-12 / progress:** `Foundation.Progress` is turned into a value at the `PackBackend` boundary. `DownloadStatusUpdate` switches always include `@unknown default`.
+3. **D-11 / R-APL-3:** no stable URL, so adopt-and-release by default. Stream through `descriptor(for:searchingInAssetPackWithID:)` → `FileHandle(fileDescriptor:closeOnDealloc:)` → SHA-256 → `staging/` → commit. Then `remove(assetPackWithID:)` once **all** of the pack's files are adopted and policy allows. An `fclonefileat` clone is an optional optimisation that needs a device check.
+4. **R-APL-4:** catalog read from the essential pack via `contents(at:searchingInAssetPackWithID:)`, off-main. Update check: `checkForUpdates()` on 26.0–26.3, plus `requireLatestVersion:` on ≥ 26.4, with the choice passed in as data. Offline falls back to the installed catalog. `removedIDs` feeds prune.
+5. **R-APL-5:** the pure tier function takes `osSupportsAppleTier: Bool`, and the one `#available` lives in a trivial live wrapper. `AssetPackManager.shared` is referenced only lazily inside `LiveAssetPackBackend`, never in tests and never in `init`.
+6. **Unsafe budget:**
+   - Every API on the list can be used with **0** escapes.
+   - The only way to spend one would be `@unchecked` on a delegate or lock box, and neither is needed (#22, #23).
+   - Fakes may use gated `Mutex` (#21).
+7. **Floor-safe replacements:** `AsyncStream.makeStream` is OK. Use `withTaskGroup` (not discarding), `Task.sleep(nanoseconds:)`, `appendingPathComponent` and concrete `AsyncStream` return types. Use no `Regex`, no Clock and no `Mutex` in production.
+8. **Typed throws:** use it everywhere it's concrete. Never let a typed-throws closure become runtime metadata (a collection, `Any`, an existential, or a stream element).
+
+## 5. UNVERIFIED (behaviour the SDK cannot show; each goes to `DEVICE-TEST-PLAN.md`)
+
+| Item | What was tried | Why it stays open |
+|---|---|---|
+| Whether a removed `essential` or `prefetch` pack is re-downloaded automatically (next app update, `checkForUpdates`, background poll) | headers, swiftdoc, and three developer.apple.com pages | Not documented. Needs TestFlight with Apple-hosted packs. |
+| The concrete error types thrown by `ensureLocalAvailability`, `checkForUpdates` and `remove` beyond `ManagedBackgroundAssetsError` | interface, swiftdoc `Throws:` lines | Only *"When the system can’t…"* is documented. Map unknown errors defensively. |
+| Whether `fclonefileat` from a pack descriptor into the app container works under the sandbox | compiles at the floor; works on the macOS host between ordinary files | The pack store is OS-managed; needs a device. |
+| Whether the bytes at an in-place `url(for:)` path stay stable during a process if the system updates the pack mid-session | header warnings only | Needs a device and a server-side update. |
+| Launching a floor-15 binary on iOS 15 (the weak BackgroundAssets link; the strong `libswiftSystem`) | `otool` load commands; the iOS 15.0/15.5 simulator runtime file trees and exported symbols | iOS 15 simulators cannot boot on a macOS 27 host; needs a device. |
+| Whether essential packs are on disk before the first launch of an Apple-hosted app (the R-APL-4 catalog source) | web cross-check: *"essential asset packs before launch"* | Needs TestFlight. |

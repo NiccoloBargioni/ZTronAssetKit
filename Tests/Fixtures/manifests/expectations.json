@@ -1,0 +1,951 @@
+{
+  "formatVersion": 1,
+  "generatedBy": "Tests/Fixtures/generate_fixtures.py",
+  "note": "Paths are relative to Tests/Fixtures. Identifier lists are sorted ascending by UTF-8 bytes. Classification follows R-MAN-4 with absent policy == \"standard\" and absent tags == [].",
+  "classes": [
+    "added",
+    "removed",
+    "contentChanged",
+    "metadataChanged",
+    "unchanged"
+  ],
+  "tiers": {
+    "aws": {
+      "series": {
+        "v1": {
+          "file": "manifests/aws/v1.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v2": {
+          "file": "manifests/aws/v2-checksum-change.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v3": {
+          "file": "manifests/aws/v3-directory-change.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v4": {
+          "file": "manifests/aws/v4-removal.json",
+          "assetCount": 11,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.title.card"
+          ]
+        }
+      },
+      "envelope": {
+        "file": "manifests/aws/v1.envelope.json",
+        "schemaVersion": 1,
+        "assetCount": 13,
+        "identifiers": [
+          "bo6.tm.easter.egg.control.room.icon",
+          "bo6.tm.easter.egg.control.room.outline",
+          "bo7.menu.background",
+          "bo7.ri.ambience.crypt",
+          "bo7.ri.character.keeper.card",
+          "bo7.ri.character.keeper.portrait",
+          "bo7.ri.cinematic.intro",
+          "bo7.ri.easter.egg.vehytherion.temple.icon",
+          "bo7.ri.easter.egg.vehytherion.temple.map",
+          "bo7.ri.easter.egg.vehytherion.temple.outline",
+          "bo7.ri.music.main.theme",
+          "waw.ndu.round.start.sting",
+          "waw.ndu.title.card"
+        ]
+      },
+      "transitions": {
+        "v1->v2": {
+          "from": "v1",
+          "to": "v2",
+          "fromFile": "manifests/aws/v1.json",
+          "toFile": "manifests/aws/v2-checksum-change.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.easter.egg.vehytherion.temple.icon"
+          ],
+          "metadataChanged": [],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v2->v3": {
+          "from": "v2",
+          "to": "v3",
+          "fromFile": "manifests/aws/v2-checksum-change.json",
+          "toFile": "manifests/aws/v3-directory-change.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v3->v4": {
+          "from": "v3",
+          "to": "v4",
+          "fromFile": "manifests/aws/v3-directory-change.json",
+          "toFile": "manifests/aws/v4-removal.json",
+          "added": [],
+          "removed": [
+            "bo6.tm.easter.egg.control.room.outline",
+            "waw.ndu.round.start.sting"
+          ],
+          "contentChanged": [],
+          "metadataChanged": [],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.title.card"
+          ]
+        }
+      },
+      "extraTransitions": {
+        "v1->v4": {
+          "from": "v1",
+          "to": "v4",
+          "fromFile": "manifests/aws/v1.json",
+          "toFile": "manifests/aws/v4-removal.json",
+          "added": [],
+          "removed": [
+            "bo6.tm.easter.egg.control.room.outline",
+            "waw.ndu.round.start.sting"
+          ],
+          "contentChanged": [
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.easter.egg.vehytherion.temple.icon"
+          ],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v1->v1.envelope": {
+          "from": "v1",
+          "to": "v1.envelope",
+          "fromFile": "manifests/aws/v1.json",
+          "toFile": "manifests/aws/v1.envelope.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "waw.ndu.title.card"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting"
+          ]
+        }
+      }
+    },
+    "apple": {
+      "series": {
+        "v1": {
+          "file": "manifests/apple/v1.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v2": {
+          "file": "manifests/apple/v2-checksum-change.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v3": {
+          "file": "manifests/apple/v3-directory-change.json",
+          "assetCount": 13,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v4": {
+          "file": "manifests/apple/v4-removal.json",
+          "assetCount": 11,
+          "identifiers": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.title.card"
+          ]
+        }
+      },
+      "envelope": {
+        "file": "manifests/apple/v1.envelope.json",
+        "schemaVersion": 1,
+        "assetCount": 13,
+        "identifiers": [
+          "bo6.tm.easter.egg.control.room.icon",
+          "bo6.tm.easter.egg.control.room.outline",
+          "bo7.menu.background",
+          "bo7.ri.ambience.crypt",
+          "bo7.ri.character.keeper.card",
+          "bo7.ri.character.keeper.portrait",
+          "bo7.ri.cinematic.intro",
+          "bo7.ri.easter.egg.vehytherion.temple.icon",
+          "bo7.ri.easter.egg.vehytherion.temple.map",
+          "bo7.ri.easter.egg.vehytherion.temple.outline",
+          "bo7.ri.music.main.theme",
+          "waw.ndu.round.start.sting",
+          "waw.ndu.title.card"
+        ]
+      },
+      "transitions": {
+        "v1->v2": {
+          "from": "v1",
+          "to": "v2",
+          "fromFile": "manifests/apple/v1.json",
+          "toFile": "manifests/apple/v2-checksum-change.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.easter.egg.vehytherion.temple.icon"
+          ],
+          "metadataChanged": [],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.menu.background",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v2->v3": {
+          "from": "v2",
+          "to": "v3",
+          "fromFile": "manifests/apple/v2-checksum-change.json",
+          "toFile": "manifests/apple/v3-directory-change.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "waw.ndu.round.start.sting",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v3->v4": {
+          "from": "v3",
+          "to": "v4",
+          "fromFile": "manifests/apple/v3-directory-change.json",
+          "toFile": "manifests/apple/v4-removal.json",
+          "added": [],
+          "removed": [
+            "bo6.tm.easter.egg.control.room.outline",
+            "waw.ndu.round.start.sting"
+          ],
+          "contentChanged": [],
+          "metadataChanged": [],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.menu.background",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.title.card"
+          ]
+        }
+      },
+      "extraTransitions": {
+        "v1->v4": {
+          "from": "v1",
+          "to": "v4",
+          "fromFile": "manifests/apple/v1.json",
+          "toFile": "manifests/apple/v4-removal.json",
+          "added": [],
+          "removed": [
+            "bo6.tm.easter.egg.control.room.outline",
+            "waw.ndu.round.start.sting"
+          ],
+          "contentChanged": [
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.easter.egg.vehytherion.temple.icon"
+          ],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "bo7.ri.music.main.theme"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "waw.ndu.title.card"
+          ]
+        },
+        "v1->v1.envelope": {
+          "from": "v1",
+          "to": "v1.envelope",
+          "fromFile": "manifests/apple/v1.json",
+          "toFile": "manifests/apple/v1.envelope.json",
+          "added": [],
+          "removed": [],
+          "contentChanged": [],
+          "metadataChanged": [
+            "bo7.menu.background",
+            "bo7.ri.cinematic.intro",
+            "bo7.ri.easter.egg.vehytherion.temple.icon",
+            "bo7.ri.easter.egg.vehytherion.temple.map",
+            "bo7.ri.easter.egg.vehytherion.temple.outline",
+            "waw.ndu.title.card"
+          ],
+          "unchanged": [
+            "bo6.tm.easter.egg.control.room.icon",
+            "bo6.tm.easter.egg.control.room.outline",
+            "bo7.ri.ambience.crypt",
+            "bo7.ri.character.keeper.card",
+            "bo7.ri.character.keeper.portrait",
+            "bo7.ri.music.main.theme",
+            "waw.ndu.round.start.sting"
+          ]
+        }
+      }
+    }
+  },
+  "payloads": [
+    {
+      "file": "payloads/bo6.tm.easter.egg.control.room.icon.jpg",
+      "role": "baseline",
+      "byteSize": 686,
+      "sha256": "418dc9bd76572bc23b33451eff6ee53abda29ff3e64b943f91ba751f40f9af68",
+      "identifiers": [
+        "bo6.tm.easter.egg.control.room.icon"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/418dc9bd76572bc2/bo6.tm.easter.egg.control.room.icon.jpg"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo6.tm.easter.egg.control.room.icon.jpg"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo6.tm.easter.egg.control.room.outline.svg",
+      "role": "baseline",
+      "byteSize": 367,
+      "sha256": "50a4c45e1bd4061e1317b20b42ab60d34103a8edef6db0fd8ad7f2dbac98252e",
+      "identifiers": [
+        "bo6.tm.easter.egg.control.room.outline"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/50a4c45e1bd4061e/bo6.tm.easter.egg.control.room.outline.svg"
+        ],
+        "apple": [
+          "ZTronMedia/vectors/bo6.tm.easter.egg.control.room.outline.svg"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.menu.background.heic",
+      "role": "baseline",
+      "byteSize": 64,
+      "sha256": "fe155aac5fc5f0e2e797a0a5004d7107f30c60f0107892ca926593f47c0d2a3b",
+      "identifiers": [
+        "bo7.menu.background"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/fe155aac5fc5f0e2/bo7.menu.background.heic"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo7.menu.background.heic"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.ambience.crypt.v2.wav",
+      "role": "v2-variant",
+      "byteSize": 2044,
+      "sha256": "40590444e1c6dc95f5ac111e4b690c243866ce802d9bdaa8014e0ea89e042fc7",
+      "identifiers": [
+        "bo7.ri.ambience.crypt"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/40590444e1c6dc95/bo7.ri.ambience.crypt.wav"
+        ],
+        "apple": [
+          "ZTronMedia/audio/bo7.ri.ambience.crypt.v2.wav"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.ambience.crypt.wav",
+      "role": "baseline",
+      "byteSize": 2044,
+      "sha256": "603fad3b8d9e0bac5fc6ab8c0a61dbb5127283460c868bef1ffe5374e4280d39",
+      "identifiers": [
+        "bo7.ri.ambience.crypt"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/603fad3b8d9e0bac/bo7.ri.ambience.crypt.wav"
+        ],
+        "apple": [
+          "ZTronMedia/audio/bo7.ri.ambience.crypt.wav"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.character.keeper.portrait.jpg",
+      "role": "baseline",
+      "byteSize": 963,
+      "sha256": "34daebb47a6eb1d6e10e5720c90f01527455d5d497cd1385818c5970f38ff245",
+      "identifiers": [
+        "bo7.ri.character.keeper.card",
+        "bo7.ri.character.keeper.portrait"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/34daebb47a6eb1d6/bo7.ri.character.keeper.card.jpg",
+          "media/34daebb47a6eb1d6/bo7.ri.character.keeper.portrait.jpg"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo7.ri.character.keeper.card.jpg",
+          "ZTronMedia/images/bo7.ri.character.keeper.portrait.jpg"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.cinematic.intro.mp4",
+      "role": "baseline",
+      "byteSize": 4096,
+      "sha256": "088e1013639dbbcfe47fbe70681ba30579bbbd64a712d5dc7b15e29591193381",
+      "identifiers": [
+        "bo7.ri.cinematic.intro"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/088e1013639dbbcf/bo7.ri.cinematic.intro.mp4"
+        ],
+        "apple": [
+          "ZTronMedia/video/bo7.ri.cinematic.intro.mp4"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.easter.egg.vehytherion.temple.icon.heic",
+      "role": "baseline",
+      "byteSize": 1536,
+      "sha256": "a3da86d8e8d0c1b637e9577137e858aadb5030b54229db4672ec0d2e01ca7ba9",
+      "identifiers": [
+        "bo7.ri.easter.egg.vehytherion.temple.icon"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/a3da86d8e8d0c1b6/bo7.ri.easter.egg.vehytherion.temple.icon.heic"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo7.ri.easter.egg.vehytherion.temple.icon.heic"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.easter.egg.vehytherion.temple.icon.v2.heic",
+      "role": "v2-variant",
+      "byteSize": 1792,
+      "sha256": "d2faa4403b6aa24620dc1fb62423766831cf8030b400d0a264c624bea55360eb",
+      "identifiers": [
+        "bo7.ri.easter.egg.vehytherion.temple.icon"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/d2faa4403b6aa246/bo7.ri.easter.egg.vehytherion.temple.icon.heic"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo7.ri.easter.egg.vehytherion.temple.icon.v2.heic"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.easter.egg.vehytherion.temple.map.png",
+      "role": "baseline",
+      "byteSize": 1236,
+      "sha256": "9221834f012ace4d8c4b2972bb29df92c42ee4693c5707c661e17cd6285645bc",
+      "identifiers": [
+        "bo7.ri.easter.egg.vehytherion.temple.map"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/9221834f012ace4d/bo7.ri.easter.egg.vehytherion.temple.map.png"
+        ],
+        "apple": [
+          "ZTronMedia/images/bo7.ri.easter.egg.vehytherion.temple.map.png"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.easter.egg.vehytherion.temple.outline.svg",
+      "role": "baseline",
+      "byteSize": 375,
+      "sha256": "a5ff10c44f45daf204b2981b68c20e593337dfeb78a755d38f9cce3e925ec2ed",
+      "identifiers": [
+        "bo7.ri.easter.egg.vehytherion.temple.outline"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/a5ff10c44f45daf2/bo7.ri.easter.egg.vehytherion.temple.outline.svg"
+        ],
+        "apple": [
+          "ZTronMedia/vectors/bo7.ri.easter.egg.vehytherion.temple.outline.svg"
+        ]
+      }
+    },
+    {
+      "file": "payloads/bo7.ri.music.main.theme.mp3",
+      "role": "baseline",
+      "byteSize": 1312,
+      "sha256": "47a1445158b1da873e408818d5382015dd37cb53b8342af6ca770a8facf31a24",
+      "identifiers": [
+        "bo7.ri.music.main.theme"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/47a1445158b1da87/bo7.ri.music.main.theme.mp3"
+        ],
+        "apple": [
+          "ZTronMedia/audio/bo7.ri.music.main.theme.mp3"
+        ]
+      }
+    },
+    {
+      "file": "payloads/waw.ndu.round.start.sting.wav",
+      "role": "baseline",
+      "byteSize": 644,
+      "sha256": "4854c15ea5afeb8fd86edb5bc9f25d5a3b8932bd8272d66596eafee389359933",
+      "identifiers": [
+        "waw.ndu.round.start.sting"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/4854c15ea5afeb8f/waw.ndu.round.start.sting.wav"
+        ],
+        "apple": [
+          "ZTronMedia/audio/waw.ndu.round.start.sting.wav"
+        ]
+      }
+    },
+    {
+      "file": "payloads/waw.ndu.title.card.png",
+      "role": "baseline",
+      "byteSize": 460,
+      "sha256": "ae029dcf3d58c2bc200e889211cc595ae40315edfc3910b8a1c5c0f5f3612a25",
+      "identifiers": [
+        "waw.ndu.title.card"
+      ],
+      "remotePaths": {
+        "aws": [
+          "media/ae029dcf3d58c2bc/waw.ndu.title.card.png"
+        ],
+        "apple": [
+          "ZTronMedia/images/waw.ndu.title.card.png"
+        ]
+      }
+    }
+  ],
+  "invalid": {
+    "manifests/invalid/bad-extension-empty.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "fileExtension \"\" is empty (R-MAN-2: at least 1 character)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.bad.extension.empty"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/bad-extension-too-long.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "fileExtension \"abcdefghi\" is 9 characters (R-MAN-2: at most 8)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.bad.extension.too.long"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/bad-extension.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "fileExtension \"p/ng\" contains a path separator (R-MAN-2: [A-Za-z0-9]{1,8})",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.bad.extension"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/byte-size-negative.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "byteSize is -1 (R-MAN-2: within 0...maxAssetBytes)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.byte.size.negative"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/checksum-non-hex.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "checksum has 64 characters but starts with \"zz\", which is not hexadecimal (R-MAN-2)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.checksum.non.hex"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/checksum-wrong-length.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "checksum has 63 hex characters (R-MAN-2: exactly 64)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.checksum.wrong.length"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/deeply-nested-10000-levels.json": {
+      "wireShape": "none",
+      "outcome": "manifestRejected",
+      "reasonClass": "undecodable-nesting-depth",
+      "violation": "10,000 nested JSON arrays (20,001 bytes) and no asset object at all",
+      "mustNotCrash": true
+    },
+    "manifests/invalid/duplicate-identifiers.json": {
+      "wireShape": "array",
+      "outcome": "manifestRejected",
+      "reasonClass": "duplicate-identifiers",
+      "violation": "identifier \"bo7.ri.music.main.theme\" appears twice (indices 1 and 2) with different content; each entry is individually valid (D-13: the prior art trapped on this)",
+      "entryCount": 4,
+      "duplicateIdentifier": "bo7.ri.music.main.theme",
+      "mustNotCrash": true
+    },
+    "manifests/invalid/envelope-unsupported-schema-version.json": {
+      "wireShape": "envelope",
+      "outcome": "manifestRejected",
+      "reasonClass": "unsupported-schema-version",
+      "violation": "envelope declares schemaVersion 99; the three assets inside are individually valid but must not be interpreted",
+      "entryCount": 3,
+      "schemaVersion": 99,
+      "mustNotCrash": true
+    },
+    "manifests/invalid/identifier-control-character.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "identifier contains U+0007 (BEL) (R-MAN-2: no control characters)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.control\u0007character"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/identifier-empty.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "identifier is the empty string (R-MAN-2: non-empty)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        ""
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/non-json-bytes.bin": {
+      "wireShape": "none",
+      "outcome": "manifestRejected",
+      "reasonClass": "undecodable-not-json",
+      "violation": "256 bytes that are not JSON in any encoding (binary prefix, then seeded random bytes)",
+      "mustNotCrash": true
+    },
+    "manifests/invalid/remote-path-absolute.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "remotePath \"/abs\" is absolute (R-MAN-2: relative only)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.remote.path.absolute"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/remote-path-embedded-dotdot.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "remotePath \"a/../../b\" contains '..' segments in the middle (R-MAN-2)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.remote.path.embedded.dotdot"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/remote-path-scheme-authority.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "remotePath \"https://evil/x\" carries a scheme and an authority (R-MAN-2)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.remote.path.scheme.authority"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    },
+    "manifests/invalid/remote-path-traversal-dotdot.json": {
+      "wireShape": "array",
+      "outcome": "entryQuarantined",
+      "violation": "remotePath \"../x\" starts with a '..' segment (R-MAN-2: no '..' segment)",
+      "entryCount": 3,
+      "quarantinedIndices": [
+        1
+      ],
+      "quarantinedIdentifiers": [
+        "invalid.remote.path.traversal.dotdot"
+      ],
+      "survivingIdentifiers": [
+        "bo7.menu.background",
+        "waw.ndu.title.card"
+      ]
+    }
+  }
+}

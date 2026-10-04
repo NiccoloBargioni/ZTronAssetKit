@@ -1,0 +1,49 @@
+[
+  {
+    "identifier": "bo7.menu.background",
+    "fileExtension": "heic",
+    "remotePath": "media/fe155aac5fc5f0e2/bo7.menu.background.heic",
+    "localPathComponents": [
+      "Black Ops 7",
+      "Menus"
+    ],
+    "byteSize": 64,
+    "checksum": "fe155aac5fc5f0e2e797a0a5004d7107f30c60f0107892ca926593f47c0d2a3b"
+  },
+  {
+    "identifier": "bo7.ri.music.main.theme",
+    "fileExtension": "mp3",
+    "remotePath": "media/47a1445158b1da87/bo7.ri.music.main.theme.mp3",
+    "localPathComponents": [
+      "Black Ops 7",
+      "Rex Infernus",
+      "Audio"
+    ],
+    "byteSize": 1312,
+    "checksum": "47a1445158b1da873e408818d5382015dd37cb53b8342af6ca770a8facf31a24"
+  },
+  {
+    "identifier": "bo7.ri.music.main.theme",
+    "fileExtension": "wav",
+    "remotePath": "media/4854c15ea5afeb8f/bo7.ri.music.main.theme.wav",
+    "localPathComponents": [
+      "Black Ops 7",
+      "Rex Infernus",
+      "Audio"
+    ],
+    "byteSize": 644,
+    "checksum": "4854c15ea5afeb8fd86edb5bc9f25d5a3b8932bd8272d66596eafee389359933"
+  },
+  {
+    "identifier": "waw.ndu.title.card",
+    "fileExtension": "png",
+    "remotePath": "media/ae029dcf3d58c2bc/waw.ndu.title.card.png",
+    "localPathComponents": [
+      "World at War",
+      "Nacht der Untoten"
+    ],
+    "localFileName": "Title Card",
+    "byteSize": 460,
+    "checksum": "ae029dcf3d58c2bc200e889211cc595ae40315edfc3910b8a1c5c0f5f3612a25"
+  }
+]
