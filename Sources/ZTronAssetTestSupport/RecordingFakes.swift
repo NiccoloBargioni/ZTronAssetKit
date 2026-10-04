@@ -864,6 +864,7 @@ public actor EventProbe {
                     }
                 }
                 group.addTask {
+                    // REENTRANCY: h-2 (proposed) — nothing: waits only for `stop()` to finish the signal stream.
                     for await _ in signal {}
                 }
                 // REENTRANCY: h-2 (proposed) — nothing: whichever child ends first cancels the other.

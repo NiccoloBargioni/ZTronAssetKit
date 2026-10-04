@@ -419,6 +419,8 @@ public actor LoopbackHTTPServer {
 
     /// Waits for the listener to become ready and returns its port; fails when it fails, waits or is cancelled.
     private static func ready(_ listener: NWListener, on queue: DispatchQueue) async throws -> UInt16 {
+        // REENTRANCY: h-8 (proposed) — nothing: a nonisolated bridge that touches no actor state; resumed exactly once
+        // by the first terminal listener state, after which the handler is removed.
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
             listener.stateUpdateHandler = { state in
                 switch state {
@@ -444,6 +446,7 @@ public actor LoopbackHTTPServer {
 
     /// One receive: the bytes, whether the peer finished, whether it failed.
     private static func receive(_ connection: NWConnection) async -> (Data?, Bool, Bool) {
+        // REENTRANCY: h-8 (proposed) — nothing: a nonisolated bridge; Network calls the completion exactly once.
         await withCheckedContinuation { (continuation: CheckedContinuation<(Data?, Bool, Bool), Never>) in
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, isComplete, error in
                 continuation.resume(returning: (data, isComplete, error != nil))
@@ -454,6 +457,7 @@ public actor LoopbackHTTPServer {
     /// Sends bytes as one complete message; `final` ends the stream with a FIN after them. (An incomplete default
     /// message would hold back every later send on another context, the final one included.)
     private static func send(_ data: Data, on connection: NWConnection, final: Bool) async {
+        // REENTRANCY: h-8 (proposed) — nothing: a nonisolated bridge; Network calls the completion exactly once.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             connection.send(
                 content: data,
