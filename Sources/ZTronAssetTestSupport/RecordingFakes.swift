@@ -220,6 +220,17 @@ public struct FakeControlRecord: Sendable, Hashable {
 ///
 /// Built by the test, handed to the engine by `FakeRemoteSourceFactory`, which attaches the open store's staging
 /// sink first (`StagingAttachable`), so `.stage(Data)` writes real staging files the store then publishes.
+///
+/// Scripting, precisely: each transfer id has one queue of steps (`script(_:_:)` appends). An attempt consumes
+/// steps from its id's queue, in order, until a terminal step (`.stage`, `.stageGenerated`, `.fail`) or a `.hold`;
+/// the rest of the queue belongs to later attempts, so `[.fail(…), .stage(…)]` scripts a failed attempt and a
+/// successful retry. Steps run synchronously inside `transfer(_:)` (staging writes included), so an attempt that is
+/// not held has finished before its handle is returned and the outcome never depends on scheduling. An attempt that
+/// reaches a `.hold`, or the end of its queue, stays active: `release(_:with:)` ends the oldest such attempt of the
+/// id (a release with no held attempt is kept for the next hold of that id, so a test never races the engine), and
+/// `script(_:_:)` wakes an attempt that ran out of steps (not one at an explicit `.hold`). A non-terminal release
+/// lets the attempt continue with its queue. `pause()` or `cancel()` on a handle ends that attempt; its remaining
+/// steps go to the next attempt. An unscripted manifest fetch answers 304 (the origin has nothing new).
 @available(macOS 15.0, iOS 18.0, *)
 public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     /// The breaker key.
@@ -232,6 +243,23 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     public nonisolated let transportLog = FakeTransportLog()
     private var staging: (any StagingSink)?
     private var heldSourceCopyBytes: Int64 = 0
+    private var steps: [TransferID: [FakeTransferStep]] = [:]
+    private var earlyReleases: [TransferID: [TransferUpdate]] = [:]
+    private var waiting: [WaitingAttempt] = []
+    private var manifestScript: [FakeManifestResponse] = []
+    private var manifestLog: [ManifestRequest] = []
+    private var reattachScript: [ReattachedTransfer] = []
+    private var cancelled: [StagingFileName] = []
+    private var reclaims: [AdoptionReport] = []
+    private var backgroundEvents: [String] = []
+    private var invalidated = false
+
+    /// An attempt that is active but not running: at an explicit `.hold`, or out of scripted steps.
+    private struct WaitingAttempt {
+        let request: TransferRequest
+        let handle: FakeTransferHandle
+        let atHold: Bool
+    }
 
     /// Creates a source.
     public init(
@@ -265,12 +293,19 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
 
     /// Scripts the next attempts of `id`.
     public func script(_ id: TransferID, _ steps: [FakeTransferStep]) {
-        fatalError("WP-H: FakeRemoteSource.script not implemented")
+        self.steps[id, default: []].append(contentsOf: steps)
+        self.dropStopped()
+        while !(self.steps[id] ?? []).isEmpty,
+            let index = self.waiting.firstIndex(where: { $0.request.id == id && !$0.atHold })
+        {
+            let attempt = self.waiting.remove(at: index)
+            self.run(attempt.request, attempt.handle)
+        }
     }
 
     /// Scripts the next manifest responses.
     public func scriptManifest(_ responses: [FakeManifestResponse]) {
-        fatalError("WP-H: FakeRemoteSource.scriptManifest not implemented")
+        self.manifestScript.append(contentsOf: responses)
     }
 
     /// Scripts what `reattachedTransfers()` returns: the transfers an "earlier process" left live in the OS or
@@ -278,12 +313,21 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     /// the completed ones' files into staging itself (through the store's sink) before `start()`; each call
     /// replaces the script, and `reattachedTransfers()` returns it once, then `[]` (one launch, ADR-028).
     public func scriptReattached(_ transfers: [ReattachedTransfer]) {
-        fatalError("WP-H: FakeRemoteSource.scriptReattached not implemented")
+        self.reattachScript = transfers
     }
 
     /// Ends a `.hold` step with `update`.
     public func release(_ id: TransferID, with update: TransferUpdate) {
-        fatalError("WP-H: FakeRemoteSource.release not implemented")
+        self.dropStopped()
+        guard let index = self.waiting.firstIndex(where: { $0.request.id == id }) else {
+            self.earlyReleases[id, default: []].append(update)
+            return
+        }
+        let attempt = self.waiting.remove(at: index)
+        attempt.handle.deliver(update)
+        if !update.isTerminal {
+            self.run(attempt.request, attempt.handle)
+        }
     }
 
     /// Requests started, in order (the `.started` entries of `transportLog`).
@@ -306,35 +350,81 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         }
     }
 
+    /// Manifest requests received, in order.
+    public var manifestRequests: [ManifestRequest] {
+        self.manifestLog
+    }
+
+    /// Names passed to `cancelTransfer(_:)`, in order.
+    public var cancelledTransfers: [StagingFileName] {
+        self.cancelled
+    }
+
+    /// Reports passed to `reclaimSourceCopies(_:)`, in order.
+    public var reclaimReports: [AdoptionReport] {
+        self.reclaims
+    }
+
+    /// Identifiers passed to `handleBackgroundEvents(identifier:)`, in order.
+    public var backgroundEventIdentifiers: [String] {
+        self.backgroundEvents
+    }
+
+    /// Whether `invalidate()` ran.
+    public var isInvalidated: Bool {
+        self.invalidated
+    }
+
     /// Transfers not yet terminal.
     public var activeTransfers: Int {
-        fatalError("WP-H: FakeRemoteSource.activeTransfers not implemented")
+        self.waiting.filter { !FakeRemoteSource.isStopped($0.handle) }.count
     }
 
     /// Scripted manifest response.
     public func fetchManifest(_ request: ManifestRequest) async throws(TransferError) -> ManifestFetchResult {
-        fatalError("WP-H: FakeRemoteSource.fetchManifest not implemented")
+        self.manifestLog.append(request)
+        guard !self.manifestScript.isEmpty else {
+            return .notModified(removedSources: [])
+        }
+        switch self.manifestScript.removeFirst() {
+        case .fetched(let bytes, let etag):
+            let origin: ManifestOrigin = self.capabilities.tier == .aws ? .network : .installedPack(updateChecked: true)
+            return .fetched(ManifestPayload(bytes: bytes, etag: etag, origin: origin))
+        case .notModified:
+            return .notModified(removedSources: [])
+        case .fail(let error):
+            throw error
+        }
     }
 
     /// Scripted transfer: records `.started(request)` in `transportLog`, then returns a `FakeTransferHandle` made
     /// with `transportLog`.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
-        fatalError("WP-H: FakeRemoteSource.transfer not implemented")
+        self.transportLog.record(.started(request))
+        let handle = FakeTransferHandle(id: request.id, attempt: request.attempt, transportLog: self.transportLog)
+        if self.invalidated {
+            handle.deliver(.failed(.cancelled(.byClient)))
+        } else {
+            self.run(request, handle)
+        }
+        return handle
     }
 
     /// What `scriptReattached(_:)` set, once; `[]` otherwise.
     public func reattachedTransfers() async -> [ReattachedTransfer] {
-        fatalError("WP-H: FakeRemoteSource.reattachedTransfers not implemented")
+        defer { self.reattachScript = [] }
+        return self.reattachScript
     }
 
     /// Records the cancellation.
     public func cancelTransfer(_ name: StagingFileName) async {
-        fatalError("WP-H: FakeRemoteSource.cancelTransfer not implemented")
+        self.cancelled.append(name)
     }
 
     /// Records the report.
     public func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
-        fatalError("WP-H: FakeRemoteSource.reclaimSourceCopies not implemented")
+        self.reclaims.append(report)
+        return ReclaimReport()
     }
 
     /// What `setSourceCopyBytes(_:)` set; 0 by default.
@@ -344,20 +434,157 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
 
     /// Records the call.
     public func handleBackgroundEvents(identifier: String) async {
-        fatalError("WP-H: FakeRemoteSource.handleBackgroundEvents not implemented")
+        self.backgroundEvents.append(identifier)
     }
 
     /// Ends every transfer.
     public func invalidate() async {
-        fatalError("WP-H: FakeRemoteSource.invalidate not implemented")
+        self.invalidated = true
+        for attempt in self.waiting where !FakeRemoteSource.isStopped(attempt.handle) {
+            attempt.handle.deliver(.failed(.cancelled(.byClient)))
+        }
+        self.waiting.removeAll()
+        self.earlyReleases.removeAll()
+    }
+
+    // MARK: Attempts
+
+    /// Runs one attempt's steps until it ends, or parks it at a hold or at the end of its queue.
+    private func run(_ request: TransferRequest, _ handle: FakeTransferHandle) {
+        while !FakeRemoteSource.isStopped(handle) {
+            guard var queue = self.steps[request.id], !queue.isEmpty else {
+                switch self.takeEarlyRelease(request, handle) {
+                case .continued:
+                    continue
+                case .ended:
+                    return
+                case .none:
+                    self.waiting.append(WaitingAttempt(request: request, handle: handle, atHold: false))
+                    return
+                }
+            }
+            let step = queue.removeFirst()
+            self.steps[request.id] = queue.isEmpty ? nil : queue
+            switch step {
+            case .progress(let received):
+                handle.deliver(.progress(received: received, expected: request.expectedBytes))
+            case .stage(let data):
+                handle.deliver(self.stage(request, total: Int64(data.count), chunkBytes: max(1, data.count)) { offset, length in
+                    data.subdata(in: Int(offset)..<(Int(offset) + length))
+                })
+                return
+            case .stageGenerated(let seed, let byteCount):
+                handle.deliver(self.stage(request, total: max(0, byteCount), chunkBytes: GeneratedPayload.chunkBytes) { offset, length in
+                    GeneratedPayload.bytes(seed: seed, offset: offset, length: length)
+                })
+                return
+            case .fail(let error):
+                handle.deliver(.failed(error))
+                return
+            case .hold:
+                switch self.takeEarlyRelease(request, handle) {
+                case .continued:
+                    continue
+                case .ended:
+                    return
+                case .none:
+                    self.waiting.append(WaitingAttempt(request: request, handle: handle, atHold: true))
+                    return
+                }
+            }
+        }
+    }
+
+    /// What a release kept for an attempt's id did to it.
+    private enum EarlyRelease {
+        /// None was kept: the attempt waits.
+        case none
+        /// A progress update was delivered: the attempt continues with its queue.
+        case continued
+        /// A terminal update was delivered: the attempt is over.
+        case ended
+    }
+
+    /// Delivers the oldest release that arrived for `request.id` before any attempt of it waited.
+    private func takeEarlyRelease(_ request: TransferRequest, _ handle: FakeTransferHandle) -> EarlyRelease {
+        guard var queue = self.earlyReleases[request.id], !queue.isEmpty else {
+            return .none
+        }
+        let update = queue.removeFirst()
+        self.earlyReleases[request.id] = queue.isEmpty ? nil : queue
+        handle.deliver(update)
+        return update.isTerminal ? .ended : .continued
+    }
+
+    /// Writes `total` bytes through the attached sink (continuing `request.resume` when set) in chunks of at most
+    /// `chunkBytes`, each produced just before it is written, and maps the outcome as the transport would.
+    private func stage(_ request: TransferRequest, total: Int64, chunkBytes: Int, bytes: (Int64, Int) -> Data) -> TransferUpdate {
+        guard let sink = self.staging else {
+            return .failed(.transient(.localIO(posixCode: ENXIO), retryAfter: nil))
+        }
+        let name = request.partialName
+        do throws(StagingError) {
+            var size: Int64 = 0
+            if let resume = request.resume {
+                size = try sink.continuePartial(from: resume.previous, as: name)
+            } else {
+                try sink.createPartial(name)
+            }
+            var offset = min(size, total)
+            while offset < total {
+                let length = Int(min(Int64(chunkBytes), total - offset))
+                size = try sink.appendPartial(bytes(offset, length), to: name)
+                offset += Int64(length)
+            }
+            let status: Int? = self.capabilities.tier == .aws ? 200 : nil
+            return .staged(StagedFile(name: name, byteCount: size, resumed: request.resume != nil, httpStatus: status, etag: nil))
+        } catch {
+            return .failed(FakeRemoteSource.transferError(error))
+        }
+    }
+
+    /// Drops parked attempts the engine paused or cancelled.
+    private func dropStopped() {
+        self.waiting.removeAll { FakeRemoteSource.isStopped($0.handle) }
+    }
+
+    /// Whether the engine ended the attempt through its handle.
+    private static func isStopped(_ handle: FakeTransferHandle) -> Bool {
+        handle.controls.contains { $0 == .pause || $0 == .cancel }
+    }
+
+    /// The transport's mapping of a staging failure (`StagingSink` doc): ENOSPC is `insufficientSpace`, anything else
+    /// a local I/O failure.
+    private static func transferError(_ error: StagingError) -> TransferError {
+        switch error {
+        case .insufficientSpace:
+            return .insufficientSpace(requiredBytes: nil)
+        case .io(let code):
+            return .transient(.localIO(posixCode: code), retryAfter: nil)
+        case .tooLarge:
+            return .transient(.localIO(posixCode: EFBIG), retryAfter: nil)
+        case .source:
+            return .transient(.localIO(posixCode: EIO), retryAfter: nil)
+        case .nameInUse:
+            return .transient(.localIO(posixCode: EEXIST), retryAfter: nil)
+        }
     }
 }
 
 /// A scripted `TransferBackend` for `HTTPRemoteSource` tests without URLSession (WP-H). Gated for `Mutex`.
+///
+/// Every `start` returns a fresh `FakeTransferHandle` (reachable through `handles`, in start order) that the test
+/// drives with `deliver(_:)`; `liveTransfers()` reports what `scriptLiveTransfers(_:)` set, minus names cancelled
+/// since; `invalidate()` fails every handle with `.cancelled(.byClient)`, as `invalidateAndCancel()` would.
 @available(macOS 15.0, iOS 18.0, *)
 public actor FakeTransferBackend: TransferBackend {
     /// The kind it pretends to be.
     public nonisolated let kind: TransferBackendKind
+    private var started: [TransferJob] = []
+    private var made: [FakeTransferHandle] = []
+    private var live: [LiveTransfer] = []
+    private var cancels: [FakeBackendCancellation] = []
+    private var invalidateCount = 0
 
     /// Creates a backend.
     public init(kind: TransferBackendKind = .foreground) {
@@ -366,38 +593,104 @@ public actor FakeTransferBackend: TransferBackend {
 
     /// Jobs started, in order.
     public var jobs: [TransferJob] {
-        fatalError("WP-H: FakeTransferBackend.jobs not implemented")
+        self.started
+    }
+
+    /// Handles returned by `start(_:)`, in order.
+    public var handles: [FakeTransferHandle] {
+        self.made
+    }
+
+    /// Scripts what `liveTransfers()` reports.
+    public func scriptLiveTransfers(_ transfers: [LiveTransfer]) {
+        self.live = transfers
+    }
+
+    /// Cancellations received, in order.
+    public var cancellations: [FakeBackendCancellation] {
+        self.cancels
+    }
+
+    /// How often `invalidate()` ran.
+    public var invalidations: Int {
+        self.invalidateCount
     }
 
     /// Returns a scripted handle.
     public func start(_ job: TransferJob) async -> any TransferHandle {
-        fatalError("WP-H: FakeTransferBackend.start not implemented")
+        self.started.append(job)
+        let handle = FakeTransferHandle(id: job.id, attempt: job.attempt)
+        self.made.append(handle)
+        return handle
     }
 
     /// Scripted live transfers.
     public func liveTransfers() async -> [LiveTransfer] {
-        fatalError("WP-H: FakeTransferBackend.liveTransfers not implemented")
+        self.live
     }
 
     /// Records the cancellation.
     public func cancel(_ name: StagingFileName, keepingPartial: Bool) async {
-        fatalError("WP-H: FakeTransferBackend.cancel not implemented")
+        self.cancels.append(FakeBackendCancellation(name: name, keepingPartial: keepingPartial))
+        self.live.removeAll { $0.name == name }
     }
 
     /// Records the invalidation.
     public func invalidate() async {
-        fatalError("WP-H: FakeTransferBackend.invalidate not implemented")
+        self.invalidateCount += 1
+        for handle in self.made {
+            handle.deliver(.failed(.cancelled(.byClient)))
+        }
     }
 }
 
+/// One `FakeTransferBackend.cancel(_:keepingPartial:)` call.
+public struct FakeBackendCancellation: Sendable, Hashable {
+    /// The staging name.
+    public var name: StagingFileName
+    /// Whether the partial was to be kept.
+    public var keepingPartial: Bool
+
+    /// Creates a record.
+    public init(name: StagingFileName, keepingPartial: Bool) {
+        self.name = name
+        self.keepingPartial = keepingPartial
+    }
+}
+
+/// The `FakeStagingSink` operations a test can make fail once.
+public enum FakeStagingOperation: Sendable, Hashable, CaseIterable {
+    /// `createPartial`.
+    case createPartial
+    /// `appendPartial`.
+    case appendPartial
+    /// `continuePartial`.
+    case continuePartial
+    /// `adoptDownload`.
+    case adoptDownload
+    /// `readStaged`.
+    case readStaged
+    /// `writeStaged`.
+    case writeStaged
+}
+
 /// An in-memory `StagingSink` for transport tests that do not need the store (WP-H). Gated for `Mutex`.
+///
+/// Semantics mirror the store's sink where transport behaviour depends on them: `continuePartial`, `adoptDownload`
+/// and `writeStaged` never replace a name (`.nameInUse`), a missing source is `.io(posixCode: ENOENT)`,
+/// `readStaged` and `writeStaged` refuse more than `maxBytes` (`.tooLarge`, nothing kept), and `discard` removes the
+/// file and its sidecar. `failNext(_:with:)` injects one failure (ENOSPC on an append, for example).
 @available(macOS 15.0, iOS 18.0, *)
 public final class FakeStagingSink: StagingSink {
     private let files: Mutex<[StagingFileName: Data]>
+    private let sidecarStore: Mutex<[StagingFileName: ResumeSidecar]>
+    private let faults: Mutex<[FakeStagingOperation: [StagingError]]>
 
     /// Starts empty.
     public init() {
         self.files = Mutex([:])
+        self.sidecarStore = Mutex([:])
+        self.faults = Mutex([:])
     }
 
     /// Staged files by name.
@@ -405,14 +698,26 @@ public final class FakeStagingSink: StagingSink {
         self.files.withLock { $0 }
     }
 
+    /// Sidecars by the partial they describe.
+    public var sidecars: [StagingFileName: ResumeSidecar] {
+        self.sidecarStore.withLock { $0 }
+    }
+
+    /// Makes the next call of `operation` throw `error`.
+    public func failNext(_ operation: FakeStagingOperation, with error: StagingError) {
+        self.faults.withLock { $0[operation, default: []].append(error) }
+    }
+
     /// Creates or truncates.
     public func createPartial(_ name: StagingFileName) throws(StagingError) {
+        try self.injected(.createPartial)
         self.files.withLock { $0[name] = Data() }
     }
 
     /// Appends.
     public func appendPartial(_ data: Data, to name: StagingFileName) throws(StagingError) -> Int64 {
-        self.files.withLock { files in
+        try self.injected(.appendPartial)
+        return self.files.withLock { files in
             files[name, default: Data()].append(data)
             return Int64(files[name, default: Data()].count)
         }
@@ -420,59 +725,246 @@ public final class FakeStagingSink: StagingSink {
 
     /// Exclusive move.
     public func continuePartial(from previous: StagingFileName, as next: StagingFileName) throws(StagingError) -> Int64 {
-        fatalError("WP-H: FakeStagingSink.continuePartial not implemented")
+        try self.injected(.continuePartial)
+        return try self.files.withLock { files throws(StagingError) -> Int64 in
+            guard files[next] == nil else {
+                throw .nameInUse
+            }
+            guard let data = files.removeValue(forKey: previous) else {
+                throw .io(posixCode: ENOENT)
+            }
+            files[next] = data
+            return Int64(data.count)
+        }
     }
 
     /// Adopts a file by reading it (tests only).
     public func adoptDownload(at location: URL, as name: StagingFileName) throws(StagingError) -> Int64 {
-        fatalError("WP-H: FakeStagingSink.adoptDownload not implemented")
+        try self.injected(.adoptDownload)
+        guard self.files.withLock({ $0[name] == nil }) else {
+            throw .nameInUse
+        }
+        guard let data = try? Data(contentsOf: location) else {
+            throw .io(posixCode: ENOENT)
+        }
+        return try self.files.withLock { files throws(StagingError) -> Int64 in
+            guard files[name] == nil else {
+                throw .nameInUse
+            }
+            files[name] = data
+            return Int64(data.count)
+        }
     }
 
     /// Records a sidecar.
     public func writeSidecar(_ sidecar: ResumeSidecar) {
-        fatalError("WP-H: FakeStagingSink.writeSidecar not implemented")
+        self.sidecarStore.withLock { $0[sidecar.name] = sidecar }
     }
 
     /// Reads a sidecar.
     public func readSidecar(for name: StagingFileName) async -> ResumeSidecar? {
-        fatalError("WP-H: FakeStagingSink.readSidecar not implemented")
+        self.sidecarStore.withLock { $0[name] }
     }
 
     /// Reads a staged file.
     public func readStaged(_ name: StagingFileName, maxBytes: Int64) async throws(StagingError) -> Data {
-        fatalError("WP-H: FakeStagingSink.readStaged not implemented")
+        try self.injected(.readStaged)
+        guard let data = self.files.withLock({ $0[name] }) else {
+            throw .io(posixCode: ENOENT)
+        }
+        guard Int64(data.count) <= maxBytes else {
+            throw .tooLarge(limit: maxBytes)
+        }
+        return data
     }
 
     /// Removes a file.
     public func discard(_ name: StagingFileName) async {
         self.files.withLock { _ = $0.removeValue(forKey: name) }
+        self.sidecarStore.withLock { _ = $0.removeValue(forKey: name) }
     }
 
     /// Drains a chunk source.
     public func writeStaged(_ name: StagingFileName, from source: any ChunkSource, maxBytes: Int64) async throws(StagingError) -> Int64 {
-        fatalError("WP-H: FakeStagingSink.writeStaged not implemented")
+        try self.injected(.writeStaged)
+        guard self.files.withLock({ $0[name] == nil }) else {
+            throw .nameInUse
+        }
+        var data = Data()
+        while let chunk = try source.nextChunk(maxBytes: 1 << 20) {
+            data.append(chunk)
+            guard Int64(data.count) <= maxBytes else {
+                throw .tooLarge(limit: maxBytes)
+            }
+        }
+        let written = data
+        return try self.files.withLock { files throws(StagingError) -> Int64 in
+            guard files[name] == nil else {
+                throw .nameInUse
+            }
+            files[name] = written
+            return Int64(written.count)
+        }
+    }
+
+    /// Throws the failure injected for `operation`, once.
+    private func injected(_ operation: FakeStagingOperation) throws(StagingError) {
+        let failure = self.faults.withLock { faults -> StagingError? in
+            guard var queue = faults[operation], !queue.isEmpty else {
+                return nil
+            }
+            let first = queue.removeFirst()
+            faults[operation] = queue.isEmpty ? nil : queue
+            return first
+        }
+        if let failure {
+            throw failure
+        }
     }
 }
 
 /// Subscribes to an event stream and lets a test wait for a matching event without sleeping (WP-H).
+///
+/// One task, owned by the probe, consumes the stream in order. `next(where:)` returns the earliest received event
+/// that matches and that no earlier call returned, or suspends until one arrives; it returns `nil` once the stream
+/// finished (or `stop()` ran) without a match, and when the calling task is cancelled. Each event is returned by at
+/// most one call. `stop()` cancels the consuming task, which terminates the stream's iteration (an engine
+/// subscription is released on that cancellation).
 public actor EventProbe {
+    private var events: [AssetEvent] = []
+    private var consumed: Set<Int> = []
+    private var waiters: [Waiter] = []
+    private var nextWaiter: UInt64 = 0
+    private var finished = false
+    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private let stopSignal: AsyncStream<Void>.Continuation
+
+    /// A suspended `next(where:)` call.
+    private struct Waiter {
+        let id: UInt64
+        let predicate: @Sendable (AssetEvent) -> Bool
+        let continuation: CheckedContinuation<AssetEvent?, Never>
+    }
+
     /// Starts consuming `stream` in one task owned by the probe; `stop()` ends it.
     public init(stream: AsyncStream<AssetEvent>) {
-        _ = stream
+        let (signal, stopSignal) = AsyncStream.makeStream(of: Void.self)
+        self.stopSignal = stopSignal
+        Task { [weak self] in
+            // REENTRANCY: h-2 (proposed) — nothing: this task is not the actor; the group ends when the stream ends
+            // or `stop()` signals, and `finish()` re-reads the waiter table on the actor.
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { [weak self] in
+                    for await event in stream {
+                        guard let self else {
+                            return
+                        }
+                        // REENTRANCY: h-2 (proposed) — nothing: `receive` appends on the actor in stream order.
+                        await self.receive(event)
+                    }
+                }
+                group.addTask {
+                    for await _ in signal {}
+                }
+                // REENTRANCY: h-2 (proposed) — nothing: whichever child ends first cancels the other.
+                await group.next()
+                group.cancelAll()
+            }
+            // REENTRANCY: h-2 (proposed) — nothing: `finish()` is idempotent.
+            await self?.finish()
+        }
     }
 
     /// Every event received so far.
     public var received: [AssetEvent] {
-        fatalError("WP-H: EventProbe.received not implemented")
+        self.events
     }
 
     /// Suspends until an event matching `predicate` arrives (or returns one already received).
     public func next(where predicate: @escaping @Sendable (AssetEvent) -> Bool) async -> AssetEvent? {
-        fatalError("WP-H: EventProbe.next not implemented")
+        if let index = self.events.indices.first(where: { !self.consumed.contains($0) && predicate(self.events[$0]) }) {
+            self.consumed.insert(index)
+            return self.events[index]
+        }
+        guard !self.finished, !Task.isCancelled else {
+            return nil
+        }
+        self.nextWaiter += 1
+        let id = self.nextWaiter
+        // REENTRANCY: h-1 (proposed) — nothing: a terminal wait. The waiter is registered synchronously in the
+        // continuation body and resumed only by its removal from `waiters` (a matching event, finish, stop or this
+        // task's cancellation); no state is read afterwards.
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<AssetEvent?, Never>) in
+                self.waiters.append(Waiter(id: id, predicate: predicate, continuation: continuation))
+                self.notifyCountWaiters()
+            }
+        } onCancel: {
+            Task {
+                // REENTRANCY: h-3 (proposed) — nothing: this task is not the actor; `cancelWaiter` re-reads the
+                // table and is a no-op for a waiter an event already resumed.
+                await self.cancelWaiter(id)
+            }
+        }
+    }
+
+    /// Suspends until at least `count` calls of `next(where:)` are waiting (tests of the probe itself).
+    func waitForWaiters(atLeast count: Int) async {
+        if self.waiters.count >= count {
+            return
+        }
+        // REENTRANCY: h-4 (proposed, as TS2) — nothing: a terminal wait, registered synchronously and resumed only
+        // by the actor turn in which `count` calls were waiting; no state is read afterwards.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.countWaiters.append((count, continuation))
+        }
     }
 
     /// Stops consuming.
     public func stop() {
-        fatalError("WP-H: EventProbe.stop not implemented")
+        self.stopSignal.finish()
+        self.finish()
+    }
+
+    private func receive(_ event: AssetEvent) {
+        let index = self.events.count
+        self.events.append(event)
+        guard let position = self.waiters.firstIndex(where: { $0.predicate(event) }) else {
+            return
+        }
+        let waiter = self.waiters.remove(at: position)
+        self.consumed.insert(index)
+        waiter.continuation.resume(returning: event)
+    }
+
+    private func finish() {
+        self.finished = true
+        let pending = self.waiters
+        self.waiters.removeAll()
+        for waiter in pending {
+            waiter.continuation.resume(returning: nil)
+        }
+    }
+
+    private func cancelWaiter(_ id: UInt64) {
+        guard let position = self.waiters.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        self.waiters.remove(at: position).continuation.resume(returning: nil)
+    }
+
+    private func notifyCountWaiters() {
+        let waiting = self.waiters.count
+        var ready: [CheckedContinuation<Void, Never>] = []
+        self.countWaiters.removeAll { waiter in
+            if waiter.count <= waiting {
+                ready.append(waiter.continuation)
+                return true
+            }
+            return false
+        }
+        for continuation in ready {
+            continuation.resume()
+        }
     }
 }
