@@ -75,6 +75,52 @@ extension ModelSuites {
             }
         }
 
+        @Test("R-MAN-2: an envelope declaring an unsupported schemaVersion is rejected as unsupported whatever its assets member looks like")
+        func unsupportedVersionWinsOverShape() {
+            // A later schema may restructure `assets` (or drop it): a v1 client must say "unsupported version", not
+            // "corrupt manifest", in either member order (ManifestError.unsupportedSchemaVersion, ADR draft A-4.9).
+            let unsupported = [
+                #"{"schemaVersion":2,"assets":[]}"#,
+                #"{"schemaVersion":2,"assets":{"a":{}}}"#,
+                #"{"assets":{"a":{}},"schemaVersion":2}"#,
+                #"{"schemaVersion":2,"packs":[]}"#,
+                #"{"packs":[],"schemaVersion":2}"#,
+                #"{"schemaVersion":2,"assets":[],"assets":[]}"#,
+                #"{"assets":[],"assets":[],"schemaVersion":2}"#,
+                #"{"assets":"x","schemaVersion":2,"assets":7}"#,
+            ]
+            for text in unsupported {
+                #expect(throws: ManifestError.unsupportedSchemaVersion(2), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
+            }
+            #expect(throws: ManifestError.unsupportedSchemaVersion(0)) { try ManifestDecoder.decode(Data(#"{"assets":7,"schemaVersion":0}"#.utf8)) }
+            // A supported version keeps the v1 shape rule: assets present, an array, and not repeated.
+            let malformed = [
+                #"{"schemaVersion":1,"assets":{"a":{}}}"#,
+                #"{"assets":{"a":{}},"schemaVersion":1}"#,
+                #"{"schemaVersion":1,"packs":[]}"#,
+                #"{"schemaVersion":1,"assets":[],"assets":[]}"#,
+                #"{"assets":[],"assets":[],"schemaVersion":1}"#,
+                #"{"assets":[],"schemaVersion":1,"assets":[]}"#,
+                #"{"assets":{"a":{}}}"#,
+            ]
+            for text in malformed {
+                #expect(throws: ManifestError.undecodable(.unexpectedShape), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
+            }
+            // A document that is not JSON, or nests too deep, is that whatever version it declares, in either member
+            // order: the version is judged only once the whole document has been read.
+            let notJSON = [
+                #"{"assets":{"a":},"schemaVersion":2}"#, #"{"schemaVersion":2,"assets":{"a":}}"#,
+                #"{"schemaVersion":2,"assets":[]"#, #"{"schemaVersion":2,"assets":[],}"#, #"{"schemaVersion":2,"assets":[]} x"#,
+            ]
+            for text in notJSON {
+                #expect(throws: ManifestError.undecodable(.notJSON), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
+            }
+            let deep = String(repeating: "[", count: 100) + String(repeating: "]", count: 100)
+            for text in [#"{"schemaVersion":2,"assets":"# + deep + "}", #"{"assets":"# + deep + #","schemaVersion":2}"#] {
+                #expect(throws: ManifestError.undecodable(.nestingTooDeep)) { try ManifestDecoder.decode(Data(text.utf8)) }
+            }
+        }
+
         @Test("R-MAN-2: limit boundaries accept the limit and reject one past it")
         func limitBoundaries() throws {
             // Payload size.

@@ -87,31 +87,46 @@ struct ManifestParser {
 
     // MARK: - Envelope
 
-    /// `{ "schemaVersion": Int, "assets": [...] }` in any member order, other members ignored. When `assets`
-    /// precedes `schemaVersion`, it is skipped (validated only) and parsed afterwards, so a manifest of an
-    /// unsupported version is never interpreted. A repeated `schemaVersion` or `assets` member is ambiguous and
-    /// makes the envelope the wrong shape.
+    /// `{ "schemaVersion": Int, "assets": [...] }` in any member order, other members ignored.
+    ///
+    /// The verdict on an envelope never depends on the order of its members (ADR draft A-4.9). It is reached in a
+    /// fixed order: the whole document must be JSON within the nesting limit (`notJSON`, `nestingTooDeep`); then
+    /// exactly one `schemaVersion` must declare an integer (else `unexpectedShape`: a missing, repeated or
+    /// non-integer version cannot be read), and one this build interprets (else `unsupportedSchemaVersion`, whatever
+    /// `assets` looks like, since a later schema may restructure or drop it); only then does the v1 shape apply
+    /// (`assets` present, an array, not repeated). So `assets` is interpreted in place only when a supported version
+    /// precedes it; otherwise it is skipped (validated only) with its facts recorded, and parsed once the document
+    /// has been read. An unsupported version is therefore never interpreted.
+    ///
+    /// With a supported version read first, an error inside `assets` (a duplicate identifier, too many entries) is
+    /// reported before a shape violation that follows it; both reject the manifest.
     private mutating func parseEnvelope() throws(ManifestError) -> ManifestWireShape {
         try self.cursor.checkDepth(1)
         try self.cursor.expect(JSONByte.openBrace)
+        var versionCount = 0
         var schemaVersion: Int?
         var assetsOffset: Int?
+        var assetsIsArray = false
+        var assetsRepeated = false
         var assetsParsed = false
         if !self.cursor.consume(JSONByte.closeBrace) {
             repeat {
                 let key = try self.cursor.readKey()
                 if self.cursor.string(key, equals: ManifestParser.schemaVersionKey) {
-                    guard schemaVersion == nil else {
-                        throw .undecodable(.unexpectedShape)
+                    versionCount += 1
+                    let version = try self.parseSchemaVersion()
+                    if versionCount == 1 {
+                        schemaVersion = version
                     }
-                    schemaVersion = try self.parseSchemaVersion()
                 } else if self.cursor.string(key, equals: ManifestParser.assetsKey) {
-                    guard assetsOffset == nil, try self.cursor.peekValueKind() == .array else {
-                        throw .undecodable(.unexpectedShape)
+                    let isArray = try self.cursor.peekValueKind() == .array
+                    if assetsOffset == nil {
+                        assetsOffset = self.cursor.offset
+                        assetsIsArray = isArray
+                    } else {
+                        assetsRepeated = true
                     }
-                    assetsOffset = self.cursor.offset
-                    if let version = schemaVersion {
-                        try self.requireSupported(version)
+                    if versionCount == 1, let version = schemaVersion, self.isSupported(version), isArray, !assetsRepeated {
                         try self.parseAssets(depth: 2)
                         assetsParsed = true
                     } else {
@@ -123,10 +138,13 @@ struct ManifestParser {
             } while try self.cursor.continueContainer(closing: JSONByte.closeBrace)
         }
         try self.requireEnd()
-        guard let version = schemaVersion, let offset = assetsOffset else {
+        guard versionCount == 1, let version = schemaVersion else {
             throw .undecodable(.unexpectedShape)
         }
         try self.requireSupported(version)
+        guard let offset = assetsOffset, assetsIsArray, !assetsRepeated else {
+            throw .undecodable(.unexpectedShape)
+        }
         if !assetsParsed {
             // The document is valid JSON (checked above); now interpret the assets it skipped.
             let end = self.cursor.offset
@@ -137,21 +155,28 @@ struct ManifestParser {
         return .envelope(schemaVersion: version)
     }
 
-    /// An integer-syntax number; anything else makes the envelope the wrong shape. Out-of-range values saturate
-    /// (and are then unsupported).
-    private mutating func parseSchemaVersion() throws(ManifestError) -> Int {
+    /// The version an integer-syntax number declares, or `nil` for any other value, which is skipped (validated
+    /// only): the envelope is then the wrong shape, judged once the document has been read. Out-of-range values
+    /// saturate (and are then unsupported).
+    private mutating func parseSchemaVersion() throws(ManifestError) -> Int? {
         guard try self.cursor.peekValueKind() == .number else {
-            throw .undecodable(.unexpectedShape)
+            try self.cursor.skipValue(depth: 1)
+            return nil
         }
         let number = try self.cursor.scanNumber()
         guard number.isInteger else {
-            throw .undecodable(.unexpectedShape)
+            return nil
         }
         return Int(clamping: self.cursor.integerValue(of: number).value)
     }
 
+    /// Whether this build interprets `version` (1 through `maxSchemaVersion`).
+    private func isSupported(_ version: Int) -> Bool {
+        version >= 1 && version <= self.options.maxSchemaVersion
+    }
+
     private func requireSupported(_ version: Int) throws(ManifestError) {
-        guard version >= 1, version <= self.options.maxSchemaVersion else {
+        guard self.isSupported(version) else {
             throw .unsupportedSchemaVersion(version)
         }
     }
