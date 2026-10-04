@@ -324,3 +324,111 @@ struct ManifestValidationTests {
         #expect(manifest.quarantined.map(\.violation) == [violation], "\(json)", sourceLocation: sourceLocation)
     }
 }
+
+/// The lexical corners of R-MAN-2/R-MAN-3: every malformed token is a typed `notJSON`, every well-formed but
+/// unusual spelling decodes.
+@Suite("Manifest lexical corners")
+struct ManifestLexicalTests {
+    @Test("R-MAN-2: malformed escapes, surrogates, UTF-8, numbers, literals and keys reject the manifest as not JSON")
+    func malformedTokensAreNotJSON() {
+        let broken = [
+            #"[{"x":"\"#,                       // a backslash as the last byte
+            #"[{"x":"\uD83D"}]"#,               // a high surrogate alone
+            #"[{"x":"\uD83Dx"}]"#,              // a high surrogate followed by text
+            #"[{"x":"\uD83DA"}]"#,         // a high surrogate followed by a non-low escape
+            #"[{"x":"\uDE00"}]"#,               // a low surrogate alone
+            #"[{"x":"\u12"#,                    // a \u escape cut short by the end of the payload
+            #"[{"x":"\u12"}]"#,                 // a \u escape with too few hex digits
+            #"[{"x":"\u12G4"}]"#,               // a non-hex digit
+            #"[{"x":"\q"}]"#,                   // an unknown escape
+            #"[{"x":-}]"#,                      // a sign without digits
+            #"[{"x":1.}]"#,                     // a fraction without digits
+            #"[{"x":1e}]"#,                     // an exponent without digits
+            #"[{"x":tru"#,                      // a truncated literal
+            #"[{"x":nul}]"#,                    // a misspelled literal
+            #"[{1:2}]"#,                        // a key that is not a string
+            #"[{"x" 1}]"#,                      // a missing colon
+            #"[{"x":[1}]}]"#,                   // a mismatched closer
+            #"{"assets":[],"schemaVersion":1"#, // an unterminated envelope
+        ]
+        for text in broken {
+            #expect(throws: ManifestError.undecodable(.notJSON), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
+        }
+        let invalidUTF8: [[UInt8]] = [[0xC0, 0x80], [0xE0, 0x80, 0x80], [0xED, 0xA0, 0x80], [0xF4, 0x90, 0x80, 0x80], [0xF5, 0x80], [0xE2, 0x28, 0xA1], [0xC3]]
+        for sequence in invalidUTF8 {
+            let payload = Data("[{\"x\":\"".utf8) + Data(sequence) + Data("\"}]".utf8)
+            #expect(throws: ManifestError.undecodable(.notJSON), "\(sequence)") { try ManifestDecoder.decode(payload) }
+        }
+    }
+
+    @Test("R-MAN-1: unusual but valid spellings decode: empty containers, exponents, every escape and four-byte scalars")
+    func unusualSpellingsDecode() throws {
+        let text = #"[{"x":{},"y":[[],{}],"z":[true,false,null,-0,1e+5,2.5E-3],"identifier":"a\b\f\n\r\t\/","fileExtension":"png","remotePath":"m/é😀中","localPathComponents":["􏿿"],"localFileName":"\"\\"}]"#
+        let manifest = try ManifestDecoder.decode(Data(text.utf8))
+        #expect(manifest.quarantined.map(\.violation) == [.identifierControlCharacter])
+        #expect(manifest.quarantined.first?.identifier == AssetID("a\u{8}\u{C}\n\r\t/"))
+
+        let valid = #"[{"identifier":"a","fileExtension":"png","remotePath":"m/\u00e9\uD83D\uDE00\u4E2D","localPathComponents":["\uDBFF\uDFFF","RAW"],"localFileName":"\"\\"}]"#
+            .replacingOccurrences(of: "RAW", with: "\u{10FFFF}")
+        let accepted = try ManifestDecoder.decode(Data(valid.utf8))
+        let entry = try #require(accepted.entries.first)
+        #expect(entry.remotePath == "m/é😀中")
+        #expect(entry.localPathComponents == ["\u{10FFFF}", "\u{10FFFF}"])
+        #expect(entry.localFileName == "\"\\")
+    }
+
+    @Test("R-MAN-2: an integer byteSize beyond Int64 is out of range, and the envelope's schemaVersion must be a single integer")
+    func numericEdges() throws {
+        let huge = #"[{"identifier":"a","fileExtension":"png","remotePath":"m","localPathComponents":[],"byteSize":99999999999999999999}]"#
+        #expect(try ManifestDecoder.decode(Data(huge.utf8)).quarantined.map(\.violation) == [.byteSizeOutOfRange(Int64.max)])
+        let negative = #"[{"identifier":"a","fileExtension":"png","remotePath":"m","localPathComponents":[],"byteSize":-99999999999999999999}]"#
+        #expect(try ManifestDecoder.decode(Data(negative.utf8)).quarantined.map(\.violation) == [.byteSizeOutOfRange(Int64.min)])
+        for envelope in [#"{"schemaVersion":1,"schemaVersion":1,"assets":[]}"#, #"{"schemaVersion":"1","assets":[]}"#,
+            #"{"schemaVersion":1.0,"assets":[]}"#, #"{"schemaVersion":1,"assets":[],"assets":[]}"#]
+        {
+            #expect(throws: ManifestError.undecodable(.unexpectedShape), "\(envelope)") { try ManifestDecoder.decode(Data(envelope.utf8)) }
+        }
+        #expect(throws: ManifestError.unsupportedSchemaVersion(Int.max)) {
+            try ManifestDecoder.decode(Data(#"{"schemaVersion":99999999999999999999,"assets":[]}"#.utf8))
+        }
+        #expect(throws: ManifestError.unsupportedSchemaVersion(-1)) { try ManifestDecoder.decode(Data(#"{"assets":[1],"schemaVersion":-1}"#.utf8)) }
+    }
+
+    @Test("R-MAN-2: rules and identifier hashing see the same bytes in bridged and native strings")
+    func bridgedStringsBehaveLikeNativeOnes() throws {
+        let bridgedID = NSString(string: "bo7.ri.\u{85}map") as String
+        let bridgedPath = NSString(string: String(repeating: "p/", count: 600)) as String
+        let entry = ManifestEntry(identifier: AssetID(bridgedID), fileExtension: NSString(string: "PNG") as String, remotePath: bridgedPath)
+        #expect(ManifestDecoder.violations(of: entry, limits: ManifestLimits()) == [
+            .identifierControlCharacter, .remotePathInvalid(.tooLong(bytes: 1_200)),
+        ])
+        let native = AssetID(String("bo7.ri.map".unicodeScalars.map(Character.init)))
+        let bridged = AssetID(NSString(string: "bo7.ri.map") as String)
+        #expect(native == bridged)
+        #expect(native.hashValue == bridged.hashValue)
+        #expect(Set([native, bridged]).count == 1)
+        // Canonically equivalent but byte-different identifiers are different assets.
+        #expect(AssetID("caf\u{E9}") != AssetID("cafe\u{301}"))
+        #expect(Set([AssetID("caf\u{E9}"), AssetID("cafe\u{301}")]).count == 2)
+        // Same length, canonically equal (reordered combining marks), different bytes: still different assets.
+        #expect("a\u{301}\u{323}" == "a\u{323}\u{301}")
+        #expect(AssetID("a\u{301}\u{323}") != AssetID("a\u{323}\u{301}"))
+    }
+
+    @Test("R-MAN-2: a manifest built in memory rejects repeated identifiers, and the diff reports each class")
+    func inMemoryManifestsRejectDuplicates() throws {
+        let entry = ManifestEntry(identifier: "a", fileExtension: "png", remotePath: "m/a")
+        #expect(throws: ManifestError.duplicateIdentifier("a")) {
+            try ValidatedManifest(entries: [entry, entry], digest: ContentHash.sha256(of: Data()))
+        }
+        var moved = entry
+        moved.localPathComponents = ["Elsewhere"]
+        var changed = entry
+        changed.remotePath = "m/b"
+        let old = try ValidatedManifest(entries: [entry, ManifestEntry(identifier: "b", fileExtension: "png", remotePath: "m/b")], digest: .init(w0: 1, w1: 0, w2: 0, w3: 0))
+        let metadata = ManifestDiff.compute(from: old, to: try ValidatedManifest(entries: [moved], digest: .init(w0: 2, w1: 0, w2: 0, w3: 0)))
+        #expect(metadata.change(of: "a") == .metadataChanged && metadata.change(of: "b") == .removed)
+        let content = ManifestDiff.compute(from: old, to: try ValidatedManifest(entries: [changed], digest: .init(w0: 3, w1: 0, w2: 0, w3: 0)))
+        #expect(content.change(of: "a") == .contentChanged)
+    }
+}
