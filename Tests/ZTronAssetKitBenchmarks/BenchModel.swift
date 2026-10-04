@@ -38,21 +38,36 @@ extension ZTronAssetKitBenchmarks {
             let thresholdMS = budgetMS * Double(limit) / Double(reference.data.count)
 
             let dense = ReferenceManifest.make(maxBytes: limit - 4_096, seed: 32)
-            let cases: [(String, Data)] = [
-                ("dense manifest", dense.data),
-                ("dense manifest truncated", dense.data.prefix(dense.data.count * 3 / 4)),
-                ("dense manifest with edits", ReferenceManifest.edited(dense.data, seed: 7)),
-                ("huge unknown string", ReferenceManifest.hugeString(in: "note", unit: "abcdefgh", bytes: limit - 256)),
-                ("huge multi-byte string", ReferenceManifest.hugeString(in: "note", unit: "é日😀", bytes: limit - 256)),
-                ("huge escaped file name", ReferenceManifest.hugeString(in: "localFileName", unit: "\\u00e9\\n", bytes: limit - 256)),
-                ("deep nesting", Data(repeating: UInt8(ascii: "["), count: limit)),
+            let keepFirst = ManifestDecodingOptions(duplicates: .keepFirst)
+            // Each case is made on demand, so no two large payloads are alive at once.
+            let cases: [(String, ManifestDecodingOptions, () -> Data)] = [
+                ("dense manifest", ManifestDecodingOptions(), { dense.data }),
+                ("dense manifest truncated", ManifestDecodingOptions(), { dense.data.prefix(dense.data.count * 3 / 4) }),
+                ("dense manifest with edits", ManifestDecodingOptions(), { ReferenceManifest.edited(dense.data, seed: 7) }),
+                ("huge unknown string", ManifestDecodingOptions(), { ReferenceManifest.hugeString(in: "note", unit: "abcdefgh", bytes: limit - 256) }),
+                ("huge multi-byte string", ManifestDecodingOptions(), { ReferenceManifest.hugeString(in: "note", unit: "é日😀", bytes: limit - 256) }),
+                ("huge escaped file name", ManifestDecodingOptions(), {
+                    ReferenceManifest.hugeString(in: "localFileName", unit: "\\u00e9\\n", bytes: limit - 256)
+                }),
+                ("deep nesting", ManifestDecodingOptions(), { Data(repeating: UInt8(ascii: "["), count: limit) }),
+                // The allocation worst cases of R-MAN-3 (ADR draft A-5, A-8): the densest heap a valid manifest allows,
+                // and the over-long values that are checked but never materialised.
+                ("minimal entries of 16-byte strings", ManifestDecodingOptions(), { ReferenceManifest.shortStringEntries(count: 100_000) }),
+                ("minimal entries of 16-byte strings, keepFirst", keepFirst, { ReferenceManifest.shortStringEntries(count: 100_000) }),
+                ("24-byte path components", ManifestDecodingOptions(), { ReferenceManifest.componentEntries(length: 24, maxBytes: limit) }),
+                ("61 one-byte tags per entry", ManifestDecodingOptions(), { ReferenceManifest.taggedEntries(tagCount: 61, maxBytes: limit) }),
+                ("huge identifier", ManifestDecodingOptions(), { ReferenceManifest.hugeField("identifier", bytes: limit - 256) }),
+                ("huge tag", ManifestDecodingOptions(), { ReferenceManifest.hugeField("tags", bytes: limit - 256, inArray: true) }),
+                ("huge checksum", ManifestDecodingOptions(), { ReferenceManifest.hugeField("checksum", bytes: limit - 256) }),
+                ("entries sharing one identifier, keepFirst", keepFirst, { ReferenceManifest.duplicateEntries(count: 100_000) }),
             ]
-            for (name, payload) in cases {
+            for (name, options, make) in cases {
+                let payload = make()
                 #expect(payload.count <= limit, "\(name)")
-                _ = try? ManifestDecoder.decode(payload)
+                _ = try? ManifestDecoder.decode(payload, options: options)
                 var worst = 0.0
                 for _ in 0..<3 {
-                    let (milliseconds, _) = ReferenceManifest.time { try? ManifestDecoder.decode(payload) }
+                    let (milliseconds, _) = ReferenceManifest.time { try? ManifestDecoder.decode(payload, options: options) }
                     worst = max(worst, milliseconds)
                 }
                 print("P-3 at the limit, \(name): \(payload.count) bytes, worst \(worst) ms, threshold \(thresholdMS) ms")
@@ -114,6 +129,80 @@ private enum ReferenceManifest {
         data.reserveCapacity(bytes)
         while data.count + unitBytes.count + tail.count <= bytes {
             data.append(unitBytes)
+        }
+        data.append(tail)
+        return data
+    }
+
+    /// `count` minimal entries whose identifier, remote path and file name are 16-byte (heap) strings.
+    static func shortStringEntries(count: Int) -> Data {
+        var text = "["
+        let filler = String(repeating: "f", count: 16)
+        for index in 0..<count {
+            let prefix = "\(index)-"
+            let identifier = prefix + String(repeating: "i", count: max(0, 16 - prefix.utf8.count))
+            text += (index == 0 ? "" : ",") + "{\"identifier\":\"\(identifier)\",\"fileExtension\":\"p\",\"remotePath\":\"\(filler)\","
+                + "\"localPathComponents\":[],\"localFileName\":\"\(filler)\"}"
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// Entries with 32 path components of `length` bytes each, up to `maxBytes`.
+    static func componentEntries(length: Int, maxBytes: Int) -> Data {
+        var text = "["
+        var index = 0
+        while index < 100_000 {
+            let components = (0..<32).map { component -> String in
+                let prefix = "\(index)-\(component)-"
+                return "\"" + prefix + String(repeating: "x", count: max(0, length - prefix.utf8.count)) + "\""
+            }
+            let entry = "{\"identifier\":\"i\(index)\",\"fileExtension\":\"p\",\"remotePath\":\"r\",\"localPathComponents\":["
+                + components.joined(separator: ",") + "]}"
+            guard text.utf8.count + entry.utf8.count + 2 <= maxBytes else {
+                break
+            }
+            text += (index == 0 ? "" : ",") + entry
+            index += 1
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// Minimal entries with `tagCount` one-byte tags and a 64-byte unknown member, up to `maxBytes`.
+    static func taggedEntries(tagCount: Int, maxBytes: Int) -> Data {
+        var text = "["
+        let tags = Array(repeating: "\"t\"", count: tagCount).joined(separator: ",")
+        let pad = String(repeating: "p", count: 64)
+        var index = 0
+        while index < 100_000 {
+            let entry = "{\"identifier\":\"i\(index)\",\"fileExtension\":\"p\",\"remotePath\":\"r\",\"localPathComponents\":[],"
+                + "\"tags\":[\(tags)],\"x\":\"\(pad)\"}"
+            guard text.utf8.count + entry.utf8.count + 2 <= maxBytes else {
+                break
+            }
+            text += (index == 0 ? "" : ",") + entry
+            index += 1
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// `count` minimal entries that all share the identifier `a`.
+    static func duplicateEntries(count: Int) -> Data {
+        let entry = #"{"identifier":"a","fileExtension":"p","remotePath":"r","localPathComponents":[]}"#
+        return Data(("[" + Array(repeating: entry, count: count).joined(separator: ",") + "]").utf8)
+    }
+
+    /// One entry whose known member `field` holds about `bytes` bytes of hex digits (in a one-element array when
+    /// `inArray`): over its limit, so it is checked on the payload and never materialised.
+    static func hugeField(_ field: String, bytes: Int, inArray: Bool = false) -> Data {
+        var members = [("identifier", "\"a\""), ("fileExtension", "\"png\""), ("remotePath", "\"m/a.png\""), ("localPathComponents", "[]")]
+        members.removeAll { $0.0 == field }
+        let head = Data(("[{" + members.map { "\"\($0.0)\":\($0.1)," }.joined() + "\"\(field)\":" + (inArray ? "[\"" : "\"")).utf8)
+        let tail = Data((inArray ? "\"]}]" : "\"}]").utf8)
+        let unit = Data("abcdef01".utf8)
+        var data = head
+        data.reserveCapacity(bytes)
+        while data.count + unit.count + tail.count <= bytes {
+            data.append(unit)
         }
         data.append(tail)
         return data
