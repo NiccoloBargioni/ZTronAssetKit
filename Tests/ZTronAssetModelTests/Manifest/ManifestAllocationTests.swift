@@ -31,6 +31,10 @@ extension ModelSuites {
                 if small.mustDecode, case .failure(let error) = outcome {
                     Issue.record("\(small.name): expected a manifest, got \(error)")
                 }
+                // Thread Sanitizer replaces the allocator, so its heap figures mean nothing: only the outcomes are checked.
+                guard !DecodeMeasurement.underThreadSanitizer else {
+                    continue
+                }
                 let retained = DecodeMeasurement.retainedGrowth { Self.decode(small.payload, options: small.options) }
                 print("R-MAN-3 small case \(small.name): \(small.payload.count) bytes, retained \(retained) B")
                 #expect(retained <= 4 * small.payload.count, "\(small.name): \(retained) B retained for \(small.payload.count) B")
@@ -58,7 +62,7 @@ extension ModelSuites {
                 SmallCase(name: "100 ones", payload: ManifestCorpus.repeatedElements("1", count: 100)),
                 SmallCase(name: "an identifier alone", payload: Data(#"[{"identifier":"a"}]"#.utf8)),
                 SmallCase(name: "an escaped identifier alone", payload: Data(#"[{"identifier":"\/"}]"#.utf8)),
-                SmallCase(name: "two escaped identifiers", payload: Data(#"[{"identifier":"\/"},{"identifier":"a"}]"#.utf8)),
+                SmallCase(name: "two escaped identifiers", payload: Data(#"[{"identifier":"\/"},{"identifier":"\u0061"}]"#.utf8)),
                 SmallCase(name: "100 identifiers alone", payload: list((0..<100).map { #"{"identifier":"\#($0)"}"# })),
                 SmallCase(name: "one minimal entry", payload: list([minimal]), mustDecode: true),
                 SmallCase(name: "one entry with a 16-byte path component", payload: list([component16]), mustDecode: true),
@@ -72,7 +76,7 @@ extension ModelSuites {
                     options: ManifestDecodingOptions(duplicates: .keepFirst), mustDecode: true),
                 SmallCase(name: "a realistic entry and a quarantined one", payload: list([realistic, #"{"identifier":"b","fileExtension":"p.g","remotePath":"r","localPathComponents":[]}"#]),
                     mustDecode: true),
-                SmallCase(name: "an escaped entry", payload: list([#"{"identifier":"ab","fileExtension":"p","remotePath":"m\/é","localPathComponents":["A"],"localFileName":"\n"}"#]),
+                SmallCase(name: "an escaped entry", payload: list([#"{"identifier":"\u0061\u0062","fileExtension":"\u0070","remotePath":"m\/\u00e9","localPathComponents":["\u0041"],"localFileName":"\n"}"#]),
                     mustDecode: true),
             ]
         }

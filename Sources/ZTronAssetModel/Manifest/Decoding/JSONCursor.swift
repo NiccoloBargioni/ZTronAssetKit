@@ -362,11 +362,6 @@ struct JSONCursor {
         string.hasEscapes ? nil : UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end])
     }
 
-    /// The bytes between the string's quotes, escapes unresolved: a view of the payload.
-    func body(of string: JSONString) -> UnsafeRawBufferPointer {
-        UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end])
-    }
-
     /// The string's value. Validated UTF-8, so decoding never repairs anything.
     func decodedString(of string: JSONString) -> String {
         if string.hasEscapes {

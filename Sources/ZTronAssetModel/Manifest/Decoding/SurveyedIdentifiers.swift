@@ -40,15 +40,15 @@ struct SurveyedIdentifiers {
         let old = self.slots
         self.slots = [UInt32](repeating: 0, count: max(4, old.count * 2))
         let mask = self.slots.count - 1
+        // Every held offset starts a token the survey scanned, so it scans again.
         for value in old where value != 0 {
-            guard let string = cursor.string(startingAt: Int(value) - 1) else {
-                continue
+            if let string = cursor.string(startingAt: Int(value) - 1) {
+                var slot = SurveyedIdentifiers.hashValue(of: string, in: cursor) & mask
+                while self.slots[slot] != 0 {
+                    slot = (slot + 1) & mask
+                }
+                self.slots[slot] = value
             }
-            var slot = SurveyedIdentifiers.hashValue(of: string, in: cursor) & mask
-            while self.slots[slot] != 0 {
-                slot = (slot + 1) & mask
-            }
-            self.slots[slot] = value
         }
     }
 
