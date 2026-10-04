@@ -122,6 +122,78 @@ struct FakeFileSystemTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("Test support: a relative link target resolves against the link's directory, with . and .. applied")
+    func relativeLinkTargets() throws {
+        let fileSystem = FakeFSFixture.make()
+        let real = FakeFSFixture.url("/fake-volume/real")
+        try fileSystem.createDirectory(at: real)
+        try fileSystem.createDirectory(at: real.appendingPathComponent("sub"))
+        try fileSystem.write(Data([6]), to: real.appendingPathComponent("x.bin"), mode: .truncate)
+        try fileSystem.createSymbolicLink(at: real.appendingPathComponent("sub/up.bin"), destination: "./../x.bin")
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/top"), destination: "../../fake-volume/real/sub")
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/real/sub/up.bin") == [6])
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/top/up.bin") == [6])
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/"), destination: "x") }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a file a power loss left under two names is one file: unlinking one name keeps the other")
+    func powerLossHardLinks() throws {
+        let fileSystem = FakeFSFixture.make(important: 1_000)
+        let source = FakeFSFixture.url("/fake-volume/s")
+        let destination = FakeFSFixture.url("/fake-volume/t")
+        for directory in [source, destination] {
+            try fileSystem.createDirectory(at: directory)
+        }
+        try fileSystem.synchronizeDirectory(at: FakeFSFixture.volume, level: .barrier)
+        try fileSystem.write(Data(repeating: 1, count: 100), to: source.appendingPathComponent("f"), mode: .truncate)
+        try fileSystem.synchronizeFile(at: source.appendingPathComponent("f"), level: .barrier)
+        try fileSystem.synchronizeDirectory(at: source, level: .barrier)
+        try fileSystem.rename(from: source.appendingPathComponent("f"), to: destination.appendingPathComponent("f"), mode: .exclusive)
+        try fileSystem.synchronizeDirectory(at: destination, level: .barrier)
+
+        let next = FakeFileSystem(
+            disk: FakeFSFixture.powerLoss(fileSystem.survivingDisk()),
+            time: ManualTimeSource(),
+            configuration: FakeFileSystemConfiguration(importantCapacity: 1_000)
+        )
+        try next.rename(from: source.appendingPathComponent("f"), to: destination.appendingPathComponent("f"), mode: .replacing)
+        #expect(FakeFSFixture.content(next, "/fake-volume/s/f")?.count == 100)
+        try next.removeItem(at: source.appendingPathComponent("f"))
+        #expect(try next.availableCapacity(at: FakeFSFixture.volume, for: .important) == 1_000)
+        #expect(FakeFSFixture.content(next, "/fake-volume/t/f")?.count == 100)
+        try next.removeItem(at: destination.appendingPathComponent("f"))
+        #expect(try next.availableCapacity(at: FakeFSFixture.volume, for: .important) == 1_100)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a hand-edited disk keeps its symbolic links and attributes")
+    func editedDiskKeepsLinksAndAttributes() throws {
+        let fileSystem = FakeFSFixture.make()
+        let root = FakeFSFixture.url("/fake-volume/root")
+        try fileSystem.createDirectory(at: root)
+        try fileSystem.applyStoreAttributes(.storeDefault, at: root)
+        try fileSystem.write(Data([1]), to: root.appendingPathComponent("a"), mode: .truncate)
+        try fileSystem.createSymbolicLink(at: root.appendingPathComponent("durable-link"), destination: "a")
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/ghost-link"), destination: "root")
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/kept-link"), destination: "root")
+        try fileSystem.removeItem(at: FakeFSFixture.url("/fake-volume/ghost-link"))
+        var image = fileSystem.survivingDisk()
+        image.files["/fake-volume/root/b"] = [2]
+
+        let next = FakeFFSLifetime.next(image)
+        #expect(try next.itemInfo(at: root.appendingPathComponent("durable-link"))?.kind == .symbolicLink)
+        #expect(FakeFSFixture.content(next, "/fake-volume/root/durable-link") == [1])
+        #expect(FakeFSFixture.content(next, "/fake-volume/root/b") == [2])
+        #expect(try next.storeAttributes(at: root) == .storeDefault)
+        #expect(try next.itemInfo(at: FakeFSFixture.url("/fake-volume/ghost-link")) == nil)
+        #expect(FakeFSFixture.content(next, "/fake-volume/kept-link/a") == [1])
+        let afterPowerLoss = FakeFSFixture.powerLoss(next.survivingDisk())
+        #expect(FakeFFSLifetime.next(afterPowerLoss).survivingDisk() == afterPowerLoss)
+        #expect(try FakeFFSLifetime.next(afterPowerLoss).itemInfo(at: FakeFSFixture.url("/fake-volume/ghost-link"))?.kind == .symbolicLink)
+    }
+
+    @available(macOS 15.0, *)
     @Test("Test support: a cycle of symbolic links fails with ELOOP instead of looping")
     func linkLoopsFail() throws {
         let fileSystem = FakeFSFixture.make()
@@ -140,6 +212,10 @@ struct FakeFileSystemTests {
         try fileSystem.createDirectory(at: b)
         try fileSystem.write(Data([1]), to: b.appendingPathComponent("f"), mode: .truncate)
         #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.rename(from: a, to: a.appendingPathComponent("inner"), mode: .replacing) }
+        try fileSystem.createDirectory(at: a.appendingPathComponent("x"))
+        try fileSystem.createDirectory(at: a.appendingPathComponent("x/y"))
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.rename(from: a, to: a.appendingPathComponent("x/y/z"), mode: .replacing) }
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.rename(from: FakeFSFixture.url("/"), to: b, mode: .replacing) }
         #expect(throws: FileSystemError.notEmpty) { try fileSystem.rename(from: a, to: b, mode: .replacing) }
         #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.rename(from: b.appendingPathComponent("f"), to: a, mode: .replacing) }
         #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.rename(from: a, to: b.appendingPathComponent("f"), mode: .replacing) }

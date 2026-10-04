@@ -161,11 +161,11 @@ public actor LoopbackHTTPServer {
 
     /// Starts listening; returns the port.
     public func start() async throws -> UInt16 {
-        if let port = self.port {
-            return port
-        }
         guard !self.stopped else {
             throw LoopbackServerError.stopped
+        }
+        if let port = self.port {
+            return port
         }
         let parameters = NWParameters.tcp
         parameters.requiredInterfaceType = .loopback

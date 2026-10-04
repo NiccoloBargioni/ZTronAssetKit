@@ -244,6 +244,67 @@ struct LoopbackHTTPServerTests {
         }
     }
 
+    @available(macOS 15.0, *)
+    @Test("Test support: a request body split across segments is awaited and a header line without a colon is skipped", .timeLimit(.minutes(1)))
+    func splitRequestBody() async throws {
+        try await Self.withServer({ request in
+            LoopbackResponse(status: 200, body: Data((request.header("x-kind") ?? "none").utf8))
+        }) { server, port in
+            let client = try await Self.connect(port)
+            try await client.send("PUT /a HTTP/1.1\r\nNoColonHere\r\nX-Kind: split\r\nContent-Length: 4\r\n\r\nab")
+            try await client.send("cd")
+            #expect(try await client.response().body == Data("split".utf8))
+            #expect(await server.requests.map(\.method) == ["PUT"])
+            client.close()
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a request followed by the client's FIN is answered before the server closes", .timeLimit(.minutes(1)))
+    func clientFinishedIsAnswered() async throws {
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 204)
+        }) { server, port in
+            let client = try await Self.connect(port)
+            try await client.sendFinal("GET /last HTTP/1.1\r\nHost: x\r\n\r\n")
+            let response = try await client.response()
+            #expect(response.status == 204)
+            let (rest, cleanClose) = await client.untilClosed()
+            #expect(rest.isEmpty && cleanClose)
+            #expect(await server.requests.map(\.target) == ["/last"])
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: malformed or reversed byte ranges are ignored and the whole body is sent", .timeLimit(.minutes(1)))
+    func malformedRangesAreIgnored() async throws {
+        let body = Data((0..<10).map { UInt8($0) })
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, body: body, rangeETag: "\"v1\"")
+        }) { _, port in
+            let client = try await Self.connect(port)
+            for range in ["bytes=x-", "bytes=5-2", "bytes=-3", "bytes=1-y"] {
+                try await client.get("/r", headers: ["Range": range])
+                let response = try await client.response()
+                #expect(response.status == 200 && response.body == body, "\(range)")
+            }
+            client.close()
+        }
+    }
+
+    @Test("Test support: start is idempotent while running and a stopped server cannot start again", .timeLimit(.minutes(1)))
+    func startAndStopLifecycle() async throws {
+        let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 200) }
+        let port = try await server.start()
+        #expect(try await server.start() == port)
+        #expect(await server.acceptedConnections == 0)
+        await server.stop()
+        await #expect(throws: LoopbackServerError.stopped) { try await server.start() }
+        let never = LoopbackHTTPServer { _ in LoopbackResponse(status: 200) }
+        await never.stop()
+        await #expect(throws: LoopbackServerError.stopped) { try await never.start() }
+    }
+
     /// Inflates an RFC 1952 member: checks the header, the CRC-32 and the size trailer.
     static func gunzip(_ framed: Data) throws -> Data {
         let bytes = [UInt8](framed)

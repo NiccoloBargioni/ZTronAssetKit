@@ -44,6 +44,23 @@ struct EventProbeTests {
         #expect(await probe.next(where: { _ in true }) == .snapshotChanged(generation: 1))
     }
 
+    @Test("Test support: waitForWaiters returns at once when enough calls wait and otherwise when the count is reached", .timeLimit(.minutes(1)))
+    func waiterCensus() async {
+        let (stream, continuation) = AsyncStream.makeStream(of: AssetEvent.self)
+        let probe = EventProbe(stream: stream)
+        let first = Task { await probe.next(where: Self.isShutDown) }
+        await probe.waitForWaiters(atLeast: 1)
+        await probe.waitForWaiters(atLeast: 1)
+        let census = Task { await probe.waitForWaiters(atLeast: 2) }
+        let second = Task { await probe.next(where: Self.isShutDown) }
+        await census.value
+        continuation.yield(.clientShutDown)
+        continuation.yield(.clientShutDown)
+        #expect(await first.value == .clientShutDown)
+        #expect(await second.value == .clientShutDown)
+        continuation.finish()
+    }
+
     @Test("Test support: a waiting next returns nil when the stream finishes without a match", .timeLimit(.minutes(1)))
     func finishedStreamAnswersNil() async {
         let (stream, continuation) = AsyncStream.makeStream(of: AssetEvent.self)

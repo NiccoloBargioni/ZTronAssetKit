@@ -67,6 +67,21 @@ final class LoopbackClient: Sendable {
         }
     }
 
+    /// Sends raw bytes and then the end of the client's stream (a FIN).
+    func sendFinal(_ text: String) async throws {
+        let error: NWError? = await withCheckedContinuation { continuation in
+            self.connection.send(
+                content: Data(text.utf8),
+                contentContext: .finalMessage,
+                isComplete: true,
+                completion: .contentProcessed { continuation.resume(returning: $0) }
+            )
+        }
+        if let error {
+            throw error
+        }
+    }
+
     /// A GET with optional extra headers.
     func get(_ target: String, headers: [String: String] = [:]) async throws {
         var text = "GET \(target) HTTP/1.1\r\nHost: 127.0.0.1\r\n"

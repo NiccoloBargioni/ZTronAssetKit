@@ -129,6 +129,65 @@ struct FakeRemoteSourceTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("Test support: early releases are delivered in order: progress continues the attempt, a terminal one ends it", .timeLimit(.minutes(1)))
+    func earlyReleasesInOrder() async {
+        let source = FakeRemoteSource()
+        await source.attach(staging: FakeStagingSink())
+        await source.release(Self.id, with: .progress(received: 1, expected: 4))
+        await source.release(Self.id, with: .progress(received: 2, expected: 4))
+        await source.script(Self.id, [.hold, .stage(Data([1, 2, 3, 4]))])
+        let request = Self.request(Self.id, 1)
+        let first = await source.transfer(request)
+        #expect(await Self.updates(of: first) == [.progress(received: 1, expected: 4), Self.staged(request, 4)])
+        let second = await source.transfer(Self.request(Self.id, 2))
+        #expect(await source.activeTransfers == 1)
+        await source.release(Self.id, with: .failed(.offline(.noConnection)))
+        #expect(await Self.updates(of: second) == [.progress(received: 2, expected: 4), .failed(.offline(.noConnection))])
+
+        await source.release(Self.other, with: .failed(.cancelled(.byClient)))
+        let unscripted = await source.transfer(Self.request(Self.other, 3))
+        #expect(await Self.updates(of: unscripted) == [.failed(.cancelled(.byClient))])
+        #expect(await source.activeTransfers == 0)
+    }
+
+    @available(macOS 15.0, *)
+    @Test(
+        "Test support: every staging failure maps the way the transport maps it",
+        .timeLimit(.minutes(1)),
+        arguments: [
+            (StagingError.tooLarge(limit: 1), TransferError.transient(.localIO(posixCode: EFBIG), retryAfter: nil)),
+            (.source(.readFailed), .transient(.localIO(posixCode: EIO), retryAfter: nil)),
+            (.nameInUse, .transient(.localIO(posixCode: EEXIST), retryAfter: nil)),
+        ]
+    )
+    func stagingErrorMapping(error: StagingError, expected: TransferError) async {
+        let source = FakeRemoteSource()
+        let sink = FakeStagingSink()
+        await source.attach(staging: sink)
+        sink.failNext(.createPartial, with: error)
+        await source.script(Self.id, [.stageGenerated(seed: 1, byteCount: 8)])
+        let handle = await source.transfer(Self.request())
+        #expect(await Self.updates(of: handle) == [.failed(expected)])
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: an Apple-tier source reports pack manifests and staged files without an HTTP status", .timeLimit(.minutes(1)))
+    func appleTierShapes() async throws {
+        let capabilities = RemoteSourceCapabilities(tier: .appleHosted, supportsPriority: false, supportsResume: false, supportsBackground: false, keepsSourceCopies: true)
+        let source = FakeRemoteSource(originID: "apple-hosted", capabilities: capabilities)
+        await source.attach(staging: FakeStagingSink())
+        await source.scriptManifest([.fetched(Data([1]), etag: nil)])
+        let request = ManifestRequest(ifNoneMatch: nil, maxBytes: 64, attempt: TransferAttempt(epoch: 1, sequence: 1))
+        #expect(try await source.fetchManifest(request) == .fetched(ManifestPayload(bytes: Data([1]), etag: nil, origin: .installedPack(updateChecked: true))))
+        await source.script(Self.id, [.stage(Data())])
+        let staged = Self.request(expected: 0)
+        let handle = await source.transfer(staged)
+        #expect(await Self.updates(of: handle) == [.staged(StagedFile(name: staged.partialName, byteCount: 0, resumed: false, httpStatus: nil, etag: nil))])
+        #expect(source.originID == "apple-hosted" && source.capabilities == capabilities)
+        #expect(await (source.attachedStaging as? FakeStagingSink) != nil)
+    }
+
+    @available(macOS 15.0, *)
     @Test("Test support: a non-terminal release continues the held attempt with its remaining steps", .timeLimit(.minutes(1)))
     func progressReleaseContinues() async {
         let source = FakeRemoteSource()

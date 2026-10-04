@@ -81,6 +81,7 @@ struct FakeFileSystemFaultTests {
         try fileSystem.write(Data([5]), to: Self.tmp, mode: .truncate)
         fileSystem.addFault(FaultRule(operation: .read, occurrence: .nth(1), error: .io))
         fileSystem.addFault(FaultRule(operation: .removeItem, occurrence: .every, error: .io))
+        fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(pathContains: "/blobs/"), occurrence: .every, error: .io))
         #expect(throws: FileSystemError.io) { try fileSystem.read(from: Self.tmp, offset: 0, maxLength: 1) }
         #expect(FakeFSFixture.content(fileSystem, "/fake-volume/index.tmp") == [5])
         #expect(try fileSystem.itemInfo(at: Self.tmp)?.byteSize == 1)
