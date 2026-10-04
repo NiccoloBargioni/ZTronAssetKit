@@ -24,8 +24,8 @@ struct TestSupportFakeRemoteSourceTests {
         )
     }
 
-    static func staged(_ request: TransferRequest, _ count: Int64, resumed: Bool = false) -> TransferUpdate {
-        .staged(StagedFile(name: request.partialName, byteCount: count, resumed: resumed, httpStatus: 200, etag: nil))
+    static func staged(_ request: TransferRequest, _ count: Int64, resumed: Bool = false, status: Int = 200) -> TransferUpdate {
+        .staged(StagedFile(name: request.partialName, byteCount: count, resumed: resumed, httpStatus: status, etag: nil))
     }
 
     static func updates(of handle: any TransferHandle) async -> [TransferUpdate] {
@@ -223,8 +223,177 @@ struct TestSupportFakeRemoteSourceTests {
         let retry = Self.request(Self.id, 2)
         let second = await source.transfer(retry)
         await source.release(Self.id, with: Self.staged(retry, 4))
-        #expect(await Self.updates(of: first) == [.paused(resumable: true)])
+        #expect(await Self.updates(of: first) == [.paused(resumable: false)])
         #expect(await Self.updates(of: second) == [Self.staged(retry, 4)])
+    }
+
+    /// The Model: `.paused(resumable:)` is `true` only when a partial plus a validator were kept. A parked attempt of
+    /// this fake has written nothing under its own name; one that continues an earlier partial left that partial and
+    /// the request's validator untouched.
+    @available(macOS 15.0, *)
+    @Test("Test support: pausing a parked attempt is resumable only when it continues an earlier partial with a validator", .timeLimit(.minutes(1)))
+    func pauseIsResumableOnlyWithAKeptPartial() async throws {
+        let source = FakeRemoteSource()
+        await source.attach(staging: FakeStagingSink())
+        await source.script(Self.id, [.hold, .hold])
+        let fresh = await source.transfer(Self.request(Self.id, 1))
+        fresh.pause()
+        #expect(await Self.updates(of: fresh) == [.paused(resumable: false)])
+        let validator = ResumeValidator.strongETag(try #require(ETag(rawValue: "\"e\"")))
+        let point = ResumePoint(previous: Self.request(Self.id, 1).partialName, offset: 2, validator: validator)
+        let resumed = await source.transfer(Self.request(Self.id, 2, resume: point))
+        resumed.pause()
+        #expect(await Self.updates(of: resumed) == [.paused(resumable: true)])
+        #expect(await source.activeTransfers == 0)
+    }
+
+    /// The Model's `TransferHandle`: terminating the updates stream (its consumer cancelled) cancels the transfer. An
+    /// engine that ends a held attempt by cancelling the task that drives it must see the census reach 0, and the
+    /// attempt's remaining steps go to the next attempt as after `cancel()`.
+    @available(macOS 15.0, *)
+    @Test("Test support: cancelling the task that consumes a held attempt cancels the attempt and drops it from the census", .timeLimit(.minutes(1)))
+    func cancelledConsumerCancelsAttempt() async {
+        let source = FakeRemoteSource()
+        await source.attach(staging: FakeStagingSink())
+        await source.script(Self.id, [.hold, .stage(Data([1, 2, 3, 4]))])
+        let held = await source.transfer(Self.request(Self.id, 1))
+        #expect(await source.activeTransfers == 1)
+        let consumer = Task { await Self.updates(of: held) }
+        consumer.cancel()
+        #expect(await consumer.value == [])
+        #expect(await source.controlLog == [FakeControlRecord(transfer: Self.id, control: .cancel)])
+        #expect(await source.activeTransfers == 0)
+        #expect(await source.parkedAttempts == 0)
+        let retry = Self.request(Self.id, 2)
+        let next = await source.transfer(retry)
+        #expect(await Self.updates(of: next) == [Self.staged(retry, 4)])
+    }
+
+    /// Starts `request` and releases its handle, never iterated or stopped, before returning.
+    @available(macOS 15.0, *)
+    static func startAndDrop(_ source: FakeRemoteSource, _ request: TransferRequest) async {
+        let handle = await source.transfer(request)
+        #expect(handle.id == request.id)
+    }
+
+    /// Starts `request` and returns only its updates stream: the handle itself is released.
+    @available(macOS 15.0, *)
+    static func streamOnly(_ source: FakeRemoteSource, _ request: TransferRequest) async -> AsyncStream<TransferUpdate> {
+        await source.transfer(request).updates
+    }
+
+    /// The Model's `TransferHandle`: terminating the updates stream cancels the transfer, also when the consumer drops
+    /// it. The source keeps only the handle's channel, so an engine that releases a held attempt's handle sees the
+    /// census reach 0, and the attempt's remaining steps go to the next attempt.
+    @available(macOS 15.0, *)
+    @Test("Test support: dropping the handle of a held attempt cancels the attempt and drops it from the census", .timeLimit(.minutes(1)))
+    func droppedHandleCancelsAttempt() async {
+        let source = FakeRemoteSource()
+        await source.attach(staging: FakeStagingSink())
+        await source.script(Self.id, [.hold, .stage(Data([1, 2, 3, 4]))])
+        await Self.startAndDrop(source, Self.request(Self.id, 1))
+        #expect(await source.controlLog == [FakeControlRecord(transfer: Self.id, control: .cancel)])
+        #expect(await source.activeTransfers == 0)
+        #expect(await source.parkedAttempts == 0)
+        let retry = Self.request(Self.id, 2)
+        let next = await source.transfer(retry)
+        #expect(await Self.updates(of: next) == [Self.staged(retry, 4)])
+    }
+
+    /// Dropping the handle is not dropping the stream: a consumer that keeps only `updates` still receives what the
+    /// source delivers, and the attempt stays active until then (the source never kept the stream itself).
+    @available(macOS 15.0, *)
+    @Test("Test support: an attempt whose updates stream outlives its handle stays active and still ends by release", .timeLimit(.minutes(1)))
+    func streamOutlivesHandle() async {
+        let source = FakeRemoteSource()
+        await source.script(Self.id, [.hold])
+        let updates = await Self.streamOnly(source, Self.request(Self.id, 1))
+        #expect(await source.activeTransfers == 1)
+        #expect(await source.controlLog == [])
+        await source.release(Self.id, with: .failed(.transient(.throttled, retryAfter: nil)))
+        var received: [TransferUpdate] = []
+        for await update in updates {
+            received.append(update)
+        }
+        #expect(received == [.failed(.transient(.throttled, retryAfter: nil))])
+        #expect(await source.activeTransfers == 0)
+        #expect(await source.controlLog == [])
+    }
+
+    /// The end of a finished stream is not a cancellation: a consumer cancelled after the terminal element records no
+    /// control.
+    @available(macOS 15.0, *)
+    @Test("Test support: a consumer cancelled after its attempt ended records no cancellation", .timeLimit(.minutes(1)))
+    func finishedStreamIsNotCancelled() async {
+        let source = FakeRemoteSource()
+        await source.attach(staging: FakeStagingSink())
+        await source.script(Self.id, [.stage(Data([1, 2, 3, 4]))])
+        let request = Self.request()
+        let handle = await source.transfer(request)
+        let consumer = Task { await Self.updates(of: handle) }
+        consumer.cancel()
+        let seen = await consumer.value
+        #expect(seen == [] || seen == [Self.staged(request, 4)], "\(seen)")
+        #expect(await source.controlLog == [])
+        #expect(await source.activeTransfers == 0)
+    }
+
+    /// A `Data` slice keeps its parent's indices: the step must stage the slice's own bytes, from its start and from a
+    /// resume offset (a zero-based offset into a slice whose `startIndex` is not 0 traps and ends the test process).
+    @available(macOS 15.0, *)
+    @Test("Test support: a stage step scripted with a Data slice stages the slice's bytes, fresh and resumed", .timeLimit(.minutes(1)))
+    func stageScriptedWithSlice() async throws {
+        let source = FakeRemoteSource()
+        let sink = FakeStagingSink()
+        await source.attach(staging: sink)
+        let parent = Data((0..<10).map { UInt8($0) })
+        let slice = parent.dropFirst(4)
+        #expect(slice.startIndex == 4)
+        await source.script(Self.id, [.stage(slice)])
+        let fresh = Self.request(Self.id, 1, expected: 6)
+        let first = await source.transfer(fresh)
+        #expect(await Self.updates(of: first) == [Self.staged(fresh, 6)])
+        #expect(sink.contents[fresh.partialName] == Data([4, 5, 6, 7, 8, 9]))
+
+        let earlier = Self.request(Self.id, 2).partialName
+        try sink.createPartial(earlier)
+        _ = try sink.appendPartial(Data([4, 5]), to: earlier)
+        let validator = ResumeValidator.strongETag(try #require(ETag(rawValue: "\"e\"")))
+        let resumed = Self.request(Self.id, 3, expected: 6, resume: ResumePoint(previous: earlier, offset: 2, validator: validator))
+        await source.script(Self.id, [.stage(parent[4..<10])])
+        let second = await source.transfer(resumed)
+        #expect(await Self.updates(of: second) == [Self.staged(resumed, 6, resumed: true, status: 206)])
+        #expect(sink.contents[resumed.partialName] == Data([4, 5, 6, 7, 8, 9]))
+    }
+
+    /// `StagingAttachable`: "a later call (a restarted client) replaces it". The engine's shutdown invalidates the
+    /// source (RE-S22); a client restarted on the same factory and source must transfer again, as the R-NET-6 and
+    /// R-NET-3 relaunch scenarios that reuse the source (and its `scriptReattached`) need.
+    @available(macOS 15.0, *)
+    @Test("Test support: a source re-attached by a restarted client after shutdown transfers again through the new sink", .timeLimit(.minutes(1)))
+    func restartedClientRevivesSource() async throws {
+        let source = FakeRemoteSource()
+        let factory = FakeRemoteSourceFactory(source: source)
+        let firstSink = FakeStagingSink()
+        let firstLifetime = try await factory.makeRemoteSource(configuration: RemoteConfiguration(), staging: firstSink, log: .tapOnly(nil))
+        await source.script(Self.id, [.hold])
+        let held = await firstLifetime.transfer(Self.request(Self.id, 1))
+        await firstLifetime.invalidate()
+        #expect(await Self.updates(of: held) == [.failed(.cancelled(.byClient))])
+        let afterShutdown = await firstLifetime.transfer(Self.request(Self.id, 2))
+        #expect(await Self.updates(of: afterShutdown) == [.failed(.cancelled(.byClient))])
+        #expect(await source.isInvalidated)
+
+        let secondSink = FakeStagingSink()
+        let secondLifetime = try await factory.makeRemoteSource(configuration: RemoteConfiguration(), staging: secondSink, log: .tapOnly(nil))
+        #expect(await source.isInvalidated == false)
+        await source.script(Self.id, [.stage(Data([1, 2, 3, 4]))])
+        let request = Self.request(Self.id, 3)
+        let handle = await secondLifetime.transfer(request)
+        #expect(await Self.updates(of: handle) == [Self.staged(request, 4)])
+        #expect(secondSink.contents == [request.partialName: Data([1, 2, 3, 4])])
+        #expect(firstSink.contents.isEmpty)
+        #expect(await source.starts.map(\.attempt.sequence) == [1, 2, 3])
     }
 
     @available(macOS 15.0, *)
@@ -235,12 +404,14 @@ struct TestSupportFakeRemoteSourceTests {
         let next = Self.request(Self.other, 2)
         let promoted = await source.transfer(bulk)
         promoted.setPriority(.userInitiated)
-        _ = await source.transfer(next)
+        // Kept until the end: dropping a parked attempt's handle would cancel it (the Model's `TransferHandle`).
+        let parked = await source.transfer(next)
         promoted.cancel()
         let promote = FakeControlRecord(transfer: Self.id, control: .setPriority(.userInitiated))
         let cancel = FakeControlRecord(transfer: Self.id, control: .cancel)
         #expect(source.transportLog.events == [.started(bulk), .controlled(promote), .started(next), .controlled(cancel)])
         #expect(await source.activeTransfers == 1)
+        #expect(parked.id == Self.other)
     }
 
     @available(macOS 15.0, *)
@@ -346,7 +517,7 @@ struct TestSupportFakeRemoteSourceTests {
         let resumed = Self.request(Self.id, 2, resume: ResumePoint(previous: earlier, offset: 2, validator: validator))
         await source.script(Self.id, [.stage(Data([1, 2, 3, 4])), .stage(Data([1, 2, 3, 4]))])
         let handle = await source.transfer(resumed)
-        #expect(await Self.updates(of: handle) == [Self.staged(resumed, 4, resumed: true)])
+        #expect(await Self.updates(of: handle) == [Self.staged(resumed, 4, resumed: true, status: 206)])
         #expect(sink.contents == [resumed.partialName: Data([1, 2, 3, 4])])
 
         let missing = Self.request(Self.id, 3, resume: ResumePoint(previous: earlier, offset: 2, validator: validator))

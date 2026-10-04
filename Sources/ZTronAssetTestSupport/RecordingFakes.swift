@@ -93,6 +93,13 @@ public final class FakeTransportLog: Sendable {
 /// order under a lock and, when the handle was made with a `FakeTransportLog`, also in that shared log, so the
 /// order of `setPriority` relative to other starts is observable (sync-1 S1-06). `cancel()` and `pause()` end the
 /// stream with their terminal element; `deliver` yields what the test scripts. Gated for `Mutex` (ADR-014).
+///
+/// As the Model's `TransferHandle` requires, terminating `updates` before its terminal element cancels the transfer:
+/// when the consuming task is cancelled, or when the stream is dropped (the handle and every iterator released), the
+/// handle records `.cancel` once, exactly as `cancel()` would, so `FakeRemoteSource` stops that attempt and drops it
+/// from `activeTransfers`. The end of a stream that delivered its terminal element is not a cancellation. What the
+/// test (or `FakeRemoteSource`) drives is the handle's channel, which never holds the stream: a source that parks an
+/// attempt keeps only the channel, so releasing the handle really drops the stream.
 @available(macOS 15.0, iOS 18.0, *)
 public final class FakeTransferHandle: TransferHandle {
     /// The content.
@@ -103,11 +110,8 @@ public final class FakeTransferHandle: TransferHandle {
     public let updates: AsyncStream<TransferUpdate>
     /// The shared log every control is also recorded in; `nil` for a stand-alone handle.
     public let transportLog: FakeTransportLog?
-    private let continuation: AsyncStream<TransferUpdate>.Continuation
-    private let log: Mutex<[TransferControl]>
-    /// Whether a terminal update was yielded: decided under this lock, so a scripted delivery racing a `cancel()` or
-    /// `pause()` on another thread ends the stream with exactly one terminal element.
-    private let terminated: Mutex<Bool>
+    /// Where controls are recorded and updates yielded; `FakeRemoteSource` keeps this, never the handle.
+    let channel: FakeTransferChannel
 
     /// Creates a handle; `FakeRemoteSource` passes its `transportLog`.
     public init(id: TransferID, attempt: TransferAttempt, transportLog: FakeTransportLog? = nil) {
@@ -115,49 +119,113 @@ public final class FakeTransferHandle: TransferHandle {
         self.attempt = attempt
         let (stream, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(8))
         self.updates = stream
-        self.continuation = continuation
         self.transportLog = transportLog
-        self.log = Mutex([])
-        self.terminated = Mutex(false)
+        let channel = FakeTransferChannel(id: id, continuation: continuation, transportLog: transportLog)
+        self.channel = channel
+        // The handler holds the channel, not the handle: the channel holds no stream, and `AsyncStream` drops the
+        // handler once it ran, so nothing is kept alive after the stream ended.
+        continuation.onTermination = { termination in
+            // `.finished` comes from the channel's `end(with:)`, which holds its lock while it finishes: never take
+            // the lock for it.
+            guard case .cancelled = termination else {
+                return
+            }
+            channel.consumerTerminated()
+        }
     }
 
     /// Records the priority change.
     public func setPriority(_ priority: AssetPriority) {
-        self.record(.setPriority(priority))
+        self.channel.record(.setPriority(priority))
     }
 
-    /// Records the pause and ends the stream with `.paused(resumable: true)` (unless it already ended).
+    /// Sets what a later `pause()` reports as `.paused(resumable:)`: whether the transfer kept a partial plus a
+    /// validator (the Model's meaning). `true` until set, so a stand-alone handle (`FakeTransferBackend`'s) stands
+    /// for a transfer that kept both unless the test says otherwise; `FakeRemoteSource` sets it per attempt.
+    public func setPauseResumable(_ resumable: Bool) {
+        self.channel.setPauseResumable(resumable)
+    }
+
+    /// Records the pause and ends the stream with `.paused(resumable:)` (unless it already ended): `true` unless
+    /// `setPauseResumable(false)` said no partial plus validator was kept.
     public func pause() {
-        self.record(.pause)
-        self.end(with: .paused(resumable: true))
+        self.channel.pause()
     }
 
     /// Records the cancellation and ends the stream with `.failed(.cancelled(.byClient))` (unless it already ended).
     public func cancel() {
-        self.record(.cancel)
-        self.end(with: .failed(.cancelled(.byClient)))
-    }
-
-    /// Yields `update` and finishes the stream, unless an earlier terminal update won. Yielding under the lock is
-    /// safe: no `onTermination` handler is installed, so nothing re-enters it.
-    private func end(with update: TransferUpdate) {
-        self.terminated.withLock { ended in
-            guard !ended else {
-                return
-            }
-            ended = true
-            self.continuation.yield(update)
-            self.continuation.finish()
-        }
-    }
-
-    private func record(_ control: TransferControl) {
-        self.log.withLock { $0.append(control) }
-        self.transportLog?.record(.controlled(FakeControlRecord(transfer: self.id, control: control)))
+        self.channel.cancel()
     }
 
     /// Yields a scripted update; a terminal one ends the stream. Dropped once the stream ended.
     public func deliver(_ update: TransferUpdate) {
+        self.channel.deliver(update)
+    }
+
+    /// Controls received, in order.
+    public var controls: [TransferControl] {
+        self.channel.controls
+    }
+}
+
+/// The driving side of a `FakeTransferHandle`: its control log, its terminal decision and its continuation, without
+/// the stream (so whoever keeps a channel never keeps the stream alive). Gated for `Mutex` (ADR-014).
+@available(macOS 15.0, iOS 18.0, *)
+final class FakeTransferChannel: Sendable {
+    /// The transfer the controls are recorded for.
+    let id: TransferID
+    /// The shared log every control is also recorded in; `nil` for a stand-alone handle.
+    let transportLog: FakeTransportLog?
+    private let continuation: AsyncStream<TransferUpdate>.Continuation
+    private let log: Mutex<[TransferControl]>
+    /// Whether the stream ended (a terminal update was yielded, or the consumer terminated it): decided under this
+    /// lock, so a scripted delivery racing a `cancel()` or `pause()` on another thread ends the stream with exactly
+    /// one terminal element.
+    private let terminated: Mutex<Bool>
+    /// What `pause()` reports as `.paused(resumable:)`.
+    private let pauseResumable: Mutex<Bool>
+
+    /// Creates the channel of one handle.
+    init(id: TransferID, continuation: AsyncStream<TransferUpdate>.Continuation, transportLog: FakeTransportLog?) {
+        self.id = id
+        self.continuation = continuation
+        self.transportLog = transportLog
+        self.log = Mutex([])
+        self.terminated = Mutex(false)
+        self.pauseResumable = Mutex(true)
+    }
+
+    /// Sets what `pause()` reports.
+    func setPauseResumable(_ resumable: Bool) {
+        self.pauseResumable.withLock { $0 = resumable }
+    }
+
+    /// Records the pause and ends the stream with `.paused(resumable:)`.
+    func pause() {
+        self.record(.pause)
+        self.end(with: .paused(resumable: self.pauseResumable.withLock { $0 }))
+    }
+
+    /// Records the cancellation and ends the stream with `.failed(.cancelled(.byClient))`.
+    func cancel() {
+        self.record(.cancel)
+        self.end(with: .failed(.cancelled(.byClient)))
+    }
+
+    /// The stream's consumer ended it before its terminal element (cancelled, or dropped with the handle): the
+    /// transfer is cancelled, recorded once as a `.cancel` control. Nothing is yielded: the stream already ended.
+    func consumerTerminated() {
+        let first = self.terminated.withLock { ended -> Bool in
+            defer { ended = true }
+            return !ended
+        }
+        if first {
+            self.record(.cancel)
+        }
+    }
+
+    /// Yields a scripted update; a terminal one ends the stream. Dropped once the stream ended.
+    func deliver(_ update: TransferUpdate) {
         guard !update.isTerminal else {
             self.end(with: update)
             return
@@ -170,8 +238,32 @@ public final class FakeTransferHandle: TransferHandle {
     }
 
     /// Controls received, in order.
-    public var controls: [TransferControl] {
+    var controls: [TransferControl] {
         self.log.withLock { $0 }
+    }
+
+    /// Whether the engine stopped the transfer: paused or cancelled it, or terminated its stream.
+    var isStopped: Bool {
+        self.controls.contains { $0 == .pause || $0 == .cancel }
+    }
+
+    /// Appends `control` to this channel's log and to the shared log.
+    func record(_ control: TransferControl) {
+        self.log.withLock { $0.append(control) }
+        self.transportLog?.record(.controlled(FakeControlRecord(transfer: self.id, control: control)))
+    }
+
+    /// Yields `update` and finishes the stream, unless the stream already ended. Yielding and finishing under the
+    /// lock is safe: the `onTermination` handler `finish()` runs ignores `.finished` and takes no lock for it.
+    private func end(with update: TransferUpdate) {
+        self.terminated.withLock { ended in
+            guard !ended else {
+                return
+            }
+            ended = true
+            self.continuation.yield(update)
+            self.continuation.finish()
+        }
     }
 }
 
@@ -191,8 +283,10 @@ public protocol StagingAttachable: Sendable {
 public enum FakeTransferStep: Sendable, Hashable {
     /// Report progress.
     case progress(Int64)
-    /// Write these bytes through the attached staging sink (`createPartial`, then `appendPartial`) under the
-    /// request's `partialName`, then report `.staged(StagedFile)` with their count; a sink error fails the
+    /// Write these bytes (a `Data` slice stages its own bytes, whatever its `startIndex`) through the attached staging
+    /// sink (`createPartial`, then `appendPartial`) under the request's `partialName`, then report
+    /// `.staged(StagedFile)` with their count (`httpStatus` 206 for a resumed request on the AWS tier, else 200;
+    /// `nil` on the Apple tier); a sink error fails the
     /// transfer the way the transport would (`StagingError.insufficientSpace` → `.insufficientSpace`, otherwise
     /// `.transient(.localIO)`). Without an attached sink (`StagingAttachable`) the step fails with
     /// `.transient(.localIO)`, so a test that forgot the factory fails visibly instead of hanging.
@@ -200,9 +294,10 @@ public enum FakeTransferStep: Sendable, Hashable {
     /// Write `byteCount` bytes of `GeneratedPayload` for `seed` through the attached staging sink in chunks of
     /// `GeneratedPayload.chunkBytes` (`createPartial`, then one `appendPartial` per chunk, each chunk generated just
     /// before it is written), then report `.staged(StagedFile)`; failures as for `.stage(Data)`. The payload is never
-    /// held in memory as a whole, so P-7's catalog does not sit in RAM and "delta does not grow with catalog size"
-    /// measures the engine and the store, not the fake. The manifest checksum of such an entry is
-    /// `GeneratedPayload.sha256(seed:byteCount:)`.
+    /// held in memory as a whole, so P-7's catalog does not sit in RAM. The source's `transportLog` still grows by one
+    /// `TransferRequest` per start (a few hundred bytes, whatever the payload size), so a P-7 run that compares
+    /// catalog sizes either uses a fresh source per size or counts that growth as the fake's. The manifest checksum
+    /// of such an entry is `GeneratedPayload.sha256(seed:byteCount:)`.
     case stageGenerated(seed: UInt64, byteCount: Int64)
     /// Fail.
     case fail(TransferError)
@@ -249,8 +344,13 @@ public struct FakeControlRecord: Sendable, Hashable {
 /// reaches a `.hold`, or the end of its queue, stays active: `release(_:with:)` ends the oldest such attempt of the
 /// id (a release with no held attempt is kept for the next hold of that id, so a test never races the engine), and
 /// `script(_:_:)` wakes an attempt that ran out of steps (not one at an explicit `.hold`). A non-terminal release
-/// lets the attempt continue with its queue. `pause()` or `cancel()` on a handle ends that attempt; its remaining
-/// steps go to the next attempt. An unscripted manifest fetch answers 304 (the origin has nothing new).
+/// lets the attempt continue with its queue. `pause()` or `cancel()` on a handle ends that attempt, and so does
+/// terminating its `updates` stream (the consuming task cancelled, or the handle dropped: the source keeps only the
+/// handle's channel); its remaining steps go to the next attempt. `pause()` reports `resumable: true` only for an
+/// attempt that continues an earlier partial (`request.resume`). An unscripted manifest fetch answers 304 (the origin
+/// has nothing new). `invalidate()` (the engine's shutdown) fails every active and later transfer until a restarted
+/// client attaches again (`attach(staging:)`), so one source serves several client lifetimes, as the factory's
+/// relaunch scenarios need.
 ///
 /// Cost of synchronous staging: a whole attempt's writes run in one turn of this actor, on the cooperative pool. Over
 /// a live sink (P-7's real files) keep each scripted asset to a few MiB (about 8 MiB is ~10 ms of writing, C2's
@@ -280,10 +380,12 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     private var backgroundEvents: [String] = []
     private var invalidated = false
 
-    /// An attempt that is active but not running: at an explicit `.hold`, or out of scripted steps.
+    /// An attempt that is active but not running: at an explicit `.hold`, or out of scripted steps. It keeps the
+    /// handle's channel, never the handle, so an engine that drops the handle drops its stream, which cancels the
+    /// attempt (the Model's `TransferHandle`).
     private struct WaitingAttempt {
         let request: TransferRequest
-        let handle: FakeTransferHandle
+        let channel: FakeTransferChannel
         let atHold: Bool
     }
 
@@ -302,9 +404,13 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         self.capabilities = capabilities
     }
 
-    /// Receives the store's staging sink (`FakeRemoteSourceFactory` calls it before returning this source).
+    /// Receives the store's staging sink (`FakeRemoteSourceFactory` calls it before returning this source). An
+    /// attach after `invalidate()` is a restarted client (`StagingAttachable`) taking the source over: it transfers
+    /// again, through the new sink. `isInvalidated` and the starts recorded after the shutdown stay observable until
+    /// that attach; scripted steps, manifests and re-attached transfers carry over to the new client.
     public func attach(staging: any StagingSink) {
         self.staging = staging
+        self.invalidated = false
     }
 
     /// The sink `.stage(Data)` writes through; `nil` until attached.
@@ -325,7 +431,7 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
             let index = self.waiting.firstIndex(where: { $0.request.id == id && !$0.atHold })
         {
             let attempt = self.waiting.remove(at: index)
-            self.run(attempt.request, attempt.handle)
+            self.run(attempt.request, attempt.channel)
         }
     }
 
@@ -350,9 +456,9 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
             return
         }
         let attempt = self.waiting.remove(at: index)
-        attempt.handle.deliver(update)
+        attempt.channel.deliver(update)
         if !update.isTerminal {
-            self.run(attempt.request, attempt.handle)
+            self.run(attempt.request, attempt.channel)
         }
     }
 
@@ -396,12 +502,13 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         self.backgroundEvents
     }
 
-    /// Whether `invalidate()` ran.
+    /// Whether `invalidate()` ran since the last `attach(staging:)`.
     public var isInvalidated: Bool {
         self.invalidated
     }
 
-    /// Transfers not yet terminal. Reading it drops the parked attempts the engine paused or cancelled.
+    /// Transfers not yet terminal. Reading it drops the parked attempts the engine paused or cancelled (through the
+    /// handle, or by terminating its stream).
     public var activeTransfers: Int {
         self.dropStopped()
         return self.waiting.count
@@ -430,15 +537,18 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     }
 
     /// Scripted transfer: records `.started(request)` in `transportLog`, then returns a `FakeTransferHandle` made
-    /// with `transportLog`.
+    /// with `transportLog`. Its `pause()` reports `.paused(resumable: true)` only for a request that continues an
+    /// earlier partial (`request.resume`, which carries the validator): an attempt of this fake writes nothing before
+    /// its terminal step, so a fresh attempt paused while parked kept no partial.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
         self.dropStopped()
         self.transportLog.record(.started(request))
         let handle = FakeTransferHandle(id: request.id, attempt: request.attempt, transportLog: self.transportLog)
+        handle.setPauseResumable(request.resume != nil)
         if self.invalidated {
             handle.deliver(.failed(.cancelled(.byClient)))
         } else {
-            self.run(request, handle)
+            self.run(request, handle.channel)
         }
         return handle
     }
@@ -470,11 +580,11 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         self.backgroundEvents.append(identifier)
     }
 
-    /// Ends every transfer.
+    /// Ends every transfer, and fails every later one at once until a restarted client attaches (`attach(staging:)`).
     public func invalidate() async {
         self.invalidated = true
-        for attempt in self.waiting where !FakeRemoteSource.isStopped(attempt.handle) {
-            attempt.handle.deliver(.failed(.cancelled(.byClient)))
+        for attempt in self.waiting where !attempt.channel.isStopped {
+            attempt.channel.deliver(.failed(.cancelled(.byClient)))
         }
         self.waiting.removeAll()
         self.earlyReleases.removeAll()
@@ -483,16 +593,16 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     // MARK: Attempts
 
     /// Runs one attempt's steps until it ends, or parks it at a hold or at the end of its queue.
-    private func run(_ request: TransferRequest, _ handle: FakeTransferHandle) {
-        while !FakeRemoteSource.isStopped(handle) {
+    private func run(_ request: TransferRequest, _ channel: FakeTransferChannel) {
+        while !channel.isStopped {
             guard var queue = self.steps[request.id], !queue.isEmpty else {
-                switch self.takeEarlyRelease(request, handle) {
+                switch self.takeEarlyRelease(request, channel) {
                 case .continued:
                     continue
                 case .ended:
                     return
                 case .none:
-                    self.waiting.append(WaitingAttempt(request: request, handle: handle, atHold: false))
+                    self.waiting.append(WaitingAttempt(request: request, channel: channel, atHold: false))
                     return
                 }
             }
@@ -500,28 +610,30 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
             self.steps[request.id] = queue.isEmpty ? nil : queue
             switch step {
             case .progress(let received):
-                handle.deliver(.progress(received: received, expected: request.expectedBytes))
+                channel.deliver(.progress(received: received, expected: request.expectedBytes))
             case .stage(let data):
-                handle.deliver(self.stage(request, total: Int64(data.count), chunkBytes: max(1, data.count)) { offset, length in
-                    data.subdata(in: Int(offset)..<(Int(offset) + length))
+                // A `Data` slice keeps its parent's indices: offsets count from the slice's own `startIndex`.
+                channel.deliver(self.stage(request, total: Int64(data.count), chunkBytes: max(1, data.count)) { offset, length in
+                    let from = data.startIndex + Int(offset)
+                    return data.subdata(in: from..<(from + length))
                 })
                 return
             case .stageGenerated(let seed, let byteCount):
-                handle.deliver(self.stage(request, total: max(0, byteCount), chunkBytes: GeneratedPayload.chunkBytes) { offset, length in
+                channel.deliver(self.stage(request, total: max(0, byteCount), chunkBytes: GeneratedPayload.chunkBytes) { offset, length in
                     GeneratedPayload.bytes(seed: seed, offset: offset, length: length)
                 })
                 return
             case .fail(let error):
-                handle.deliver(.failed(error))
+                channel.deliver(.failed(error))
                 return
             case .hold:
-                switch self.takeEarlyRelease(request, handle) {
+                switch self.takeEarlyRelease(request, channel) {
                 case .continued:
                     continue
                 case .ended:
                     return
                 case .none:
-                    self.waiting.append(WaitingAttempt(request: request, handle: handle, atHold: true))
+                    self.waiting.append(WaitingAttempt(request: request, channel: channel, atHold: true))
                     return
                 }
             }
@@ -539,13 +651,13 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     }
 
     /// Delivers the oldest release that arrived for `request.id` before any attempt of it waited.
-    private func takeEarlyRelease(_ request: TransferRequest, _ handle: FakeTransferHandle) -> EarlyRelease {
+    private func takeEarlyRelease(_ request: TransferRequest, _ channel: FakeTransferChannel) -> EarlyRelease {
         guard var queue = self.earlyReleases[request.id], !queue.isEmpty else {
             return .none
         }
         let update = queue.removeFirst()
         self.earlyReleases[request.id] = queue.isEmpty ? nil : queue
-        handle.deliver(update)
+        channel.deliver(update)
         return update.isTerminal ? .ended : .continued
     }
 
@@ -569,7 +681,8 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
                 size = try sink.appendPartial(bytes(offset, length), to: name)
                 offset += Int64(length)
             }
-            let status: Int? = self.capabilities.tier == .aws ? 200 : nil
+            // The real transport's final status: 206 for a resumed range request, 200 for a whole body.
+            let status: Int? = self.capabilities.tier == .aws ? (request.resume != nil ? 206 : 200) : nil
             return .staged(StagedFile(name: name, byteCount: size, resumed: request.resume != nil, httpStatus: status, etag: nil))
         } catch {
             return .failed(FakeRemoteSource.transferError(error))
@@ -578,14 +691,9 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
 
     /// Drops parked attempts the engine paused or cancelled. Runs at every interaction that reads or adds parked
     /// attempts (`transfer`, `script`, `release`, `activeTransfers`), so an engine that stops many attempts and never
-    /// scripts or releases does not keep them (each with its handle and request) for the source's lifetime.
+    /// scripts or releases does not keep them (each with its channel and request) for the source's lifetime.
     private func dropStopped() {
-        self.waiting.removeAll { FakeRemoteSource.isStopped($0.handle) }
-    }
-
-    /// Whether the engine ended the attempt through its handle.
-    private static func isStopped(_ handle: FakeTransferHandle) -> Bool {
-        handle.controls.contains { $0 == .pause || $0 == .cancel }
+        self.waiting.removeAll { $0.channel.isStopped }
     }
 
     /// The transport's mapping of a staging failure (`StagingSink` doc): ENOSPC is `insufficientSpace`, anything else

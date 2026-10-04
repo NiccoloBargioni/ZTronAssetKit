@@ -64,6 +64,49 @@ struct TestSupportFakeTransferBackendTests {
         #expect(received == [.failed(.cancelled(.byClient))])
     }
 
+    /// The Model's `TransferHandle`: terminating the updates stream (its consumer cancelled) cancels the transfer, so
+    /// an `HTTPRemoteSource` test sees the cancellation a driver task's cancellation makes.
+    @available(macOS 15.0, *)
+    @Test("Test support: cancelling the task that consumes a handle's updates records a cancellation on the handle", .timeLimit(.minutes(1)))
+    func cancelledConsumerCancelsHandle() async throws {
+        let backend = FakeTransferBackend()
+        _ = await backend.start(Self.job(1))
+        let handle = try #require(await backend.handles.first)
+        let consumer = Task {
+            var received: [TransferUpdate] = []
+            for await update in handle.updates {
+                received.append(update)
+            }
+            return received
+        }
+        consumer.cancel()
+        #expect(await consumer.value == [])
+        #expect(handle.controls == [.cancel])
+        handle.cancel()
+        #expect(handle.controls == [.cancel, .cancel])
+    }
+
+    /// `.paused(resumable:)` says whether a partial plus a validator were kept: a stand-alone handle stands for a
+    /// transfer that kept both until the test says otherwise.
+    @available(macOS 15.0, *)
+    @Test("Test support: a stand-alone handle pauses resumably unless the test says no partial was kept", .timeLimit(.minutes(1)))
+    func standalonePauseOutcome() async {
+        let kept = FakeTransferHandle(id: Self.job(1).id, attempt: Self.job(1).attempt)
+        kept.pause()
+        let lost = FakeTransferHandle(id: Self.job(2).id, attempt: Self.job(2).attempt)
+        lost.setPauseResumable(false)
+        lost.pause()
+        var outcomes: [TransferUpdate] = []
+        for await update in kept.updates {
+            outcomes.append(update)
+        }
+        for await update in lost.updates {
+            outcomes.append(update)
+        }
+        #expect(outcomes == [.paused(resumable: true), .paused(resumable: false)])
+        #expect(kept.controls == [.pause] && lost.controls == [.pause])
+    }
+
     @available(macOS 15.0, *)
     @Test("Test support: a handle ends with exactly one terminal update when a scripted delivery races a cancel", .timeLimit(.minutes(1)))
     func racingTerminalsDeliverOne() async {
