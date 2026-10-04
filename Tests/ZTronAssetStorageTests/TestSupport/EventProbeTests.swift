@@ -53,7 +53,7 @@ struct TestSupportEventProbeTests {
         await probe.waitForWaiters(atLeast: 1)
         let census = Task { await probe.waitForWaiters(atLeast: 2) }
         let second = Task { await probe.next(where: Self.isShutDown) }
-        await census.value
+        #expect(await census.value)
         continuation.yield(.clientShutDown)
         continuation.yield(.clientShutDown)
         #expect(await first.value == .clientShutDown)
@@ -105,5 +105,33 @@ struct TestSupportEventProbeTests {
         let cancelledEarly = Task { await probe.next(where: { _ in false }) }
         cancelledEarly.cancel()
         #expect(await cancelledEarly.value == nil)
+    }
+
+    @Test("Test support: a probe released without stop ends its consumer, which releases the subscription", .timeLimit(.minutes(1)))
+    func releasedProbeEndsItsConsumer() async {
+        let (stream, continuation) = AsyncStream.makeStream(of: AssetEvent.self)
+        let (terminated, terminations) = AsyncStream.makeStream(of: Void.self)
+        continuation.onTermination = { _ in
+            terminations.yield()
+            terminations.finish()
+        }
+        var probe: EventProbe? = EventProbe(stream: stream)
+        #expect(await probe?.received == [])
+        probe = nil
+        var sawTermination = false
+        for await _ in terminated {
+            sawTermination = true
+        }
+        #expect(sawTermination)
+    }
+
+    @Test("Test support: a census wait ends, unreached, when the probe stops", .timeLimit(.minutes(1)))
+    func censusWaitEndsOnStop() async {
+        let (stream, _) = AsyncStream.makeStream(of: AssetEvent.self)
+        let probe = EventProbe(stream: stream)
+        let census = Task { await probe.waitForWaiters(atLeast: 1) }
+        await probe.stop()
+        #expect(await census.value == false)
+        #expect(await probe.waitForWaiters(atLeast: 1) == false)
     }
 }

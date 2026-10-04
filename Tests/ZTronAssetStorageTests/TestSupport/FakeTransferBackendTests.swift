@@ -63,4 +63,26 @@ struct TestSupportFakeTransferBackendTests {
         }
         #expect(received == [.failed(.cancelled(.byClient))])
     }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a handle ends with exactly one terminal update when a scripted delivery races a cancel", .timeLimit(.minutes(1)))
+    func racingTerminalsDeliverOne() async {
+        let staged = TransferUpdate.staged(StagedFile(name: Self.job(1).partialName, byteCount: 4, resumed: false, httpStatus: 200, etag: nil))
+        for round in 0..<2_000 {
+            let handle = FakeTransferHandle(id: Self.job(1).id, attempt: Self.job(1).attempt)
+            DispatchQueue.concurrentPerform(iterations: 2) { index in
+                if index == 0 {
+                    handle.deliver(staged)
+                } else {
+                    handle.cancel()
+                }
+            }
+            var terminals: [TransferUpdate] = []
+            for await update in handle.updates where update.isTerminal {
+                terminals.append(update)
+            }
+            #expect(terminals.count == 1, "round \(round): \(terminals)")
+            #expect(handle.controls == [.cancel])
+        }
+    }
 }

@@ -105,6 +105,9 @@ public final class FakeTransferHandle: TransferHandle {
     public let transportLog: FakeTransportLog?
     private let continuation: AsyncStream<TransferUpdate>.Continuation
     private let log: Mutex<[TransferControl]>
+    /// Whether a terminal update was yielded: decided under this lock, so a scripted delivery racing a `cancel()` or
+    /// `pause()` on another thread ends the stream with exactly one terminal element.
+    private let terminated: Mutex<Bool>
 
     /// Creates a handle; `FakeRemoteSource` passes its `transportLog`.
     public init(id: TransferID, attempt: TransferAttempt, transportLog: FakeTransportLog? = nil) {
@@ -115,6 +118,7 @@ public final class FakeTransferHandle: TransferHandle {
         self.continuation = continuation
         self.transportLog = transportLog
         self.log = Mutex([])
+        self.terminated = Mutex(false)
     }
 
     /// Records the priority change.
@@ -122,18 +126,29 @@ public final class FakeTransferHandle: TransferHandle {
         self.record(.setPriority(priority))
     }
 
-    /// Records the pause and ends the stream with `.paused(resumable: true)`.
+    /// Records the pause and ends the stream with `.paused(resumable: true)` (unless it already ended).
     public func pause() {
         self.record(.pause)
-        self.continuation.yield(.paused(resumable: true))
-        self.continuation.finish()
+        self.end(with: .paused(resumable: true))
     }
 
-    /// Records the cancellation and ends the stream with `.failed(.cancelled(.byClient))`.
+    /// Records the cancellation and ends the stream with `.failed(.cancelled(.byClient))` (unless it already ended).
     public func cancel() {
         self.record(.cancel)
-        self.continuation.yield(.failed(.cancelled(.byClient)))
-        self.continuation.finish()
+        self.end(with: .failed(.cancelled(.byClient)))
+    }
+
+    /// Yields `update` and finishes the stream, unless an earlier terminal update won. Yielding under the lock is
+    /// safe: no `onTermination` handler is installed, so nothing re-enters it.
+    private func end(with update: TransferUpdate) {
+        self.terminated.withLock { ended in
+            guard !ended else {
+                return
+            }
+            ended = true
+            self.continuation.yield(update)
+            self.continuation.finish()
+        }
     }
 
     private func record(_ control: TransferControl) {
@@ -141,11 +156,16 @@ public final class FakeTransferHandle: TransferHandle {
         self.transportLog?.record(.controlled(FakeControlRecord(transfer: self.id, control: control)))
     }
 
-    /// Yields a scripted update; a terminal one ends the stream.
+    /// Yields a scripted update; a terminal one ends the stream. Dropped once the stream ended.
     public func deliver(_ update: TransferUpdate) {
-        self.continuation.yield(update)
-        if update.isTerminal {
-            self.continuation.finish()
+        guard !update.isTerminal else {
+            self.end(with: update)
+            return
+        }
+        self.terminated.withLock { ended in
+            if !ended {
+                self.continuation.yield(update)
+            }
         }
     }
 
@@ -231,6 +251,12 @@ public struct FakeControlRecord: Sendable, Hashable {
 /// `script(_:_:)` wakes an attempt that ran out of steps (not one at an explicit `.hold`). A non-terminal release
 /// lets the attempt continue with its queue. `pause()` or `cancel()` on a handle ends that attempt; its remaining
 /// steps go to the next attempt. An unscripted manifest fetch answers 304 (the origin has nothing new).
+///
+/// Cost of synchronous staging: a whole attempt's writes run in one turn of this actor, on the cooperative pool. Over
+/// a live sink (P-7's real files) keep each scripted asset to a few MiB (about 8 MiB is ~10 ms of writing, C2's
+/// stretch); a larger catalog is many assets, not one large one. Over a `FakeFileSystem` the writes are numbered
+/// mutations of that fake, so a crash-enumeration scenario must not run transfers concurrently with other store
+/// work: the interleaving, and so the crash-point numbering, would then depend on scheduling.
 @available(macOS 15.0, iOS 18.0, *)
 public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     /// The breaker key.
@@ -836,7 +862,7 @@ public actor EventProbe {
     private var waiters: [Waiter] = []
     private var nextWaiter: UInt64 = 0
     private var finished = false
-    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Bool, Never>)] = []
     private let stopSignal: AsyncStream<Void>.Continuation
 
     /// A suspended `next(where:)` call.
@@ -876,7 +902,13 @@ public actor EventProbe {
         }
     }
 
-    /// Every event received so far.
+    /// A probe released without `stop()` still ends its consumer, so the subscription it holds is released.
+    deinit {
+        self.stopSignal.finish()
+    }
+
+    /// Every event received so far (kept for the probe's lifetime: `next` scans it, so a probe is meant for one
+    /// test's events, not for an unbounded stream).
     public var received: [AssetEvent] {
         self.events
     }
@@ -909,14 +941,19 @@ public actor EventProbe {
         }
     }
 
-    /// Suspends until at least `count` calls of `next(where:)` are waiting (tests of the probe itself).
-    func waitForWaiters(atLeast count: Int) async {
+    /// Suspends until at least `count` calls of `next(where:)` are waiting (tests of the probe itself); `false`
+    /// when the probe finished first (no call can wait any more).
+    @discardableResult
+    func waitForWaiters(atLeast count: Int) async -> Bool {
         if self.waiters.count >= count {
-            return
+            return true
+        }
+        guard !self.finished else {
+            return false
         }
         // REENTRANCY: h-4 (proposed, as TS2) — nothing: a terminal wait, registered synchronously and resumed only
-        // by the actor turn in which `count` calls were waiting; no state is read afterwards.
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        // by the actor turn in which `count` calls were waiting, or by `finish()`; no state is read afterwards.
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             self.countWaiters.append((count, continuation))
         }
     }
@@ -945,6 +982,11 @@ public actor EventProbe {
         for waiter in pending {
             waiter.continuation.resume(returning: nil)
         }
+        let census = self.countWaiters
+        self.countWaiters.removeAll()
+        for waiter in census {
+            waiter.continuation.resume(returning: false)
+        }
     }
 
     private func cancelWaiter(_ id: UInt64) {
@@ -956,7 +998,7 @@ public actor EventProbe {
 
     private func notifyCountWaiters() {
         let waiting = self.waiters.count
-        var ready: [CheckedContinuation<Void, Never>] = []
+        var ready: [CheckedContinuation<Bool, Never>] = []
         self.countWaiters.removeAll { waiter in
             if waiter.count <= waiting {
                 ready.append(waiter.continuation)
@@ -965,7 +1007,7 @@ public actor EventProbe {
             return false
         }
         for continuation in ready {
-            continuation.resume()
+            continuation.resume(returning: true)
         }
     }
 }
