@@ -47,7 +47,9 @@ struct TestSupportFakeFileSystemTests {
         fileSystem.releaseLock(token)  // a stale token releases nothing
         #expect(throws: FileSystemError.wouldBlock) { try fileSystem.acquireExclusiveLock(at: lock) }
         fileSystem.releaseLock(again)
-        #expect(fileSystem.operations.filter { $0.kind == .releaseLock }.count == 3)
+        let releases = fileSystem.operations.filter { $0.kind == .releaseLock }
+        #expect(releases.count == 3)
+        #expect(releases.allSatisfy { $0.url.path == "/fake-volume/store.lock" })
     }
 
     @available(macOS 15.0, *)

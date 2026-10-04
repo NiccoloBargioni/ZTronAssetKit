@@ -590,15 +590,16 @@ public final class FakeFileSystem: FileSystem {
             }
             state.nextLockHandle += 1
             state.locks[id] = state.nextLockHandle
+            state.lockURLs[state.nextLockHandle] = url
             return FileLockToken(identity: FileIdentity(device: FSGraph.device, inode: id), handle: state.nextLockHandle)
         }
     }
 
-    /// Releases a modelled lock.
+    /// Releases a modelled lock; logged against the lock file's URL (or `/` for a token this lifetime never issued).
     public func releaseLock(_ token: FileLockToken) {
         let isMain = Thread.isMainThread
         self.state.withLock { state in
-            let url = URL(fileURLWithPath: "/", isDirectory: true)
+            let url = state.lockURLs[token.handle] ?? URL(fileURLWithPath: "/", isDirectory: true)
             state.log.append(FSOpRecord(index: state.log.count, kind: .releaseLock, url: url, destination: nil, isMainThread: isMain, failure: nil))
             if state.crashImage == nil, state.locks[token.identity.inode] == token.handle {
                 state.locks.removeValue(forKey: token.identity.inode)
@@ -769,6 +770,8 @@ struct FakeFileSystemState: Sendable {
     var locks: [UInt64: Int64] = [:]
     /// The last handle issued.
     var nextLockHandle: Int64 = 0
+    /// The URL each handle was acquired at, so a release is logged against its lock file.
+    var lockURLs: [Int64: URL] = [:]
 
     /// A fresh lifetime on `graph`.
     init(graph: FSGraph, baselineUsage: Int64) {
