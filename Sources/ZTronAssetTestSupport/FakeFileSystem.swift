@@ -697,10 +697,12 @@ public final class FakeFileSystem: FileSystem {
             id = state.graph.allocate(FSNode(kind: .file, modifiedAt: now))
             state.graph.link(id, as: location.name, in: parent)
         }
-        guard let node = state.graph.nodes[id], node.kind == .file else {
+        // Read the kind and the size without binding the node: a second reference to its bytes would make the append
+        // below copy the whole file (copy-on-write), so k appends would cost O(k·n) instead of O(bytes appended).
+        guard state.graph.nodes[id]?.kind == .file else {
             throw .other(errno: EISDIR)
         }
-        let previous = Int64(node.data.count)
+        let previous = Int64(state.graph.nodes[id]?.data.count ?? 0)
         let target = mode == .truncate ? Int64(bytes.count) : previous + Int64(bytes.count)
         let room = self.available(.important, in: state) + previous
         let fits = target <= room
