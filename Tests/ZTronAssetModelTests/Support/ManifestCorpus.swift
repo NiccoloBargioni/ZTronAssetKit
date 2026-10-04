@@ -1,0 +1,165 @@
+import Foundation
+import ZTronAssetModel
+
+/// Seeded manifest generators and mutators for the R-MAN-3 fuzz corpus and the R-MAN-4 property tests.
+///
+/// Every value is a pure function of its seed (SplitMix64), so a failing case is reproduced from the seed its
+/// expectation prints.
+enum ManifestCorpus {
+    /// The payload limit every 32 MiB case targets (`ManifestLimits().maxPayloadBytes`, R-MAN-2).
+    static let payloadLimit = Int(ManifestLimits().maxPayloadBytes)
+
+    // MARK: - Realistic manifests
+
+    /// The JSON text of one realistic entry (about 350 bytes, like a production catalog entry): a dotted
+    /// identifier, an AWS-tier remote path, three directory components, a file name, a size and a checksum.
+    static func entryJSON(_ index: Int, random: inout SplitMix64) -> String {
+        let extensions = ["heic", "png", "jpg", "svg", "mp4", "mp3", "wav"]
+        let areas = ["Vehytherion Temple", "Control Room", "Nacht der Untoten", "Crypt", "Cinematics", "Audio"]
+        let words = random.next()
+        let ext = extensions[Int(words % UInt64(extensions.count))]
+        let area = areas[Int((words >> 8) % UInt64(areas.count))]
+        let checksum = (0..<4).map { _ in ManifestCorpus.hex16(random.next()) }.joined()
+        let identifier = "bo7.ri.easter.egg.asset.\(index).variant\(words >> 40)"
+        return "{\"identifier\":\"\(identifier)\",\"fileExtension\":\"\(ext)\","
+            + "\"remotePath\":\"media/\(checksum.prefix(16))/\(identifier).\(ext)\","
+            + "\"localPathComponents\":[\"Black Ops 7\",\"Rex Infernus\",\"\(area)\"],"
+            + "\"localFileName\":\"Asset \(index)\",\"byteSize\":\(words % 50_000_000),\"checksum\":\"\(checksum)\"}"
+    }
+
+    /// A bare-array manifest of realistic entries whose size stays at most `maxBytes`, and its entry count.
+    /// Identifiers are unique, so it decodes under the default options while it holds at most 100,000 entries.
+    static func manifest(maxBytes: Int, seed: UInt64) -> (data: Data, entryCount: Int) {
+        var random = SplitMix64(seed: seed)
+        var text = "["
+        text.reserveCapacity(maxBytes)
+        var index = 0
+        while true {
+            let entry = ManifestCorpus.entryJSON(index, random: &random)
+            guard text.utf8.count + entry.utf8.count + 2 <= maxBytes else {
+                break
+            }
+            if index > 0 {
+                text += ","
+            }
+            text += entry
+            index += 1
+        }
+        text += "]"
+        return (Data(text.utf8), index)
+    }
+
+    /// A manifest of exactly `count` realistic entries.
+    static func manifest(entryCount count: Int, seed: UInt64) -> Data {
+        var random = SplitMix64(seed: seed)
+        let entries = (0..<count).map { ManifestCorpus.entryJSON($0, random: &random) }
+        return Data(("[" + entries.joined(separator: ",") + "]").utf8)
+    }
+
+    /// Sixteen lowercase hex digits.
+    static func hex16(_ value: UInt64) -> String {
+        let digits = String(value, radix: 16)
+        return String(repeating: "0", count: 16 - digits.count) + digits
+    }
+
+    // MARK: - Fuzz inputs
+
+    /// `count` seeded random bytes. Large payloads repeat a 64 KiB random block, which keeps generation cheap and
+    /// changes nothing for a decoder that rejects within the first bytes.
+    static func randomBytes(count: Int, seed: UInt64, firstByte: UInt8? = nil) -> Data {
+        var random = SplitMix64(seed: seed)
+        let blockSize = min(count, 64 * 1_024)
+        var block = [UInt8]()
+        block.reserveCapacity(blockSize)
+        while block.count < blockSize {
+            block.append(UInt8(truncatingIfNeeded: random.next()))
+        }
+        if let firstByte, !block.isEmpty {
+            block[0] = firstByte
+        }
+        var data = Data(capacity: count)
+        while !block.isEmpty, data.count + block.count <= count {
+            data.append(contentsOf: block)
+        }
+        data.append(contentsOf: block.prefix(count - data.count))
+        return data
+    }
+
+    /// `payload` with `count` seeded edits: a byte replaced by a random or a JSON-structural byte, inserted,
+    /// deleted, or a short slice duplicated.
+    static func mutated(_ payload: Data, count: Int, seed: UInt64) -> Data {
+        var random = SplitMix64(seed: seed)
+        var bytes = [UInt8](payload)
+        let structural = Array("[]{}\",:\\0123456789-.eEtfn u".utf8)
+        for _ in 0..<count {
+            guard !bytes.isEmpty else {
+                bytes.append(UInt8(truncatingIfNeeded: random.next()))
+                continue
+            }
+            let position = Int(random.next() % UInt64(bytes.count))
+            switch random.next() % 5 {
+            case 0:
+                bytes[position] = UInt8(truncatingIfNeeded: random.next())
+            case 1:
+                bytes[position] = structural[Int(random.next() % UInt64(structural.count))]
+            case 2:
+                bytes.insert(structural[Int(random.next() % UInt64(structural.count))], at: position)
+            case 3:
+                bytes.remove(at: position)
+            default:
+                let end = min(bytes.count, position + 1 + Int(random.next() % 16))
+                bytes.insert(contentsOf: bytes[position..<end], at: position)
+            }
+        }
+        return Data(bytes)
+    }
+
+    /// `depth` nested arrays (`[[[...]]]`), closed or left open.
+    static func nestedArrays(depth: Int, closed: Bool) -> Data {
+        var data = Data(repeating: UInt8(ascii: "["), count: depth)
+        if closed {
+            data.append(Data(repeating: UInt8(ascii: "]"), count: depth))
+        }
+        return data
+    }
+
+    /// A one-entry manifest whose member `field` holds a string of `count` copies of `unit` (inside a one-element
+    /// array when `inArray`); `field` may be a known member (replacing its normal value) or an unknown one.
+    static func hugeString(in field: String, unit: String, count: Int, inArray: Bool = false, terminated: Bool = true) -> Data {
+        var members: [(String, String)] = [
+            ("identifier", "\"a.b\""), ("fileExtension", "\"png\""), ("remotePath", "\"m/a.png\""),
+            ("localPathComponents", "[\"A\"]"),
+        ]
+        let prefix = "\"\(field)\":"
+        var data = Data("[{".utf8)
+        members.removeAll { $0.0 == field }
+        for (name, value) in members {
+            data.append(Data("\"\(name)\":\(value),".utf8))
+        }
+        data.append(Data(prefix.utf8))
+        if inArray {
+            data.append(UInt8(ascii: "["))
+        }
+        data.append(UInt8(ascii: "\""))
+        let unitBytes = Data(unit.utf8)
+        var body = Data(capacity: unitBytes.count * count)
+        var remaining = count
+        var chunk = unitBytes
+        // Doubling keeps building a 32 MiB string to a few dozen appends.
+        while remaining > 0 {
+            let copies = chunk.count / unitBytes.count
+            if copies <= remaining {
+                body.append(chunk)
+                remaining -= copies
+                chunk.append(chunk)
+            } else {
+                chunk = unitBytes
+            }
+        }
+        data.append(body)
+        if terminated {
+            data.append(Data((inArray ? "\"]}]" : "\"}]").utf8))
+        }
+        return data
+    }
+}
