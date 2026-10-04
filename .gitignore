@@ -1,0 +1,8 @@
+.DS_Store
+.build*
+.verify-logs
+DerivedData
+*.xcodeproj
+.swiftpm
+.worktrees
+/Packages

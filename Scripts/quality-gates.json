@@ -1,0 +1,122 @@
+{
+  "_contract": "Immutable. Lowering a number, widening an exclusion or removing a pattern is forbidden (CLAUDE.md rule G1). Raising is welcome. The SHA-256 of this file is quoted in the /goal condition.",
+  "swift": {
+    "min_toolchain": "6.3"
+  },
+  "coverage": {
+    "overall_min_lines_pct": 80.0,
+    "per_target_min_lines_pct": 70.0,
+    "critical_targets": [
+      "ZTronAssetStorage",
+      "ZTronAssetSync"
+    ],
+    "critical_min_lines_pct": 90.0,
+    "expected_targets": [
+      "ZTronAssetModel",
+      "ZTronAssetStorage",
+      "ZTronAssetTransport",
+      "ZTronAssetAppleHosted",
+      "ZTronAssetSync",
+      "ZTronAssetKit"
+    ],
+    "exclude_path_regexes": [
+      "/Tests/",
+      "/\\.build",
+      "/checkouts/",
+      "/DerivedData/",
+      "/ZTronAssetTestSupport/"
+    ],
+    "device_only_path_regexes": [
+      "/Sources/ZTronAssetTransport/BackgroundSessionBackend\\.swift$",
+      "/Sources/ZTronAssetAppleHosted/LiveAssetPackBackend\\.swift$"
+    ],
+    "device_only_max_lines_fraction": 0.03
+  },
+  "tests": {
+    "full_run_repeats": 3,
+    "tsan": true
+  },
+  "unsafe": {
+    "max_escapes": 3,
+    "patterns": [
+      "@unchecked\\s+Sendable",
+      "nonisolated\\(unsafe\\)",
+      "unsafeBitCast",
+      "Unmanaged\\s*<",
+      "unowned\\(unsafe\\)",
+      "withUnsafeMutable\\w*",
+      "UnsafeMutable(Raw)?Pointer",
+      "assumeIsolated",
+      "@preconcurrency"
+    ]
+  },
+  "docs": {
+    "min_documented_public_fraction": 1.0,
+    "max_exempt": 10
+  },
+  "trace": {
+    "require_all_must": true,
+    "require_all_budgets": true
+  },
+  "budgets": {
+    "_note": "Benchmark tests (suites named *Benchmarks) MUST read every threshold from here, never from literals. Reference: Apple-silicon Mac, release configuration, N = 10,000 assets unless stated.",
+    "P-1": {
+      "lookup_p99_us": 25,
+      "scale_ratio_max": 3.0
+    },
+    "P-2": {
+      "index_load_ms": 25
+    },
+    "P-3": {
+      "manifest_decode_validate_ms": 80
+    },
+    "P-4": {
+      "plan_ms": 20,
+      "doubling_ratio_max": 2.5
+    },
+    "P-5": {
+      "index_commit_ms": 40,
+      "commits_per_s_max": 4
+    },
+    "P-6": {
+      "hash_mb_per_s_min": 800,
+      "vs_oneshot_min_ratio": 0.7,
+      "memory_delta_mib_max": 4
+    },
+    "P-7": {
+      "sync_memory_delta_mib_max": 48,
+      "catalog_gib": 1
+    },
+    "P-8": {
+      "main_thread_fs_calls_max": 0,
+      "ui_call_ms_max": 1.0
+    },
+    "P-9": {
+      "heartbeat_tick_ms": 10,
+      "heartbeat_gap_ms_p99_max": 50,
+      "concurrent_resolves": 64
+    },
+    "P-10": {
+      "assets": 500,
+      "connections_max": 8
+    },
+    "P-11": {
+      "assets": 200,
+      "server_latency_ms": 10,
+      "concurrency": 5,
+      "speedup_min": 3.0
+    },
+    "P-12": {
+      "init_ms_max": 1.0
+    },
+    "P-13": {
+      "blobs": 10000,
+      "gc_total_s_max": 2.0,
+      "batch_ms_max": 5
+    },
+    "P-14": {
+      "idle_timers_max": 0,
+      "idle_tasks_max": 0
+    }
+  }
+}
