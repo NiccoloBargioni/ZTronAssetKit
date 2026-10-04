@@ -79,6 +79,9 @@ public struct LogLine: Sendable, Hashable {
 public protocol LogTap: Sendable {
     /// Receives one rendered line.
     func record(_ line: LogLine)
+    /// Receives one edge of a signpost interval (R-OBS-1, ARCHITECTURE §13.5 item 2). The default implementation
+    /// records the event's rendered `.debug` line through `record(_:)`, so existing taps see intervals unchanged.
+    func recordInterval(_ event: LogIntervalEvent)
 }
 
 /// How hard the system is asking for memory back (R-CLN-11).

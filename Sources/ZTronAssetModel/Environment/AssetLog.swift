@@ -151,3 +151,198 @@ extension LogLevel {
         }
     }
 }
+
+/// The six signpost intervals of R-OBS-1. Each operation that owns one wraps itself in
+/// `LogRoute.interval(_:category:_:)` (ARCHITECTURE §13.5 item 2): plan (sync), transfer (transport, apple), verify
+/// and commit (store), gc and eviction (store cleanup).
+public enum LogIntervalName: String, Sendable, Hashable, CaseIterable, Codable {
+    /// Planning a sync run.
+    case plan
+    /// One transfer from first byte to its terminal update.
+    case transfer
+    /// Verifying a staged file (size and streaming hash).
+    case verify
+    /// One index commit.
+    case commit
+    /// Garbage collection (orphans, staging).
+    case gc
+    /// Quota eviction.
+    case eviction
+}
+
+/// One edge of a signpost interval as the `LogTap` sees it (R-OBS-1): the signpost itself goes to the sink's
+/// signposter, which tests do not have, so this event is how a test asserts that an operation was wrapped.
+public struct LogIntervalEvent: Sendable, Hashable {
+    /// Whether the interval began or ended.
+    public enum Phase: String, Sendable, Hashable, CaseIterable {
+        /// `LogRoute.interval(_:category:_:)` was called.
+        case began
+        /// `LogInterval.end()` was called.
+        case ended
+    }
+
+    /// The subsystem: `AssetLog.subsystem` for intervals the module emits.
+    public var subsystem: String
+    /// The category the interval is signposted under.
+    public var category: LogCategory
+    /// Which interval.
+    public var name: LogIntervalName
+    /// Which edge.
+    public var phase: Phase
+    /// The rendered detail given when the interval began (identifiers hashed, no secret); both edges carry it, so
+    /// overlapping intervals of one name can be paired.
+    public var message: String
+
+    /// Creates an event under the module's subsystem unless another one is given.
+    public init(
+        subsystem: String = AssetLog.subsystem,
+        category: LogCategory,
+        name: LogIntervalName,
+        phase: Phase,
+        message: String = ""
+    ) {
+        self.subsystem = subsystem
+        self.category = category
+        self.name = name
+        self.phase = phase
+        self.message = message
+    }
+
+    /// The `.debug` line a tap that does not implement `recordInterval(_:)` receives:
+    /// `interval <name> <began|ended>`, then `: <message>` when there is one.
+    public var line: LogLine {
+        let suffix = self.message.isEmpty ? "" : ": " + self.message
+        let text = LogIntervalEvent.prefix + self.name.rawValue + " " + self.phase.rawValue + suffix
+        return LogLine(subsystem: self.subsystem, category: self.category, level: .debug, message: text)
+    }
+
+    /// The event a rendered interval line stands for, or `nil` for any other line.
+    ///
+    /// The line is read as UTF-8 bytes, not as `Character`s: a message that starts with a combining mark forms one
+    /// grapheme with the separator's space, which a character-wise parse would not split again.
+    public init?(line: LogLine) {
+        let utf8 = line.message.utf8
+        guard line.level == .debug, utf8.starts(with: LogIntervalEvent.prefix.utf8) else {
+            return nil
+        }
+        let rest = utf8.dropFirst(LogIntervalEvent.prefix.utf8.count)
+        let headEnd = rest.firstIndex(of: UInt8(ascii: ":")) ?? rest.endIndex
+        let head = rest[rest.startIndex..<headEnd]
+        guard let space = head.firstIndex(of: UInt8(ascii: " ")),
+            let name = LogIntervalName(rawValue: String(Substring(head[head.startIndex..<space]))),
+            let phase = Phase(rawValue: String(Substring(head[head.index(after: space)...])))
+        else {
+            return nil
+        }
+        var message = ""
+        if headEnd != rest.endIndex {
+            let separatorEnd = rest.index(after: headEnd)
+            guard separatorEnd != rest.endIndex, rest[separatorEnd] == UInt8(ascii: " ") else {
+                return nil
+            }
+            message = String(Substring(rest[rest.index(after: separatorEnd)...]))
+        }
+        self.init(subsystem: line.subsystem, category: line.category, name: name, phase: phase, message: message)
+    }
+
+    private static let prefix = "interval "
+}
+
+extension LogTap {
+    /// The default for taps that only record lines: the event as its rendered `.debug` line, so every tap sees
+    /// both edges of every interval.
+    public func recordInterval(_ event: LogIntervalEvent) {
+        self.record(event.line)
+    }
+}
+
+/// A signpost interval that has begun (R-OBS-1). End it exactly once, typically with `defer { interval.end() }`
+/// right after `LogRoute.interval(_:category:_:)`; it may span awaits.
+///
+/// A copy is the same interval, and `end()` has no once-guard: none can be shared by copies without a lock or an
+/// atomic, which the iOS 15 floor and the unsafe budget rule out. A second end of one interval makes the os overlay
+/// assert in a debug build under `OSLogSink` (and log a double-end error otherwise); tests cannot see that, since
+/// their signposters are disabled. So each interval has one owner that ends it in one place: a `let` ended only by
+/// the `defer` that follows it, or, for an interval that outlives its scope (a transfer kept until its terminal
+/// update), the single code path that removes it from its owner's state. Owners' tests assert through the tap that
+/// every began edge has exactly one ended edge (ADR draft A-7).
+public struct LogInterval: Sendable {
+    /// Which interval.
+    public let name: LogIntervalName
+    /// The category it is signposted under.
+    public let category: LogCategory
+    /// The detail it began with.
+    public let message: String
+    private let tap: (any LogTap)?
+    private let signposter: OSSignposter?
+    private let state: OSSignpostIntervalState?
+
+    init(name: LogIntervalName, category: LogCategory, message: String, tap: (any LogTap)?, signposter: OSSignposter?) {
+        self.name = name
+        self.category = category
+        self.message = message
+        self.tap = tap
+        self.signposter = signposter
+        self.state = signposter.map { LogInterval.begin(name, on: $0, message: message) }
+        tap?.recordInterval(LogIntervalEvent(category: category, name: name, phase: .began, message: message))
+    }
+
+    /// Whether the sink signposts this interval (`OSLogSink`); `false` under the test sink.
+    public var isSignposted: Bool {
+        self.state != nil
+    }
+
+    /// Ends the interval on the signposter and reports the ended edge to the tap.
+    public func end() {
+        if let signposter = self.signposter, let state = self.state {
+            LogInterval.end(self.name, on: signposter, state: state)
+        }
+        self.tap?.recordInterval(LogIntervalEvent(category: self.category, name: self.name, phase: .ended, message: self.message))
+    }
+
+    /// Signpost names must be static strings, hence one literal per interval.
+    private static func begin(_ name: LogIntervalName, on signposter: OSSignposter, message: String) -> OSSignpostIntervalState {
+        let id = signposter.makeSignpostID()
+        switch name {
+        case .plan:
+            return signposter.beginInterval("plan", id: id, "\(message, privacy: .public)")
+        case .transfer:
+            return signposter.beginInterval("transfer", id: id, "\(message, privacy: .public)")
+        case .verify:
+            return signposter.beginInterval("verify", id: id, "\(message, privacy: .public)")
+        case .commit:
+            return signposter.beginInterval("commit", id: id, "\(message, privacy: .public)")
+        case .gc:
+            return signposter.beginInterval("gc", id: id, "\(message, privacy: .public)")
+        case .eviction:
+            return signposter.beginInterval("eviction", id: id, "\(message, privacy: .public)")
+        }
+    }
+
+    private static func end(_ name: LogIntervalName, on signposter: OSSignposter, state: OSSignpostIntervalState) {
+        switch name {
+        case .plan:
+            signposter.endInterval("plan", state)
+        case .transfer:
+            signposter.endInterval("transfer", state)
+        case .verify:
+            signposter.endInterval("verify", state)
+        case .commit:
+            signposter.endInterval("commit", state)
+        case .gc:
+            signposter.endInterval("gc", state)
+        case .eviction:
+            signposter.endInterval("eviction", state)
+        }
+    }
+}
+
+extension LogRoute {
+    /// Begins one of the six R-OBS-1 signpost intervals on the sink's signposter (none under `TapOnlyLogSink`) and
+    /// reports its began edge to the tap; the returned value ends it, exactly once (ARCHITECTURE §13.5 item 2; see
+    /// `LogInterval` for who ends it). `message` is rendered like a log line: identifiers through
+    /// `AssetLog.hashed(_:)`, never a secret.
+    public func interval(_ name: LogIntervalName, category: LogCategory, _ message: String = "") -> LogInterval {
+        LogInterval(name: name, category: category, message: message, tap: self.tap, signposter: self.sink.signposter(category))
+    }
+}

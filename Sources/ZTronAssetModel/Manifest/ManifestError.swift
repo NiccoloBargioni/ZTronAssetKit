@@ -1,7 +1,13 @@
 /// Why a whole manifest was rejected (R-MAN-2 structural violations). Nothing of a rejected manifest is applied.
 public enum ManifestError: Error, Sendable, Hashable {
-    /// The payload exceeds `ManifestLimits.maxPayloadBytes`.
+    /// The payload has more bytes than `ManifestLimits.maxPayloadBytes`: `bytes` is the payload's size and `limit`
+    /// the limit. Checked before a byte is read.
     case payloadTooLarge(bytes: Int64, limit: Int64)
+    /// The payload is within its size limit, but its decoded form could need more memory than R-MAN-3 allows (four
+    /// times the payload): `bytes` is the decoder's estimate of the heap the decoded manifest would take, an upper
+    /// bound, and `limit` the most the estimate may reach for this payload (ADR draft A-8). Reported before anything
+    /// is built; only a manifest dense with short heap strings or many minimal entries reaches it.
+    case decodedSizeExceeded(bytes: Int64, limit: Int64)
     /// More entries than `ManifestLimits.maxEntries`.
     case tooManyEntries(count: Int, limit: Int)
     /// The bytes are not a manifest in either wire shape.
@@ -60,6 +66,9 @@ public enum RemotePathViolation: Sendable, Hashable {
     case authority
     /// Contains a control character.
     case controlCharacter
+    /// Contains `?` or `#`: a query or fragment, which the transport rejects on every fetch (TR1-10), so the entry is
+    /// quarantined with this diagnostic instead.
+    case queryOrFragment
 }
 
 /// A quarantined entry and its diagnostic (never crashes, never applied).
