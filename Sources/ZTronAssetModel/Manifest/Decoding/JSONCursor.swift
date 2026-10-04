@@ -19,14 +19,18 @@ struct JSONCursor {
     private(set) var offset: Int
     /// The nesting limit (`ManifestLimits.maxNestingDepth`).
     let maxDepth: Int
-    /// Reused container stack for `skipValue(depth:)` (`true` = object), so skipping allocates at most once.
-    private var stack: [Bool]
+    /// The containers `skipValue(depth:)` has open, one bit per level (set: an object). The first 64 levels live in
+    /// `stackWord`, so within the default nesting limit (64) skipping never allocates (R-MAN-3: a payload of a few
+    /// bytes must not cost a heap block); deeper levels, possible only under a larger configured limit, use
+    /// `stackOverflow`, reserved once for the deepest nesting the payload can hold.
+    private var stackCount = 0
+    private var stackWord: UInt64 = 0
+    private var stackOverflow: [UInt64] = []
 
     init(bytes: UnsafeRawBufferPointer, maxDepth: Int) {
         self.bytes = bytes
         self.offset = 0
         self.maxDepth = maxDepth
-        self.stack = []
     }
 
     // MARK: - Bytes and structure
@@ -108,6 +112,13 @@ struct JSONCursor {
         let byte = self.bytes[self.offset]
         self.offset += 1
         if byte == JSONByte.comma {
+            // One trailing comma before the closer is accepted, exactly where the prior art's `JSONDecoder` accepted
+            // one (R-MAN-1, ADR draft A-4.5): after a member or element, never alone, never twice.
+            self.skipWhitespace()
+            if self.offset < self.bytes.count, self.bytes[self.offset] == close {
+                self.offset += 1
+                return false
+            }
             return true
         }
         guard byte == close else {
@@ -169,7 +180,7 @@ struct JSONCursor {
     /// Skips one complete value of any kind at `depth` (the number of containers already open around it),
     /// validating it, iteratively so that no nesting can exhaust the stack.
     mutating func skipValue(depth: Int) throws(ManifestError) {
-        self.stack.removeAll(keepingCapacity: true)
+        self.stackCount = 0
         var level = depth
         while true {
             // A value starts here.
@@ -189,7 +200,7 @@ struct JSONCursor {
                 if self.consume(JSONByte.closeBracket) {
                     level -= 1
                 } else {
-                    self.stack.append(false)
+                    self.pushContainer(isObject: false)
                     continue
                 }
             case .object:
@@ -199,26 +210,55 @@ struct JSONCursor {
                 if self.consume(JSONByte.closeBrace) {
                     level -= 1
                 } else {
-                    self.stack.append(true)
+                    self.pushContainer(isObject: true)
                     _ = try self.readKey()
                     continue
                 }
             }
             // A value ended: close every container it completes, or move to the next member or element.
-            while let isObject = self.stack.last {
+            while self.stackCount > 0 {
+                let isObject = self.innermostContainerIsObject
                 if try self.continueContainer(closing: isObject ? JSONByte.closeBrace : JSONByte.closeBracket) {
                     if isObject {
                         _ = try self.readKey()
                     }
                     break
                 }
-                self.stack.removeLast()
+                self.stackCount -= 1
                 level -= 1
             }
-            if self.stack.isEmpty {
+            if self.stackCount == 0 {
                 return
             }
         }
+    }
+
+    /// Records a container `skipValue(depth:)` opened.
+    private mutating func pushContainer(isObject: Bool) {
+        let level = self.stackCount
+        let bit: UInt64 = 1 << UInt64(level % 64)
+        if level < 64 {
+            self.stackWord = isObject ? self.stackWord | bit : self.stackWord & ~bit
+        } else {
+            let word = level / 64 - 1
+            if word == self.stackOverflow.count {
+                if self.stackOverflow.isEmpty {
+                    // The deepest nesting this payload can hold: one byte per level, and never past the limit.
+                    self.stackOverflow.reserveCapacity(min(self.maxDepth, self.bytes.count) / 64)
+                }
+                self.stackOverflow.append(0)
+            }
+            let current = self.stackOverflow[word]
+            self.stackOverflow[word] = isObject ? current | bit : current & ~bit
+        }
+        self.stackCount += 1
+    }
+
+    /// Whether the innermost open container of `skipValue(depth:)` is an object.
+    private var innermostContainerIsObject: Bool {
+        let level = self.stackCount - 1
+        let word = level < 64 ? self.stackWord : self.stackOverflow[level / 64 - 1]
+        return word & (1 << UInt64(level % 64)) != 0
     }
 
     // MARK: - Strings
@@ -290,10 +330,10 @@ struct JSONCursor {
             let escaped = self.bytes[index + 1]
             index += 2
             if escaped == UInt8(ascii: "u") {
-                var scalar = self.hexValue(at: index)
+                var scalar = JSONCursor.hexValue(self.bytes, at: index)
                 index += 4
                 if scalar >= 0xD800 && scalar <= 0xDBFF {
-                    let low = self.hexValue(at: index + 2)
+                    let low = JSONCursor.hexValue(self.bytes, at: index + 2)
                     index += 6
                     scalar = 0x10000 + ((scalar - 0xD800) << 10) + (low - 0xDC00)
                 }
@@ -359,7 +399,7 @@ struct JSONCursor {
                 let escaped = self.bytes[index]
                 index += 1
                 if escaped == UInt8(ascii: "u") {
-                    let scalar = self.hexValue(at: index)
+                    let scalar = JSONCursor.hexValue(self.bytes, at: index)
                     index += 4
                     guard scalar < 0x80 else {
                         return false
@@ -375,6 +415,87 @@ struct JSONCursor {
             position += 1
         }
         return position == literal.count
+    }
+
+    /// Whether two scanned strings decode to the same bytes, compared without allocating (the survey's identifier
+    /// table, ADR draft A-8): raw bytes when neither has an escape, else both decoded in step.
+    func string(_ lhs: JSONString, equalsString rhs: JSONString) -> Bool {
+        guard lhs.decodedCount == rhs.decodedCount else {
+            return false
+        }
+        if !lhs.hasEscapes, !rhs.hasEscapes {
+            let count = lhs.end - lhs.start
+            var index = 0
+            while index + 8 <= count {
+                let left = self.bytes.loadUnaligned(fromByteOffset: lhs.start + index, as: UInt64.self)
+                guard left == self.bytes.loadUnaligned(fromByteOffset: rhs.start + index, as: UInt64.self) else {
+                    return false
+                }
+                index += 8
+            }
+            while index < count {
+                guard self.bytes[lhs.start + index] == self.bytes[rhs.start + index] else {
+                    return false
+                }
+                index += 1
+            }
+            return true
+        }
+        var left = self.decodedBytes(iterating: lhs)
+        var right = self.decodedBytes(iterating: rhs)
+        while let byte = left.next() {
+            guard byte == right.next() else {
+                return false
+            }
+        }
+        return right.next() == nil
+    }
+
+    /// Feeds a string's decoded bytes to `hasher`: its decoded length, then little-endian eight-byte words, the last
+    /// one zero-padded. A string with escapes and one without hash alike when their decoded bytes are equal.
+    func hash(_ string: JSONString, into hasher: inout Hasher) {
+        hasher.combine(string.decodedCount)
+        var word: UInt64 = 0
+        var shift: UInt64 = 0
+        if string.hasEscapes {
+            var decoded = self.decodedBytes(iterating: string)
+            while let byte = decoded.next() {
+                word |= UInt64(byte) << shift
+                shift += 8
+                if shift == 64 {
+                    hasher.combine(word)
+                    word = 0
+                    shift = 0
+                }
+            }
+        } else {
+            var offset = string.start
+            while offset + 8 <= string.end {
+                hasher.combine(UInt64(littleEndian: self.bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self)))
+                offset += 8
+            }
+            while offset < string.end {
+                word |= UInt64(self.bytes[offset]) << shift
+                shift += 8
+                offset += 1
+            }
+        }
+        if shift > 0 {
+            hasher.combine(word)
+        }
+    }
+
+    /// The string whose body starts at `start` (one past its opening quote), scanned again: a token this cursor
+    /// read before, so it is valid; `nil` otherwise.
+    func string(startingAt start: Int) -> JSONString? {
+        var copy = self
+        copy.seek(to: start - 1)
+        return try? copy.scanString()
+    }
+
+    /// The decoded UTF-8 bytes of a scanned string, one at a time, with escapes resolved as they are reached.
+    func decodedBytes(iterating string: JSONString) -> JSONDecodedBytes {
+        JSONDecodedBytes(bytes: self.bytes, index: string.start, end: string.end)
     }
 
     /// Scans one escape sequence at the backslash; returns its decoded UTF-8 length. (Plain comparisons throughout
@@ -431,11 +552,11 @@ struct JSONCursor {
     }
 
     /// The value of four hexadecimal digits that `scanHexQuad` already validated.
-    private func hexValue(at index: Int) -> UInt32 {
+    fileprivate static func hexValue(_ bytes: UnsafeRawBufferPointer, at index: Int) -> UInt32 {
         var value: UInt32 = 0
         var position = index
         while position < index + 4 {
-            value = value << 4 | UInt32(JSONByte.hexNibble(self.bytes[position]) ?? 0)
+            value = value << 4 | UInt32(JSONByte.hexNibble(bytes[position]) ?? 0)
             position += 1
         }
         return value
@@ -683,6 +804,71 @@ struct JSONString {
     var decodedCount: Int
     /// Whether any escape occurs (otherwise the raw bytes are the value).
     var hasEscapes: Bool
+}
+
+/// The decoded UTF-8 bytes of a string `JSONCursor.scanString` validated, produced one at a time without allocating:
+/// each escape is decoded when it is reached, and the further bytes of a multi-byte scalar wait in `pending`.
+struct JSONDecodedBytes: IteratorProtocol {
+    /// The payload.
+    let bytes: UnsafeRawBufferPointer
+    /// The next payload byte to read.
+    var index: Int
+    /// The closing quote.
+    let end: Int
+    /// Bytes of the current scalar still to return, lowest first.
+    private var pending: UInt32 = 0
+    private var pendingCount = 0
+
+    init(bytes: UnsafeRawBufferPointer, index: Int, end: Int) {
+        self.bytes = bytes
+        self.index = index
+        self.end = end
+    }
+
+    mutating func next() -> UInt8? {
+        if self.pendingCount > 0 {
+            let byte = UInt8(truncatingIfNeeded: self.pending)
+            self.pending >>= 8
+            self.pendingCount -= 1
+            return byte
+        }
+        guard self.index < self.end else {
+            return nil
+        }
+        let byte = self.bytes[self.index]
+        guard byte == JSONByte.backslash else {
+            self.index += 1
+            return byte
+        }
+        let escaped = self.bytes[self.index + 1]
+        self.index += 2
+        guard escaped == UInt8(ascii: "u") else {
+            return JSONByte.unescaped(escaped)
+        }
+        var scalar = JSONCursor.hexValue(self.bytes, at: self.index)
+        self.index += 4
+        if scalar >= 0xD800 && scalar <= 0xDBFF {
+            let low = JSONCursor.hexValue(self.bytes, at: self.index + 2)
+            self.index += 6
+            scalar = 0x10000 + ((scalar - 0xD800) << 10) + (low - 0xDC00)
+        }
+        if scalar < 0x80 {
+            return UInt8(truncatingIfNeeded: scalar)
+        }
+        if scalar < 0x800 {
+            self.pending = 0x80 | scalar & 0x3F
+            self.pendingCount = 1
+            return UInt8(truncatingIfNeeded: 0xC0 | scalar >> 6)
+        }
+        if scalar < 0x10000 {
+            self.pending = (0x80 | scalar >> 6 & 0x3F) | (0x80 | scalar & 0x3F) << 8
+            self.pendingCount = 2
+            return UInt8(truncatingIfNeeded: 0xE0 | scalar >> 12)
+        }
+        self.pending = (0x80 | scalar >> 12 & 0x3F) | (0x80 | scalar >> 6 & 0x3F) << 8 | (0x80 | scalar & 0x3F) << 16
+        self.pendingCount = 3
+        return UInt8(truncatingIfNeeded: 0xF0 | scalar >> 18)
+    }
 }
 
 /// A scanned number.

@@ -3,7 +3,8 @@
 public struct ManifestLimits: Sendable, Hashable {
     /// Maximum number of entries (R-MAN-2: 100,000). Also bounds the index and the event subjects (H-9).
     public var maxEntries: Int
-    /// Maximum payload size in bytes (R-MAN-2: 32 MiB). Enforced while streaming by the transport too.
+    /// Maximum payload size in bytes (R-MAN-2: 32 MiB). Enforced while streaming by the transport too. The decoder
+    /// addresses the payload with 32-bit offsets, so it reads at most 4 GiB − 2 bytes whatever this says.
     public var maxPayloadBytes: Int64
     /// Maximum identifier length in UTF-8 bytes (R-MAN-2: 256).
     public var maxIdentifierBytes: Int
@@ -17,9 +18,15 @@ public struct ManifestLimits: Sendable, Hashable {
     public var maxTagBytes: Int
     /// Maximum number of tags per entry.
     public var maxTagsPerEntry: Int
+    /// The most quarantine diagnostics a decoded manifest keeps (R-MAN-2, R-MAN-3; default 256): the first ones in
+    /// payload order, while `ValidatedManifest.quarantinedCount` counts every quarantined entry. Bounding them keeps
+    /// the per-entry quarantine at any density without letting diagnostics (48 bytes each, for as little as two
+    /// payload bytes) push a manifest over the allocation bound; 256 diagnostics take about 14 KiB. A decoder keeps
+    /// fewer when its allocation bound has no room for them (a payload of a few hundred bytes of invalid elements).
+    public var maxQuarantineDiagnostics: Int
 
     /// The SPEC defaults: 100,000 entries, 32 MiB, 256-byte identifiers, 1,024-byte paths, 4 GiB assets,
-    /// nesting 64, tags ≤ 64 × 128 bytes.
+    /// nesting 64, tags ≤ 64 × 128 bytes; and at most 256 quarantine diagnostics.
     public init(
         maxEntries: Int = 100_000,
         maxPayloadBytes: Int64 = 32 * 1_024 * 1_024,
@@ -28,7 +35,8 @@ public struct ManifestLimits: Sendable, Hashable {
         maxAssetBytes: Int64 = 4 * 1_024 * 1_024 * 1_024,
         maxNestingDepth: Int = 64,
         maxTagBytes: Int = 128,
-        maxTagsPerEntry: Int = 64
+        maxTagsPerEntry: Int = 64,
+        maxQuarantineDiagnostics: Int = 256
     ) {
         self.maxEntries = maxEntries
         self.maxPayloadBytes = maxPayloadBytes
@@ -38,6 +46,7 @@ public struct ManifestLimits: Sendable, Hashable {
         self.maxNestingDepth = maxNestingDepth
         self.maxTagBytes = maxTagBytes
         self.maxTagsPerEntry = maxTagsPerEntry
+        self.maxQuarantineDiagnostics = maxQuarantineDiagnostics
     }
 }
 

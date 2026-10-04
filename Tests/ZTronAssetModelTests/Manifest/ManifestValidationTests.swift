@@ -68,7 +68,7 @@ extension ModelSuites {
                     try ManifestDecoder.decode(Data(shape.utf8))
                 }
             }
-            for broken in ["", "[", "[{}", "[1,]", "[] x", "{\"assets\":[],}", "nul", "[\"\u{01}\"]", "[01]"] {
+            for broken in ["", "[", "[{}", "[1,,]", "[,]", "[] x", "{\"assets\":[],,}", "nul", "[\"\u{01}\"]", "[01]"] {
                 #expect(throws: ManifestError.undecodable(.notJSON), "\(broken.debugDescription)") {
                     try ManifestDecoder.decode(Data(broken.utf8))
                 }
@@ -88,6 +88,7 @@ extension ModelSuites {
                 #"{"schemaVersion":2,"assets":[],"assets":[]}"#,
                 #"{"assets":[],"assets":[],"schemaVersion":2}"#,
                 #"{"assets":"x","schemaVersion":2,"assets":7}"#,
+                #"{"schemaVersion":2,"assets":[],}"#,
             ]
             for text in unsupported {
                 #expect(throws: ManifestError.unsupportedSchemaVersion(2), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
@@ -110,7 +111,7 @@ extension ModelSuites {
             // order: the version is judged only once the whole document has been read.
             let notJSON = [
                 #"{"assets":{"a":},"schemaVersion":2}"#, #"{"schemaVersion":2,"assets":{"a":}}"#,
-                #"{"schemaVersion":2,"assets":[]"#, #"{"schemaVersion":2,"assets":[],}"#, #"{"schemaVersion":2,"assets":[]} x"#,
+                #"{"schemaVersion":2,"assets":[]"#, #"{"schemaVersion":2,"assets":[],,}"#, #"{"schemaVersion":2,"assets":[]} x"#,
             ]
             for text in notJSON {
                 #expect(throws: ManifestError.undecodable(.notJSON), "\(text)") { try ManifestDecoder.decode(Data(text.utf8)) }
@@ -170,8 +171,9 @@ extension ModelSuites {
             try Self.expectQuarantined(Self.entryJSON(extra: #""tags":["a","b","c"]"#), as: .tagInvalid, limits: limits)
             try Self.expectQuarantined(Self.entryJSON(extra: #""tags":[""]"#), as: .tagInvalid, limits: limits)
 
-            // Path components: at most 32 (the index's per-record limit, store design §2.3).
-            let components = { (count: Int) in "\"localPathComponents\":[" + Array(repeating: "\"d\"", count: count).joined(separator: ",") + "]" }
+            // Path components: at most 32 (the index's per-record limit, store design §2.3). Three-byte ones: 32 one-byte
+            // components alone need four times their payload (a 640-byte array for 128 bytes), over R-MAN-3's bound.
+            let components = { (count: Int) in "\"localPathComponents\":[" + Array(repeating: "\"dir\"", count: count).joined(separator: ",") + "]" }
             try Self.expectAccepted(Self.entryJSON(components: components(32)), limits: limits)
             try Self.expectQuarantined(Self.entryJSON(components: components(33)), as: .malformedField("localPathComponents"), limits: limits)
 
@@ -212,8 +214,8 @@ extension ModelSuites {
                 try ManifestDecoder.decode(Data(count: mebibytes32 + 1))
             }
 
-            // Entries: 100,001 elements are rejected at the first one past the limit, whatever they hold. (100,000
-            // valid entries decode in the R-MAN-3 fuzz test's "minimal entries of 16-byte strings" case.)
+            // Entries: 100,001 elements are rejected for the first one past the limit, whatever they hold. (100,000 valid
+            // entries decode in the R-MAN-3 fuzz test's limit cases "… at the estimate's limit".)
             #expect(throws: ManifestError.tooManyEntries(count: 100_001, limit: 100_000)) {
                 try ManifestDecoder.decode(ManifestCorpus.repeatedElements("{}", count: 100_001))
             }
@@ -222,7 +224,7 @@ extension ModelSuites {
             }
             #expect(defaults == ManifestLimits(
                 maxEntries: 100_000, maxPayloadBytes: 33_554_432, maxIdentifierBytes: 256, maxRemotePathBytes: 1_024,
-                maxAssetBytes: 4_294_967_296, maxNestingDepth: 64, maxTagBytes: 128, maxTagsPerEntry: 64
+                maxAssetBytes: 4_294_967_296, maxNestingDepth: 64, maxTagBytes: 128, maxTagsPerEntry: 64, maxQuarantineDiagnostics: 256
             ))
         }
 
@@ -358,9 +360,9 @@ extension ModelSuites {
             #expect(entry == ManifestEntry(identifier: "a", fileExtension: "png", remotePath: "m/a.png"))
         }
 
-        @Test("R-MAN-2: remotePath must be relative, without parent segments, scheme, authority or control characters")
+        @Test("R-MAN-2: remotePath must be relative, without parent segments, scheme, authority, control characters, query or fragment")
         func remotePathRules() throws {
-            let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "a/./b", "dir/%41.png", "a/b?c", "a/b?x=..",
+            let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "a/./b", "dir/%41.png", "a/%3F.png",
                 "a/%2e%2e.png", "a/..%2"]
             for path in accepted {
                 #expect(ManifestDecoder.violations(of: Self.entry(remotePath: path), limits: ManifestLimits()).isEmpty, "\(path)")
@@ -379,9 +381,15 @@ extension ModelSuites {
                 ("a/b\u{7F}", [.controlCharacter]),
                 ("a/\u{85}b", [.controlCharacter]),
                 ("a\nb", [.controlCharacter]),
-                // The path ends at a query or fragment (RFC 3986 §4.2), so a parent segment just before one is still one.
-                ("a/..?x", [.parentSegment]),
-                ("..#frag", [.parentSegment]),
+                // A query or fragment is quarantined (orchestrator decision 3, fix round 3). The path ends at one (RFC 3986
+                // §4.2), so a parent segment just before one is still one, and one inside it is not.
+                ("a/b?c", [.queryOrFragment]),
+                ("a/b?x=..", [.queryOrFragment]),
+                ("a#", [.queryOrFragment]),
+                ("a/..?x", [.parentSegment, .queryOrFragment]),
+                ("..#frag", [.parentSegment, .queryOrFragment]),
+                ("../a?b", [.parentSegment, .queryOrFragment]),
+                ("/a?b", [.absolute, .queryOrFragment]),
                 // Percent-encoded slashes and backslashes separate segments too: the origin or the transport may decode
                 // or normalise them (ADR draft A-4.7).
                 ("a/..%2Fb", [.parentSegment]),
@@ -397,6 +405,10 @@ extension ModelSuites {
                     "\(path.debugDescription)"
                 )
             }
+            // The decoder quarantines such an entry with the first violation, and keeps the rest of the manifest.
+            let manifest = try ManifestDecoder.decode(Self.payload([Self.entryJSON(remotePath: "m/a.png?v=2"), Self.entryJSON(identifier: "ok")]))
+            #expect(manifest.quarantined.map(\.violation) == [.remotePathInvalid(.queryOrFragment)])
+            #expect(manifest.entries.map(\.identifier) == ["ok"])
         }
 
         @Test("R-MAN-2: violations(of:) reports every rule an entry breaks, in field order")

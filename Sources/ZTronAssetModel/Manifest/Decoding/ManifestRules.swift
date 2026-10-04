@@ -1,9 +1,11 @@
 /// The per-entry rules of R-MAN-2, one function per field, shared by `ManifestDecoder.violations(of:limits:)` and
-/// the streaming parser so the two can never disagree. The text rules work on UTF-8 bytes: the parser passes the
-/// payload's bytes (no copy), `violations(of:)` a string's contiguous UTF-8. Each returns the field's violations in
-/// a fixed order (an empty array, which does not allocate, when the field is valid); the parser quarantines an entry
-/// with the first violation in field order (identifier, fileExtension, remotePath, localPathComponents,
-/// localFileName, byteSize, checksum, tags, policy).
+/// the streaming parser so the two can never disagree (`R-MAN-2: the decoder quarantines an entry exactly when
+/// violations(of:) reports a violation …` checks it under random limits, negative and zero ones included). The text
+/// rules work on UTF-8 bytes: the parser passes the payload's bytes (no copy), `violations(of:)` a string's
+/// contiguous UTF-8. Each text rule visits the field's violations in a fixed order: `…Violations` collects them all
+/// (an empty array, which does not allocate, when the field is valid), `first…Violation` stops at the first without
+/// allocating, which is all the parser needs; it quarantines an entry with the first violation in field order
+/// (identifier, fileExtension, remotePath, localPathComponents, localFileName, byteSize, checksum, tags, policy).
 enum ManifestRules {
     /// Path components per entry the decoder materialises: the index stores at most 32 per record (store design
     /// §2.3), and the cap bounds the allocation an array of tiny strings could cause (R-MAN-3). An entry with more
@@ -60,17 +62,46 @@ enum ManifestRules {
 
     /// Non-empty, at most `maxIdentifierBytes` UTF-8 bytes, no control character.
     static func identifierViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [ManifestEntryViolation] {
-        guard !utf8.isEmpty else {
-            return [.identifierEmpty]
-        }
         var result: [ManifestEntryViolation] = []
-        if utf8.count > limits.maxIdentifierBytes {
-            result.append(.identifierTooLong(bytes: utf8.count))
-        }
-        if ManifestRules.containsControlCharacter(utf8: utf8) {
-            result.append(.identifierControlCharacter)
+        ManifestRules.visitIdentifierViolations(utf8: utf8, limits: limits) {
+            result.append($0)
+            return true
         }
         return result
+    }
+
+    /// The first of `identifierViolations(utf8:limits:)`, without allocating.
+    static func firstIdentifierViolation(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> ManifestEntryViolation? {
+        var first: ManifestEntryViolation?
+        ManifestRules.visitIdentifierViolations(utf8: utf8, limits: limits) {
+            first = $0
+            return false
+        }
+        return first
+    }
+
+    /// Whether an identifier of `count` bytes is over its limit: emptiness is checked first, so an empty identifier
+    /// is `identifierEmpty` whatever the limit (the parser uses this before it materialises anything).
+    static func isIdentifierTooLong(_ count: Int, limits: ManifestLimits) -> Bool {
+        count > 0 && count > limits.maxIdentifierBytes
+    }
+
+    /// Visits the identifier's violations in order until `visit` returns `false`.
+    private static func visitIdentifierViolations(
+        utf8: UnsafeRawBufferPointer,
+        limits: ManifestLimits,
+        _ visit: (ManifestEntryViolation) -> Bool
+    ) {
+        guard !utf8.isEmpty else {
+            _ = visit(.identifierEmpty)
+            return
+        }
+        if ManifestRules.isIdentifierTooLong(utf8.count, limits: limits), !visit(.identifierTooLong(bytes: utf8.count)) {
+            return
+        }
+        if ManifestRules.containsControlCharacter(utf8: utf8) {
+            _ = visit(.identifierControlCharacter)
+        }
     }
 
     /// Whether valid UTF-8 contains a Unicode control character (general category Cc): C0 (U+0000–U+001F), DEL
@@ -112,21 +143,51 @@ enum ManifestRules {
     // MARK: - remotePath
 
     /// The remote path rules: relative, at most `maxRemotePathBytes` bytes, no control character, no scheme, no
-    /// authority, not absolute and no `..` segment. The `..` check reads the path as the origin or a transport might:
-    /// it ends at a query or fragment (`?`, `#`, RFC 3986 §4.2), segments are also separated by `\` and by
-    /// percent-encoded slashes and backslashes (`%2F`, `%5C`), and a dot may be percent-encoded (`%2E`), since any of
-    /// these may be decoded or normalised on the way (ADR draft A-4.7).
+    /// authority, not absolute, no `..` segment, and no query or fragment. The `..` check reads the path as the origin
+    /// or a transport might: it ends at a query or fragment (`?`, `#`, RFC 3986 §4.2), segments are also separated by
+    /// `\` and by percent-encoded slashes and backslashes (`%2F`, `%5C`), and a dot may be percent-encoded (`%2E`),
+    /// since any of these may be decoded or normalised on the way (ADR draft A-4.7). A `?` or `#` anywhere is
+    /// `queryOrFragment` (orchestrator decision 3, fix round 3): the transport would reject the path on every fetch.
     static func remotePathViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [RemotePathViolation] {
+        var result: [RemotePathViolation] = []
+        ManifestRules.visitRemotePathViolations(utf8: utf8, limits: limits) {
+            result.append($0)
+            return true
+        }
+        return result
+    }
+
+    /// The first of `remotePathViolations(utf8:limits:)`, without allocating.
+    static func firstRemotePathViolation(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> RemotePathViolation? {
+        var first: RemotePathViolation?
+        ManifestRules.visitRemotePathViolations(utf8: utf8, limits: limits) {
+            first = $0
+            return false
+        }
+        return first
+    }
+
+    /// Whether a remote path of `count` bytes is over its limit: emptiness is checked first, as for identifiers.
+    static func isRemotePathTooLong(_ count: Int, limits: ManifestLimits) -> Bool {
+        count > 0 && count > limits.maxRemotePathBytes
+    }
+
+    /// Visits the path's violations in order until `visit` returns `false`.
+    private static func visitRemotePathViolations(
+        utf8: UnsafeRawBufferPointer,
+        limits: ManifestLimits,
+        _ visit: (RemotePathViolation) -> Bool
+    ) {
         let count = utf8.count
         guard count > 0 else {
-            return [.empty]
+            _ = visit(.empty)
+            return
         }
-        var result: [RemotePathViolation] = []
-        if count > limits.maxRemotePathBytes {
-            result.append(.tooLong(bytes: count))
+        if ManifestRules.isRemotePathTooLong(count, limits: limits), !visit(.tooLong(bytes: count)) {
+            return
         }
-        if ManifestRules.containsControlCharacter(utf8: utf8) {
-            result.append(.controlCharacter)
+        if ManifestRules.containsControlCharacter(utf8: utf8), !visit(.controlCharacter) {
+            return
         }
         let slash = UInt8(ascii: "/")
         // RFC 3986 §4.2: the first segment of a relative reference cannot contain a colon, so one there is a scheme.
@@ -139,21 +200,22 @@ enum ManifestRules {
             }
             index += 1
         }
-        if schemeEnd != nil {
-            result.append(.scheme)
+        if schemeEnd != nil, !visit(.scheme) {
+            return
         }
         let hierarchyStart = schemeEnd.map { $0 + 1 } ?? 0
-        if hierarchyStart + 1 < count, utf8[hierarchyStart] == slash, utf8[hierarchyStart + 1] == slash {
-            result.append(.authority)
+        if hierarchyStart + 1 < count, utf8[hierarchyStart] == slash, utf8[hierarchyStart + 1] == slash, !visit(.authority) {
+            return
         }
-        if utf8[0] == slash {
-            result.append(.absolute)
+        if utf8[0] == slash, !visit(.absolute) {
+            return
         }
         // One pass: the path ends at the first `?` or `#`, or at the payload's end; each segment is checked when its
         // separator is reached. An ordinary byte costs one table load.
         let classes = ManifestRules.pathByteClasses
         var segmentStart = 0
         var pathEnd = count
+        var parent = false
         index = 0
         while index < pathEnd {
             let byteClass = classes[Int(utf8[index])]
@@ -171,16 +233,33 @@ enum ManifestRules {
                 continue
             }
             if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) {
-                result.append(.parentSegment)
-                return result
+                parent = true
+                break
             }
             index += separator
             segmentStart = index
         }
-        if ManifestRules.isParentSegment(utf8, from: segmentStart, to: pathEnd) {
-            result.append(.parentSegment)
+        // Unless a parent segment ended the pass, the last segment ends at the path's end.
+        if parent || ManifestRules.isParentSegment(utf8, from: segmentStart, to: pathEnd), !visit(.parentSegment) {
+            return
         }
-        return result
+        // The path ended at a `?` or `#`, or one follows the parent segment that ended the pass.
+        if pathEnd < count || (parent && ManifestRules.containsQueryOrFragment(utf8, from: index)) {
+            _ = visit(.queryOrFragment)
+        }
+    }
+
+    /// Whether a `?` or `#` occurs at or after `start`.
+    private static func containsQueryOrFragment(_ utf8: UnsafeRawBufferPointer, from start: Int) -> Bool {
+        let classes = ManifestRules.pathByteClasses
+        var index = start
+        while index < utf8.count {
+            if classes[Int(utf8[index])] == ManifestRules.pathEnd {
+                return true
+            }
+            index += 1
+        }
+        return false
     }
 
     /// The `..` check's byte classes, indexed by byte: `ordinary`, `separator` (`/`, `\`), `percent` (maybe an encoded
@@ -246,9 +325,16 @@ enum ManifestRules {
         byteSize >= 0 && byteSize <= limits.maxAssetBytes ? nil : .byteSizeOutOfRange(byteSize)
     }
 
-    /// At most `maxTagsPerEntry` tags, each 1…`maxTagBytes` UTF-8 bytes.
+    /// At most `maxTagsPerEntry` tags (`maxTagCount(_:)`), each 1…`maxTagBytes` UTF-8 bytes.
     static func areValidTags(_ tags: [String], limits: ManifestLimits) -> Bool {
-        tags.count <= limits.maxTagsPerEntry && tags.allSatisfy { ManifestRules.isValidTagLength($0.utf8.count, limits: limits) }
+        tags.count <= ManifestRules.maxTagCount(limits) && tags.allSatisfy { ManifestRules.isValidTagLength($0.utf8.count, limits: limits) }
+    }
+
+    /// The most tags an entry may carry: `maxTagsPerEntry`, a negative limit read as zero, so an entry without tags is
+    /// valid under any limit (fix round 3: with a negative limit the decoder accepted any number of tags while
+    /// `violations(of:)` rejected even none).
+    static func maxTagCount(_ limits: ManifestLimits) -> Int {
+        max(0, limits.maxTagsPerEntry)
     }
 
     /// Whether a tag of `count` UTF-8 bytes is allowed.

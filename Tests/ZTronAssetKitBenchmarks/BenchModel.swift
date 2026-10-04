@@ -54,6 +54,25 @@ extension ZTronAssetKitBenchmarks {
                 // and the over-long values that are checked but never materialised.
                 ("minimal entries of 16-byte strings", ManifestDecodingOptions(), { ReferenceManifest.shortStringEntries(count: 100_000) }),
                 ("minimal entries of 16-byte strings, keepFirst", keepFirst, { ReferenceManifest.shortStringEntries(count: 100_000) }),
+                ("minimal entries of 16-byte strings, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.shortStringEntries(count: 100_000))
+                }),
+                // Verifier round 3's R-MAN-3 reproductions, accepted at the estimate's limit (fix round 3, ADR draft A-8).
+                ("100,000 entries with one 16-byte path component and one 16-byte tag, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.arrayStringEntries(count: 100_000, components: 1, tags: 1))
+                }),
+                ("100,000 entries with three 16-byte path components, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.arrayStringEntries(count: 100_000, components: 3, tags: 0))
+                }),
+                ("60,000 entries with three 16-byte strings and three 16-byte path components, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.arrayStringEntries(count: 60_000, components: 3, tags: 0, longStrings: true))
+                }),
+                ("100,000 minimal entries, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.arrayStringEntries(count: 100_000, components: 0, tags: 0))
+                }),
+                ("100,000 empty objects, quarantined", ManifestDecodingOptions(), {
+                    Data(("[" + Array(repeating: "{}", count: 100_000).joined(separator: ",") + "]").utf8)
+                }),
                 ("25-byte path components", ManifestDecodingOptions(), { ReferenceManifest.componentEntries(length: 25, maxBytes: limit) }),
                 ("61 one-byte tags per entry", ManifestDecodingOptions(), { ReferenceManifest.taggedEntries(tagCount: 61, maxBytes: limit) }),
                 ("huge identifier", ManifestDecodingOptions(), { ReferenceManifest.hugeField("identifier", bytes: limit - 256) }),
@@ -167,6 +186,24 @@ private enum ReferenceManifest {
         return Data((text + "]").utf8)
     }
 
+    /// `count` entries with an inline identifier and `components` path components and `tags` tags of 16 bytes each;
+    /// with `longStrings`, a 16-byte identifier, remote path and file name too. Built by `String` concatenation.
+    static func arrayStringEntries(count: Int, components: Int, tags: Int, longStrings: Bool = false) -> Data {
+        func string(_ prefix: String) -> String {
+            "\"" + prefix + String(repeating: "x", count: max(0, 16 - prefix.utf8.count)) + "\""
+        }
+        var text = "["
+        for index in 0..<count {
+            let identifier = longStrings ? string("\(index)-i") : "\"" + String(index, radix: 36) + "\""
+            let componentList = (0..<components).map { string("\(index)-c\($0)-") }.joined(separator: ",")
+            let tagList = (0..<tags).map { string("\(index)-t\($0)-") }.joined(separator: ",")
+            text += (index == 0 ? "" : ",") + "{\"identifier\":" + identifier + ",\"fileExtension\":\"p\",\"remotePath\":"
+                + (longStrings ? string("\(index)-r") : "\"r\"") + ",\"localPathComponents\":[" + componentList + "]"
+                + (tags > 0 ? ",\"tags\":[" + tagList + "]" : "") + (longStrings ? ",\"localFileName\":" + string("\(index)-n") : "") + "}"
+        }
+        return Data((text + "]").utf8)
+    }
+
     /// Entries with 32 path components of `length` bytes each, up to `maxBytes`.
     static func componentEntries(length: Int, maxBytes: Int) -> Data {
         var text = "["
@@ -219,20 +256,25 @@ private enum ReferenceManifest {
         return Data((text + "]").utf8)
     }
 
-    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit (three
-    /// times the payload). Whitespace changes no estimate and a rejection reports the estimate, so one decode finds
-    /// the padding; a payload the decoder already accepts is returned as it is.
+    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit.
+    /// Whitespace changes no estimate, and a rejection reports the estimate and the limit for the payload's size, so
+    /// a decode or two find the padding; a payload the decoder already accepts is returned as it is.
     static func atEstimateLimit(_ payload: Data) -> Data {
-        do throws(ManifestError) {
-            _ = try ManifestDecoder.decode(payload)
-            return payload
-        } catch {
-            guard case .payloadTooLarge(let estimated, _) = error else {
-                return payload
+        var padded = payload
+        for _ in 0..<4 {
+            do throws(ManifestError) {
+                _ = try ManifestDecoder.decode(padded)
+                return padded
+            } catch {
+                guard case .decodedSizeExceeded(let estimated, let limit) = error, limit > 0 else {
+                    return padded
+                }
+                // The limit is proportional to the payload's size.
+                let target = (Int(estimated) * padded.count + Int(limit) - 1) / Int(limit)
+                padded += Data(repeating: UInt8(ascii: " "), count: max(1, target - padded.count))
             }
-            let target = Int((estimated + 2) / 3)
-            return payload + Data(repeating: UInt8(ascii: " "), count: max(0, target - payload.count))
         }
+        return padded
     }
 
     /// One minimal entry followed by copies of the unknown member `member` up to `bytes`: inside the entry (after

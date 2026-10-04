@@ -26,11 +26,13 @@ struct DecodeCost {
 /// 4x budget. The exact in-use growth right after the closure (its result alive) is reported and asserted too. The
 /// sample also counts whatever other tests allocate meanwhile, which only makes it larger.
 ///
-/// In-use bytes also depend on what the process freed before (fix round 2): a freed block of a few MiB is cached and
-/// reused for a later request down to about two thirds of its size, and counts whole (measured with `malloc_size`:
-/// up to 1.49x the request; `malloc_zone_pressure_relief` does not clear that cache). So one decode's figures move
-/// with the cases measured before it (a limit case read 3.01x after one predecessor and 3.38x after another); the
-/// decoder's 25 % headroom below the 4x bound is for that (ADR draft A-8).
+/// In-use bytes also depend on what the process freed before (fix round 3, ADR draft A-8): a freed block of more
+/// than 2 MiB is cached, reused for any later request of more than half its size, and then counts whole, so a
+/// request just over half a cached block reads up to twice its size (measured in fresh processes: a freed block of
+/// B bytes served every request from B/2 + 1 bytes; requests of at most 2 MiB always read exactly
+/// `malloc_good_size`). The decoder's estimate counts every such request twice;
+/// `serveFromBlocksTwiceAsLarge(_:)` creates that worst case on purpose, so a limit case measures what the estimate
+/// must bound.
 enum DecodeMeasurement {
     /// Whether this test binary runs under Thread Sanitizer, whose allocator and instrumentation make heap and
     /// time figures meaningless (detected by its runtime library being loaded).
@@ -63,6 +65,58 @@ enum DecodeMeasurement {
     /// CPU time of the calling thread, in nanoseconds.
     static func threadCPUNanoseconds() -> UInt64 {
         clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+    }
+
+    /// Arranges for each of `requests` (malloc sizes above 2 MiB) to be served from a cached block of nearly twice
+    /// its size, the worst R-MAN-3's estimate must bound (ADR draft A-8). The allocator serves a large request from
+    /// the smallest cached block that fits, so the blocks a request could take now (left by building the payload)
+    /// are taken first and held, until a request is served fresh twice in a row; then a block of `2 * request - 64
+    /// KiB` is freed, the only one left that fits. Returns the held blocks: keep them alive until the measurement
+    /// ends, so they cannot be cached again.
+    @available(macOS 15.0, *)
+    static func serveFromBlocksTwiceAsLarge(_ requests: [Int]) -> [[UInt8]] {
+        var held: [[UInt8]] = []
+        let large = requests.filter { $0 > 2 << 20 }
+        for request in large {
+            var freshInARow = 0
+            for _ in 0..<64 where freshInARow < 2 {
+                let before = DecodeMeasurement.heapInUse()
+                var block = [UInt8](repeating: 0, count: request - 32)
+                block[block.count - 1] = 1
+                let growth = DecodeMeasurement.heapInUse() - before
+                held.append(block)
+                freshInARow = growth <= malloc_good_size(request) ? freshInARow + 1 : 0
+            }
+        }
+        var freed: [[UInt8]] = []
+        for request in large {
+            var block = [UInt8](repeating: 0, count: 2 * request - 64 * 1_024 - 32)
+            block[block.count - 1] = 1
+            freed.append(block)
+        }
+        // The atomic store is a side effect the optimiser must keep, so every block is really allocated; `freed` is
+        // released on return and its blocks cached.
+        DecodeMeasurement.blockSink.store((held + freed).reduce(0) { $0 &+ Int($1[$1.count - 1]) }, ordering: .relaxed)
+        return held
+    }
+
+    /// Keeps the blocks of `serveFromBlocksTwiceAsLarge(_:)` observable.
+    @available(macOS 15.0, *)
+    private static let blockSink = Atomic<Int>(0)
+
+    /// The exact in-use heap growth `body` leaves behind with its result alive, with no sampler thread: the lowest of
+    /// `runs` runs, so an allocation another thread makes meanwhile does not count. For small payloads, whose decode
+    /// takes microseconds and whose peak no sampler can see; the result of each run is released before the next.
+    static func retainedGrowth<Result>(runs: Int = 3, _ body: () -> Result) -> Int {
+        var lowest = Int.max
+        for _ in 0..<runs {
+            let before = DecodeMeasurement.heapInUse()
+            let result = body()
+            let after = DecodeMeasurement.heapInUse()
+            withExtendedLifetime(result) {}
+            lowest = min(lowest, after - before)
+        }
+        return lowest
     }
 
     /// Runs `body` on the calling thread while a sampler thread tracks the heap's in-use bytes.

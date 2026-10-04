@@ -3,8 +3,8 @@ import Testing
 import ZTronAssetModel
 
 extension ModelSuites {
-    /// R-MAN-3: fuzzed input never traps, and at the 32 MiB payload limit the decoder stays within 1 s and 4x the
-    /// payload.
+    /// R-MAN-3: fuzzed input never traps, and at the 32 MiB payload limit the decoder stays within 4x the payload and
+    /// within 1 s.
     ///
     /// Every case derives from one base seed, printed at the start (override it with `ZTRON_MANIFEST_FUZZ_SEED` to
     /// replay a run); each expectation names its case and seed. A trap would end the test process, so reaching the
@@ -33,6 +33,8 @@ extension ModelSuites {
             case acceptedAndQuarantined(accepted: Int, quarantined: Int)
             /// Rejected before anything is built because the decoded form could exceed four times the payload.
             case overAllocationBudget
+            /// Nothing accepted, every element quarantined, and as many diagnostics as the default limit keeps.
+            case allQuarantined(Int)
         }
 
         /// One fuzz input.
@@ -43,6 +45,9 @@ extension ModelSuites {
             var expected: Expected
             /// The options the case decodes with (remote-manifest defaults unless the case says otherwise).
             var options = ManifestDecodingOptions()
+            /// The decoder's largest requests for this case, which the allocator is made to serve from cached blocks
+            /// nearly twice their size before the case is measured (`DecodeMeasurement.serveFromBlocksTwiceAsLarge`).
+            var largeRequests: [Int] = []
         }
 
         private static let baseSeed: UInt64 = {
@@ -53,7 +58,7 @@ extension ModelSuites {
         }()
 
         @available(macOS 15.0, *)
-        @Test("R-MAN-3: seeded fuzz of random, truncated, mutated and deeply nested manifests never traps and stays within 1 s and 4x the payload")
+        @Test("R-MAN-3: seeded fuzz of random, truncated, mutated and deeply nested manifests never traps, and outside Thread Sanitizer stays within 4x the payload in linear time")
         func seededFuzzStaysWithinBounds() throws {
             let seed = Self.baseSeed
             print("R-MAN-3 fuzz: base seed \(seed) (replay with ZTRON_MANIFEST_FUZZ_SEED=\(seed))")
@@ -70,7 +75,9 @@ extension ModelSuites {
             Self.forEachLimitCase(seed: seed, payloadBytes: limit) { fuzzCase in
                 limitCases += 1
                 #expect(fuzzCase.payload.count <= ManifestCorpus.payloadLimit, "\(fuzzCase.name) seed \(fuzzCase.seed)")
+                let held = tsan ? [] : DecodeMeasurement.serveFromBlocksTwiceAsLarge(fuzzCase.largeRequests)
                 let (outcome, cost) = DecodeMeasurement.measure { Self.decode(fuzzCase.payload, options: fuzzCase.options) }
+                withExtendedLifetime(held) {}
                 Self.check(fuzzCase, outcome: outcome)
                 guard !tsan else {
                     return
@@ -92,7 +99,7 @@ extension ModelSuites {
                     denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
                 }
             }
-            #expect(limitCases == 33)
+            #expect(limitCases == 37)
             if !tsan {
                 // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
                 // cost about 1,000x).
@@ -110,8 +117,8 @@ extension ModelSuites {
             var lowestPeak = Int.max
             for _ in 0..<3 {
                 let (outcome, cost) = DecodeMeasurement.measure { Self.decode(payload) }
-                guard case .failure(.payloadTooLarge(let estimated, let limit)) = outcome else {
-                    Issue.record("expected payloadTooLarge, got \(outcome)")
+                guard case .failure(.decodedSizeExceeded(let estimated, let limit)) = outcome else {
+                    Issue.record("expected decodedSizeExceeded, got \(outcome)")
                     return
                 }
                 #expect(estimated > limit)
@@ -123,45 +130,56 @@ extension ModelSuites {
                 // the survey's own state is, hence the generous bound.
                 #expect(lowestPeak < payload.count, "peak \(lowestPeak) B for \(payload.count) B")
             }
-            // The same shape with 25-byte components fits, and is decoded whole (24-byte components estimate 3.03x since
-            // fix round 2 modelled the allocator's 640-byte blocks for their 544-byte arrays, and are rejected too).
-            let denser = ManifestCorpus.shortComponentEntries(length: 24, maxBytes: 2 << 20)
-            guard case .failure(.payloadTooLarge(let denserEstimate, let denserLimit)) = Self.decode(denser) else {
-                Issue.record("expected payloadTooLarge for 24-byte components")
+            // 18-byte components are over the limit too (a 64-byte string and a 16-byte slot for 21 payload bytes); 20-byte
+            // ones fit (about 3.6x), and are decoded whole.
+            let denser = ManifestCorpus.shortComponentEntries(length: 18, maxBytes: 2 << 20)
+            guard case .failure(.decodedSizeExceeded(let denserEstimate, let denserLimit)) = Self.decode(denser) else {
+                Issue.record("expected decodedSizeExceeded for 18-byte components")
                 return
             }
-            #expect(denserEstimate > denserLimit && denserLimit == 3 * Int64(denser.count))
-            let fitting = ManifestCorpus.shortComponentEntries(length: 25, maxBytes: 2 << 20)
+            #expect(denserEstimate > denserLimit && denserLimit == Int64(denser.count) * 15 / 4)
+            let fitting = ManifestCorpus.shortComponentEntries(length: 20, maxBytes: 2 << 20)
             let decoded = try ManifestDecoder.decode(fitting)
             #expect(decoded.count > 0 && decoded.quarantined.isEmpty)
             #expect(decoded.entries.allSatisfy { $0.localPathComponents.count == 32 })
         }
 
-        @Test("R-MAN-3: quarantine diagnostics count against the allocation bound, so only a payload dense with tiny invalid elements is rejected whole")
+        @Test("R-MAN-2: a manifest dense with invalid entries is quarantined entry by entry, with an exact count and at most maxQuarantineDiagnostics diagnostics")
         func quarantineDenseManifests() throws {
-            // A realistic quarantine: 2,000 entries whose checksum has 32 hex digits are each quarantined (R-MAN-2).
+            // A realistic quarantine: 2,000 entries whose checksum has 32 hex digits are each quarantined; the first 256
+            // keep a diagnostic.
             let entries = (0..<2_000).map { index in
                 "{\"identifier\":\"bo7.ri.asset.\(index)\",\"fileExtension\":\"png\",\"remotePath\":\"media/a/\(index).png\","
                     + "\"localPathComponents\":[\"Black Ops 7\",\"Maps\"],\"checksum\":\"\(String(repeating: "0f", count: 16))\"}"
             }
             let realistic = try ManifestDecoder.decode(Data(("[" + entries.joined(separator: ",") + "]").utf8))
-            #expect(realistic.count == 0 && realistic.quarantined.count == 2_000)
+            #expect(realistic.count == 0 && realistic.quarantinedCount == 2_000)
+            #expect(realistic.quarantined.map(\.index) == Array(0..<256))
             #expect(realistic.quarantined.allSatisfy { $0.violation == .checksumInvalid && $0.identifier != nil })
+            #expect(realistic.quarantined.first?.identifier == "bo7.ri.asset.0")
 
-            // 1,000 empty objects (3,001 bytes) fit the 64 KiB floor, and each is quarantined.
-            let small = try ManifestDecoder.decode(ManifestCorpus.repeatedElements("{}", count: 1_000))
-            #expect(small.count == 0 && small.quarantined.count == 1_000)
-            #expect(small.quarantined.allSatisfy { $0.violation == .malformedField("identifier") && $0.identifier == nil })
-
-            // 20,000 empty objects (60,001 bytes) would need about sixteen times their payload in diagnostics: the
-            // manifest is rejected whole, as an over-budget payload (ADR draft A-8).
-            let dense = ManifestCorpus.repeatedElements("{}", count: 20_000)
-            guard case .failure(.payloadTooLarge(let estimated, let limit)) = Self.decode(dense) else {
-                Issue.record("expected payloadTooLarge for \(dense.count) bytes of empty objects")
-                return
+            // Empty objects, three bytes of payload for a 48-byte diagnostic: every one is quarantined and counted (past
+            // about 1,300 of them they used to be rejected whole, ADR draft A-8), and the diagnostics kept are a prefix
+            // that fits the allocation bound: none of 1 (4 bytes), some of 100 and of 1,000, 256 of 20,000 and more.
+            for count in [1, 100, 1_000, 20_000, 100_000] {
+                let payload = ManifestCorpus.repeatedElements("{}", count: count)
+                let manifest = try ManifestDecoder.decode(payload)
+                let kept = manifest.quarantined.count
+                print("R-MAN-2 quarantine of \(count) empty objects (\(payload.count) bytes): \(kept) diagnostics kept")
+                #expect(manifest.count == 0 && manifest.quarantinedCount == count, "\(count)")
+                #expect(manifest.quarantined.map(\.index) == Array(0..<kept), "\(count)")
+                #expect(manifest.quarantined.allSatisfy { $0.violation == .malformedField("identifier") && $0.identifier == nil }, "\(count)")
+                #expect(kept <= min(count, 256), "\(count): \(kept) kept")
+                #expect(count < 100 || kept > 0, "\(count): \(kept) kept")
+                #expect(count < 20_000 || kept == 256, "\(count): \(kept) kept")
+                #expect(kept == 0 || 32 + MemoryLayout<QuarantinedEntry>.stride * kept <= 4 * payload.count, "\(count): \(kept) kept")
             }
-            #expect(limit == 3 * Int64(dense.count))
-            #expect(estimated >= Int64(20_000 * MemoryLayout<QuarantinedEntry>.stride))
+            // The limit is a parameter: none at all, or every one.
+            let none = try ManifestDecoder.decode(Data("[{},1,null]".utf8), options: ManifestDecodingOptions(limits: ManifestLimits(maxQuarantineDiagnostics: 0)))
+            #expect(none.quarantinedCount == 3 && none.quarantined.isEmpty)
+            let realisticPayload = Data(("[" + entries.joined(separator: ",") + "]").utf8)
+            let every = try ManifestDecoder.decode(realisticPayload, options: ManifestDecodingOptions(limits: ManifestLimits(maxQuarantineDiagnostics: 5_000)))
+            #expect(every.quarantinedCount == 2_000 && every.quarantined.count == 2_000)
         }
 
         @Test("R-MAN-3: every prefix of a shipped manifest is rejected as not JSON without trapping")
@@ -257,7 +275,8 @@ extension ModelSuites {
             // Room for the mutations' insertions.
             let denseSeed = random.next()
             let dense = ManifestCorpus.manifest(maxBytes: payloadBytes - 4_096, seed: denseSeed)
-            body(Case(name: Self.denseCaseName, seed: denseSeed, payload: dense.data, expected: .accepted(dense.entryCount)))
+            body(Case(name: Self.denseCaseName, seed: denseSeed, payload: dense.data, expected: .accepted(dense.entryCount),
+                largeRequests: Self.largeRequests(acceptedEntries: dense.entryCount)))
             let cutSeed = random.next()
             let cut = dense.data.count / 2 + Int(cutSeed % UInt64(dense.data.count / 2))
             body(Case(name: "dense manifest truncated", seed: cutSeed, payload: dense.data.prefix(cut), expected: .error(.undecodable(.notJSON))))
@@ -270,14 +289,32 @@ extension ModelSuites {
                 body(make())
             }
 
-            // The allocation worst cases: heap strings as dense as a valid manifest allows.
+            // The allocation worst cases: heap strings and entries as dense as a valid manifest allows, padded until the
+            // allocation estimate reaches its limit, and measured after freeing blocks just under twice the size of the
+            // decoder's entry array and identifier index, which the allocator then serves them from (verifier round 3:
+            // such reuse read 4.18x before the estimate counted it, ADR draft A-8).
             let entryCount = min(100_000, payloadBytes / 150)
-            body(Case(name: "minimal entries of 16-byte strings", seed: 0, payload: ManifestCorpus.shortStringEntries(length: 16, count: entryCount),
-                expected: .accepted(entryCount)))
-            // The same under keepFirst: the survey also holds every distinct accepted identifier (as payload views).
-            body(Case(name: "minimal entries of 16-byte strings, keepFirst", seed: 0,
-                payload: ManifestCorpus.shortStringEntries(length: 16, count: entryCount), expected: .accepted(entryCount),
-                options: ManifestDecodingOptions(duplicates: .keepFirst)))
+            let keepFirst = ManifestDecodingOptions(duplicates: .keepFirst)
+            body(Case(name: "minimal entries of 16-byte strings, at the estimate's limit", seed: 0,
+                payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.shortStringEntries(length: 16, count: entryCount)),
+                expected: .accepted(entryCount), largeRequests: Self.largeRequests(acceptedEntries: entryCount)))
+            // The same under keepFirst: the survey also keeps every distinct accepted identifier.
+            body(Case(name: "minimal entries of 16-byte strings, keepFirst, at the estimate's limit", seed: 0,
+                payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.shortStringEntries(length: 16, count: entryCount), options: keepFirst),
+                expected: .accepted(entryCount), options: keepFirst, largeRequests: Self.largeRequests(acceptedEntries: entryCount)))
+            // Verifier round 3's reproductions: inline identifiers with 16-byte strings in per-entry arrays.
+            let arrayShapes: [(name: String, count: Int, components: Int, tags: Int, longStrings: Bool)] = [
+                ("one 16-byte path component and one 16-byte tag", entryCount, 1, 1, false),
+                ("three 16-byte path components", entryCount, 3, 0, false),
+                ("three 16-byte strings and three 16-byte path components", entryCount * 3 / 5, 3, 0, true),
+                ("minimal entries", entryCount, 0, 0, false),
+            ]
+            for shape in arrayShapes {
+                let payload = ManifestCorpus.arrayStringEntries(count: shape.count, components: shape.components, tags: shape.tags, longStrings: shape.longStrings)
+                body(Case(name: "\(shape.count) entries with \(shape.name), at the estimate's limit", seed: 0,
+                    payload: ManifestCorpus.paddedToEstimateLimit(payload), expected: .accepted(shape.count),
+                    largeRequests: Self.largeRequests(acceptedEntries: shape.count)))
+            }
             body(Case(name: "16-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 16, maxBytes: payloadBytes),
                 expected: .overAllocationBudget))
             // The densest component shape the estimate accepts: 25-byte strings (64-byte blocks) in 32-element arrays
@@ -296,17 +333,18 @@ extension ModelSuites {
             let sizeClassCount = payloadBytes / 640
             body(Case(name: "32 empty path components and 31 one-byte tags per entry, at the estimate's limit", seed: 0,
                 payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.sizeClassEntries(components: 32, tags: 31, count: sizeClassCount)),
-                expected: .accepted(sizeClassCount)))
+                expected: .accepted(sizeClassCount), largeRequests: Self.largeRequests(acceptedEntries: sizeClassCount)))
             let tagClassCount = payloadBytes / 340
             body(Case(name: "31 one-byte tags per entry, at the estimate's limit", seed: 0,
                 payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.sizeClassEntries(components: 0, tags: 31, count: tagClassCount)),
-                expected: .accepted(tagClassCount)))
+                expected: .accepted(tagClassCount), largeRequests: Self.largeRequests(acceptedEntries: tagClassCount)))
 
-            // Elements that are not objects: each is a quarantine diagnostic for two or three payload bytes.
+            // Elements that are not objects: each is a quarantine for two or three payload bytes, counted exactly, with a
+            // bounded number of diagnostics (orchestrator decision 2, fix round 3).
             let maxEntries = ManifestLimits().maxEntries
             for element in ["1", "null", "[]", "\"\"", "{}"] {
                 body(Case(name: "\(maxEntries) elements \(element)", seed: 0, payload: ManifestCorpus.repeatedElements(element, count: maxEntries),
-                    expected: .overAllocationBudget))
+                    expected: .allQuarantined(maxEntries)))
             }
             // The legacy manifest's policy (keepFirst) with every entry repeating one identifier: the survey cannot
             // build identifiers, yet must not count the repeats as accepted entries.
@@ -342,6 +380,18 @@ extension ModelSuites {
             ]
         }
 
+        /// The two largest requests of a decode that accepts `count` entries: the entry array and the identifier index
+        /// (ADR draft A-8), as malloc sizes.
+        private static func largeRequests(acceptedEntries count: Int) -> [Int] {
+            let entries = 32 + count * MemoryLayout<ManifestEntry>.stride
+            var buckets = 2
+            while buckets * 3 / 4 < count {
+                buckets *= 2
+            }
+            let index = 64 + (buckets + 63) / 64 * 8 + buckets * (MemoryLayout<AssetID>.stride + MemoryLayout<Int>.stride)
+            return [entries, index]
+        }
+
         // MARK: - Checks
 
         private static func decode(_ payload: Data, options: ManifestDecodingOptions = ManifestDecodingOptions()) -> Result<ValidatedManifest, ManifestError> {
@@ -370,15 +420,21 @@ extension ModelSuites {
                 #expect(manifest.quarantined.isEmpty, "\(label): \(manifest.quarantined.prefix(3))")
             case (.acceptedAndQuarantined(let accepted, let quarantined), .success(let manifest)):
                 #expect(manifest.count == accepted, "\(label)")
-                #expect(manifest.quarantined.count == quarantined, "\(label)")
+                #expect(manifest.quarantinedCount == quarantined, "\(label)")
+                #expect(manifest.quarantined.count == min(quarantined, ManifestLimits().maxQuarantineDiagnostics), "\(label)")
+            case (.allQuarantined(let quarantined), .success(let manifest)):
+                #expect(manifest.count == 0 && manifest.quarantinedCount == quarantined, "\(label)")
+                #expect(manifest.quarantined.count == min(quarantined, ManifestLimits().maxQuarantineDiagnostics), "\(label)")
             case (.overAllocationBudget, .failure(let error)):
-                guard case .payloadTooLarge(let estimated, let limit) = error else {
+                guard case .decodedSizeExceeded(let estimated, let limit) = error else {
                     Issue.record("\(label): expected the allocation bound, got \(error)")
                     break
                 }
                 #expect(estimated > limit && limit <= 4 * Int64(fuzzCase.payload.count), "\(label): \(error)")
             case (.overAllocationBudget, .success(let manifest)):
                 Issue.record("\(label): expected the allocation bound, decoded \(manifest.count) entries")
+            case (.allQuarantined, .failure(let error)):
+                Issue.record("\(label): expected a quarantine, got \(error)")
             case (_, .failure(let error)):
                 Issue.record("\(label): expected a manifest, got \(error)")
             case (.anyOutcome, .success):
@@ -394,7 +450,8 @@ extension ModelSuites {
         private static func checkInvariants(_ manifest: ValidatedManifest, payload: Data, label: String) {
             let limits = ManifestLimits()
             #expect(manifest.digest == ContentHash.sha256(of: payload), "\(label)")
-            #expect(manifest.count + manifest.quarantined.count <= limits.maxEntries, "\(label)")
+            #expect(manifest.count + manifest.quarantinedCount <= limits.maxEntries, "\(label)")
+            #expect(manifest.quarantined.count <= min(manifest.quarantinedCount, limits.maxQuarantineDiagnostics), "\(label)")
             let indices = manifest.quarantined.map(\.index)
             #expect(zip(indices, indices.dropFirst()).allSatisfy { $0 < $1 }, "\(label)")
             var broken = 0

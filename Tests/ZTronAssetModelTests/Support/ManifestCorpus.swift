@@ -127,21 +127,48 @@ enum ManifestCorpus {
         return Data((text + "]").utf8)
     }
 
-    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit (three
-    /// times the payload): as much decoded heap per payload byte as the decoder accepts. Whitespace changes no
-    /// estimate and a rejection reports the estimate (`payloadTooLarge(bytes:limit:)`), so one decode finds the
-    /// padding; a payload the decoder already accepts is returned as it is.
-    static func paddedToEstimateLimit(_ payload: Data) -> Data {
-        do throws(ManifestError) {
-            _ = try ManifestDecoder.decode(payload)
-            return payload
-        } catch {
-            guard case .payloadTooLarge(let estimated, _) = error else {
-                return payload
-            }
-            let target = Int((estimated + 2) / 3)
-            return payload + Data(repeating: UInt8(ascii: " "), count: max(0, target - payload.count))
+    /// `count` entries whose identifier is inline (base 36), with `fileExtension` "p", `remotePath` "r", and
+    /// `components` path components and `tags` tags of `length` bytes each; with `longStrings`, the identifier, remote
+    /// path and file name are `length`-byte strings too. The R-MAN-3 reproductions of verifier round 3: every array
+    /// element of 16 bytes is a 16-byte slot plus a 64-byte heap string for 19 payload bytes. Built by `String`
+    /// concatenation, as a publisher's script might be, which leaves the allocator freed blocks of the sizes the text
+    /// grew through.
+    static func arrayStringEntries(count: Int, components: Int, tags: Int, length: Int = 16, longStrings: Bool = false) -> Data {
+        func string(_ prefix: String) -> String {
+            "\"" + prefix + String(repeating: "x", count: max(0, length - prefix.utf8.count)) + "\""
         }
+        var text = "["
+        for index in 0..<count {
+            let identifier = longStrings ? string("\(index)-i") : "\"" + String(index, radix: 36) + "\""
+            let componentList = (0..<components).map { string("\(index)-c\($0)-") }.joined(separator: ",")
+            let tagList = (0..<tags).map { string("\(index)-t\($0)-") }.joined(separator: ",")
+            text += (index == 0 ? "" : ",") + "{\"identifier\":" + identifier + ",\"fileExtension\":\"p\",\"remotePath\":"
+                + (longStrings ? string("\(index)-r") : "\"r\"") + ",\"localPathComponents\":[" + componentList + "]"
+                + (tags > 0 ? ",\"tags\":[" + tagList + "]" : "") + (longStrings ? ",\"localFileName\":" + string("\(index)-n") : "") + "}"
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit: as much
+    /// decoded heap per payload byte as the decoder accepts. Whitespace changes no estimate, and a rejection reports
+    /// the estimate and the limit for the payload's size, so a decode or two find the padding; a payload the decoder
+    /// already accepts is returned as it is.
+    static func paddedToEstimateLimit(_ payload: Data, options: ManifestDecodingOptions = ManifestDecodingOptions()) -> Data {
+        var padded = payload
+        for _ in 0..<4 {
+            do throws(ManifestError) {
+                _ = try ManifestDecoder.decode(padded, options: options)
+                return padded
+            } catch {
+                guard case .decodedSizeExceeded(let estimated, let limit) = error, limit > 0 else {
+                    return padded
+                }
+                // The limit is proportional to the payload's size.
+                let target = (Int(estimated) * padded.count + Int(limit) - 1) / Int(limit)
+                padded += Data(repeating: UInt8(ascii: " "), count: max(1, target - padded.count))
+            }
+        }
+        return padded
     }
 
     /// A bare array of `count` copies of the JSON value `element` (`1`, `null`, `{}`…).

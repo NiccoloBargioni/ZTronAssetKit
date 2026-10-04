@@ -1,19 +1,25 @@
 /// The manifest schema on top of `JSONCursor` (R-MAN-1, R-MAN-2): both wire shapes, unknown fields skipped,
-/// structural violations thrown, per-entry violations quarantined.
+/// structural violations rejected, per-entry violations quarantined.
 ///
 /// No recursion, two passes over the same code (ADR draft A-8). The *survey* pass (`survey(_:options:)`) validates
-/// the whole payload, applies every per-entry rule on the payload's own bytes and counts what the result will hold
-/// (every element of the assets array, and under `.keepFirst` the repeats of an accepted identifier), materialising
-/// nothing; `ManifestDecoder` then refuses a payload whose decoded form would exceed its allocation budget
-/// (R-MAN-3). The *build* pass reserves exactly the surveyed capacities and materialises only the values an entry
-/// may use, so peak memory is the result plus one decoded string at most (ADR draft A-3). The identifier index
-/// the result needs is built once, here, and handed to `ValidatedManifest`.
+/// the whole payload, applies every per-entry rule on the payload's own bytes, finds repeated identifiers
+/// (`SurveyedIdentifiers`) and counts what the result will hold, materialising nothing; `ManifestDecoder` then
+/// refuses a payload whose decoded form could exceed its allocation bound (R-MAN-3). The *build* pass reserves
+/// exactly the surveyed capacities and materialises an entry only once it is known to be accepted (its members are
+/// read again from the payload), so a quarantined entry costs nothing but the diagnostic the bound has room for. The
+/// identifier index the result needs is built once, here, and handed to `ValidatedManifest`.
+///
+/// Which error a rejected payload reports never depends on member order (ADR draft A-4.3, A-4.9, fix round 3): an
+/// error inside the assets array (one entry too many, a repeated identifier) is recorded at its place and the rest of
+/// the document is still read, so a document that is not JSON or nests too deep reports that, an envelope reports a
+/// version or shape error next, and only then the first assets error in payload order.
 struct ManifestParser {
     /// What one parse produced: the manifest (build pass) or only the tally (survey pass).
     struct Output {
         var entries: [ManifestEntry]
         var positions: [AssetID: Int]
         var quarantined: [QuarantinedEntry]
+        var quarantinedCount: Int
         var shape: ManifestWireShape
         var survey: ManifestSurvey
     }
@@ -24,36 +30,44 @@ struct ManifestParser {
     private let building: Bool
     /// The survey pass's counts.
     private var tally = ManifestSurvey()
+    /// The first error inside the assets array in payload order, thrown once the whole document has been read.
+    private var pendingError: ManifestError?
+    /// The survey's record of identifiers seen (duplicate rules).
+    private var identifiers = SurveyedIdentifiers()
     private var entries: [ManifestEntry] = []
-    private var quarantined: [QuarantinedEntry] = []
-    /// Accepted identifiers and their positions: the result's index and the duplicate check (R-MAN-2, D-13).
+    /// Accepted identifiers and their positions: the result's index, and under `.keepFirst` the repeat check. Empty
+    /// up to `ValidatedManifest.linearLookupLimit` entries, which are found by a linear scan.
     private var positions: [AssetID: Int] = [:]
-    /// Valid identifiers of quarantined entries (`.reject` only): a later entry repeating one is a duplicate too.
-    private var quarantinedIdentifiers: Set<AssetID> = []
-    /// The survey's stand-in for `positions` under `.keepFirst`: the accepted identifiers as views of the payload,
-    /// so a repeat is counted as quarantined (as the build will) without materialising a string.
-    private var surveyedIdentifiers: Set<SurveyedIdentifier> = []
-    /// Reused element buffer for string arrays, so each array is built at its exact size.
-    private var scratch: [String] = []
+    private let indexesPositions: Bool
+    private var quarantined: [QuarantinedEntry] = []
+    private var quarantinedCount = 0
+    /// The most diagnostics the build keeps, and the bytes their identifier strings may still take.
+    private let diagnosticCapacity: Int
+    private var diagnosticStringBytes: Int
+    /// Whether diagnostics are still kept: the kept ones are a prefix of the quarantine, in payload order.
+    private var keepsDiagnostics = true
 
-    /// A survey pass when `survey` is `nil`, else a build pass that reserves what the survey counted.
-    init(bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions, reserving survey: ManifestSurvey?) {
+    /// A survey pass when `plan` is `nil`, else a build pass that reserves what the survey counted.
+    init(bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions, plan: ManifestBuildPlan?) {
         self.cursor = JSONCursor(bytes: bytes, maxDepth: options.limits.maxNestingDepth)
         self.options = options
-        self.building = survey != nil
-        if let survey {
-            self.entries.reserveCapacity(survey.acceptedCount)
-            self.positions.reserveCapacity(survey.acceptedCount)
-            self.quarantined.reserveCapacity(survey.quarantinedCount)
-            self.quarantinedIdentifiers.reserveCapacity(survey.quarantinedIdentifierCount)
+        self.building = plan != nil
+        self.indexesPositions = (plan?.survey.acceptedCount ?? 0) > ValidatedManifest.linearLookupLimit
+        self.diagnosticCapacity = plan?.diagnosticCapacity ?? 0
+        self.diagnosticStringBytes = plan?.diagnosticStringBytes ?? 0
+        if let plan {
+            self.entries.reserveCapacity(plan.survey.acceptedCount)
+            if self.indexesPositions {
+                self.positions.reserveCapacity(plan.survey.acceptedCount)
+            }
+            self.quarantined.reserveCapacity(plan.diagnosticCapacity)
         }
     }
 
-    /// Runs the survey pass over the whole payload and returns its counts. The pass's own buffers (the container
-    /// stack, and under `.keepFirst` the set of accepted identifiers) are released when it returns, before the build
-    /// pass allocates anything.
+    /// Runs the survey pass over the whole payload and returns its counts. The pass's own buffers (the identifier
+    /// table) are released when it returns, before the build pass allocates anything.
     static func survey(_ bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions) throws(ManifestError) -> ManifestSurvey {
-        var parser = ManifestParser(bytes: bytes, options: options, reserving: nil)
+        var parser = ManifestParser(bytes: bytes, options: options, plan: nil)
         return try parser.parse().survey
     }
 
@@ -74,7 +88,13 @@ struct ManifestParser {
             throw .undecodable(.unexpectedShape)
         }
         try self.requireEnd()
-        return Output(entries: self.entries, positions: self.positions, quarantined: self.quarantined, shape: shape, survey: self.tally)
+        if let error = self.pendingError {
+            throw error
+        }
+        return Output(
+            entries: self.entries, positions: self.positions, quarantined: self.quarantined, quarantinedCount: self.quarantinedCount,
+            shape: shape, survey: self.tally
+        )
     }
 
     /// Only whitespace may follow the top-level value.
@@ -93,13 +113,11 @@ struct ManifestParser {
     /// fixed order: the whole document must be JSON within the nesting limit (`notJSON`, `nestingTooDeep`); then
     /// exactly one `schemaVersion` must declare an integer (else `unexpectedShape`: a missing, repeated or
     /// non-integer version cannot be read), and one this build interprets (else `unsupportedSchemaVersion`, whatever
-    /// `assets` looks like, since a later schema may restructure or drop it); only then does the v1 shape apply
-    /// (`assets` present, an array, not repeated). So `assets` is interpreted in place only when a supported version
-    /// precedes it; otherwise it is skipped (validated only) with its facts recorded, and parsed once the document
-    /// has been read. An unsupported version is therefore never interpreted.
-    ///
-    /// With a supported version read first, an error inside `assets` (a duplicate identifier, too many entries) is
-    /// reported before a shape violation that follows it; both reject the manifest.
+    /// `assets` looks like, since a later schema may restructure or drop it); then the v1 shape applies (`assets`
+    /// present, an array, not repeated); only then an error inside `assets` (one entry too many, a repeated
+    /// identifier), which `parseAssets` records rather than throws. So `assets` is interpreted in place only when a
+    /// supported version precedes it; otherwise it is skipped (validated only) with its facts recorded, and parsed
+    /// once the document has been read. An unsupported version is therefore never interpreted.
     private mutating func parseEnvelope() throws(ManifestError) -> ManifestWireShape {
         try self.cursor.checkDepth(1)
         try self.cursor.expect(JSONByte.openBrace)
@@ -184,7 +202,8 @@ struct ManifestParser {
     // MARK: - Assets
 
     /// The assets array at `depth` (1 for a bare array, 2 inside the envelope). The entry limit counts every
-    /// element, quarantined ones included, and stops the parse at the first element past it.
+    /// element, quarantined ones included. The first error in payload order, an element past the limit or (in the
+    /// survey) a repeated identifier, is recorded; the elements after it are only validated as JSON.
     private mutating func parseAssets(depth: Int) throws(ManifestError) {
         try self.cursor.checkDepth(depth)
         try self.cursor.expect(JSONByte.openBracket)
@@ -193,10 +212,14 @@ struct ManifestParser {
         }
         var index = 0
         repeat {
-            guard index < self.options.limits.maxEntries else {
-                throw .tooManyEntries(count: index + 1, limit: self.options.limits.maxEntries)
+            if self.pendingError == nil, index >= self.options.limits.maxEntries {
+                self.pendingError = .tooManyEntries(count: index + 1, limit: self.options.limits.maxEntries)
             }
-            try self.parseEntry(index: index, depth: depth)
+            if self.pendingError == nil {
+                try self.parseEntry(index: index, depth: depth)
+            } else {
+                try self.cursor.skipValue(depth: depth)
+            }
             index += 1
         } while try self.cursor.continueContainer(closing: JSONByte.closeBracket)
     }
@@ -205,12 +228,8 @@ struct ManifestParser {
     private mutating func parseEntry(index: Int, depth: Int) throws(ManifestError) {
         guard try self.cursor.peekValueKind() == .object else {
             try self.cursor.skipValue(depth: depth)
-            guard self.building else {
-                // Two payload bytes (`1,`) can cost a whole diagnostic: the survey counts it like any quarantine.
-                self.tally.quarantinedCount += 1
-                return
-            }
-            self.quarantined.append(QuarantinedEntry(index: index, identifier: nil, violation: .malformedField(ManifestRules.Field.entry)))
+            // Two payload bytes (`1,`) cost a whole diagnostic, or none once the bound has no room (ADR draft A-8).
+            self.quarantine(index: index, identifier: nil, violation: .malformedField(ManifestRules.Field.entry))
             return
         }
         let objectDepth = depth + 1
@@ -239,93 +258,178 @@ struct ManifestParser {
 
     /// Applies the cross-field rules (required members, duplicate identifiers) and appends the entry to the
     /// result or the quarantine (build pass), or counts it (survey pass).
-    ///
-    /// Duplicates (ADR draft A-4.3): under `.reject` a valid identifier repeating an accepted or a quarantined one
-    /// rejects the manifest. Under `.keepFirst` only an accepted identifier makes a later occurrence a duplicate, so
-    /// the first occurrence that can be kept is kept, and the repeat is quarantined as `malformedField("identifier")`.
     private mutating func finish(_ draft: EntryDraft, index: Int) throws(ManifestError) {
         var draft = draft
         for field in EntryField.required where !draft.isPresent(field) {
             draft.reject(field, .malformedField(field.name))
         }
         guard self.building else {
-            self.countInSurvey(draft)
+            self.countInSurvey(draft, index: index)
             return
         }
-        let id = draft.identifier.map { AssetID($0) }
-        if let id, draft.identifierIsValid {
-            switch self.options.duplicates {
-            case .reject:
-                if self.positions[id] != nil || self.quarantinedIdentifiers.contains(id) {
-                    throw .duplicateIdentifier(id)
-                }
-            case .keepFirst:
-                if self.positions[id] != nil {
-                    draft.reject(.identifier, .malformedField(ManifestRules.Field.identifier))
-                    draft.identifierIsValid = false
-                }
+        // Duplicates (ADR draft A-4.3): under `.reject` the survey proved every identifier unique. Under `.keepFirst`
+        // only an accepted identifier makes a later occurrence a duplicate, so the first occurrence that can be kept is
+        // kept, and a repeat, valid or not otherwise, is quarantined as `malformedField("identifier")` (the identifier
+        // is the first field, so this is its first violation).
+        var lookedUp: AssetID?
+        if self.options.duplicates == .keepFirst, draft.identifierIsValid, let identifier = draft.identifier {
+            let id = AssetID(self.cursor.decodedString(of: identifier))
+            if self.isAccepted(id) {
+                self.quarantine(index: index, id: id, violation: .malformedField(ManifestRules.Field.identifier))
+                return
             }
+            lookedUp = id
         }
-        guard draft.firstViolation == nil, let id, let fileExtension = draft.fileExtension,
+        guard draft.firstViolation == nil, let identifier = draft.identifier, let fileExtension = draft.fileExtension,
             let remotePath = draft.remotePath, let components = draft.localPathComponents
         else {
-            if let id, draft.identifierIsValid, self.options.duplicates == .reject {
-                self.quarantinedIdentifiers.insert(id)
-            }
             let violation = draft.firstViolation ?? .malformedField(ManifestRules.Field.entry)
-            self.quarantined.append(QuarantinedEntry(index: index, identifier: id, violation: violation))
+            if let lookedUp {
+                self.quarantine(index: index, id: lookedUp, violation: violation)
+            } else {
+                self.quarantine(index: index, identifier: draft.identifier, violation: violation)
+            }
             return
         }
-        self.positions[id] = self.entries.count
+        let id = lookedUp ?? AssetID(self.cursor.decodedString(of: identifier))
+        let localPathComponents = try self.materialize(components)
+        var tags: [String] = []
+        if let tagArray = draft.tags {
+            tags = try self.materialize(tagArray)
+        }
+        if self.indexesPositions {
+            self.positions[id] = self.entries.count
+        }
         self.entries.append(
             ManifestEntry(
                 identifier: id,
-                fileExtension: fileExtension,
-                remotePath: remotePath,
-                localPathComponents: components,
-                localFileName: draft.localFileName,
+                fileExtension: self.cursor.decodedString(of: fileExtension),
+                remotePath: self.cursor.decodedString(of: remotePath),
+                localPathComponents: localPathComponents,
+                localFileName: draft.localFileName.map { self.cursor.decodedString(of: $0) },
                 byteSize: draft.byteSize,
                 checksum: draft.checksum,
-                tags: draft.tags ?? [],
+                tags: tags,
                 policy: draft.policy ?? .standard
             )
         )
     }
 
-    /// The survey pass's count of one entry, matching what `finish` does with it in the build pass. Under
-    /// `.keepFirst` an entry that passes every rule but repeats an accepted identifier is a quarantine, found by
-    /// comparing the identifiers' decoded bytes exactly (no hash stands in for them), so the build reserves exactly.
-    private mutating func countInSurvey(_ draft: EntryDraft) {
-        guard draft.firstViolation == nil else {
+    /// Whether `id` is an accepted identifier already.
+    private func isAccepted(_ id: AssetID) -> Bool {
+        if self.indexesPositions {
+            return self.positions[id] != nil
+        }
+        return self.entries.contains { $0.identifier == id }
+    }
+
+    /// The survey pass's count of one entry, matching what `finish` does with it in the build pass, and the duplicate
+    /// rules (ADR draft A-4.3): under `.reject` a valid identifier repeating any valid one seen before (a quarantined
+    /// occurrence included) is the manifest's error, recorded at this second occurrence; under `.keepFirst` an entry
+    /// that passes every rule but repeats an accepted identifier is a quarantine. Identifiers are compared by their
+    /// decoded bytes, read from the payload.
+    private mutating func countInSurvey(_ draft: EntryDraft, index: Int) {
+        guard let identifier = draft.identifier, draft.identifierIsValid else {
             self.tally.quarantinedCount += 1
-            if draft.identifierIsValid, self.options.duplicates == .reject {
-                self.tally.quarantinedIdentifierCount += 1
+            self.noteDiagnosticIdentifier(draft.identifier)
+            return
+        }
+        let accepted = draft.firstViolation == nil
+        // Under `.keepFirst` the build materialises every valid identifier to look it up among the accepted ones; the
+        // string of an entry it then quarantines is a transient (or a diagnostic's, charged to its own budget).
+        let lookupBytes = ManifestFootprint.string(utf8Count: identifier.decodedCount) + self.decodedCopyBytes(identifier)
+        if self.options.duplicates == .reject || accepted, !self.identifiers.insert(identifier, in: self.cursor) {
+            switch self.options.duplicates {
+            case .reject:
+                self.pendingError = .duplicateIdentifier(AssetID(self.cursor.decodedString(of: identifier)))
+            case .keepFirst:
+                self.tally.quarantinedCount += 1
+                self.tally.noteTransient(lookupBytes)
             }
             return
         }
-        if let identifier = draft.surveyedIdentifier, !self.surveyedIdentifiers.insert(identifier).inserted {
+        guard accepted else {
             self.tally.quarantinedCount += 1
+            self.tally.noteTransient(self.options.duplicates == .keepFirst ? lookupBytes : self.decodedCopyBytes(identifier))
             return
         }
         self.tally.acceptedCount += 1
+        self.tally.acceptedBytes += draft.heapBytes
+        self.tally.noteTransient(ManifestFootprint.array(count: draft.largestEscapedCount, stride: 1))
     }
 
-    /// The string's value in the build pass; in the survey pass, its heap cost is counted and `nil` returned.
-    private mutating func materialize(_ string: JSONString) -> String? {
-        guard self.building else {
-            self.tally.materializedBytes += ManifestFootprint.string(utf8Count: string.decodedCount)
-            if string.hasEscapes {
-                self.tally.largestEscapedString = max(self.tally.largestEscapedString, string.decodedCount)
-            }
-            return nil
+    /// A kept diagnostic materialises its identifier: an escaped one is decoded through a transient copy.
+    private mutating func noteDiagnosticIdentifier(_ identifier: JSONString?) {
+        if let identifier {
+            self.tally.noteTransient(self.decodedCopyBytes(identifier))
         }
-        return self.cursor.decodedString(of: string)
+    }
+
+    /// The heap of the decoded copy an escaped string is read through (none for a string without escapes).
+    private func decodedCopyBytes(_ string: JSONString) -> Int {
+        string.hasEscapes ? ManifestFootprint.array(count: string.decodedCount, stride: 1) : 0
+    }
+
+    /// Counts a quarantined element and keeps its diagnostic while the plan has room: at most `diagnosticCapacity`,
+    /// and only while their identifier strings fit `diagnosticStringBytes`; the first that does not fit ends the
+    /// kept prefix. The identifier is materialised only for a kept diagnostic.
+    private mutating func quarantine(index: Int, identifier: JSONString?, violation: ManifestEntryViolation) {
+        guard self.building else {
+            self.tally.quarantinedCount += 1
+            return
+        }
+        guard self.keepsDiagnostic(identifierBytes: identifier.map { ManifestFootprint.string(utf8Count: $0.decodedCount) } ?? 0) else {
+            self.quarantinedCount += 1
+            return
+        }
+        self.quarantinedCount += 1
+        let id = identifier.map { AssetID(self.cursor.decodedString(of: $0)) }
+        self.quarantined.append(QuarantinedEntry(index: index, identifier: id, violation: violation))
+    }
+
+    /// `quarantine(index:identifier:violation:)` for an identifier already materialised (under `.keepFirst`, to look
+    /// it up).
+    private mutating func quarantine(index: Int, id: AssetID, violation: ManifestEntryViolation) {
+        self.quarantinedCount += 1
+        if self.keepsDiagnostic(identifierBytes: ManifestFootprint.string(utf8Count: id.rawValue.utf8.count)) {
+            self.quarantined.append(QuarantinedEntry(index: index, identifier: id, violation: violation))
+        }
+    }
+
+    /// Whether the next diagnostic, whose identifier string takes `identifierBytes`, is kept; charges its bytes.
+    private mutating func keepsDiagnostic(identifierBytes: Int) -> Bool {
+        guard self.keepsDiagnostics, self.quarantined.count < self.diagnosticCapacity, identifierBytes <= self.diagnosticStringBytes else {
+            self.keepsDiagnostics = false
+            return false
+        }
+        self.diagnosticStringBytes -= identifierBytes
+        return true
+    }
+
+    /// The strings of an accepted array member, read again from the payload into an array of exactly their count.
+    private mutating func materialize(_ array: DraftStringArray) throws(ManifestError) -> [String] {
+        guard array.count > 0 else {
+            return []
+        }
+        var result: [String] = []
+        result.reserveCapacity(array.count)
+        let resume = self.cursor.offset
+        self.cursor.seek(to: array.start)
+        try self.cursor.expect(JSONByte.openBracket)
+        repeat {
+            self.cursor.skipWhitespace()
+            let string = try self.cursor.scanString()
+            result.append(self.cursor.decodedString(of: string))
+        } while try self.cursor.continueContainer(closing: JSONByte.closeBracket)
+        self.cursor.seek(to: resume)
+        return result
     }
 
     // MARK: - Fields
 
-    /// Reads one known member's value into the draft. Text is checked against the field's rules on the payload's
-    /// bytes first; a value over its field's length limit is never materialised.
+    /// Reads one known member's value into the draft: the payload extent of a text value, checked against the field's
+    /// rules on the payload's bytes (or, for an escaped string, a decoded copy) and materialised only by `finish`
+    /// once the whole entry is accepted. The heap the entry would take is counted as it goes (`EntryDraft.heapBytes`).
     private mutating func parseField(_ field: EntryField, into draft: inout EntryDraft, depth: Int) throws(ManifestError) {
         let limits = self.options.limits
         switch field {
@@ -333,17 +437,15 @@ struct ManifestParser {
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            guard string.decodedCount <= limits.maxIdentifierBytes else {
+            guard !ManifestRules.isIdentifierTooLong(string.decodedCount, limits: limits) else {
                 return draft.reject(field, .identifierTooLong(bytes: string.decodedCount))
             }
-            draft.identifier = self.materialize(string)
-            if let violation = self.firstViolation(of: string, ManifestRules.identifierViolations(utf8:limits:)) {
+            draft.identifier = string
+            draft.count(string)
+            if let violation = self.firstViolation(of: string, ManifestRules.firstIdentifierViolation(utf8:limits:)) {
                 draft.reject(field, violation)
             } else {
                 draft.identifierIsValid = true
-                if !self.building, self.options.duplicates == .keepFirst {
-                    draft.surveyedIdentifier = SurveyedIdentifier(body: self.cursor.body(of: string), hasEscapes: string.hasEscapes)
-                }
             }
         case .fileExtension:
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
@@ -352,18 +454,20 @@ struct ManifestParser {
             guard string.decodedCount <= 8, self.isValidFileExtension(string) else {
                 return draft.reject(field, .fileExtensionInvalid)
             }
-            draft.fileExtension = self.materialize(string)
+            draft.fileExtension = string
+            draft.count(string)
         case .remotePath:
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            guard string.decodedCount <= limits.maxRemotePathBytes else {
+            guard !ManifestRules.isRemotePathTooLong(string.decodedCount, limits: limits) else {
                 return draft.reject(field, .remotePathInvalid(.tooLong(bytes: string.decodedCount)))
             }
-            if let violation = self.firstViolation(of: string, ManifestRules.remotePathViolations(utf8:limits:)) {
+            if let violation = self.firstViolation(of: string, ManifestRules.firstRemotePathViolation(utf8:limits:)) {
                 return draft.reject(field, .remotePathInvalid(violation))
             }
-            draft.remotePath = self.materialize(string)
+            draft.remotePath = string
+            draft.count(string)
         case .localPathComponents:
             draft.localPathComponents = try self.stringArray(
                 field, &draft, depth: depth, maxCount: ManifestRules.maxPathComponents,
@@ -376,7 +480,8 @@ struct ManifestParser {
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            draft.localFileName = self.materialize(string)
+            draft.localFileName = string
+            draft.count(string)
         case .byteSize:
             if try self.cursor.consumeNull() {
                 return
@@ -410,7 +515,7 @@ struct ManifestParser {
                 return
             }
             draft.tags = try self.stringArray(
-                field, &draft, depth: depth, maxCount: limits.maxTagsPerEntry, countViolation: .tagInvalid,
+                field, &draft, depth: depth, maxCount: ManifestRules.maxTagCount(limits), countViolation: .tagInvalid,
                 elementViolation: { ManifestRules.isValidTagLength($0, limits: limits) ? nil : .tagInvalid }
             )
         case .policy:
@@ -443,10 +548,9 @@ struct ManifestParser {
         draft.reject(field, .malformedField(field.name))
     }
 
-    /// An array of strings with at most `maxCount` elements, each checked by `elementViolation` (on its decoded
-    /// UTF-8 length) before it is materialised. Returns `nil` after rejecting the field; the rest of the array is
-    /// still validated as JSON but nothing more is materialised. The build pass collects the elements in `scratch`
-    /// and returns them in an array reserved at their exact count; the survey pass counts them and returns `[]`.
+    /// An array of at most `maxCount` strings, each checked by `elementViolation` (on its decoded UTF-8 length): its
+    /// place in the payload and its count, or `nil` after rejecting the field. The rest of a rejected array is still
+    /// validated as JSON. `finish` reads an accepted one again into an array of exactly its count.
     private mutating func stringArray(
         _ field: EntryField,
         _ draft: inout EntryDraft,
@@ -454,15 +558,17 @@ struct ManifestParser {
         maxCount: Int,
         countViolation: ManifestEntryViolation,
         elementViolation: (Int) -> ManifestEntryViolation?
-    ) throws(ManifestError) -> [String]? {
+    ) throws(ManifestError) -> DraftStringArray? {
         guard try self.cursor.peekValueKind() == .array else {
             try self.rejectValue(field, &draft, depth: depth)
             return nil
         }
         try self.cursor.checkDepth(depth + 1)
+        let start = self.cursor.offset
         try self.cursor.expect(JSONByte.openBracket)
-        self.scratch.removeAll(keepingCapacity: true)
         var count = 0
+        var heapBytes = 0
+        var largestEscaped = 0
         var violation: ManifestEntryViolation?
         if !self.cursor.consume(JSONByte.closeBracket) {
             repeat {
@@ -476,52 +582,63 @@ struct ManifestParser {
                     continue
                 }
                 let string = try self.cursor.scanString()
-                if count == maxCount {
+                // At most `maxCount` elements (`>=`: a limit below one allows none, as `violations(of:)` reads it).
+                if count >= maxCount {
                     violation = countViolation
                 } else if let rejected = elementViolation(string.decodedCount) {
                     violation = rejected
                 } else {
-                    if let element = self.materialize(string) {
-                        self.scratch.append(element)
+                    heapBytes += ManifestFootprint.string(utf8Count: string.decodedCount)
+                    if string.hasEscapes {
+                        largestEscaped = max(largestEscaped, string.decodedCount)
                     }
                     count += 1
                 }
             } while try self.cursor.continueContainer(closing: JSONByte.closeBracket)
         }
-        self.tally.materializedBytes += self.building ? 0 : ManifestFootprint.array(count: count, stride: MemoryLayout<String>.stride)
         if let violation {
             draft.reject(field, violation)
             return nil
         }
-        var result: [String] = []
-        result.reserveCapacity(self.scratch.count)
-        result.append(contentsOf: self.scratch)
-        return result
+        draft.heapBytes += heapBytes + ManifestFootprint.array(count: count, stride: MemoryLayout<String>.stride)
+        draft.largestEscapedCount = max(draft.largestEscapedCount, largestEscaped)
+        return DraftStringArray(start: start, count: count)
     }
 
-    /// The first violation a byte rule reports for a scanned string (on the payload's bytes when unescaped).
-    private func firstViolation<Violation>(
+    /// The first violation a byte rule reports for a scanned string, on the payload's bytes when it has no escape,
+    /// else on a decoded copy (a transient the survey counts).
+    private mutating func firstViolation<Violation>(
         of string: JSONString,
-        _ rule: (UnsafeRawBufferPointer, ManifestLimits) -> [Violation]
+        _ rule: (UnsafeRawBufferPointer, ManifestLimits) -> Violation?
     ) -> Violation? {
         if let view = self.cursor.rawBytes(of: string) {
-            return rule(view, self.options.limits).first
+            return rule(view, self.options.limits)
         }
-        return self.cursor.decodedBytes(of: string).withUnsafeBytes { rule($0, self.options.limits).first }
+        self.noteDecodedCopy(string)
+        return self.cursor.decodedBytes(of: string).withUnsafeBytes { rule($0, self.options.limits) }
     }
 
-    private func isValidFileExtension(_ string: JSONString) -> Bool {
+    private mutating func isValidFileExtension(_ string: JSONString) -> Bool {
         if let view = self.cursor.rawBytes(of: string) {
             return ManifestRules.isValidFileExtension(utf8: view)
         }
+        self.noteDecodedCopy(string)
         return self.cursor.decodedBytes(of: string).withUnsafeBytes(ManifestRules.isValidFileExtension(utf8:))
     }
 
-    private func contentHash(of string: JSONString) -> ContentHash? {
+    private mutating func contentHash(of string: JSONString) -> ContentHash? {
         if let view = self.cursor.rawBytes(of: string) {
             return ManifestParser.contentHash(hex: view)
         }
+        self.noteDecodedCopy(string)
         return self.cursor.decodedBytes(of: string).withUnsafeBytes(ManifestParser.contentHash(hex:))
+    }
+
+    /// Counts the decoded copy an escaped string is checked through (both passes make it; the survey counts it).
+    private mutating func noteDecodedCopy(_ string: JSONString) {
+        if !self.building {
+            self.tally.noteTransient(self.decodedCopyBytes(string))
+        }
     }
 
     /// The digest 64 hexadecimal characters (either case) spell, or `nil` if any is not hex.
@@ -617,23 +734,27 @@ enum EntryField: Int, CaseIterable {
     private static let keys: [[UInt8]] = EntryField.allCases.map { Array($0.name.utf8) }
 }
 
-/// One asset while its members are read: the materialised values and the first violation in field order.
+/// One asset while its members are read: where its accepted values sit in the payload, and the first violation in
+/// field order.
 struct EntryDraft {
     /// Members seen so far, one bit per `EntryField` (a repeated member is a violation).
     private var presentMask: UInt16 = 0
-    var identifier: String?
+    /// The identifier when it is within its length limit (for the entry, or the diagnostic of a quarantined one).
+    var identifier: JSONString?
     /// Whether `identifier` passed the identifier rules (only valid identifiers take part in the duplicate check).
     var identifierIsValid = false
-    var fileExtension: String?
-    var remotePath: String?
-    var localPathComponents: [String]?
-    var localFileName: String?
+    var fileExtension: JSONString?
+    var remotePath: JSONString?
+    var localPathComponents: DraftStringArray?
+    var localFileName: JSONString?
     var byteSize: Int64?
     var checksum: ContentHash?
-    var tags: [String]?
+    var tags: DraftStringArray?
     var policy: AssetPolicy?
-    /// The valid identifier as the survey pass saw it, under `.keepFirst` only (duplicate counting).
-    var surveyedIdentifier: SurveyedIdentifier?
+    /// The heap the entry's strings and string arrays take once materialised (`ManifestFootprint`).
+    var heapBytes = 0
+    /// The decoded length of the longest escaped string materialising the entry decodes (its copy is a transient).
+    var largestEscapedCount = 0
     /// The violation of the earliest field (in field order) that has one; within a field, the first recorded.
     private(set) var firstViolation: ManifestEntryViolation?
     private var firstViolationField = Int.max
@@ -655,52 +776,18 @@ struct EntryDraft {
             self.firstViolation = violation
         }
     }
+
+    /// Counts the heap a string member takes once materialised.
+    mutating func count(_ string: JSONString) {
+        self.heapBytes += ManifestFootprint.string(utf8Count: string.decodedCount)
+        if string.hasEscapes {
+            self.largestEscapedCount = max(self.largestEscapedCount, string.decodedCount)
+        }
+    }
 }
 
-/// An identifier as the survey pass sees it: a view of its JSON string body in the payload, equal and hashed by its
-/// decoded bytes (an escaped body is decoded on demand, so the set of them holds no copy). The view lives only
-/// inside the survey, within `ManifestDecoder.decode`'s `withUnsafeBytes` scope (ADR draft A-2).
-struct SurveyedIdentifier: Hashable {
-    /// The bytes between the quotes.
-    let body: UnsafeRawBufferPointer
-    /// Whether `body` contains escapes (its decoded bytes then differ from it).
-    let hasEscapes: Bool
-
-    static func == (lhs: SurveyedIdentifier, rhs: SurveyedIdentifier) -> Bool {
-        if !lhs.hasEscapes, !rhs.hasEscapes {
-            return SurveyedIdentifier.equal(lhs.body, rhs.body)
-        }
-        return lhs.decoded().withUnsafeBytes { left in rhs.decoded().withUnsafeBytes { right in SurveyedIdentifier.equal(left, right) } }
-    }
-
-    func hash(into hasher: inout Hasher) {
-        if self.hasEscapes {
-            self.decoded().withUnsafeBytes { hasher.combine(bytes: $0) }
-        } else {
-            hasher.combine(bytes: self.body)
-        }
-    }
-
-    /// The identifier's UTF-8 bytes, escapes resolved.
-    private func decoded() -> [UInt8] {
-        guard self.hasEscapes else {
-            return Array(self.body)
-        }
-        let whole = JSONString(start: 0, end: self.body.count, decodedCount: self.body.count, hasEscapes: true)
-        return JSONCursor(bytes: self.body, maxDepth: 0).decodedBytes(of: whole)
-    }
-
-    private static func equal(_ lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer) -> Bool {
-        guard lhs.count == rhs.count else {
-            return false
-        }
-        var index = 0
-        while index < lhs.count {
-            guard lhs[index] == rhs[index] else {
-                return false
-            }
-            index += 1
-        }
-        return true
-    }
+/// An array member of strings that passed its rules: where it starts in the payload (its `[`) and its count.
+struct DraftStringArray {
+    var start: Int
+    var count: Int
 }
