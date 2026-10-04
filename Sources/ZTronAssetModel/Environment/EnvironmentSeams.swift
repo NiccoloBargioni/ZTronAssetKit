@@ -71,9 +71,11 @@ public struct LogLine: Sendable, Hashable {
     }
 }
 
-/// An optional sink that receives every rendered log line next to `os.Logger` (R-OBS-1, R-SEC-1).
+/// An optional observer that receives every rendered log line next to the environment's `LogSink` (R-OBS-1,
+/// R-SEC-1, ADR-047).
 ///
-/// Tests assert on it (canary key absent, identifiers hashed); `.live()` leaves it `nil`. `record` must not block.
+/// Tests assert on it (canary key absent, identifiers hashed) while their `TapOnlyLogSink` keeps the unified log
+/// untouched; `.live()` leaves it `nil`. `record` must not block.
 public protocol LogTap: Sendable {
     /// Receives one rendered line.
     func record(_ line: LogLine)

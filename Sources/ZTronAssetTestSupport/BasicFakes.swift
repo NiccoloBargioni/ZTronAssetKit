@@ -54,10 +54,12 @@ public struct FakeRemoteSourceFactory: RemoteSourceFactory {
         self.source = source
     }
 
-    /// Attaches `staging` to an attachable source, then returns the prepared source.
+    /// Attaches `staging` to an attachable source, then returns the prepared source. The prepared source was built
+    /// by the test, so `log` is not handed over (a fake source logs nothing).
     public func makeRemoteSource(
         configuration: RemoteConfiguration,
-        staging: any StagingSink
+        staging: any StagingSink,
+        log: LogRoute
     ) async throws(AssetError) -> any RemoteSource {
         if let attachable = self.source as? any StagingAttachable {
             await attachable.attach(staging: staging)
@@ -91,6 +93,8 @@ public actor FakeDeviceConditionsSource: DeviceConditionsSource {
         self.observers[id] = continuation
         continuation.onTermination = { [weak self] _ in
             Task {
+                // REENTRANCY: TS1 — nothing: this task is not the actor; removeObserver re-reads the table on the
+                // actor, and a second removal of the same id is a no-op.
                 await self?.removeObserver(id)
             }
         }
@@ -118,6 +122,8 @@ public actor FakeDeviceConditionsSource: DeviceConditionsSource {
         if self.observers.count == count {
             return
         }
+        // REENTRANCY: TS2 — nothing: a terminal wait. The waiter is registered synchronously inside the body, and
+        // notifyCountWaiters resumes it only from the actor turn that reached `count`; no state is read afterwards.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.countWaiters.append((count, continuation))
         }
@@ -163,6 +169,8 @@ public actor FakeMemoryPressureSource: MemoryPressureSource {
         self.observers[id] = continuation
         continuation.onTermination = { [weak self] _ in
             Task {
+                // REENTRANCY: TS1 — nothing: this task is not the actor; removeObserver re-reads the table on the
+                // actor, and a second removal of the same id is a no-op.
                 await self?.removeObserver(id)
             }
         }
@@ -187,6 +195,8 @@ public actor FakeMemoryPressureSource: MemoryPressureSource {
         if self.observers.count == count {
             return
         }
+        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the actor turn
+        // that reached `count`; no state is read afterwards.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.countWaiters.append((count, continuation))
         }

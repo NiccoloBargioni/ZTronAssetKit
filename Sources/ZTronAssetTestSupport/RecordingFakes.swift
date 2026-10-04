@@ -53,10 +53,46 @@ public final class RecordingLogTap: LogTap {
     }
 }
 
+/// One entry of a fake transport's ordered log: a transfer start or a control on one of its handles
+/// (R-NET-10, H-4, sync-1 S1-06).
+public enum FakeTransportEvent: Sendable, Hashable {
+    /// `FakeRemoteSource.transfer(_:)` started this request.
+    case started(TransferRequest)
+    /// A handle received a control.
+    case controlled(FakeControlRecord)
+}
+
+/// The single ordered log a `FakeRemoteSource` shares with every handle it creates (contract-fix round 4).
+///
+/// Starts are recorded on the source's actor, controls synchronously on the handles (`TransferHandle`'s controls
+/// are synchronous, ADR-021), so two separate logs cannot say whether a promoted asset's `setPriority` came before
+/// the next start. One lock over one array gives every start and every control a place in a single sequence:
+/// the H-4 test `R-NET-10: a promoted asset's priority change reaches the transport before any other transfer
+/// starts` reads it directly. Gated for `Mutex` (ADR-014).
+@available(macOS 15.0, iOS 18.0, *)
+public final class FakeTransportLog: Sendable {
+    private let entries: Mutex<[FakeTransportEvent]>
+
+    /// Starts empty.
+    public init() {
+        self.entries = Mutex([])
+    }
+
+    /// Appends one event; the lock defines the global order.
+    public func record(_ event: FakeTransportEvent) {
+        self.entries.withLock { $0.append(event) }
+    }
+
+    /// Every event so far, in the order recorded.
+    public var events: [FakeTransportEvent] {
+        self.entries.withLock { $0 }
+    }
+}
+
 /// A transfer handle driven by the test (R-SYN-3, R-SYN-4, R-NET-10 tests): every control is recorded in call
-/// order under a lock, so the order of `setPriority` relative to other starts is observable (sync-1 S1-06).
-/// `cancel()` and `pause()` end the stream with their terminal element; `deliver` yields what the test scripts.
-/// Gated for `Mutex` (ADR-014).
+/// order under a lock and, when the handle was made with a `FakeTransportLog`, also in that shared log, so the
+/// order of `setPriority` relative to other starts is observable (sync-1 S1-06). `cancel()` and `pause()` end the
+/// stream with their terminal element; `deliver` yields what the test scripts. Gated for `Mutex` (ADR-014).
 @available(macOS 15.0, iOS 18.0, *)
 public final class FakeTransferHandle: TransferHandle {
     /// The content.
@@ -65,36 +101,44 @@ public final class FakeTransferHandle: TransferHandle {
     public let attempt: TransferAttempt
     /// The update stream.
     public let updates: AsyncStream<TransferUpdate>
+    /// The shared log every control is also recorded in; `nil` for a stand-alone handle.
+    public let transportLog: FakeTransportLog?
     private let continuation: AsyncStream<TransferUpdate>.Continuation
     private let log: Mutex<[TransferControl]>
 
-    /// Creates a handle.
-    public init(id: TransferID, attempt: TransferAttempt) {
+    /// Creates a handle; `FakeRemoteSource` passes its `transportLog`.
+    public init(id: TransferID, attempt: TransferAttempt, transportLog: FakeTransportLog? = nil) {
         self.id = id
         self.attempt = attempt
         let (stream, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(8))
         self.updates = stream
         self.continuation = continuation
+        self.transportLog = transportLog
         self.log = Mutex([])
     }
 
     /// Records the priority change.
     public func setPriority(_ priority: AssetPriority) {
-        self.log.withLock { $0.append(.setPriority(priority)) }
+        self.record(.setPriority(priority))
     }
 
     /// Records the pause and ends the stream with `.paused(resumable: true)`.
     public func pause() {
-        self.log.withLock { $0.append(.pause) }
+        self.record(.pause)
         self.continuation.yield(.paused(resumable: true))
         self.continuation.finish()
     }
 
     /// Records the cancellation and ends the stream with `.failed(.cancelled(.byClient))`.
     public func cancel() {
-        self.log.withLock { $0.append(.cancel) }
+        self.record(.cancel)
         self.continuation.yield(.failed(.cancelled(.byClient)))
         self.continuation.finish()
+    }
+
+    private func record(_ control: TransferControl) {
+        self.log.withLock { $0.append(control) }
+        self.transportLog?.record(.controlled(FakeControlRecord(transfer: self.id, control: control)))
     }
 
     /// Yields a scripted update; a terminal one ends the stream.
@@ -114,7 +158,7 @@ public final class FakeTransferHandle: TransferHandle {
 /// A source that writes through the store's staging sink once the engine has one (WP-H, WP-F, P-7).
 ///
 /// The store's sink exists only after `AssetStore.open()`, which runs inside `SyncEngine.start()`; the only place
-/// that sees it is `RemoteSourceFactory.makeRemoteSource(configuration:staging:)`. A fake source is built by the
+/// that sees it is `RemoteSourceFactory.makeRemoteSource(configuration:staging:log:)`. A fake source is built by the
 /// test before that, so `FakeRemoteSourceFactory` hands the sink over through this protocol before returning the
 /// source. Deliberately **not** availability-gated, so the factory's cast needs no `#available` and the package
 /// keeps its single `#available` (R-APL-5).
@@ -133,6 +177,13 @@ public enum FakeTransferStep: Sendable, Hashable {
     /// `.transient(.localIO)`). Without an attached sink (`StagingAttachable`) the step fails with
     /// `.transient(.localIO)`, so a test that forgot the factory fails visibly instead of hanging.
     case stage(Data)
+    /// Write `byteCount` bytes of `GeneratedPayload` for `seed` through the attached staging sink in chunks of
+    /// `GeneratedPayload.chunkBytes` (`createPartial`, then one `appendPartial` per chunk, each chunk generated just
+    /// before it is written), then report `.staged(StagedFile)`; failures as for `.stage(Data)`. The payload is never
+    /// held in memory as a whole, so P-7's catalog does not sit in RAM and "delta does not grow with catalog size"
+    /// measures the engine and the store, not the fake. The manifest checksum of such an entry is
+    /// `GeneratedPayload.sha256(seed:byteCount:)`.
+    case stageGenerated(seed: UInt64, byteCount: Int64)
     /// Fail.
     case fail(TransferError)
     /// Wait until the test calls `release(_:with:)`.
@@ -164,7 +215,8 @@ public struct FakeControlRecord: Sendable, Hashable {
 }
 
 /// The engine's network, scripted (R-NET-1; WP-H): starts, priority changes, pauses and cancellations are
-/// recorded; `activeTransfers` is the census R-SYN-15 and P-14 assert on. Gated for `Mutex` (its handles).
+/// recorded in one ordered `transportLog`; `activeTransfers` is the census R-SYN-15 and P-14 assert on. Gated for
+/// `Mutex` (its handles).
 ///
 /// Built by the test, handed to the engine by `FakeRemoteSourceFactory`, which attaches the open store's staging
 /// sink first (`StagingAttachable`), so `.stage(Data)` writes real staging files the store then publishes.
@@ -174,6 +226,10 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
     public nonisolated let originID: String
     /// The capabilities reported.
     public nonisolated let capabilities: RemoteSourceCapabilities
+    /// Starts and controls in one sequence (R-NET-10, H-4): `transfer(_:)` records `.started(request)` here and
+    /// creates its handle with this log before returning it, so a control on any handle and every later start are
+    /// totally ordered. `starts` and `controlLog` are projections of it.
+    public nonisolated let transportLog = FakeTransportLog()
     private var staging: (any StagingSink)?
     private var heldSourceCopyBytes: Int64 = 0
 
@@ -217,19 +273,37 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         fatalError("WP-H: FakeRemoteSource.scriptManifest not implemented")
     }
 
+    /// Scripts what `reattachedTransfers()` returns: the transfers an "earlier process" left live in the OS or
+    /// completed into staging (H-6; R-NET-3 adoption from staging, R-CLN-3 survival through launch GC). A test puts
+    /// the completed ones' files into staging itself (through the store's sink) before `start()`; each call
+    /// replaces the script, and `reattachedTransfers()` returns it once, then `[]` (one launch, ADR-028).
+    public func scriptReattached(_ transfers: [ReattachedTransfer]) {
+        fatalError("WP-H: FakeRemoteSource.scriptReattached not implemented")
+    }
+
     /// Ends a `.hold` step with `update`.
     public func release(_ id: TransferID, with update: TransferUpdate) {
         fatalError("WP-H: FakeRemoteSource.release not implemented")
     }
 
-    /// Requests started, in order.
+    /// Requests started, in order (the `.started` entries of `transportLog`).
     public var starts: [TransferRequest] {
-        fatalError("WP-H: FakeRemoteSource.starts not implemented")
+        self.transportLog.events.compactMap { event in
+            guard case .started(let request) = event else {
+                return nil
+            }
+            return request
+        }
     }
 
-    /// Controls received, in order across transfers.
+    /// Controls received, in order across transfers (the `.controlled` entries of `transportLog`).
     public var controlLog: [FakeControlRecord] {
-        fatalError("WP-H: FakeRemoteSource.controlLog not implemented")
+        self.transportLog.events.compactMap { event in
+            guard case .controlled(let record) = event else {
+                return nil
+            }
+            return record
+        }
     }
 
     /// Transfers not yet terminal.
@@ -242,12 +316,13 @@ public actor FakeRemoteSource: RemoteSource, StagingAttachable {
         fatalError("WP-H: FakeRemoteSource.fetchManifest not implemented")
     }
 
-    /// Scripted transfer.
+    /// Scripted transfer: records `.started(request)` in `transportLog`, then returns a `FakeTransferHandle` made
+    /// with `transportLog`.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
         fatalError("WP-H: FakeRemoteSource.transfer not implemented")
     }
 
-    /// Scripted re-attached transfers.
+    /// What `scriptReattached(_:)` set, once; `[]` otherwise.
     public func reattachedTransfers() async -> [ReattachedTransfer] {
         fatalError("WP-H: FakeRemoteSource.reattachedTransfers not implemented")
     }

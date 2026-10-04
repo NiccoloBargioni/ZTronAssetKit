@@ -51,21 +51,24 @@ struct QualityBudgets {
     }
 }
 
-@Suite("BudgetsBenchmarks")
-struct BudgetsBenchmarks {
-    @Test("every budget in quality-gates.json is present with numeric thresholds the benchmarks can read")
-    func budgetsAreReadable() throws {
-        let budgets = try QualityBudgets()
-        let expected = Set((1...14).map { "P-\($0)" })
-        #expect(budgets.identifiers == expected)
-        for id in expected {
-            let fields = budgets.fields(id)
-            #expect(!fields.isEmpty, "\(id) has no numeric threshold")
-            for (key, value) in fields {
-                #expect(value >= 0, "\(id).\(key)")
+extension ZTronAssetKitBenchmarks {
+    /// The thresholds every benchmark reads (orchestrator-owned, ADR-010).
+    @Suite("BudgetsBenchmarks")
+    struct BudgetsBenchmarks {
+        @Test("every budget in quality-gates.json is present with numeric thresholds the benchmarks can read")
+        func budgetsAreReadable() throws {
+            let budgets = try QualityBudgets()
+            let expected = Set((1...14).map { "P-\($0)" })
+            #expect(budgets.identifiers == expected)
+            for id in expected {
+                let fields = budgets.fields(id)
+                #expect(!fields.isEmpty, "\(id) has no numeric threshold")
+                for (key, value) in fields {
+                    #expect(value >= 0, "\(id).\(key)")
+                }
             }
+            #expect(budgets.value("P-1", "lookup_p99_us") != nil)
+            #expect(budgets.value("P-14", "idle_tasks_max") != nil)
         }
-        #expect(budgets.value("P-1", "lookup_p99_us") != nil)
-        #expect(budgets.value("P-14", "idle_tasks_max") != nil)
     }
 }

@@ -8,7 +8,8 @@ extension AssetEnvironment {
     /// The real world (C4): the only place that names live conformers. Building it performs no I/O (P-12); each
     /// call builds fresh conformers, so two clients never share executors or observers. A function, not a
     /// `static var` (SPEC §4.2, ADR-038). The legacy `UserDefaults` stamp is read from `legacyDefaultsSuiteName`,
-    /// `.standard` when `nil` (R-STO-11).
+    /// `.standard` when `nil` (R-STO-11); `AssetClient(configuration:)` passes
+    /// `configuration.legacy.defaultsSuiteName` (ADR-048). Lines go to the unified log (`OSLogSink`, ADR-047).
     public static func live(legacyDefaultsSuiteName: String? = nil) -> AssetEnvironment {
         let metadataExecutor = DispatchBlockingExecutor(label: "com.ztron.assetkit.metadata")
         return AssetEnvironment(
@@ -20,7 +21,8 @@ extension AssetEnvironment {
             conditions: LiveDeviceConditionsSource(),
             remoteSources: LiveRemoteSourceFactory(),
             appVersion: LiveAppVersionSource(executor: metadataExecutor),
-            legacyDefaults: LiveLegacyDefaults(suiteName: legacyDefaultsSuiteName)
+            legacyDefaults: LiveLegacyDefaults(suiteName: legacyDefaultsSuiteName),
+            logSink: OSLogSink()
         )
     }
 }
@@ -30,16 +32,18 @@ public struct LiveRemoteSourceFactory: RemoteSourceFactory {
     /// Creates the factory (stateless).
     public init() {}
 
-    /// Selects the tier through the package's single `#available` and builds its source.
+    /// Selects the tier through the package's single `#available` and builds its source, logging through `log`.
     public func makeRemoteSource(
         configuration: RemoteConfiguration,
-        staging: any StagingSink
+        staging: any StagingSink,
+        log: LogRoute
     ) async throws(AssetError) -> any RemoteSource {
         let resolved = AppleHostedTier.resolve(
             configuration: configuration,
             staging: staging,
             packBackend: nil,
-            makeAWS: { http in HTTPRemoteSource(configuration: http, staging: staging) }
+            log: log,
+            makeAWS: { http in HTTPRemoteSource(configuration: http, staging: staging, log: log) }
         )
         switch resolved {
         case .success(let source):

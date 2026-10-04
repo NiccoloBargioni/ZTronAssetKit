@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ZTronAssetModel
+import ZTronAssetTestSupport
 import ZTronAssetTransport
 
 @Suite("Transport contracts")
@@ -53,6 +54,28 @@ struct TransportContractTests {
         #expect(BackgroundSessionIdentifier.isOurs("com.ztron.assetkit.bg.media-2.v1"))
         #expect(!BackgroundSessionIdentifier.isOurs("com.ztron.assetkit.bg..v1"))
         #expect(!BackgroundSessionIdentifier.isOurs("com.other.app.bg.default.v1"))
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-3: the production source builds a background coordinator only when background transfers are enabled with a valid namespace")
+    func productionBackgroundBackend() throws {
+        let staging = FakeStagingSink()
+        let policy = TransportSecurityPolicy.production(allowedHosts: ["cdn.example.com"])
+        #expect(HTTPRemoteSource.makeBackgroundBackend(.disabled, staging: staging, policy: policy) == nil)
+        let invalid = BackgroundTransferPolicy.enabled(BackgroundTransferOptions(namespace: "Not Valid"))
+        #expect(HTTPRemoteSource.makeBackgroundBackend(invalid, staging: staging, policy: policy) == nil)
+
+        let options = BackgroundTransferOptions(namespace: "media", discretionary: false, maxTasks: 8)
+        let backend = try #require(HTTPRemoteSource.makeBackgroundBackend(.enabled(options), staging: staging, policy: policy))
+        #expect(backend.kind == .background)
+        let coordinator = try #require(backend as? BackgroundTransferCoordinator)
+        #expect(coordinator.options == options)
+        let driver = try #require(coordinator.driver as? LiveBackgroundSessionDriver)
+        #expect(driver.identifier.rawValue == "com.ztron.assetkit.bg.media.v1")
+        #expect(!driver.discretionary)
+        #expect(driver.delegate.mode == .background)
+        #expect(driver.delegate.policy == policy)
+        #expect((driver.delegate.staging as? FakeStagingSink) === staging)
     }
 
     @Test("R-NET-4: plain HTTP is refused by the production policy even for loopback hosts")

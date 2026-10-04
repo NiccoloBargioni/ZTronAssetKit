@@ -40,6 +40,7 @@ struct AppleHostedContractTests {
             configuration: configuration,
             staging: FakeStagingSink(),
             packBackend: FakePackBackend(),
+            log: .tapOnly(nil),
             makeAWS: { _ in
                 awsBuilds += 1
                 return aws
@@ -54,6 +55,7 @@ struct AppleHostedContractTests {
             configuration: RemoteConfiguration(http: nil, appleHosted: nil, awsOnly: false),
             staging: FakeStagingSink(),
             packBackend: FakePackBackend(),
+            log: .tapOnly(nil),
             makeAWS: { _ in aws }
         )
         #expect(throws: TierUnavailable.noSourceConfigured) { try none.get() }

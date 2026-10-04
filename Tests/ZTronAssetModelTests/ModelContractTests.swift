@@ -1,7 +1,9 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetTestSupport
+import os
 
 private func hash(_ seed: UInt8) -> ContentHash {
     ContentHash.sha256(of: Data([seed]))
@@ -198,8 +200,73 @@ struct ModelContractTests {
         #expect(AssetLog.subsystem == "com.ztron.assetkit")
         #expect(LogLine(category: .apple, level: .info, message: "x").subsystem == AssetLog.subsystem)
         let tap = RecordingLogTap()
-        AssetLog.log(.store, .debug, "evicted \(rendered)", tap: tap)
+        AssetLog.log(.store, .debug, "evicted \(rendered)", sink: TapOnlyLogSink(), tap: tap)
         #expect(tap.lines == [LogLine(subsystem: "com.ztron.assetkit", category: .store, level: .debug, message: "evicted \(rendered)")])
         #expect(LogLevel.allCases.map(\.osLogType) == [.debug, .info, .error, .fault])
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-OBS-1: every line reaches the environment's sink and tap once, and an environment of fakes keeps the unified log untouched")
+    func logRouteReachesSinkAndTap() {
+        let sink = RecordingLogSink()
+        let tap = RecordingLogTap()
+        let route = LogRoute(sink: sink, tap: tap)
+        route.log(.transport, .error, "refused \(AssetLog.hashed(AssetID("bo7.a")))")
+        let expected = LogLine(category: .transport, level: .error, message: "refused \(AssetLog.hashed(AssetID("bo7.a")))")
+        #expect(sink.lines == [expected])
+        #expect(tap.lines == [expected])
+
+        let time = ManualTimeSource()
+        let environment = AssetEnvironment(
+            fileSystem: FakeFileSystem(time: time),
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 7),
+            conditions: FakeDeviceConditionsSource(),
+            remoteSources: FakeRemoteSourceFactory(source: FakeRemoteSource()),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults(),
+            logTap: tap
+        )
+        #expect(environment.logSink is TapOnlyLogSink)
+        #expect(environment.logRoute.signposter(.store) == nil)
+        environment.logRoute.log(.store, .info, "reaped 3")
+        #expect(tap.lines.last == LogLine(category: .store, level: .info, message: "reaped 3"))
+        #expect(tap.lines.count == 2)
+        #expect(LogRoute.tapOnly(nil).sink is TapOnlyLogSink)
+        #expect(OSLogSink().signposter(.sync) != nil)
+    }
+
+    @Test("R-SYN-11: the eviction switch defaults to permitted and an out-of-range snapshot install interval is clamped")
+    func storagePolicyAndTuningKnobs() {
+        #expect(StoragePolicy().evictionPermitted)
+        #expect(!StoragePolicy(evictionPermitted: false).evictionPermitted)
+        let negative = SyncTuning(snapshotInstallInterval: -1).clamped()
+        #expect(negative.tuning.snapshotInstallInterval == 0.1)
+        #expect(negative.clampedFields == ["snapshotInstallInterval"])
+        let notANumber = SyncTuning(snapshotInstallInterval: .nan).clamped()
+        #expect(notANumber.tuning.snapshotInstallInterval == 0.1)
+        let valid = SyncTuning(snapshotInstallInterval: 0.25).clamped()
+        #expect(valid.tuning.snapshotInstallInterval == 0.25)
+        #expect(valid.clampedFields.isEmpty)
+    }
+}
+
+/// A `LogSink` that records what it is asked to write (the R-OBS-1 route test); gated for `Mutex` (ADR-014).
+@available(macOS 15.0, *)
+private final class RecordingLogSink: LogSink {
+    private let recorded = Mutex<[LogLine]>([])
+
+    func write(_ line: LogLine) {
+        self.recorded.withLock { $0.append(line) }
+    }
+
+    func signposter(_ category: LogCategory) -> OSSignposter? {
+        nil
+    }
+
+    var lines: [LogLine] {
+        self.recorded.withLock { $0 }
     }
 }

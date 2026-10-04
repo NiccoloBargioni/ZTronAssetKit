@@ -11,7 +11,8 @@ package enum CommitDurability: Sendable, Hashable {
     case durable
 }
 
-/// Store configuration (R-STO-10, ADR-001, ADR-035).
+/// Store configuration (R-STO-10, ADR-001, ADR-035). `AssetClient.init` builds it from the client configuration
+/// (`AssetClient.storeConfiguration(for:)`, ADR-048), so every knob below reaches the store.
 package struct StoreConfiguration: Sendable, Hashable {
     /// Where the root lives.
     package var location: StorageLocation
@@ -19,8 +20,16 @@ package struct StoreConfiguration: Sendable, Hashable {
     package var policy: StoragePolicy
     /// The prior-art layout to migrate (R-STO-11).
     package var legacy: LegacyMigrationPolicy
+    /// The untrusted-input limits (R-MAN-2): `maxAssetBytes` is the publication cap
+    /// (`StoreIntegrityFailure.oversize`, ARCHITECTURE §4.3 step 3), and legacy migration decodes the prior-art
+    /// `manifest.json` under them (ADR-029).
+    package var limits: ManifestLimits
     /// P-5: commits are coalesced to at most one per this interval (0.25 s ⇒ ≤ 4/s).
     package var commitMinimumInterval: TimeInterval
+    /// S2-12, P-8: bulk and prefetch publications install at most one snapshot per this interval (0.1 s ⇒ ≤ 10 Hz);
+    /// a user-initiated publication installs at once. The trailing install is a store deadline
+    /// (`nextDeadline()`, `runDueWork()`, ADR-016, ADR-022). From `SyncTuning.snapshotInstallInterval`.
+    package var snapshotInstallInterval: TimeInterval
     /// P-13: unlinks per deletion unit.
     package var deletionBatchSize: Int
     /// R-INT-1: bytes per hash unit (≤ 1 MiB).
@@ -31,14 +40,18 @@ package struct StoreConfiguration: Sendable, Hashable {
         location: StorageLocation = .applicationSupport,
         policy: StoragePolicy = StoragePolicy(),
         legacy: LegacyMigrationPolicy = LegacyMigrationPolicy(),
+        limits: ManifestLimits = ManifestLimits(),
         commitMinimumInterval: TimeInterval = 0.25,
+        snapshotInstallInterval: TimeInterval = 0.1,
         deletionBatchSize: Int = 64,
         hashChunkBytes: Int = 1 << 20
     ) {
         self.location = location
         self.policy = policy
         self.legacy = legacy
+        self.limits = limits
         self.commitMinimumInterval = commitMinimumInterval
+        self.snapshotInstallInterval = snapshotInstallInterval
         self.deletionBatchSize = deletionBatchSize
         self.hashChunkBytes = hashChunkBytes
     }
@@ -60,8 +73,8 @@ package struct StoreEnvironment: Sendable {
     package var legacyDefaults: any LegacyDefaults
     /// The acknowledgement protocol (ADR-016).
     package var snapshotSink: any SnapshotSink
-    /// Optional log tap.
-    package var logTap: (any LogTap)?
+    /// Where the store's `store` lines go: the environment's sink and tap (ADR-047); tap-only in tests.
+    package var log: LogRoute
 
     /// Takes the store's part of an environment.
     package init(environment: AssetEnvironment, snapshotSink: any SnapshotSink) {
@@ -72,7 +85,7 @@ package struct StoreEnvironment: Sendable {
         self.random = environment.random
         self.legacyDefaults = environment.legacyDefaults
         self.snapshotSink = snapshotSink
-        self.logTap = environment.logTap
+        self.log = environment.logRoute
     }
 }
 
@@ -309,6 +322,9 @@ package struct VerificationReport: Sendable, Hashable {
 package struct StoreWorkReport: Sendable, Hashable {
     /// A coalesced commit ran.
     package var committed: Bool
+    /// A trailing snapshot install ran: bulk publications coalesced within `snapshotInstallInterval` are now
+    /// visible to `lookup` (S2-12, ADR-016).
+    package var installedSnapshot: Bool
     /// Blobs reaped.
     package var reapedKeys: Int
     /// Bytes reaped (wakes `blocked(.awaitingSpace)` jobs, sync-2 S2-02).
@@ -317,8 +333,15 @@ package struct StoreWorkReport: Sendable, Hashable {
     package var nextDeadline: MonotonicInstant?
 
     /// Creates a report.
-    package init(committed: Bool, reapedKeys: Int, reapedBytes: Int64, nextDeadline: MonotonicInstant?) {
+    package init(
+        committed: Bool,
+        installedSnapshot: Bool,
+        reapedKeys: Int,
+        reapedBytes: Int64,
+        nextDeadline: MonotonicInstant?
+    ) {
         self.committed = committed
+        self.installedSnapshot = installedSnapshot
         self.reapedKeys = reapedKeys
         self.reapedBytes = reapedBytes
         self.nextDeadline = nextDeadline

@@ -70,6 +70,11 @@ public struct StoragePolicy: Sendable, Hashable {
     /// When the in-scope catalog exceeds the budget: fetch the largest prefix in plan order that fits and skip the
     /// rest (ADR-025, sync-2 S2-07). When `false`, an over-budget plan fails with no side effects.
     public var admitLargestFittingPrefix: Bool
+    /// Whether a run may evict least-recently-used assets to make room for its fetches (R-SYN-11 "policy
+    /// permitting", ADR-048). Default `true`. When `false`, a plan that does not fit evicts nothing: it admits its
+    /// largest fitting prefix (`admitLargestFittingPrefix`) or fails with `insufficientSpace` and no side effect.
+    /// Quota eviction down to the budget during maintenance (R-CLN-4) is unaffected.
+    public var evictionPermitted: Bool
 
     /// The ADR-035 defaults.
     public init(
@@ -85,7 +90,8 @@ public struct StoragePolicy: Sendable, Hashable {
         integrityBackoffBase: TimeInterval = 60,
         integrityBackoffMultiplier: Double = 10,
         allowUnverifiedAssets: Bool = true,
-        admitLargestFittingPrefix: Bool = true
+        admitLargestFittingPrefix: Bool = true,
+        evictionPermitted: Bool = true
     ) {
         self.budget = budget
         self.reserveFreeBytes = reserveFreeBytes
@@ -100,6 +106,7 @@ public struct StoragePolicy: Sendable, Hashable {
         self.integrityBackoffMultiplier = integrityBackoffMultiplier
         self.allowUnverifiedAssets = allowUnverifiedAssets
         self.admitLargestFittingPrefix = admitLargestFittingPrefix
+        self.evictionPermitted = evictionPermitted
     }
 
     /// The integrity backoff after `attempt` failures (1-based): `base × multiplier^(attempt−1)`, or `nil` once
@@ -119,7 +126,9 @@ public struct LegacyMigrationPolicy: Sendable, Hashable {
     public var enabled: Bool
     /// The legacy root; `nil` means `<Caches>/CDNAssets` (the prior art's default).
     public var root: URL?
-    /// The `UserDefaults` suite holding the legacy stamp; `nil` means `.standard`.
+    /// The `UserDefaults` suite holding the legacy stamp; `nil` means `.standard`. `AssetClient(configuration:)`
+    /// without an explicit environment builds `.live(legacyDefaultsSuiteName:)` from it (ADR-048); an app that
+    /// passes its own live environment passes the same suite there.
     public var defaultsSuiteName: String?
     /// The legacy stamp key.
     public var defaultsKey: String

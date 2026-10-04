@@ -14,6 +14,18 @@ public enum SessionMode: Sendable, Hashable {
 /// (`URLSessionTask.delegate`, iOS 15+), which implements no method, so URLSession forwards every callback here.
 /// Data callbacks append synchronously into staging on the delegate queue (C2, ADR-019); redirects are decided by
 /// `RedirectPolicy` (R-NET-4).
+///
+/// **WP-D owns every body of this file**, including the members implemented in Stage 1 (ARCHITECTURE §6.1): it adds
+/// the delegate methods (data, redirect, completion, download completion in `.background` mode, invalidation) in
+/// this file or in extensions under `Session/`.
+///
+/// Session-level events have no task mailbox to go to: a background session's download tasks are routed through
+/// `taskDescription` and must survive relaunch (H-6), and `didBecomeInvalidWithError` concerns the whole session
+/// (transport-2 T2-04). They go to `sessionEvents`, one stream per delegate created in `init` (a `Sendable`
+/// `AsyncStream` and its continuation, so no lock and no escape): `.finished` and `.backgroundEventsFinished` in
+/// `.background` mode (consumed by `LiveBackgroundSessionDriver.activate()`), `.invalidated` in both modes (awaited
+/// by `ForegroundTransferBackend.invalidate()`). Tests call the delegate methods directly, with unresumed tasks and
+/// files inside this repository, and read this stream (ARCHITECTURE §14).
 public final class SessionDelegate: NSObject, URLSessionDataDelegate, Sendable {
     /// Foreground or background behaviour.
     public let mode: SessionMode
@@ -21,12 +33,20 @@ public final class SessionDelegate: NSObject, URLSessionDataDelegate, Sendable {
     public let staging: any StagingSink
     /// Redirect and key policy.
     public let policy: TransportSecurityPolicy
+    /// Session-level events in delivery order (single consumer, unbounded: a background session's events are
+    /// bounded by `BackgroundTransferOptions.maxTasks`, transport-2 T2-17).
+    package let sessionEvents: AsyncStream<SessionEvent>
+    /// The producer side of `sessionEvents`, yielded to by the delegate methods on the delegate queue.
+    let sessionEventSink: AsyncStream<SessionEvent>.Continuation
 
-    /// Creates a delegate (one per session).
+    /// Creates a delegate (one per session) and its session-event stream.
     public init(mode: SessionMode, staging: any StagingSink, policy: TransportSecurityPolicy) {
         self.mode = mode
         self.staging = staging
         self.policy = policy
+        let (events, sink) = AsyncStream.makeStream(of: SessionEvent.self, bufferingPolicy: .unbounded)
+        self.sessionEvents = events
+        self.sessionEventSink = sink
     }
 }
 
@@ -48,7 +68,7 @@ public final class TaskMailbox: NSObject, URLSessionTaskDelegate, Sendable {
 /// The foreground backend (R-NET-2, ADR-019): one long-lived, ephemeral, cache-less session whose data tasks
 /// stream into staging. Constructed in `AssetClient.start()`, never in `init` (P-12, sync-2 S2-18). URLSession
 /// retains its delegate until invalidated, so `invalidate()` (shutdown) and `deinit` both invalidate
-/// (transport-2 T2-19).
+/// (transport-2 T2-19). WP-D owns every body, the Stage 1 ones included.
 public final class ForegroundTransferBackend: TransferBackend {
     /// `.foreground`.
     public let kind: TransferBackendKind = .foreground
@@ -108,7 +128,8 @@ public final class ForegroundTransferBackend: TransferBackend {
         fatalError("WP-D: ForegroundTransferBackend.cancel not implemented")
     }
 
-    /// `invalidateAndCancel()` and waits for `didBecomeInvalidWithError`.
+    /// `invalidateAndCancel()` and waits for `didBecomeInvalidWithError`, i.e. for `.invalidated` on
+    /// `delegate.sessionEvents` (transport-2 T2-04).
     public func invalidate() async {
         fatalError("WP-D: ForegroundTransferBackend.invalidate not implemented")
     }

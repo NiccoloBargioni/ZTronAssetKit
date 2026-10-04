@@ -16,12 +16,15 @@ public final class AppleHostedRemoteSource: RemoteSource {
     public let backend: any PackBackend
     /// Where bytes go.
     public let staging: any StagingSink
+    /// Where `apple` lines go (ADR-047): the environment's route, tap-only in tests.
+    public let log: LogRoute
 
     /// Creates the source; touches no pack API (R-APL-1).
-    public init(configuration: AppleTierConfiguration, backend: any PackBackend, staging: any StagingSink) {
+    public init(configuration: AppleTierConfiguration, backend: any PackBackend, staging: any StagingSink, log: LogRoute) {
         self.configuration = configuration
         self.backend = backend
         self.staging = staging
+        self.log = log
     }
 
     /// `"apple-hosted"`.

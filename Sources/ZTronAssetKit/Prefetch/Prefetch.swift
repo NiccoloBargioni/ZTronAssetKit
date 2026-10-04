@@ -111,11 +111,17 @@ public final class PrefetchWindowController {
     private let radius: Int
     private var handles: [AssetID: (handle: PrefetchHandle, priority: AssetPriority)]
 
-    /// Creates a controller (callable from any isolation).
-    nonisolated public init(client: AssetClient, radius: Int = 2) {
+    /// Creates a controller (callable from any isolation). `radius` defaults to the client's
+    /// `configuration.prefetchRadius` (R-CAR-3, ADR-048).
+    nonisolated public init(client: AssetClient, radius: Int? = nil) {
         self.client = client
-        self.radius = radius
+        self.radius = PrefetchWindowController.resolvedRadius(radius, configuration: client.configuration)
         self.handles = [:]
+    }
+
+    /// The window radius a controller uses: the explicit one, else the configuration's `prefetchRadius`. Pure.
+    nonisolated package static func resolvedRadius(_ radius: Int?, configuration: AssetClientConfiguration) -> Int {
+        radius ?? configuration.prefetchRadius
     }
 
     /// Moves the window: starts what entered, cancels what left, re-lanes what changed priority (new handle first,

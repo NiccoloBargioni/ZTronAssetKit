@@ -6,7 +6,9 @@ public enum RetryDisposition: Sendable, Hashable {
     case whenOnline
     /// The per-run attempt cap was reached; the next run retries.
     case nextRun
-    /// Persisted in the index: integrity quarantine or 404 until the manifest entry changes (R-INT-3).
+    /// Persisted in the index until the manifest entry's content identity changes: integrity exhaustion
+    /// (`AssetStore.recordIntegrityFailure`, R-INT-3) or a 404/410 (`AssetStore.recordFailure(_:identity:reason:)`
+    /// with `.notFound`, R-NET-6), so a relaunch never requests it again (ADR-032).
     case untilEntryChanges
 }
 

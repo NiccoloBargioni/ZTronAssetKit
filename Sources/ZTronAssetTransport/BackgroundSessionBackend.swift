@@ -21,7 +21,7 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
         self.discretionary = discretionary
     }
 
-    /// Creates the background session and returns its event stream.
+    /// Creates the background session (once) and returns `delegate.sessionEvents`.
     public func activate() async -> AsyncStream<SessionEvent> {
         fatalError("WP-D: LiveBackgroundSessionDriver.activate not implemented")
     }

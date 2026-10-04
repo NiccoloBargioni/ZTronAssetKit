@@ -124,7 +124,7 @@ package struct PlanningPolicy: Sendable, Hashable {
     package var includeOnDemand: Bool
     /// ADR-025.
     package var admitLargestFittingPrefix: Bool
-    /// Eviction may make room (R-SYN-11 "policy permitting").
+    /// Eviction may make room (R-SYN-11 "policy permitting"): `StoragePolicy.evictionPermitted`.
     package var evictionPermitted: Bool
     /// The wall clock, for `nextEligibleAt` comparisons (passed in: the planner reads no clock).
     package var now: Date
@@ -142,6 +142,19 @@ package struct PlanningPolicy: Sendable, Hashable {
         self.admitLargestFittingPrefix = admitLargestFittingPrefix
         self.evictionPermitted = evictionPermitted
         self.now = now
+    }
+
+    /// The policy of a run under `storage` (ADR-048): unverified admission, the largest-fitting-prefix rule and the
+    /// eviction switch come from the client's `StoragePolicy`, so no knob is dropped between configuration and
+    /// planner. Pure.
+    package init(storage: StoragePolicy, includeOnDemand: Bool, now: Date) {
+        self.init(
+            allowUnverifiedAssets: storage.allowUnverifiedAssets,
+            includeOnDemand: includeOnDemand,
+            admitLargestFittingPrefix: storage.admitLargestFittingPrefix,
+            evictionPermitted: storage.evictionPermitted,
+            now: now
+        )
     }
 }
 

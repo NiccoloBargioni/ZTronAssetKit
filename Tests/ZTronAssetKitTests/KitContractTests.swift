@@ -123,6 +123,57 @@ private final class CountingCache: PurgeableCache {
 
 @Suite("Facade contracts")
 struct KitContractTests {
+    @Test("R-STO-11: the default live environment reads the legacy stamp from the configured UserDefaults suite")
+    func liveEnvironmentUsesConfiguredSuite() throws {
+        var configuration = AssetClientConfiguration(remote: RemoteConfiguration())
+        configuration.legacy.defaultsSuiteName = "group.com.ztron.legacy"
+        let resolved = AssetClient.resolvedEnvironment(nil, for: configuration)
+        let legacy = try #require(resolved.legacyDefaults as? LiveLegacyDefaults)
+        #expect(legacy.suiteName == "group.com.ztron.legacy")
+        #expect(resolved.logSink is OSLogSink)
+        #expect(resolved.logTap == nil)
+
+        let standard = AssetClient.resolvedEnvironment(nil, for: AssetClientConfiguration(remote: RemoteConfiguration()))
+        #expect((standard.legacyDefaults as? LiveLegacyDefaults)?.suiteName == nil)
+
+        let explicit = AssetEnvironment.live(legacyDefaultsSuiteName: "explicit")
+        let kept = AssetClient.resolvedEnvironment(explicit, for: configuration)
+        #expect((kept.legacyDefaults as? LiveLegacyDefaults)?.suiteName == "explicit")
+    }
+
+    @Test("R-STO-13: the store receives the client's snapshot install interval, manifest limits, policy and legacy layout")
+    func storeConfigurationFromClient() {
+        var configuration = AssetClientConfiguration(remote: RemoteConfiguration())
+        configuration.tuning.snapshotInstallInterval = 0.5
+        configuration.limits.maxAssetBytes = 1 << 20
+        configuration.storage.evictionPermitted = false
+        configuration.legacy.enabled = false
+        configuration.location = .caches
+        let store = AssetClient.storeConfiguration(for: configuration)
+        #expect(store.snapshotInstallInterval == 0.5)
+        #expect(store.limits == configuration.limits)
+        #expect(store.limits.maxAssetBytes == 1 << 20)
+        #expect(store.policy == configuration.storage)
+        #expect(!store.policy.evictionPermitted)
+        #expect(store.legacy == configuration.legacy)
+        #expect(store.location == .caches)
+
+        configuration.tuning.snapshotInstallInterval = -3
+        #expect(AssetClient.storeConfiguration(for: configuration).snapshotInstallInterval == 0.1)
+        #expect(StoreConfiguration().snapshotInstallInterval == SyncTuning().snapshotInstallInterval)
+        // What `diagnosticReport()` reports as the index schema (R-OBS-3) is the codec's exported constant.
+        #expect(Int(StoreLayout.indexSchemaVersion) == 1)
+    }
+
+    @Test("R-CAR-3: the window controller's radius defaults to the client configuration's prefetchRadius")
+    func prefetchRadiusFollowsConfiguration() {
+        var configuration = AssetClientConfiguration(remote: RemoteConfiguration())
+        #expect(PrefetchWindowController.resolvedRadius(nil, configuration: configuration) == 2)
+        configuration.prefetchRadius = 4
+        #expect(PrefetchWindowController.resolvedRadius(nil, configuration: configuration) == 4)
+        #expect(PrefetchWindowController.resolvedRadius(1, configuration: configuration) == 1)
+    }
+
     @Test("R-CAR-3: window targets are current, then ±1, then ±2, clamped at both ends")
     func windowOrder() {
         let pages = ids(["p0", "p1", "p2", "p3", "p4", "p5"])

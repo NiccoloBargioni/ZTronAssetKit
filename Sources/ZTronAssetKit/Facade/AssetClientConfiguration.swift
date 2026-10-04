@@ -19,9 +19,9 @@ public struct AssetClientConfiguration: Sendable, Hashable {
     public var refresh: RefreshPolicy
     /// Concurrency, retries, breaker, rate limits (R-SYN-3, R-SYN-5, R-SYN-12).
     public var tuning: SyncTuning
-    /// Manifest limits (R-MAN-2).
+    /// Manifest limits (R-MAN-2); `maxAssetBytes` is also the store's publication cap (ADR-048).
     public var limits: ManifestLimits
-    /// The prefetch window radius (R-CAR-3; default 2).
+    /// The prefetch window radius (R-CAR-3; default 2): the default of `PrefetchWindowController(client:radius:)`.
     public var prefetchRadius: Int
     /// What the app wants kept (R-CAR-5, ADR-027; default `.all`): the scope of every bulk run; entries outside it
     /// are evicted first and never block an Apple pack release. `AssetClient.setRetentionScope(_:)` replaces it at

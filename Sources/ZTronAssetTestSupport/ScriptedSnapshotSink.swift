@@ -57,6 +57,8 @@ package actor ScriptedSnapshotSink: SnapshotSink {
         if self.offered.count >= count {
             return
         }
+        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the install that
+        // reached `count`; no state is read afterwards (the caller re-reads `offeredKeys`).
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.installWaiters.append((count, continuation))
         }

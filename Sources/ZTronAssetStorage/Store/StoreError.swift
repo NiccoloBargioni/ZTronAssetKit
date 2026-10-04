@@ -6,17 +6,19 @@ package enum StoreIntegrityFailure: Sendable, Hashable {
     case sizeMismatch(expected: Int64, actual: Int64)
     /// The digest of the written bytes differs from the manifest's checksum.
     case checksumMismatch(expected: ContentHash, actual: ContentHash)
-    /// More bytes than `maxAssetBytes`.
+    /// More bytes than `StoreConfiguration.limits.maxAssetBytes`; detected before hashing.
     case oversize(limit: Int64, actual: Int64)
 }
 
-/// Why an entry is `failed` until its manifest entry changes (R-INT-3, R-CLN-8).
+/// Why an entry is `failed` until its manifest entry's content identity changes (R-INT-3, R-CLN-8, R-NET-6).
+/// Persisted in the index; `apply` clears it when the identity changes (ADR-032).
 package enum FailureReason: Sendable, Hashable {
-    /// Repeated integrity failures.
+    /// Repeated integrity failures (`recordIntegrityFailure` after `maxIntegrityAttempts`).
     case integrity
     /// Repeatedly reported unreadable.
     case unreadable
-    /// The origin reported it missing (404/410).
+    /// The origin reported it missing (404/410), recorded by `recordFailure(_:identity:reason:)` so no run or
+    /// relaunch requests it again before the entry changes (R-NET-6, ARCHITECTURE §7.6).
     case notFound
 }
 

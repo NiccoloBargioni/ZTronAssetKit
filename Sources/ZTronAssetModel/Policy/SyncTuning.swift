@@ -130,8 +130,9 @@ public struct SyncTuning: Sendable, Hashable, Codable {
     public var pendingRunDebounce: TimeInterval
     /// Seconds a manifest fetch may take before the engine falls back to the applied manifest (transport-2 T2-14).
     public var manifestFetchDeadline: TimeInterval
-    /// Minimum seconds between snapshot installs on the main actor for bulk work (S2-12: ≤ 10 Hz); user-initiated
-    /// commits install immediately.
+    /// Minimum seconds between snapshot installs on the main actor for bulk and prefetch work (S2-12: ≤ 10 Hz);
+    /// user-initiated commits install immediately. `AssetClient.init` passes it to the store
+    /// (`StoreConfiguration.snapshotInstallInterval`), the only caller of `SnapshotSink.install` (ADR-016).
     public var snapshotInstallInterval: TimeInterval
 
     /// The defaults of sync design §7.1 as amended by the reviews (ARCHITECTURE §7).
@@ -201,6 +202,10 @@ public struct SyncTuning: Sendable, Hashable, Codable {
         if self.runLookahead < 0 {
             copy.runLookahead = 0
             fields.append("runLookahead")
+        }
+        if !(self.snapshotInstallInterval >= 0) {
+            copy.snapshotInstallInterval = 0.1
+            fields.append("snapshotInstallInterval")
         }
         return (copy, fields)
     }

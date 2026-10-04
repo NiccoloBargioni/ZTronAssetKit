@@ -27,17 +27,16 @@ public final class AssetClient: Sendable {
     private let backgroundRelay: BackgroundEventsRelay
     private let cacheRelay: PurgeableCacheRelay
 
-    /// Creates a client; performs no I/O and starts nothing (P-12).
-    public init(configuration: AssetClientConfiguration, environment: AssetEnvironment = .live()) {
+    /// Creates a client; performs no I/O and starts nothing (P-12). Without an `environment` it builds
+    /// `.live(legacyDefaultsSuiteName: configuration.legacy.defaultsSuiteName)`, so the legacy stamp is read from
+    /// the configured suite (R-STO-11, ADR-048); tests pass an environment of fakes.
+    public init(configuration: AssetClientConfiguration, environment: AssetEnvironment? = nil) {
+        let environment = AssetClient.resolvedEnvironment(environment, for: configuration)
         self.configuration = configuration
         self.environment = environment
         let mirror = SnapshotMirror(time: environment.time)
         let store = AssetStore(
-            configuration: StoreConfiguration(
-                location: configuration.location,
-                policy: configuration.storage,
-                legacy: configuration.legacy
-            ),
+            configuration: AssetClient.storeConfiguration(for: configuration),
             environment: StoreEnvironment(environment: environment, snapshotSink: mirror)
         )
         self.mirror = mirror
@@ -65,6 +64,27 @@ public final class AssetClient: Sendable {
         Task {
             await engine.shutdown()
         }
+    }
+
+    /// The environment a client runs in (ADR-048): the caller's, or `.live()` reading the legacy stamp from the
+    /// configured `UserDefaults` suite. Pure; builds no conformer that does I/O (P-12).
+    package static func resolvedEnvironment(
+        _ environment: AssetEnvironment?,
+        for configuration: AssetClientConfiguration
+    ) -> AssetEnvironment {
+        environment ?? .live(legacyDefaultsSuiteName: configuration.legacy.defaultsSuiteName)
+    }
+
+    /// The store's configuration (ADR-048): location, storage policy, legacy layout, the manifest limits (the
+    /// publication cap `maxAssetBytes`) and the snapshot install interval from the clamped tuning (S2-12). Pure.
+    package static func storeConfiguration(for configuration: AssetClientConfiguration) -> StoreConfiguration {
+        StoreConfiguration(
+            location: configuration.location,
+            policy: configuration.storage,
+            legacy: configuration.legacy,
+            limits: configuration.limits,
+            snapshotInstallInterval: configuration.tuning.clamped().tuning.snapshotInstallInterval
+        )
     }
 
     /// The executor for bounded blocking units off the cooperative pool (ADR-003, C2), shared with the fallback

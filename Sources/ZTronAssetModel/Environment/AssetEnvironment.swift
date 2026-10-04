@@ -25,10 +25,14 @@ public struct AssetEnvironment: Sendable {
     public var legacyDefaults: any LegacyDefaults
     /// Optional memory-pressure events (R-CLN-11, MAY).
     public var memoryPressure: (any MemoryPressureSource)?
-    /// Optional log sink for tests (R-OBS-1); `nil` in `.live()`.
+    /// Where log lines are written (R-OBS-1, ADR-047): `OSLogSink` in `.live()`, `TapOnlyLogSink` (the default)
+    /// in every test environment, so tests never write to the unified log.
+    public var logSink: any LogSink
+    /// Optional observer of every log line for tests (R-OBS-1); `nil` in `.live()`.
     public var logTap: (any LogTap)?
 
-    /// Creates an environment from explicit conformers.
+    /// Creates an environment from explicit conformers. `logSink` defaults to `TapOnlyLogSink`: an environment
+    /// assembled by hand writes nothing to the unified log unless it names `OSLogSink` (ADR-047).
     public init(
         fileSystem: any FileSystem,
         metadataExecutor: any BlockingExecutor,
@@ -40,6 +44,7 @@ public struct AssetEnvironment: Sendable {
         appVersion: any AppVersionSource,
         legacyDefaults: any LegacyDefaults,
         memoryPressure: (any MemoryPressureSource)? = nil,
+        logSink: any LogSink = TapOnlyLogSink(),
         logTap: (any LogTap)? = nil
     ) {
         self.fileSystem = fileSystem
@@ -52,6 +57,13 @@ public struct AssetEnvironment: Sendable {
         self.appVersion = appVersion
         self.legacyDefaults = legacyDefaults
         self.memoryPressure = memoryPressure
+        self.logSink = logSink
         self.logTap = logTap
+    }
+
+    /// The sink and the tap as one value, for the layers built from this environment (store, engine, remote
+    /// sources).
+    public var logRoute: LogRoute {
+        LogRoute(sink: self.logSink, tap: self.logTap)
     }
 }

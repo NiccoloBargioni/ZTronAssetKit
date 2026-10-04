@@ -9,7 +9,7 @@ import ZTronAssetModel
 public struct DiagnosticReport: Sendable, Hashable, Codable {
     /// The module's version string.
     public var moduleVersion: String
-    /// The index schema version.
+    /// The index schema version (`StoreLayout.indexSchemaVersion`).
     public var indexSchemaVersion: Int
     /// The committed index generation.
     public var indexGeneration: UInt64

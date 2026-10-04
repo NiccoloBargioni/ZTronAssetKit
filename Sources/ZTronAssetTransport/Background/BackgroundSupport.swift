@@ -103,18 +103,24 @@ public protocol BackgroundSessionDriver: Sendable {
 }
 
 /// The tested half of the background session (WP-D): attach-or-create by staging name, pause intent, fallback to
-/// foreground, and the completion-handler protocol with `BackgroundEventsRelay`. Owns one pump task only while
-/// a background transfer is outstanding, so the engine can be idle-silent (transport-2 T2-10).
+/// foreground, the task cap, and the completion-handler protocol with `BackgroundEventsRelay`. Owns one pump task
+/// only while a background transfer is outstanding, so the engine can be idle-silent (transport-2 T2-10). The
+/// production `HTTPRemoteSource` builds it over `LiveBackgroundSessionDriver` when background transfers are
+/// enabled (`HTTPRemoteSource.makeBackgroundBackend`, ADR-026); tests build it over `FakeBackgroundSessionDriver`.
 package actor BackgroundTransferCoordinator: TransferBackend {
     /// `.background`.
     package nonisolated let kind: TransferBackendKind = .background
-    private let driver: any BackgroundSessionDriver
+    /// The device-only driver (decision-free).
+    package nonisolated let driver: any BackgroundSessionDriver
     private let staging: any StagingSink
+    /// The task cap and redirect exposure (transport-2 T2-09, T2-17).
+    package nonisolated let options: BackgroundTransferOptions
 
     /// Creates a coordinator (no session until the first `start` or `activate`).
-    package init(driver: any BackgroundSessionDriver, staging: any StagingSink) {
+    package init(driver: any BackgroundSessionDriver, staging: any StagingSink, options: BackgroundTransferOptions) {
         self.driver = driver
         self.staging = staging
+        self.options = options
     }
 
     /// Attach-or-create by staging name.

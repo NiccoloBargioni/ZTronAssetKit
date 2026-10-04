@@ -121,9 +121,12 @@ public protocol RemoteSource: Sendable {
 
 /// Builds the live remote source lazily, inside `AssetClient.start()` and never in `init` (P-12, sync-2 S2-18).
 public protocol RemoteSourceFactory: Sendable {
-    /// Selects the tier (R-APL-5) and builds its source over the store's staging sink.
+    /// Selects the tier (R-APL-5) and builds its source over the store's staging sink. `log` is the environment's
+    /// route (`AssetEnvironment.logRoute`, ADR-047): the source logs its `transport` or `apple` lines through it, so
+    /// a test environment's source never writes to the unified log.
     func makeRemoteSource(
         configuration: RemoteConfiguration,
-        staging: any StagingSink
+        staging: any StagingSink,
+        log: LogRoute
     ) async throws(AssetError) -> any RemoteSource
 }

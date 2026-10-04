@@ -30,6 +30,10 @@ public actor SteppedBlockingExecutor: BlockingExecutor {
         let sequence = self.nextSequence
         self.submitted.append(sequence)
         if self.holding {
+            // REENTRANCY: TS3 — nothing to re-validate: `sequence` is this call's own local, the gate was removed by
+            // the release that resumed it, and `completed` is append-only, so units released out of order record
+            // their completion in the order they actually ran (other calls may run or be released meanwhile; that
+            // interleaving is what the executor exists to expose, H-5).
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 self.gates[sequence] = continuation
                 self.notifyHeldWaiters()
@@ -90,6 +94,8 @@ public actor SteppedBlockingExecutor: BlockingExecutor {
         if self.gates.count >= count {
             return
         }
+        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the actor turn
+        // in which `count` units were held; no state is read afterwards (the caller re-reads `heldUnits`).
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.heldWaiters.append((count, continuation))
         }

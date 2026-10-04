@@ -5,7 +5,8 @@ import ZTronAssetModel
 ///
 /// Immutable: every field is a `let` of a `Sendable` type. Built by the composition root inside
 /// `AssetClient.start()` (P-12). The app key is attached per request by the request factory, only for origins the
-/// security policy allows (R-NET-4); it is never put in `httpAdditionalHeaders`.
+/// security policy allows (R-NET-4); it is never put in `httpAdditionalHeaders`. WP-D owns every body, including
+/// the initialisers implemented in Stage 1 (ARCHITECTURE §6.1, §6.4).
 public final class HTTPRemoteSource: RemoteSource {
     /// The configuration (the key redacts itself).
     public let configuration: HTTPSourceConfiguration
@@ -15,12 +16,17 @@ public final class HTTPRemoteSource: RemoteSource {
     public let staging: any StagingSink
     /// The foreground backend.
     public let foreground: any TransferBackend
-    /// The opt-in background backend (ADR-026); `nil` by default.
+    /// The opt-in background backend (ADR-026); `nil` unless `configuration.background` is `.enabled` with a valid
+    /// namespace.
     public let background: (any TransferBackend)?
+    /// Where `transport` lines go (ADR-047): the environment's route, tap-only in tests.
+    public let log: LogRoute
 
-    /// Production: an HTTPS-only policy over `baseURL`'s host plus the additional hosts, and the live foreground
-    /// backend.
-    public convenience init(configuration: HTTPSourceConfiguration, staging: any StagingSink) {
+    /// Production: an HTTPS-only policy over `baseURL`'s host plus the additional hosts, the live foreground
+    /// backend, and, when `configuration.background` is `.enabled`, the background coordinator over
+    /// `LiveBackgroundSessionDriver` (`makeBackgroundBackend`). Creates the foreground `URLSession` (no I/O, about
+    /// 0.05 ms); the background session is created only by the coordinator's first `activate()` (ADR-028).
+    public convenience init(configuration: HTTPSourceConfiguration, staging: any StagingSink, log: LogRoute) {
         var hosts = configuration.additionalAllowedHosts
         if let host = configuration.baseURL.host {
             hosts.insert(host)
@@ -36,23 +42,46 @@ public final class HTTPRemoteSource: RemoteSource {
                 maxConnectionsPerHost: configuration.maxConnectionsPerHost,
                 requestTimeout: configuration.requestTimeout
             ),
-            background: nil
+            background: HTTPRemoteSource.makeBackgroundBackend(configuration.background, staging: staging, policy: policy),
+            log: log
         )
     }
 
-    /// Tests and benchmarks (same package): an explicit policy (loopback) and injected backends.
+    /// Tests and benchmarks (same package): an explicit policy (loopback), injected backends and log route.
     package init(
         configuration: HTTPSourceConfiguration,
         staging: any StagingSink,
         policy: TransportSecurityPolicy,
         foreground: any TransferBackend,
-        background: (any TransferBackend)?
+        background: (any TransferBackend)?,
+        log: LogRoute
     ) {
         self.configuration = configuration
         self.staging = staging
         self.policy = policy
         self.foreground = foreground
         self.background = background
+        self.log = log
+    }
+
+    /// The production background backend for `policy` (R-NET-3, ADR-026): `nil` when background transfers are
+    /// disabled (the default) or the namespace is not `[0-9a-z-]{1,32}`; otherwise a `BackgroundTransferCoordinator`
+    /// over `LiveBackgroundSessionDriver` and its own `.background` `SessionDelegate`. Builds no `URLSession` and
+    /// performs no I/O: the driver creates the session in `activate()`, which `start()` calls after the store opened
+    /// (ADR-028).
+    package static func makeBackgroundBackend(
+        _ background: BackgroundTransferPolicy,
+        staging: any StagingSink,
+        policy: TransportSecurityPolicy
+    ) -> (any TransferBackend)? {
+        guard case .enabled(let options) = background,
+            let identifier = BackgroundSessionIdentifier(namespace: options.namespace)
+        else {
+            return nil
+        }
+        let delegate = SessionDelegate(mode: .background, staging: staging, policy: policy)
+        let driver = LiveBackgroundSessionDriver(identifier: identifier, delegate: delegate, discretionary: options.discretionary)
+        return BackgroundTransferCoordinator(driver: driver, staging: staging, options: options)
     }
 
     /// `scheme://host:port` of `baseURL`.

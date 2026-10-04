@@ -144,15 +144,89 @@ struct SyncContractTests {
         let source = FakeRemoteSource()
         let sink = FakeStagingSink()
         #expect(await source.attachedStaging == nil)
-        let made = try await FakeRemoteSourceFactory(source: source).makeRemoteSource(configuration: RemoteConfiguration(), staging: sink)
+        let made = try await FakeRemoteSourceFactory(source: source).makeRemoteSource(configuration: RemoteConfiguration(), staging: sink, log: .tapOnly(nil))
         #expect((made as? FakeRemoteSource) === source)
         #expect((await source.attachedStaging as? FakeStagingSink) === sink)
         #expect(await made.sourceCopyBytes() == 0)
         await source.setSourceCopyBytes(4_096)
         #expect(await made.sourceCopyBytes() == 4_096)
         let plain = FakeAppleLikeSource()
-        let passedThrough = try await FakeRemoteSourceFactory(source: plain).makeRemoteSource(configuration: RemoteConfiguration(), staging: sink)
+        let passedThrough = try await FakeRemoteSourceFactory(source: plain).makeRemoteSource(configuration: RemoteConfiguration(), staging: sink, log: .tapOnly(nil))
         #expect(passedThrough.originID == plain.originID)
+    }
+
+    @Test("R-SYN-11: the planning policy takes eviction permission, unverified admission and the prefix rule from StoragePolicy")
+    func planningPolicyFollowsStoragePolicy() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let defaults = PlanningPolicy(storage: StoragePolicy(), includeOnDemand: false, now: now)
+        #expect(defaults == PlanningPolicy(
+            allowUnverifiedAssets: true,
+            includeOnDemand: false,
+            admitLargestFittingPrefix: true,
+            evictionPermitted: true,
+            now: now
+        ))
+        let strict = PlanningPolicy(
+            storage: StoragePolicy(allowUnverifiedAssets: false, admitLargestFittingPrefix: false, evictionPermitted: false),
+            includeOnDemand: true,
+            now: now
+        )
+        #expect(!strict.allowUnverifiedAssets)
+        #expect(!strict.admitLargestFittingPrefix)
+        #expect(!strict.evictionPermitted)
+        #expect(strict.includeOnDemand)
+        #expect(strict.now == now)
+    }
+
+    @Test("Test support: generated payloads are a pure function of seed and offset and hash in bounded chunks like one-shot SHA-256")
+    func generatedPayloads() {
+        let whole = GeneratedPayload.bytes(seed: 42, offset: 0, length: 1_000)
+        #expect(whole.count == 1_000)
+        var pieces = Data()
+        var offset: Int64 = 0
+        for length in [1, 7, 8, 13, 300, 671] {
+            pieces.append(GeneratedPayload.bytes(seed: 42, offset: offset, length: length))
+            offset += Int64(length)
+        }
+        #expect(pieces == whole)
+        #expect(GeneratedPayload.bytes(seed: 43, offset: 0, length: 1_000) != whole)
+        #expect(GeneratedPayload.bytes(seed: 42, offset: 5, length: 0).isEmpty)
+        #expect(GeneratedPayload.bytes(seed: 42, offset: -1, length: 4).isEmpty)
+        let size = Int64(GeneratedPayload.chunkBytes * 2 + 17)
+        let oneShot = ContentHash.sha256(of: GeneratedPayload.bytes(seed: 9, offset: 0, length: Int(size)))
+        #expect(GeneratedPayload.sha256(seed: 9, byteCount: size) == oneShot)
+        #expect(GeneratedPayload.sha256(seed: 9, byteCount: 0) == ContentHash.sha256(of: Data()))
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a fake source and its handles record starts and controls in one global order", .timeLimit(.minutes(1)))
+    func transportLogOrdersStartsAndControls() async {
+        let source = FakeRemoteSource()
+        let bulk = TransferID.content(ContentHash.sha256(of: Data([1])))
+        let next = TransferID.content(ContentHash.sha256(of: Data([2])))
+        let first = TransferAttempt(epoch: 1, sequence: 1)
+        let second = TransferAttempt(epoch: 1, sequence: 2)
+        let request = TransferRequest(id: next, attempt: second, remotePath: "media/next.png", expectedBytes: 4, maxBytes: 64, priority: .bulk)
+        // Two handles share the source's log; a stand-alone handle records only in its own.
+        let promoted = FakeTransferHandle(id: bulk, attempt: first, transportLog: source.transportLog)
+        let other = FakeTransferHandle(id: next, attempt: second, transportLog: source.transportLog)
+        let alone = FakeTransferHandle(id: bulk, attempt: first)
+
+        promoted.setPriority(.userInitiated)
+        source.transportLog.record(.started(request))
+        other.pause()
+        alone.cancel()
+        promoted.cancel()
+
+        let promote = FakeControlRecord(transfer: bulk, control: .setPriority(.userInitiated))
+        let pause = FakeControlRecord(transfer: next, control: .pause)
+        let cancel = FakeControlRecord(transfer: bulk, control: .cancel)
+        #expect(source.transportLog.events == [.controlled(promote), .started(request), .controlled(pause), .controlled(cancel)])
+        #expect(await source.starts == [request])
+        #expect(await source.controlLog == [promote, pause, cancel])
+        #expect(promoted.controls == [.setPriority(.userInitiated), .cancel])
+        #expect(alone.controls == [.cancel])
+        #expect(alone.transportLog == nil)
     }
 
     @Test("Test support: observer censuses of the fake conditions and memory-pressure sources are awaited without polling", .timeLimit(.minutes(1)))

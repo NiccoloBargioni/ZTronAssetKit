@@ -53,6 +53,10 @@ package struct StoreLayout: Sendable, Hashable {
     package static let containerName = "ZTronAssetKit"
     /// `v1`: the layout version.
     package static let versionName = "v1"
+    /// The `schemaVersion` the index codec writes into the header (store.md §2.3, ADR-012), exported so
+    /// `DiagnosticReport.indexSchemaVersion` reports it without reading a file (R-OBS-3). A newer schema on disk
+    /// makes the load degraded (§4.2); every new schema adds golden fixtures (R-STO-12).
+    package static let indexSchemaVersion: UInt16 = 1
 
     /// `<base>/ZTronAssetKit`, whose entry in `base` must be synced at creation (store-1 S1-02).
     package var container: URL {
