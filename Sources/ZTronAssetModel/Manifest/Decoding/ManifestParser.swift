@@ -1,12 +1,14 @@
 /// The manifest schema on top of `JSONCursor` (R-MAN-1, R-MAN-2): both wire shapes, unknown fields skipped,
 /// structural violations thrown, per-entry violations quarantined.
 ///
-/// One pass, no recursion. Only the values an accepted entry needs are materialised, and only after their decoded
-/// length passed the field's limit, so peak memory is the result plus a bounded scratch (R-MAN-3, ADR draft A-3).
+/// One pass, no recursion. A value is checked against its field's rules on the payload's own bytes and
+/// materialised only when the entry may use it, so peak memory is the result plus a bounded scratch (R-MAN-3, ADR
+/// draft A-3). The identifier index the result needs is built here, once, and handed to `ValidatedManifest`.
 struct ManifestParser {
-    /// What one parse produced, before `ValidatedManifest` indexes it.
+    /// What one parse produced.
     struct Output {
         var entries: [ManifestEntry]
+        var positions: [AssetID: Int]
         var quarantined: [QuarantinedEntry]
         var shape: ManifestWireShape
     }
@@ -15,8 +17,10 @@ struct ManifestParser {
     private let options: ManifestDecodingOptions
     private var entries: [ManifestEntry] = []
     private var quarantined: [QuarantinedEntry] = []
-    /// Identifiers that passed the identifier rules so far (R-MAN-2 duplicates, D-13).
-    private var seen: Set<AssetID> = []
+    /// Accepted identifiers and their positions: the result's index and the duplicate check (R-MAN-2, D-13).
+    private var positions: [AssetID: Int] = [:]
+    /// Valid identifiers of quarantined entries: a later entry repeating one is a duplicate too.
+    private var quarantinedIdentifiers: Set<AssetID> = []
 
     init(bytes: UnsafeRawBufferPointer, options: ManifestDecodingOptions) {
         self.cursor = JSONCursor(bytes: bytes, maxDepth: options.limits.maxNestingDepth)
@@ -40,7 +44,7 @@ struct ManifestParser {
             throw .undecodable(.unexpectedShape)
         }
         try self.requireEnd()
-        return Output(entries: self.entries, quarantined: self.quarantined, shape: shape)
+        return Output(entries: self.entries, positions: self.positions, quarantined: self.quarantined, shape: shape)
     }
 
     /// Only whitespace may follow the top-level value.
@@ -55,7 +59,8 @@ struct ManifestParser {
 
     /// `{ "schemaVersion": Int, "assets": [...] }` in any member order, other members ignored. When `assets`
     /// precedes `schemaVersion`, it is skipped (validated only) and parsed afterwards, so a manifest of an
-    /// unsupported version is never interpreted.
+    /// unsupported version is never interpreted. A repeated `schemaVersion` or `assets` member is ambiguous and
+    /// makes the envelope the wrong shape.
     private mutating func parseEnvelope() throws(ManifestError) -> ManifestWireShape {
         try self.cursor.checkDepth(1)
         try self.cursor.expect(JSONByte.openBrace)
@@ -102,18 +107,17 @@ struct ManifestParser {
         return .envelope(schemaVersion: version)
     }
 
-    /// An integer-syntax number; anything else makes the envelope the wrong shape.
+    /// An integer-syntax number; anything else makes the envelope the wrong shape. Out-of-range values saturate
+    /// (and are then unsupported).
     private mutating func parseSchemaVersion() throws(ManifestError) -> Int {
         guard try self.cursor.peekValueKind() == .number else {
-            try self.cursor.skipValue(depth: 1)
             throw .undecodable(.unexpectedShape)
         }
         let number = try self.cursor.scanNumber()
         guard number.isInteger else {
             throw .undecodable(.unexpectedShape)
         }
-        let value = self.cursor.integerValue(of: number).value
-        return Int(clamping: value)
+        return Int(clamping: self.cursor.integerValue(of: number).value)
     }
 
     private func requireSupported(_ version: Int) throws(ManifestError) {
@@ -124,7 +128,8 @@ struct ManifestParser {
 
     // MARK: - Assets
 
-    /// The assets array at `depth` (1 for a bare array, 2 inside the envelope).
+    /// The assets array at `depth` (1 for a bare array, 2 inside the envelope). The entry limit counts every
+    /// element, quarantined ones included, and stops the parse at the first element past it.
     private mutating func parseAssets(depth: Int) throws(ManifestError) {
         try self.cursor.checkDepth(depth)
         try self.cursor.expect(JSONByte.openBracket)
@@ -172,55 +177,37 @@ struct ManifestParser {
         try self.finish(draft, index: index)
     }
 
-    /// Validates a finished draft and appends it to the entries or the quarantine.
+    /// Applies the cross-field rules (required members, duplicate identifiers) and appends the entry to the
+    /// result or the quarantine.
     private mutating func finish(_ draft: EntryDraft, index: Int) throws(ManifestError) {
-        let limits = self.options.limits
         var draft = draft
         for field in EntryField.required where !draft.isPresent(field) {
             draft.reject(field, .malformedField(field.name))
         }
-        // Field-level rules on the materialised values, in field order (the same rules as `violations(of:)`).
-        if let identifier = draft.identifier {
-            if let violation = ManifestRules.identifierViolations(identifier, limits: limits).first {
-                draft.reject(.identifier, violation)
-            } else {
-                let id = AssetID(identifier)
-                if self.seen.contains(id) {
-                    switch self.options.duplicates {
-                    case .reject:
-                        throw .duplicateIdentifier(id)
-                    case .keepFirst:
-                        draft.reject(.identifier, .malformedField(ManifestRules.Field.identifier))
-                    }
-                } else {
-                    self.seen.insert(id)
-                }
+        let id = draft.identifier.map { AssetID($0) }
+        if let id, draft.identifierIsValid, self.positions[id] != nil || self.quarantinedIdentifiers.contains(id) {
+            switch self.options.duplicates {
+            case .reject:
+                throw .duplicateIdentifier(id)
+            case .keepFirst:
+                draft.reject(.identifier, .malformedField(ManifestRules.Field.identifier))
+                draft.identifierIsValid = false
             }
         }
-        if let fileExtension = draft.fileExtension, !ManifestRules.isValidFileExtension(fileExtension) {
-            draft.reject(.fileExtension, .fileExtensionInvalid)
-        }
-        if let remotePath = draft.remotePath, let violation = ManifestRules.remotePathViolations(remotePath, limits: limits).first {
-            draft.reject(.remotePath, .remotePathInvalid(violation))
-        }
-        if let byteSize = draft.byteSize, let violation = ManifestRules.byteSizeViolation(byteSize, limits: limits) {
-            draft.reject(.byteSize, violation)
-        }
-
-        if let violation = draft.firstViolation {
-            self.quarantined.append(QuarantinedEntry(index: index, identifier: draft.identifier.map { AssetID($0) }, violation: violation))
-            return
-        }
-        guard let identifier = draft.identifier, let fileExtension = draft.fileExtension, let remotePath = draft.remotePath,
-            let components = draft.localPathComponents
+        guard draft.firstViolation == nil, let id, let fileExtension = draft.fileExtension,
+            let remotePath = draft.remotePath, let components = draft.localPathComponents
         else {
-            // Unreachable: a missing required field was rejected above. Quarantine rather than trap.
-            self.quarantined.append(QuarantinedEntry(index: index, identifier: nil, violation: .malformedField(ManifestRules.Field.entry)))
+            if let id, draft.identifierIsValid {
+                self.quarantinedIdentifiers.insert(id)
+            }
+            let violation = draft.firstViolation ?? .malformedField(ManifestRules.Field.entry)
+            self.quarantined.append(QuarantinedEntry(index: index, identifier: id, violation: violation))
             return
         }
+        self.positions[id] = self.entries.count
         self.entries.append(
             ManifestEntry(
-                identifier: AssetID(identifier),
+                identifier: id,
                 fileExtension: fileExtension,
                 remotePath: remotePath,
                 localPathComponents: components,
@@ -235,8 +222,8 @@ struct ManifestParser {
 
     // MARK: - Fields
 
-    /// Reads one known member's value into the draft. Values over their field's limit are skipped, not
-    /// materialised.
+    /// Reads one known member's value into the draft. Text is checked against the field's rules on the payload's
+    /// bytes first; a value over its field's length limit is never materialised.
     private mutating func parseField(_ field: EntryField, into draft: inout EntryDraft, depth: Int) throws(ManifestError) {
         let limits = self.options.limits
         switch field {
@@ -244,29 +231,34 @@ struct ManifestParser {
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            if string.decodedCount > limits.maxIdentifierBytes {
-                draft.reject(field, .identifierTooLong(bytes: string.decodedCount))
+            guard string.decodedCount <= limits.maxIdentifierBytes else {
+                return draft.reject(field, .identifierTooLong(bytes: string.decodedCount))
+            }
+            draft.identifier = self.cursor.decodedString(of: string)
+            if let violation = self.firstViolation(of: string, ManifestRules.identifierViolations(utf8:limits:)) {
+                draft.reject(field, violation)
             } else {
-                draft.identifier = self.cursor.decodedString(of: string)
+                draft.identifierIsValid = true
             }
         case .fileExtension:
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            if string.decodedCount > 8 {
-                draft.reject(field, .fileExtensionInvalid)
-            } else {
-                draft.fileExtension = self.cursor.decodedString(of: string)
+            guard string.decodedCount <= 8, self.isValidFileExtension(string) else {
+                return draft.reject(field, .fileExtensionInvalid)
             }
+            draft.fileExtension = self.cursor.decodedString(of: string)
         case .remotePath:
             guard let string = try self.stringValue(field, &draft, depth: depth) else {
                 return
             }
-            if string.decodedCount > limits.maxRemotePathBytes {
-                draft.reject(field, .remotePathInvalid(.tooLong(bytes: string.decodedCount)))
-            } else {
-                draft.remotePath = self.cursor.decodedString(of: string)
+            guard string.decodedCount <= limits.maxRemotePathBytes else {
+                return draft.reject(field, .remotePathInvalid(.tooLong(bytes: string.decodedCount)))
             }
+            if let violation = self.firstViolation(of: string, ManifestRules.remotePathViolations(utf8:limits:)) {
+                return draft.reject(field, .remotePathInvalid(violation))
+            }
+            draft.remotePath = self.cursor.decodedString(of: string)
         case .localPathComponents:
             draft.localPathComponents = try self.stringArray(
                 field, &draft, depth: depth, maxCount: ManifestRules.maxPathComponents,
@@ -291,7 +283,11 @@ struct ManifestParser {
             guard number.isInteger else {
                 return draft.reject(field, .malformedField(field.name))
             }
-            draft.byteSize = self.cursor.integerValue(of: number).value
+            let byteSize = self.cursor.integerValue(of: number).value
+            if let violation = ManifestRules.byteSizeViolation(byteSize, limits: limits) {
+                return draft.reject(field, violation)
+            }
+            draft.byteSize = byteSize
         case .checksum:
             if try self.cursor.consumeNull() {
                 return
@@ -388,33 +384,78 @@ struct ManifestParser {
         return result
     }
 
-    /// The digest a 64-character hexadecimal string spells (either case), or `nil` if any character is not hex.
-    private func contentHash(of string: JSONString) -> ContentHash? {
-        var words: (UInt64, UInt64, UInt64, UInt64) = (0, 0, 0, 0)
-        let escaped = string.hasEscapes ? self.cursor.decodedBytes(of: string) : []
-        for position in 0..<64 {
-            let byte = string.hasEscapes ? escaped[position] : self.cursor.bytes[string.start + position]
-            guard let nibble = JSONByte.hexNibble(byte) else {
-                return nil
-            }
-            let value = UInt64(nibble)
-            switch position / 16 {
-            case 0:
-                words.0 = words.0 << 4 | value
-            case 1:
-                words.1 = words.1 << 4 | value
-            case 2:
-                words.2 = words.2 << 4 | value
-            default:
-                words.3 = words.3 << 4 | value
-            }
+    /// The first violation a byte rule reports for a scanned string (on the payload's bytes when unescaped).
+    private func firstViolation<Violation>(
+        of string: JSONString,
+        _ rule: (UnsafeRawBufferPointer, ManifestLimits) -> [Violation]
+    ) -> Violation? {
+        if let view = self.cursor.rawBytes(of: string) {
+            return rule(view, self.options.limits).first
         }
-        return ContentHash(w0: words.0, w1: words.1, w2: words.2, w3: words.3)
+        return self.cursor.decodedBytes(of: string).withUnsafeBytes { rule($0, self.options.limits).first }
     }
 
-    /// The known member a key names, or `nil` for an unknown member (ignored, R-MAN-1).
+    private func isValidFileExtension(_ string: JSONString) -> Bool {
+        if let view = self.cursor.rawBytes(of: string) {
+            return ManifestRules.isValidFileExtension(utf8: view)
+        }
+        return self.cursor.decodedBytes(of: string).withUnsafeBytes(ManifestRules.isValidFileExtension(utf8:))
+    }
+
+    private func contentHash(of string: JSONString) -> ContentHash? {
+        if let view = self.cursor.rawBytes(of: string) {
+            return ManifestParser.contentHash(hex: view)
+        }
+        return self.cursor.decodedBytes(of: string).withUnsafeBytes(ManifestParser.contentHash(hex:))
+    }
+
+    /// The digest 64 hexadecimal characters (either case) spell, or `nil` if any is not hex.
+    private static func contentHash(hex utf8: UnsafeRawBufferPointer) -> ContentHash? {
+        guard utf8.count == 64, let w0 = ManifestParser.hexWord(utf8, at: 0), let w1 = ManifestParser.hexWord(utf8, at: 16),
+            let w2 = ManifestParser.hexWord(utf8, at: 32), let w3 = ManifestParser.hexWord(utf8, at: 48)
+        else {
+            return nil
+        }
+        return ContentHash(w0: w0, w1: w1, w2: w2, w3: w3)
+    }
+
+    /// Sixteen hexadecimal characters at `offset` as one big-endian word.
+    private static func hexWord(_ utf8: UnsafeRawBufferPointer, at offset: Int) -> UInt64? {
+        var word: UInt64 = 0
+        for index in offset..<(offset + 16) {
+            guard let nibble = JSONByte.hexNibble(utf8[index]) else {
+                return nil
+            }
+            word = word << 4 | UInt64(nibble)
+        }
+        return word
+    }
+
+    /// The known member a key names, or `nil` for an unknown member (ignored, R-MAN-1). Keys are told apart by
+    /// length and first byte, then compared once.
     private func field(for key: JSONString) -> EntryField? {
-        EntryField.allCases.first { self.cursor.string(key, equals: $0.key) }
+        guard !key.hasEscapes else {
+            return EntryField.allCases.first { self.cursor.string(key, equals: $0.key) }
+        }
+        let first = key.decodedCount > 0 ? self.cursor.bytes[key.start] : 0
+        let candidate: EntryField
+        switch key.decodedCount {
+        case 4:
+            candidate = .tags
+        case 6:
+            candidate = .policy
+        case 8:
+            candidate = first == UInt8(ascii: "b") ? .byteSize : .checksum
+        case 10:
+            candidate = first == UInt8(ascii: "i") ? .identifier : .remotePath
+        case 13:
+            candidate = first == UInt8(ascii: "f") ? .fileExtension : .localFileName
+        case 19:
+            candidate = .localPathComponents
+        default:
+            return nil
+        }
+        return self.cursor.string(key, equals: candidate.key) ? candidate : nil
     }
 
     private static let schemaVersionKey = Array("schemaVersion".utf8)
@@ -466,6 +507,8 @@ struct EntryDraft {
     /// Members seen so far, one bit per `EntryField` (a repeated member is a violation).
     private var presentMask: UInt16 = 0
     var identifier: String?
+    /// Whether `identifier` passed the identifier rules (only valid identifiers take part in the duplicate check).
+    var identifierIsValid = false
     var fileExtension: String?
     var remotePath: String?
     var localPathComponents: [String]?

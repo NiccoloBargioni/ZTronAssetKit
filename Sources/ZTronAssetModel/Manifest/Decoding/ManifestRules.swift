@@ -1,7 +1,9 @@
 /// The per-entry rules of R-MAN-2, one function per field, shared by `ManifestDecoder.violations(of:limits:)` and
-/// the streaming parser so the two can never disagree. Each returns the field's violations in a fixed order; the
-/// parser quarantines an entry with the first violation in field order (identifier, fileExtension, remotePath,
-/// localPathComponents, localFileName, byteSize, checksum, tags, policy).
+/// the streaming parser so the two can never disagree. The text rules work on UTF-8 bytes: the parser passes the
+/// payload's bytes (no copy), `violations(of:)` a string's contiguous UTF-8. Each returns the field's violations in
+/// a fixed order (an empty array, which does not allocate, when the field is valid); the parser quarantines an entry
+/// with the first violation in field order (identifier, fileExtension, remotePath, localPathComponents,
+/// localFileName, byteSize, checksum, tags, policy).
 enum ManifestRules {
     /// Path components per entry the decoder materialises: the index stores at most 32 per record (store design
     /// §2.3), and the cap bounds the allocation an array of tiny strings could cause (R-MAN-3). An entry with more
@@ -24,11 +26,15 @@ enum ManifestRules {
 
     /// Every violation of `entry`, in field order.
     static func violations(of entry: ManifestEntry, limits: ManifestLimits) -> [ManifestEntryViolation] {
-        var result = ManifestRules.identifierViolations(entry.identifier.rawValue, limits: limits)
-        if !ManifestRules.isValidFileExtension(entry.fileExtension) {
+        var result = ManifestRules.withUTF8(of: entry.identifier.rawValue) {
+            ManifestRules.identifierViolations(utf8: $0, limits: limits)
+        }
+        if !ManifestRules.withUTF8(of: entry.fileExtension, ManifestRules.isValidFileExtension(utf8:)) {
             result.append(.fileExtensionInvalid)
         }
-        result += ManifestRules.remotePathViolations(entry.remotePath, limits: limits).map { .remotePathInvalid($0) }
+        result += ManifestRules.withUTF8(of: entry.remotePath) {
+            ManifestRules.remotePathViolations(utf8: $0, limits: limits)
+        }.map { .remotePathInvalid($0) }
         if entry.localPathComponents.count > ManifestRules.maxPathComponents {
             result.append(.malformedField(Field.localPathComponents))
         }
@@ -41,89 +47,133 @@ enum ManifestRules {
         return result
     }
 
+    /// Runs `body` over the UTF-8 bytes of `text`: its contiguous storage when it has one (native strings), else a
+    /// copy, so both paths feed the rules identical bytes.
+    static func withUTF8<Result>(of text: String, _ body: (UnsafeRawBufferPointer) -> Result) -> Result {
+        if let result = text.utf8.withContiguousStorageIfAvailable({ body(UnsafeRawBufferPointer($0)) }) {
+            return result
+        }
+        return Array(text.utf8).withUnsafeBytes(body)
+    }
+
     // MARK: - identifier
 
     /// Non-empty, at most `maxIdentifierBytes` UTF-8 bytes, no control character.
-    static func identifierViolations(_ identifier: String, limits: ManifestLimits) -> [ManifestEntryViolation] {
-        let count = identifier.utf8.count
-        guard count > 0 else {
+    static func identifierViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [ManifestEntryViolation] {
+        guard !utf8.isEmpty else {
             return [.identifierEmpty]
         }
         var result: [ManifestEntryViolation] = []
-        if count > limits.maxIdentifierBytes {
-            result.append(.identifierTooLong(bytes: count))
+        if utf8.count > limits.maxIdentifierBytes {
+            result.append(.identifierTooLong(bytes: utf8.count))
         }
-        if ManifestRules.containsControlCharacter(identifier) {
+        if ManifestRules.containsControlCharacter(utf8: utf8) {
             result.append(.identifierControlCharacter)
         }
         return result
     }
 
-    /// Whether `text` contains a Unicode control character (general category Cc: U+0000–U+001F, U+007F–U+009F).
-    static func containsControlCharacter(_ text: String) -> Bool {
-        text.unicodeScalars.contains { scalar in
-            scalar.value < 0x20 || (0x7F...0x9F).contains(scalar.value)
+    /// Whether valid UTF-8 contains a Unicode control character (general category Cc): C0 (U+0000–U+001F), DEL
+    /// (U+007F) or C1 (U+0080–U+009F, encoded `C2 80`…`C2 9F`).
+    static func containsControlCharacter(utf8: UnsafeRawBufferPointer) -> Bool {
+        let count = utf8.count
+        var index = 0
+        while index < count {
+            let byte = utf8[index]
+            if byte < 0x20 || byte == 0x7F {
+                return true
+            }
+            if byte == 0xC2, index + 1 < count, utf8[index + 1] <= 0x9F {
+                return true
+            }
+            index += 1
         }
+        return false
     }
 
     // MARK: - fileExtension
 
     /// `[A-Za-z0-9]{1,8}`, the rule `AssetFileExtension` re-checks before any URL is built.
-    static func isValidFileExtension(_ fileExtension: String) -> Bool {
-        AssetFileExtension(fileExtension) != nil
+    static func isValidFileExtension(utf8: UnsafeRawBufferPointer) -> Bool {
+        guard (1...8).contains(utf8.count) else {
+            return false
+        }
+        for byte in utf8 {
+            let lower = byte | 0x20
+            let isLetter = lower >= UInt8(ascii: "a") && lower <= UInt8(ascii: "z")
+            let isDigit = byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9")
+            guard isLetter || isDigit else {
+                return false
+            }
+        }
+        return true
     }
 
     // MARK: - remotePath
 
     /// The remote path rules: relative, at most `maxRemotePathBytes` bytes, no control character, no scheme, no
     /// authority, not absolute and no `..` segment (also when percent-encoded, since the origin may decode it).
-    static func remotePathViolations(_ path: String, limits: ManifestLimits) -> [RemotePathViolation] {
-        let utf8 = Array(path.utf8)
-        guard !utf8.isEmpty else {
+    static func remotePathViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [RemotePathViolation] {
+        let count = utf8.count
+        guard count > 0 else {
             return [.empty]
         }
         var result: [RemotePathViolation] = []
-        if utf8.count > limits.maxRemotePathBytes {
-            result.append(.tooLong(bytes: utf8.count))
+        if count > limits.maxRemotePathBytes {
+            result.append(.tooLong(bytes: count))
         }
-        if ManifestRules.containsControlCharacter(path) {
+        if ManifestRules.containsControlCharacter(utf8: utf8) {
             result.append(.controlCharacter)
         }
         let slash = UInt8(ascii: "/")
-        let firstSegmentEnd = utf8.firstIndex(of: slash) ?? utf8.count
         // RFC 3986 §4.2: the first segment of a relative reference cannot contain a colon, so one there is a scheme.
-        let schemeEnd = utf8[..<firstSegmentEnd].firstIndex(of: UInt8(ascii: ":"))
+        var schemeEnd: Int?
+        var index = 0
+        while index < count, utf8[index] != slash {
+            if utf8[index] == UInt8(ascii: ":") {
+                schemeEnd = index
+                break
+            }
+            index += 1
+        }
         if schemeEnd != nil {
             result.append(.scheme)
         }
         let hierarchyStart = schemeEnd.map { $0 + 1 } ?? 0
-        if hierarchyStart + 1 < utf8.count, utf8[hierarchyStart] == slash, utf8[hierarchyStart + 1] == slash {
+        if hierarchyStart + 1 < count, utf8[hierarchyStart] == slash, utf8[hierarchyStart + 1] == slash {
             result.append(.authority)
         }
         if utf8[0] == slash {
             result.append(.absolute)
         }
         var segmentStart = 0
-        for index in 0...utf8.count where index == utf8.count || utf8[index] == slash {
-            if ManifestRules.isParentSegment(utf8[segmentStart..<index]) {
-                result.append(.parentSegment)
-                break
+        index = 0
+        while index <= count {
+            if index == count || utf8[index] == slash {
+                if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) {
+                    result.append(.parentSegment)
+                    break
+                }
+                segmentStart = index + 1
             }
-            segmentStart = index + 1
+            index += 1
         }
         return result
     }
 
-    /// `..`, also spelled with percent-encoded dots (`%2e`, `%2E`).
-    private static func isParentSegment(_ segment: ArraySlice<UInt8>) -> Bool {
+    /// Whether `utf8[start..<end]` is `..`, also spelled with percent-encoded dots (`%2e`, `%2E`).
+    private static func isParentSegment(_ utf8: UnsafeRawBufferPointer, from start: Int, to end: Int) -> Bool {
+        // `..` is 2 bytes; with both dots encoded it is 6.
+        guard end - start >= 2, end - start <= 6 else {
+            return false
+        }
         var dots = 0
-        var index = segment.startIndex
-        while index < segment.endIndex, dots < 3 {
-            if segment[index] == UInt8(ascii: ".") {
+        var index = start
+        while index < end, dots < 3 {
+            if utf8[index] == UInt8(ascii: ".") {
                 index += 1
-            } else if segment[index] == UInt8(ascii: "%"), index + 2 < segment.endIndex,
-                segment[index + 1] == UInt8(ascii: "2"),
-                segment[index + 2] == UInt8(ascii: "e") || segment[index + 2] == UInt8(ascii: "E")
+            } else if utf8[index] == UInt8(ascii: "%"), index + 2 < end, utf8[index + 1] == UInt8(ascii: "2"),
+                utf8[index + 2] == UInt8(ascii: "e") || utf8[index + 2] == UInt8(ascii: "E")
             {
                 index += 3
             } else {
@@ -131,7 +181,7 @@ enum ManifestRules {
             }
             dots += 1
         }
-        return dots == 2 && index == segment.endIndex
+        return dots == 2 && index == end
     }
 
     // MARK: - byteSize, tags

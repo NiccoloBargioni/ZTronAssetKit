@@ -73,6 +73,16 @@ public struct ValidatedManifest: Sendable, Hashable {
         self.positions[id] != nil
     }
 
+    /// Wraps a decoder result whose identifiers the decoder already indexed (and so proved unique), so a 100,000-entry
+    /// manifest is hashed once, not twice (R-MAN-3, P-3).
+    init(decoded entries: [ManifestEntry], positions: [AssetID: Int], quarantined: [QuarantinedEntry], shape: ManifestWireShape, digest: ContentHash) {
+        self.entries = entries
+        self.quarantined = quarantined
+        self.shape = shape
+        self.digest = digest
+        self.positions = positions
+    }
+
     private init(unchecked entries: [ManifestEntry], digest: ContentHash) {
         self.entries = entries
         self.quarantined = []
@@ -109,8 +119,9 @@ public enum ManifestDecoder {
             }
         }
         let output = try parsed.get()
-        return try ValidatedManifest(
-            entries: output.entries,
+        return ValidatedManifest(
+            decoded: output.entries,
+            positions: output.positions,
             quarantined: output.quarantined,
             shape: output.shape,
             digest: ContentHash.sha256(of: data)

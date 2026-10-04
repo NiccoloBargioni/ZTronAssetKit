@@ -53,16 +53,26 @@ struct JSONCursor {
         }
     }
 
-    /// Skips JSON whitespace (space, tab, line feed, carriage return).
+    /// Skips JSON whitespace (space, tab, line feed, carriage return). Runs of eight spaces (pretty-printed
+    /// indentation) are skipped a word at a time.
     mutating func skipWhitespace() {
-        while self.offset < self.bytes.count {
-            switch self.bytes[self.offset] {
-            case JSONByte.space, JSONByte.tab, JSONByte.lineFeed, JSONByte.carriageReturn:
-                self.offset += 1
-            default:
-                return
+        let bytes = self.bytes
+        let end = bytes.count
+        var offset = self.offset
+        while offset < end {
+            let byte = bytes[offset]
+            if byte == JSONByte.space {
+                offset += 1
+                while offset + 8 <= end, bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self) == JSONWord.spaces {
+                    offset += 8
+                }
+            } else if byte == JSONByte.lineFeed || byte == JSONByte.carriageReturn || byte == JSONByte.tab {
+                offset += 1
+            } else {
+                break
             }
         }
+        self.offset = offset
     }
 
     /// Skips whitespace, then consumes `byte` if it is next.
@@ -125,22 +135,26 @@ struct JSONCursor {
         guard let byte = self.peek() else {
             throw .undecodable(.notJSON)
         }
-        switch byte {
-        case JSONByte.quote:
+        // Plain comparisons, not range patterns: those go through generic `~=` in unoptimised builds.
+        if byte == JSONByte.quote {
             return .string
-        case JSONByte.openBracket:
-            return .array
-        case JSONByte.openBrace:
-            return .object
-        case JSONByte.minus, JSONByte.zero...JSONByte.nine:
-            return .number
-        case UInt8(ascii: "n"):
-            return .null
-        case UInt8(ascii: "t"), UInt8(ascii: "f"):
-            return .boolean
-        default:
-            throw .undecodable(.notJSON)
         }
+        if byte == JSONByte.openBracket {
+            return .array
+        }
+        if byte == JSONByte.openBrace {
+            return .object
+        }
+        if byte == JSONByte.minus || JSONByte.isDigit(byte) {
+            return .number
+        }
+        if byte == UInt8(ascii: "n") {
+            return .null
+        }
+        if byte == UInt8(ascii: "t") || byte == UInt8(ascii: "f") {
+            return .boolean
+        }
+        throw .undecodable(.notJSON)
     }
 
     /// Consumes `null` if it is the next value; returns whether it was.
@@ -210,42 +224,48 @@ struct JSONCursor {
     // MARK: - Strings
 
     /// Scans a string starting at its opening quote, validating escapes and UTF-8, and returns its extent and
-    /// decoded length. Nothing is allocated.
+    /// decoded length. Nothing is allocated. Printable ASCII, which is almost every byte of a manifest, is checked
+    /// eight bytes at a time (`JSONWord.isPlainASCII`); anything else goes through the byte-wise path.
     mutating func scanString() throws(ManifestError) -> JSONString {
         guard self.peek() == JSONByte.quote else {
             throw .undecodable(.notJSON)
         }
-        self.offset += 1
-        let start = self.offset
+        let bytes = self.bytes
+        let end = bytes.count
+        let start = self.offset + 1
+        var offset = start
         var decodedCount = 0
         var hasEscapes = false
-        let end = self.bytes.count
         while true {
-            // The common case: a run of printable ASCII.
-            while self.offset < end {
-                let byte = self.bytes[self.offset]
-                guard byte >= 0x20, byte < 0x80, byte != JSONByte.quote, byte != JSONByte.backslash else {
+            while offset + 8 <= end {
+                let word = bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self)
+                guard JSONWord.isPlainASCII(word) else {
                     break
                 }
-                self.offset += 1
-                decodedCount += 1
+                offset += 8
+                decodedCount += 8
             }
-            guard self.offset < end else {
+            guard offset < end else {
                 throw .undecodable(.notJSON)
             }
-            let byte = self.bytes[self.offset]
+            let byte = bytes[offset]
             if byte == JSONByte.quote {
-                let token = JSONString(start: start, end: self.offset, decodedCount: decodedCount, hasEscapes: hasEscapes)
-                self.offset += 1
-                return token
-            }
-            if byte == JSONByte.backslash {
+                self.offset = offset + 1
+                return JSONString(start: start, end: offset, decodedCount: decodedCount, hasEscapes: hasEscapes)
+            } else if byte == JSONByte.backslash {
                 hasEscapes = true
+                self.offset = offset
                 decodedCount += try self.scanEscape()
+                offset = self.offset
             } else if byte < 0x20 {
                 throw .undecodable(.notJSON)
+            } else if byte < 0x80 {
+                offset += 1
+                decodedCount += 1
             } else {
+                self.offset = offset
                 decodedCount += try self.scanMultiByteScalar()
+                offset = self.offset
             }
         }
     }
@@ -257,40 +277,38 @@ struct JSONCursor {
         result.reserveCapacity(string.decodedCount)
         var index = string.start
         while index < string.end {
-            let byte = self.bytes[index]
-            guard byte == JSONByte.backslash else {
-                result.append(byte)
-                index += 1
+            // Copy the run up to the next escape in one call.
+            var runEnd = index
+            while runEnd < string.end, self.bytes[runEnd] != JSONByte.backslash {
+                runEnd += 1
+            }
+            if runEnd > index {
+                result.append(contentsOf: UnsafeRawBufferPointer(rebasing: self.bytes[index..<runEnd]))
+                index = runEnd
                 continue
             }
             let escaped = self.bytes[index + 1]
             index += 2
-            switch escaped {
-            case UInt8(ascii: "b"):
-                result.append(0x08)
-            case UInt8(ascii: "f"):
-                result.append(0x0C)
-            case UInt8(ascii: "n"):
-                result.append(0x0A)
-            case UInt8(ascii: "r"):
-                result.append(0x0D)
-            case UInt8(ascii: "t"):
-                result.append(0x09)
-            case UInt8(ascii: "u"):
-                var scalar = UInt32(self.hexValue(at: index))
+            if escaped == UInt8(ascii: "u") {
+                var scalar = self.hexValue(at: index)
                 index += 4
-                if (0xD800...0xDBFF).contains(scalar) {
-                    let low = UInt32(self.hexValue(at: index + 2))
+                if scalar >= 0xD800 && scalar <= 0xDBFF {
+                    let low = self.hexValue(at: index + 2)
                     index += 6
                     scalar = 0x10000 + ((scalar - 0xD800) << 10) + (low - 0xDC00)
                 }
                 JSONCursor.appendUTF8(scalar, to: &result)
-            default:
-                // `"`, `\` and `/` stand for themselves.
-                result.append(escaped)
+            } else {
+                result.append(JSONByte.unescaped(escaped))
             }
         }
         return result
+    }
+
+    /// The string's bytes as a view of the payload when it has no escape (the common case: no copy), else `nil`
+    /// and the caller works on `decodedBytes(of:)`. Non-generic, so unoptimised builds pay no metadata lookups.
+    func rawBytes(of string: JSONString) -> UnsafeRawBufferPointer? {
+        string.hasEscapes ? nil : UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end])
     }
 
     /// The string's value. Validated UTF-8, so decoding never repairs anything.
@@ -320,44 +338,39 @@ struct JSONCursor {
         return true
     }
 
-    /// Scans one escape sequence at the backslash; returns its decoded UTF-8 length.
+    /// Scans one escape sequence at the backslash; returns its decoded UTF-8 length. (Plain comparisons throughout
+    /// this section: range patterns go through generic `~=` in unoptimised builds.)
     private mutating func scanEscape() throws(ManifestError) -> Int {
         guard self.offset + 1 < self.bytes.count else {
             throw .undecodable(.notJSON)
         }
         let escaped = self.bytes[self.offset + 1]
         self.offset += 2
-        switch escaped {
-        case JSONByte.quote, JSONByte.backslash, UInt8(ascii: "/"), UInt8(ascii: "b"), UInt8(ascii: "f"),
-            UInt8(ascii: "n"), UInt8(ascii: "r"), UInt8(ascii: "t"):
-            return 1
-        case UInt8(ascii: "u"):
-            let unit = try self.scanHexQuad()
-            switch unit {
-            case 0xD800...0xDBFF:
-                // A high surrogate must be followed by an escaped low surrogate: together one 4-byte scalar.
-                guard self.offset + 1 < self.bytes.count, self.bytes[self.offset] == JSONByte.backslash,
-                    self.bytes[self.offset + 1] == UInt8(ascii: "u")
-                else {
-                    throw .undecodable(.notJSON)
-                }
-                self.offset += 2
-                guard (0xDC00...0xDFFF).contains(try self.scanHexQuad()) else {
-                    throw .undecodable(.notJSON)
-                }
-                return 4
-            case 0xDC00...0xDFFF:
+        guard escaped == UInt8(ascii: "u") else {
+            guard JSONByte.isSimpleEscape(escaped) else {
                 throw .undecodable(.notJSON)
-            case 0..<0x80:
-                return 1
-            case 0x80..<0x800:
-                return 2
-            default:
-                return 3
             }
-        default:
+            return 1
+        }
+        let unit = try self.scanHexQuad()
+        if unit >= 0xD800 && unit <= 0xDBFF {
+            // A high surrogate must be followed by an escaped low surrogate: together one 4-byte scalar.
+            guard self.offset + 1 < self.bytes.count, self.bytes[self.offset] == JSONByte.backslash,
+                self.bytes[self.offset + 1] == UInt8(ascii: "u")
+            else {
+                throw .undecodable(.notJSON)
+            }
+            self.offset += 2
+            let low = try self.scanHexQuad()
+            guard low >= 0xDC00 && low <= 0xDFFF else {
+                throw .undecodable(.notJSON)
+            }
+            return 4
+        }
+        if unit >= 0xDC00 && unit <= 0xDFFF {
             throw .undecodable(.notJSON)
         }
+        return unit < 0x80 ? 1 : unit < 0x800 ? 2 : 3
     }
 
     /// Scans four hexadecimal digits and returns their value.
@@ -366,21 +379,25 @@ struct JSONCursor {
             throw .undecodable(.notJSON)
         }
         var value: UInt16 = 0
-        for _ in 0..<4 {
+        var remaining = 4
+        while remaining > 0 {
             guard let nibble = JSONByte.hexNibble(self.bytes[self.offset]) else {
                 throw .undecodable(.notJSON)
             }
             value = value << 4 | UInt16(nibble)
             self.offset += 1
+            remaining -= 1
         }
         return value
     }
 
     /// The value of four hexadecimal digits that `scanHexQuad` already validated.
-    private func hexValue(at index: Int) -> UInt16 {
-        var value: UInt16 = 0
-        for position in index..<(index + 4) {
-            value = value << 4 | UInt16(JSONByte.hexNibble(self.bytes[position]) ?? 0)
+    private func hexValue(at index: Int) -> UInt32 {
+        var value: UInt32 = 0
+        var position = index
+        while position < index + 4 {
+            value = value << 4 | UInt32(JSONByte.hexNibble(self.bytes[position]) ?? 0)
+            position += 1
         }
         return value
     }
@@ -389,36 +406,39 @@ struct JSONCursor {
     /// above U+10FFFF) and returns its length.
     private mutating func scanMultiByteScalar() throws(ManifestError) -> Int {
         let lead = self.bytes[self.offset]
+        var secondLow: UInt8 = 0x80
+        var secondHigh: UInt8 = 0xBF
         let length: Int
-        var secondRange: ClosedRange<UInt8> = 0x80...0xBF
-        switch lead {
-        case 0xC2...0xDF:
+        if lead >= 0xC2 && lead <= 0xDF {
             length = 2
-        case 0xE0:
+        } else if lead >= 0xE0 && lead <= 0xEF {
             length = 3
-            secondRange = 0xA0...0xBF
-        case 0xE1...0xEC, 0xEE...0xEF:
-            length = 3
-        case 0xED:
-            length = 3
-            secondRange = 0x80...0x9F
-        case 0xF0:
+            if lead == 0xE0 {
+                secondLow = 0xA0
+            } else if lead == 0xED {
+                secondHigh = 0x9F
+            }
+        } else if lead >= 0xF0 && lead <= 0xF4 {
             length = 4
-            secondRange = 0x90...0xBF
-        case 0xF1...0xF3:
-            length = 4
-        case 0xF4:
-            length = 4
-            secondRange = 0x80...0x8F
-        default:
+            if lead == 0xF0 {
+                secondLow = 0x90
+            } else if lead == 0xF4 {
+                secondHigh = 0x8F
+            }
+        } else {
             throw .undecodable(.notJSON)
         }
-        guard self.offset + length <= self.bytes.count, secondRange.contains(self.bytes[self.offset + 1]) else {
+        guard self.offset + length <= self.bytes.count else {
+            throw .undecodable(.notJSON)
+        }
+        let second = self.bytes[self.offset + 1]
+        guard second >= secondLow && second <= secondHigh else {
             throw .undecodable(.notJSON)
         }
         var index = self.offset + 2
         while index < self.offset + length {
-            guard (0x80...0xBF).contains(self.bytes[index]) else {
+            let byte = self.bytes[index]
+            guard byte >= 0x80 && byte <= 0xBF else {
                 throw .undecodable(.notJSON)
             }
             index += 1
@@ -429,17 +449,16 @@ struct JSONCursor {
 
     /// Appends the UTF-8 encoding of a scalar value that is known to be valid.
     private static func appendUTF8(_ scalar: UInt32, to bytes: inout [UInt8]) {
-        switch scalar {
-        case 0..<0x80:
+        if scalar < 0x80 {
             bytes.append(UInt8(truncatingIfNeeded: scalar))
-        case 0x80..<0x800:
+        } else if scalar < 0x800 {
             bytes.append(UInt8(truncatingIfNeeded: 0xC0 | scalar >> 6))
             bytes.append(UInt8(truncatingIfNeeded: 0x80 | scalar & 0x3F))
-        case 0x800..<0x10000:
+        } else if scalar < 0x10000 {
             bytes.append(UInt8(truncatingIfNeeded: 0xE0 | scalar >> 12))
             bytes.append(UInt8(truncatingIfNeeded: 0x80 | scalar >> 6 & 0x3F))
             bytes.append(UInt8(truncatingIfNeeded: 0x80 | scalar & 0x3F))
-        default:
+        } else {
             bytes.append(UInt8(truncatingIfNeeded: 0xF0 | scalar >> 18))
             bytes.append(UInt8(truncatingIfNeeded: 0x80 | scalar >> 12 & 0x3F))
             bytes.append(UInt8(truncatingIfNeeded: 0x80 | scalar >> 6 & 0x3F))
@@ -552,6 +571,29 @@ struct JSONNumber {
     var isInteger: Bool
 }
 
+/// Eight-byte (SWAR) tests over little-endian words of the payload: each bit trick flags at least every byte it
+/// is meant to find (false positives only send a word to the byte-wise path).
+enum JSONWord {
+    static let spaces: UInt64 = 0x2020_2020_2020_2020
+    private static let ones: UInt64 = 0x0101_0101_0101_0101
+    private static let highBits: UInt64 = 0x8080_8080_8080_8080
+
+    /// Whether all eight bytes are printable ASCII other than `"` and `\`: no high bit, none below 0x20, none
+    /// equal to a quote or a backslash.
+    static func isPlainASCII(_ word: UInt64) -> Bool {
+        let nonASCII = word & JSONWord.highBits
+        let belowSpace = (word &- JSONWord.ones &* 0x20) & ~word & JSONWord.highBits
+        let quote = JSONWord.zeroBytes(word ^ (JSONWord.ones &* UInt64(JSONByte.quote)))
+        let backslash = JSONWord.zeroBytes(word ^ (JSONWord.ones &* UInt64(JSONByte.backslash)))
+        return nonASCII | belowSpace | quote | backslash == 0
+    }
+
+    /// A non-zero value iff some byte of `word` is zero.
+    private static func zeroBytes(_ word: UInt64) -> UInt64 {
+        (word &- JSONWord.ones) & ~word & JSONWord.highBits
+    }
+}
+
 /// The bytes the reader looks for.
 enum JSONByte {
     static let quote = UInt8(ascii: "\"")
@@ -573,20 +615,45 @@ enum JSONByte {
     static let falseLiteral = Array("false".utf8)
     static let nullLiteral = Array("null".utf8)
 
+    /// Whether `\` followed by `byte` is one of the two-character escapes.
+    static func isSimpleEscape(_ byte: UInt8) -> Bool {
+        byte == JSONByte.quote || byte == JSONByte.backslash || byte == UInt8(ascii: "/") || byte == UInt8(ascii: "b")
+            || byte == UInt8(ascii: "f") || byte == UInt8(ascii: "n") || byte == UInt8(ascii: "r") || byte == UInt8(ascii: "t")
+    }
+
+    /// The byte a validated two-character escape stands for.
+    static func unescaped(_ byte: UInt8) -> UInt8 {
+        if byte == UInt8(ascii: "b") {
+            return 0x08
+        }
+        if byte == UInt8(ascii: "f") {
+            return 0x0C
+        }
+        if byte == UInt8(ascii: "n") {
+            return 0x0A
+        }
+        if byte == UInt8(ascii: "r") {
+            return 0x0D
+        }
+        if byte == UInt8(ascii: "t") {
+            return 0x09
+        }
+        // `"`, `\` and `/` stand for themselves.
+        return byte
+    }
+
     static func isDigit(_ byte: UInt8) -> Bool {
         byte >= JSONByte.zero && byte <= JSONByte.nine
     }
 
     static func hexNibble(_ byte: UInt8) -> UInt8? {
-        switch byte {
-        case UInt8(ascii: "0")...UInt8(ascii: "9"):
+        if byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9") {
             return byte - UInt8(ascii: "0")
-        case UInt8(ascii: "a")...UInt8(ascii: "f"):
-            return byte - UInt8(ascii: "a") + 10
-        case UInt8(ascii: "A")...UInt8(ascii: "F"):
-            return byte - UInt8(ascii: "A") + 10
-        default:
-            return nil
         }
+        let lower = byte | 0x20
+        if lower >= UInt8(ascii: "a") && lower <= UInt8(ascii: "f") {
+            return lower - UInt8(ascii: "a") + 10
+        }
+        return nil
     }
 }

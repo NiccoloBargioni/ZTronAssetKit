@@ -49,15 +49,25 @@ public struct AssetID: RawRepresentable, Hashable, Comparable, Sendable, Codable
     }
 
     /// Byte-wise equality, consistent with `<` and `hash(into:)`.
+    ///
+    /// Different lengths or texts that are not even canonically equivalent are rejected by `String`'s own
+    /// comparison, which compares contiguous UTF-8 in one call; only canonically equal texts, which may still
+    /// differ in bytes, are compared byte by byte.
     public static func == (lhs: AssetID, rhs: AssetID) -> Bool {
-        lhs.rawValue.utf8.elementsEqual(rhs.rawValue.utf8)
+        guard lhs.rawValue.utf8.count == rhs.rawValue.utf8.count, lhs.rawValue == rhs.rawValue else {
+            return false
+        }
+        return lhs.rawValue.utf8.elementsEqual(rhs.rawValue.utf8)
     }
 
-    /// Hashes the UTF-8 bytes, so equal identifiers hash equally under byte-wise equality.
+    /// Hashes the UTF-8 bytes, so equal identifiers hash equally under byte-wise equality. The bytes are fed in
+    /// one `combine(bytes:)` call from contiguous storage, or from a copy for a bridged string, so both
+    /// representations of the same bytes hash alike.
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.rawValue.utf8.count)
-        for byte in self.rawValue.utf8 {
-            hasher.combine(byte)
+        let fed: Void? = self.rawValue.utf8.withContiguousStorageIfAvailable { hasher.combine(bytes: UnsafeRawBufferPointer($0)) }
+        if fed == nil {
+            Array(self.rawValue.utf8).withUnsafeBytes { hasher.combine(bytes: $0) }
         }
     }
 
