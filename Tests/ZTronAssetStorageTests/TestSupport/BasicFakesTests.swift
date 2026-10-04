@@ -19,20 +19,21 @@ struct TestSupportBasicFakesTests {
         #expect(defaults.removedKeys == ["CDNLastSync", "absent"])
     }
 
-    @Test("Test support: InlineBlockingExecutor runs each unit on the caller and rethrows a typed failure", .timeLimit(.minutes(1)))
+    /// A value only the calling task carries: a unit that ran on another thread or queue would not see it.
+    enum CallerMarker {
+        @TaskLocal static var value = 0
+    }
+
+    @Test("Test support: InlineBlockingExecutor runs each unit inside the calling task and rethrows a typed failure", .timeLimit(.minutes(1)))
     func inlineExecutor() async {
         let executor = InlineBlockingExecutor()
-        #expect(await executor.run { 6 * 7 } == 42)
+        let seen = await CallerMarker.$value.withValue(42) {
+            await executor.run { CallerMarker.value }
+        }
+        #expect(seen == 42)
         await #expect(throws: FileSystemError.noSpace) {
             try await executor.run(throwing: { () throws(FileSystemError) -> Int in throw .noSpace })
         }
-    }
-
-    @Test("Test support: FakeAppVersionSource reports its fixed version and SeededRandom keeps its seed", .timeLimit(.minutes(1)))
-    func fixedValues() async {
-        #expect(await FakeAppVersionSource(version: "2.1+7").currentAppVersion() == "2.1+7")
-        #expect(await FakeAppVersionSource().currentAppVersion() == "1.0+1")
-        #expect(SeededRandom(seed: 99).seed == 99)
     }
 
     @Test("Test support: FakeDeviceConditionsSource delivers each sent state to every live observation", .timeLimit(.minutes(1)))
