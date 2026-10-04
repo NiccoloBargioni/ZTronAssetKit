@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 @testable import ZTronAssetTestSupport
@@ -58,6 +59,18 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
         case capacityThrows
         case syncFails
         case itemInfoThrows
+        case createMakesIntermediates
+        case truncateAppends
+        case writeCreatesParents
+        case exclusiveMoveCopiesWithoutRemoving
+        case replacingRenameRefuses
+        case missingRenameSucceeds
+        case removeLeavesFile
+        case missingListingIsEmpty
+        case removeFollowsLink
+        case missingSyncSucceeds
+        case releaseBreaksReacquire
+        case staleReleaseUnlocks
 
         /// The clause the contract must report.
         var clause: String {
@@ -96,12 +109,38 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
                 return "availableCapacity reports a non-negative figure for both purposes"
             case .syncFails:
                 return "synchronizeFile and synchronizeDirectory succeed at both levels on existing items"
+            case .createMakesIntermediates:
+                return "createDirectory below a missing parent fails with notFound"
+            case .truncateAppends:
+                return "write(.truncate) creates the file and replaces its content"
+            case .writeCreatesParents:
+                return "write into a missing directory fails with notFound"
+            case .exclusiveMoveCopiesWithoutRemoving:
+                return "rename(.exclusive) onto a free name moves the file"
+            case .replacingRenameRefuses:
+                return "rename(.replacing) replaces an existing destination and removes the source name"
+            case .missingRenameSucceeds:
+                return "rename of a missing source fails with notFound"
+            case .removeLeavesFile:
+                return "removeItem removes a file and an empty directory"
+            case .missingListingIsEmpty:
+                return "contentsOfDirectory of a missing directory fails with notFound"
+            case .removeFollowsLink:
+                return "removeItem of a symbolic link removes the link, not its target"
+            case .missingSyncSucceeds:
+                return "synchronizeFile of a missing file fails with notFound"
+            case .releaseBreaksReacquire:
+                return "releaseLock is idempotent and the lock can be taken again"
+            case .staleReleaseUnlocks:
+                return "releasing a stale token leaves a lock taken since then held"
             }
         }
     }
 
     let base: FakeFileSystem
     let defect: Defect
+    /// For `staleReleaseUnlocks`: the latest real token per lock file, as a reused descriptor number would name it.
+    let latestTokens = BrokenConformerTokens()
 
     func standardDirectory(_ directory: StandardDirectory) throws(FileSystemError) -> URL {
         try self.base.standardDirectory(directory)
@@ -129,6 +168,9 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     func contentsOfDirectory(at url: URL) throws(FileSystemError) -> [FileItemInfo] {
         if self.defect == .listingThrows {
             throw .io
+        }
+        if self.defect == .missingListingIsEmpty, try self.base.itemInfo(at: url) == nil {
+            return []
         }
         let items = try self.base.contentsOfDirectory(at: url)
         guard self.defect == .listingLosesKinds else {
@@ -175,6 +217,9 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
         if self.defect == .createFailsWhenPresent, try self.base.itemInfo(at: url) != nil {
             throw .alreadyExists
         }
+        if self.defect == .createMakesIntermediates, try self.base.itemInfo(at: url.deletingLastPathComponent()) == nil {
+            try self.createDirectory(at: url.deletingLastPathComponent())
+        }
         try self.base.createDirectory(at: url)
     }
 
@@ -182,8 +227,17 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
         if self.defect == .truncateReplacesFile, mode == .truncate {
             try self.base.removeItem(at: url)
         }
+        if self.defect == .writeCreatesParents, try self.base.itemInfo(at: url.deletingLastPathComponent()) == nil {
+            try self.base.createDirectory(at: url.deletingLastPathComponent())
+        }
+        var effective = mode
+        if self.defect == .appendTruncates {
+            effective = .truncate
+        } else if self.defect == .truncateAppends {
+            effective = .append
+        }
         do throws(FileSystemError) {
-            try self.base.write(data, to: url, mode: self.defect == .appendTruncates ? .truncate : mode)
+            try self.base.write(data, to: url, mode: effective)
         } catch .noSpace where self.defect == .shortWriteHidden {
             return
         }
@@ -193,6 +247,9 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
         if self.defect == .syncFails, level == .full {
             throw .notSupported
         }
+        if self.defect == .missingSyncSucceeds, try self.base.itemInfo(at: url) == nil {
+            return
+        }
         try self.base.synchronizeFile(at: url, level: level)
     }
 
@@ -201,6 +258,16 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     }
 
     func rename(from source: URL, to destination: URL, mode: RenameMode) throws(FileSystemError) {
+        if self.defect == .missingRenameSucceeds, try self.base.itemInfo(at: source) == nil {
+            return
+        }
+        if self.defect == .replacingRenameRefuses, mode == .replacing, try self.base.itemInfo(at: destination) != nil {
+            throw .alreadyExists
+        }
+        if self.defect == .exclusiveMoveCopiesWithoutRemoving, mode == .exclusive, try self.base.itemInfo(at: destination) == nil {
+            try self.base.write(try self.base.read(from: source, offset: 0, maxLength: 1 << 20), to: destination, mode: .truncate)
+            return
+        }
         if self.defect == .renameCopies, try self.base.itemInfo(at: destination) == nil {
             let data = try self.base.read(from: source, offset: 0, maxLength: 1 << 20)
             try self.base.write(data, to: destination, mode: .truncate)
@@ -213,6 +280,14 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     func removeItem(at url: URL) throws(FileSystemError) {
         if self.defect == .removeAbsentThrows, (try? self.base.itemInfo(at: url)) ?? nil == nil {
             throw .notFound
+        }
+        let kind = try self.base.itemInfo(at: url)?.kind
+        if self.defect == .removeLeavesFile, kind == .file {
+            return
+        }
+        if self.defect == .removeFollowsLink, kind == .symbolicLink, let target = self.base.survivingDisk().symbolicLinks[url.path] {
+            try self.base.removeItem(at: url.deletingLastPathComponent().appendingPathComponent(target))
+            return
         }
         do throws(FileSystemError) {
             try self.base.removeItem(at: url)
@@ -234,6 +309,10 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
             if self.defect == .lockTokenIsForeign {
                 return FileLockToken(identity: FileIdentity(device: 7, inode: 7), handle: token.handle)
             }
+            if self.defect == .staleReleaseUnlocks {
+                self.latestTokens.remember(token)
+                return FileLockToken(identity: token.identity, handle: 3)  // the same descriptor number every time
+            }
             return token
         } catch .wouldBlock where self.defect == .lockIsReentrant {
             return FileLockToken(identity: FileIdentity(device: 0, inode: 0), handle: -1)
@@ -241,7 +320,16 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     }
 
     func releaseLock(_ token: FileLockToken) {
-        self.base.releaseLock(token)
+        switch self.defect {
+        case .releaseBreaksReacquire:
+            return
+        case .staleReleaseUnlocks:
+            if let latest = self.latestTokens.latest(for: token.identity) {
+                self.base.releaseLock(latest)
+            }
+        default:
+            self.base.releaseLock(token)
+        }
     }
 
     func seedSymbolicLink(at url: URL, destination: String) throws(FileSystemError) {
@@ -250,5 +338,20 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
 
     func seedShortWrite(at url: URL, landing bytes: Int, error: FileSystemError) {
         self.base.seedShortWrite(at: url, landing: bytes, error: error)
+    }
+}
+
+/// The latest real lock token per lock file, so `staleReleaseUnlocks` releases whatever lock a reused descriptor
+/// number names now.
+@available(macOS 15.0, *)
+final class BrokenConformerTokens: Sendable {
+    private let tokens = Mutex<[FileIdentity: FileLockToken]>([:])
+
+    func remember(_ token: FileLockToken) {
+        self.tokens.withLock { $0[token.identity] = token }
+    }
+
+    func latest(for identity: FileIdentity) -> FileLockToken? {
+        self.tokens.withLock { $0[identity] }
     }
 }

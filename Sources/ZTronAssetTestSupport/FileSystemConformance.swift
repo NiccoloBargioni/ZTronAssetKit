@@ -24,7 +24,7 @@ public struct FileSystemConformanceViolation: Sendable, Hashable, CustomStringCo
 ///
 /// One set of clauses (absent-is-success removal, exclusive and replacing renames, append and truncate writes, short
 /// writes reported after the bytes that landed, non-following `itemInfo` and listings, the closed
-/// `FileSystemError` mapping, lock idempotence) that both conformers must satisfy, so `FakeFileSystem` cannot drift
+/// `FileSystemError` mapping, lock idempotence, including a stale token's release) that both conformers must satisfy, so `FakeFileSystem` cannot drift
 /// from the live behaviour the store relies on. It ships here, as an API, so that each package runs it from its
 /// own test files: WP-H against `FakeFileSystem` (`Tests/ZTronAssetStorageTests/TestSupport/`), WP-B against
 /// `LiveFileSystem` (`Tests/ZTronAssetStorageTests/Core/`), and neither edits the other's tests (ARCHITECTURE §1.2,
@@ -39,7 +39,8 @@ public enum FileSystemConformance {
     /// fixtures cannot be made through the seam: a symbolic link is created with the fake's seeding hook or, for a
     /// real directory, with `FileManager` inside `root`; a short write can only be induced in the fake, so that
     /// clause is checked only there. The suite never calls `standardDirectory` (the live one may create a
-    /// directory outside the repository).
+    /// directory outside the repository). Listing order is not part of the contract (the live order is arbitrary;
+    /// the fake lists in descending name order so that code relying on an order fails in tests): callers sort.
     public static func violations(of fileSystem: any FileSystem, in root: URL) -> [FileSystemConformanceViolation] {
         let probe = ConformanceProbe(fileSystem: fileSystem, root: root)
         probe.checkDirectories()
@@ -312,12 +313,25 @@ private final class ConformanceProbe {
         let release = "releaseLock is idempotent and the lock can be taken again"
         self.fileSystem.releaseLock(token)
         self.fileSystem.releaseLock(token)
-        switch self.result({ () throws(FileSystemError) -> FileLockToken in try self.fileSystem.acquireExclusiveLock(at: lock) }) {
-        case .success(let again):
-            self.fileSystem.releaseLock(again)
-        case .failure(let error):
-            self.fail(release, "re-acquiring threw \(error)")
+        guard case .success(let again) = self.result({ () throws(FileSystemError) -> FileLockToken in try self.fileSystem.acquireExclusiveLock(at: lock) })
+        else {
+            self.fail(release, "re-acquiring failed")
+            return
         }
+
+        // A live descriptor number is reused after `close`, so a stale token must not name the new lock (R-STO-9).
+        let stale = "releasing a stale token leaves a lock taken since then held"
+        self.fileSystem.releaseLock(token)
+        switch self.result({ () throws(FileSystemError) -> FileLockToken in try self.fileSystem.acquireExclusiveLock(at: lock) }) {
+        case .success(let intruder):
+            self.fail(stale, "a third holder took the lock after the first token was released again")
+            self.fileSystem.releaseLock(intruder)
+        case .failure(let error) where error != .wouldBlock:
+            self.fail(stale, "acquiring the held lock failed with \(error) instead of wouldBlock")
+        case .failure:
+            break
+        }
+        self.fileSystem.releaseLock(again)
     }
 
     func checkAttributesAndCapacity() {
