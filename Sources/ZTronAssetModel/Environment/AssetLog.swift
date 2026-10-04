@@ -217,23 +217,32 @@ public struct LogIntervalEvent: Sendable, Hashable {
     }
 
     /// The event a rendered interval line stands for, or `nil` for any other line.
+    ///
+    /// The line is read as UTF-8 bytes, not as `Character`s: a message that starts with a combining mark forms one
+    /// grapheme with the separator's space, which a character-wise parse would not split again.
     public init?(line: LogLine) {
-        guard line.level == .debug, line.message.hasPrefix(LogIntervalEvent.prefix) else {
+        let utf8 = line.message.utf8
+        guard line.level == .debug, utf8.starts(with: LogIntervalEvent.prefix.utf8) else {
             return nil
         }
-        let rest = line.message.dropFirst(LogIntervalEvent.prefix.count)
-        let head = rest.prefix { $0 != ":" }
-        let words = head.split(separator: " ", omittingEmptySubsequences: false)
-        guard words.count == 2, let name = LogIntervalName(rawValue: String(words[0])),
-            let phase = Phase(rawValue: String(words[1]))
+        let rest = utf8.dropFirst(LogIntervalEvent.prefix.utf8.count)
+        let headEnd = rest.firstIndex(of: UInt8(ascii: ":")) ?? rest.endIndex
+        let head = rest[rest.startIndex..<headEnd]
+        guard let space = head.firstIndex(of: UInt8(ascii: " ")),
+            let name = LogIntervalName(rawValue: String(Substring(head[head.startIndex..<space]))),
+            let phase = Phase(rawValue: String(Substring(head[head.index(after: space)...])))
         else {
             return nil
         }
-        let message = rest.dropFirst(head.count)
-        guard message.isEmpty || message.hasPrefix(": ") else {
-            return nil
+        var message = ""
+        if headEnd != rest.endIndex {
+            let separatorEnd = rest.index(after: headEnd)
+            guard separatorEnd != rest.endIndex, rest[separatorEnd] == UInt8(ascii: " ") else {
+                return nil
+            }
+            message = String(Substring(rest[rest.index(after: separatorEnd)...]))
         }
-        self.init(subsystem: line.subsystem, category: line.category, name: name, phase: phase, message: String(message.dropFirst(2)))
+        self.init(subsystem: line.subsystem, category: line.category, name: name, phase: phase, message: message)
     }
 
     private static let prefix = "interval "

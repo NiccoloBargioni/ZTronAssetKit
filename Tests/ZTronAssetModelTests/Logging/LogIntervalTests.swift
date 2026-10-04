@@ -69,7 +69,9 @@ struct LogIntervalTests {
     func intervalLinesParse() {
         for name in LogIntervalName.allCases {
             for phase in LogIntervalEvent.Phase.allCases {
-                for message in ["", "id#00ff00ff00ff00ff", "a: b: c"] {
+                // A message that starts with a combining mark forms one Character with the separator's space;
+                // the parse works on bytes, so it still finds the separator.
+                for message in ["", "id#00ff00ff00ff00ff", "a: b: c", " leading", "\u{0301}combining first", "\u{0301}", "\u{200D}x", "é:"] {
                     let event = LogIntervalEvent(category: .apple, name: name, phase: phase, message: message)
                     #expect(LogIntervalEvent(line: event.line) == event)
                     #expect(event.line.level == .debug && event.line.category == .apple)
