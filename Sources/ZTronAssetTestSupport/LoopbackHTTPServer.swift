@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import ZTronAssetModel
 
 /// One request the loopback server received (P-10 connection counts, key-stripping and Range assertions).
@@ -123,9 +124,27 @@ public typealias LoopbackHandler = @Sendable (LoopbackRequest) -> LoopbackRespon
 /// A plain HTTP/1.1 server on `127.0.0.1`, ephemeral port, loopback interface only (ADR-011; WP-H): an actor over
 /// `NWListener`, keep-alive, one async loop per connection. Never used outside tests and benchmarks; the only
 /// plaintext policy that reaches it is the package-only `TransportSecurityPolicy.loopbackTesting`.
+///
+/// Behaviour (transport.md §12, ARCHITECTURE §6.7): requests are parsed in arrival order (a `Content-Length` request
+/// body is consumed), numbered globally, per target and by 1-based connection, and answered by the handler on the
+/// actor. Responses carry `Content-Length` (unless `omitContentLength`, which closes the connection after the
+/// body), `Connection`, and, for `.gzip`, `Content-Encoding: gzip` over a `Gzip` body. With `rangeETag`, a 200
+/// becomes a 206 for `Range: bytes=a-` or `bytes=a-b` when `If-Range` is absent or equals the tag (416 when the start
+/// is past the end); any other `If-Range` gets the whole body. `.closeAfter(n)` sends n body bytes and a FIN (the
+/// deterministic "connection lost"; never RST, transport.md E-16); `.stallAfter(n)` sends n bytes and holds the
+/// connection until `stop()`. Latency goes through the injected `LoopbackDelay`, which never sleeps by default.
 public actor LoopbackHTTPServer {
     private let delay: any LoopbackDelay
     private let handler: LoopbackHandler
+    private let queue = DispatchQueue(label: "com.ztron.assetkit.tests.loopback-server")
+    private var listener: NWListener?
+    private var port: UInt16?
+    private var connections: [Int: NWConnection] = [:]
+    private var accepted = 0
+    private var sequence = 0
+    private var perTarget: [String: Int] = [:]
+    private var log: [LoopbackRequest] = []
+    private var stopped = false
 
     /// Creates a server (not listening yet).
     public init(delay: any LoopbackDelay = NoLoopbackDelay(), handler: @escaping LoopbackHandler) {
@@ -133,36 +152,383 @@ public actor LoopbackHTTPServer {
         self.handler = handler
     }
 
+    deinit {
+        self.listener?.cancel()
+        for connection in self.connections.values {
+            connection.cancel()
+        }
+    }
+
     /// Starts listening; returns the port.
     public func start() async throws -> UInt16 {
-        fatalError("WP-H: LoopbackHTTPServer.start not implemented")
+        if let port = self.port {
+            return port
+        }
+        guard !self.stopped else {
+            throw LoopbackServerError.stopped
+        }
+        let parameters = NWParameters.tcp
+        parameters.requiredInterfaceType = .loopback
+        parameters.acceptLocalOnly = true
+        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
+        let listener = try NWListener(using: parameters)
+        listener.newConnectionHandler = { [weak self] connection in
+            Task {
+                // REENTRANCY: h-5 (proposed) — nothing: this task is not the actor; `accept` re-reads `stopped` on
+                // the actor and cancels a connection that arrives after `stop()`.
+                await self?.accept(connection)
+            }
+        }
+        self.listener = listener
+        // REENTRANCY: h-6 (proposed) — `stopped` and `listener` are re-read: a `stop()` that ran while the listener
+        // was coming up cancelled it, so the start fails instead of reporting a dead port.
+        let port = try await LoopbackHTTPServer.ready(listener, on: self.queue)
+        guard !self.stopped, self.listener === listener else {
+            listener.cancel()
+            throw LoopbackServerError.stopped
+        }
+        self.port = port
+        return port
     }
 
     /// Stops the listener and every connection (stalled ones included).
     public func stop() {
-        fatalError("WP-H: LoopbackHTTPServer.stop not implemented")
+        self.stopped = true
+        self.listener?.cancel()
+        self.listener = nil
+        for connection in self.connections.values {
+            connection.cancel()
+        }
+        self.connections.removeAll()
     }
 
     /// Connections accepted so far (P-10).
     public var acceptedConnections: Int {
-        fatalError("WP-H: LoopbackHTTPServer.acceptedConnections not implemented")
+        self.accepted
     }
 
     /// Requests received so far.
     public var requests: [LoopbackRequest] {
-        fatalError("WP-H: LoopbackHTTPServer.requests not implemented")
+        self.log
     }
+
+    // MARK: Connections
+
+    private func accept(_ connection: NWConnection) {
+        guard !self.stopped else {
+            connection.cancel()
+            return
+        }
+        self.accepted += 1
+        let number = self.accepted
+        self.connections[number] = connection
+        connection.start(queue: self.queue)
+        Task {
+            // REENTRANCY: h-5 (proposed) — nothing: `serve` re-reads `stopped` after each of its own awaits.
+            await self.serve(connection, number: number)
+        }
+    }
+
+    /// One connection's loop: parse every complete request in the buffer, answer it, then read more. A receive that
+    /// reports the end of the client's stream (with or without bytes) is the last one: no receive completes after
+    /// it, so the requests still buffered are answered and the connection is closed.
+    private func serve(_ connection: NWConnection, number: Int) async {
+        var buffer = Data()
+        var clientFinished = false
+        while !self.stopped {
+            while let request = self.takeRequest(from: &buffer, connection: number) {
+                self.log.append(request)
+                // REENTRANCY: h-7 (proposed) — `stopped` is re-read: after `stop()` the connection was cancelled and
+                // the loop ends; the log entry was appended before the await, so it is never lost.
+                let keepOpen = await self.respond(to: request, on: connection, number: number)
+                guard keepOpen, !self.stopped else {
+                    return
+                }
+            }
+            if clientFinished {
+                self.close(connection, number: number)
+                return
+            }
+            // REENTRANCY: h-7 (proposed) — `stopped` is re-read by the loop condition; a failed or finished receive
+            // closes this connection only (its entry is removed by number, never another connection's).
+            let (data, complete, failed) = await LoopbackHTTPServer.receive(connection)
+            if let data {
+                buffer.append(data)
+            }
+            if failed {
+                self.close(connection, number: number)
+                return
+            }
+            clientFinished = complete
+        }
+    }
+
+    /// Answers one request; returns whether the connection stays open for the next one.
+    private func respond(to request: LoopbackRequest, on connection: NWConnection, number: Int) async -> Bool {
+        let response = self.handler(request)
+        if response.latencyNanoseconds > 0 {
+            // REENTRANCY: h-7 (proposed) — `stopped` is re-read below: a response is not sent after `stop()`.
+            await self.delay.wait(nanoseconds: response.latencyNanoseconds)
+            guard !self.stopped else {
+                return false
+            }
+        }
+        let (head, body) = LoopbackHTTPServer.render(response, for: request)
+        switch response.ending {
+        case .complete:
+            let closes = response.omitContentLength || request.header("connection")?.lowercased() == "close"
+            // REENTRANCY: h-7 (proposed) — nothing but `stopped` (read by the caller): the bytes are queued in order.
+            await LoopbackHTTPServer.send(head + body, on: connection, final: closes)
+            if closes {
+                self.close(connection, number: number)
+                return false
+            }
+            return true
+        case .closeAfter(let count):
+            // REENTRANCY: h-7 (proposed) — nothing: the connection is closed right after, whatever happened meanwhile.
+            await LoopbackHTTPServer.send(head + body.prefix(max(0, count)), on: connection, final: true)
+            self.close(connection, number: number)
+            return false
+        case .stallAfter(let count):
+            // REENTRANCY: h-7 (proposed) — nothing: the connection stays in the table until `stop()` cancels it.
+            await LoopbackHTTPServer.send(head + body.prefix(max(0, count)), on: connection, final: false)
+            return false
+        }
+    }
+
+    private func close(_ connection: NWConnection, number: Int) {
+        connection.cancel()
+        self.connections.removeValue(forKey: number)
+    }
+
+    // MARK: Parsing and rendering
+
+    /// Removes and returns the first complete request (head plus `Content-Length` body), or `nil` when the buffer
+    /// does not hold one yet.
+    private func takeRequest(from buffer: inout Data, connection: Int) -> LoopbackRequest? {
+        guard let end = buffer.range(of: Data("\r\n\r\n".utf8)) else {
+            return nil
+        }
+        let head = String(decoding: buffer[buffer.startIndex..<end.lowerBound], as: UTF8.self)
+        var lines = head.components(separatedBy: "\r\n")
+        let requestLine = lines.removeFirst().split(separator: " ")
+        var headers: [String: String] = [:]
+        for line in lines {
+            guard let colon = line.firstIndex(of: ":") else {
+                continue
+            }
+            headers[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+        }
+        let bodyLength = headers["content-length"].flatMap { Int($0) } ?? 0
+        guard buffer.distance(from: end.upperBound, to: buffer.endIndex) >= bodyLength else {
+            return nil
+        }
+        buffer = Data(buffer[buffer.index(end.upperBound, offsetBy: bodyLength)...])
+        let target = requestLine.count > 1 ? String(requestLine[1]) : "/"
+        self.sequence += 1
+        self.perTarget[target, default: 0] += 1
+        return LoopbackRequest(
+            connection: connection,
+            sequence: self.sequence,
+            pathSequence: self.perTarget[target, default: 1],
+            method: requestLine.first.map(String.init) ?? "",
+            target: target,
+            headers: headers
+        )
+    }
+
+    /// The response head and the body to send (encoded, and sliced for a range).
+    private static func render(_ response: LoopbackResponse, for request: LoopbackRequest) -> (Data, Data) {
+        var status = response.status
+        var body = response.encoding == .gzip ? Gzip.compress(response.body) : response.body
+        var headers = response.headers
+        if response.encoding == .gzip {
+            headers["Content-Encoding"] = "gzip"
+        }
+        if let tag = response.rangeETag {
+            headers["ETag"] = tag
+            headers["Accept-Ranges"] = "bytes"
+            let ifRange = request.header("if-range")
+            if status == 200, ifRange == nil || ifRange == tag, let range = request.header("range").flatMap(LoopbackHTTPServer.byteRange) {
+                let total = body.count
+                if range.start < total {
+                    let last = min(range.end ?? (total - 1), total - 1)
+                    body = body.subdata(in: range.start..<(last + 1))
+                    status = 206
+                    headers["Content-Range"] = "bytes \(range.start)-\(last)/\(total)"
+                } else {
+                    body = Data()
+                    status = 416
+                    headers["Content-Range"] = "bytes */\(total)"
+                }
+            }
+        }
+        if !response.omitContentLength {
+            headers["Content-Length"] = String(body.count)
+        }
+        let closes = response.omitContentLength || request.header("connection")?.lowercased() == "close"
+        headers["Connection"] = closes ? "close" : "keep-alive"
+        var head = "HTTP/1.1 \(status) \(LoopbackHTTPServer.reason(status))\r\n"
+        for (name, value) in headers.sorted(by: { $0.key < $1.key }) {
+            head += "\(name): \(value)\r\n"
+        }
+        head += "\r\n"
+        return (Data(head.utf8), body)
+    }
+
+    /// `bytes=a-` or `bytes=a-b`; `nil` for any other unit or form (the header is then ignored).
+    private static func byteRange(_ header: String) -> (start: Int, end: Int?)? {
+        guard header.hasPrefix("bytes=") else {
+            return nil
+        }
+        let parts = header.dropFirst(6).split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2, let start = Int(parts[0]), start >= 0 else {
+            return nil
+        }
+        guard !parts[1].isEmpty else {
+            return (start, nil)
+        }
+        guard let end = Int(parts[1]), end >= start else {
+            return nil
+        }
+        return (start, end)
+    }
+
+    private static func reason(_ status: Int) -> String {
+        switch status {
+        case 200: return "OK"
+        case 206: return "Partial Content"
+        case 301: return "Moved Permanently"
+        case 302: return "Found"
+        case 304: return "Not Modified"
+        case 307: return "Temporary Redirect"
+        case 308: return "Permanent Redirect"
+        case 401: return "Unauthorized"
+        case 403: return "Forbidden"
+        case 404: return "Not Found"
+        case 410: return "Gone"
+        case 416: return "Range Not Satisfiable"
+        case 429: return "Too Many Requests"
+        case 500: return "Internal Server Error"
+        case 503: return "Service Unavailable"
+        default: return "Status"
+        }
+    }
+
+    // MARK: Network bridging
+
+    /// Waits for the listener to become ready and returns its port; fails when it fails, waits or is cancelled.
+    private static func ready(_ listener: NWListener, on queue: DispatchQueue) async throws -> UInt16 {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                case .failed(let error), .waiting(let error):
+                    listener.stateUpdateHandler = nil
+                    listener.cancel()
+                    continuation.resume(throwing: LoopbackServerError.listener("\(error)"))
+                case .cancelled:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(throwing: LoopbackServerError.stopped)
+                case .setup:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+        }
+    }
+
+    /// One receive: the bytes, whether the peer finished, whether it failed.
+    private static func receive(_ connection: NWConnection) async -> (Data?, Bool, Bool) {
+        await withCheckedContinuation { (continuation: CheckedContinuation<(Data?, Bool, Bool), Never>) in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, isComplete, error in
+                continuation.resume(returning: (data, isComplete, error != nil))
+            }
+        }
+    }
+
+    /// Sends bytes as one complete message; `final` ends the stream with a FIN after them. (An incomplete default
+    /// message would hold back every later send on another context, the final one included.)
+    private static func send(_ data: Data, on connection: NWConnection, final: Bool) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            connection.send(
+                content: data,
+                contentContext: final ? .finalMessage : .defaultMessage,
+                isComplete: true,
+                completion: .contentProcessed { _ in continuation.resume() }
+            )
+        }
+    }
+}
+
+/// Why `LoopbackHTTPServer.start()` failed.
+enum LoopbackServerError: Error, Sendable, Hashable {
+    /// The listener failed or could not get a path.
+    case listener(String)
+    /// `stop()` ran before the listener was ready, or the server was stopped already.
+    case stopped
 }
 
 /// RFC 1952 gzip framing around raw DEFLATE, plus CRC-32 (the gzip scenario of SPEC §7.3).
 public enum Gzip {
     /// Compresses `data`.
     public static func compress(_ data: Data) -> Data {
-        fatalError("WP-H: Gzip.compress not implemented")
+        let deflated: Data
+        if data.isEmpty {
+            deflated = Data([0x03, 0x00])  // the canonical empty final block
+        } else {
+            deflated = (try? (data as NSData).compressed(using: .zlib) as Data) ?? Gzip.storedDeflate(data)
+        }
+        return Gzip.frame(deflated, original: data)
     }
 
     /// The CRC-32 of `data`.
     public static func crc32(_ data: Data) -> UInt32 {
-        fatalError("WP-H: Gzip.crc32 not implemented")
+        var crc: UInt32 = 0xFFFF_FFFF
+        for byte in data {
+            crc = Gzip.table[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)
+        }
+        return crc ^ 0xFFFF_FFFF
+    }
+
+    /// The member around raw DEFLATE bytes: header (no name, no mtime: nothing clock-dependent), payload, CRC-32
+    /// and size, little-endian.
+    static func frame(_ deflated: Data, original: Data) -> Data {
+        var framed = Data([0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF])
+        framed.append(deflated)
+        Gzip.appendLittleEndian(&framed, Gzip.crc32(original))
+        Gzip.appendLittleEndian(&framed, UInt32(truncatingIfNeeded: original.count))
+        return framed
+    }
+
+    /// RFC 1951 stored blocks: a valid DEFLATE stream that needs no compressor (the fallback if the system's fails).
+    static func storedDeflate(_ data: Data) -> Data {
+        var out = Data()
+        var offset = data.startIndex
+        repeat {
+            let length = min(65_535, data.endIndex - offset)
+            let last = offset + length == data.endIndex
+            out.append(last ? 0x01 : 0x00)
+            out.append(contentsOf: [UInt8(length & 0xFF), UInt8(length >> 8), UInt8(~length & 0xFF), UInt8((~length >> 8) & 0xFF)])
+            out.append(data[offset..<(offset + length)])
+            offset += length
+        } while offset < data.endIndex
+        return out
+    }
+
+    private static func appendLittleEndian(_ out: inout Data, _ value: UInt32) {
+        out.append(contentsOf: [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF), UInt8((value >> 16) & 0xFF), UInt8(value >> 24)])
+    }
+
+    private static let table: [UInt32] = (0..<256).map { index -> UInt32 in
+        var value = UInt32(index)
+        for _ in 0..<8 {
+            value = value & 1 != 0 ? 0xEDB8_8320 ^ (value >> 1) : value >> 1
+        }
+        return value
     }
 }
