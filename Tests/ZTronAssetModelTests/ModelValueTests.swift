@@ -46,7 +46,8 @@ struct ModelValueTests {
         let manifest = try ManifestDecoder.decode(Data(#"[{"identifier":"a","fileExtension":"png","remotePath":"m/a","localPathComponents":[]}]"#.utf8))
         let sent = await Task.detached { manifest }.value
         #expect(sent == manifest)
-        let sendable: [Any.Type] = [
+        // The real check is at compile time: `requireSendable` accepts only `Sendable` types.
+        _ = [
             Self.requireSendable(ValidatedManifest.self), Self.requireSendable(ManifestDiff.self),
             Self.requireSendable(QuarantinedEntry.self), Self.requireSendable(ManifestError.self),
             Self.requireSendable(ManifestLimits.self), Self.requireSendable(ManifestDecodingOptions.self),
@@ -55,8 +56,7 @@ struct ModelValueTests {
             Self.requireSendable(LogIntervalEvent.self), Self.requireSendable(LogInterval.self),
             Self.requireSendable(LogRoute.self), Self.requireSendable(AssetEnvironment.self),
             Self.requireSendable(TransferRequest.self), Self.requireSendable(AssetEvent.self),
-        ]
-        #expect(sendable.count == 16)
+        ] as [Any.Type]
     }
 
     private static func requireSendable<Value: Sendable>(_ type: Value.Type) -> Any.Type {

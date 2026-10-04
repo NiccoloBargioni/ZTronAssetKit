@@ -4,8 +4,9 @@ import Testing
 /// Read-only scans of `Sources/` for the package-wide rules WP-A owns (R-ENV-1, R-OBS-1, R-MAN-7).
 ///
 /// Located through `#filePath` (no working-directory assumption), it only reads. A small Swift-aware lexer strips
-/// comments and string-literal contents, so a rule stated in a doc comment or a message never trips a scan, and
-/// tracks which type declaration encloses each line.
+/// comments and string-literal contents (keeping the code of interpolations), so a rule stated in a doc comment or
+/// a message never trips a scan while a call inside `\(…)` does, and tracks which type declaration encloses each
+/// line.
 enum SourceScan {
     /// One line of code, with its comments removed and its string literals' contents blanked.
     struct Line {
@@ -15,7 +16,8 @@ enum SourceScan {
         var number: Int
         /// The line as written.
         var text: String
-        /// The code part: no comment, string contents replaced by spaces (the quotes stay).
+        /// The code part: no comment, string contents replaced by spaces (the quotes and the code of
+        /// interpolations stay).
         var code: String
         /// The names of the type declarations (`struct`, `class`, `actor`, `enum`, `extension`, `protocol`) that
         /// enclose the line, outermost first.
@@ -42,13 +44,22 @@ enum SourceScan {
         return files.sorted { $0.0 < $1.0 }.flatMap { self.lex(path: $0.0, text: $0.1) }
     }
 
+    /// Where the lexer is, innermost last: inside a string literal, or inside an interpolation of one.
+    private enum Frame {
+        /// A string literal: its closing delimiter's `#` count and whether it is `"""`.
+        case string(hashes: Int, multiline: Bool)
+        /// Code inside `\( … )` (or `\#( … )` in a raw string): the parentheses opened since and not yet closed.
+        case interpolation(openParentheses: Int)
+    }
+
     /// Splits one file into lines with code parts and enclosing types. Handles `//` and `/* */` comments, string
-    /// literals with escapes, raw strings (`#"…"#`, any number of `#`) and multi-line strings.
+    /// literals with escapes, raw strings (`#"…"#`, any number of `#`) and multi-line strings. The code inside an
+    /// interpolation (`\(…)`, or `\#(…)` with the raw string's `#` count) stays code, nested strings and
+    /// interpolations included, so a call written there is seen like any other.
     static func lex(path: String, text: String) -> [Line] {
         var result: [Line] = []
         var inBlockComment = false
-        /// Inside a string: `nil` outside; the closing delimiter's `#` count and whether it is `"""`.
-        var string: (hashes: Int, multiline: Bool)?
+        var frames: [Frame] = []
         var depth = 0
         var types: [(name: String, depth: Int)] = []
         var pendingType: String?
@@ -70,13 +81,18 @@ enum SourceScan {
                         inBlockComment = false
                         position += 1
                     }
-                } else if let open = string {
-                    let closing = (open.multiline ? "\"\"\"" : "\"") + String(repeating: "#", count: open.hashes)
+                } else if case .string(let hashes, let multiline)? = frames.last {
+                    let closing = (multiline ? "\"\"\"" : "\"") + String(repeating: "#", count: hashes)
+                    let interpolation = "\\" + String(repeating: "#", count: hashes) + "("
                     if matches(closing, at: position) {
-                        string = nil
+                        frames.removeLast()
                         code += closing
                         position += closing.count - 1
-                    } else if character == "\\", open.hashes == 0 {
+                    } else if matches(interpolation, at: position) {
+                        frames.append(.interpolation(openParentheses: 0))
+                        code += interpolation
+                        position += interpolation.count - 1
+                    } else if character == "\\", hashes == 0 {
                         code += "  "
                         position += 1
                     } else {
@@ -94,21 +110,35 @@ enum SourceScan {
                     }
                     if matches("\"", at: position + hashes) {
                         let multiline = matches("\"\"\"", at: position + hashes)
-                        string = (hashes, multiline)
+                        frames.append(.string(hashes: hashes, multiline: multiline))
                         let opening = String(repeating: "#", count: hashes) + (multiline ? "\"\"\"" : "\"")
                         code += opening
                         position += opening.count - 1
                     } else {
                         code.append(character)
                     }
+                } else if case .interpolation(let open)? = frames.last, character == "(" || character == ")" {
+                    code.append(character)
+                    frames.removeLast()
+                    if character == "(" {
+                        frames.append(.interpolation(openParentheses: open + 1))
+                    } else if open > 0 {
+                        frames.append(.interpolation(openParentheses: open - 1))
+                    }
+                    // Else the interpolation closed: back in its string.
                 } else {
                     code.append(character)
                 }
                 position += 1
             }
-            if let open = string, !open.multiline {
-                // A single-line string cannot continue on the next line.
-                string = nil
+            // A single-line string, and anything opened inside it, cannot continue on the next line.
+            if let single = frames.firstIndex(where: { frame in
+                if case .string(_, false) = frame {
+                    return true
+                }
+                return false
+            }) {
+                frames.removeSubrange(single...)
             }
 
             if let name = self.declaredType(in: code) {
@@ -148,6 +178,25 @@ enum SourceScan {
             return tokens[index + 1]
         }
         return nil
+    }
+
+    /// Whether `pattern` occurs in `code`. A pattern that starts with a name matches only where that name starts
+    /// (`Date()` is not found in `lastUpdateDate()`); with `standalone`, not after a `.` either (`print(` is not
+    /// `logger.print(`).
+    static func contains(_ pattern: String, in code: String, standalone: Bool = false) -> Bool {
+        let isName = { (character: Character) in character.isLetter || character.isNumber || character == "_" }
+        guard let first = pattern.first, isName(first) else {
+            return code.contains(pattern)
+        }
+        var searchStart = code.startIndex
+        while let range = code.range(of: pattern, range: searchStart..<code.endIndex) {
+            let preceding = range.lowerBound == code.startIndex ? nil : code[code.index(before: range.lowerBound)]
+            if preceding.map({ !(isName($0) || (standalone && $0 == ".")) }) ?? true {
+                return true
+            }
+            searchStart = range.upperBound
+        }
+        return false
     }
 
     /// The text of `\( … )` interpolations in a line's original text (balanced parentheses).

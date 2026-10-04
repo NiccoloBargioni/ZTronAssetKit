@@ -25,13 +25,22 @@ struct LogScanTests {
             route.log(.sync, .error,
                 "failed \\(entry.identifier) at \\(remotePath)")
             let span = route.interval(.transfer, category: .transport, "from \\(url)")
+            let detail = "evicted \\(id) after \\(count)"
+            route.log(.store, .info, detail)
+            var text = "start"
+            text += " at \\(remotePath)"
+            route.log(.store, .info, "done: \\(text)")
             """)
-        #expect(Self.violations(in: bad).count == 10, "\(Self.violations(in: bad))")
+        #expect(Self.violations(in: bad).count == 12, "\(Self.violations(in: bad))")
         let good = SourceScan.lex(path: "Sources/X/Good.swift", text: """
             route.log(.store, .info, "evicted \\(AssetLog.hashed(id)) bytes=\\(byteCount)")
             route.log(.sync, .error,
                 "failed \\(AssetLog.hashed(entry.identifier)) class=\\(failure)")
             let span = route.interval(.commit, category: .store, "generation \\(generation)")
+            let detail = "evicted \\(AssetLog.hashed(id)) after \\(count)"
+            route.log(.store, .info, detail)
+            let url = makeURL("\\(id)")
+            route.log(.store, .info, "fetched \\(byteCount) bytes")
             // print("in a comment") and Logger(subsystem: "x") in comments are not code
             let text = "print(\\"in a string\\") is not a call"
             """)
@@ -97,13 +106,20 @@ struct LogScanTests {
     private static func violations(in lines: [SourceScan.Line]) -> [String] {
         var found: [String] = []
         let forbiddenCalls = ["print(", "debugPrint(", "NSLog(", "os_log(", "dump("]
+        /// Names bound, in the current function, to text that interpolates an identifier without hashing it.
+        var tainted: Set<String> = []
+        var scope = ""
         for (index, line) in lines.enumerated() {
             let location = "\(line.path):\(line.number)"
             let code = line.code
+            if line.path != scope || code.contains("func ") {
+                tainted = []
+                scope = line.path
+            }
             if (code.contains("Logger(") || code.contains("OSSignposter(") || code.contains("OSLog(")), line.path != Self.logFile {
                 found.append("\(location): logger or signposter outside AssetLog.swift")
             }
-            for call in forbiddenCalls where Self.containsCall(call, in: code) {
+            for call in forbiddenCalls where SourceScan.contains(call, in: code, standalone: true) {
                 found.append("\(location): \(call) bypasses the log sink")
             }
             if code.contains("LogLine(subsystem:"), !line.path.hasPrefix("Sources/ZTronAssetModel/Environment/") {
@@ -112,41 +128,63 @@ struct LogScanTests {
             if code.contains("LogCategory(rawValue:") {
                 found.append("\(location): a category made from text")
             }
+            let statement = Self.statement(from: index, in: lines)
+            let unhashed = statement.map(\.text).flatMap(SourceScan.interpolations(in:)).filter {
+                Self.namesIdentifier($0) && !$0.contains("hashed(")
+            }
             if [".log(", "LogLine(", ".interval(", ".emit("].contains(where: code.contains), !code.contains("func ") {
-                for interpolation in Self.statementText(from: index, in: lines).flatMap(SourceScan.interpolations(in:))
-                where Self.namesIdentifier(interpolation) && !interpolation.contains("hashed(") {
+                for interpolation in unhashed {
                     found.append("\(location): \\(\(interpolation)) is not hashed")
+                }
+                let words = Set(statement.flatMap { Self.words(in: $0.code) })
+                for name in tainted.sorted() where words.contains(name) {
+                    found.append("\(location): \(name) carries an unhashed identifier into the line")
+                }
+            }
+            // A message assembled before the call: `let m = "…\\(id)…"`, `m += "…"`.
+            if let name = Self.boundName(in: code) {
+                if !unhashed.isEmpty {
+                    tainted.insert(name)
+                } else if !code.contains("+=") {
+                    tainted.remove(name)
                 }
             }
         }
         return found
     }
 
-    /// Whether `call` (`print(`) appears in `code` as a call, not as the tail of a longer name.
-    private static func containsCall(_ call: String, in code: String) -> Bool {
-        var searchStart = code.startIndex
-        while let range = code.range(of: call, range: searchStart..<code.endIndex) {
-            let preceding = range.lowerBound == code.startIndex ? nil : code[code.index(before: range.lowerBound)]
-            if preceding.map({ !($0.isLetter || $0.isNumber || $0 == "_" || $0 == ".") }) ?? true {
-                return true
+    /// The name a `let`/`var` binding, an assignment or a `+=` on this line gives a value to.
+    private static func boundName(in code: String) -> String? {
+        let patterns = [#"\b(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^=]*)?=(?!=)"#, #"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\+?=(?!=)"#]
+        let range = NSRange(code.startIndex..., in: code)
+        for pattern in patterns {
+            guard let expression = try? NSRegularExpression(pattern: pattern),
+                let match = expression.firstMatch(in: code, range: range), let name = Range(match.range(at: 1), in: code)
+            else {
+                continue
             }
-            searchStart = range.upperBound
+            return String(code[name])
         }
-        return false
+        return nil
     }
 
-    /// The original text of the statement starting at `index`: lines are joined until its parentheses balance.
-    private static func statementText(from index: Int, in lines: [SourceScan.Line]) -> [String] {
+    /// The identifiers (names) in a line of code.
+    private static func words(in code: String) -> [String] {
+        code.split(whereSeparator: { !($0.isLetter || $0.isNumber || $0 == "_") }).map(String.init)
+    }
+
+    /// The lines of the statement starting at `index`: lines are joined until its parentheses balance.
+    private static func statement(from index: Int, in lines: [SourceScan.Line]) -> [SourceScan.Line] {
         var balance = 0
-        var texts: [String] = []
+        var result: [SourceScan.Line] = []
         var current = index
         repeat {
             let line = lines[current]
-            texts.append(line.text)
+            result.append(line)
             balance += line.code.filter { $0 == "(" }.count - line.code.filter { $0 == ")" }.count
             current += 1
         } while balance > 0 && current < lines.count && lines[current].path == lines[index].path
-        return texts
+        return result
     }
 
     /// Whether an interpolated expression names something that identifies an asset or a location: those must be
