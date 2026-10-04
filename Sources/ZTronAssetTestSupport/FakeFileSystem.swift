@@ -133,8 +133,11 @@ public struct FaultRule: Sendable, Hashable {
     public var occurrence: Occurrence
     /// The error thrown.
     public var error: FileSystemError
-    /// For `write`: how many bytes land before the error (`nil`: none). A write fault models `write(2)` failing
-    /// after `open(2)` succeeded, so the file exists afterwards and a `.truncate` write has emptied it first.
+    /// For `write`: how many bytes land before the error (`nil`: none). The error decides where the write fails. An
+    /// error `write(2)` itself returns (`.noSpace`, `.io`, `.other` with EFBIG, EINTR, EDQUOT or EAGAIN) fails after
+    /// `open(2)` succeeded: the file exists afterwards, a `.truncate` write has emptied it, and these bytes (or what
+    /// an `.afterBytes` threshold lets through) have landed. Any other error (`.permissionDenied`, `.notFound`,
+    /// `.other(EISDIR)`, …) fails `open(2)` itself and changes nothing, whatever this says.
     public var partialBytes: Int?
 
     /// Creates a rule.
@@ -223,7 +226,8 @@ public struct DiskImage: Sendable, Hashable {
         )
     }
 
-    /// Every path, sorted.
+    /// Every file and directory path of the current namespace, sorted. Symbolic links are not listed (`digest()`
+    /// covers them; a test that seeds one reads it through the fake).
     public var paths: [String] {
         (Array(self.files.keys) + Array(self.directories)).sorted()
     }
@@ -714,6 +718,21 @@ public final class FakeFileSystem: FileSystem {
         }
     }
 
+    /// Whether an injected write error is one `write(2)` returns after `open(2)` succeeded (ENOSPC, EIO, EFBIG, EINTR,
+    /// EDQUOT, EAGAIN), so the open's side effects and the rule's landed bytes apply. Every other error (EACCES/EPERM,
+    /// ENOENT, EISDIR, ENOTDIR, …) is one `open(2)` returns, which leaves the file system untouched (store.md §3.4:
+    /// EACCES before the first unlock mutates nothing).
+    static func failsAfterOpen(_ error: FileSystemError) -> Bool {
+        switch error {
+        case .noSpace, .io:
+            return true
+        case .other(let code):
+            return [EFBIG, EINTR, EDQUOT, EAGAIN].contains(code)
+        case .permissionDenied, .notFound, .alreadyExists, .crossDevice, .wouldBlock, .notEmpty, .notSupported:
+            return false
+        }
+    }
+
     /// Runs one call: records it, enforces the crash point and the fault rules, then performs `body`.
     private func perform<T: Sendable>(
         _ kind: FSOpKind,
@@ -764,17 +783,18 @@ public final class FakeFileSystem: FileSystem {
                 if self.configuration.crashMode == .processKillTornWrite {
                     torn(&state)
                 }
+                // Lock state needs no clearing: it dies with this lifetime, whose every later call throws `.io`
+                // (`releaseLock` included), and the next lifetime starts with no holder.
                 state.crashImage = DiskImage(graph: state.graph.surviving(self.configuration.crashMode))
-                state.locks.removeAll()
                 throw .io
             }
             state.mutations += 1
         }
         if let fired = state.fireFault(kind, url, offered: offered) {
-            if kind == .write {
+            if kind == .write, FakeFileSystem.failsAfterOpen(fired.error) {
                 partial(&state, fired.landed ?? 0)  // write(2) failed after open(2): created, and truncated for .truncate
             }
-            throw fired.error
+            throw fired.error  // any other error failed open(2) itself: nothing changed
         }
         return try body(&state)
     }

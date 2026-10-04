@@ -164,14 +164,20 @@ struct TestSupportFakeFileSystemCrashTests {
         #expect(tornElsewhere.survivingDisk() == killed.survivingDisk())
     }
 
+    /// R-STO-9 relies on the lock file outliving the process that held it: the next lifetime locks the **same** file
+    /// (same identity), never a fresh one made by the acquisition. Lock state itself lives in a lifetime only.
     @available(macOS 15.0, *)
-    @Test("Test support: a process kill releases every lock, so the next lifetime takes the lock again")
-    func crashReleasesLocks() throws {
+    @Test("Test support: a process kill keeps the lock file with its identity, and the next lifetime locks that same file")
+    func crashKeepsTheLockFile() throws {
         let lock = FakeFSFixture.url("/fake-volume/store.lock")
         let first = FakeFSFixture.make(crashBefore: 1)
-        _ = try first.acquireExclusiveLock(at: lock)
+        let token = try first.acquireExclusiveLock(at: lock)
         #expect(throws: FileSystemError.io) { try first.createDirectory(at: FakeFSFixture.url("/fake-volume/d")) }
         let next = FakeFFSLifetime.next(first.survivingDisk())
-        #expect(throws: Never.self) { _ = try next.acquireExclusiveLock(at: lock) }
+        #expect(try next.itemInfo(at: lock)?.identity == token.identity)
+        let again = try next.acquireExclusiveLock(at: lock)
+        #expect(again.identity == token.identity)
+        #expect(try next.itemInfo(at: lock)?.identity == token.identity)
+        #expect(throws: FileSystemError.wouldBlock) { try next.acquireExclusiveLock(at: lock) }
     }
 }

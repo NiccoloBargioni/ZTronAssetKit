@@ -47,6 +47,28 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(FakeFSFixture.content(fileSystem, "/fake-volume/x.part") == [])
     }
 
+    /// store.md §3.4 / F19: before the first unlock `open(2)` fails with EACCES and nothing is mutated, so an
+    /// open-time error must not create, truncate or partly write the file, whatever `partialBytes` says.
+    @available(macOS 15.0, *)
+    @Test(
+        "Test support: a write fault with an open-time error (EACCES, ENOENT, EISDIR, ENOTDIR) fails before the open and changes nothing",
+        arguments: [FileSystemError.permissionDenied, .notFound, .other(errno: EACCES), .other(errno: EISDIR), .other(errno: ENOTDIR)]
+    )
+    func openTimeWriteFaultChangesNothing(error: FileSystemError) throws {
+        let fileSystem = FakeFSFixture.make(important: 1_000)
+        let part = FakeFSFixture.url("/fake-volume/x.part")
+        try fileSystem.write(Data([1, 2, 3, 4]), to: Self.tmp, mode: .truncate)
+        let before = fileSystem.survivingDisk()
+        fileSystem.addFault(FaultRule(operation: .write, occurrence: .every, error: error, partialBytes: 2))
+        #expect(throws: error) { try fileSystem.write(Data([5, 6, 7]), to: Self.tmp, mode: .truncate) }
+        #expect(throws: error) { try fileSystem.write(Data([8, 9, 10]), to: Self.tmp, mode: .append) }
+        #expect(throws: error) { try fileSystem.write(Data([7, 7, 7]), to: part, mode: .append) }
+        #expect(fileSystem.survivingDisk() == before)
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/index.tmp") == [1, 2, 3, 4])
+        #expect(try fileSystem.itemInfo(at: part) == nil)
+        #expect(try fileSystem.availableCapacity(at: FakeFSFixture.volume, for: .important) == 996)
+    }
+
     @available(macOS 15.0, *)
     @Test("Test support: an afterBytes rule truncates the write that crosses the threshold and fails every later write")
     func afterBytesIsAShortWrite() throws {
