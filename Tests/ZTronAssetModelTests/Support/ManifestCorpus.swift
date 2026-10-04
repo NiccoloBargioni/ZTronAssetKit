@@ -113,6 +113,37 @@ enum ManifestCorpus {
         return Data((text + "]").utf8)
     }
 
+    /// `count` minimal entries, each with `components` empty path components and `tags` one-byte tags: string
+    /// arrays of 32 + 16 × n bytes, which for 31 and 32 elements (528 and 544 bytes) lie just past a size class of
+    /// the segregated allocator and are served from 640-byte blocks (fix round 2).
+    static func sizeClassEntries(components: Int, tags: Int, count: Int) -> Data {
+        let componentList = Array(repeating: "\"\"", count: components).joined(separator: ",")
+        let tagList = Array(repeating: "\"t\"", count: tags).joined(separator: ",")
+        var text = "["
+        for index in 0..<count {
+            text += (index == 0 ? "" : ",") + "{\"identifier\":\"\(String(index, radix: 36))\",\"fileExtension\":\"p\",\"remotePath\":\"r\","
+                + "\"localPathComponents\":[\(componentList)],\"tags\":[\(tagList)]}"
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit (three
+    /// times the payload): as much decoded heap per payload byte as the decoder accepts. Whitespace changes no
+    /// estimate and a rejection reports the estimate (`payloadTooLarge(bytes:limit:)`), so one decode finds the
+    /// padding; a payload the decoder already accepts is returned as it is.
+    static func paddedToEstimateLimit(_ payload: Data) -> Data {
+        do throws(ManifestError) {
+            _ = try ManifestDecoder.decode(payload)
+            return payload
+        } catch {
+            guard case .payloadTooLarge(let estimated, _) = error else {
+                return payload
+            }
+            let target = Int((estimated + 2) / 3)
+            return payload + Data(repeating: UInt8(ascii: " "), count: max(0, target - payload.count))
+        }
+    }
+
     /// A bare array of `count` copies of the JSON value `element` (`1`, `null`, `{}`…).
     static func repeatedElements(_ element: String, count: Int) -> Data {
         var data = Data(capacity: count * (element.utf8.count + 1) + 2)

@@ -25,6 +25,12 @@ struct DecodeCost {
 /// string) live for milliseconds; what a sample can miss is a spike shorter than that, which is small next to the
 /// 4x budget. The exact in-use growth right after the closure (its result alive) is reported and asserted too. The
 /// sample also counts whatever other tests allocate meanwhile, which only makes it larger.
+///
+/// In-use bytes also depend on what the process freed before (fix round 2): a freed block of a few MiB is cached and
+/// reused for a later request down to about two thirds of its size, and counts whole (measured with `malloc_size`:
+/// up to 1.49x the request; `malloc_zone_pressure_relief` does not clear that cache). So one decode's figures move
+/// with the cases measured before it (a limit case read 3.01x after one predecessor and 3.38x after another); the
+/// decoder's 25 % headroom below the 4x bound is for that (ADR draft A-8).
 enum DecodeMeasurement {
     /// Whether this test binary runs under Thread Sanitizer, whose allocator and instrumentation make heap and
     /// time figures meaningless (detected by its runtime library being loaded).

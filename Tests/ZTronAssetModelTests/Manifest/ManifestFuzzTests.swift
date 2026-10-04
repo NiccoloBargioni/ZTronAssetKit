@@ -92,7 +92,7 @@ extension ModelSuites {
                     denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
                 }
             }
-            #expect(limitCases == 31)
+            #expect(limitCases == 33)
             if !tsan {
                 // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
                 // cost about 1,000x).
@@ -105,20 +105,33 @@ extension ModelSuites {
         @Test("R-MAN-3: a manifest whose decoded form could exceed four times its payload is rejected before anything is built")
         func overBudgetManifestIsRejectedEarly() throws {
             let payload = ManifestCorpus.shortComponentEntries(length: 16, maxBytes: 2 << 20)
-            let (outcome, cost) = DecodeMeasurement.measure { Self.decode(payload) }
-            guard case .failure(.payloadTooLarge(let estimated, let limit)) = outcome else {
-                Issue.record("expected payloadTooLarge, got \(outcome)")
+            // Three identical decodes: the lowest peak is the decoder's own, since whatever another thread allocates
+            // meanwhile only adds to a sample (the orchestrator's contract suites run beside `ModelSuites`).
+            var lowestPeak = Int.max
+            for _ in 0..<3 {
+                let (outcome, cost) = DecodeMeasurement.measure { Self.decode(payload) }
+                guard case .failure(.payloadTooLarge(let estimated, let limit)) = outcome else {
+                    Issue.record("expected payloadTooLarge, got \(outcome)")
+                    return
+                }
+                #expect(estimated > limit)
+                #expect(limit <= 4 * Int64(payload.count))
+                lowestPeak = min(lowestPeak, cost.peakHeapGrowth)
+            }
+            if !DecodeMeasurement.underThreadSanitizer {
+                // The over-budget result was never built (it would take more than 4x the payload); about 10 KB of
+                // the survey's own state is, hence the generous bound.
+                #expect(lowestPeak < payload.count, "peak \(lowestPeak) B for \(payload.count) B")
+            }
+            // The same shape with 25-byte components fits, and is decoded whole (24-byte components estimate 3.03x since
+            // fix round 2 modelled the allocator's 640-byte blocks for their 544-byte arrays, and are rejected too).
+            let denser = ManifestCorpus.shortComponentEntries(length: 24, maxBytes: 2 << 20)
+            guard case .failure(.payloadTooLarge(let denserEstimate, let denserLimit)) = Self.decode(denser) else {
+                Issue.record("expected payloadTooLarge for 24-byte components")
                 return
             }
-            #expect(estimated > limit)
-            #expect(limit <= 4 * Int64(payload.count))
-            if !DecodeMeasurement.underThreadSanitizer {
-                // The over-budget result was never built (it would take more than 4x the payload); the sample may
-                // include what other suites allocate meanwhile, hence the generous bound.
-                #expect(cost.peakHeapGrowth < payload.count, "peak \(cost.peakHeapGrowth) B for \(payload.count) B")
-            }
-            // The same shape with 24-byte components fits, and is decoded whole.
-            let fitting = ManifestCorpus.shortComponentEntries(length: 24, maxBytes: 2 << 20)
+            #expect(denserEstimate > denserLimit && denserLimit == 3 * Int64(denser.count))
+            let fitting = ManifestCorpus.shortComponentEntries(length: 25, maxBytes: 2 << 20)
             let decoded = try ManifestDecoder.decode(fitting)
             #expect(decoded.count > 0 && decoded.quarantined.isEmpty)
             #expect(decoded.entries.allSatisfy { $0.localPathComponents.count == 32 })
@@ -267,7 +280,9 @@ extension ModelSuites {
                 options: ManifestDecodingOptions(duplicates: .keepFirst)))
             body(Case(name: "16-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 16, maxBytes: payloadBytes),
                 expected: .overAllocationBudget))
-            body(Case(name: "24-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 24, maxBytes: payloadBytes),
+            // The densest component shape the estimate accepts: 25-byte strings (64-byte blocks) in 32-element arrays
+            // (640-byte blocks) estimate 2.94x; 24-byte ones estimate 3.03x and are rejected (fix round 2).
+            body(Case(name: "25-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 25, maxBytes: payloadBytes),
                 expected: .anyOutcome))
             // Tag arrays just within the allocator's 16-byte-quantum class (61 tags: 1,008 bytes) and just past it (64
             // tags: 1,056 bytes, served in 512-byte quanta), with little payload around them.
@@ -275,6 +290,17 @@ extension ModelSuites {
                 body(Case(name: "\(tagCount) one-byte tags per entry", seed: 0,
                     payload: ManifestCorpus.taggedEntries(tagCount: tagCount, padding: 64, maxBytes: payloadBytes), expected: .anyOutcome))
             }
+            // String arrays just past a size class of the segregated allocator (31 and 32 elements: 528- and 544-byte
+            // requests served from 640-byte blocks), padded until the allocation estimate reaches its limit: the most
+            // decoded heap per payload byte that the decoder accepts (fix round 2).
+            let sizeClassCount = payloadBytes / 640
+            body(Case(name: "32 empty path components and 31 one-byte tags per entry, at the estimate's limit", seed: 0,
+                payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.sizeClassEntries(components: 32, tags: 31, count: sizeClassCount)),
+                expected: .accepted(sizeClassCount)))
+            let tagClassCount = payloadBytes / 340
+            body(Case(name: "31 one-byte tags per entry, at the estimate's limit", seed: 0,
+                payload: ManifestCorpus.paddedToEstimateLimit(ManifestCorpus.sizeClassEntries(components: 0, tags: 31, count: tagClassCount)),
+                expected: .accepted(tagClassCount)))
 
             // Elements that are not objects: each is a quarantine diagnostic for two or three payload bytes.
             let maxEntries = ManifestLimits().maxEntries
