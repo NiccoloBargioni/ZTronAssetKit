@@ -31,8 +31,10 @@ extension ModelSuites {
                 var text = "start"
                 text += " at \\(remotePath)"
                 route.log(.store, .info, "done: \\(text)")
+                func f(_ id: AssetID) { route.log(.store, .info, "x \\(id)") }
+                func g(_ id: AssetID) -> LogInterval { route.interval(.gc, category: .store, "x \\(id)") }
                 """)
-            #expect(Self.violations(in: bad).count == 12, "\(Self.violations(in: bad))")
+            #expect(Self.violations(in: bad).count == 14, "\(Self.violations(in: bad))")
             let good = SourceScan.lex(path: "Sources/X/Good.swift", text: """
                 route.log(.store, .info, "evicted \\(AssetLog.hashed(id)) bytes=\\(byteCount)")
                 route.log(.sync, .error,
@@ -69,13 +71,22 @@ extension ModelSuites {
             #expect(Self.callSites(of: .commit, in: sample).count == 1)
             #expect(Self.callSites(of: .gc, in: sample).isEmpty)
 
+            // A stub is a `fatalError("WP-<owner>` call in code: a comment that quotes one does not keep the rule from
+            // biting once the owner's real stubs are gone.
+            let stubs = SourceScan.lex(path: "Sources/ZTronAssetStorage/X.swift", text: """
+                /// Replaces the old `fatalError("WP-B: not implemented")` stub.
+                func f() {} // fatalError("WP-B: not implemented")
+                func g() { fatalError("WP-C: not implemented") }
+                """)
+            #expect(!Self.hasStub(workPackage: "B", target: "ZTronAssetStorage", in: stubs))
+            #expect(Self.hasStub(workPackage: "C", target: "ZTronAssetStorage", in: stubs))
+            #expect(!Self.hasStub(workPackage: "C", target: "ZTronAssetSync", in: stubs))
+
             let lines = try SourceScan.lines()
             var pending: [String] = []
             for name in LogIntervalName.allCases {
                 let owner = try #require(Self.owners[name])
-                let ownerHasStubs = lines.contains { line in
-                    line.path.hasPrefix("Sources/\(owner.target)/") && line.text.contains("fatalError(\"WP-\(owner.workPackage)")
-                }
+                let ownerHasStubs = Self.hasStub(workPackage: owner.workPackage, target: owner.target, in: lines)
                 let sites = Self.callSites(of: name, in: lines)
                 if sites.isEmpty {
                     #expect(ownerHasStubs, "interval \(name.rawValue) has no call site, and WP-\(owner.workPackage) has no stub left in \(owner.target)")
@@ -98,6 +109,15 @@ extension ModelSuites {
             .gc: ("C", "ZTronAssetStorage"),
             .eviction: ("C", "ZTronAssetStorage"),
         ]
+
+        /// Whether `target` still contains a `fatalError("WP-<workPackage>` stub: the call must be code (`line.code`
+        /// keeps it, a comment does not), and the line as written must name the work package.
+        private static func hasStub(workPackage: String, target: String, in lines: [SourceScan.Line]) -> Bool {
+            lines.contains { line in
+                line.path.hasPrefix("Sources/\(target)/") && line.code.contains("fatalError(")
+                    && line.text.contains("fatalError(\"WP-\(workPackage)")
+            }
+        }
 
         private static func callSites(of name: LogIntervalName, in lines: [SourceScan.Line]) -> [SourceScan.Line] {
             lines.filter { $0.code.contains(".interval(.\(name.rawValue)") || $0.code.contains(".interval(LogIntervalName.\(name.rawValue)") }
@@ -133,7 +153,10 @@ extension ModelSuites {
                 let unhashed = statement.map(\.text).flatMap(SourceScan.interpolations(in:)).filter {
                     Self.namesIdentifier($0) && !$0.contains("hashed(")
                 }
-                if [".log(", "LogLine(", ".interval(", ".emit("].contains(where: code.contains), !code.contains("func ") {
+                // Every line with a call is checked, a one-line `func` whose body logs included (fix round 2: lines with
+                // `func ` used to be exempt, so `func f(_ id: AssetID) { route.log(…"\(id)") }` passed). The logging
+                // API's own declarations need no exemption: `func log(` and the like contain none of these calls.
+                if [".log(", "LogLine(", ".interval(", ".emit("].contains(where: code.contains) {
                     for interpolation in unhashed {
                         found.append("\(location): \\(\(interpolation)) is not hashed")
                     }
