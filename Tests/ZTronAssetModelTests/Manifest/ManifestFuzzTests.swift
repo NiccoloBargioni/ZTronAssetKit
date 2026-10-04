@@ -28,6 +28,8 @@ struct ManifestFuzzTests {
         case quarantined(ManifestEntryViolation)
         /// This many entries, nothing quarantined.
         case accepted(Int)
+        /// This many entries accepted and this many quarantined.
+        case acceptedAndQuarantined(accepted: Int, quarantined: Int)
         /// Rejected before anything is built because the decoded form could exceed four times the payload.
         case overAllocationBudget
     }
@@ -38,6 +40,8 @@ struct ManifestFuzzTests {
         var seed: UInt64
         var payload: Data
         var expected: Expected
+        /// The options the case decodes with (remote-manifest defaults unless the case says otherwise).
+        var options = ManifestDecodingOptions()
     }
 
     private static let baseSeed: UInt64 = {
@@ -55,7 +59,7 @@ struct ManifestFuzzTests {
         let small = try Self.smallCorpus(seed: seed)
         #expect(small.count > 1_000)
         for fuzzCase in small {
-            Self.check(fuzzCase, outcome: Self.decode(fuzzCase.payload))
+            Self.check(fuzzCase, outcome: Self.decode(fuzzCase.payload, options: fuzzCase.options))
         }
 
         let tsan = DecodeMeasurement.underThreadSanitizer
@@ -65,7 +69,7 @@ struct ManifestFuzzTests {
         Self.forEachLimitCase(seed: seed, payloadBytes: limit) { fuzzCase in
             limitCases += 1
             #expect(fuzzCase.payload.count <= ManifestCorpus.payloadLimit, "\(fuzzCase.name) seed \(fuzzCase.seed)")
-            let (outcome, cost) = DecodeMeasurement.measure { Self.decode(fuzzCase.payload) }
+            let (outcome, cost) = DecodeMeasurement.measure { Self.decode(fuzzCase.payload, options: fuzzCase.options) }
             Self.check(fuzzCase, outcome: outcome)
             guard !tsan else {
                 return
@@ -87,7 +91,7 @@ struct ManifestFuzzTests {
                 denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
             }
         }
-        #expect(limitCases == 22)
+        #expect(limitCases == 31)
         if !tsan {
             // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
             // cost about 1,000x).
@@ -117,6 +121,33 @@ struct ManifestFuzzTests {
         let decoded = try ManifestDecoder.decode(fitting)
         #expect(decoded.count > 0 && decoded.quarantined.isEmpty)
         #expect(decoded.entries.allSatisfy { $0.localPathComponents.count == 32 })
+    }
+
+    @Test("R-MAN-3: quarantine diagnostics count against the allocation bound, so only a payload dense with tiny invalid elements is rejected whole")
+    func quarantineDenseManifests() throws {
+        // A realistic quarantine: 2,000 entries whose checksum has 32 hex digits are each quarantined (R-MAN-2).
+        let entries = (0..<2_000).map { index in
+            "{\"identifier\":\"bo7.ri.asset.\(index)\",\"fileExtension\":\"png\",\"remotePath\":\"media/a/\(index).png\","
+                + "\"localPathComponents\":[\"Black Ops 7\",\"Maps\"],\"checksum\":\"\(String(repeating: "0f", count: 16))\"}"
+        }
+        let realistic = try ManifestDecoder.decode(Data(("[" + entries.joined(separator: ",") + "]").utf8))
+        #expect(realistic.count == 0 && realistic.quarantined.count == 2_000)
+        #expect(realistic.quarantined.allSatisfy { $0.violation == .checksumInvalid && $0.identifier != nil })
+
+        // 1,000 empty objects (3,001 bytes) fit the 64 KiB floor, and each is quarantined.
+        let small = try ManifestDecoder.decode(ManifestCorpus.repeatedElements("{}", count: 1_000))
+        #expect(small.count == 0 && small.quarantined.count == 1_000)
+        #expect(small.quarantined.allSatisfy { $0.violation == .malformedField("identifier") && $0.identifier == nil })
+
+        // 20,000 empty objects (60,001 bytes) would need about sixteen times their payload in diagnostics: the
+        // manifest is rejected whole, as an over-budget payload (ADR draft A-8).
+        let dense = ManifestCorpus.repeatedElements("{}", count: 20_000)
+        guard case .failure(.payloadTooLarge(let estimated, let limit)) = Self.decode(dense) else {
+            Issue.record("expected payloadTooLarge for \(dense.count) bytes of empty objects")
+            return
+        }
+        #expect(limit == 3 * Int64(dense.count))
+        #expect(estimated >= Int64(20_000 * MemoryLayout<QuarantinedEntry>.stride))
     }
 
     @Test("R-MAN-3: every prefix of a shipped manifest is rejected as not JSON without trapping")
@@ -229,10 +260,34 @@ struct ManifestFuzzTests {
         let entryCount = min(100_000, payloadBytes / 150)
         body(Case(name: "minimal entries of 16-byte strings", seed: 0, payload: ManifestCorpus.shortStringEntries(length: 16, count: entryCount),
             expected: .accepted(entryCount)))
+        // The same under keepFirst: the survey also holds every distinct accepted identifier (as payload views).
+        body(Case(name: "minimal entries of 16-byte strings, keepFirst", seed: 0,
+            payload: ManifestCorpus.shortStringEntries(length: 16, count: entryCount), expected: .accepted(entryCount),
+            options: ManifestDecodingOptions(duplicates: .keepFirst)))
         body(Case(name: "16-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 16, maxBytes: payloadBytes),
             expected: .overAllocationBudget))
         body(Case(name: "24-byte path components", seed: 0, payload: ManifestCorpus.shortComponentEntries(length: 24, maxBytes: payloadBytes),
             expected: .anyOutcome))
+        // Tag arrays just within the allocator's 16-byte-quantum class (61 tags: 1,008 bytes) and just past it (64
+        // tags: 1,056 bytes, served in 512-byte quanta), with little payload around them.
+        for tagCount in [61, 64] {
+            body(Case(name: "\(tagCount) one-byte tags per entry", seed: 0,
+                payload: ManifestCorpus.taggedEntries(tagCount: tagCount, padding: 64, maxBytes: payloadBytes), expected: .anyOutcome))
+        }
+
+        // Elements that are not objects: each is a quarantine diagnostic for two or three payload bytes.
+        let maxEntries = ManifestLimits().maxEntries
+        for element in ["1", "null", "[]", "\"\"", "{}"] {
+            body(Case(name: "\(maxEntries) elements \(element)", seed: 0, payload: ManifestCorpus.repeatedElements(element, count: maxEntries),
+                expected: .overAllocationBudget))
+        }
+        // The legacy manifest's policy (keepFirst) with every entry repeating one identifier: the survey cannot
+        // build identifiers, yet must not count the repeats as accepted entries.
+        let duplicateCount = min(maxEntries, payloadBytes / 100)
+        body(Case(name: "\(duplicateCount) minimal entries sharing one identifier, keepFirst", seed: 0,
+            payload: ManifestCorpus.duplicateEntries(count: duplicateCount),
+            expected: .acceptedAndQuarantined(accepted: 1, quarantined: duplicateCount - 1),
+            options: ManifestDecodingOptions(duplicates: .keepFirst)))
     }
 
     /// One entry with a string of about `count` bytes in each place a manifest can hold one, each made on demand.
@@ -262,9 +317,9 @@ struct ManifestFuzzTests {
 
     // MARK: - Checks
 
-    private static func decode(_ payload: Data) -> Result<ValidatedManifest, ManifestError> {
+    private static func decode(_ payload: Data, options: ManifestDecodingOptions = ManifestDecodingOptions()) -> Result<ValidatedManifest, ManifestError> {
         do throws(ManifestError) {
-            return .success(try ManifestDecoder.decode(payload))
+            return .success(try ManifestDecoder.decode(payload, options: options))
         } catch {
             return .failure(error)
         }
@@ -286,6 +341,9 @@ struct ManifestFuzzTests {
         case (.accepted(let count), .success(let manifest)):
             #expect(manifest.count == count, "\(label)")
             #expect(manifest.quarantined.isEmpty, "\(label): \(manifest.quarantined.prefix(3))")
+        case (.acceptedAndQuarantined(let accepted, let quarantined), .success(let manifest)):
+            #expect(manifest.count == accepted, "\(label)")
+            #expect(manifest.quarantined.count == quarantined, "\(label)")
         case (.overAllocationBudget, .failure(let error)):
             guard case .payloadTooLarge(let estimated, let limit) = error else {
                 Issue.record("\(label): expected the allocation bound, got \(error)")

@@ -311,6 +311,11 @@ struct JSONCursor {
         string.hasEscapes ? nil : UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end])
     }
 
+    /// The bytes between the string's quotes, escapes unresolved: a view of the payload.
+    func body(of string: JSONString) -> UnsafeRawBufferPointer {
+        UnsafeRawBufferPointer(rebasing: self.bytes[string.start..<string.end])
+    }
+
     /// The string's value. Validated UTF-8, so decoding never repairs anything.
     func decodedString(of string: JSONString) -> String {
         if string.hasEscapes {
@@ -517,6 +522,91 @@ struct JSONCursor {
             index += 1
         }
         return (value, false)
+    }
+
+    /// The value of a number whose exact decimal value is an integer, whatever its spelling (`1234`, `1234.0`,
+    /// `1.234e3`, `12340e-1`), saturated to `Int64` when out of range; `nil` when it has a non-zero fractional part
+    /// (`1.5`, `1e-1`). Works on the digits, never on a floating-point value, so no spelling loses precision, and in
+    /// time linear in the number's length whatever its exponent.
+    func integralValue(of number: JSONNumber) -> Int64? {
+        var index = number.start
+        let negative = self.bytes[index] == JSONByte.minus
+        if negative {
+            index += 1
+        }
+        let integerStart = index
+        while index < number.end, JSONByte.isDigit(self.bytes[index]) {
+            index += 1
+        }
+        let integerCount = index - integerStart
+        var fractionStart = index
+        var fractionCount = 0
+        if index < number.end, self.bytes[index] == UInt8(ascii: ".") {
+            index += 1
+            fractionStart = index
+            while index < number.end, JSONByte.isDigit(self.bytes[index]) {
+                index += 1
+            }
+            fractionCount = index - fractionStart
+        }
+        // The exponent, clamped: past 10^8 it only decides between zero, saturation and "fractional".
+        var exponent = 0
+        if index < number.end {
+            index += 1
+            let negativeExponent = self.bytes[index] == JSONByte.minus
+            if negativeExponent || self.bytes[index] == UInt8(ascii: "+") {
+                index += 1
+            }
+            while index < number.end {
+                exponent = min(exponent * 10 + Int(self.bytes[index] - JSONByte.zero), 100_000_000)
+                index += 1
+            }
+            if negativeExponent {
+                exponent = -exponent
+            }
+        }
+        // The value is the digit string D (integer then fraction digits) times 10^shift.
+        let digitCount = integerCount + fractionCount
+        let digits = (integerStart: integerStart, integerCount: integerCount, fractionStart: fractionStart)
+        let shift = exponent - fractionCount
+        // Digits that shift moves behind the decimal point must all be zero.
+        let kept = shift < 0 ? digitCount + shift : digitCount
+        var position = max(kept, 0)
+        while position < digitCount {
+            guard self.digit(position, of: digits) == 0 else {
+                return nil
+            }
+            position += 1
+        }
+        let saturated = negative ? Int64.min : Int64.max
+        var value: Int64 = 0
+        position = 0
+        while position < kept {
+            let (shifted, overflowA) = value.multipliedReportingOverflow(by: 10)
+            let digit = self.digit(position, of: digits)
+            let (next, overflowB) = negative ? shifted.subtractingReportingOverflow(digit) : shifted.addingReportingOverflow(digit)
+            if overflowA || overflowB {
+                return saturated
+            }
+            value = next
+            position += 1
+        }
+        var zeros = shift
+        while zeros > 0, value != 0 {
+            let (shifted, overflow) = value.multipliedReportingOverflow(by: 10)
+            if overflow {
+                return saturated
+            }
+            value = shifted
+            zeros -= 1
+        }
+        return value
+    }
+
+    /// The digit at `position` of a number's digit string: its integer digits, then its fraction digits.
+    private func digit(_ position: Int, of digits: (integerStart: Int, integerCount: Int, fractionStart: Int)) -> Int64 {
+        let offset = position < digits.integerCount ? digits.integerStart + position : digits.fractionStart + position - digits.integerCount
+        return Int64(self.bytes[offset] - JSONByte.zero)
     }
 
     /// Consumes `literal` exactly (`true`, `false`, `null`).

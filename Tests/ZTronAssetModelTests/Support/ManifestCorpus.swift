@@ -94,6 +94,55 @@ enum ManifestCorpus {
         return Data((text + "]").utf8)
     }
 
+    /// Minimal entries carrying `tagCount` one-byte tags and an unknown member of `padding` bytes, up to
+    /// `maxBytes`: a tag array is a heap allocation of 32 + 16 × `tagCount` bytes for four payload bytes per tag.
+    static func taggedEntries(tagCount: Int, padding: Int, maxBytes: Int) -> Data {
+        var text = "["
+        let tags = Array(repeating: "\"t\"", count: tagCount).joined(separator: ",")
+        let pad = String(repeating: "p", count: padding)
+        var index = 0
+        while index < 100_000 {
+            let entry = "{\"identifier\":\"i\(index)\",\"fileExtension\":\"p\",\"remotePath\":\"r\",\"localPathComponents\":[],"
+                + "\"tags\":[\(tags)],\"x\":\"\(pad)\"}"
+            guard text.utf8.count + entry.utf8.count + 2 <= maxBytes else {
+                break
+            }
+            text += (index == 0 ? "" : ",") + entry
+            index += 1
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// A bare array of `count` copies of the JSON value `element` (`1`, `null`, `{}`…).
+    static func repeatedElements(_ element: String, count: Int) -> Data {
+        var data = Data(capacity: count * (element.utf8.count + 1) + 2)
+        data.append(UInt8(ascii: "["))
+        let bytes = Data(element.utf8)
+        for index in 0..<count {
+            if index > 0 {
+                data.append(UInt8(ascii: ","))
+            }
+            data.append(bytes)
+        }
+        data.append(UInt8(ascii: "]"))
+        return data
+    }
+
+    /// `count` minimal valid entries that all share the identifier `a` (about 81 bytes each).
+    static func duplicateEntries(count: Int) -> Data {
+        let entry = Data(#"{"identifier":"a","fileExtension":"p","remotePath":"r","localPathComponents":[]}"#.utf8)
+        var data = Data(capacity: count * (entry.count + 1) + 2)
+        data.append(UInt8(ascii: "["))
+        for index in 0..<count {
+            if index > 0 {
+                data.append(UInt8(ascii: ","))
+            }
+            data.append(entry)
+        }
+        data.append(UInt8(ascii: "]"))
+        return data
+    }
+
     /// Sixteen lowercase hex digits.
     static func hex16(_ value: UInt64) -> String {
         let digits = String(value, radix: 16)

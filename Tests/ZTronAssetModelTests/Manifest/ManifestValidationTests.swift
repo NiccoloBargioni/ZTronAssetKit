@@ -145,6 +145,65 @@ struct ManifestValidationTests {
         #expect(throws: ManifestError.unsupportedSchemaVersion(0)) { try ManifestDecoder.decode(envelope(0)) }
     }
 
+    @Test("R-MAN-2: the default options enforce the SPEC's numbers: 256-byte identifiers, 1,024-byte paths, 100,000 entries, 32 MiB")
+    func defaultLimitBoundaries() throws {
+        let defaults = ManifestLimits()
+        // Identifier: 256 UTF-8 bytes accepted, 257 quarantined.
+        try Self.expectAccepted(Self.entryJSON(identifier: String(repeating: "i", count: 256)), limits: defaults)
+        try Self.expectQuarantined(Self.entryJSON(identifier: String(repeating: "i", count: 257)), as: .identifierTooLong(bytes: 257), limits: defaults)
+        // remotePath: 1,024 bytes accepted, 1,025 quarantined.
+        try Self.expectAccepted(Self.entryJSON(remotePath: String(repeating: "p", count: 1_024)), limits: defaults)
+        try Self.expectQuarantined(
+            Self.entryJSON(remotePath: String(repeating: "p", count: 1_025)), as: .remotePathInvalid(.tooLong(bytes: 1_025)), limits: defaults
+        )
+
+        // Payload: 32 MiB passes the size check (and is then read: zero bytes are not JSON); one byte more is
+        // rejected before any byte is read.
+        let mebibytes32 = 32 * 1_024 * 1_024
+        #expect(throws: ManifestError.undecodable(.notJSON)) { try ManifestDecoder.decode(Data(count: mebibytes32)) }
+        #expect(throws: ManifestError.payloadTooLarge(bytes: 33_554_433, limit: 33_554_432)) {
+            try ManifestDecoder.decode(Data(count: mebibytes32 + 1))
+        }
+
+        // Entries: 100,001 elements are rejected at the first one past the limit, whatever they hold. (100,000
+        // valid entries decode in the R-MAN-3 fuzz test's "minimal entries of 16-byte strings" case.)
+        #expect(throws: ManifestError.tooManyEntries(count: 100_001, limit: 100_000)) {
+            try ManifestDecoder.decode(ManifestCorpus.repeatedElements("{}", count: 100_001))
+        }
+        #expect(throws: ManifestError.tooManyEntries(count: 100_001, limit: 100_000)) {
+            try ManifestDecoder.decode(ManifestCorpus.repeatedElements("0", count: 100_001))
+        }
+        #expect(defaults == ManifestLimits(
+            maxEntries: 100_000, maxPayloadBytes: 33_554_432, maxIdentifierBytes: 256, maxRemotePathBytes: 1_024,
+            maxAssetBytes: 4_294_967_296, maxNestingDepth: 64, maxTagBytes: 128, maxTagsPerEntry: 64
+        ))
+    }
+
+    @Test("R-MAN-1: an integral byteSize decodes in every number spelling the prior art's JSONDecoder accepted")
+    func integralByteSizeSpellings() throws {
+        let entry = { (byteSize: String) in Self.entryJSON(extra: "\"byteSize\":\(byteSize)") }
+        let integral: [(String, Int64)] = [
+            ("1234", 1_234), ("1234.0", 1_234), ("1.234e3", 1_234), ("1E3", 1_000), ("1e+3", 1_000), ("12340e-1", 1_234),
+            ("100E-2", 1), ("0.0", 0), ("-0", 0), ("-0.0e5", 0), ("0e999999999999", 0), ("0.000e-999999999999", 0),
+            ("1.50000e1", 15), ("4294967296.000", 4_294_967_296),
+        ]
+        for (spelling, value) in integral {
+            let manifest = try ManifestDecoder.decode(Self.payload([entry(spelling)]))
+            #expect(manifest.entries.first?.byteSize == value, "\(spelling): \(manifest.quarantined)")
+        }
+        let quarantined: [(String, ManifestEntryViolation)] = [
+            ("1.5", .malformedField("byteSize")), ("1e-1", .malformedField("byteSize")), ("1.2345e3", .malformedField("byteSize")),
+            ("10e-2", .malformedField("byteSize")), ("1e-999999999999", .malformedField("byteSize")),
+            ("1e400", .byteSizeOutOfRange(Int64.max)), ("-1e400", .byteSizeOutOfRange(Int64.min)), ("-1.0", .byteSizeOutOfRange(-1)),
+            ("4294967297.0", .byteSizeOutOfRange(4_294_967_297)), ("9223372036854775808.0", .byteSizeOutOfRange(Int64.max)),
+            ("-9223372036854775808.0", .byteSizeOutOfRange(Int64.min)),
+        ]
+        for (spelling, violation) in quarantined {
+            let manifest = try ManifestDecoder.decode(Self.payload([entry(spelling)]))
+            #expect(manifest.count == 0 && manifest.quarantined.map(\.violation) == [violation], "\(spelling)")
+        }
+    }
+
     @Test("R-MAN-2: a repeated identifier rejects a remote manifest and keeps only the first occurrence under keepFirst")
     func duplicatePolicies() throws {
         let payload = Self.payload([
@@ -162,6 +221,57 @@ struct ManifestValidationTests {
             QuarantinedEntry(index: 2, identifier: "a", violation: .malformedField("identifier")),
             QuarantinedEntry(index: 3, identifier: "a", violation: .malformedField("identifier")),
         ])
+
+        // keepFirst keeps the first occurrence that can be kept: a quarantined first occurrence does not make a
+        // later valid one a duplicate (the legacy file of the valid entry is then adopted, not re-downloaded). A
+        // remote manifest stays strict: the repeated identifier rejects it.
+        let quarantinedFirst = Self.payload([
+            Self.entryJSON(identifier: "a", fileExtension: "p.ng"),
+            Self.entryJSON(identifier: "a", remotePath: "m/valid.png"),
+            Self.entryJSON(identifier: "a", fileExtension: "bad!"),
+            Self.entryJSON(identifier: "a", remotePath: "m/later.png"),
+        ])
+        #expect(throws: ManifestError.duplicateIdentifier("a")) { try ManifestDecoder.decode(quarantinedFirst) }
+        let kept = try ManifestDecoder.decode(quarantinedFirst, options: ManifestDecodingOptions(duplicates: .keepFirst))
+        #expect(kept.entries.map(\.remotePath) == ["m/valid.png"])
+        #expect(kept.quarantined == [
+            QuarantinedEntry(index: 0, identifier: "a", violation: .fileExtensionInvalid),
+            QuarantinedEntry(index: 2, identifier: "a", violation: .malformedField("identifier")),
+            QuarantinedEntry(index: 3, identifier: "a", violation: .malformedField("identifier")),
+        ])
+    }
+
+    @Test("R-MAN-2: keepFirst finds a repeated identifier whatever its escapes and keeps every distinct one")
+    func keepFirstComparesDecodedIdentifiers() throws {
+        let keepFirst = ManifestDecodingOptions(duplicates: .keepFirst)
+        let spelled = Self.payload([
+            Self.entryJSON(identifier: "ab", remotePath: "m/1.png"),
+            #"{"identifier":"ab","fileExtension":"png","remotePath":"m/2.png","localPathComponents":[]}"#,
+            #"{"identifier":"ab","fileExtension":"png","remotePath":"m/3.png","localPathComponents":[]}"#,
+            #"{"identifier":"ac","fileExtension":"png","remotePath":"m/4.png","localPathComponents":[]}"#,
+            Self.entryJSON(identifier: "ac", remotePath: "m/5.png"),
+        ])
+        let kept = try ManifestDecoder.decode(spelled, options: keepFirst)
+        #expect(kept.entries.map(\.remotePath) == ["m/1.png", "m/4.png"])
+        #expect(kept.quarantined.map(\.index) == [1, 2, 4])
+        #expect(kept.quarantined.allSatisfy { $0.violation == .malformedField("identifier") })
+
+        // Identifiers of every length up to the limit, every other one escaped, then all of them again with the other
+        // spelling: each distinct identifier is kept once and each repeat is quarantined.
+        let identifiers = (1...256).map { String(repeating: "x", count: $0) }
+        let spell = { (identifier: String, escaped: Bool) in escaped ? "\\u0078" + identifier.dropFirst() : identifier }
+        var entries: [String] = []
+        for round in 0..<2 {
+            for (index, identifier) in identifiers.enumerated() {
+                let escaped = (index + round).isMultiple(of: 2)
+                entries.append("{\"identifier\":\"\(spell(identifier, escaped))\",\"fileExtension\":\"png\",\"remotePath\":\"m/\(round)\",\"localPathComponents\":[]}")
+            }
+        }
+        let all = try ManifestDecoder.decode(Self.payload(entries), options: keepFirst)
+        #expect(all.entries.map(\.identifier.rawValue) == identifiers)
+        #expect(all.entries.allSatisfy { $0.remotePath == "m/0" })
+        #expect(all.quarantined.map(\.index) == Array(256..<512))
+        #expect(throws: ManifestError.duplicateIdentifier("x")) { try ManifestDecoder.decode(Self.payload(entries)) }
     }
 
     @Test("R-MAN-2: a missing, null or mistyped field quarantines its entry under that field's name")
@@ -178,7 +288,7 @@ struct ManifestValidationTests {
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"localFileName":5}"#, .malformedField("localFileName")),
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"byteSize":"5"}"#, .malformedField("byteSize")),
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"byteSize":1.5}"#, .malformedField("byteSize")),
-            (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"byteSize":1e3}"#, .malformedField("byteSize")),
+            (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"byteSize":1e-1}"#, .malformedField("byteSize")),
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"checksum":false}"#, .malformedField("checksum")),
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"tags":"t"}"#, .malformedField("tags")),
             (#"{"identifier":"a","fileExtension":"png","remotePath":"m/a.png","localPathComponents":[],"tags":[1]}"#, .malformedField("tags")),
@@ -203,7 +313,8 @@ struct ManifestValidationTests {
 
     @Test("R-MAN-2: remotePath must be relative, without parent segments, scheme, authority or control characters")
     func remotePathRules() throws {
-        let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "a/./b", "dir/%41.png", "a/b?c"]
+        let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "a/./b", "dir/%41.png", "a/b?c", "a/b?x=..",
+            "a/%2e%2e.png", "a/..%2"]
         for path in accepted {
             #expect(ManifestDecoder.violations(of: Self.entry(remotePath: path), limits: ManifestLimits()).isEmpty, "\(path)")
         }
@@ -221,6 +332,16 @@ struct ManifestValidationTests {
             ("a/b\u{7F}", [.controlCharacter]),
             ("a/\u{85}b", [.controlCharacter]),
             ("a\nb", [.controlCharacter]),
+            // The path ends at a query or fragment (RFC 3986 §4.2), so a parent segment just before one is still one.
+            ("a/..?x", [.parentSegment]),
+            ("..#frag", [.parentSegment]),
+            // Percent-encoded slashes and backslashes separate segments too: the origin or the transport may decode
+            // or normalise them (ADR draft A-4.7).
+            ("a/..%2Fb", [.parentSegment]),
+            ("%2e%2e%2fsecret", [.parentSegment]),
+            ("a\\..\\b", [.parentSegment]),
+            ("a%5C..%5cb", [.parentSegment]),
+            ("..\\x", [.parentSegment]),
         ]
         for (path, violations) in rejected {
             #expect(

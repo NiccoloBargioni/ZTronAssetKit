@@ -114,8 +114,7 @@ public enum ManifestDecoder {
         }
         let parsed: Result<ManifestParser.Output, ManifestError> = data.withUnsafeBytes { bytes in
             do throws(ManifestError) {
-                var survey = ManifestParser(bytes: bytes, options: options, reserving: nil)
-                let counts = try survey.parse().survey
+                let counts = try ManifestParser.survey(bytes, options: options)
                 let limit = ManifestFootprint.limit(payloadBytes: bytes.count)
                 guard counts.estimatedBytes <= limit else {
                     throw .payloadTooLarge(bytes: Int64(counts.estimatedBytes), limit: Int64(limit))
