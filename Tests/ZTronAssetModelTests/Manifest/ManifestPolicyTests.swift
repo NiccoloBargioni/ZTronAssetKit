@@ -24,13 +24,28 @@ extension ModelSuites {
             let reencoded = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(withDefaults.entries)) as? [[String: Any]])
             #expect(reencoded.first.map { Set($0.keys) } == ["identifier", "fileExtension", "remotePath", "localPathComponents"])
 
-            // The prior art fetched every asset in manifest order: untagged standard entries are all in the default
-            // scope, none in a tag scope, and fetch order (rank, then position) is manifest order.
+            // The prior art fetched every asset: untagged standard entries are all in the default scope, none in a tag
+            // scope.
             #expect(legacy.entries.allSatisfy { AssetScope.all.contains($0) })
             #expect(legacy.entries.allSatisfy { !AssetScope.tags(["easter-egg"]).contains($0) })
-            let fetchOrder = legacy.entries.enumerated().sorted { ($0.element.policy.rank, $0.offset) < ($1.element.policy.rank, $1.offset) }
-            #expect(fetchOrder.map(\.element.identifier) == legacy.entries.map(\.identifier))
             #expect(!AssetScope.all.isExplicit)
+
+            // Among explicit policies, an entry without one is fetched exactly where an explicit `standard` entry is:
+            // after essential, before on-demand, in manifest order among its peers (AssetPolicy's own order, then
+            // position). Spelling the absent policy out changes no position.
+            func fetchOrder(_ firstPolicy: String) throws -> [AssetID] {
+                let members = [firstPolicy, #","policy":"onDemand""#, #","policy":"essential""#, #","policy":"standard""#, ""]
+                let entries = members.enumerated().map { index, policy in
+                    #"{"identifier":"e\#(index)","fileExtension":"png","remotePath":"m/\#(index).png","localPathComponents":[]"# + policy + "}"
+                }
+                let manifest = try ManifestDecoder.decode(Data(("[" + entries.joined(separator: ",") + "]").utf8))
+                return manifest.entries.enumerated()
+                    .sorted { $0.element.policy < $1.element.policy || ($0.element.policy == $1.element.policy && $0.offset < $1.offset) }
+                    .map(\.element.identifier)
+            }
+            #expect(try fetchOrder("") == ["e2", "e0", "e3", "e4", "e1"])
+            #expect(try fetchOrder(#","policy":"standard""#) == fetchOrder(""))
+            #expect(try fetchOrder(#","policy":"essential""#) != fetchOrder(""))
         }
 
         @Test("R-MAN-6: tags and policy decode from the envelope and order fetches essential, then standard, then on-demand")
