@@ -121,15 +121,13 @@ extension ModelSuites {
 
         @Test("R-ENV-1: the live clock's readings never go backwards and a deadline already passed returns without sleeping", .timeLimit(.minutes(1)))
         func liveClockContract() async throws {
+            // The wall clock (`now()`) is not read: tests never depend on it (fix round 2; ADR draft A-12 lists it as a
+            // deliberately untested line). The monotonic and awake clocks are, for their order only.
             let clock = LiveTimeSource()
             let first = clock.monotonicNow()
             let awake = clock.uptimeNow()
-            let wall = clock.now()
             #expect(clock.monotonicNow() >= first)
             #expect(clock.uptimeNow() >= awake)
-            // The wall clock reads a real date (after 2023-11-14); its order is not asserted, since a time-server step may
-            // move it backwards.
-            #expect(wall > Date(timeIntervalSince1970: 1_700_000_000))
             // A deadline in the past: no sleep at all.
             try await clock.sleep(until: .zero)
             try await clock.sleep(until: first)
