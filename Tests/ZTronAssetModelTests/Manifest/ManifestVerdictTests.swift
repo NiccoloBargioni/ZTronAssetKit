@@ -147,6 +147,36 @@ extension ModelSuites {
             #expect(throws: ManifestError.undecodable(.notJSON)) { try ManifestDecoder.decode(Data(#"{"schemaVersion":1,,"assets":[]}"#.utf8)) }
         }
 
+        @Test("R-MAN-2: a raised nesting limit is honoured past 64 levels of mixed objects and arrays, and a mismatched closer there is not JSON")
+        func deepNestingPastTheInlineStack() throws {
+            // Levels alternate between arrays and objects, so the skipped value's container stack must remember each one
+            // past the 64 levels it keeps inline (fix round 3).
+            func nested(_ levels: Int, breakAt broken: Int? = nil) -> String {
+                var open = ""
+                var close = ""
+                for level in 0..<levels {
+                    let isObject = level.isMultiple(of: 2)
+                    open += isObject ? "{\"k\":" : "["
+                    let closer = isObject ? "}" : "]"
+                    close = (level == broken ? (isObject ? "]" : "}") : closer) + close
+                }
+                return open + "1" + close
+            }
+            let entry = { (member: String) in #"[{"identifier":"a","fileExtension":"p","remotePath":"r","localPathComponents":[],"x":"# + member + "}]" }
+            // The bare array and the entry take two of the 1,000 levels.
+            let deep = ManifestDecodingOptions(limits: ManifestLimits(maxNestingDepth: 1_000))
+            for levels in [63, 64, 65, 128, 129, 998] {
+                let manifest = try ManifestDecoder.decode(Data(entry(nested(levels)).utf8), options: deep)
+                #expect(manifest.count == 1, "\(levels) levels")
+            }
+            #expect(throws: ManifestError.undecodable(.nestingTooDeep)) { try ManifestDecoder.decode(Data(entry(nested(999)).utf8), options: deep) }
+            for broken in [0, 63, 64, 65, 130, 500] {
+                #expect(throws: ManifestError.undecodable(.notJSON), "closer broken at \(broken)") {
+                    try ManifestDecoder.decode(Data(entry(nested(600, breakAt: broken)).utf8), options: deep)
+                }
+            }
+        }
+
         // MARK: - Helpers
 
         /// The entry's JSON text, its strings escaped not at all (0), in their first scalar (1) or entirely (2).

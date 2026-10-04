@@ -233,6 +233,18 @@ struct JSONCursor {
         }
     }
 
+    /// The heap of the container stack's overflow: none within 64 levels, else the one reservation
+    /// `pushContainer(isObject:)` makes for the deepest nesting this payload can hold (counted by R-MAN-3's estimate).
+    var stackOverflowBytes: Int {
+        self.stackOverflow.isEmpty ? 0 : ManifestFootprint.array(count: JSONCursor.overflowWords(maxDepth: self.maxDepth, payloadBytes: self.bytes.count), stride: 8)
+    }
+
+    /// The words the overflow is reserved for: one bit per level past the first 64, and never more levels than the limit
+    /// or the payload's bytes (each level opens with one).
+    private static func overflowWords(maxDepth: Int, payloadBytes: Int) -> Int {
+        max(1, min(maxDepth, payloadBytes) / 64)
+    }
+
     /// Records a container `skipValue(depth:)` opened.
     private mutating func pushContainer(isObject: Bool) {
         let level = self.stackCount
@@ -243,8 +255,7 @@ struct JSONCursor {
             let word = level / 64 - 1
             if word == self.stackOverflow.count {
                 if self.stackOverflow.isEmpty {
-                    // The deepest nesting this payload can hold: one byte per level, and never past the limit.
-                    self.stackOverflow.reserveCapacity(min(self.maxDepth, self.bytes.count) / 64)
+                    self.stackOverflow.reserveCapacity(JSONCursor.overflowWords(maxDepth: self.maxDepth, payloadBytes: self.bytes.count))
                 }
                 self.stackOverflow.append(0)
             }

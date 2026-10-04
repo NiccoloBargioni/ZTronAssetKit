@@ -120,9 +120,12 @@ struct ManifestSurvey {
     /// Heap bytes of the strings and string arrays of the accepted entries.
     var acceptedBytes = 0
     /// The largest transient allocation of the build pass, alive next to everything counted: the decoded copy of an
-    /// escaped string (validated or materialised), or under `.keepFirst` the identifier string of a repeat, which is
-    /// made to look it up and then dropped.
+    /// escaped string (validated or materialised), or under `.keepFirst` the identifier string of an entry looked up
+    /// and then quarantined.
     var transientBytes = 0
+    /// The container stack's overflow, which both passes reserve once if a skipped value nests deeper than 64 levels
+    /// (possible only when `maxNestingDepth` is raised above its default of 64).
+    var stackBytes = 0
 
     /// The estimated peak heap of the build pass, its diagnostics aside (`ManifestFootprint.diagnosticCapacity`).
     var estimatedBytes: Int {
@@ -130,6 +133,7 @@ struct ManifestSurvey {
             + ManifestFootprint.array(count: self.acceptedCount, stride: MemoryLayout<ManifestEntry>.stride)
             + ManifestFootprint.index(count: self.acceptedCount)
             + self.transientBytes
+            + self.stackBytes
     }
 
     /// Records a transient allocation of `bytes`.

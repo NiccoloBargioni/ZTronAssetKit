@@ -99,7 +99,7 @@ extension ModelSuites {
                     denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
                 }
             }
-            #expect(limitCases == 37)
+            #expect(limitCases == 38)
             if !tsan {
                 // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
                 // cost about 1,000x).
@@ -346,6 +346,12 @@ extension ModelSuites {
                 body(Case(name: "\(maxEntries) elements \(element)", seed: 0, payload: ManifestCorpus.repeatedElements(element, count: maxEntries),
                     expected: .allQuarantined(maxEntries)))
             }
+            // Elements that are identifiers alone: each is quarantined, and its identifier still takes part in the duplicate
+            // rule (ADR draft A-4.3), so the survey's identifier table holds every one of them: 4-byte slots, at most half
+            // full (fix round 3).
+            let identifiersOnly = (0..<maxEntries).map { "{\"identifier\":\"\(String($0, radix: 36))\"}" }.joined(separator: ",")
+            body(Case(name: "\(maxEntries) elements that are an identifier alone", seed: 0, payload: Data(("[" + identifiersOnly + "]").utf8),
+                expected: .allQuarantined(maxEntries)))
             // The legacy manifest's policy (keepFirst) with every entry repeating one identifier: the survey cannot
             // build identifiers, yet must not count the repeats as accepted entries.
             let duplicateCount = min(maxEntries, payloadBytes / 100)

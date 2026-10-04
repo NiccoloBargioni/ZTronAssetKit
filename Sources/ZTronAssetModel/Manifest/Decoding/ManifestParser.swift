@@ -91,6 +91,7 @@ struct ManifestParser {
         if let error = self.pendingError {
             throw error
         }
+        self.tally.stackBytes = self.cursor.stackOverflowBytes
         return Output(
             entries: self.entries, positions: self.positions, quarantined: self.quarantined, quarantinedCount: self.quarantinedCount,
             shape: shape, survey: self.tally
