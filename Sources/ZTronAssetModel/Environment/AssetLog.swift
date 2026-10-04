@@ -258,6 +258,14 @@ extension LogTap {
 
 /// A signpost interval that has begun (R-OBS-1). End it exactly once, typically with `defer { interval.end() }`
 /// right after `LogRoute.interval(_:category:_:)`; it may span awaits.
+///
+/// A copy is the same interval, and `end()` has no once-guard: none can be shared by copies without a lock or an
+/// atomic, which the iOS 15 floor and the unsafe budget rule out. A second end of one interval makes the os overlay
+/// assert in a debug build under `OSLogSink` (and log a double-end error otherwise); tests cannot see that, since
+/// their signposters are disabled. So each interval has one owner that ends it in one place: a `let` ended only by
+/// the `defer` that follows it, or, for an interval that outlives its scope (a transfer kept until its terminal
+/// update), the single code path that removes it from its owner's state. Owners' tests assert through the tap that
+/// every began edge has exactly one ended edge (ADR draft A-7).
 public struct LogInterval: Sendable {
     /// Which interval.
     public let name: LogIntervalName
@@ -331,8 +339,9 @@ public struct LogInterval: Sendable {
 
 extension LogRoute {
     /// Begins one of the six R-OBS-1 signpost intervals on the sink's signposter (none under `TapOnlyLogSink`) and
-    /// reports its began edge to the tap; the returned value ends it (ARCHITECTURE §13.5 item 2). `message` is
-    /// rendered like a log line: identifiers through `AssetLog.hashed(_:)`, never a secret.
+    /// reports its began edge to the tap; the returned value ends it, exactly once (ARCHITECTURE §13.5 item 2; see
+    /// `LogInterval` for who ends it). `message` is rendered like a log line: identifiers through
+    /// `AssetLog.hashed(_:)`, never a secret.
     public func interval(_ name: LogIntervalName, category: LogCategory, _ message: String = "") -> LogInterval {
         LogInterval(name: name, category: category, message: message, tap: self.tap, signposter: self.sink.signposter(category))
     }

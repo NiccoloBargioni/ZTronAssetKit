@@ -66,6 +66,23 @@ extension ModelSuites {
             #expect(tap.lines.isEmpty)
         }
 
+        @available(macOS 15.0, *)
+        @Test("R-OBS-1: every end of an interval reaches the tap, so an owner's test sees a double end as a second ended edge")
+        func doubleEndReachesTheTap() {
+            // A copy is the same interval. Under `OSLogSink` a second end asserts in a debug build (the os overlay's
+            // double-end check); tests run without signposts, so the tap is where an owner's test catches it: one ended
+            // edge per began edge (ADR draft A-7).
+            let tap = StructuredTap()
+            let interval = LogRoute.tapOnly(tap).interval(.commit, category: .store, "generation 3")
+            let copy = interval
+            interval.end()
+            #expect(tap.events.map(\.phase) == [.began, .ended])
+            copy.end()
+            let ended = tap.events.filter { $0.phase == .ended }
+            #expect(tap.events.filter { $0.phase == .began }.count == 1)
+            #expect(ended.count == 2 && ended.allSatisfy { $0.name == .commit && $0.message == "generation 3" })
+        }
+
         @Test("R-OBS-1: interval events round-trip through their rendered line and no other line parses as one")
         func intervalLinesParse() {
             for name in LogIntervalName.allCases {
