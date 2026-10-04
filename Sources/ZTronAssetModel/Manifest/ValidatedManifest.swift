@@ -90,14 +90,39 @@ public struct ValidatedManifest: Sendable, Hashable {
 /// blocking-I/O executor, never on the main thread or for long on the cooperative pool (C2, ADR-003).
 public enum ManifestDecoder {
     /// Decodes either wire shape and validates every entry.
+    ///
+    /// The payload size is checked before a byte is read; the bytes are then parsed in one pass by a reader that
+    /// materialises only what accepted entries need (`ManifestParser`, ADR draft A-1), and the digest is the
+    /// SHA-256 of `data` as received.
     public static func decode(_ data: Data, options: ManifestDecodingOptions = ManifestDecodingOptions()) throws(ManifestError)
         -> ValidatedManifest
     {
-        fatalError("WP-A: not implemented")
+        guard Int64(data.count) <= options.limits.maxPayloadBytes else {
+            throw .payloadTooLarge(bytes: Int64(data.count), limit: options.limits.maxPayloadBytes)
+        }
+        let parsed: Result<ManifestParser.Output, ManifestError> = data.withUnsafeBytes { bytes in
+            var parser = ManifestParser(bytes: bytes, options: options)
+            do throws(ManifestError) {
+                return .success(try parser.parse())
+            } catch {
+                return .failure(error)
+            }
+        }
+        let output = try parsed.get()
+        return try ValidatedManifest(
+            entries: output.entries,
+            quarantined: output.quarantined,
+            shape: output.shape,
+            digest: ContentHash.sha256(of: data)
+        )
     }
 
     /// The per-entry rules of R-MAN-2 for one entry: every violation, or an empty array when the entry is valid.
+    ///
+    /// Reported in field order (identifier, fileExtension, remotePath, localPathComponents, byteSize, tags); the
+    /// decoder quarantines an entry with the first. A `ManifestEntry` value cannot hold a malformed checksum or
+    /// policy, so those violations arise only while decoding.
     public static func violations(of entry: ManifestEntry, limits: ManifestLimits) -> [ManifestEntryViolation] {
-        fatalError("WP-A: not implemented")
+        ManifestRules.violations(of: entry, limits: limits)
     }
 }
