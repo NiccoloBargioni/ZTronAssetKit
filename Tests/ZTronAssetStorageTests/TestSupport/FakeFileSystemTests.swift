@@ -1,0 +1,253 @@
+import Foundation
+import Testing
+import ZTronAssetModel
+import ZTronAssetTestSupport
+
+/// Recording (R-STO-7 calling thread, R-STO-8 attributes), locks (R-STO-9), the namespace and disk images.
+@Suite("Test support: FakeFileSystem recording and namespace")
+struct FakeFileSystemTests {
+    @available(macOS 15.0, *)
+    @Test("Test support: every call records whether it ran on the main thread", .timeLimit(.minutes(1)))
+    func recordsCallingThread() async throws {
+        let fileSystem = FakeFSFixture.make()
+        _ = try fileSystem.itemInfo(at: FakeFSFixture.volume)
+        await MainActor.run {
+            _ = try? fileSystem.contentsOfDirectory(at: FakeFSFixture.volume)
+        }
+        #expect(fileSystem.mainThreadCalls == 1)
+        #expect(fileSystem.operations.map(\.isMainThread) == [false, true])
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: applied attributes are recorded by path and read back in the next lifetime")
+    func attributesAreRecorded() throws {
+        let fileSystem = FakeFSFixture.make()
+        let root = FakeFSFixture.url("/fake-volume/root")
+        try fileSystem.createDirectory(at: root)
+        #expect(try fileSystem.storeAttributes(at: root) == StoreAttributes(excludedFromBackup: false, protection: nil))
+        try fileSystem.applyStoreAttributes(.storeDefault, at: root)
+        #expect(fileSystem.appliedAttributes == ["/fake-volume/root": .storeDefault])
+        #expect(try fileSystem.storeAttributes(at: root) == .storeDefault)
+
+        let next = FakeFFSLifetime.next(fileSystem.survivingDisk())
+        #expect(try next.storeAttributes(at: root) == .storeDefault)
+        #expect(throws: FileSystemError.notFound) { try next.storeAttributes(at: root.appendingPathComponent("absent")) }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a held lock blocks every other holder until released and its token names the lock file")
+    func lockBlocksOtherHolders() throws {
+        let fileSystem = FakeFSFixture.make()
+        let lock = FakeFSFixture.url("/fake-volume/store.lock")
+        let token = try fileSystem.acquireExclusiveLock(at: lock)
+        #expect(try fileSystem.itemInfo(at: lock)?.identity == token.identity)
+        #expect(throws: FileSystemError.wouldBlock) { try fileSystem.acquireExclusiveLock(at: lock) }
+        fileSystem.releaseLock(token)
+        let again = try fileSystem.acquireExclusiveLock(at: lock)
+        fileSystem.releaseLock(token)  // a stale token releases nothing
+        #expect(throws: FileSystemError.wouldBlock) { try fileSystem.acquireExclusiveLock(at: lock) }
+        fileSystem.releaseLock(again)
+        #expect(fileSystem.operations.filter { $0.kind == .releaseLock }.count == 3)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a replaced lock file has a new identity, which is how a replaced root is detected")
+    func replacedLockFileChangesIdentity() throws {
+        let fileSystem = FakeFSFixture.make()
+        let lock = FakeFSFixture.url("/fake-volume/store.lock")
+        let token = try fileSystem.acquireExclusiveLock(at: lock)
+        try fileSystem.removeItem(at: lock)
+        try fileSystem.write(Data(), to: lock, mode: .truncate)
+        let identity = try #require(try fileSystem.itemInfo(at: lock)?.identity)
+        #expect(identity != token.identity)
+        #expect(throws: Never.self) { _ = try fileSystem.acquireExclusiveLock(at: lock) }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: standard directories resolve to existing directories under the configured volume root")
+    func standardDirectoriesExist() throws {
+        let volume = URL(fileURLWithPath: "/other-volume", isDirectory: true)
+        let fileSystem = FakeFileSystem(time: ManualTimeSource(), configuration: FakeFileSystemConfiguration(volumeRoot: volume))
+        let support = try fileSystem.standardDirectory(.applicationSupport)
+        let caches = try fileSystem.standardDirectory(.caches)
+        #expect(support.path == "/other-volume/Library/Application Support")
+        #expect(caches.path == "/other-volume/Library/Caches")
+        #expect(try fileSystem.itemInfo(at: support)?.kind == .directory)
+        #expect(try fileSystem.itemInfo(at: caches)?.kind == .directory)
+        #expect(FakeFSFixture.powerLoss(fileSystem.survivingDisk()).directories.contains("/other-volume/Library/Caches"))
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: listings are sorted by name and report sizes, kinds and the injected modification time")
+    func listingsAreSorted() throws {
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(time: time)
+        let directory = FakeFSFixture.url("/fake-volume/d")
+        try fileSystem.createDirectory(at: directory)
+        try fileSystem.write(Data([1, 2]), to: directory.appendingPathComponent("c.bin"), mode: .truncate)
+        time.advance(by: 5)
+        try fileSystem.write(Data([1]), to: directory.appendingPathComponent("a.bin"), mode: .truncate)
+        try fileSystem.createDirectory(at: directory.appendingPathComponent("b"))
+        let listing = try fileSystem.contentsOfDirectory(at: directory)
+        #expect(listing.map(\.name) == ["a.bin", "b", "c.bin"])
+        #expect(listing.map(\.kind) == [.file, .directory, .file])
+        #expect(listing.map(\.byteSize) == [1, 0, 2])
+        #expect(listing[0].modifiedAt == time.now())
+        #expect(listing[2].modifiedAt == time.now().addingTimeInterval(-5))
+        #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.contentsOfDirectory(at: directory.appendingPathComponent("a.bin")) }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: an intermediate symbolic link is followed, a final one only by reads and writes")
+    func symbolicLinks() throws {
+        let fileSystem = FakeFSFixture.make()
+        let real = FakeFSFixture.url("/fake-volume/real")
+        try fileSystem.createDirectory(at: real)
+        try fileSystem.write(Data([4]), to: real.appendingPathComponent("x.bin"), mode: .truncate)
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/alias"), destination: "/fake-volume/real")
+        try fileSystem.createSymbolicLink(at: real.appendingPathComponent("l.bin"), destination: "x.bin")
+
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/alias/x.bin") == [4])
+        #expect(try fileSystem.itemInfo(at: FakeFSFixture.url("/fake-volume/alias"))?.kind == .symbolicLink)
+        #expect(try fileSystem.itemInfo(at: FakeFSFixture.url("/fake-volume/alias"))?.byteSize == Int64("/fake-volume/real".utf8.count))
+        try fileSystem.write(Data([5]), to: real.appendingPathComponent("l.bin"), mode: .append)
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/real/x.bin") == [4, 5])
+        try fileSystem.rename(from: real.appendingPathComponent("l.bin"), to: real.appendingPathComponent("m.bin"), mode: .exclusive)
+        #expect(try fileSystem.itemInfo(at: real.appendingPathComponent("m.bin"))?.kind == .symbolicLink)
+        #expect(throws: FileSystemError.alreadyExists) {
+            try fileSystem.createSymbolicLink(at: real.appendingPathComponent("m.bin"), destination: "x.bin")
+        }
+        let disk = fileSystem.survivingDisk()
+        #expect(FakeFFSLifetime.next(disk).survivingDisk() == disk)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a cycle of symbolic links fails with ELOOP instead of looping")
+    func linkLoopsFail() throws {
+        let fileSystem = FakeFSFixture.make()
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/a"), destination: "b")
+        try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/b"), destination: "a")
+        #expect(throws: FileSystemError.other(errno: ELOOP)) { try fileSystem.read(from: FakeFSFixture.url("/fake-volume/a"), offset: 0, maxLength: 1) }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: renames refuse to move a directory into itself or onto a non-empty directory")
+    func directoryRenames() throws {
+        let fileSystem = FakeFSFixture.make()
+        let a = FakeFSFixture.url("/fake-volume/a")
+        let b = FakeFSFixture.url("/fake-volume/b")
+        try fileSystem.createDirectory(at: a)
+        try fileSystem.createDirectory(at: b)
+        try fileSystem.write(Data([1]), to: b.appendingPathComponent("f"), mode: .truncate)
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.rename(from: a, to: a.appendingPathComponent("inner"), mode: .replacing) }
+        #expect(throws: FileSystemError.notEmpty) { try fileSystem.rename(from: a, to: b, mode: .replacing) }
+        #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.rename(from: b.appendingPathComponent("f"), to: a, mode: .replacing) }
+        #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.rename(from: a, to: b.appendingPathComponent("f"), mode: .replacing) }
+        try fileSystem.rename(from: b, to: FakeFSFixture.url("/fake-volume/c"), mode: .exclusive)
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/c/f") == [1])
+        try fileSystem.rename(from: a, to: a, mode: .exclusive)
+        #expect(try fileSystem.itemInfo(at: a)?.kind == .directory)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: misuse of the seam is reported as an error: oversized reads, relative URLs, directories as files")
+    func misuseIsReported() throws {
+        let fileSystem = FakeFSFixture.make()
+        let file = FakeFSFixture.url("/fake-volume/f.bin")
+        try fileSystem.write(Data([1]), to: file, mode: .truncate)
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.read(from: file, offset: 0, maxLength: (1 << 20) + 1) }
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.read(from: file, offset: -1, maxLength: 1) }
+        #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.itemInfo(at: URL(string: "https://example.com/f")!) }
+        #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.read(from: FakeFSFixture.volume, offset: 0, maxLength: 1) }
+        #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.write(Data([1]), to: FakeFSFixture.volume, mode: .append) }
+        #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.synchronizeDirectory(at: file, level: .barrier) }
+        #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.write(Data([1]), to: file.appendingPathComponent("x"), mode: .truncate) }
+        #expect(throws: FileSystemError.permissionDenied) { try fileSystem.removeItem(at: FakeFSFixture.url("/")) }
+        #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.acquireExclusiveLock(at: FakeFSFixture.volume) }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: disk digests are equal for equal trees and change with any path or byte")
+    func digestsFollowContent() throws {
+        let first = FakeFSFixture.make()
+        let second = FakeFSFixture.make()
+        for fileSystem in [first, second] {
+            try fileSystem.createDirectory(at: FakeFSFixture.url("/fake-volume/d"))
+            try fileSystem.write(Data([1, 2]), to: FakeFSFixture.url("/fake-volume/d/f"), mode: .truncate)
+        }
+        #expect(first.survivingDisk().digest() == second.survivingDisk().digest())
+        #expect(first.survivingDisk() == second.survivingDisk())
+
+        try second.write(Data([3]), to: FakeFSFixture.url("/fake-volume/d/f"), mode: .truncate)
+        #expect(first.survivingDisk().digest() != second.survivingDisk().digest())
+        try first.rename(from: FakeFSFixture.url("/fake-volume/d/f"), to: FakeFSFixture.url("/fake-volume/d/g"), mode: .exclusive)
+        let renamed = first.survivingDisk()
+        #expect(renamed.digest() != FakeFSFixture.make().survivingDisk().digest())
+        #expect(renamed.paths.contains("/fake-volume/d/g"))
+        try first.createSymbolicLink(at: FakeFSFixture.url("/fake-volume/d/l"), destination: "g")
+        #expect(first.survivingDisk().digest() != renamed.digest())
+        #expect(Set([renamed, renamed]).count == 1)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: makeDurable lets a seeded disk survive a power loss in its first lifetime")
+    func makeDurableSeedsSurvive() throws {
+        var seeded = DiskImage()
+        seeded.files["/fake-volume/legacy/a/b.png"] = [1, 2]
+        seeded.directories.insert("/fake-volume/legacy")
+        #expect(FakeFSFixture.powerLoss(seeded).files["/fake-volume/legacy/a/b.png"] == nil)
+        seeded.makeDurable()
+        #expect(FakeFSFixture.powerLoss(seeded).files["/fake-volume/legacy/a/b.png"] == [1, 2])
+        #expect(FakeFSFixture.powerLoss(seeded).directories.contains("/fake-volume/legacy/a"))
+
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(time: time)
+        try fileSystem.createDirectory(at: FakeFSFixture.url("/fake-volume/s"))
+        try fileSystem.write(Data([7]), to: FakeFSFixture.url("/fake-volume/s/f"), mode: .truncate)
+        time.advance(by: 100)
+        var image = fileSystem.survivingDisk()
+        image.makeDurable()
+        let next = FakeFileSystem(disk: image, time: time)
+        #expect(try next.itemInfo(at: FakeFSFixture.url("/fake-volume/s/f"))?.modifiedAt == time.now().addingTimeInterval(-100))
+        #expect(FakeFSFixture.powerLoss(image).files["/fake-volume/s/f"] == [7])
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a hand-edited disk loads with the edit and keeps the durability of every untouched file")
+    func editedDiskKeepsUntouchedDurability() throws {
+        let fileSystem = FakeFSFixture.make()
+        let directory = FakeFSFixture.url("/fake-volume/blobs")
+        try fileSystem.createDirectory(at: directory)
+        for name in ["a", "b"] {
+            let staged = FakeFSFixture.url("/fake-volume/\(name).part")
+            try fileSystem.write(Data([1, 2, 3]), to: staged, mode: .truncate)
+            try fileSystem.synchronizeFile(at: staged, level: .barrier)
+            try fileSystem.rename(from: staged, to: directory.appendingPathComponent(name), mode: .exclusive)
+        }
+        var image = fileSystem.survivingDisk()
+        image.files.removeValue(forKey: "/fake-volume/blobs/a")  // the OS purged one blob between launches
+
+        let next = FakeFFSLifetime.next(image)
+        #expect(try next.itemInfo(at: directory.appendingPathComponent("a")) == nil)
+        let afterPowerLoss = FakeFSFixture.powerLoss(next.survivingDisk(), .powerLossKeepMetadata)
+        #expect(afterPowerLoss.files["/fake-volume/blobs/b"] == [1, 2, 3])
+        #expect(afterPowerLoss.files["/fake-volume/blobs/a"] == nil)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a seeded file whose parent directories are not listed gets them, and a seeded durable-only file returns on power loss")
+    func seededImagesAreLenient() throws {
+        var seeded = DiskImage()
+        seeded.files["/fake-volume/x/y/z.bin"] = [8]
+        seeded.durableFiles["/fake-volume/gone.bin"] = [9]
+        seeded.durableDirectories.insert("/fake-volume/ghost")
+        let fileSystem = FakeFFSLifetime.next(seeded)
+        #expect(try fileSystem.itemInfo(at: FakeFSFixture.url("/fake-volume/x/y"))?.kind == .directory)
+        #expect(FakeFSFixture.content(fileSystem, "/fake-volume/x/y/z.bin") == [8])
+        #expect(try fileSystem.itemInfo(at: FakeFSFixture.url("/fake-volume/gone.bin")) == nil)
+        let disk = FakeFSFixture.powerLoss(seeded)
+        #expect(disk.files["/fake-volume/gone.bin"] == [9])
+        #expect(disk.directories.contains("/fake-volume/ghost"))
+        #expect(disk.files["/fake-volume/x/y/z.bin"] == nil)
+    }
+}
