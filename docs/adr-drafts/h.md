@@ -51,8 +51,10 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
 - **Decision.** Mutations (the eight crash-boundary kinds) are numbered from 0 in call order, **failed ones
   included** (a failed rename is still a boundary the store crossed); queries and `releaseLock` are logged but not
   numbered. `crashBefore: k` makes mutation k and everything after it never happen: the call throws `.io`, every
-  later call throws `.io` (`releaseLock` becomes a no-op), locks are dropped, and `survivingDisk()` returns the
-  disk frozen at that point per `crashMode`. Without a crash, `survivingDisk()` applies the mode *now* (a test's
+  later call throws `.io` (`releaseLock` becomes a no-op), and `survivingDisk()` returns the disk frozen at that
+  point per `crashMode`. Lock state lives in one lifetime only, so nothing clears it at the crash (fix round 2: the
+  `locks.removeAll()` there could not be observed and was removed); the lock **file** survives a process kill with
+  its identity and the next lifetime locks that same file (R-STO-9). Without a crash, `survivingDisk()` applies the mode *now* (a test's
   "power loss now"). `processKill` keeps the graph unchanged (split intact); `processKillTornWrite` additionally lands
   half of a crashing `write` (equal to `processKill` for any other op); `powerLossDropUnsynced` rebuilds the namespace
   from synced listings with synced bytes; `powerLossKeepMetadata` keeps the namespace and reverts bytes. After a power
@@ -71,9 +73,15 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
 - **Decision.** Every rule counts the calls that match its operation and URL; the first rule that fires wins.
   `.nth(n)` fires on the n-th match, `.every` on each, `.afterBytes(n)` (writes only) when the bytes that landed on
   that path since the rule was added would pass n: the crossing write lands up to n bytes, every later one lands
-  none. A write fault models `write(2)` failing **after** `open(2)` succeeded (fix round 1; it used to leave the file
-  untouched): the file exists afterwards, a `.truncate` write has emptied it, and `partialBytes` (default 0) land
-  before the error, which is the pessimistic outcome for `index.tmp` and `.resumetmp`. Faults apply to queries too. Free space is the configured
+  none. The error decides where a write fault fails (fix round 2). An error `write(2)` itself returns (`.noSpace`,
+  `.io`, `.other` with EFBIG, EINTR, EDQUOT or EAGAIN) fails **after** `open(2)` succeeded (fix round 1): the file
+  exists afterwards, a `.truncate` write has emptied it, and `partialBytes` (default 0), or what an `.afterBytes`
+  threshold lets through, land before the error: the pessimistic outcome for `index.tmp` and `.resumetmp`. Any other
+  error (`.permissionDenied`, `.notFound`, `.other` with EISDIR, ENOTDIR, EACCES, …) fails `open(2)` itself and
+  changes nothing, whatever `partialBytes` says, as store.md §3.4 and F19 require for EACCES before the first
+  unlock (round 1 created and truncated the file for every error). No `FaultRule` field was added (that would change
+  a contract type): the classification is by error and documented on `partialBytes`. Faults apply to queries too.
+  Free space is the configured
   capacity minus the net bytes the lifetime added (deleting frees, an inode still linked elsewhere frees nothing); a
   write that does not fit lands what fits and throws `.noSpace` (an emergent ENOSPC, so a reaper that frees space
   really makes room). Misuse is reported, never trapped: a read over 1 MiB or a negative offset is `EINVAL`, a
@@ -107,7 +115,11 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   store code that relies on an order) and callers sort. Fixtures the seam cannot make reach the fake through the
   internal, ungated `FileSystemFixtureSeeding` cast (no `#available`, R-APL-5); for any other conformer the link is
   created with `FileManager` inside the caller's root. The suite never calls `standardDirectory` (the live one may
-  create a directory outside the repository). It returns values and imports no Swift Testing (ADR-041).
+  create a directory outside the repository). It returns values and imports no Swift Testing (ADR-041). Of the
+  `FileSystemError` mapping it checks only what a test can induce on both conformers inside its root (`.notFound`,
+  `.alreadyExists`, `.notEmpty`, `.wouldBlock`, plus `.noSpace` in the fake-only short-write clause); the live
+  mapping of every other errno belongs to WP-B's pure errno-mapping table tests (fix round 2: the type's doc used to
+  claim "the closed `FileSystemError` mapping").
 - **Consequences.** `R-STO-6: FakeFileSystem satisfies the shared FileSystem conformance contract` passes; 36
   single-defect conformers cover every one of the 29 clauses (`R-STO-6: the conformance contract reports a conformer
   that breaks one of its clauses`; a script cross-checks the clause strings against the defects), so no clause is
@@ -116,9 +128,12 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   would release a lock re-acquired on a reused descriptor number. It can satisfy the clause without an unsafe escape
   or a lock type above the floor, for example by recording a per-acquisition nonce in the lock descriptor's own file
   offset (`lseek(fd, nonce, SEEK_SET)` at acquisition, the nonce carried in the token's handle next to the
-  descriptor, compared with `lseek(fd, 0, SEEK_CUR)` before unlocking; the lock file stays empty). The contract owner may also want one sentence in
-  `FileSystem`'s doc (Model, not WP-H's): "`contentsOfDirectory` returns no particular order" and "releasing a stale
-  token releases nothing".
+  descriptor, compared with `lseek(fd, 0, SEEK_CUR)` before unlocking; the lock file stays empty). **Still open after
+  fix round 2 (orchestrator, before WP-B starts):** ratify the clause in DECISIONS.md and amend store.md §3.2 and
+  §3.3 and the `FileSystem.releaseLock` doc in the Model ("releasing a stale token releases nothing"), or drop the
+  clause; otherwise WP-B's `R-STO-6: the fake and live file systems agree on the shared conformance contract` fails
+  on a reused descriptor number. WP-H owns none of those files. The contract owner may also want one sentence in
+  `FileSystem`'s doc: "`contentsOfDirectory` returns no particular order".
 
 ## H-6 — `FakeRemoteSource` scripting
 
@@ -131,7 +146,11 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   id, and a release with none waiting is **kept for the next hold of that id** (no test can race the engine's start);
   `script` wakes an attempt that ran out of steps, never one at an explicit `.hold`; a progress release lets the
   attempt continue with its queue. `pause()`/`cancel()` on a handle ends that attempt (read from the handle's own
-  control log; `FakeTransferHandle` is unchanged); its remaining steps go to the next attempt. `.stage(Data)` is one
+  control log; `FakeTransferHandle` is unchanged); its remaining steps go to the next attempt. Parked attempts the
+  engine stopped are dropped at every interaction that reads or adds parked attempts: `transfer`, `script`,
+  `release` and the `activeTransfers` census (fix round 2: only `script` and `release` did, so an engine run that
+  cancels many held attempts and never scripts or releases kept each one, with its handle and request, and every
+  census scanned them all; tested with 40 stopped attempts). `.stage(Data)` is one
   `createPartial` + one `appendPartial`; `.stageGenerated` appends `GeneratedPayload.chunkBytes` chunks, each
   generated just before it is written. With `request.resume`, the fake continues the earlier partial
   (`continuePartial`) and appends only the bytes it lacks (`resumed: true`). Sink failures map like the transport:
@@ -179,8 +198,28 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   answered and the connection closed. Requests with a `Content-Length` body are consumed (split bodies awaited).
   Ranges: `bytes=a-` and `bytes=a-b` only (anything else is ignored → 200), 206 with `Content-Range`, 416 with
   `bytes */total` past the end, `If-Range` must equal the tag. `start()` is idempotent while running and throws after
-  `stop()` (found by a test: it used to return the closed port); concurrent starts await one in-flight start task,
-  so there is one listener (fix round 1: a second start used to create a second listener and make the first throw).
+  `stop()` (found by a test: it used to return the closed port); concurrent starts wait for one listener (fix round
+  1: a second start used to create a second listener and make the first throw).
+- **Start versus stop (fix round 2).** Round 1 bridged the listener's state handler to one continuation and assumed
+  Network delivers exactly one terminal state. It does not: when `stop()`'s `cancel()` races the listener coming up,
+  the handler can see a terminal state and then `.cancelled` (clearing the handler inside the callback does not stop
+  a callback already scheduled), so the continuation was resumed twice and the test process trapped; and a listener
+  cancelled before its `start(queue:)` sometimes reports nothing, so `start()` hung. Now the waiting starts live on the
+  actor (`startWaiters`, registered synchronously in the continuation body) and are resumed only from actor code,
+  through one helper that empties the list before resuming: on `.ready` with the port, on `.failed`/`.waiting` with
+  the listener error (the listener is cancelled and cleared, so a later `start()` makes a new one), and by `stop()`
+  itself with `.stopped`, so a missing callback cannot hang a start and a repeated one finds nothing left to resume.
+  The listener is created and started synchronously in `start()`, so `stop()` can no longer land between the two.
+  The state handler forwards each state to the actor with the listener's generation number; a state of any listener
+  but the current one, or after the port is known, is ignored. A start resumed with a port re-reads `stopped` and
+  throws if `stop()` ran in between. Tested: `Test support: start racing stop ends every start exactly once, with a
+  port or stopped, and never hangs` (400 rounds of two starts and a stop spread over the listener's start-up by
+  `Task.yield()`; the round-1 server traps with "SWIFT TASK CONTINUATION MISUSE: ready(_:on:) tried to resume its
+  continuation more than once" in both runs made; three runs of a scratch probe, 6,000 raced starts each, saw both
+  outcomes and no other).
+- **Head cap (fix round 2).** A request head over 64 KiB, or 64 KiB without the blank line that ends a head, is
+  answered `431 Request Header Fields Too Large` with `Connection: close` and the connection closed (it used to grow
+  the buffer without limit and rescan it on every receive). Tested: the round-1 server hit the one-minute time limit.
   A `Content-Length` that is not `1*DIGIT` within 64 MiB is answered 400 and the connection closed (fix round 1: a
   negative one trapped the test process); header names merge case-insensitively, a scripted `Content-Length` wins (a
   test can announce a size other than the body's, R-NET-7) and the server's other headers replace scripted ones. Gzip: header with MTIME 0 and OS 255 (nothing
@@ -201,6 +240,15 @@ drive the fakes without them:
 - `FakeFileSystem.createSymbolicLink(at:destination:)`; `DiskImage.makeDurable()`; `DiskImage.purge(_:)` (fix round
   1: the durable OS-purge edit R-CLN-7 tests need); `DiskImage`'s `==` and `hash(into:)` are now explicit
   (observable state only) instead of synthesized.
+- **Semantic change to ratify:** the contract synthesized `DiskImage` equality over its four package fields; it now
+  compares the observable state, which **also includes symbolic links (current and durable) and applied
+  attributes**, and still never inode numbers or modification times. Two disks that differ only in a link or in
+  backup exclusion are therefore unequal (R-SYN-11's "zero side effects" needs that). `DiskImage.paths` keeps the
+  contract's body and lists files and directories only; its doc now says so and points at `digest()`, which covers
+  links (fix round 2).
+- Total (counted by the reqs verifier, fix round 2): 21 additive public declarations, 0 contract declarations
+  missing or changed. Fix round 2 added no public declaration (`FakeRemoteSource.parkedAttempts` and
+  `LoopbackHTTPServer.maxRequestHeadBytes` are internal, for the fakes' own tests).
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.3)
 
@@ -211,9 +259,9 @@ drive the fakes without them:
 | h-3 | `EventProbe.next`'s `onCancel` task: `await self.cancelWaiter(id)` | nothing: the task is not the actor; `cancelWaiter` re-reads the table and is a no-op for a waiter already resumed |
 | h-4 | `EventProbe.waitForWaiters(atLeast:)` | nothing: a terminal wait as TS2, resumed by the count or by `finish()` |
 | h-5 | `LoopbackHTTPServer`: the listener's `newConnectionHandler` task (`accept`) and the per-connection task (`serve`) | nothing: the tasks are not the actor's turn; `accept` re-reads `stopped` and cancels a late connection, `serve` re-reads `stopped` after each of its awaits |
-| h-6 | `LoopbackHTTPServer.start()`: awaiting the one in-flight start task (the listener coming up) | `stopped`: a `stop()` meanwhile cancelled the listener, so every waiting start throws instead of reporting a dead port; concurrent starts share the task, so there is one listener and no identity to re-check; a failed start clears the task only if it is still the current one |
+| h-6 | `LoopbackHTTPServer.start()`: the waiter's continuation (the listener coming up) | `stopped`: a start resumed with a port throws if `stop()` ran before its turn. The waiter is registered synchronously in the continuation body and resumed exactly once, only by actor code (`resumeStartWaiters` empties the list first): with the port on `.ready`, with the error on `.failed`/`.waiting`, with `.stopped` from `stop()`; concurrent starts wait for the one current listener |
 | h-7 | `LoopbackHTTPServer.serve`/`respond`: `respond`, `receive`, the injected delay, `send` | `stopped`: no response is sent and no connection is served after `stop()`; the request log entry was appended before the await; a closing connection removes only its own entry |
-| h-8 | `LoopbackHTTPServer.ready/receive/send` (nonisolated static bridges) | nothing: they touch no actor state; each continuation is resumed exactly once by Network |
+| h-8 | `LoopbackHTTPServer`: the listener's `stateUpdateHandler` task (`listenerStateChanged`); `receive`/`send` (nonisolated static bridges) | nothing: the handler task is not the actor's turn, and `listenerStateChanged` ignores a state of any listener but the current one (generation number) or one after the port is known, however late, often or rarely Network reports it; the bridges touch no actor state and Network calls each completion exactly once |
 
 `FakeRemoteSource`, `FakeTransferBackend` and the Mutex-backed fakes contain no await.
 
@@ -241,9 +289,24 @@ drive the fakes without them:
 | correct: header case conflicts | Fixed, test first (H-8) |
 | correct: unbounded growth | Request body capped at 64 MiB (H-8). **Declined:** a counts-only op-log option for `FakeFileSystem` (it would change the contract's configuration type, and the fake holds every file's bytes in memory anyway, so no memory budget can be measured over it: documented on the type); trimming `EventProbe` events (`received` promises every event: documented) |
 | reqs/correct: TestSupport not compiled for iOS by the gate | Orchestrator decision (WP-H cannot edit `Scripts/` or `Package.swift`); WP-H ran the cross-compile by hand (see the fix-round report) |
-| reqs: coverage, optional stop-during-start test | **Declined:** whether `stop()` lands before or after the listener is ready is up to Network, so the test would assert either outcome and cover a line only by chance (SPEC 7.2) |
+| reqs: coverage, optional stop-during-start test | **Declined in round 1 (wrongly; superseded in fix round 2):** whether `stop()` lands before or after the listener is ready is up to Network. The race this hid trapped the process; round 2 tests the invariant instead (H-8) |
 | reqs: additive public API | For the orchestrator to ratify (list above, now with `purge(_:)`) |
 | reqs: process | (a) for the orchestrator (WP-A re-run); (b) the probe file `ZZVerifyHCorrectProbes.swift` was not in this worktree when fix round 1 started (`git status` clean) |
+
+## Fix round 2 — dispositions of the verifiers' findings
+
+| Finding | Disposition |
+|---|---|
+| reqs, blocking: trivially-true "a process kill releases every lock" test (G4) | Fixed: replaced by `Test support: a process kill keeps the lock file with its identity, and the next lifetime locks that same file` (identity of the token, of the file after the kill and of the next lifetime's token; `.wouldBlock` after it). Two scratch mutants fail it: acquisition replacing the lock file (2 issues) and a kill frozen as a power loss (3 issues). The unobservable `state.locks.removeAll()` at the crash was removed, with a comment saying why none is needed (H-2) |
+| correct, blocking: `start()` vs `stop()` double resume (trap) and hang | Fixed, test first (H-8, rows h-6 and h-8). The new race test trapped the round-1 server with the continuation-misuse message, before and after the yield spread was added; it passes on the fix |
+| reqs: `InlineBlockingExecutor` test passes for an unstructured `Task` | Fixed: the unit also reports the identity of the task it runs in (`withUnsafeCurrentTask { $0?.hashValue }`, in the test only; no gated pattern), which must equal the caller's. Scratch mutants `await Task { work() }.value` and a task-group child both fail it |
+| correct: write faults always applied the after-open side effects | Fixed, test first (H-3): open-time errors change nothing; 5 errors tested (`.permissionDenied`, `.notFound`, EACCES, EISDIR, ENOTDIR), 20 issues on the round-1 fake |
+| correct: `FakeRemoteSource` kept dead parked attempts | Fixed, test first (H-6): dropped at every `transfer` and census read; the round-1 fake kept 20 and then 41 |
+| correct: unbounded request head in `LoopbackHTTPServer` | Fixed, test first (H-8): 431 and close past 64 KiB; the round-1 server hit the one-minute time limit |
+| reqs: conformance doc claimed the closed error mapping | Fixed (H-5): the doc names the errors the clauses check and points the rest at WP-B's errno-mapping tests |
+| reqs: additive API, `DiskImage` equality, `paths` | `paths` documented as files and directories only (body is the contract's); equality change and additions listed above for ratification |
+| reqs: stale-token clause binds WP-B (ratification) | For the orchestrator before WP-B starts (H-5): DECISIONS.md, store.md §3.2/§3.3 and the Model's `releaseLock` doc are not WP-H files. Not declined, not doable here |
+| reqs: verifier's xcodebuild wrote an error result bundle to the system temp directory | Not a WP-H defect; WP-H may not delete outside the repository, so a human should remove that one `.xcresult`. WP-H's own iOS build in this round passes `-resultBundlePath` inside `.build-h`, with `TMPDIR` and the module caches inside `.build-h` too, so no failing build of WP-H writes outside the repository |
 
 ## Evidence and incidents
 

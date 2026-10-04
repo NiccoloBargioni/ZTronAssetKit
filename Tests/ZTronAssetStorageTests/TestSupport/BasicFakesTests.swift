@@ -24,13 +24,22 @@ struct TestSupportBasicFakesTests {
         @TaskLocal static var value = 0
     }
 
+    /// The identity of the task running the caller (`nil` outside any task). Task-locals alone cannot prove "inline":
+    /// an unstructured `Task { }` or a task-group child inherits them, but each is a different task.
+    static func currentTaskIdentity() -> Int? {
+        withUnsafeCurrentTask { $0?.hashValue }
+    }
+
     @Test("Test support: InlineBlockingExecutor runs each unit inside the calling task and rethrows a typed failure", .timeLimit(.minutes(1)))
     func inlineExecutor() async {
         let executor = InlineBlockingExecutor()
+        let caller = Self.currentTaskIdentity()
         let seen = await CallerMarker.$value.withValue(42) {
-            await executor.run { CallerMarker.value }
+            await executor.run { (CallerMarker.value, Self.currentTaskIdentity()) }
         }
-        #expect(seen == 42)
+        #expect(caller != nil)
+        #expect(seen.0 == 42)
+        #expect(seen.1 == caller, "the unit ran in another task (a child, unstructured or detached task) or on a queue")
         await #expect(throws: FileSystemError.noSpace) {
             try await executor.run(throwing: { () throws(FileSystemError) -> Int in throw .noSpace })
         }

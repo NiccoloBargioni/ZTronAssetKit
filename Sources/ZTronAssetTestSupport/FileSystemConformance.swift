@@ -23,12 +23,17 @@ public struct FileSystemConformanceViolation: Sendable, Hashable, CustomStringCo
 /// The shared conformance contract of the `FileSystem` seam (R-STO-6; WP-H, contract-fix round 4).
 ///
 /// One set of clauses (absent-is-success removal, exclusive and replacing renames, append and truncate writes, short
-/// writes reported after the bytes that landed, non-following `itemInfo` and listings, the closed
-/// `FileSystemError` mapping, lock idempotence, including a stale token's release) that both conformers must satisfy, so `FakeFileSystem` cannot drift
-/// from the live behaviour the store relies on. It ships here, as an API, so that each package runs it from its
-/// own test files: WP-H against `FakeFileSystem` (`Tests/ZTronAssetStorageTests/TestSupport/`), WP-B against
-/// `LiveFileSystem` (`Tests/ZTronAssetStorageTests/Core/`), and neither edits the other's tests (ARCHITECTURE §1.2,
-/// §11).
+/// writes reported after the bytes that landed, non-following `itemInfo` and listings, lock idempotence, including a
+/// stale token's release) that both conformers must satisfy, so `FakeFileSystem` cannot drift from the live behaviour
+/// the store relies on. Of the `FileSystemError` mapping, the clauses check only the errors a test can induce on both
+/// conformers inside its own root: `.notFound`, `.alreadyExists`, `.notEmpty` and `.wouldBlock`, plus `.noSpace` in
+/// the short-write clause, which runs on the fake only. The live mapping of every other errno (`.permissionDenied`,
+/// `.noSpace`, `.crossDevice`, `.io`, `.notSupported`, `.other`) is covered by WP-B's pure errno-mapping table tests,
+/// not here.
+///
+/// It ships here, as an API, so that each package runs it from its own test files: WP-H against `FakeFileSystem`
+/// (`Tests/ZTronAssetStorageTests/TestSupport/`), WP-B against `LiveFileSystem` (`Tests/ZTronAssetStorageTests/Core/`),
+/// and neither edits the other's tests (ARCHITECTURE §1.2, §11).
 public enum FileSystemConformance {
     /// Runs every clause against `fileSystem` inside `root`, an empty directory the caller created and owns (for
     /// `LiveFileSystem`, under the test's scratch path inside this repository, never the system temporary
