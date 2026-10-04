@@ -87,16 +87,15 @@ public struct ManifestEntry: Sendable, Hashable, Codable {
         self.policy = policy
     }
 
-    /// The prior art's file name: `localFileName`, else the last dot-segment of the identifier
-    /// (`CDNAsset.swift:66-72`, RECON §5). Used only by legacy migration and the shims.
+    /// The prior art's file name: `localFileName`, else the last non-empty dot-segment of the identifier, else the
+    /// identifier itself (`CDNAsset.swift:66-72`, RECON §5: `split(separator: ".")` omits empty segments, so
+    /// `"trailing."` names `trailing` and `"."` names `.`). Used only by legacy migration, which must find the files
+    /// the prior art wrote under this name, and the shims.
     public var resolvedFileName: String {
         if let name = self.localFileName {
             return name
         }
-        if let last = self.identifier.rawValue.split(separator: ".", omittingEmptySubsequences: false).last {
-            return String(last)
-        }
-        return self.identifier.rawValue
+        return self.identifier.rawValue.split(separator: ".").last.map(String.init) ?? self.identifier.rawValue
     }
 
     /// The content identity used by the diff and the planner (R-MAN-4, R-MAN-5).

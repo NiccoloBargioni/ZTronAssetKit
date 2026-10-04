@@ -126,7 +126,9 @@ struct ModelBehaviourTests {
         let wall = clock.now()
         #expect(clock.monotonicNow() >= first)
         #expect(clock.uptimeNow() >= awake)
-        #expect(clock.now().timeIntervalSince(wall) >= -1)
+        // The wall clock reads a real date (after 2023-11-14); its order is not asserted, since a time-server step may
+        // move it backwards.
+        #expect(wall > Date(timeIntervalSince1970: 1_700_000_000))
         // A deadline in the past: no sleep at all.
         try await clock.sleep(until: .zero)
         try await clock.sleep(until: first)
@@ -201,7 +203,13 @@ struct ModelBehaviourTests {
         #expect(ManifestEntry(identifier: "bo7.ri.map", fileExtension: "png", remotePath: "m", localFileName: "Temple Map").resolvedFileName == "Temple Map")
         #expect(ManifestEntry(identifier: "bo7.ri.map", fileExtension: "png", remotePath: "m").resolvedFileName == "map")
         #expect(ManifestEntry(identifier: "plain", fileExtension: "png", remotePath: "m").resolvedFileName == "plain")
-        #expect(ManifestEntry(identifier: "trailing.", fileExtension: "png", remotePath: "m").resolvedFileName == "")
+        // The prior art's rule (`split(separator: ".")` drops empty segments, `CDNAsset.resolvedFileName`), which legacy
+        // migration needs to find the files the prior art wrote.
+        let priorArt = { (identifier: String) in identifier.split(separator: ".").last.map(String.init) ?? identifier }
+        for (identifier, expected) in [("trailing.", "trailing"), (".", "."), ("a..b", "b"), ("", ""), ("..", ".."), (".hidden", "hidden")] {
+            #expect(ManifestEntry(identifier: AssetID(identifier), fileExtension: "png", remotePath: "m").resolvedFileName == expected, "\(identifier)")
+            #expect(priorArt(identifier) == expected, "\(identifier)")
+        }
         let hash = ContentHash.sha256(of: Data([3]))
         #expect(ManifestEntry(identifier: "a", fileExtension: "png", remotePath: "m", checksum: hash).transferID == .content(hash))
     }

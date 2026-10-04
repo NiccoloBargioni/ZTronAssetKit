@@ -112,7 +112,10 @@ enum ManifestRules {
     // MARK: - remotePath
 
     /// The remote path rules: relative, at most `maxRemotePathBytes` bytes, no control character, no scheme, no
-    /// authority, not absolute and no `..` segment (also when percent-encoded, since the origin may decode it).
+    /// authority, not absolute and no `..` segment. The `..` check reads the path as the origin or a transport might:
+    /// it ends at a query or fragment (`?`, `#`, RFC 3986 §4.2), segments are also separated by `\` and by
+    /// percent-encoded slashes and backslashes (`%2F`, `%5C`), and a dot may be percent-encoded (`%2E`), since any of
+    /// these may be decoded or normalised on the way (ADR draft A-4.7).
     static func remotePathViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [RemotePathViolation] {
         let count = utf8.count
         guard count > 0 else {
@@ -146,19 +149,71 @@ enum ManifestRules {
         if utf8[0] == slash {
             result.append(.absolute)
         }
+        // One pass: the path ends at the first `?` or `#`, or at the payload's end; each segment is checked when its
+        // separator is reached. An ordinary byte costs one table load.
+        let classes = ManifestRules.pathByteClasses
         var segmentStart = 0
+        var pathEnd = count
         index = 0
-        while index <= count {
-            if index == count || utf8[index] == slash {
-                if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) {
-                    result.append(.parentSegment)
-                    break
-                }
-                segmentStart = index + 1
+        while index < pathEnd {
+            let byteClass = classes[Int(utf8[index])]
+            if byteClass == ManifestRules.ordinary {
+                index += 1
+                continue
             }
-            index += 1
+            if byteClass == ManifestRules.pathEnd {
+                pathEnd = index
+                break
+            }
+            let separator = byteClass == ManifestRules.separator ? 1 : ManifestRules.encodedSeparatorLength(utf8, at: index)
+            guard separator > 0 else {
+                index += 1
+                continue
+            }
+            if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) {
+                result.append(.parentSegment)
+                return result
+            }
+            index += separator
+            segmentStart = index
+        }
+        if ManifestRules.isParentSegment(utf8, from: segmentStart, to: pathEnd) {
+            result.append(.parentSegment)
         }
         return result
+    }
+
+    /// The `..` check's byte classes, indexed by byte: `ordinary`, `separator` (`/`, `\`), `percent` (maybe an encoded
+    /// separator) or `pathEnd` (`?`, `#`).
+    private static let pathByteClasses: [UInt8] = (0...255).map { (byte: Int) -> UInt8 in
+        switch UInt8(byte) {
+        case UInt8(ascii: "/"), UInt8(ascii: "\\"):
+            return ManifestRules.separator
+        case UInt8(ascii: "%"):
+            return ManifestRules.percent
+        case UInt8(ascii: "?"), UInt8(ascii: "#"):
+            return ManifestRules.pathEnd
+        default:
+            return ManifestRules.ordinary
+        }
+    }
+
+    private static let ordinary: UInt8 = 0
+    private static let separator: UInt8 = 1
+    private static let percent: UInt8 = 2
+    private static let pathEnd: UInt8 = 3
+
+    /// 3 when `%` at `index` starts an encoded slash or backslash (`%2F`, `%5C`, either case), else 0. The two
+    /// following bytes are inside the path when they are a separator: neither is `?` or `#`.
+    private static func encodedSeparatorLength(_ utf8: UnsafeRawBufferPointer, at index: Int) -> Int {
+        guard index + 2 < utf8.count else {
+            return 0
+        }
+        let high = utf8[index + 1]
+        let low = utf8[index + 2] | 0x20
+        let isSlash = high == UInt8(ascii: "2") && low == UInt8(ascii: "f")
+        let isBackslash = high == UInt8(ascii: "5") && low == UInt8(ascii: "c")
+        return isSlash || isBackslash ? 3 : 0
     }
 
     /// Whether `utf8[start..<end]` is `..`, also spelled with percent-encoded dots (`%2e`, `%2E`).
