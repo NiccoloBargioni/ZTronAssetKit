@@ -7,15 +7,25 @@ extension ModelSuites {
     @Suite("Environment scans")
     struct EnvironmentScanTests {
         /// Calls that read a real clock, schedule on one, sleep, or draw unseeded randomness (R-ENV-1, C4). A pattern
-        /// that starts with a name matches only where that name starts (`Date()` is not `lastUpdateDate()`); `.random(`
-        /// counts only without `using:`, which draws from the system generator.
+        /// that starts with a name matches only where that name starts (`Date()` is not `lastUpdateDate()`).
         private static let realWorldCalls = [
             "Date()", "Date.now", "Date.init()", "Date(timeIntervalSinceNow", "Date.init(timeIntervalSinceNow", ": Date = .now",
-            "DispatchTime.now(", "DispatchWallTime.now(", ": DispatchTime = .now(", "deadline: .now(", "wallDeadline: .now(", "asyncAfter(",
-            "Timer.", "Timer(", "DispatchSource.makeTimerSource", "Task.sleep", "Thread.sleep", "usleep(", "nanosleep(",
-            "SystemRandomNumberGenerator", "arc4random", "UUID()", "CFAbsoluteTimeGetCurrent", "mach_absolute_time", "clock_gettime",
-            "ContinuousClock", "SuspendingClock", "systemUptime",
+            "NSDate()", "NSDate.now", "NSDate.date(", "DispatchTime.now(", "DispatchWallTime.now(", ": DispatchTime = .now(",
+            "deadline: .now(", "wallDeadline: .now(", "asyncAfter(", "Timer.", "Timer(", "DispatchSource.makeTimerSource", "Task.sleep",
+            "Thread.sleep", "usleep(", "nanosleep(", "SystemRandomNumberGenerator", "arc4random", "SecRandomCopyBytes", "UUID()",
+            "NSUUID()", "uuid_generate", "CFAbsoluteTimeGetCurrent", "CACurrentMediaTime", "mach_absolute_time", "mach_continuous_time",
+            "mach_approximate_time", "clock_gettime", "ContinuousClock", "SuspendingClock", "systemUptime",
         ]
+
+        /// C library calls that read the wall clock or the C library's global generator, matched only as free calls
+        /// (fix round 3): `time(nil)` is a call, `stopwatch.time(nil)` a method of another type.
+        private static let freeCalls = [
+            "gettimeofday(", "time(nil)", "time(NULL)", "drand48(", "erand48(", "lrand48(", "nrand48(", "mrand48(", "jrand48(",
+            "random()", "srandom(", "rand()", "srand(",
+        ]
+
+        /// Methods that draw from `SystemRandomNumberGenerator` unless a generator is passed with `using:`.
+        private static let systemRandomMethods = [".random(", ".randomElement(", ".shuffled(", ".shuffle("]
 
         @Test("R-ENV-1: no production source outside the live conformers calls Date(), DispatchTime.now(), Task.sleep or SystemRandomNumberGenerator")
         func realClocksOnlyInLiveConformers() throws {
@@ -41,10 +51,29 @@ extension ModelSuites {
                 // Date() in a comment, and "Task.sleep" in a string, are not calls
                 let text = "Task.sleep \\(Date()) escaped"
                 let raw = #"\(Date()) is text in a raw string"#
+                struct Clocks {
+                    func wall() -> NSDate { NSDate() }
+                    func continuous() -> UInt64 { mach_continuous_time() }
+                    func approximate() -> UInt64 { mach_approximate_time() }
+                    func day() { var tv = timeval(); gettimeofday(&tv, nil) }
+                    func epoch() -> Int { time(nil) }
+                    func media() -> Double { CACurrentMediaTime() }
+                    func stopwatch(_ s: Stopwatch) -> Int { s.time(nil) + s.drand48(seed) }
+                }
+                struct Draws {
+                    func one(_ ids: [Int]) -> Int? { ids.randomElement() }
+                    func mixed(_ ids: [Int]) -> [Int] { ids.shuffled() }
+                    func inPlace(_ ids: inout [Int]) { ids.shuffle() }
+                    func seeded(_ ids: [Int], _ g: inout SplitMix64) -> Int? { ids.randomElement(using: &g) }
+                    func seededMix(_ ids: [Int], _ g: inout SplitMix64) -> [Int] { ids.shuffled(using: &g) }
+                    func secure(_ b: inout [UInt8]) { _ = SecRandomCopyBytes(kSecRandomDefault, 8, &b) }
+                    func c() -> Double { drand48() + Double(random()) + Double(rand()) + Double(lrand48()) }
+                    func id() -> NSUUID { NSUUID() }
+                }
                 """##)
             let sampleFindings = Self.findings(in: sample)
             #expect(sampleFindings.allowed.map(\.number) == [2])
-            #expect(sampleFindings.forbidden.map(\.number) == [5, 6, 8, 9, 10, 11, 12, 13, 15])
+            #expect(sampleFindings.forbidden.map(\.number) == [5, 6, 8, 9, 10, 11, 12, 13, 15, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38])
 
             let lines = try SourceScan.lines()
             let findings = Self.findings(in: lines)
@@ -110,8 +139,10 @@ extension ModelSuites {
             var allowed: [SourceScan.Line] = []
             var forbidden: [SourceScan.Line] = []
             for line in lines {
-                let unseededRandom = line.code.contains(".random(") && !line.code.contains("using:")
-                guard unseededRandom || Self.realWorldCalls.contains(where: { SourceScan.contains($0, in: line.code) }) else {
+                let unseededRandom = Self.systemRandomMethods.contains(where: line.code.contains) && !line.code.contains("using:")
+                let realWorld = Self.realWorldCalls.contains { SourceScan.contains($0, in: line.code) }
+                    || Self.freeCalls.contains { SourceScan.contains($0, in: line.code, standalone: true) }
+                guard unseededRandom || realWorld else {
                     continue
                 }
                 if line.enclosingTypes.contains(where: Self.isLiveConformer) {

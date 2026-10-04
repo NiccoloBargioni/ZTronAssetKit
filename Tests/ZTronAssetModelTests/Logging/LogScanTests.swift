@@ -33,8 +33,13 @@ extension ModelSuites {
                 route.log(.store, .info, "done: \\(text)")
                 func f(_ id: AssetID) { route.log(.store, .info, "x \\(id)") }
                 func g(_ id: AssetID) -> LogInterval { route.interval(.gc, category: .store, "x \\(id)") }
+                route.log(.sync, .error, "manifest rejected: \\(error)")
+                route.log(.sync, .error, "first quarantine \\(manifest.quarantined.first!)")
+                for asset in kept { route.log(.store, .info, "kept \\(asset)") }
+                route.log(.sync, .info, "subject \\(subject) of \\(entries)")
+                route.log(.sync, .info, "diagnostic \\(diagnostic) in \\(entry.remotePath.count)")
                 """)
-            #expect(Self.violations(in: bad).count == 14, "\(Self.violations(in: bad))")
+            #expect(Self.violations(in: bad).count == 20, "\(Self.violations(in: bad))")
             let good = SourceScan.lex(path: "Sources/X/Good.swift", text: """
                 route.log(.store, .info, "evicted \\(AssetLog.hashed(id)) bytes=\\(byteCount)")
                 route.log(.sync, .error,
@@ -46,6 +51,9 @@ extension ModelSuites {
                 route.log(.store, .info, "fetched \\(byteCount) bytes")
                 // print("in a comment") and Logger(subsystem: "x") in comments are not code
                 let text = "print(\\"in a string\\") is not a call"
+                route.log(.sync, .info, "kept \\(manifest.count) of \\(entries.count), \\(manifest.quarantinedCount) quarantined")
+                route.log(.sync, .error, "failed: \\(String(describing: type(of: error))) after \\(entries.isEmpty)")
+                route.log(.sync, .error, "failed \\(AssetLog.hashed(entry.identifier)): \\(reasonClass)")
                 """)
             #expect(Self.violations(in: good).isEmpty, "\(Self.violations(in: good))")
 
@@ -211,12 +219,31 @@ extension ModelSuites {
             return result
         }
 
-        /// Whether an interpolated expression names something that identifies an asset or a location: those must be
-        /// rendered through `AssetLog.hashed(_:)` (R-OBS-1) or not at all.
+        /// Whether an interpolated expression names something that identifies an asset or a location, or a value whose
+        /// description can carry one: those must be rendered through `AssetLog.hashed(_:)` (R-OBS-1) or not at all.
+        /// Since fix round 3 the names include errors (`ManifestError.duplicateIdentifier` renders the identifier),
+        /// manifests, entries, assets, quarantine diagnostics and event subjects: `\(error)` or
+        /// `\(manifest.quarantined.first!)` would put a raw identifier into a `.public` line. A count, an emptiness
+        /// test or a type name derived from them carries none (`isSafeProjection`).
         private static func namesIdentifier(_ expression: String) -> Bool {
             let words = expression.split(whereSeparator: { !($0.isLetter || $0.isNumber || $0 == "_") }).map(String.init)
-            let identifying: Set<String> = ["id", "ids", "identifier", "identifiers", "assetID", "rawValue", "remotePath", "url", "URL", "appKey", "key"]
-            return words.contains(where: identifying.contains)
+            return words.contains(where: Self.identifyingNames.contains) && !Self.isSafeProjection(expression)
+        }
+
+        private static let identifyingNames: Set<String> = [
+            "id", "ids", "identifier", "identifiers", "assetID", "rawValue", "remotePath", "url", "URL", "appKey", "key",
+            "error", "errors", "entry", "entries", "asset", "assets", "quarantine", "quarantined", "diagnostic", "diagnostics",
+            "manifest", "manifests", "subject", "subjects",
+        ]
+
+        /// Whether the expression is a number, a truth value or a type name: it ends in `.count`, `.isEmpty` or
+        /// `.quarantinedCount`, or is `type(of:)` of something (possibly through `String(describing:)`).
+        private static func isSafeProjection(_ expression: String) -> Bool {
+            let trimmed = expression.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("type(of:") || trimmed.hasPrefix("String(describing: type(of:") {
+                return true
+            }
+            return [".count", ".isEmpty", ".quarantinedCount"].contains { trimmed.hasSuffix($0) }
         }
     }
 }
