@@ -42,7 +42,7 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   power loss after the next lifetime syncs the parent`), also across an edit (`…editing one path of a killed disk
   keeps the durable state of every path the edit did not touch`, `…rewriting a file's content in a disk image keeps
   the file's identity and its synced bytes`, `…a fake started on an edited disk shows exactly the edited disk` over
-  21 kinds of edit, `…a purge removes a path from both namespaces, while an edit of files alone is undone by a power
+  20 kinds of edit, `…a purge removes a path from both namespaces, while an edit of files alone is undone by a power
   loss`). A power loss can leave one file under two names (directories are independent); it is then one inode
   (tested: `…a file a power loss left under two names is one file…`).
 
@@ -146,20 +146,32 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   id, and a release with none waiting is **kept for the next hold of that id** (no test can race the engine's start);
   `script` wakes an attempt that ran out of steps, never one at an explicit `.hold`; a progress release lets the
   attempt continue with its queue. `pause()`/`cancel()` on a handle ends that attempt (read from the handle's own
-  control log; `FakeTransferHandle` is unchanged); its remaining steps go to the next attempt. Parked attempts the
+  control log), and so does terminating its `updates` stream (fix round 3, the Model's `TransferHandle`: the
+  consuming task cancelled, or the handle dropped; see H-7); its remaining steps go to the next attempt. A parked
+  attempt keeps only the handle's **channel** (fix round 3), never the handle or its stream, so an engine that
+  releases a held attempt's handle really drops the stream. Parked attempts the
   engine stopped are dropped at every interaction that reads or adds parked attempts: `transfer`, `script`,
   `release` and the `activeTransfers` census (fix round 2: only `script` and `release` did, so an engine run that
   cancels many held attempts and never scripts or releases kept each one, with its handle and request, and every
   census scanned them all; tested with 40 stopped attempts). `.stage(Data)` is one
-  `createPartial` + one `appendPartial`; `.stageGenerated` appends `GeneratedPayload.chunkBytes` chunks, each
+  `createPartial` + one `appendPartial`, indexing the scripted bytes from their own `startIndex` (fix round 3: a
+  `Data` slice such as `payload.dropFirst(2)` used to trap the test process); `.stageGenerated` appends `GeneratedPayload.chunkBytes` chunks, each
   generated just before it is written. With `request.resume`, the fake continues the earlier partial
   (`continuePartial`) and appends only the bytes it lacks (`resumed: true`). Sink failures map like the transport:
   ENOSPC → `.insufficientSpace(requiredBytes: nil)`, `.io(c)` → `.transient(.localIO(posixCode: c))`, others to
-  `localIO` with EFBIG/EIO/EEXIST; no sink → `localIO(ENXIO)`. `httpStatus` is 200 on the AWS tier, `nil` on the
-  Apple tier; manifests come from `.network` or `.installedPack(updateChecked: true)` by tier. An unscripted manifest
+  `localIO` with EFBIG/EIO/EEXIST; no sink → `localIO(ENXIO)`. `httpStatus` is 200 on the AWS tier (206 for a resumed request, fix
+  round 3: the real transport's final status), `nil` on the Apple tier; `pause()` reports `resumable: true` only for
+  an attempt that continues an earlier partial (`request.resume`, which carries the validator), because an attempt of
+  this fake writes nothing before its terminal step (fix round 3: it always reported `true`); manifests come from `.network` or `.installedPack(updateChecked: true)` by tier. An unscripted manifest
   fetch answers 304 (the origin has nothing new); responses are queued. `invalidate()` fails every active attempt with
   `.cancelled(.byClient)` and every later `transfer` at once (the start is still recorded, so a start after
-  shutdown is visible).
+  shutdown is visible) **until the next `attach(staging:)`** (fix round 3): `StagingAttachable` says a later attach
+  is "a restarted client", and `FakeRemoteSourceFactory` must hand out the same source (`R-NET-1: FakeRemoteSourceFactory
+  hands the store's staging sink…` checks identity), so the attach revives it; `isInvalidated` reads `true` until
+  then, and scripts, manifests and re-attached transfers carry over to the new client (R-NET-6 and R-NET-3 relaunch
+  scenarios, R-CLN-3). The `transportLog` keeps every start (documented on `.stageGenerated`: about 200 bytes per
+  start, whatever the payload, so P-7 either uses a fresh source per catalog size or counts that growth as the
+  fake's).
 - **Cost (fix round 1, documented on the type).** A whole attempt's staging writes run in one turn of the actor on
   the cooperative pool. Over a live sink (P-7's real files) each scripted asset stays at a few MiB (about 8 MiB is
   ~10 ms of writing, C2's stretch): P-7's catalog is many assets, never one large one. Over a `FakeFileSystem` those
@@ -173,6 +185,19 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   racing a `cancel()` or `pause()` on another thread ends the stream with exactly one terminal element (tested over
   2,000 races; the old yield-then-finish pair delivered two); the control is still recorded, and a non-terminal
   delivery after the end is dropped.
+- `FakeTransferHandle` (fix round 3): the Model's `TransferHandle` says terminating `updates` (consumer cancelled or
+  dropped) cancels the transfer; the contract body installed no `onTermination`, so an engine that ended a held
+  attempt by cancelling its driver task never brought `activeTransfers` (R-SYN-14/15, P-14) to 0. The handle now
+  splits into the public handle (which owns the stream) and an internal `FakeTransferChannel` (control log, terminal
+  decision, continuation; no stream). `onTermination` captures the channel: on `.cancelled` it marks the stream
+  ended and records `.cancel` once, exactly as `cancel()` would; `.finished` (from the channel's own `end(with:)`,
+  which holds the lock while it finishes) is ignored without taking the lock. `AsyncStream` reports `.cancelled` both
+  for a cancelled consumer and for a stream dropped with every iterator (checked with a scratch probe before relying
+  on it), and since `FakeRemoteSource` parks only channels, releasing the handle drops the stream. A consumer that
+  keeps `updates` after releasing the handle keeps the attempt (tested). `FakeTransferBackend` keeps its handles in
+  `handles`, so only a cancelled consumer applies there. The capture cycle channel → continuation → handler →
+  channel is broken by `AsyncStream`, which drops the handler once it ran. `setPauseResumable(_:)` (public addition)
+  says what `pause()` reports; `true` until set, so a stand-alone handle behaves as before.
 - `FakeTransferBackend`: each `start` returns a fresh `FakeTransferHandle` (no shared log) reachable in `handles`;
   `liveTransfers()` reports `scriptLiveTransfers(_:)` minus names cancelled since; `invalidate()` fails every handle
   with `.cancelled(.byClient)` and is counted.
@@ -211,12 +236,22 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10.3 at merge.
   itself with `.stopped`, so a missing callback cannot hang a start and a repeated one finds nothing left to resume.
   The listener is created and started synchronously in `start()`, so `stop()` can no longer land between the two.
   The state handler forwards each state to the actor with the listener's generation number; a state of any listener
-  but the current one, or after the port is known, is ignored. A start resumed with a port re-reads `stopped` and
+  but the current one, or after the port is known, is ignored (fix round 3 narrows the second rule to a repeated
+  `.ready`: see the next item). A start resumed with a port re-reads `stopped` and
   throws if `stop()` ran in between. Tested: `Test support: start racing stop ends every start exactly once, with a
   port or stopped, and never hangs` (400 rounds of two starts and a stop spread over the listener's start-up by
   `Task.yield()`; the round-1 server traps with "SWIFT TASK CONTINUATION MISUSE: ready(_:on:) tried to resume its
   continuation more than once" in both runs made; three runs of a scratch probe, 6,000 raced starts each, saw both
   outcomes and no other).
+- **Start cancellation and late failure (fix round 3).** Waiting starts are keyed by id; `start()` waits inside
+  `withTaskCancellationHandler`, whose `onCancel` task removes that id on the actor and resumes it with
+  `CancellationError` (removal before resumption, as `resumeStartWaiters`, so each waiter is still resumed exactly
+  once); the listener keeps coming up for later starts. A `.failed`/`.waiting` of the current listener after it was
+  ready now cancels it and forgets its port (it used to be ignored behind `port == nil`, so `start()` kept returning
+  a dead port); the next `start()` makes a new listener; accepted connections are kept. Tests reach both paths
+  through internal seams: `holdListenerStates()`/`releaseListenerStates()` keep a listener "coming up" whatever
+  Network's timing, and `listenerStateChanged` and `listenerGeneration` are internal. Range responses index the body
+  from its own `startIndex` (a `Data` slice body trapped the test process).
 - **Head cap (fix round 2).** A request head over 64 KiB, or 64 KiB without the blank line that ends a head, is
   answered `431 Request Header Fields Too Large` with `Connection: close` and the connection closed (it used to grow
   the buffer without limit and rescan it on every receive). Tested: the round-1 server hit the one-minute time limit.
@@ -237,6 +272,9 @@ drive the fakes without them:
 - `FakeTransferBackend`: `handles`, `scriptLiveTransfers(_:)`, `cancellations`, `invalidations`; new value type
   `FakeBackendCancellation`.
 - `FakeStagingSink`: `sidecars`, `failNext(_:with:)`; new enum `FakeStagingOperation`.
+- `FakeTransferHandle.setPauseResumable(_:)` (fix round 3; `pause()`'s contract doc said `.paused(resumable: true)`
+  always, now "unless `setPauseResumable(false)`", and `FakeRemoteSource` sets it per attempt: **contract doc
+  wording to ratify**).
 - `FakeFileSystem.createSymbolicLink(at:destination:)`; `DiskImage.makeDurable()`; `DiskImage.purge(_:)` (fix round
   1: the durable OS-purge edit R-CLN-7 tests need); `DiskImage`'s `==` and `hash(into:)` are now explicit
   (observable state only) instead of synthesized.
@@ -248,7 +286,10 @@ drive the fakes without them:
   links (fix round 2).
 - Total (counted by the reqs verifier, fix round 2): 21 additive public declarations, 0 contract declarations
   missing or changed. Fix round 2 added no public declaration (`FakeRemoteSource.parkedAttempts` and
-  `LoopbackHTTPServer.maxRequestHeadBytes` are internal, for the fakes' own tests).
+  `LoopbackHTTPServer.maxRequestHeadBytes` are internal, for the fakes' own tests). Fix round 3 adds one
+  (`setPauseResumable`), so **22**, and still 0 missing or changed (a `comm` of every `public` line against the
+  `contracts` tag); `FakeTransferChannel`, the listener seams and `listenerGeneration` are internal. Ratified by the
+  orchestrator before fix round 3: every addition listed up to fix round 2 and the explicit `DiskImage` `==`/hash.
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.3)
 
@@ -259,9 +300,10 @@ drive the fakes without them:
 | h-3 | `EventProbe.next`'s `onCancel` task: `await self.cancelWaiter(id)` | nothing: the task is not the actor; `cancelWaiter` re-reads the table and is a no-op for a waiter already resumed |
 | h-4 | `EventProbe.waitForWaiters(atLeast:)` | nothing: a terminal wait as TS2, resumed by the count or by `finish()` |
 | h-5 | `LoopbackHTTPServer`: the listener's `newConnectionHandler` task (`accept`) and the per-connection task (`serve`) | nothing: the tasks are not the actor's turn; `accept` re-reads `stopped` and cancels a late connection, `serve` re-reads `stopped` after each of its awaits |
-| h-6 | `LoopbackHTTPServer.start()`: the waiter's continuation (the listener coming up) | `stopped`: a start resumed with a port throws if `stop()` ran before its turn. The waiter is registered synchronously in the continuation body and resumed exactly once, only by actor code (`resumeStartWaiters` empties the list first): with the port on `.ready`, with the error on `.failed`/`.waiting`, with `.stopped` from `stop()`; concurrent starts wait for the one current listener |
+| h-6 | `LoopbackHTTPServer.start()`: the waiter's continuation (the listener coming up), inside `withTaskCancellationHandler` | `stopped`: a start resumed with a port throws if `stop()` ran before its turn. The waiter is registered by id synchronously in the continuation body and resumed exactly once, only by actor code that removed it first: `resumeStartWaiters` (empties the list) with the port on `.ready`, with the error on `.failed`/`.waiting`, with `.stopped` from `stop()`; `cancelStartWaiter` with `CancellationError` (fix round 3); concurrent starts wait for the one current listener |
 | h-7 | `LoopbackHTTPServer.serve`/`respond`: `respond`, `receive`, the injected delay, `send` | `stopped`: no response is sent and no connection is served after `stop()`; the request log entry was appended before the await; a closing connection removes only its own entry |
-| h-8 | `LoopbackHTTPServer`: the listener's `stateUpdateHandler` task (`listenerStateChanged`); `receive`/`send` (nonisolated static bridges) | nothing: the handler task is not the actor's turn, and `listenerStateChanged` ignores a state of any listener but the current one (generation number) or one after the port is known, however late, often or rarely Network reports it; the bridges touch no actor state and Network calls each completion exactly once |
+| h-8 | `LoopbackHTTPServer`: the listener's `stateUpdateHandler` task (`listenerStateChanged`); `receive`/`send` (nonisolated static bridges) | nothing: the handler task is not the actor's turn, and `listenerStateChanged` ignores a state of any listener but the current one (generation number) and a repeated `.ready`, however late, often or rarely Network reports it (a `.failed`/`.waiting` after `.ready` drops the listener and its port, fix round 3); the bridges touch no actor state and Network calls each completion exactly once |
+| h-9 | `LoopbackHTTPServer.start()`'s `onCancel` task: `await self.cancelStartWaiter(id)` (fix round 3) | nothing: the task is not the actor; `cancelStartWaiter` re-reads the table and is a no-op for a waiter already resumed |
 
 `FakeRemoteSource`, `FakeTransferBackend` and the Mutex-backed fakes contain no await.
 
@@ -308,6 +350,31 @@ drive the fakes without them:
 | reqs: stale-token clause binds WP-B (ratification) | For the orchestrator before WP-B starts (H-5): DECISIONS.md, store.md §3.2/§3.3 and the Model's `releaseLock` doc are not WP-H files. Not declined, not doable here |
 | reqs: verifier's xcodebuild wrote an error result bundle to the system temp directory | Not a WP-H defect; WP-H may not delete outside the repository, so a human should remove that one `.xcresult`. WP-H's own iOS build in this round passes `-resultBundlePath` inside `.build-h`, with `TMPDIR` and the module caches inside `.build-h` too, so no failing build of WP-H writes outside the repository |
 
+## Fix round 3 — dispositions of the verifiers' remaining findings
+
+Failing test first for every bug: each regression test below was run before its fix (or against a mutant restoring
+the pre-fix body, for the handle termination that an interrupted earlier attempt of this round had already written)
+and failed as stated.
+
+| Finding | Disposition |
+|---|---|
+| correct, blocking: `.stage(Data)` sliced a `Data` slice with zero-based offsets (trap) | Fixed (H-6): offsets count from the slice's `startIndex`. `Test support: a stage step scripted with a Data slice stages the slice's bytes, fresh and resumed` (`dropFirst(4)` fresh, `parent[4..<10]` resumed) ended the pre-fix test helper with "unexpected signal code 5" |
+| correct, blocking: the loopback Range path sliced a `Data` slice body with zero-based indices (trap) | Fixed (H-8): the range counts from the body's `startIndex`. `Test support: a range request against a body that is a Data slice gets the slice's bytes` (`bytes=2-`, `bytes=0-3`, no range) ended the pre-fix helper with "unexpected signal code 5" |
+| correct, blocking: `FakeTransferHandle` ignored the termination of its stream; the census kept a cancelled consumer's attempt | Fixed (H-6, H-7): `onTermination` records `.cancel` once on `.cancelled`; the source parks the channel, not the handle, so a dropped handle also cancels. Tests: `…cancelling the task that consumes a held attempt cancels the attempt and drops it from the census`, `…dropping the handle of a held attempt cancels the attempt and drops it from the census`, `…cancelling the task that consumes a handle's updates records a cancellation on the handle` (backend), plus two guards that must not cancel: `…a consumer cancelled after its attempt ended records no cancellation`, `…an attempt whose updates stream outlives its handle stays active and still ends by release`. A mutant without the handler's effect fails the first three (8 issues); the guards pass on it, as they must. `oneOrderedTransportLog` now keeps its parked handle alive (it used to discard it, which the contract makes a cancellation) and asserts on it |
+| correct, blocking: `invalidate()` made the source permanently dead for a restarted client | Fixed (H-6): `attach(staging:)` revives the source (the factory must return the same source, which `R-NET-1: FakeRemoteSourceFactory hands the store's staging sink…` checks). `…a source re-attached by a restarted client after shutdown transfers again through the new sink` (start → shutdown → new client on the same factory → transfer) failed on the pre-fix fake with 3 issues |
+| correct: `.paused(resumable: true)` always; resumed AWS stage reported 200 | Fixed (H-6, H-7): `resumable` is `request.resume != nil` on the source's handles (new public `setPauseResumable(_:)`, default `true` for stand-alone handles); a resumed AWS stage reports 206. `…pausing a parked attempt is resumable only when it continues an earlier partial with a validator` failed before (1 issue), the resume test's new 206 expectation failed before (1 issue); `…a stand-alone handle pauses resumably unless the test says no partial was kept` covers the default. No sidecar is written by the fake (documented: the test that scripts `request.resume` seeds what the engine needs) |
+| correct: O(k·n) appends in `FakeFileSystem` | Fixed: the kind and size are read without binding the node, so the append mutates a uniquely referenced array. No deterministic test can show a complexity class without timing, so a throwaway probe (256 appends of 256 KiB, debug build, last 8 over first 8) measured the ratio: **22.4** before, **0.65** after; the probe was deleted |
+| correct: `start()` not cancellation-aware; `.failed` after `.ready` ignored | Fixed (H-8, rows h-6, h-9): `…a start cancelled while the listener comes up throws CancellationError, and a later start gets the port` hung the pre-fix server past its one-minute time limit (killed after 120 s); `…a listener that fails after it was ready is replaced at the next start, whose port serves` failed before (1 issue) |
+| reqs: latency test name claimed an untested default | Fixed: renamed to `…scripted latency is awaited through the injected delay, and a response without latency awaits nothing` (what it asserts), and `…a server with the default delay answers a response scripted with an hour of latency at once` runs `NoLoopbackDelay.wait` (a sleeping default would hit the time limit) |
+| reqs: ADR said 21 kinds of edit | Fixed: 20 (`Edit.allCases`) |
+| correct: unbounded `transportLog` and `FakeTransferBackend.made` | Documented on `.stageGenerated` (one request per start, a few hundred bytes; P-7 uses a fresh source per size or counts it as the fake's). **Declined:** a counts-only mode (new API with no consumer; `starts`/`controlLog` promise every entry) and trimming `made` (`handles` promises every handle, which tests drive) |
+| reqs: contract surface (21 additions, explicit `DiskImage` `==`/hash) | Ratified by the orchestrator before this round; fix round 3 adds `FakeTransferHandle.setPauseResumable(_:)` (22) and changes the wording of `pause()`'s doc (listed above) |
+| reqs: stale-token clause binds WP-B | Orchestrator decision: the clause stays; WP-B makes `LiveFileSystem` satisfy it. Nothing to change here |
+| reqs: `.barrier`/`.full` indistinguishable; `FSOpRecord` has no `SyncLevel` | Not doable in WP-H (`FSOpRecord`'s initializer is contract): for the orchestrator (a level-recording spy in WP-B, or a contract change) |
+| reqs: ADR-038 wording (conformance suite's `FileManager` link fixture) | For the orchestrator when merging H-5 (record the test-fixture exception) |
+| reqs: iOS gate does not compile TestSupport | Orchestrator (the gate is `Scripts/`). WP-H type-checked `Sources/ZTronAssetTestSupport` for `arm64-apple-ios15.0` against the iOS products of the required build: exit 0 |
+| reqs: DerivedData folder outside the repository | Not WP-H code; for the human (`rm -rf ~/Library/Developer/Xcode/DerivedData/h-hgsfxwgcziygfseopnrziiztmbdq`). The folder may come from an earlier `xcodebuild` in this worktree (15:57); every `xcodebuild` build of fix round 3 passed `-derivedDataPath` and `-resultBundlePath` inside `.build-h`. See the fix-round-3 incident below |
+
 ## Evidence and incidents
 
 - Test-first: the new remote-source, staging-sink, backend, probe and loopback tests were run against the stubs
@@ -321,3 +388,9 @@ drive the fakes without them:
   per-worktree filter was in place; it may have terminated a concurrently running test helper of another worktree
   (WP-A's `.build-a` was running at the time). If WP-A saw an unexplained aborted test run around then, it should
   re-run. Every later kill was restricted to this worktree's own `.worktrees/h` test bundles.
+- **Incident (fix round 3).** One `xcodebuild -list -derivedDataPath .build-h/xcode` (to look for a TestSupport
+  scheme) was refused because `-list` does not take `-derivedDataPath`, and xcodebuild wrote its error result bundle
+  to the per-user temp directory despite `TMPDIR` pointing inside `.build-h`:
+  `/var/folders/7y/s6b_jp997bl6j5yw9d17lvfm0000gn/T/ResultBundle_2026-05-10_00-34-0037.xcresult` (20 KiB). WP-H may
+  not delete outside the repository, so a human should remove it (`rm -rf` that path). Every later `xcodebuild` call
+  of this round named a scheme and passed `-resultBundlePath` inside `.build-h`.
