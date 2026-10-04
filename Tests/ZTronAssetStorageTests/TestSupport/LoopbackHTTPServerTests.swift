@@ -344,6 +344,55 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
+    /// Whether `stop()` lands before, during or after the listener comes up is Network's choice, so the property is
+    /// the invariant, over many races: each `start()` ends exactly once (no continuation misuse trap, no hang), with
+    /// a port or with `.stopped`, and the stopped server never starts again. The stop is spread over the listener's
+    /// start-up by a growing number of `Task.yield()`s (scheduling points, not sleeps), so both outcomes occur, but
+    /// the test does not count them: their mix depends on the machine.
+    @Test("Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs", .timeLimit(.minutes(1)))
+    func startRacingStop() async throws {
+        for round in 0..<400 {
+            let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
+            let starts = (0..<2).map { _ in Task { try await server.start() } }
+            let stopping = Task {
+                for _ in 0..<round {
+                    await Task.yield()
+                }
+                await server.stop()
+            }
+            await stopping.value
+            for start in starts {
+                switch await start.result {
+                case .success(let port):
+                    #expect(port > 0, "round \(round)")
+                case .failure(let error):
+                    #expect(error as? LoopbackServerError == .stopped, "round \(round): \(error)")
+                }
+            }
+            await #expect(throws: LoopbackServerError.stopped, "round \(round)") { try await server.start() }
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test("Test support: a request head that grows past its cap without a blank line gets 431 and the connection is closed", .timeLimit(.minutes(1)))
+    func oversizedHeadIsRejected() async throws {
+        try await Self.withServer({ _ in
+            LoopbackResponse(status: 200, body: Data("handled".utf8))
+        }) { server, port in
+            let client = try await Self.connect(port)
+            let prefix = Data("GET /a HTTP/1.1\r\nX-Filler: ".utf8)
+            // Exactly one byte past the cap, so the server has read everything when it refuses (no unread bytes, no RST).
+            let filler = Data(repeating: UInt8(ascii: "a"), count: LoopbackHTTPServer.maxRequestHeadBytes + 1 - prefix.count)
+            try await client.send(prefix + filler)
+            let response = try await client.response()
+            #expect(response.status == 431)
+            #expect(response.headers["connection"] == "close")
+            let (rest, cleanClose) = await client.untilClosed()
+            #expect(rest.isEmpty && cleanClose)
+            #expect(await server.requests.isEmpty)
+        }
+    }
+
     @Test("Test support: start is idempotent while running and a stopped server cannot start again", .timeLimit(.minutes(1)))
     func startAndStopLifecycle() async throws {
         let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 200) }

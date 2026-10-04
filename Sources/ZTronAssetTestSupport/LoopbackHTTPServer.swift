@@ -127,8 +127,9 @@ public typealias LoopbackHandler = @Sendable (LoopbackRequest) -> LoopbackRespon
 ///
 /// Behaviour (transport.md §12, ARCHITECTURE §6.7): requests are parsed in arrival order (a `Content-Length` request
 /// body is consumed), numbered globally, per target and by 1-based connection, and answered by the handler on the
-/// actor. A request whose `Content-Length` is not a digit string of at most 64 MiB is answered `400` and its
-/// connection closed; it never reaches the handler or `requests`. Responses carry `Content-Length` (unless
+/// actor. A request whose `Content-Length` is not a digit string of at most 64 MiB is answered `400`, and a request
+/// head over 64 KiB (or 64 KiB without the blank line ending it) `431`; either connection is then closed, and the
+/// request never reaches the handler or `requests`. Responses carry `Content-Length` (unless
 /// `omitContentLength`, which closes the connection after the body, or the script sets one: a scripted
 /// `Content-Length` in any case is sent as scripted), `Connection`, and, for `.gzip`, `Content-Encoding: gzip` over
 /// a `Gzip` body; header names merge case-insensitively, the server's own replacing scripted ones. With
@@ -149,10 +150,16 @@ public actor LoopbackHTTPServer {
     private var perTarget: [String: Int] = [:]
     private var log: [LoopbackRequest] = []
     private var stopped = false
-    private var starting: Task<UInt16, any Error>?
+    /// Starts waiting for the current listener to come up; resumed only through `resumeStartWaiters`.
+    private var startWaiters: [CheckedContinuation<UInt16, any Error>] = []
+    /// Numbers listeners, so a state change of a listener that is no longer the current one is ignored.
+    private var listenerGeneration = 0
 
     /// The largest request body the server buffers (a larger `Content-Length` is answered with 400).
     static let maxRequestBodyBytes = 64 << 20
+
+    /// The largest request head the server buffers (a longer one is answered with 431).
+    static let maxRequestHeadBytes = 64 << 10
 
     /// Creates a server (not listening yet).
     public init(delay: any LoopbackDelay = NoLoopbackDelay(), handler: @escaping LoopbackHandler) {
@@ -169,6 +176,10 @@ public actor LoopbackHTTPServer {
 
     /// Starts listening; returns the port. Idempotent: a call while running returns the port, and calls made while
     /// the listener is coming up wait for that one listener. Throws once `stop()` ran (also when it ran meanwhile).
+    ///
+    /// Each waiting call is resumed exactly once, by actor code: the listener's state changes are forwarded to the
+    /// actor (only the current listener's count), and `stop()` fails every waiter itself, so neither a state Network
+    /// reports twice nor one it never reports can resume a call twice or leave it hanging.
     public func start() async throws -> UInt16 {
         guard !self.stopped else {
             throw LoopbackServerError.stopped
@@ -176,37 +187,31 @@ public actor LoopbackHTTPServer {
         if let port = self.port {
             return port
         }
-        let starting: Task<UInt16, any Error>
-        if let inFlight = self.starting {
-            starting = inFlight
-        } else {
+        if self.listener == nil {
             let listener = try self.makeListener()
+            self.listenerGeneration += 1
+            let generation = self.listenerGeneration
+            listener.stateUpdateHandler = { [weak self] state in
+                Task {
+                    // REENTRANCY: h-8 (proposed) — nothing: this task is not the actor; `listenerStateChanged`
+                    // ignores a state of any listener but the current one.
+                    await self?.listenerStateChanged(state, generation: generation)
+                }
+            }
             self.listener = listener
-            let queue = self.queue
-            starting = Task {
-                // REENTRANCY: h-8 (proposed) — nothing: the bridge touches no actor state.
-                try await LoopbackHTTPServer.ready(listener, on: queue)
-            }
-            self.starting = starting
+            listener.start(queue: self.queue)
         }
-        do {
-            // REENTRANCY: h-6 (proposed) — `stopped` is re-read: a `stop()` while the listener came up cancelled it,
-            // so every waiting start fails instead of reporting a dead port. Concurrent starts await this one task,
-            // so there is only ever one listener (no identity to re-check).
-            let port = try await starting.value
-            guard !self.stopped else {
-                throw LoopbackServerError.stopped
-            }
-            self.port = port
-            return port
-        } catch {
-            if self.starting == starting {
-                self.starting = nil
-                self.listener?.cancel()
-                self.listener = nil
-            }
-            throw error
+        // REENTRANCY: h-6 (proposed) — `stopped` is re-read: a `stop()` between the resumption and this turn means
+        // the port is dead, so the call throws. The waiter is registered synchronously in the continuation body
+        // (no state can change before it is in `startWaiters`) and resumed only by `resumeStartWaiters`, which
+        // empties the list first: once with the port, a listener failure, or `.stopped` from `stop()`.
+        let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
+            self.startWaiters.append(continuation)
         }
+        guard !self.stopped else {
+            throw LoopbackServerError.stopped
+        }
+        return port
     }
 
     /// A listener on 127.0.0.1, any port, loopback only, whose connections are accepted on the actor.
@@ -226,11 +231,49 @@ public actor LoopbackHTTPServer {
         return listener
     }
 
-    /// Stops the listener and every connection (stalled ones included).
+    /// A state of listener `generation`. Only the current listener's states count, and only until it is ready:
+    /// `.ready` records the port and answers every waiting start; `.failed` or `.waiting` cancels the listener and
+    /// fails them (a later `start()` makes a new listener); `.cancelled` fails them with `.stopped`. Network may
+    /// report states late, twice, or not at all after a cancel: each waiter is still resumed exactly once.
+    private func listenerStateChanged(_ state: NWListener.State, generation: Int) {
+        guard generation == self.listenerGeneration, let listener = self.listener, self.port == nil else {
+            return
+        }
+        switch state {
+        case .ready:
+            let port = listener.port?.rawValue ?? 0
+            self.port = port
+            self.resumeStartWaiters(with: .success(port))
+        case .failed(let error), .waiting(let error):
+            listener.cancel()
+            self.listener = nil
+            self.resumeStartWaiters(with: .failure(LoopbackServerError.listener("\(error)")))
+        case .cancelled:
+            self.listener = nil
+            self.resumeStartWaiters(with: .failure(LoopbackServerError.stopped))
+        case .setup:
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    /// Resumes every waiting start once with `outcome`; the list is emptied before any resumption, so a later state
+    /// change or `stop()` finds nothing left to resume.
+    private func resumeStartWaiters(with outcome: Result<UInt16, any Error>) {
+        let waiters = self.startWaiters
+        self.startWaiters = []
+        for waiter in waiters {
+            waiter.resume(with: outcome)
+        }
+    }
+
+    /// Stops the listener and every connection (stalled ones included); every start still waiting throws `.stopped`.
     public func stop() {
         self.stopped = true
         self.listener?.cancel()
         self.listener = nil
+        self.resumeStartWaiters(with: .failure(LoopbackServerError.stopped))
         for connection in self.connections.values {
             connection.cancel()
         }
@@ -278,6 +321,11 @@ public actor LoopbackHTTPServer {
                 case .malformed:
                     // REENTRANCY: h-7 (proposed) — nothing: the connection is closed right after, whatever happened.
                     await LoopbackHTTPServer.send(LoopbackHTTPServer.badRequest, on: connection, final: true)
+                    self.close(connection, number: number)
+                    return
+                case .headTooLarge:
+                    // REENTRANCY: h-7 (proposed) — nothing: the connection is closed right after, whatever happened.
+                    await LoopbackHTTPServer.send(LoopbackHTTPServer.headTooLarge, on: connection, final: true)
                     self.close(connection, number: number)
                     return
                 case .request(let request):
@@ -355,14 +403,19 @@ public actor LoopbackHTTPServer {
         /// A request the server refuses to buffer: its `Content-Length` is not `1*DIGIT` within
         /// `maxRequestBodyBytes` (a negative or oversized length must never index the buffer).
         case malformed
+        /// A head longer than `maxRequestHeadBytes`, or that many bytes without the blank line ending a head: the
+        /// buffer stops growing (and stops being rescanned) at the cap.
+        case headTooLarge
         /// A whole request, removed from the buffer.
         case request(LoopbackRequest)
     }
 
     /// Removes and returns the first complete request (head plus `Content-Length` body).
     private func takeRequest(from buffer: inout Data, connection: Int) -> Parsed {
-        guard let end = buffer.range(of: Data("\r\n\r\n".utf8)) else {
-            return .incomplete
+        guard let end = buffer.range(of: Data("\r\n\r\n".utf8)),
+            buffer.distance(from: buffer.startIndex, to: end.lowerBound) <= LoopbackHTTPServer.maxRequestHeadBytes
+        else {
+            return buffer.count > LoopbackHTTPServer.maxRequestHeadBytes ? .headTooLarge : .incomplete
         }
         let head = String(decoding: buffer[buffer.startIndex..<end.lowerBound], as: UTF8.self)
         var lines = head.components(separatedBy: "\r\n")
@@ -404,6 +457,11 @@ public actor LoopbackHTTPServer {
 
     /// The answer to a request the server refuses to parse; the connection is closed after it.
     private static let badRequest = Data("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".utf8)
+
+    /// The answer to a request head over `maxRequestHeadBytes`; the connection is closed after it.
+    private static let headTooLarge = Data(
+        "HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".utf8
+    )
 
     /// The response head and the body to send (encoded, and sliced for a range). Header names merge
     /// case-insensitively: a scripted `Content-Length` (in any case) is sent as scripted, so a test can announce a
@@ -485,6 +543,7 @@ public actor LoopbackHTTPServer {
         case 410: return "Gone"
         case 416: return "Range Not Satisfiable"
         case 429: return "Too Many Requests"
+        case 431: return "Request Header Fields Too Large"
         case 500: return "Internal Server Error"
         case 503: return "Service Unavailable"
         default: return "Status"
@@ -492,33 +551,6 @@ public actor LoopbackHTTPServer {
     }
 
     // MARK: Network bridging
-
-    /// Waits for the listener to become ready and returns its port; fails when it fails, waits or is cancelled.
-    private static func ready(_ listener: NWListener, on queue: DispatchQueue) async throws -> UInt16 {
-        // REENTRANCY: h-8 (proposed) — nothing: a nonisolated bridge that touches no actor state; resumed exactly once
-        // by the first terminal listener state, after which the handler is removed.
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, any Error>) in
-            listener.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    listener.stateUpdateHandler = nil
-                    continuation.resume(returning: listener.port?.rawValue ?? 0)
-                case .failed(let error), .waiting(let error):
-                    listener.stateUpdateHandler = nil
-                    listener.cancel()
-                    continuation.resume(throwing: LoopbackServerError.listener("\(error)"))
-                case .cancelled:
-                    listener.stateUpdateHandler = nil
-                    continuation.resume(throwing: LoopbackServerError.stopped)
-                case .setup:
-                    break
-                @unknown default:
-                    break
-                }
-            }
-            listener.start(queue: queue)
-        }
-    }
 
     /// One receive: the bytes, whether the peer finished, whether it failed.
     private static func receive(_ connection: NWConnection) async -> (Data?, Bool, Bool) {
@@ -549,7 +581,8 @@ public actor LoopbackHTTPServer {
 enum LoopbackServerError: Error, Sendable, Hashable {
     /// The listener failed or could not get a path.
     case listener(String)
-    /// `stop()` ran before the listener was ready, or the server was stopped already.
+    /// `stop()` ran before the start returned (while the listener came up, or before the call), or the listener
+    /// was cancelled before it was ready.
     case stopped
 }
 
