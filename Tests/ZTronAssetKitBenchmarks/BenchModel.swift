@@ -54,12 +54,32 @@ extension ZTronAssetKitBenchmarks {
                 // and the over-long values that are checked but never materialised.
                 ("minimal entries of 16-byte strings", ManifestDecodingOptions(), { ReferenceManifest.shortStringEntries(count: 100_000) }),
                 ("minimal entries of 16-byte strings, keepFirst", keepFirst, { ReferenceManifest.shortStringEntries(count: 100_000) }),
-                ("24-byte path components", ManifestDecodingOptions(), { ReferenceManifest.componentEntries(length: 24, maxBytes: limit) }),
+                ("25-byte path components", ManifestDecodingOptions(), { ReferenceManifest.componentEntries(length: 25, maxBytes: limit) }),
                 ("61 one-byte tags per entry", ManifestDecodingOptions(), { ReferenceManifest.taggedEntries(tagCount: 61, maxBytes: limit) }),
                 ("huge identifier", ManifestDecodingOptions(), { ReferenceManifest.hugeField("identifier", bytes: limit - 256) }),
                 ("huge tag", ManifestDecodingOptions(), { ReferenceManifest.hugeField("tags", bytes: limit - 256, inArray: true) }),
                 ("huge checksum", ManifestDecodingOptions(), { ReferenceManifest.hugeField("checksum", bytes: limit - 256) }),
                 ("entries sharing one identifier, keepFirst", keepFirst, { ReferenceManifest.duplicateEntries(count: 100_000) }),
+                // Per-entry arrays just past an allocator size class, padded to the allocation estimate's limit
+                // (fix round 2): the most heap a payload the estimate accepts can hold.
+                ("32 empty path components and 31 one-byte tags per entry, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.sizeClassEntries(components: 32, tags: 31, count: limit / 640))
+                }),
+                ("31 one-byte tags per entry, at the estimate's limit", ManifestDecodingOptions(), {
+                    ReferenceManifest.atEstimateLimit(ReferenceManifest.sizeClassEntries(components: 0, tags: 31, count: 100_000))
+                }),
+                // Keys with an escape are compared while their escapes are decoded (fix round 2): the shortest escaped
+                // key whose decoded length matches two field names, with the assets skipped once and parsed again
+                // after schemaVersion, or in one entry; and envelope keys of schemaVersion's length.
+                ("shortest escaped 8-byte unknown keys, assets before schemaVersion", ManifestDecodingOptions(), {
+                    ReferenceManifest.repeatedKeys(#""\/bcdefgh":0"#, bytes: limit, assetsFirst: true)
+                }),
+                ("shortest escaped 8-byte unknown keys in one entry", ManifestDecodingOptions(), {
+                    ReferenceManifest.repeatedKeys(#""\/bcdefgh":0"#, bytes: limit)
+                }),
+                ("escaped 13-byte unknown keys in the envelope", ManifestDecodingOptions(), {
+                    ReferenceManifest.repeatedKeys(#""\/bcdefghijklm":0"#, bytes: limit, inEnvelope: true)
+                }),
             ]
             for (name, options, make) in cases {
                 let payload = make()
@@ -185,6 +205,63 @@ private enum ReferenceManifest {
         return Data((text + "]").utf8)
     }
 
+    /// `count` minimal entries, each with `components` empty path components and `tags` one-byte tags: arrays of
+    /// 32 + 16 × n bytes, which for 31 and 32 elements (528 and 544 bytes) lie just past a size class of the
+    /// segregated allocator and are served from 640-byte blocks.
+    static func sizeClassEntries(components: Int, tags: Int, count: Int) -> Data {
+        let componentList = "[" + Array(repeating: "\"\"", count: components).joined(separator: ",") + "]"
+        let tagList = "[" + Array(repeating: "\"t\"", count: tags).joined(separator: ",") + "]"
+        var text = "["
+        for index in 0..<count {
+            text += (index == 0 ? "" : ",") + "{\"identifier\":\"\(String(index, radix: 36))\",\"fileExtension\":\"p\",\"remotePath\":\"r\","
+                + "\"localPathComponents\":\(componentList),\"tags\":\(tagList)}"
+        }
+        return Data((text + "]").utf8)
+    }
+
+    /// `payload` followed by just enough whitespace for the decoder's allocation estimate to reach its limit (three
+    /// times the payload). Whitespace changes no estimate and a rejection reports the estimate, so one decode finds
+    /// the padding; a payload the decoder already accepts is returned as it is.
+    static func atEstimateLimit(_ payload: Data) -> Data {
+        do throws(ManifestError) {
+            _ = try ManifestDecoder.decode(payload)
+            return payload
+        } catch {
+            guard case .payloadTooLarge(let estimated, _) = error else {
+                return payload
+            }
+            let target = Int((estimated + 2) / 3)
+            return payload + Data(repeating: UInt8(ascii: " "), count: max(0, target - payload.count))
+        }
+    }
+
+    /// One minimal entry followed by copies of the unknown member `member` up to `bytes`: inside the entry (after
+    /// the envelope's `assets` and before its `schemaVersion` when `assetsFirst`), or in the envelope itself.
+    static func repeatedKeys(_ member: String, bytes: Int, assetsFirst: Bool = false, inEnvelope: Bool = false) -> Data {
+        let entry = #"{"identifier":"a","fileExtension":"p","remotePath":"r","localPathComponents":[]"#
+        let head: String
+        let tail: String
+        if inEnvelope {
+            head = #"{"schemaVersion":1,"assets":["# + entry + "}]"
+            tail = "}"
+        } else if assetsFirst {
+            head = #"{"assets":["# + entry
+            tail = #"}],"schemaVersion":1}"#
+        } else {
+            head = "[" + entry
+            tail = "}]"
+        }
+        let unit = Data(("," + member).utf8)
+        let tailBytes = Data(tail.utf8)
+        var data = Data(head.utf8)
+        data.reserveCapacity(bytes)
+        while data.count + unit.count + tailBytes.count <= bytes {
+            data.append(unit)
+        }
+        data.append(tailBytes)
+        return data
+    }
+
     /// `count` minimal entries that all share the identifier `a`.
     static func duplicateEntries(count: Int) -> Data {
         let entry = #"{"identifier":"a","fileExtension":"p","remotePath":"r","localPathComponents":[]}"#
@@ -213,13 +290,14 @@ private enum ReferenceManifest {
         return String(repeating: "0", count: 16 - digits.count) + digits
     }
 
-    /// Wall-clock milliseconds of one call (benchmarks run serialized, ADR-010).
+    /// Milliseconds of CPU time the calling thread spends in one call (`CLOCK_THREAD_CPUTIME_ID`). The decoder is
+    /// single-threaded and does no I/O, so on a quiet device this is its wall time; unlike wall time it does not grow
+    /// when other processes compete for the cores (fix round 2: on a busy host a 200 ms decode read 685 ms of wall
+    /// time). Benchmarks run serialized (ADR-010).
     static func time<Result>(_ body: () throws -> Result) rethrows -> (Double, Result) {
-        let clock = ContinuousClock()
-        let start = clock.now
+        let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
         let result = try body()
-        let elapsed = clock.now - start
-        let milliseconds = Double(elapsed.components.seconds) * 1_000 + Double(elapsed.components.attoseconds) / 1e15
-        return (milliseconds, result)
+        let elapsed = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - start
+        return (Double(elapsed) / 1_000_000, result)
     }
 }
