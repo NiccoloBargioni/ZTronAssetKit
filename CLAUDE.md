@@ -47,3 +47,6 @@ Work on branch `feature/asset-kit` in this repo; small commits with imperative m
 
 ## Known traps already hit in this codebase
 SPEC Appendix A (three Swift 6 diagnostics) and Appendix B (iOS 15 availability). Read them before your first compile.
+
+## Orchestration state
+Resume from `docs/ORCHESTRATION.md` (current level, worktrees, how to run and merge the next level, measured costs). Subagents in a work package ignore it; it is for the orchestrator.
