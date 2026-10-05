@@ -18,7 +18,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 | Gates at `l1-merged` | `--quick` PASS; unsafe 0; docs 1270/1270; trace: 35 MUSTs still without tests (all owned by L2–L5) |
 
 ## Run Level 2
-1. Pre-flight: `git status` clean on `feature/asset-kit`; the three worktrees clean; usage reset; Mac kept awake (app keep-awake setting — sleep stalled agents ~6 h in Level 1).
+1. Pre-flight: `git status` clean on `feature/asset-kit`; the three worktrees clean; usage reset; Mac kept awake — the app's keep-awake setting, or else start `caffeinate -ims -t 172800` in the background right before launching (prevents idle and system sleep for 48 h; the display may still sleep; a closed laptop lid still sleeps unless on power with an external display). Sleep stalled agents ~6 h in Level 1.
 2. Launch: `Workflow({scriptPath: ".claude/workflows/assetkit-stage2-level.js", args: {level: "L2", base: "l1-merged", wps: ["b", "d", "e"]}})`. Per WP: author → two independent verifiers (requirements/tests and correctness/concurrency) → up to two fix rounds. All WP instructions are inside the script (`WPS` table, `notes`).
 3. If any WP ends with blocking findings, run one close-out round (fixer + independent verifier that reproduces the original failures), as was done for Level 1 (`DECISIONS.md` ADR-049 documents the pattern).
 4. Merge in order **b, d, e**: `git merge --no-ff wp/<x>`; then `bash Scripts/verify.sh --quick`, `bash Scripts/verify.sh --gates-only` (rewrites `docs/TRACEABILITY.md`), the release build and the iOS `xcodebuild` (always with `-derivedDataPath .build/xcode`).
