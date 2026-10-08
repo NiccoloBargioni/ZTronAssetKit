@@ -534,6 +534,21 @@ struct StoreRecoveryTests {
         #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[QuarantineFixture.key], .corrupt))
     }
 
+    /// ADR draft B-34 tells an index file that cannot be read (an error: the launch writes nothing) from one that ends
+    /// early (no error, fewer bytes than its size: torn, as a torn write leaves it, and the launch commits as usual).
+    @Test("R-STO-4: an index file whose read ends early is torn, not unreadable, and the launch still commits", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func shortIndexReadIsTorn() async throws {
+        let slice = IndexSpaceSlice(bin: .newer, previous: .committed, temporary: .absent)
+        let fake = IndexSpace.fake(IndexSpace.disk(slice))
+        let shortening = MisreportingFileSystem(fake, failing: 0, shortReads: URLMatcher(lastComponentSuffix: "index.bin"))
+        let outcome = await IndexLoader.load(layout: IndexSpace.layout, fileSystem: shortening, metadata: InlineBlockingExecutor(), bulk: InlineBlockingExecutor())
+        #expect(outcome.unreadable.isEmpty, "a short read is not an error")
+        #expect(outcome.chosen == .previous && outcome.content?.generation == 10 && outcome.degraded, "index.bin is torn: index.prev loads, degraded")
+        let launch = LaunchState.build(outcome: outcome, onDisk: [:], blobsRecreated: false, seed: IndexSpace.seed, now: IndexSpace.now, layout: IndexSpace.layout)
+        #expect(launch.unavailable == nil && launch.degraded, "the launch commits as usual")
+    }
+
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
     /// stopped between its renames; returns the disk the killed process leaves.
     @available(macOS 15.0, *)

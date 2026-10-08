@@ -781,7 +781,7 @@ enum IndexSpace {
             }
         case .renameTookEffect(let operation):
             let before = earlier.prefix { $0.index < operation.index }.filter { $0.kind == .rename }.count
-            let wrapper = RenameReportingFailure(fake, failing: before + 1)
+            let wrapper = MisreportingFileSystem(fake, failing: before + 1)
             fileSystem = wrapper
             fired = { wrapper.fired }
         case .none, .crash:
@@ -1010,17 +1010,20 @@ final class MutationRecorder: FileSystem {
     }
 }
 
-/// A `FileSystem` over a `FakeFileSystem` whose `failing`-th rename (1-based, any URL) takes effect and then reports
-/// EIO: the "rename failure" of the state-space test (a rename whose result was lost, as in probe VPC2-K).
+/// A `FileSystem` over a `FakeFileSystem` that misreports: its `failing`-th rename (1-based, any URL) takes effect and
+/// then reports EIO (the "rename failure" of the state-space test: a rename whose result was lost, as in probe
+/// VPC2-K), and every read of a URL `shortReads` matches returns no bytes without an error (a file that ended early).
 @available(macOS 15.0, *)
-final class RenameReportingFailure: FileSystem {
+final class MisreportingFileSystem: FileSystem {
     let base: FakeFileSystem
     private let failing: Int
+    private let shortReads: URLMatcher?
     private let renames = Mutex<Int>(0)
 
-    init(_ base: FakeFileSystem, failing: Int) {
+    init(_ base: FakeFileSystem, failing: Int, shortReads: URLMatcher? = nil) {
         self.base = base
         self.failing = failing
+        self.shortReads = shortReads
     }
 
     /// Whether the failing rename ran.
@@ -1041,7 +1044,8 @@ final class RenameReportingFailure: FileSystem {
     }
 
     func read(from url: URL, offset: Int64, maxLength: Int) throws(FileSystemError) -> Data {
-        try self.base.read(from: url, offset: offset, maxLength: maxLength)
+        let data = try self.base.read(from: url, offset: offset, maxLength: maxLength)
+        return self.shortReads?.matches(url) == true ? Data() : data
     }
 
     func availableCapacity(at url: URL, for purpose: CapacityPurpose) throws(FileSystemError) -> Int64 {
