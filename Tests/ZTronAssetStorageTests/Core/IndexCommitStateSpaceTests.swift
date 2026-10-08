@@ -76,8 +76,7 @@ enum VolumeScript: String, CaseIterable, Sendable {
     }
 }
 
-/// One initial disk: the states of the three index files. Each one is a test case that enumerates every volume script
-/// and every event.
+/// One initial disk: the states of the three index files. Each one enumerates every volume script and every event.
 struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
     var bin: SeededIndex
     var previous: SeededIndex
@@ -99,11 +98,25 @@ struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
         }
     }
 
-    /// Every initial disk: 7 × 7 × 8.
-    static let all: [IndexSpaceSlice] = SeededIndex.renamedInto.flatMap { bin in
-        SeededIndex.renamedInto.flatMap { previous in
-            SeededIndex.allCases.map { IndexSpaceSlice(bin: bin, previous: previous, temporary: $0) }
-        }
+}
+
+/// The states of `index.bin` and `index.prev`: one test case, which enumerates every state of `index.tmp`.
+struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
+    var bin: SeededIndex
+    var previous: SeededIndex
+
+    var testDescription: String {
+        "bin=\(self.bin) prev=\(self.previous)"
+    }
+
+    /// The row's initial disks, one per state of `index.tmp`.
+    var slices: [IndexSpaceSlice] {
+        SeededIndex.allCases.map { IndexSpaceSlice(bin: self.bin, previous: self.previous, temporary: $0) }
+    }
+
+    /// Every row: 7 × 7 (× 8 states of `index.tmp` each).
+    static let all: [IndexSpaceRow] = SeededIndex.renamedInto.flatMap { bin in
+        SeededIndex.renamedInto.map { IndexSpaceRow(bin: bin, previous: $0) }
     }
 }
 
@@ -137,42 +150,66 @@ struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
 ///   launch after it loads at least the reopen's generation with a larger epoch. A launch whose own launch commit failed
 ///   may see its epoch again (ADR draft B-5), so a case's epoch is not compared with the reopen's.
 ///
-/// How the enumeration stays affordable without sampling: the no-fault run records the disk before every mutation, and
-/// a crash before mutation k leaves exactly that disk under the crash's view, so only torn writes are run again; a run
-/// with a fault resumes from the no-fault run's disk at the start of the commit the fault falls in (the run is
-/// deterministic up to the fault); and the reopen of a survivor, which after `open()`'s root barrier depends only on its
-/// index files as a kill and as a power loss keeping metadata leave them, is computed once per distinct pair.
-@Suite("Core: index commit state space (R-STO-4, R-STO-5)")
+/// How the enumeration stays affordable without sampling (every case runs; only identical work is shared): the no-fault
+/// run records the disk before every mutation, and a crash before mutation k leaves exactly that disk under the crash's
+/// view, so only torn writes are run again (from the start of their commit); a run with a fault resumes from the no-fault
+/// run's disk at the start of the commit the fault falls in (the run is deterministic up to the fault); the checks after
+/// a commit and at the end of a run are computed once per `RunKey` (the effects of the run's mutations and its
+/// bookkeeping: equal keys mean an identical volume and memory); and the reopen of a survivor, which after `open()`'s
+/// root barrier depends only on its index files as a kill and as a power loss keeping metadata leave them, is computed
+/// once per distinct pair.
+@Suite("Core: index commit state space (R-STO-4, R-STO-5)", .serialized)
 struct IndexCommitStateSpaceTests {
+    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield after every case:
+    /// a row then takes about a second under TSan, so its time limit keeps a wide margin, and suites running beside this
+    /// one keep the cooperative pool (every case of every suite starts its time limit when the run starts).
     @Test(
         "R-STO-4: every initial index state, with one fault at every operation, a kill or a power loss at every mutation, keeps I-a…I-e",
         .timeLimit(.minutes(1)),
-        arguments: IndexSpaceSlice.all
+        arguments: IndexSpaceRow.all
     )
     @available(macOS 15.0, *)
-    func everyStateFaultAndCrash(slice: IndexSpaceSlice) async throws {
-        var memo = IndexSpace.Memo()
-        let initial = IndexSpace.disk(slice)
-        let start = IndexSpace.views(initial)
-        try IndexSpace.checkSeed(slice, start)
-        var violations: [String] = []
-        for volume in VolumeScript.allCases {
-            violations += await IndexSpace.enumerate(slice, initial: initial, start: start, volume: volume, memo: &memo)
+    func everyStateFaultAndCrash(row: IndexSpaceRow) async throws {
+        var starts: [(IndexSpaceSlice, DiskImage, IndexSpace.Views)] = []
+        for slice in row.slices {
+            let initial = IndexSpace.disk(slice)
+            let start = IndexSpace.views(initial)
+            try IndexSpace.checkSeed(slice, start)
+            starts.append((slice, initial, start))
         }
+        let results = await withTaskGroup(of: IndexSpace.SliceResult.self) { group in
+            for (slice, initial, start) in starts {
+                group.addTask(priority: .low) {
+                    await IndexSpace.enumerate(slice, initial: initial, start: start)
+                }
+            }
+            var results: [IndexSpace.SliceResult] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
+        }
+        let violations = results.sorted { $0.slice < $1.slice }.flatMap(\.violations)
         let shown = violations.prefix(40).joined(separator: "\n")
-        #expect(violations.isEmpty, "\(violations.count) violations from \(slice.testDescription); the first ones:\n\(shown)")
-        let counts = memo.counts
-        print("R-STO-4 index state \(slice.testDescription): \(counts.cases) cases (\(counts.faults) faults, \(counts.crashes) crash points) and \(memo.reopens.count) distinct reopens enumerated")
+        #expect(violations.isEmpty, "\(violations.count) violations from \(row.testDescription); the first ones:\n\(shown)")
+        let cases = results.map(\.counts.cases).reduce(0, +)
+        let faults = results.map(\.counts.faults).reduce(0, +)
+        let crashes = results.map(\.counts.crashes).reduce(0, +)
+        print("R-STO-4 index states \(row.testDescription) tmp=*: \(results.count) initial disks, \(cases) cases (\(faults) faults, \(crashes) crash points) enumerated")
     }
 }
 
 /// The machinery of the state-space test.
 @available(macOS 15.0, *)
 enum IndexSpace {
-    static let layout = CoreFixture.layout
+    /// The fake volume's root and the store's base on it: shallow, so every path the fake resolves is short.
+    static let volume = URL(fileURLWithPath: "/v", isDirectory: true)
+    static let layout = StoreLayout(base: IndexSpace.volume)
     static let seed: UInt64 = 0x1D3
     static let storeID = StoreIdentifier.derived(fromSeed: IndexSpace.seed)
     static let now = Date(timeIntervalSince1970: 1_700_000_000)
+    /// Stands for the case's description in a memoised violation; replaced when the violation is reported.
+    static let here = "‹case›"
 
     /// The index files of a disk view, by path.
     typealias Files = [String: [UInt8]]
@@ -181,6 +218,12 @@ enum IndexSpace {
 
     static func path(_ file: IndexFile) -> String {
         IndexSpace.layout.indexURL(file).path
+    }
+
+    /// A fake on `disk` (configured for a kill unless `mode` says otherwise).
+    static func fake(_ disk: DiskImage, crashBefore: Int? = nil, mode: CrashMode = .processKill) -> FakeFileSystem {
+        let configuration = FakeFileSystemConfiguration(crashBefore: crashBefore, crashMode: mode, volumeRoot: IndexSpace.volume)
+        return FakeFileSystem(disk: disk, time: ManualTimeSource(), configuration: configuration)
     }
 
     /// The encoded generation `generation` of the lineage.
@@ -228,11 +271,11 @@ enum IndexSpace {
         if slice.temporary == .newerUnsynced {
             image.durableFiles[IndexSpace.path(.temporary)] = nil
         }
-        return FakeFileSystem(disk: image, time: ManualTimeSource()).survivingDisk()
+        return IndexSpace.fake(image).survivingDisk()
     }
 
     /// The index files of a disk under each crash view.
-    struct Views {
+    struct Views: Sendable {
         /// The current namespace: what a kill leaves.
         var current: Files
         /// Synced names with synced data: what a power loss dropping unsynced state leaves.
@@ -255,7 +298,7 @@ enum IndexSpace {
 
     /// The disk a crash of `mode` leaves of `disk` (a disk taken from a fake configured for a kill).
     static func surviving(_ disk: DiskImage, _ mode: CrashMode) -> DiskImage {
-        FakeFileSystem(disk: disk, time: ManualTimeSource(), configuration: FakeFileSystemConfiguration(crashMode: mode)).survivingDisk()
+        IndexSpace.fake(disk, mode: mode).survivingDisk()
     }
 
     /// The three views of `disk` (a disk taken from a fake configured for a kill, so `files` is its current namespace).
@@ -317,15 +360,55 @@ enum IndexSpace {
         var endDurable: Files
     }
 
+    /// One mutation's effect on the volume. A failed mutation other than a write changes nothing on the fake (an injected
+    /// error fails it before it acts), so it has no effect; a failed write has opened, created and truncated its file.
+    struct Effect: Hashable {
+        var kind: FSOpKind
+        var path: String
+        var destination: String?
+        var failed: Bool
+    }
+
+    /// Everything a lifetime keeps in memory that a check or a later commit reads.
+    struct Bookkeeping: Hashable {
+        var committed: UInt64
+        var pending: UInt64?
+        var claimed: UInt64
+        var epoch: UInt64
+        var loaded: UInt64
+        var storeID: StoreIdentifier
+        var generation: UInt64
+        var launchCommitted: Bool
+        var flushCommitted: Bool
+        var readOnly: Bool
+    }
+
+    /// What a run has done so far: the effects of its mutations from the initial disk, and its bookkeeping after the load
+    /// and after each commit. The fake is deterministic, so two runs from one initial disk with equal keys left the same
+    /// volume (every effect is a function of the volume before it, and the bytes a commit writes are a function of its
+    /// bookkeeping) and the same bookkeeping: every later check gives the same answer, and is computed once.
+    struct RunKey: Hashable {
+        var effects: [Effect] = []
+        var bookkeeping: [Bookkeeping] = []
+    }
+
+    /// The memoised result of the checks after one commit.
+    struct Checkpoint {
+        var violations: [String]
+        var currentIsValid: Bool
+    }
+
     /// The per-test-case caches and counters (no state is shared between test cases).
     struct Memo {
         var summaries: [Files: Summary] = [:]
         var reopens: [ReopenKey: Reopen] = [:]
+        var checkpoints: [RunKey: Checkpoint] = [:]
+        var ends: [RunKey: [String]] = [:]
         var counts = Counts()
     }
 
     /// What was enumerated.
-    struct Counts {
+    struct Counts: Sendable {
         var cases = 0
         var faults = 0
         var crashes = 0
@@ -354,6 +437,16 @@ enum IndexSpace {
         return summary
     }
 
+    /// The effects of the mutations among `operations`.
+    static func effects(_ operations: ArraySlice<FSOpRecord>) -> [Effect] {
+        operations.compactMap { operation -> Effect? in
+            guard operation.kind.isMutation, operation.failure == nil || operation.kind == .write else {
+                return nil
+            }
+            return Effect(kind: operation.kind, path: operation.url.path, destination: operation.destination?.path, failed: operation.failure != nil)
+        }
+    }
+
     // MARK: One lifetime
 
     /// The in-memory state of a lifetime between its phases.
@@ -372,18 +465,42 @@ enum IndexSpace {
         /// The load could not read an index file: `open()` commits nothing in this lifetime and `close()` flushes
         /// nothing (`LaunchState.unavailable`, ADR draft B-34).
         var readOnly = false
+
+        var bookkeeping: Bookkeeping {
+            Bookkeeping(
+                committed: self.ledger.committedGeneration,
+                pending: self.ledger.pendingPromotion,
+                claimed: self.claimed,
+                epoch: self.epoch,
+                loaded: self.loaded,
+                storeID: self.storeID,
+                generation: self.generation,
+                launchCommitted: self.launchCommitted,
+                flushCommitted: self.flushCommitted,
+                readOnly: self.readOnly
+            )
+        }
+    }
+
+    /// A lifetime in progress: its bookkeeping, its key, whether `index.bin` is valid now, and the violations found so far
+    /// (described with `here`).
+    struct Run {
+        var progress: Progress
+        var key: RunKey
+        var currentIsValid: Bool
+        var violations: [String] = []
     }
 
     /// The load, as `open()` does it, and `open()`'s root barrier before the launch commit (ADR-015; a failed barrier is
     /// tolerated). `recorder` learns the loaded committed generation before the barrier.
-    static func open(on fileSystem: any FileSystem, recorder: MutationRecorder? = nil) async -> Progress {
+    static func open(on fileSystem: any FileSystem, fake: FakeFileSystem, recorder: MutationRecorder? = nil) async -> Run {
         let inline = InlineBlockingExecutor()
         let layout = IndexSpace.layout
         let outcome = await IndexLoader.load(layout: layout, fileSystem: fileSystem, metadata: inline, bulk: inline)
         let launch = LaunchState.build(outcome: outcome, onDisk: [:], blobsRecreated: false, seed: IndexSpace.seed, now: IndexSpace.now, layout: layout)
         recorder?.setClaimed(launch.committedGeneration)
         _ = try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)
-        return Progress(
+        let progress = Progress(
             ledger: IndexCommitLedger(committedGeneration: launch.committedGeneration, pendingPromotion: launch.promotion),
             claimed: launch.committedGeneration,
             epoch: launch.nextGeneration,
@@ -392,6 +509,8 @@ enum IndexSpace {
             generation: launch.nextGeneration,
             readOnly: launch.unavailable != nil
         )
+        let key = RunKey(effects: IndexSpace.effects(fake.operations[...]), bookkeeping: [progress.bookkeeping])
+        return Run(progress: progress, key: key, currentIsValid: false)
     }
 
     /// The commit at `index` (0: the ordered launch commit, 1: close()'s durable flush), folded as `commitNow` folds it;
@@ -426,55 +545,64 @@ enum IndexSpace {
         return succeeded
     }
 
-    /// The disk at the start of one commit of the no-fault run, to resume a run with a fault from.
+    /// The no-fault run at the start of one commit, to resume a run with a fault or a torn write from.
     struct Phase {
         var disk: DiskImage
-        var progress: Progress
+        var run: Run
         /// The commit that starts here.
         var commit: Int
         /// The length of the no-fault run's operation log here.
         var operations: Int
+        /// The mutations the no-fault run performed before here.
+        var mutations: Int
     }
 
-    /// Runs the commits from `first` on, checking I-b and I-c after each (the fake is configured for a kill, so its
-    /// surviving disk is its current state); returns the disk the run ends with.
+    /// Runs the commits from `first` on, checking I-b and I-c after each (once per distinct key; the fake is configured
+    /// for a kill, so its surviving disk is its current state). `phase` sees the run at the start of each commit.
     static func runCommits(
         from first: Int,
-        _ progress: inout Progress,
-        before startDisk: DiskImage,
+        _ run: inout Run,
         on fileSystem: any FileSystem,
         fake: FakeFileSystem,
         volume: VolumeScript,
-        label: String,
         memo: inout Memo,
-        violations: inout [String],
-        phases: ((Int, DiskImage, Progress) -> Void)? = nil
-    ) -> DiskImage {
-        var disk = startDisk
+        phase: ((Int, Run) -> Void)? = nil
+    ) {
         var full = false
         for index in first..<2 {
-            phases?(index, disk, progress)
+            phase?(index, run)
             if volume.isFull(atCommit: index), !full {
                 fake.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .every, error: .noSpace))
                 full = true
             }
-            let wasValid = IndexSpace.summary(disk.files, &memo).currentIsValid
-            let succeeded = IndexSpace.commit(index, &progress, on: fileSystem)
-            disk = fake.survivingDisk()
-            let after = IndexSpace.summary(disk.files, &memo)
-            guard !progress.readOnly else {
+            let logged = fake.operations.count
+            let succeeded = IndexSpace.commit(index, &run.progress, on: fileSystem)
+            guard !run.progress.readOnly else {
                 continue
             }
-            let attempt = "\(label), after the \(index == 0 ? "launch commit" : "durable flush") (\(succeeded ? "succeeded" : "failed"))"
-            let committed = progress.ledger.committedGeneration
-            if committed > 0, !after.generations.contains(committed) {
-                violations.append("\(attempt): I-b, the committed generation \(committed) is not on disk (\(IndexSpace.describe(disk.files)))")
+            run.key.effects += IndexSpace.effects(fake.operations[logged...])
+            run.key.bookkeeping.append(run.progress.bookkeeping)
+            let checkpoint: Checkpoint
+            if let known = memo.checkpoints[run.key] {
+                checkpoint = known
+            } else {
+                let files = fake.survivingDisk().files
+                let after = IndexSpace.summary(files, &memo)
+                var found: [String] = []
+                let attempt = "\(IndexSpace.here), after the \(index == 0 ? "launch commit" : "durable flush") (\(succeeded ? "succeeded" : "failed"))"
+                let committed = run.progress.ledger.committedGeneration
+                if committed > 0, !after.generations.contains(committed) {
+                    found.append("\(attempt): I-b, the committed generation \(committed) is not on disk (\(IndexSpace.describe(files)))")
+                }
+                if !succeeded, run.currentIsValid, !after.currentIsValid {
+                    found.append("\(attempt): I-c, index.bin was valid before the failed commit and is \(files[IndexSpace.path(.current)] == nil ? "missing" : "invalid") after it")
+                }
+                checkpoint = Checkpoint(violations: found, currentIsValid: after.currentIsValid)
+                memo.checkpoints[run.key] = checkpoint
             }
-            if !succeeded, wasValid, !after.currentIsValid {
-                violations.append("\(attempt): I-c, index.bin was valid before the failed commit and is \(disk.files[IndexSpace.path(.current)] == nil ? "missing" : "invalid") after it")
-            }
+            run.violations += checkpoint.violations
+            run.currentIsValid = checkpoint.currentIsValid
         }
-        return disk
     }
 
     // MARK: Checks
@@ -507,15 +635,15 @@ enum IndexSpace {
         if let known = memo.reopens[key] {
             reopen = known
         } else {
-            let fake = FakeFileSystem(disk: disk(), time: ManualTimeSource())
-            var progress = await IndexSpace.open(on: fake)
-            _ = IndexSpace.commit(0, &progress, on: fake)
+            let fake = IndexSpace.fake(disk())
+            var run = await IndexSpace.open(on: fake, fake: fake)
+            _ = IndexSpace.commit(0, &run.progress, on: fake)
             let end = fake.survivingDisk()
             reopen = Reopen(
-                launchCommitted: progress.launchCommitted,
-                epoch: progress.epoch,
-                loaded: progress.loaded,
-                claimed: progress.claimed,
+                launchCommitted: run.progress.launchCommitted,
+                epoch: run.progress.epoch,
+                loaded: run.progress.loaded,
+                claimed: run.progress.claimed,
                 end: end.files,
                 endDurable: end.durableFiles
             )
@@ -541,46 +669,65 @@ enum IndexSpace {
         return violations
     }
 
-    /// The checks at the end of a run that did not crash: the process ends (a kill), or the power fails right after.
-    static func checkEnd(_ end: DiskImage, start: Views, claimed: UInt64, label: String, _ memo: inout Memo) async -> [String] {
+    /// The checks at the end of a run that did not crash (the process ends, as a kill; or the power fails right after),
+    /// and its reopen: once per distinct key.
+    static func finish(_ run: Run, fake: FakeFileSystem, start: Views, memo: inout Memo) async -> [String] {
+        if let known = memo.ends[run.key] {
+            return run.violations + known
+        }
+        let end = fake.survivingDisk()
         let views = IndexSpace.views(end)
-        var violations: [String] = []
+        let claimed = run.progress.claimed
+        var found: [String] = []
         for (mode, view) in [(CrashMode.processKill, "a kill at the end"), (.powerLossDropUnsynced, "a power loss dropping unsynced state at the end"), (.powerLossKeepMetadata, "a power loss keeping metadata at the end")] {
             let floor = IndexSpace.floor(start, mode, claimed: claimed, &memo)
-            violations += IndexSpace.checkSurvivor(views.files(after: mode), view: view, floor: floor, claimed: claimed, label: label, &memo)
+            found += IndexSpace.checkSurvivor(views.files(after: mode), view: view, floor: floor, claimed: claimed, label: IndexSpace.here, &memo)
         }
         let key = ReopenKey(current: views.current, kept: views.kept)
-        violations += await IndexSpace.checkReopen(key, disk: { end }, floor: IndexSpace.floor(start, .processKill, claimed: claimed, &memo), claimed: claimed, label: label, &memo)
-        return violations
+        found += await IndexSpace.checkReopen(key, disk: { end }, floor: IndexSpace.floor(start, .processKill, claimed: claimed, &memo), claimed: claimed, label: IndexSpace.here, &memo)
+        memo.ends[run.key] = found
+        return run.violations + found
+    }
+
+    /// `violations` described with `here`, described with `label` instead.
+    static func labelled(_ violations: [String], _ label: String) -> [String] {
+        violations.map { $0.replacingOccurrences(of: IndexSpace.here, with: label) }
     }
 
     // MARK: The enumeration of one initial disk and volume script
+
+    /// What one initial disk's enumeration found.
+    struct SliceResult: Sendable {
+        var slice: String
+        var violations: [String]
+        var counts: Counts
+    }
+
+    /// Every volume script and every event for `slice`, yielding after each case.
+    static func enumerate(_ slice: IndexSpaceSlice, initial: DiskImage, start: Views) async -> SliceResult {
+        var memo = Memo()
+        var violations: [String] = []
+        for volume in VolumeScript.allCases {
+            violations += await IndexSpace.enumerate(slice, initial: initial, start: start, volume: volume, memo: &memo)
+        }
+        return SliceResult(slice: slice.testDescription, violations: violations, counts: memo.counts)
+    }
 
     /// Every event for `slice` on `volume`; returns the violations.
     static func enumerate(_ slice: IndexSpaceSlice, initial: DiskImage, start: Views, volume: VolumeScript, memo: inout Memo) async -> [String] {
         var violations: [String] = []
         let label = "\(slice.testDescription) volume=\(volume)"
         // No fault, recorded: the disk before every mutation, and at the start of every commit.
-        let clean = FakeFileSystem(disk: initial, time: ManualTimeSource())
+        let clean = IndexSpace.fake(initial)
         let recorder = MutationRecorder(clean)
-        var progress = await IndexSpace.open(on: recorder, recorder: recorder)
+        var run = await IndexSpace.open(on: recorder, fake: clean, recorder: recorder)
+        run.currentIsValid = IndexSpace.summary(clean.survivingDisk().files, &memo).currentIsValid
         var phases: [Phase] = []
-        let end = IndexSpace.runCommits(
-            from: 0,
-            &progress,
-            before: clean.survivingDisk(),
-            on: recorder,
-            fake: clean,
-            volume: volume,
-            label: "\(label) no fault",
-            memo: &memo,
-            violations: &violations,
-            phases: { index, disk, progress in
-                recorder.setClaimed(progress.claimed)
-                phases.append(Phase(disk: disk, progress: progress, commit: index, operations: clean.operations.count))
-            }
-        )
-        violations += await IndexSpace.checkEnd(end, start: start, claimed: progress.claimed, label: "\(label) no fault", &memo)
+        IndexSpace.runCommits(from: 0, &run, on: recorder, fake: clean, volume: volume, memo: &memo) { index, run in
+            recorder.setClaimed(run.progress.claimed)
+            phases.append(Phase(disk: clean.survivingDisk(), run: run, commit: index, operations: clean.operations.count, mutations: clean.mutationCount))
+        }
+        violations += IndexSpace.labelled(await IndexSpace.finish(run, fake: clean, start: start, memo: &memo), "\(label) no fault")
         memo.counts.cases += 1
         let operations = clean.operations
         // One fault at every operation.
@@ -597,6 +744,7 @@ enum IndexSpace {
                 violations += await IndexSpace.runFault(event, from: phase, operations: operations, initial: initial, start: start, volume: volume, label: "\(label) \(event)", memo: &memo)
                 memo.counts.cases += 1
                 memo.counts.faults += 1
+                await Task.yield()
             }
         }
         // A crash before every mutation, in every mode.
@@ -606,19 +754,20 @@ enum IndexSpace {
             return violations + ["\(label): recorded \(snapshots.count) disks for \(mutations.count) mutations"]
         }
         for (point, snapshot) in snapshots.enumerated() {
-            violations += await IndexSpace.checkCrashes(at: point, snapshot, mutation: mutations[point], initial: initial, start: start, volume: volume, label: label, memo: &memo)
+            let phase = phases.last { $0.mutations <= point }
+            violations += await IndexSpace.checkCrashes(at: point, snapshot, mutation: mutations[point], from: phase, start: start, volume: volume, label: label, memo: &memo)
+            await Task.yield()
         }
         return violations
     }
 
     /// One case with an injected fault, resumed from `phase` (the start of the commit the fault falls in) when given.
     static func runFault(_ event: Event, from phase: Phase?, operations: [FSOpRecord], initial: DiskImage, start: Views, volume: VolumeScript, label: String, memo: inout Memo) async -> [String] {
-        let fake = FakeFileSystem(disk: phase?.disk ?? initial, time: ManualTimeSource())
+        let fake = IndexSpace.fake(phase?.disk ?? initial)
         let offset = phase?.operations ?? 0
         let earlier = operations[offset...]
-        var violations: [String] = []
         let fileSystem: any FileSystem
-        var fired: () -> Bool
+        let fired: () -> Bool
         switch event {
         case .fault(let operation, let error):
             let matcher = URLMatcher(lastComponentSuffix: operation.url.lastPathComponent, pathContains: operation.url.path)
@@ -638,45 +787,34 @@ enum IndexSpace {
         case .none, .crash:
             return ["\(label): not a fault"]
         }
-        var progress: Progress
-        let startDisk: DiskImage
+        var run: Run
         if let phase {
-            progress = phase.progress
-            startDisk = phase.disk
+            run = phase.run
+            // The resumed run's own log starts empty; its key goes on from the no-fault run's key at the phase.
         } else {
-            progress = await IndexSpace.open(on: fileSystem)
-            startDisk = fake.survivingDisk()
+            run = await IndexSpace.open(on: fileSystem, fake: fake)
+            run.currentIsValid = IndexSpace.summary(fake.survivingDisk().files, &memo).currentIsValid
         }
-        let end = IndexSpace.runCommits(
-            from: phase?.commit ?? 0,
-            &progress,
-            before: startDisk,
-            on: fileSystem,
-            fake: fake,
-            volume: volume,
-            label: label,
-            memo: &memo,
-            violations: &violations
-        )
+        IndexSpace.runCommits(from: phase?.commit ?? 0, &run, on: fileSystem, fake: fake, volume: volume, memo: &memo)
+        var violations = IndexSpace.labelled(await IndexSpace.finish(run, fake: fake, start: start, memo: &memo), label)
         if !fired() {
             violations.append("\(label): the fault never fired")
         }
         // I-e: on a free volume, a fault before close()'s flush does not outlive its commit: the flush, which meets no
         // fault of its own, succeeds (unless the load could not read the index, when nothing is committed at all).
-        if volume == .free, (phase?.commit ?? 0) == 0, !progress.readOnly, !progress.flushCommitted {
+        if volume == .free, (phase?.commit ?? 0) == 0, !run.progress.readOnly, !run.progress.flushCommitted {
             violations.append("\(label): I-e, close()'s durable flush failed after the fault, with none of its own")
         }
-        violations += await IndexSpace.checkEnd(end, start: start, claimed: progress.claimed, label: label, &memo)
         return violations
     }
 
     /// The crashes before mutation `point`: the recorded disk under each power loss and as a kill, and a torn write run
-    /// again when the mutation is a write.
+    /// again (from the start of its commit) when the mutation is a write.
     static func checkCrashes(
         at point: Int,
         _ snapshot: MutationRecorder.Snapshot,
         mutation: FSOpRecord,
-        initial: DiskImage,
+        from phase: Phase?,
         start: Views,
         volume: VolumeScript,
         label: String,
@@ -691,17 +829,20 @@ enum IndexSpace {
             (.powerLossKeepMetadata, keptDisk.files, ReopenKey(current: keptDisk.files, kept: keptDisk.files), { keptDisk }),
         ]
         if mutation.kind == .write {
-            let torn = FakeFileSystem(disk: initial, time: ManualTimeSource(), configuration: FakeFileSystemConfiguration(crashBefore: point, crashMode: .processKillTornWrite))
-            var progress = await IndexSpace.open(on: torn)
-            var tornViolations: [String] = []
-            var unusedMemo = Memo()
-            _ = IndexSpace.runCommits(from: 0, &progress, before: initial, on: torn, fake: torn, volume: volume, label: label, memo: &unusedMemo, violations: &tornViolations)
-            if torn.crashed {
-                let disk = torn.survivingDisk()
-                let tornKept = IndexSpace.surviving(disk, .powerLossKeepMetadata)
-                survivors.append((.processKillTornWrite, disk.files, ReopenKey(current: disk.files, kept: tornKept.files), { disk }))
+            if let phase {
+                let torn = IndexSpace.fake(phase.disk, crashBefore: point - phase.mutations, mode: .processKillTornWrite)
+                var run = phase.run
+                var scratch = Memo()
+                IndexSpace.runCommits(from: phase.commit, &run, on: torn, fake: torn, volume: volume, memo: &scratch)
+                if torn.crashed {
+                    let disk = torn.survivingDisk()
+                    let tornKept = IndexSpace.surviving(disk, .powerLossKeepMetadata)
+                    survivors.append((.processKillTornWrite, disk.files, ReopenKey(current: disk.files, kept: tornKept.files), { disk }))
+                } else {
+                    violations.append("\(label) \(Event.crash(point, .processKillTornWrite)): the crash point was never reached")
+                }
             } else {
-                violations.append("\(label) \(Event.crash(point, .processKillTornWrite)): the crash point was never reached")
+                violations.append("\(label) \(Event.crash(point, .processKillTornWrite)): a write before the launch commit")
             }
         }
         for (mode, files, key, disk) in survivors {
