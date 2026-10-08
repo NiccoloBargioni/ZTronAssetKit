@@ -130,6 +130,10 @@ struct PackTransferDriver: Sendable {
     let stop: PackTransferStop
 
     /// Runs the attempt inside the R-OBS-1 `transfer` interval and ends the stream with one terminal element.
+    ///
+    /// The interval ends before the terminal element is yielded, on every path: yielding resumes the consumer on
+    /// another thread, so ending it afterwards would let the engine (or a test) see a finished transfer whose
+    /// interval is still open.
     func run() async {
         let interval = self.parts.log.interval(.transfer, category: .apple, "attempt \(self.request.attempt.token)")
         var terminal = await self.attempt()
@@ -139,8 +143,8 @@ struct PackTransferDriver: Sendable {
             }
             terminal = stop.terminal
         }
-        await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
         interval.end()
+        await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
     }
 
     /// Ends the stream with `terminal`. A consumer can drop the stream after the stop check above and before this

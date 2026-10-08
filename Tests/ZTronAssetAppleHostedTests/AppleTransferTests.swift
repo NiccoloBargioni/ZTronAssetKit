@@ -369,16 +369,52 @@ struct AppleTransferTests {
     func transferIsWrappedInTheInterval() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
         let request = assetA.request()
-        _ = await collect(await fixture.source.transfer(request))
-        let intervals = fixture.tap.lines.compactMap(LogIntervalEvent.init(line:))
-        #expect(
-            intervals == [
-                LogIntervalEvent(category: .apple, name: .transfer, phase: .began, message: "attempt \(request.attempt.token)"),
-                LogIntervalEvent(category: .apple, name: .transfer, phase: .ended, message: "attempt \(request.attempt.token)"),
-            ]
-        )
+        let drained = await collectNotingIntervals(await fixture.source.transfer(request), tap: fixture.tap)
+        #expect(drained.updates.last.map(Self.isStaged) == true, "\(drained.updates)")
+        // Seen by the consumer when the terminal update arrived, not after the stream ended: whoever sees a
+        // transfer's terminal update also sees its interval closed.
+        #expect(drained.atTerminal == Self.closedInterval(of: request), "\(drained.atTerminal)")
         #expect(fixture.tap.lines.allSatisfy { $0.subsystem == AssetLog.subsystem })
         await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-OBS-1: a failed, cancelled or paused Apple transfer closes its interval before its terminal update", .timeLimit(.minutes(1)))
+    func stoppedTransferClosesTheInterval() async throws {
+        // Failed: the file is missing from its pack after the pack was made available (skew).
+        let missing = PackAsset("ZTronMedia/images/new.heic", "added in catalog v2")
+        let skewed = AppleTierFixture(installed: [Packs.media: mediaFiles], remote: [Packs.media: mediaFiles])
+        let skewRequest = missing.request()
+        let skew = await collectNotingIntervals(await skewed.source.transfer(skewRequest), tap: skewed.tap)
+        #expect(skew.updates == [.failed(.transient(.sourceVersionSkew, retryAfter: nil))])
+        #expect(skew.atTerminal == Self.closedInterval(of: skewRequest), "\(skew.atTerminal)")
+        await skewed.source.invalidate()
+
+        // Cancelled and paused while waiting for the pack.
+        for control in [TransferControl.cancel, .pause] {
+            let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+            fixture.backend.scriptEnsure(Packs.media, [.hold])
+            let request = assetA.request()
+            let handle = await fixture.source.transfer(request)
+            await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+            if control == .pause {
+                handle.pause()
+            } else {
+                handle.cancel()
+            }
+            let drained = await collectNotingIntervals(handle, tap: fixture.tap)
+            #expect(drained.updates == [control == .pause ? .paused(resumable: false) : .failed(.cancelled(.byClient))])
+            #expect(drained.atTerminal == Self.closedInterval(of: request), "\(control): \(drained.atTerminal)")
+            await fixture.source.invalidate()
+        }
+    }
+
+    /// The two edges of `request`'s `transfer` interval.
+    static func closedInterval(of request: TransferRequest) -> [LogIntervalEvent] {
+        [
+            LogIntervalEvent(category: .apple, name: .transfer, phase: .began, message: "attempt \(request.attempt.token)"),
+            LogIntervalEvent(category: .apple, name: .transfer, phase: .ended, message: "attempt \(request.attempt.token)"),
+        ]
     }
 
     @available(macOS 26.0, *)
