@@ -156,9 +156,14 @@ struct StoreEdgeTests {
         let second = Task {
             try await harness.store.open()
         }
+        // The second open, then close, park on the running open in that order before it is released: started together,
+        // close could reach the store first and the second open would then find it closing (close-out cycle 3: failed
+        // under load and on the third of a run of repetitions).
+        await StoreEdgeTests.waitForOpenWaiters(1, harness)
         let closing = Task {
             await harness.store.close()
         }
+        await StoreEdgeTests.waitForOpenWaiters(2, harness)
         await metadata.setHolding(false)
         let report = try await first.value
         #expect(try await second.value == report)
@@ -289,5 +294,15 @@ extension AssetStore {
             self.state.core.appliedManifest = manifest
         }
         self.markDirty(.soon)
+    }
+}
+
+extension StoreEdgeTests {
+    /// Waits until `count` callers are parked on a running `open()` (polled between yields; no sleeping).
+    @available(macOS 15.0, *)
+    static func waitForOpenWaiters(_ count: Int, _ harness: CoreHarness) async {
+        while await harness.state.core.openWaiters.count < count {
+            await Task.yield()
+        }
     }
 }
