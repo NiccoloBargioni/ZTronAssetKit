@@ -16,6 +16,7 @@ final class SyncLevelSpy: FileSystem {
 
     let base: FakeFileSystem
     private let recorded = Mutex<[Sync]>([])
+    private let attributesOverride = Mutex<StoreAttributes?>(nil)
 
     init(_ base: FakeFileSystem) {
         self.base = base
@@ -47,7 +48,15 @@ final class SyncLevelSpy: FileSystem {
     }
 
     func storeAttributes(at url: URL) throws(FileSystemError) -> StoreAttributes {
-        try self.base.storeAttributes(at: url)
+        if let reported = self.attributesOverride.withLock({ $0 }) {
+            return reported
+        }
+        return try self.base.storeAttributes(at: url)
+    }
+
+    /// Makes `storeAttributes` report `attributes` for every item (a restore that dropped them).
+    func reportAttributes(_ attributes: StoreAttributes?) {
+        self.attributesOverride.withLock { $0 = attributes }
     }
 
     func createDirectory(at url: URL) throws(FileSystemError) {

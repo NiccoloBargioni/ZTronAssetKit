@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetTestSupport
@@ -192,6 +193,75 @@ struct StoreDeletionTests {
         let expected = payloads.map { harness.layout.blobURL(CoreFixture.key($0)) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         #expect(removed == expected)
         #expect(await harness.state.core.blobTable.isEmpty)
+    }
+}
+
+@Suite("Core: time-bounded deletion units")
+struct DeletionUnitTests {
+    @Test("P-13: a deletion unit stops when its time budget is spent and the reaper carries the rest to the next unit", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func timeBoundedUnits() async throws {
+        let clock = SteppingClock()
+        let metadata = CountingExecutor()
+        let fake = FakeFileSystem(time: clock.base)
+        let store = AssetStore(
+            configuration: CoreFixture.configuration(),
+            environment: CoreHarness.environment(fileSystem: fake, time: clock, metadata: metadata)
+        )
+        _ = try await store.open()
+        let payloads = (0..<20).map { CoreFixture.bytes(2_000 + UInt64($0), count: 16) }
+        let entries = payloads.enumerated().map { CoreFixture.entry("t\($0.offset)", $0.element) }
+        _ = try await store.apply(CoreFixture.manifest(entries), etag: nil, eviction: nil)
+        let sink = try await store.makeStagingSink()
+        for (index, (bytes, entry)) in zip(payloads, entries).enumerated() {
+            let name = StagingFileName(transfer: entry.transferID, attempt: TransferAttempt(epoch: 1, sequence: UInt32(index + 1)), kind: .partial)
+            try sink.createPartial(name)
+            _ = try sink.appendPartial(bytes, to: name)
+            _ = try await store.publish(StagedFile(name: name, byteCount: 16, resumed: false, httpStatus: nil, etag: nil), binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .userInitiated)
+        }
+        _ = try await store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        clock.base.advance(by: 10)
+        await store.runDueWorkInstallOnly()
+        let before = await metadata.units
+        clock.setStepping(true)
+        let result = await store.reapDeletable(maxKeys: .max)
+        clock.setStepping(false)
+        #expect(result.filesRemoved == 20)
+        #expect(await metadata.units - before == 7, "a 3 ms budget at 1 ms per clock read admits three unlinks per unit")
+        #expect(await store.state.core.blobTable.isEmpty)
+        let removed = fake.operations.filter { $0.kind == .removeItem && $0.url.path.contains("/blobs/") }.map(\.url)
+        #expect(removed == payloads.map { CoreFixture.layout.blobURL(CoreFixture.key($0)) }.sorted { $0.lastPathComponent < $1.lastPathComponent })
+    }
+}
+
+/// A clock whose monotonic reads advance 1 ms each while stepping (a slow volume, seen from inside a unit).
+@available(macOS 15.0, *)
+final class SteppingClock: TimeSource {
+    let base = ManualTimeSource()
+    private let stepping = Mutex(false)
+
+    func setStepping(_ value: Bool) {
+        self.stepping.withLock { $0 = value }
+    }
+
+    func now() -> Date {
+        self.base.now()
+    }
+
+    func monotonicNow() -> MonotonicInstant {
+        let value = self.base.monotonicNow()
+        if self.stepping.withLock({ $0 }) {
+            self.base.advance(by: 0.001)
+        }
+        return value
+    }
+
+    func uptimeNow() -> MonotonicInstant {
+        self.base.uptimeNow()
+    }
+
+    func sleep(until deadline: MonotonicInstant) async throws(CancellationError) {
+        try await self.base.sleep(until: deadline)
     }
 }
 

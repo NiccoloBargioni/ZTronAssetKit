@@ -206,9 +206,11 @@ enum IndexCodec {
                 ?? AssetRecord(entry: entry, residency: .absent(.neverFetched), expectedBlob: entry.checksum, lastAccess: Date(timeIntervalSinceReferenceDate: 0))
             ordered.append((record, false))
         }
-        for id in content.records.keys.sorted() where !content.appliedManifest.contains(id) {
-            if let record = content.records[id] {
-                ordered.append((record, true))
+        if content.records.count != content.appliedManifest.count || content.records.keys.contains(where: { !content.appliedManifest.contains($0) }) {
+            for id in content.records.keys.filter({ !content.appliedManifest.contains($0) }).sorted() {
+                if let record = content.records[id] {
+                    ordered.append((record, true))
+                }
             }
         }
         writer.count(ordered.count)
@@ -450,7 +452,9 @@ enum IndexCodec {
         for _ in 0..<count {
             let length = try reader.count(minimumBytesEach: 1)
             let slice = try reader.take(length)
-            guard let text = String(bytes: slice, encoding: .utf8) else {
+            // Decoding replaces invalid sequences; comparing the bytes back rejects them (no Foundation round trip).
+            let text = String(decoding: slice, as: UTF8.self)
+            guard text.utf8.count == slice.count, text.utf8.elementsEqual(slice) else {
                 throw .malformed
             }
             strings.append(text)
@@ -831,22 +835,40 @@ enum IndexCodec {
 }
 
 /// The STRINGS table under construction: interned by UTF-8 bytes in order of first use (deterministic output).
+///
+/// `String` equality is canonical equivalence, so a `String`-keyed lookup alone would merge identifiers that differ
+/// only in normalisation. The fast path looks the text up by `String` and confirms the bytes; a canonically equal
+/// text with other bytes (rare) goes through the byte-keyed table.
 private struct StringTable {
-    private var indices: [[UInt8]: Int] = [:]
-    private var ordered: [[UInt8]] = []
+    private var byText: [String: Int] = [:]
+    private var byBytes: [[UInt8]: Int] = [:]
+    private var ordered: [String] = []
     /// Encoded size estimate for buffer reservation.
     private(set) var byteEstimate = 0
 
     /// The index of `text`, interning it on first use.
     mutating func reference(_ text: String) -> Int {
-        let bytes = Array(text.utf8)
-        if let index = self.indices[bytes] {
-            return index
+        if let index = self.byText[text] {
+            if self.ordered[index].utf8.elementsEqual(text.utf8) {
+                return index
+            }
+            let bytes = Array(text.utf8)
+            if let index = self.byBytes[bytes] {
+                return index
+            }
+            let added = self.append(text)
+            self.byBytes[bytes] = added
+            return added
         }
+        let added = self.append(text)
+        self.byText[text] = added
+        return added
+    }
+
+    private mutating func append(_ text: String) -> Int {
         let index = self.ordered.count
-        self.indices[bytes] = index
-        self.ordered.append(bytes)
-        self.byteEstimate += bytes.count + 2
+        self.ordered.append(text)
+        self.byteEstimate += text.utf8.count + 2
         return index
     }
 
@@ -854,9 +876,9 @@ private struct StringTable {
     func encoded() -> [UInt8] {
         var writer = IndexByteWriter(capacity: self.byteEstimate + 4)
         writer.count(self.ordered.count)
-        for bytes in self.ordered {
-            writer.count(bytes.count)
-            writer.append(bytes)
+        for text in self.ordered {
+            writer.count(text.utf8.count)
+            writer.append(text.utf8)
         }
         return writer.bytes
     }

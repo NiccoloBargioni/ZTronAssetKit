@@ -98,17 +98,39 @@ enum BlobPlacementUnit {
 
 /// One deletion unit of the reaper (P-13): up to `deletionBatchSize` unlinks in sorted order, each result kept, so
 /// a failure keeps only its own key doomed (ARCHITECTURE §4.4).
+///
+/// The unit also stops once `budget` seconds of the injected monotonic clock have passed (after at least one
+/// unlink), so a slow volume shortens the batch instead of lengthening the time between suspension points; the keys
+/// it did not attempt go to the next unit (ADR draft B-10). On `ManualTimeSource` time never passes inside a unit.
 enum BlobDeletionUnit {
-    /// Removes each key's blob; absent files count as removed (idempotent sweeps, R-CLN-12).
-    static func run(fileSystem: any FileSystem, layout: StoreLayout, keys: [BlobKey]) -> [BlobKey: FileSystemError] {
-        var failures: [BlobKey: FileSystemError] = [:]
+    /// What the unit did: the failed unlinks, and how many keys (a prefix of the input) it attempted.
+    struct Outcome: Sendable {
+        /// Keys whose unlink failed, with the error.
+        var failures: [BlobKey: FileSystemError]
+        /// The number of leading keys attempted.
+        var attempted: Int
+    }
+
+    /// The time a deletion unit may take before it yields: P-13's 5 ms batch budget less the overshoot of the last
+    /// unlink and the scheduling noise of a busy device.
+    static let budget: TimeInterval = 0.003
+
+    /// Removes each key's blob until the budget is spent; absent files count as removed (idempotent sweeps,
+    /// R-CLN-12).
+    static func run(fileSystem: any FileSystem, layout: StoreLayout, keys: [BlobKey], time: any TimeSource, budget: TimeInterval) -> Outcome {
+        let deadline = time.monotonicNow().adding(seconds: budget)
+        var outcome = Outcome(failures: [:], attempted: 0)
         for key in keys {
+            if outcome.attempted > 0, time.monotonicNow() >= deadline {
+                break
+            }
+            outcome.attempted += 1
             do throws(FileSystemError) {
                 try fileSystem.removeItem(at: layout.blobURL(key))
             } catch {
-                failures[key] = error
+                outcome.failures[key] = error
             }
         }
-        return failures
+        return outcome
     }
 }

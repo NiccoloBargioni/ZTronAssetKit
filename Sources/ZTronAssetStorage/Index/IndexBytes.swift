@@ -57,17 +57,27 @@ struct IndexByteWriter {
         self.u64(value.timeIntervalSinceReferenceDate.bitPattern)
     }
 
-    /// The 32 digest bytes.
+    /// The 32 digest bytes (each word big-endian, so the bytes are the digest's own order).
     mutating func hash(_ value: ContentHash) {
-        for word in [value.w0, value.w1, value.w2, value.w3] {
-            for shift in stride(from: 56, through: 0, by: -8) {
-                self.bytes.append(UInt8(truncatingIfNeeded: word >> UInt64(shift)))
+        self.bigEndian(value.w0)
+        self.bigEndian(value.w1)
+        self.bigEndian(value.w2)
+        self.bigEndian(value.w3)
+    }
+
+    private mutating func bigEndian(_ word: UInt64) {
+        var shift: UInt64 = 56
+        while true {
+            self.bytes.append(UInt8(truncatingIfNeeded: word >> shift))
+            guard shift > 0 else {
+                return
             }
+            shift -= 8
         }
     }
 
     /// Raw bytes.
-    mutating func append(_ other: [UInt8]) {
+    mutating func append<Bytes: Sequence>(_ other: Bytes) where Bytes.Element == UInt8 {
         self.bytes.append(contentsOf: other)
     }
 
@@ -180,12 +190,21 @@ struct IndexByteReader {
         guard self.remaining >= 32 else {
             throw .malformed
         }
-        var words: [UInt64] = [0, 0, 0, 0]
-        for index in 0..<32 {
-            words[index / 8] = (words[index / 8] << 8) | UInt64(self.bytes[self.offset + index])
-        }
+        let w0 = self.bigEndianWord(at: self.offset)
+        let w1 = self.bigEndianWord(at: self.offset + 8)
+        let w2 = self.bigEndianWord(at: self.offset + 16)
+        let w3 = self.bigEndianWord(at: self.offset + 24)
         self.offset += 32
-        return ContentHash(w0: words[0], w1: words[1], w2: words[2], w3: words[3])
+        return ContentHash(w0: w0, w1: w1, w2: w2, w3: w3)
+    }
+
+    /// Eight bytes at `start` as a big-endian word (the caller checked the bounds).
+    private func bigEndianWord(at start: Int) -> UInt64 {
+        var word: UInt64 = 0
+        for index in start..<(start + 8) {
+            word = (word << 8) | UInt64(self.bytes[index])
+        }
+        return word
     }
 
     /// `count` raw bytes.

@@ -19,6 +19,7 @@ extension AssetStore {
 
     /// Returns once every mutation counted before the call is committed at `durability` (REENTRANCY R5).
     func requireCommittedInternal(_ durability: CommitDurability) async throws(StoreError) {
+        try self.checkLive()
         let target = self.state.core.commits.mutationSerial
         while !self.state.core.commits.covers(target, durability) {
             try self.checkLive()
@@ -146,36 +147,22 @@ extension AssetStore {
         )
     }
 
-    /// A store error rendered for a log line without any identifier or path (R-OBS-1).
+    /// A store error rendered for a log line without any identifier or path (R-OBS-1): only the failures a commit or
+    /// a publication logs are spelled out; every other case carries an identifier and renders as its class.
     static func describe(_ error: StoreError) -> String {
         switch error {
         case .fileSystem(let failure):
             return "fileSystem(\(String(describing: failure)))"
         case .storageUnavailable(let reason):
             return "storageUnavailable(\(String(describing: reason)))"
-        case .integrity(let failure):
-            switch failure {
-            case .sizeMismatch:
-                return "integrity(sizeMismatch)"
-            case .checksumMismatch:
-                return "integrity(checksumMismatch)"
-            case .oversize:
-                return "integrity(oversize)"
-            }
-        case .unverifiedRejected, .unknownAsset, .notPresent, .superseded, .assetFailed:
-            return "assetError"
-        case .locked:
-            return "locked"
-        case .closed:
-            return "closed"
-        case .notOpen:
-            return "notOpen"
-        case .cancelled:
-            return "cancelled"
-        case .insufficientSpace:
-            return "insufficientSpace"
-        case .purgeRaced:
-            return "purgeRaced"
+        case .integrity(.sizeMismatch):
+            return "integrity(sizeMismatch)"
+        case .integrity(.checksumMismatch):
+            return "integrity(checksumMismatch)"
+        case .integrity(.oversize):
+            return "integrity(oversize)"
+        default:
+            return "storeError"
         }
     }
 }

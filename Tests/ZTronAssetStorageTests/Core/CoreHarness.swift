@@ -168,7 +168,7 @@ struct CoreHarness {
     /// A store environment over any file system (spies), with inline executors unless given.
     static func environment(
         fileSystem: any FileSystem,
-        time: ManualTimeSource,
+        time: any TimeSource,
         sink: ScriptedSnapshotSink = ScriptedSnapshotSink(),
         metadata: any BlockingExecutor = InlineBlockingExecutor(),
         bulk: any BlockingExecutor = InlineBlockingExecutor()

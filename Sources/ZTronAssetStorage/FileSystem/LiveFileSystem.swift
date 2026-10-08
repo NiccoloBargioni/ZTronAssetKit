@@ -21,15 +21,8 @@ public struct LiveFileSystem: FileSystem {
 
     /// `FileManager.url(for:in:appropriateFor:create:)` for the user domain.
     public func standardDirectory(_ directory: StandardDirectory) throws(FileSystemError) -> URL {
-        let search: FileManager.SearchPathDirectory
-        switch directory {
-        case .applicationSupport:
-            search = .applicationSupportDirectory
-        case .caches:
-            search = .cachesDirectory
-        }
         do {
-            return try FileManager.default.url(for: search, in: .userDomainMask, appropriateFor: nil, create: true)
+            return try FileManager.default.url(for: LiveFileSystem.searchPath(directory), in: .userDomainMask, appropriateFor: nil, create: true)
         } catch {
             throw FileSystemErrorMapping.cocoa(error)
         }
@@ -319,15 +312,35 @@ public struct LiveFileSystem: FileSystem {
         defer {
             _ = close(descriptor)
         }
-        if fcntl(descriptor, level == .full ? F_FULLFSYNC : F_BARRIERFSYNC) == 0 {
+        let result = fcntl(descriptor, level == .full ? F_FULLFSYNC : F_BARRIERFSYNC)
+        try LiveFileSystem.finishSync(fcntlResult: result, fcntlErrno: result == 0 ? 0 : errno) {
+            let fallback = fsync(descriptor)
+            return (fallback, fallback == 0 ? 0 : errno)
+        }
+    }
+
+    /// What a sync's outcome means (store-1 S1-15): success; or, for a volume that cannot perform the `fcntl`
+    /// (ENOTSUP, EINVAL, ENOTTY), the `fsync` fallback's outcome; any other errno, EIO above all, is the error.
+    static func finishSync(fcntlResult: Int32, fcntlErrno: Int32, fsync: () -> (result: Int32, errno: Int32)) throws(FileSystemError) {
+        if fcntlResult == 0 {
             return
         }
-        let code = errno
-        guard FileSystemErrorMapping.syncFallsBackToFsync(errno: code) else {
-            throw FileSystemErrorMapping.posix(code)
+        guard FileSystemErrorMapping.syncFallsBackToFsync(errno: fcntlErrno) else {
+            throw FileSystemErrorMapping.posix(fcntlErrno)
         }
-        guard fsync(descriptor) == 0 else {
-            throw FileSystemErrorMapping.posix(errno)
+        let fallback = fsync()
+        guard fallback.result == 0 else {
+            throw FileSystemErrorMapping.posix(fallback.errno)
+        }
+    }
+
+    /// The Foundation search path of a platform directory (ADR-001).
+    static func searchPath(_ directory: StandardDirectory) -> FileManager.SearchPathDirectory {
+        switch directory {
+        case .applicationSupport:
+            return .applicationSupportDirectory
+        case .caches:
+            return .cachesDirectory
         }
     }
 
