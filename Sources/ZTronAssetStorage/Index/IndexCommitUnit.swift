@@ -74,7 +74,8 @@ struct IndexCommitOutcome: Sendable {
 /// 2. `write(index.tmp, .truncate)` — on ENOSPC remove `index.tmp`, and `index.prev` only when `index.bin` holds the
 ///    committed generation, then retry once;
 /// 3. sync `index.tmp` (barrier or full);
-/// 4. `rename(index.bin → index.prev)`;
+/// 4. `rename(index.bin → index.prev)`, only when `index.prev` is absent or `index.bin` holds the committed generation
+///    (otherwise step 5 renames straight over the invalid or uncommitted `index.bin`, keeping `index.prev`);
 /// 5. `rename(index.tmp → index.bin)` — on failure step 4 is rolled back, so `index.bin` is never missing after a
 ///    failed commit;
 /// 6. sync the root (barrier), or full-sync root, `ZTronAssetKit` and `<base>` (durable).
@@ -97,7 +98,7 @@ enum IndexCommitUnit {
                 // synced (step 3): its data must be durable before it becomes `index.bin` and counts as committed,
                 // or the ENOSPC fallback could drop `index.prev` for a file a power loss empties (probe VP7).
                 try fileSystem.synchronizeFile(at: layout.indexURL(.temporary), level: level)
-                try IndexCommitUnit.replaceCurrent(with: layout.indexURL(.temporary), layout: layout, fileSystem: fileSystem)
+                try IndexCommitUnit.replaceCurrent(with: layout.indexURL(.temporary), committed: committed, layout: layout, fileSystem: fileSystem)
                 outcome.promotedName = true
                 try fileSystem.synchronizeDirectory(at: layout.root, level: level)
                 outcome.promotedDurably = true
@@ -131,7 +132,7 @@ enum IndexCommitUnit {
             return outcome
         }
         do throws(FileSystemError) {
-            try IndexCommitUnit.replaceCurrent(with: temporary, layout: layout, fileSystem: fileSystem)
+            try IndexCommitUnit.replaceCurrent(with: temporary, committed: committed, layout: layout, fileSystem: fileSystem)
             try fileSystem.synchronizeDirectory(at: layout.root, level: level)
             if input.durability == .durable {
                 try fileSystem.synchronizeDirectory(at: layout.container, level: .full)
@@ -145,15 +146,21 @@ enum IndexCommitUnit {
         return outcome
     }
 
-    /// Steps 4 and 5: `index.bin → index.prev` (when there is an `index.bin`), then `source → index.bin`. When the
-    /// second rename fails the first is undone (`index.prev → index.bin`, exclusive, so nothing that did reach
-    /// `index.bin` is overwritten): a failed commit never leaves the newest committed generation only in
-    /// `index.prev`, where the next commit's ENOSPC fallback or a later `index.bin → index.prev` would drop it
-    /// (review round 3, probe 1). A failed undo leaves `index.prev` in place, which the ENOSPC fallback then keeps.
-    private static func replaceCurrent(with source: URL, layout: StoreLayout, fileSystem: any FileSystem) throws(FileSystemError) {
+    /// Steps 4 and 5: `index.bin → index.prev`, then `source → index.bin`. Step 4 runs only when `index.bin` exists and
+    /// either `index.prev` does not or `index.bin` holds the committed generation (`committed`, ADR draft B-28 as
+    /// amended in close-out cycle 3): otherwise `index.bin` is rotten, foreign or an uncommitted attempt, `index.prev`
+    /// may hold the only valid generation, and `source` is renamed straight over `index.bin` instead (probe VPC2-D: a
+    /// rotten `index.bin` moved over the only valid `index.prev`). When the second rename fails the first is undone
+    /// (`index.prev → index.bin`, exclusive, so nothing that did reach `index.bin` is overwritten): a failed commit never
+    /// leaves the newest committed generation only in `index.prev`, where the next commit's ENOSPC fallback or a later
+    /// `index.bin → index.prev` would drop it (review round 3, probe 1). A failed undo leaves `index.prev` in place,
+    /// which the ENOSPC fallback then keeps.
+    private static func replaceCurrent(with source: URL, committed: UInt64, layout: StoreLayout, fileSystem: any FileSystem) throws(FileSystemError) {
         let current = layout.indexURL(.current)
         let previous = layout.indexURL(.previous)
-        let moved = try fileSystem.itemInfo(at: current) != nil
+        let currentExists = try fileSystem.itemInfo(at: current) != nil
+        let previousExists = currentExists ? try fileSystem.itemInfo(at: previous) != nil : false
+        let moved = currentExists && (!previousExists || IndexCommitUnit.currentHolds(committed, layout: layout, fileSystem: fileSystem))
         if moved {
             try fileSystem.rename(from: current, to: previous, mode: .replacing)
         }
