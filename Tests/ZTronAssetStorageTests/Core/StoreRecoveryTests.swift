@@ -232,6 +232,9 @@ struct StoreRecoveryTests {
         case rename
         /// The root's sync after the promotion's renames fails with EIO: `index.tmp` is `index.bin` now, unordered.
         case sync
+        /// The sync of the loaded `index.tmp` before the renames fails with EIO (review close-out, probe VP7: a killed
+        /// process may have written it without its step 3): nothing is renamed and the promotion stays pending.
+        case syncFile
     }
 
     @Test(
@@ -265,13 +268,15 @@ struct StoreRecoveryTests {
         case .sync:
             // The first root sync is open()'s own barrier (tolerated); the second is the promotion's.
             reopened.fileSystem.addFault(FaultRule(operation: .synchronizeDirectory, matching: URLMatcher(lastComponentSuffix: "v1"), occurrence: .nth(2), error: .io))
+        case .syncFile:
+            reopened.fileSystem.addFault(FaultRule(operation: .synchronizeFile, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
         }
         let report = try await reopened.store.open()
         #expect(await reopened.state.core.records[entry.identifier] == nil, "the loaded generation is index.tmp's")
         #expect(report.generation == binGeneration, "only index.bin's generation is committed after the failed launch commit")
         let bin = try IndexCodec.decode([UInt8](try #require(reopened.content(reopened.layout.indexURL(.current))))).get()
         switch fault {
-        case .rename:
+        case .rename, .syncFile:
             #expect(reopened.exists(reopened.layout.indexURL(.temporary)), "the loaded index.tmp is never truncated before it is promoted")
             #expect(bin.generation == binGeneration, "the failed promotion was rolled back")
             #expect(await reopened.state.core.commits.pendingPromotion == pruneGeneration, "the next commit promotes it again")
@@ -391,44 +396,61 @@ struct StoreRecoveryTests {
     /// stopped between its renames; returns the disk the killed process leaves.
     @available(macOS 15.0, *)
     static func interruptedBetweenRenames(_ interruption: StepFiveInterruption) async throws -> (DiskImage, ManifestEntry, BlobKey) {
-        let bytes = CoreFixture.bytes(501)
-        let entry = CoreFixture.entry("a", bytes)
-        let key = CoreFixture.key(bytes)
-        @Sendable func script(_ harness: CoreHarness) async throws {
-            _ = try await harness.store.open()
-            _ = try await harness.store.apply(CoreFixture.manifest([entry]), etag: ETag(rawValue: "\"e1\""), eviction: nil)
-            try await harness.publish(bytes, [entry], urgency: .userInitiated)
-            var rotten = bytes
-            rotten[rotten.startIndex] ^= 0xFF
-            try harness.fileSystem.write(rotten, to: harness.layout.blobURL(key), mode: .truncate)
-            await harness.store.setResidency(.quarantined(until: Date(timeIntervalSinceReferenceDate: 1e9)), of: entry.identifier, dooming: .corrupt)
-            try await harness.store.flush(.durable)
-        }
         switch interruption {
         case .eio:
             let harness = CoreHarness.make()
-            try await script(harness)
+            try await StoreRecoveryTests.quarantine(harness)
             harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
             await #expect(throws: StoreError.fileSystem(.io)) {
                 try await harness.store.markSyncDue()
             }
-            return (harness.fileSystem.survivingDisk(), entry, key)
+            return (harness.fileSystem.survivingDisk(), QuarantineFixture.entry, QuarantineFixture.key)
         case .crash:
-            let clean = CoreHarness.make()
-            try await script(clean)
-            let start = clean.fileSystem.operations.count
-            try await clean.store.markSyncDue()
-            let operations = clean.fileSystem.operations
-            let rename = try #require(operations[start...].first { $0.kind == .rename && $0.url.lastPathComponent == "index.tmp" })
-            let crashPoint = operations[..<rename.index].filter(\.kind.isMutation).count
-            let harness = CoreHarness.make(crashBefore: crashPoint, mode: .processKill)
-            try await script(harness)
-            await #expect(throws: StoreError.self) {
-                try await harness.store.markSyncDue()
-            }
-            #expect(harness.fileSystem.crashed)
-            return (harness.fileSystem.survivingDisk(), entry, key)
+            return try await StoreRecoveryTests.killedInLastCommit { $0.kind == .rename && $0.url.lastPathComponent == "index.tmp" }
         }
+    }
+
+    /// The asset `quarantine(_:)` publishes and dooms `corrupt`.
+    enum QuarantineFixture {
+        static let bytes = CoreFixture.bytes(501)
+        static let entry = CoreFixture.entry("a", QuarantineFixture.bytes)
+        static let key = CoreFixture.key(QuarantineFixture.bytes)
+    }
+
+    /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush.
+    @available(macOS 15.0, *)
+    static func quarantine(_ harness: CoreHarness) async throws {
+        let entry = QuarantineFixture.entry
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([entry]), etag: ETag(rawValue: "\"e1\""), eviction: nil)
+        try await harness.publish(QuarantineFixture.bytes, [entry], urgency: .userInitiated)
+        var rotten = QuarantineFixture.bytes
+        rotten[rotten.startIndex] ^= 0xFF
+        try harness.fileSystem.write(rotten, to: harness.layout.blobURL(QuarantineFixture.key), mode: .truncate)
+        await harness.store.setResidency(.quarantined(until: Date(timeIntervalSinceReferenceDate: 1e9)), of: entry.identifier, dooming: .corrupt)
+        try await harness.store.flush(.durable)
+    }
+
+    /// `quarantine(_:)`, then one more commit (`markSyncDue`) in a process killed (`.processKill`) right before the
+    /// first mutation of that commit that `isCrashPoint` matches in a clean run; returns the disk the killed process
+    /// leaves.
+    @available(macOS 15.0, *)
+    static func killedInLastCommit(before isCrashPoint: (FSOpRecord) -> Bool) async throws -> (DiskImage, ManifestEntry, BlobKey) {
+        let clean = CoreHarness.make()
+        try await StoreRecoveryTests.quarantine(clean)
+        let start = clean.fileSystem.operations.count
+        try await clean.store.markSyncDue()
+        let operations = clean.fileSystem.operations
+        let match = operations[start...].first(where: isCrashPoint)
+        let point = try #require(match, "the clean commit performs the crash point")
+        let crashPoint = operations[..<point.index].filter(\.kind.isMutation).count
+        let harness = CoreHarness.make(crashBefore: crashPoint, mode: .processKill)
+        try await StoreRecoveryTests.quarantine(harness)
+        await #expect(throws: StoreError.self) {
+            try await harness.store.markSyncDue()
+        }
+        #expect(harness.fileSystem.crashed)
+        return (harness.fileSystem.survivingDisk(), QuarantineFixture.entry, QuarantineFixture.key)
     }
 
     /// The load rule over the index files of `disk`.
