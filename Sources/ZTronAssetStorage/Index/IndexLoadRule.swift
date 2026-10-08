@@ -18,9 +18,10 @@ struct IndexLoadOutcome: Sendable, Equatable {
     var chosen: IndexFile?
     /// `1 + max(generation, launch epoch)` over every header that parsed (1 when none did).
     var nextGeneration: UInt64
-    /// The newest valid generation, agreeing with the chosen one's store ID, outside `index.tmp` (0 when none): what
-    /// survives when the chosen file is `index.tmp`, which the launch commit truncates (and removes on ENOSPC). Keys
-    /// the chosen generation dooms wait for a commit above it (review: load rule vs commit protocol).
+    /// The newest valid generation, agreeing with the chosen one's store ID, outside `index.tmp` (0 when none): the
+    /// committed generation while a chosen `index.tmp` is not yet promoted to `index.bin` (the launch commit's first
+    /// step, ADR draft B-28, which can fail). Keys the chosen generation dooms wait for that promotion or a later
+    /// commit (review: load rule vs commit protocol).
     var survivingGeneration: UInt64
     /// No valid generation although an index file existed, an invalid `index.bin`, a newer schema, or a chosen
     /// generation that was itself degraded.

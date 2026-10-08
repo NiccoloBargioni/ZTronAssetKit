@@ -26,6 +26,12 @@ struct IndexCommitInput: Sendable {
     /// The doom of each key whose replacement placement was in flight when the state was captured: `live` in the
     /// table, but the bytes under its name are still the doomed ones (ADR draft B-24).
     var replacingDooms: [BlobKey: DoomInfo] = [:]
+    /// The newest committed generation, which `index.bin` holds after every successful commit: the ENOSPC fallback
+    /// drops `index.prev` only when `index.bin` provably holds it (ADR draft B-28). `0` keeps `index.prev` always.
+    var committedGeneration: UInt64 = 0
+    /// The generation of a loaded `index.tmp` that must become `index.bin` before `index.tmp` is written again
+    /// (ADR draft B-28): the launch chose it, so it is the newest valid generation and may be the only one.
+    var promotion: UInt64?
 
     /// The content to encode: `content` with DOOMED completed from the captured blob table.
     var completeContent: IndexContent {
@@ -49,29 +55,56 @@ struct IndexCommitInput: Sendable {
     }
 }
 
-/// The index commit protocol, one metadata unit (ARCHITECTURE §4.1, ADR-015):
+/// What one commit unit did.
+struct IndexCommitOutcome: Sendable {
+    /// The encoded size on success (diagnostics), or the failure.
+    var result: Result<Int, StoreError>
+    /// The loaded `index.tmp` was renamed to `index.bin` (the promotion is no longer pending, whatever followed).
+    var promotedName = false
+    /// That rename was also ordered by the root's sync: the promoted generation is committed.
+    var promotedDurably = false
+}
+
+/// The index commit protocol, one metadata unit (ARCHITECTURE §4.1, ADR-015, as amended by ADR draft B-28):
+/// 0. when the launch loaded `index.tmp`, promote it first: `index.bin → index.prev`, `index.tmp → index.bin`, sync the
+///    root (it is synced and valid, so this completes the interrupted commit instead of truncating its generation);
 /// 1. barrier-sync dirty fan-outs, then `blobs/`;
-/// 2. `write(index.tmp, .truncate)` — on ENOSPC remove `index.tmp` and `index.prev` and retry once;
+/// 2. `write(index.tmp, .truncate)` — on ENOSPC remove `index.tmp`, and `index.prev` only when `index.bin` holds the
+///    committed generation, then retry once;
 /// 3. sync `index.tmp` (barrier or full);
 /// 4. `rename(index.bin → index.prev)`;
-/// 5. `rename(index.tmp → index.bin)`;
+/// 5. `rename(index.tmp → index.bin)` — on failure step 4 is rolled back, so `index.bin` is never missing after a
+///    failed commit;
 /// 6. sync the root (barrier), or full-sync root, `ZTronAssetKit` and `<base>` (durable).
 ///
 /// A failure before the first rename removes `index.tmp` and leaves `index.bin`/`index.prev` untouched; the actor
 /// keeps its in-memory state authoritative and restores the dirty directories (REENTRANCY R5).
 enum IndexCommitUnit {
-    /// Runs the protocol; the encoded size is returned for diagnostics.
-    static func run(_ input: IndexCommitInput, fileSystem: any FileSystem) -> Result<Int, StoreError> {
+    /// Runs the protocol.
+    static func run(_ input: IndexCommitInput, fileSystem: any FileSystem) -> IndexCommitOutcome {
         let layout = input.layout
         if let lock = input.lock, case .failure(let error) = StoreLock.verifyRoot(fileSystem: fileSystem, layout: layout, token: lock) {
-            return .failure(error)
+            return IndexCommitOutcome(result: .failure(error))
+        }
+        let level: SyncLevel = input.durability == .durable ? .full : .barrier
+        var outcome = IndexCommitOutcome(result: .failure(.storageUnavailable(.ioFailure)))
+        var committed = input.committedGeneration
+        if let promotion = input.promotion {
+            do throws(FileSystemError) {
+                try IndexCommitUnit.replaceCurrent(with: layout.indexURL(.temporary), layout: layout, fileSystem: fileSystem)
+                outcome.promotedName = true
+                try fileSystem.synchronizeDirectory(at: layout.root, level: level)
+                outcome.promotedDurably = true
+                committed = promotion
+            } catch {
+                outcome.result = .failure(.fileSystem(error))
+                return outcome
+            }
         }
         guard let data = IndexCodec.encode(input.completeContent) else {
-            return .failure(.storageUnavailable(.ioFailure))
+            return outcome
         }
         let temporary = layout.indexURL(.temporary)
-        let current = layout.indexURL(.current)
-        let level: SyncLevel = input.durability == .durable ? .full : .barrier
         do throws(FileSystemError) {
             for fanOut in input.dirtyFanOuts {
                 try IndexCommitUnit.barrier(layout.blobsDirectory.appendingPathComponent(fanOut, isDirectory: true), fileSystem)
@@ -80,41 +113,85 @@ enum IndexCommitUnit {
                 try IndexCommitUnit.barrier(layout.blobsDirectory, fileSystem)
             }
         } catch {
-            return .failure(.fileSystem(error))
+            outcome.result = .failure(.fileSystem(error))
+            return outcome
         }
         do throws(FileSystemError) {
-            try IndexCommitUnit.writeTemporary(data, layout: layout, fileSystem: fileSystem)
+            try IndexCommitUnit.writeTemporary(data, layout: layout, committed: committed, fileSystem: fileSystem)
             try fileSystem.synchronizeFile(at: temporary, level: level)
         } catch {
             try? fileSystem.removeItem(at: temporary)
-            return .failure(.fileSystem(error))
+            outcome.result = .failure(.fileSystem(error))
+            return outcome
         }
         do throws(FileSystemError) {
-            if try fileSystem.itemInfo(at: current) != nil {
-                try fileSystem.rename(from: current, to: layout.indexURL(.previous), mode: .replacing)
-            }
-            try fileSystem.rename(from: temporary, to: current, mode: .replacing)
+            try IndexCommitUnit.replaceCurrent(with: temporary, layout: layout, fileSystem: fileSystem)
             try fileSystem.synchronizeDirectory(at: layout.root, level: level)
             if input.durability == .durable {
                 try fileSystem.synchronizeDirectory(at: layout.container, level: .full)
                 try fileSystem.synchronizeDirectory(at: layout.container.deletingLastPathComponent(), level: .full)
             }
         } catch {
-            return .failure(.fileSystem(error))
+            outcome.result = .failure(.fileSystem(error))
+            return outcome
         }
-        return .success(data.count)
+        outcome.result = .success(data.count)
+        return outcome
     }
 
-    /// Step 2 with the ENOSPC fallback of ADR-015: the older generations are dropped to make room, once.
-    private static func writeTemporary(_ data: Data, layout: StoreLayout, fileSystem: any FileSystem) throws(FileSystemError) {
+    /// Steps 4 and 5: `index.bin → index.prev` (when there is an `index.bin`), then `source → index.bin`. When the
+    /// second rename fails the first is undone (`index.prev → index.bin`, exclusive, so nothing that did reach
+    /// `index.bin` is overwritten): a failed commit never leaves the newest committed generation only in
+    /// `index.prev`, where the next commit's ENOSPC fallback or a later `index.bin → index.prev` would drop it
+    /// (review round 3, probe 1). A failed undo leaves `index.prev` in place, which the ENOSPC fallback then keeps.
+    private static func replaceCurrent(with source: URL, layout: StoreLayout, fileSystem: any FileSystem) throws(FileSystemError) {
+        let current = layout.indexURL(.current)
+        let previous = layout.indexURL(.previous)
+        let moved = try fileSystem.itemInfo(at: current) != nil
+        if moved {
+            try fileSystem.rename(from: current, to: previous, mode: .replacing)
+        }
+        do throws(FileSystemError) {
+            try fileSystem.rename(from: source, to: current, mode: .replacing)
+        } catch {
+            if moved {
+                try? fileSystem.rename(from: previous, to: current, mode: .exclusive)
+            }
+            throw error
+        }
+    }
+
+    /// Step 2 with the ENOSPC fallback of ADR-015 as amended by ADR draft B-28: `index.tmp` is dropped to make room,
+    /// and `index.prev` only when `index.bin` holds the committed generation, so the newest valid generation is never
+    /// the one removed; then the write is retried once.
+    private static func writeTemporary(_ data: Data, layout: StoreLayout, committed: UInt64, fileSystem: any FileSystem) throws(FileSystemError) {
         let temporary = layout.indexURL(.temporary)
         do throws(FileSystemError) {
             try fileSystem.write(data, to: temporary, mode: .truncate)
         } catch .noSpace {
             try fileSystem.removeItem(at: temporary)
-            try fileSystem.removeItem(at: layout.indexURL(.previous))
+            if IndexCommitUnit.currentHolds(committed, layout: layout, fileSystem: fileSystem) {
+                try fileSystem.removeItem(at: layout.indexURL(.previous))
+            }
             try fileSystem.write(data, to: temporary, mode: .truncate)
         }
+    }
+
+    /// Whether `index.bin` is the complete file of generation `generation` (> 0): its header parses, names that
+    /// generation, and its size is exactly `64 + bodyLength + 32`. `index.bin` only ever arrives by renaming a synced,
+    /// complete `index.tmp`, and every attempt has a generation of its own (I-5), so a header naming the committed
+    /// generation is the file that was committed (or loaded); a rotten or foreign `index.bin` names another one.
+    static func currentHolds(_ generation: UInt64, layout: StoreLayout, fileSystem: any FileSystem) -> Bool {
+        let current = layout.indexURL(.current)
+        guard generation > 0,
+            let info = try? fileSystem.itemInfo(at: current), info.kind == .file,
+            let bytes = try? fileSystem.read(from: current, offset: 0, maxLength: IndexHeader.length),
+            let header = IndexHeader.parse([UInt8](bytes)), header.generation == generation,
+            header.bodyLength <= IndexHeader.maxBodyLength
+        else {
+            return false
+        }
+        return info.byteSize == Int64(IndexHeader.length) + Int64(header.bodyLength) + Int64(IndexHeader.trailerLength)
     }
 
     /// A barrier sync that tolerates a directory that vanished (nothing in it can be referenced then).

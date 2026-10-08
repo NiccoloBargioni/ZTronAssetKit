@@ -193,6 +193,9 @@ struct CommitBookkeeping: Sendable {
     var dirtyFanOuts: Set<String> = []
     /// `blobs/` must be barrier-synced by the next commit (after open, or when a fan-out was created).
     var blobsDirectoryDirty = false
+    /// The generation of the `index.tmp` the launch loaded, until a commit unit renamed it to `index.bin` (ADR draft
+    /// B-28): every commit attempt promotes it before it writes `index.tmp` again.
+    var pendingPromotion: UInt64?
 
     /// Whether a `.soon` mutation is not yet committed.
     var soonPending: Bool {

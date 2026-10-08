@@ -97,7 +97,7 @@ extension ZTronAssetKitBenchmarks {
                         IndexCommitUnit.run(input, fileSystem: fileSystem)
                     }
                     let elapsed = StorageBench.milliseconds(ContinuousClock.now - started)
-                    #expect((try? result.get()) != nil)
+                    #expect((try? result.result.get()) != nil)
                     if run >= 3 {
                         timings.append(elapsed)
                     }

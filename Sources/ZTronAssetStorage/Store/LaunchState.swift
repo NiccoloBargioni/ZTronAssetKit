@@ -11,9 +11,13 @@ struct LaunchState: Sendable {
     var storeID: StoreIdentifier
     /// The next generation to allocate; the launch commit takes it, and it is the launch epoch (ADR draft B-5).
     var nextGeneration: UInt64
-    /// The newest generation that survives a failed launch commit (`IndexLoadOutcome.survivingGeneration` when the
-    /// load rule chose `index.tmp`, which the launch commit truncates; the loaded generation otherwise).
+    /// The newest committed generation: the loaded one, except when the load rule chose `index.tmp`. That one is
+    /// committed only once the launch commit promoted it to `index.bin` (`promotion`); until then it is
+    /// `IndexLoadOutcome.survivingGeneration`, the newest valid generation outside `index.tmp` (ADR draft B-28).
     var committedGeneration: UInt64
+    /// The generation of the loaded `index.tmp`, which the next commit renames to `index.bin` before it writes
+    /// `index.tmp` again (ADR draft B-28); `nil` when the load rule chose another file.
+    var promotion: UInt64?
     /// Records, blob table and orphans reconciled with the listing.
     var reconciled: LaunchReconciliation.Result
     /// The snapshot entry of every present reconciled record.
@@ -45,6 +49,7 @@ struct LaunchState: Sendable {
             storeID: content.storeID == .zero ? derived : content.storeID,
             nextGeneration: nextGeneration,
             committedGeneration: outcome.chosen == .temporary ? outcome.survivingGeneration : content.generation,
+            promotion: outcome.chosen == .temporary ? content.generation : nil,
             reconciled: reconciled,
             presentTable: SnapshotTable.build(records: reconciled.records, layout: layout),
             // No valid index although blobs exist (or an index existed but failed).

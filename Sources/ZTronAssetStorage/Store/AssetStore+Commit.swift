@@ -80,14 +80,16 @@ extension AssetStore {
             lock: self.state.core.lock,
             blobTable: self.state.core.blobTable,
             deletingDooms: self.state.core.deletingDooms,
-            replacingDooms: self.state.core.replacingDooms
+            replacingDooms: self.state.core.replacingDooms,
+            committedGeneration: self.state.core.committedGeneration,
+            promotion: self.state.core.commits.pendingPromotion
         )
         self.state.core.commits.inFlight = true
         self.state.core.commits.dirtyFanOuts = []
         self.state.core.commits.blobsDirectoryDirty = false
         self.state.core.commits.lastAttemptAt = self.environment.time.monotonicNow()
         let fileSystem = self.environment.fileSystem
-        let result: Result<Int, StoreError>
+        let outcome: IndexCommitOutcome
         do {
             let interval = self.environment.log.interval(.commit, category: .store, "generation \(generation)")
             defer {
@@ -96,12 +98,19 @@ extension AssetStore {
             // REENTRANCY: R5 — `committedGeneration = max(…)` with the generation allocated at capture; mutations made
             // meanwhile stay dirty (their serial is above `serial`); on failure the dirty directories are restored;
             // waiters are resumed either way; callers re-check the phase, so no new commit starts once closing.
-            result = await self.runUnit(on: self.environment.metadataExecutor) {
+            outcome = await self.runUnit(on: self.environment.metadataExecutor) {
                 IndexCommitUnit.run(input, fileSystem: fileSystem)
             }
         }
         self.state.core.commits.inFlight = false
-        switch result {
+        if outcome.promotedName {
+            // The loaded index.tmp is index.bin now, whether or not the rest of the unit succeeded (ADR draft B-28).
+            self.state.core.commits.pendingPromotion = nil
+        }
+        if outcome.promotedDurably, let promoted = input.promotion {
+            self.state.core.committedGeneration = max(self.state.core.committedGeneration, promoted)
+        }
+        switch outcome.result {
         case .success:
             self.state.core.committedGeneration = max(self.state.core.committedGeneration, generation)
             self.state.core.commits.committedSerial = max(self.state.core.commits.committedSerial, serial)

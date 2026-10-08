@@ -195,6 +195,130 @@ struct StoreCrashTests {
     /// How many slices the pair enumeration is split into.
     static let slices = 4
 
+    /// A fault injected at one commit step of the first sync (SPEC §7.3 "EIO on rename", "ENOSPC"; review round 3,
+    /// probe 1).
+    enum CommitFault: String, CaseIterable, Sendable {
+        /// EIO on step 5, `index.tmp → index.bin` (the unit rolls step 4 back).
+        case renameTemporary
+        /// EIO on step 4, `index.bin → index.prev`.
+        case renameCurrent
+        /// EIO on step 6, the root's sync after both renames.
+        case syncRoot
+        /// ENOSPC on step 2, the write of `index.tmp` (the fallback's retry fails too).
+        case writeTemporary
+
+        /// The rules that make the `occurrence`-th matching operation of one commit fail.
+        func rules(occurrence: Int) -> [FaultRule] {
+            switch self {
+            case .renameTemporary:
+                return [FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(occurrence), error: .io)]
+            case .renameCurrent:
+                return [FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.bin"), occurrence: .nth(occurrence), error: .io)]
+            case .syncRoot:
+                return [FaultRule(operation: .synchronizeDirectory, matching: URLMatcher(lastComponentSuffix: "v1"), occurrence: .nth(occurrence), error: .io)]
+            case .writeTemporary:
+                // Every earlier attempt wrote once, so attempt n writes the n-th time; its fallback's retry is the next
+                // write: fail both.
+                return [occurrence, occurrence + 1].map {
+                    FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth($0), error: .noSpace)
+                }
+            }
+        }
+
+        /// How many operations of the clean first sync a rule of this fault can match (one per commit attempt).
+        func occurrences(in operations: [FSOpRecord]) -> Int {
+            switch self {
+            case .renameTemporary:
+                return operations.filter { $0.kind == .rename && $0.url.lastPathComponent == "index.tmp" }.count
+            case .renameCurrent:
+                return operations.filter { $0.kind == .rename && $0.url.lastPathComponent == "index.bin" }.count
+            case .syncRoot:
+                return operations.filter { $0.kind == .synchronizeDirectory && $0.url == CoreFixture.layout.root }.count
+            case .writeTemporary:
+                return operations.filter { $0.kind == .write && $0.url.lastPathComponent == "index.tmp" }.count
+            }
+        }
+    }
+
+    @Test(
+        "R-STO-5: a fault at every commit step, a kill, then a launch on a full volume preserve I-1…I-5",
+        .timeLimit(.minutes(1)),
+        arguments: CommitFault.allCases
+    )
+    @available(macOS 15.0, *)
+    func faultAtEveryCommitThenFullVolume(fault: CommitFault) async throws {
+        let clean = CoreHarness.make()
+        _ = await FirstSync.run(clean)
+        let occurrences = fault.occurrences(in: clean.fileSystem.operations)
+        // Five commits (launch, apply, the checksum-less publication, the coalesced one, the durable flush); the first
+        // finds no index.bin to rename.
+        #expect(occurrences >= (fault == .renameCurrent ? 4 : 5), "every commit of the first sync is a fault point")
+        for occurrence in 1...occurrences {
+            let harness = CoreHarness.make()
+            let rules = fault.rules(occurrence: occurrence)
+            for rule in rules {
+                harness.fileSystem.addFault(rule)
+            }
+            let trace = await FirstSync.run(harness)
+            let label = "\(fault) at commit \(occurrence)"
+            let fired = harness.fileSystem.operations.contains { operation in
+                rules.contains { $0.operation == operation.kind && $0.matching.matches(operation.url) && $0.error == operation.failure }
+            }
+            #expect(fired, "\(label): the fault never fired")
+            // The process is killed right after; the next launch finds the volume full.
+            let disk = await StoreCrashTests.fullVolumeLifetime(harness.fileSystem.survivingDisk(), label: label)
+            #expect((StoreRecoveryTests.loadRule(disk).content?.generation ?? 0) >= trace.generation, "\(label): I-5, a committed generation was lost")
+            let downloaded = await FirstSync.reopenAndConverge(disk, after: trace, mode: .processKill, label: label)
+            #expect(downloaded.isDisjoint(with: trace.returned), "\(label): re-downloaded \(downloaded.intersection(trace.returned))")
+        }
+        print("R-STO-5 \(fault): \(occurrences) commit fault points enumerated")
+    }
+
+    @Test(
+        "R-STO-5: crash at every boundary, then a launch on a full volume, preserves I-1…I-5",
+        .timeLimit(.minutes(1)),
+        arguments: CrashMode.allCases
+    )
+    @available(macOS 15.0, *)
+    func crashThenFullVolume(mode: CrashMode) async throws {
+        let clean = CoreHarness.make()
+        _ = await FirstSync.run(clean)
+        let total = clean.fileSystem.mutationCount
+        for point in 0..<total {
+            let harness = CoreHarness.make(crashBefore: point, mode: mode)
+            let trace = await FirstSync.run(harness)
+            let label = "\(mode) at \(point), then a full volume"
+            let disk = await StoreCrashTests.fullVolumeLifetime(harness.fileSystem.survivingDisk(), label: label)
+            let downloaded = await FirstSync.reopenAndConverge(disk, after: trace, mode: mode, label: label)
+            let protected = mode == .processKill || mode == .processKillTornWrite ? trace.returned : trace.committed
+            #expect(downloaded.isDisjoint(with: protected), "\(label): re-downloaded \(downloaded.intersection(protected))")
+        }
+        print("R-STO-5 \(mode) then a full volume: \(total) crash points enumerated")
+    }
+
+    /// A lifetime on a full volume (every write of `index.tmp` fails with ENOSPC): open, then close. It must unlink no
+    /// blob, keep the loaded generation on disk, and never leave the disk with fewer valid generations than it found.
+    @available(macOS 15.0, *)
+    static func fullVolumeLifetime(_ disk: DiskImage, label: String) async -> DiskImage {
+        let before = StoreRecoveryTests.loadRule(disk)
+        let harness = CoreHarness.make(disk: disk)
+        harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .every, error: .noSpace))
+        do {
+            _ = try await harness.store.open()
+            let violations = await CoreInvariants.violations(of: harness)
+            #expect(violations.isEmpty, "\(label), full-volume launch: \(violations)")
+        } catch {
+            Issue.record("\(label): the full-volume launch failed with \(error)")
+        }
+        await harness.store.close()
+        #expect(CoreInvariants.blobRemovals(harness.fileSystem.operations, layout: harness.layout).isEmpty, "\(label), full-volume launch")
+        let after = harness.fileSystem.survivingDisk()
+        let left = StoreRecoveryTests.loadRule(after)
+        #expect((left.content?.generation ?? 0) >= (before.content?.generation ?? 0), "\(label): the full-volume launch lost generation \(before.content?.generation ?? 0)")
+        #expect(!left.degraded || before.degraded, "\(label): the full-volume launch left no valid index")
+        return after
+    }
+
     /// The second lifetime of the pair test: open (adoption, launch commit), re-apply, flush durably.
     @available(macOS 15.0, *)
     static func secondLifetime(_ harness: CoreHarness) async {

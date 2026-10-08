@@ -127,6 +127,7 @@ extension AssetStore {
         self.state.core.storeID = loaded.storeID
         self.state.core.nextGeneration = loaded.nextGeneration
         self.state.core.committedGeneration = loaded.committedGeneration
+        self.state.core.commits.pendingPromotion = loaded.promotion
         // The launch epoch is the generation the launch commit carries: persisted and strictly increasing (ADR-013).
         self.state.core.launchEpoch = loaded.nextGeneration
         self.state.core.records = reconciled.records
