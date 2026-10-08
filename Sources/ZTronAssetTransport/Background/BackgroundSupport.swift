@@ -92,8 +92,10 @@ public protocol BackgroundSessionDriver: Sendable {
     func activate() async -> AsyncStream<SessionEvent>
     /// `getAllTasks`.
     func snapshot() async -> [BackgroundTaskSnapshot]
-    /// Creates and resumes a download task tagged with `name`.
-    func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async
+    /// Creates and resumes a download task tagged with `name`: a new download of `request` when `resumeData` is `nil`,
+    /// else the continuation of a paused download from that resume data (`downloadTask(withResumeData:)`, which
+    /// carries its own archived request). The coordinator decides which; the driver only creates the task.
+    func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async
     /// Cancels a task; returns the resume data when `producingResumeData` (the coordinator decides what to keep).
     func cancel(taskIdentifier: Int, producingResumeData: Bool) async -> ResumeData?
     /// Sets a task's priority.
@@ -118,7 +120,9 @@ public protocol BackgroundSessionDriver: Sendable {
 /// priority change or terminated stream acts only while that attach still holds the name, so a handle replaced by a
 /// later attach never reaches the transfer that replaced it. **Pause.** The driver is decision-free (T2-05): a
 /// pause records the intent here, the driver returns the resume data, and the cancellation the session reports
-/// becomes `paused(resumable:)` whichever of the two arrives first. **Buffer.** Unclaimed successes are kept,
+/// becomes `paused(resumable:)` whichever of the two arrives first; the data (checksummed content only, TR1-3) is
+/// handed to the driver when the engine restarts that content, once, and a refused continuation reads as
+/// `resumeRejected` so the next attempt starts fresh. **Buffer.** Unclaimed successes are kept,
 /// oldest dropped first, up to `maxTasks` (their files stay in staging for launch reconciliation); unclaimed
 /// failures are dropped; re-attachment hands the kept successes over to launch reconciliation (ADR-028).
 package actor BackgroundTransferCoordinator: TransferBackend {
@@ -162,8 +166,11 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     private var cancelling: [StagingFileName: Int] = [:]
     private var priorities: [StagingFileName: Float] = [:]
     private var pauses: [StagingFileName: PauseState] = [:]
-    /// The resume data of pauses (T2-05), oldest dropped first past `maxTasks`.
+    /// The resume data of pauses (T2-05), oldest dropped first past `maxTasks`; checksummed content only (TR1-3).
+    /// A restart of the same content continues from it once (orchestrator ruling D-14.2).
     private var resumeData: BoundedNameTable<ResumeData>
+    /// Names whose OS task continues resume data: their refusal signals mean the data was stale.
+    private var resumedStarts: BoundedNameTable<Bool>
     private var finishWaiters: [CheckedContinuation<Void, Never>] = []
     private var unclaimedFinishes = 0
     private var disabled = false
@@ -180,6 +187,7 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         self.outcomes = BoundedNameTable(capacity: options.maxTasks)
         self.processed = BoundedNameTable(capacity: Self.processedCapacity(options))
         self.resumeData = BoundedNameTable(capacity: options.maxTasks)
+        self.resumedStarts = BoundedNameTable(capacity: Self.processedCapacity(options))
     }
 
     /// Creates a coordinator whose requests are checked against `policy` and carry `appKey` (pass one only when the
@@ -201,6 +209,7 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         self.outcomes = BoundedNameTable(capacity: options.maxTasks)
         self.processed = BoundedNameTable(capacity: Self.processedCapacity(options))
         self.resumeData = BoundedNameTable(capacity: options.maxTasks)
+        self.resumedStarts = BoundedNameTable(capacity: Self.processedCapacity(options))
     }
 
     /// How many processed names are remembered: far more terminals than can be processed while one listing is
@@ -212,7 +221,8 @@ package actor BackgroundTransferCoordinator: TransferBackend {
 
     // MARK: - TransferBackend
 
-    /// Attach-or-create by content: a buffered outcome, else a live OS task, else a new tagged download.
+    /// Attach-or-create by content: a buffered outcome, else a live OS task, else a new tagged download, which
+    /// continues the resume data a pause of the same content kept, when there is some (used once).
     package func start(_ job: TransferJob) async -> any TransferHandle {
         guard !self.invalidated else {
             return Self.refused(job, .cancelled(.byClient))
@@ -260,12 +270,19 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         }
         let priority = job.priority.urlSessionTaskPriority
         self.processed.remove(name)
+        // R-NET-8 (D-14.2): the engine restarts a transfer it was told is `paused(resumable: true)` as a new attempt
+        // of the same content; the data is taken out of the table, so a refused continuation is followed by a fresh
+        // download, never by the same stale data again.
+        let resumeData = self.resumeData.first { $0.transfer == job.id }.flatMap { self.resumeData.remove($0) }
+        if resumeData != nil {
+            self.resumedStarts.set(true, for: name)
+        }
         // The waiter exists before the OS can finish the task, so no completion finds nobody.
         let handle = self.attach(name, id: job.id, expected: expected)
         self.priorities[name] = priority
         // REENTRANCY: D-3 (proposed) — nothing is read after the start: the waiter was registered before it, and a
         // completion that raced ahead was delivered to that waiter by the pump.
-        await self.driver.startDownload(request, name: name, priority: priority, expectedBytes: expected)
+        await self.driver.startDownload(request, name: name, priority: priority, expectedBytes: expected, resumeData: resumeData)
         return handle
     }
 
@@ -470,10 +487,13 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         }
         // REENTRANCY: D-5 (proposed) — `pauses[name]` is re-read afterwards: the cancellation may have been reported
         // during the await (then the pause is delivered here), or not yet (then the pump delivers it).
-        let data = await self.driver.cancel(taskIdentifier: task.taskIdentifier, producingResumeData: keepingPartial)
+        let returned = await self.driver.cancel(taskIdentifier: task.taskIdentifier, producingResumeData: keepingPartial)
         guard keepingPartial else {
             return
         }
+        // A checksum-less transfer is never resumed (transport-1 TR1-3): its data is not kept, and its pause is
+        // reported not resumable.
+        let data = name.transfer.kind == .content ? returned : nil
         if let data {
             self.resumeData.set(data, for: name)
         }
@@ -580,6 +600,11 @@ package actor BackgroundTransferCoordinator: TransferBackend {
 
     private func deliver(_ update: TransferUpdate, for name: StagingFileName) {
         var update = update
+        if self.resumedStarts.remove(name) != nil, case .failed(let failure) = update {
+            // The delegate classified the task as a plain download; it continued resume data, so its refusal signals
+            // mean the data was stale (transport-1 TR1-4): the engine's next attempt starts fresh.
+            update = .failed(TransferClassifier.asResumed(failure))
+        }
         if case .failed(.cancelled) = update, let pause = self.pauses[name] {
             switch pause {
             case .requested, .cancellationArrived:

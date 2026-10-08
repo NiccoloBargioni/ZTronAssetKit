@@ -24,10 +24,12 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
         var expectedBytes: Int64?
         var keyHeader: String?
         var timeout: TimeInterval
+        /// The resume data the coordinator continued from (`nil`: a fresh download).
+        var resumeData: ResumeData?
     }
 
     private enum Delivery {
-        case finished(URLSessionDownloadTask, status: Int, body: Data, finalURL: URL?)
+        case finished(URLSessionDownloadTask, status: Int, body: Data, finalURL: URL?, contentRangeStart: Int64?)
         case failed(URLSessionDownloadTask, NSError)
         case eventsFinished
     }
@@ -152,7 +154,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
         }
     }
 
-    func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async {
+    func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async {
         let task = self.session.downloadTask(with: request)
         BackgroundTaskTag(name: name, expectedBytes: expectedBytes).label(task, priority: priority)
         self.tasks[task.taskIdentifier] = task
@@ -162,7 +164,8 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
             priority: priority,
             expectedBytes: expectedBytes,
             keyHeader: request.value(forHTTPHeaderField: self.keyHeaderName),
-            timeout: request.timeoutInterval
+            timeout: request.timeoutInterval,
+            resumeData: resumeData
         ))
     }
 
@@ -251,14 +254,15 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
         return task.taskIdentifier
     }
 
-    /// The OS finished the task writing `name` with `status` and `body` (after redirects to `finalURL`, when given):
-    /// delivered now when the session is active, else at the next `activate()`.
-    func complete(_ name: StagingFileName, status: Int = 200, body: Data, finalURL: URL? = nil) {
+    /// The OS finished the task writing `name` with `status` and `body` (after redirects to `finalURL`, when given;
+    /// a continued download answers 206 with a `Content-Range` starting at `contentRangeStart`, and its file holds
+    /// the whole body): delivered now when the session is active, else at the next `activate()`.
+    func complete(_ name: StagingFileName, status: Int = 200, body: Data, finalURL: URL? = nil, contentRangeStart: Int64? = nil) {
         guard let (identifier, task) = self.task(named: name) else {
             return
         }
         self.tasks.removeValue(forKey: identifier)
-        self.deliverOrQueue(.finished(task, status: status, body: body, finalURL: finalURL))
+        self.deliverOrQueue(.finished(task, status: status, body: body, finalURL: finalURL, contentRangeStart: contentRangeStart))
     }
 
     /// The OS failed the task writing `name` with the URL error `code` (and `userInfo`).
@@ -303,7 +307,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
 
     private func deliver(_ delivery: Delivery) {
         switch delivery {
-        case .finished(let task, let status, let body, let finalURL):
+        case .finished(let task, let status, let body, let finalURL, let contentRangeStart):
             guard let tag = BackgroundTaskTag(decoding: task.taskDescription) else {
                 return
             }
@@ -316,7 +320,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
                 contentTypeIsXML: false,
                 retryAfter: nil,
                 etag: nil,
-                contentRangeStart: nil,
+                contentRangeStart: contentRangeStart,
                 keyPresented: false
             )
             let original = task.originalRequest?.url

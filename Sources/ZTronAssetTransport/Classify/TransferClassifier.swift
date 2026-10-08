@@ -162,6 +162,20 @@ public enum TransferClassifier {
         }
     }
 
+    /// A failure classified for a plain request, as it reads once the request turns out to have resumed: what
+    /// `resumed: true` changes in both tables (a 206 without `Content-Range`, a 416, −1002) is `resumeRejected`.
+    /// The background session classifies its tasks without knowing which ones the OS continued from resume data;
+    /// the coordinator, which handed the data over, applies this (orchestrator ruling D-14.2). `rejected(.invalidURL)`
+    /// also stands for −1000, which a task continuing resume data built from a validated URL cannot produce.
+    static func asResumed(_ failure: TransferError) -> TransferError {
+        switch failure {
+        case .rejected(.invalidURL), .rejected(.unexpectedStatus(206)), .rejected(.unexpectedStatus(416)):
+            return .transient(.resumeRejected, retryAfter: nil)
+        default:
+            return failure
+        }
+    }
+
     /// `URLError.NetworkUnavailableReason` raw values (NSURLError.h): cellular 0, expensive 1, constrained 2.
     private static func offlineReason(_ reason: Int?) -> OfflineReason {
         switch reason {

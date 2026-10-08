@@ -52,11 +52,12 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
         }
     }
 
-    /// A tagged download task, created inside the holder so it never meets an invalidated session.
-    public func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async {
+    /// A tagged download task, created inside the holder so it never meets an invalidated session: from the resume
+    /// data when the coordinator passed some, else from `request`.
+    public func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async {
         let tag = BackgroundTaskTag(name: name, expectedBytes: expectedBytes)
         await self.holder.withSession(self.makeSession) { session in
-            let task = session.downloadTask(with: request)
+            let task = resumeData.map { session.downloadTask(withResumeData: $0.bytes) } ?? session.downloadTask(with: request)
             tag.label(task, priority: priority)
             task.resume()
         }

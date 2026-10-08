@@ -46,7 +46,9 @@ extension SessionDelegate: URLSessionDownloadDelegate {
     ///
     /// The OS follows redirects in a background session without asking (NSURLSession.h), so the hop rules are
     /// checked after the fact: bytes that arrived from another origin are refused and never adopted (ADR-026). The
-    /// staged size is compared with `byteSize` (R-NET-7).
+    /// staged size is compared with `byteSize` (R-NET-7). A 206 with a `Content-Range` is the OS continuing resume
+    /// data the coordinator handed it (checksummed content only, TR1-3; we never send a `Range` in the background):
+    /// the OS's file holds the whole body, staged as resumed (and hashed at publication).
     private func downloadOutcome(
         tag: BackgroundTaskTag,
         response: ResponseFacts?,
@@ -62,7 +64,8 @@ extension SessionDelegate: URLSessionDownloadDelegate {
         else {
             return .failed(.rejected(.redirectRefused(.unenforceableInBackground)))
         }
-        guard response.status == 200 else {
+        let continued = response.status == 206 && response.contentRangeStart != nil
+        guard response.status == 200 || continued else {
             let failure = TransferClassifier.classify(response, purpose: .asset, sentConditional: false, resumed: false, keyWithheld: false)
             return .failed(failure ?? .transient(.badServerResponse, retryAfter: nil))
         }
@@ -81,7 +84,7 @@ extension SessionDelegate: URLSessionDownloadDelegate {
         if tag.expectedBytes == nil && size == 0 {
             return .failed(.integrity(.truncated(expected: nil, received: 0)))
         }
-        return .staged(StagedFile(name: tag.name, byteCount: size, resumed: false, httpStatus: response.status, etag: response.etag))
+        return .staged(StagedFile(name: tag.name, byteCount: size, resumed: continued, httpStatus: response.status, etag: response.etag))
     }
 
     /// A background task ended with an error: report it under its tag (a success was reported when its file was
