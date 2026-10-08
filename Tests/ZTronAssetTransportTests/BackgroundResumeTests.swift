@@ -241,6 +241,37 @@ struct BackgroundResumeTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-8: a continued background download answered 200 (validator changed) stages the whole body as a fresh, non-resumed file", .timeLimit(.minutes(1)), arguments: [false, true])
+    func continuationAnsweredWhole(_ relaunched: Bool) async throws {
+        let rig = try Rig("bg-resume-whole-\(relaunched)")
+        defer { rig.cleanUp() }
+        let first = rig.coordinator()
+        let data = ResumeData(bytes: Data("archive".utf8))
+        let paused = rig.job(1)
+        #expect(await Self.pause(paused, returning: data, rig: rig, coordinator: first) == .paused(resumable: true))
+        let continued = rig.job(2)
+        let firstLaunch = await first.start(continued)
+        #expect(await rig.driver.starts.map(\.resumeData) == [nil, data])
+        #expect(await first.keptResumeData(for: paused.partialName) == nil)
+        var waiting = firstLaunch
+        if relaunched {
+            // The process dies while the OS still holds the continuation; the next process joins it.
+            await rig.relaunch()
+            let second = rig.coordinator()
+            #expect(await second.reattached().map(\.name) == [continued.partialName])
+            waiting = await second.start(rig.job(3))
+            #expect(await rig.driver.starts.count == 2)
+        }
+        // The validator changed: the origin ignores If-Range and sends the whole new body with a 200. It is a
+        // complete download (hashed at publication), not a refusal: refusing it would cost a second full download.
+        let body = TransportFixtures.payload(4_000, seed: 3)
+        await rig.driver.complete(continued.partialName, status: 200, body: body)
+        #expect(await run(waiting).terminal == .staged(StagedFile(name: continued.partialName, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil)))
+        #expect(rig.staging.contents[continued.partialName] == body)
+        withExtendedLifetime(firstLaunch) {}
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-8: resume data the task cap evicted is not used: that restart downloads afresh", .timeLimit(.minutes(1)))
     func evictedDataIsNotUsed() async throws {
         let rig = try Rig("bg-resume-evicted", maxTasks: 1)
