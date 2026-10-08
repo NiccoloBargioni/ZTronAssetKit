@@ -55,10 +55,32 @@ extension AssetStore {
         }
     }
 
-    /// When the coalescing window opens again, or `nil` when no commit was attempted yet.
+    /// When the coalescing window opens again, or `nil` when no commit was attempted yet. Explicit callers
+    /// (`requireCommitted`, so `flush`, `apply`, `markSynced`, …) wait only for this window, never for the backoff.
     func commitWindowOpens() -> MonotonicInstant? {
         self.state.core.commits.lastAttemptAt.map { $0.adding(seconds: max(0, self.configuration.commitMinimumInterval)) }
     }
+
+    /// When the scheduled commit (`nextDeadline()`, `runDueWork()`) may be attempted: the coalescing window after a
+    /// success, backed off exponentially after failed attempts (ADR draft B-29): a commit that keeps failing on a full
+    /// or broken volume neither re-encodes the index every window nor keeps the engine's alarm busy for good.
+    func scheduledCommitOpens() -> MonotonicInstant? {
+        let interval = max(0, self.configuration.commitMinimumInterval)
+        let failures = self.state.core.commits.consecutiveFailures
+        return self.state.core.commits.lastAttemptAt.map { $0.adding(seconds: AssetStore.commitRetryDelay(interval: interval, afterFailures: failures)) }
+    }
+
+    /// The delay before the scheduled retry after `failures` failed attempts in a row: `interval` when none failed,
+    /// else `interval × 2^failures`, at most `maxCommitBackoff`.
+    static func commitRetryDelay(interval: TimeInterval, afterFailures failures: Int) -> TimeInterval {
+        guard failures > 0 else {
+            return interval
+        }
+        return min(AssetStore.maxCommitBackoff, interval * pow(2, Double(min(failures, 16))))
+    }
+
+    /// The longest backoff of the scheduled commit (5 minutes, as the unlink backoff).
+    static let maxCommitBackoff: TimeInterval = 300
 
     /// Captures the state, allocates the generation, runs the commit unit and folds its result back
     /// (REENTRANCY R5). The caller ensured no commit is in flight.
@@ -118,16 +140,25 @@ extension AssetStore {
                 self.state.core.commits.durableSerial = max(self.state.core.commits.durableSerial, serial)
             }
             self.state.core.metrics.commits += 1
+            if self.state.core.commits.consecutiveFailures > 0 {
+                let failures = self.state.core.commits.consecutiveFailures
+                self.environment.log.log(.store, .info, "commit of generation \(generation) succeeded after \(failures) failed attempts")
+                self.state.core.commits.consecutiveFailures = 0
+            }
             self.resumeCommitWaiters()
         case .failure(let error):
             self.state.core.commits.dirtyFanOuts.formUnion(fanOuts)
             self.state.core.commits.blobsDirectoryDirty = self.state.core.commits.blobsDirectoryDirty || blobsDirty
             self.state.core.metrics.commitFailures += 1
+            self.state.core.commits.consecutiveFailures += 1
             if error == .storageUnavailable(.rootVanished) {
                 self.state.core.unavailable = .rootVanished
             }
-            let reason = AssetStore.describe(error)
-            self.environment.log.log(.store, .error, "commit of generation \(generation) failed: \(reason)")
+            // One error per failure streak (ADR draft B-29); `StoreMetrics.commitFailures` counts every attempt.
+            if self.state.core.commits.consecutiveFailures == 1 {
+                let reason = AssetStore.describe(error)
+                self.environment.log.log(.store, .error, "commit of generation \(generation) failed: \(reason); retries back off until one succeeds")
+            }
             self.resumeCommitWaiters()
             throw error
         }

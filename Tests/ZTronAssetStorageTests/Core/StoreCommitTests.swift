@@ -185,6 +185,63 @@ struct StoreCommitTests {
         #expect(await harness.store.metrics().commits == commitsBefore + 2)
     }
 
+    /// Review round 3, probe 6: a commit that keeps failing (a full volume, EIO) re-encoded the index and logged an
+    /// error every 250 ms forever, so the engine's alarm never went quiet. The scheduled retry now backs off.
+    @Test("P-5: failed commits back off exponentially, explicit flushes still try at once, success resets, one error per streak", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func failedCommitsBackOff() async throws {
+        let interval: TimeInterval = 0.25
+        let harness = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: interval))
+        _ = try await harness.store.open()
+        harness.time.advance(by: 1)
+        _ = try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(87))]), etag: nil, eviction: nil)
+        // The next six commit attempts fail with EIO on the write of index.tmp (no fallback retry for EIO).
+        for occurrence in 1...6 {
+            harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(occurrence), error: .io))
+        }
+        let errorsBefore = harness.tap.lines.filter { $0.level == .error }.count
+        await harness.store.markDirty(.soon)
+        var attempts: [MonotonicInstant] = []
+        for streak in 0..<5 {
+            let deadline = try #require(await harness.store.nextDeadline())
+            if let last = attempts.last {
+                // Not before the deadline: the alarm firing early does nothing.
+                harness.time.advance(to: last.adding(seconds: deadline.seconds(since: last) - 0.01))
+                #expect(await harness.store.runDueWork().committed == false)
+                #expect(await harness.store.metrics().commitFailures == UInt64(streak), "no attempt before the backed-off deadline")
+            }
+            harness.time.advance(to: deadline)
+            let work = await harness.store.runDueWork()
+            #expect(!work.committed)
+            #expect(await harness.store.metrics().commitFailures == UInt64(streak + 1))
+            attempts.append(harness.time.monotonicNow())
+        }
+        let gaps = zip(attempts.dropFirst(), attempts).map { $0.seconds(since: $1) }
+        #expect(gaps == [0.5, 1, 2, 4], "interval × 2^failures: \(gaps)")
+        let next = try #require(await harness.store.nextDeadline())
+        #expect(next.seconds(since: attempts[4]) == 8)
+        let errors = harness.tap.lines.filter { $0.level == .error }.count - errorsBefore
+        #expect(errors == 1, "one error per failure streak, not one per attempt: \(errors)")
+        // An explicit flush does not wait for the backoff, only for the coalescing window (≤ 4/s).
+        harness.time.advance(by: interval)
+        await #expect(throws: StoreError.fileSystem(.io)) {
+            try await harness.store.flush(.ordered)
+        }
+        harness.time.advance(by: interval)
+        try await harness.store.flush(.ordered)
+        #expect(await harness.store.metrics().commitFailures == 6)
+        // Success resets the backoff: the next mutation is due one window after the successful attempt.
+        let succeeded = harness.time.monotonicNow()
+        await harness.store.markDirty(.soon)
+        #expect(await harness.store.nextDeadline() == succeeded.adding(seconds: interval))
+        #expect(await harness.state.core.commits.consecutiveFailures == 0)
+        // A new streak logs again, once (a rule counts the matching calls made after it was added).
+        harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        harness.time.advance(by: interval)
+        #expect(await harness.store.runDueWork().committed == false)
+        #expect(harness.tap.lines.filter { $0.level == .error }.count - errorsBefore == 2)
+    }
+
     @Test("R-STO-6: a launch commit that fails leaves the store open on the loaded state and retries later", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func launchCommitFailureServesReadOnly() async throws {

@@ -187,6 +187,9 @@ struct CommitBookkeeping: Sendable {
     var lastAttemptAt: MonotonicInstant?
     /// A commit unit is running.
     var inFlight = false
+    /// Commit attempts that failed in a row since the last success: the scheduled retry (`nextDeadline()`,
+    /// `runDueWork()`) backs off exponentially, and only the first failure of a streak logs an error (ADR draft B-29).
+    var consecutiveFailures = 0
     /// Callers waiting for the running commit to finish (REENTRANCY R5).
     var waiters: [CheckedContinuation<Void, Never>] = []
     /// Fan-outs that received or adopted a blob since the last successful commit.

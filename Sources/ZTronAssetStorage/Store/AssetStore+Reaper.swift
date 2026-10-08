@@ -82,7 +82,7 @@ extension AssetStore {
         // While `apply` writes behind the commit fence its own commit, right after the last write, covers every
         // pending mutation; reporting the window would only make the alarm spin (ADR draft B-23).
         if commits.soonPending, !commits.inFlight, self.state.core.unavailable == nil, !self.state.core.applyGate.writing {
-            consider(self.commitWindowOpens() ?? now)
+            consider(self.scheduledCommitOpens() ?? now)
         }
         if self.state.core.snapshots.installDue {
             consider(self.installWindowOpens() ?? now)
@@ -113,10 +113,10 @@ extension AssetStore {
         let now = self.environment.time.monotonicNow()
         let commits = self.state.core.commits
         if commits.soonPending, !commits.inFlight, self.state.core.unavailable == nil, !self.state.core.applyGate.writing,
-            (self.commitWindowOpens() ?? now) <= now
+            (self.scheduledCommitOpens() ?? now) <= now
         {
             do throws(StoreError) {
-                // REENTRANCY: R5 — the phase; a failure leaves the state dirty and the next window retries it.
+                // REENTRANCY: R5 — the phase; a failure leaves the state dirty and a backed-off window retries it.
                 try await self.commitNow(.ordered)
                 report.committed = true
             } catch {
