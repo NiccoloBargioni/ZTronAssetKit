@@ -141,31 +141,59 @@ struct SessionDelegateDirectTests {
     @available(macOS 15.0, *)
     @Test("R-NET-6: a client's discard is never turned into a staging failure by a later write into the discarded partial", .timeLimit(.minutes(1)))
     func discardIsSticky() async throws {
-        let delegate = SessionDelegate(mode: .foreground, staging: FakeStagingSink(), policy: Self.policy)
+        let staging = FakeStagingSink()
+        let delegate = SessionDelegate(mode: .foreground, staging: staging, policy: Self.policy)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
-        let job = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.url, expected: 5)
+        let job = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.url, expected: 5, maxBytes: 1_000)
+        // The partial holds bytes and the response carried a strong validator: a pause would keep it for resume.
+        try staging.createPartial(job.partialName)
+        _ = try staging.appendPartial(TransportFixtures.payload(3), to: job.partialName)
+        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["ETag": "\"v1\""]))
+        let cancelled = NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
         let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self)
         let task = session.dataTask(with: Self.url)
         task.delegate = TaskMailbox(continuation: continuation, job: job)
         // The backend marked the task and discarded the partial; a chunk already past its marker check then fails to
-        // write into the vanished file and records that failure.
+        // write into the vanished file and records that failure, and a late pause asks to keep the partial.
         TaskMarker.requestDiscard(on: task)
         TaskMarker.record(.staging(.io(posixCode: ENOENT)), on: task)
         TaskMarker.requestIfUnmarked(.pause, on: task)
-        #expect(TaskMarker(decoding: task.taskDescription) == .discard)
-        delegate.urlSession(session, task: task, didCompleteWithError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled))
+        delegate.urlSession(session, task: task, didCompleteWithError: cancelled)
         var iterator = updates.makeAsyncIterator()
         #expect(await iterator.next() == .failed(.cancelled(.byClient)))
-        // A discard supersedes a pause, never a verdict that already explains why the task stopped.
+        #expect(staging.sidecars.isEmpty)
+        // A discard supersedes a pause: the client's cancellation, nothing kept for resume.
         let pausing = session.dataTask(with: Self.url)
         TaskMarker.requestIfUnmarked(.pause, on: pausing)
         TaskMarker.requestDiscard(on: pausing)
-        #expect(TaskMarker(decoding: pausing.taskDescription) == .discard)
+        #expect(delegate.foregroundOutcome(task: pausing, job: job, response: response, error: cancelled) == .failed(.cancelled(.byClient)))
+        #expect(staging.sidecars.isEmpty)
+        // ...but never a verdict that already explains why the task stopped.
         let judged = session.dataTask(with: Self.url)
         TaskMarker.record(.oversize(announced: 9), on: judged)
         TaskMarker.requestDiscard(on: judged)
-        #expect(TaskMarker(decoding: judged.taskDescription) == .oversize(announced: 9))
+        #expect(delegate.foregroundOutcome(task: judged, job: job, response: response, error: cancelled) == .failed(.integrity(.oversize(announced: 9, limit: 1_000))))
+        // Without the discard, the same pause is reported paused and keeps the partial for resume.
+        let paused = session.dataTask(with: Self.url)
+        TaskMarker.requestIfUnmarked(.pause, on: paused)
+        #expect(delegate.foregroundOutcome(task: paused, job: job, response: response, error: cancelled) == .paused(resumable: true))
+        #expect(staging.sidecars[job.partialName]?.receivedBytes == 3)
+    }
+
+    @Test("R-NET-6: the task-marker codec round-trips every marker and decodes nothing else")
+    func markerCodec() {
+        let markers: [TaskMarker] = [
+            .pause, .discard, .oversize(announced: nil), .oversize(announced: .max), .exceedsExpected(written: 4_001),
+            .staging(.insufficientSpace), .staging(.io(posixCode: ENOENT)), .staging(.tooLarge(limit: 7)), .staging(.nameInUse),
+            .staging(.source(.readFailed)), .rangeMismatch, .finalStatus, .notHTTP,
+        ]
+        for marker in markers {
+            #expect(TaskMarker(decoding: marker.encoded) == marker, "\(marker)")
+        }
+        for foreign in [nil, "", "pause", "ztak1 x 1", "ztak-marker", "ztak-marker bogus", "ztak-marker Pause"] as [String?] {
+            #expect(TaskMarker(decoding: foreign) == nil, "\(String(describing: foreign))")
+        }
     }
 
     /// One foreground completion: what staging holds, what marks the task, how it ended, and the one outcome.
