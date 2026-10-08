@@ -14,8 +14,14 @@ import ZTronAssetTestSupport
 /// - `newerUnsynced` (generation 11 complete in the current namespace, its data and name never synced: a kill between
 ///   steps 2 and 3, probe VP7) is enumerated for `index.tmp` only. `index.tmp` is the one file the protocol writes in
 ///   place; `index.bin` and `index.prev` only ever receive an `index.tmp` that was synced first (step 3, and the
-///   promotion's own sync), so their data is never unsynced. Volatile names (renames not yet ordered by a root sync)
-///   are not seeded either: every kill point of the enumeration leaves them, and every case's survivor is reopened.
+///   promotion's own sync), so their data is never unsynced.
+/// - Names not yet ordered by a root sync (a kill after a rename or a removal and before the next root sync) are not
+///   seeded here: `IndexCommitUnorderedNamesTests` starts from every such kill survivor of the fault-free lifetimes of
+///   these disks. A power loss can undo what the load read there until a root sync orders it, and the first one is
+///   `open()`'s barrier: the store counts nothing committed before it (ADR draft B-36), and once it succeeded every
+///   index name is ordered (that suite checks it), which leaves a disk of this space up to its generation numbers and
+///   the unsynced data of an `index.tmp` (read as torn, like an absent one). That suite therefore enumerates the
+///   barrier's faults, a crash before it, and the lifetime after a failed barrier.
 /// - A rotten file (`badHeader`, `badBody`, `truncated`) is a rotten copy of a generation no other file holds, above
 ///   every valid one (20 + the file's position). Every attempt allocates a generation of its own and files are only
 ///   renamed afterwards, so two files never share a generation, and a rotten header can never name the committed one.
@@ -192,10 +198,135 @@ struct IndexCommitStateSpaceTests {
         let violations = results.sorted { $0.slice < $1.slice }.flatMap(\.violations)
         let shown = violations.prefix(40).joined(separator: "\n")
         #expect(violations.isEmpty, "\(violations.count) violations from \(row.testDescription); the first ones:\n\(shown)")
+        // The size of the space is asserted, not only printed: a refactor that dropped a disk, a volume script, an event or
+        // a crash mode would otherwise still pass (close-out cycle 4).
+        #expect(results.count == SeededIndex.allCases.count && Set(results.map(\.slice)) == Set(row.slices.map(\.testDescription)), "every initial disk of \(row.testDescription) ran")
+        for result in results {
+            let counts = result.counts
+            #expect(counts.faultFree == VolumeScript.allCases.count, "\(result.slice): one fault-free lifetime per volume script")
+            #expect(counts.faults == counts.expectedFaults && counts.expectedFaults > 0, "\(result.slice): \(counts.faults) faults for \(counts.expectedFaults) fault points")
+            #expect(counts.crashes == counts.expectedCrashes && counts.expectedCrashes > 0, "\(result.slice): \(counts.crashes) crash cases for \(counts.expectedCrashes) crash points")
+            #expect(counts.cases == counts.faultFree + counts.faults + counts.crashes, "\(result.slice): every case is counted once")
+        }
         let cases = results.map(\.counts.cases).reduce(0, +)
         let faults = results.map(\.counts.faults).reduce(0, +)
         let crashes = results.map(\.counts.crashes).reduce(0, +)
         print("R-STO-4 index states \(row.testDescription) tmp=*: \(results.count) initial disks, \(cases) cases (\(faults) faults, \(crashes) crash points) enumerated")
+    }
+}
+
+extension IndexCommitStateSpaceTests {
+    @Test("R-STO-4: the state space holds every initial disk once: 7 states of index.bin and index.prev, 8 of index.tmp, 3 volume scripts")
+    func spaceIsComplete() {
+        #expect(SeededIndex.allCases == [.absent, .older, .committed, .newer, .newerUnsynced, .badHeader, .badBody, .truncated])
+        #expect(SeededIndex.renamedInto == SeededIndex.allCases.filter { $0 != .newerUnsynced })
+        #expect(VolumeScript.allCases == [.free, .fullAtClose, .fullFromLaunch])
+        let slices = IndexSpaceRow.all.flatMap(\.slices)
+        let expected = SeededIndex.renamedInto.flatMap { bin in
+            SeededIndex.renamedInto.flatMap { previous in
+                SeededIndex.allCases.map { "bin=\(bin) prev=\(previous) tmp=\($0)" }
+            }
+        }
+        #expect(IndexSpaceRow.all.count == 49 && slices.count == 392 && Set(expected).count == 392)
+        #expect(Set(slices.map(\.testDescription)) == Set(expected), "every combination of the three files once")
+    }
+}
+
+/// The kill survivors whose index names no root sync has ordered yet (close-out cycle 4, review "state-space enumeration:
+/// pruning justification"; ADR drafts B-33, B-36). The initial disks are every distinct kill survivor of the fault-free
+/// lifetimes of the row's disks (`IndexCommitStateSpaceTests`) on every volume script, whose three crash views differ
+/// (a rename or a removal not yet ordered by a root sync, or data not yet synced). A power loss can undo what the load
+/// read there until a root sync orders it, and the first one is `open()`'s barrier: the store counts nothing committed
+/// before it (B-36), and once it succeeded every index name is ordered, which the fault-free case checks; the rest of
+/// that lifetime starts from a disk of the seeded space (up to its generation numbers, and the unsynced data of an
+/// `index.tmp`, which reads as torn like an absent one).
+/// So each disk runs, on every volume script: no fault; EIO and ENOSPC at the root barrier, the lifetime then going on
+/// with names a power loss can still undo (every commit attempt checked, the end checked under every crash view,
+/// reopened, and I-e on a free volume); and once, a crash before the barrier in each mode. The invariants are those of
+/// `IndexCommitStateSpaceTests`, with I-a's floor the newest valid generation the same crash leaves of the initial disk.
+/// A one-off run of the full single-event enumeration (every fault at every operation, every crash at every mutation)
+/// over these survivors and the main enumeration's unsynced disks (1,822 disks, 467,719 cases) found 564 violations
+/// before B-36, all in lifetimes whose barrier failed, and none after it; this suite finds the same class (ADR draft B-36).
+@Suite("Core: index commit state space from unordered names (R-STO-4, R-STO-5)", .serialized)
+struct IndexCommitUnorderedNamesTests {
+    @Test(
+        "R-STO-5: every kill survivor with unordered index names, with a fault at open()'s root barrier or a crash before it, keeps I-a…I-e",
+        .timeLimit(.minutes(1)),
+        arguments: IndexSpaceRow.all
+    )
+    @available(macOS 15.0, *)
+    func everyUnorderedSurvivor(row: IndexSpaceRow) async throws {
+        let survivors = await UnorderedSurvivors.shared.survivors(of: row)
+        let results = await withTaskGroup(of: IndexSpace.SliceResult.self) { group in
+            for (index, survivor) in survivors.enumerated() {
+                group.addTask(priority: .low) {
+                    await IndexSpace.enumerateUnordered(survivor, label: "\(row.testDescription) survivor \(index) (\(survivor.origin))")
+                }
+            }
+            var results: [IndexSpace.SliceResult] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
+        }
+        let violations = results.sorted { $0.slice < $1.slice }.flatMap(\.violations)
+        let shown = violations.prefix(40).joined(separator: "\n")
+        #expect(violations.isEmpty, "\(violations.count) violations from the unordered survivors of \(row.testDescription); the first ones:\n\(shown)")
+        #expect(results.count == survivors.count, "every survivor ran")
+        for result in results {
+            let counts = result.counts
+            #expect(counts.faultFree == VolumeScript.allCases.count, "\(result.slice): one fault-free lifetime per volume script")
+            #expect(counts.faults == 2 * VolumeScript.allCases.count, "\(result.slice): EIO and ENOSPC at the barrier on every volume script")
+            #expect(counts.crashes == 3, "\(result.slice): a crash before the barrier in each mode")
+            #expect(counts.cases == counts.faultFree + counts.faults + counts.crashes)
+        }
+        let cases = results.map(\.counts.cases).reduce(0, +)
+        print("R-STO-5 unordered names \(row.testDescription) tmp=*: \(survivors.count) kill survivors first met in this row, \(cases) cases enumerated")
+    }
+
+    @Test("R-STO-5: the unordered-name survivors are every distinct kill survivor of the fault-free lifetimes whose crash views differ", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func unorderedSurvivorsAreComplete() async {
+        let rows = await UnorderedSurvivors.shared.all()
+        let survivors = rows.flatMap { $0 }
+        let keys = survivors.map { IndexSpace.ViewsKey(current: $0.start.current, dropped: $0.start.dropped, kept: $0.start.kept) }
+        #expect(rows.count == IndexSpaceRow.all.count)
+        #expect(Set(keys).count == survivors.count, "each survivor once")
+        #expect(survivors.allSatisfy { $0.start.current != $0.start.dropped || $0.start.kept != $0.start.current }, "every crash view of a survivor is not the same")
+        #expect(survivors.contains { $0.start.dropped != $0.start.kept }, "some survivor has a name a power loss undoes")
+        print("R-STO-5 unordered names: \(survivors.count) distinct kill survivors")
+    }
+}
+
+/// The kill survivors of `IndexCommitUnorderedNamesTests`, computed once for the whole suite: each row enumerates the
+/// survivors first met in its own lifetimes, so a survivor that two rows' lifetimes both leave runs once. Read-only once
+/// computed, and the same on every run (the lifetimes are deterministic).
+@available(macOS 15.0, *)
+actor UnorderedSurvivors {
+    static let shared = UnorderedSurvivors()
+    private var rows: [[IndexSpace.Survivor]]?
+
+    /// The survivors of every row, in the order of `IndexSpaceRow.all`.
+    func all() async -> [[IndexSpace.Survivor]] {
+        if let rows = self.rows {
+            return rows
+        }
+        var seen: Set<IndexSpace.ViewsKey> = []
+        var rows: [[IndexSpace.Survivor]] = []
+        for row in IndexSpaceRow.all {
+            // REENTRANCY: test support — nothing is re-read: the result is a function of the row alone, and a caller that
+            // arrived meanwhile computes the same rows.
+            rows.append(await IndexSpace.unorderedSurvivors(of: row, excluding: &seen))
+        }
+        self.rows = rows
+        return rows
+    }
+
+    /// The survivors first met in `row`'s lifetimes.
+    func survivors(of row: IndexSpaceRow) async -> [IndexSpace.Survivor] {
+        let index = IndexSpaceRow.all.firstIndex { $0.testDescription == row.testDescription } ?? 0
+        // REENTRANCY: test support — nothing is re-read after the rows are computed.
+        return await self.all()[index]
     }
 }
 
@@ -407,11 +538,16 @@ enum IndexSpace {
         var counts = Counts()
     }
 
-    /// What was enumerated.
+    /// What was enumerated, and what the fault-free runs say should have been: one fault-free case per volume script,
+    /// EIO at every operation, ENOSPC at every mutation and a lost rename result at every rename, and a crash before
+    /// every mutation in three modes plus a torn write before every write.
     struct Counts: Sendable {
         var cases = 0
+        var faultFree = 0
         var faults = 0
         var crashes = 0
+        var expectedFaults = 0
+        var expectedCrashes = 0
     }
 
     static func summary(_ files: Files, _ memo: inout Memo) -> Summary {
@@ -731,7 +867,11 @@ enum IndexSpace {
         }
         violations += IndexSpace.labelled(await IndexSpace.finish(run, fake: clean, start: start, memo: &memo), "\(label) no fault")
         memo.counts.cases += 1
+        memo.counts.faultFree += 1
         let operations = clean.operations
+        let mutationCount = operations.filter(\.kind.isMutation).count
+        memo.counts.expectedFaults += operations.count + mutationCount + operations.filter { $0.kind == .rename }.count
+        memo.counts.expectedCrashes += 3 * mutationCount + operations.filter { $0.kind == .write }.count
         // One fault at every operation.
         for operation in operations {
             var events: [Event] = [.fault(operation, .io)]
@@ -906,6 +1046,112 @@ enum IndexSpace {
                 return "\(mode) before mutation \(point)"
             }
         }
+    }
+}
+
+// MARK: Kill survivors with unordered names
+
+@available(macOS 15.0, *)
+extension IndexSpace {
+    /// A kill survivor whose crash views differ, and where it came from.
+    struct Survivor: Sendable {
+        var disk: DiskImage
+        var start: Views
+        var origin: String
+    }
+
+    /// The crash views of a disk, as a key.
+    struct ViewsKey: Hashable {
+        var current: Files
+        var dropped: Files
+        var kept: Files
+    }
+
+    /// Every disk a kill leaves during the fault-free lifetimes of `row`'s disks on every volume script whose crash views
+    /// differ, and that is not in `seen`, in the order they are first met (the disks the main enumeration starts from
+    /// are left out); adds them to `seen`.
+    static func unorderedSurvivors(of row: IndexSpaceRow, excluding seen: inout Set<ViewsKey>) async -> [Survivor] {
+        var survivors: [Survivor] = []
+        for slice in row.slices {
+            let initial = IndexSpace.disk(slice)
+            for volume in VolumeScript.allCases {
+                var memo = Memo()
+                let clean = IndexSpace.fake(initial)
+                let recorder = MutationRecorder(clean)
+                var run = await IndexSpace.open(on: recorder, fake: clean)
+                IndexSpace.runCommits(from: 0, &run, on: recorder, fake: clean, volume: volume, memo: &memo) { _, run in
+                    recorder.setClaimed(run.progress.claimed)
+                }
+                // Point 0 is the initial disk itself, before open()'s barrier.
+                for (point, snapshot) in recorder.snapshots.enumerated() where point > 0 {
+                    let views = IndexSpace.views(snapshot.disk)
+                    let key = ViewsKey(current: views.current, dropped: views.dropped, kept: views.kept)
+                    guard views.current != views.dropped || views.kept != views.current, seen.insert(key).inserted else {
+                        continue
+                    }
+                    survivors.append(Survivor(disk: snapshot.disk, start: views, origin: "\(slice.testDescription) volume=\(volume) killed before mutation \(point)"))
+                }
+            }
+        }
+        return survivors
+    }
+
+    /// The cases of one survivor (see `IndexCommitUnorderedNamesTests`).
+    static func enumerateUnordered(_ survivor: Survivor, label: String) async -> SliceResult {
+        var memo = Memo()
+        var violations: [String] = []
+        let start = survivor.start
+        let root = IndexSpace.layout.root
+        for volume in VolumeScript.allCases {
+            // No fault: the barrier orders every index name, so the rest of the lifetime starts from a disk of the seeded
+            // space.
+            let clean = IndexSpace.fake(survivor.disk)
+            var run = await IndexSpace.open(on: clean, fake: clean)
+            let ordered = IndexSpace.views(clean.survivingDisk())
+            if ordered.dropped != ordered.kept {
+                violations.append("\(label) volume=\(volume) no fault: open()'s root barrier left an index name unordered (\(IndexSpace.describe(ordered.dropped)) after a power loss, \(IndexSpace.describe(ordered.kept)) named)")
+            }
+            run.currentIsValid = IndexSpace.summary(clean.survivingDisk().files, &memo).currentIsValid
+            IndexSpace.runCommits(from: 0, &run, on: clean, fake: clean, volume: volume, memo: &memo)
+            violations += IndexSpace.labelled(await IndexSpace.finish(run, fake: clean, start: start, memo: &memo), "\(label) volume=\(volume) no fault")
+            memo.counts.cases += 1
+            memo.counts.faultFree += 1
+            // The barrier fails: the names stay unordered until a commit's own root sync.
+            for error in [FileSystemError.io, .noSpace] {
+                let caseLabel = "\(label) volume=\(volume) \(error) at open()'s root barrier"
+                let fake = IndexSpace.fake(survivor.disk)
+                fake.addFault(FaultRule(operation: .synchronizeDirectory, matching: URLMatcher(lastComponentSuffix: root.lastPathComponent, pathContains: root.path), occurrence: .nth(1), error: error))
+                var run = await IndexSpace.open(on: fake, fake: fake)
+                if fake.operations.first(where: { $0.kind == .synchronizeDirectory && $0.url == root })?.failure != error {
+                    violations.append("\(caseLabel): the fault never fired")
+                }
+                run.currentIsValid = IndexSpace.summary(fake.survivingDisk().files, &memo).currentIsValid
+                IndexSpace.runCommits(from: 0, &run, on: fake, fake: fake, volume: volume, memo: &memo)
+                violations += IndexSpace.labelled(await IndexSpace.finish(run, fake: fake, start: start, memo: &memo), caseLabel)
+                if volume == .free, !run.progress.readOnly, !run.progress.flushCommitted {
+                    violations.append("\(caseLabel): I-e, close()'s durable flush failed after the fault, with none of its own")
+                }
+                memo.counts.cases += 1
+                memo.counts.faults += 1
+                await Task.yield()
+            }
+        }
+        // A crash before the barrier: the survivor as each crash leaves it, with nothing counted committed.
+        let keptDisk = IndexSpace.surviving(survivor.disk, .powerLossKeepMetadata)
+        let crashes: [(CrashMode, Files, ReopenKey, () -> DiskImage)] = [
+            (.processKill, start.current, ReopenKey(current: start.current, kept: keptDisk.files), { survivor.disk }),
+            (.powerLossDropUnsynced, start.dropped, ReopenKey(current: start.dropped, kept: start.dropped), { IndexSpace.surviving(survivor.disk, .powerLossDropUnsynced) }),
+            (.powerLossKeepMetadata, start.kept, ReopenKey(current: start.kept, kept: start.kept), { keptDisk }),
+        ]
+        for (mode, files, key, disk) in crashes {
+            let caseLabel = "\(label) \(Event.crash(0, mode))"
+            let floor = IndexSpace.floor(start, mode, claimed: 0, &memo)
+            violations += IndexSpace.checkSurvivor(files, view: "the crash", floor: floor, claimed: 0, checkCommitted: false, label: caseLabel, &memo)
+            violations += await IndexSpace.checkReopen(key, disk: disk, floor: floor, claimed: 0, label: caseLabel, &memo)
+            memo.counts.cases += 1
+            memo.counts.crashes += 1
+        }
+        return SliceResult(slice: label, violations: violations, counts: memo.counts)
     }
 }
 
