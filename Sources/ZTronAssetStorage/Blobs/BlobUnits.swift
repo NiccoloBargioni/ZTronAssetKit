@@ -156,7 +156,7 @@ enum BlobDeletionUnit {
     /// `batch_ms_max` (5 ms; orchestrator ruling on ADR draft B-9, L2 close-out), so the unit's own work is kept to a
     /// fifth of it: one unit plus one slow last unlink stays far below 5 ms, and the remaining 4 ms absorb the
     /// scheduler. Measured on this Mac (release, 64-byte blobs, APFS): a single unlink p50 0.045 ms, p99 < 0.1 ms, and
-    /// a unit's own work ≤ 1.1 ms on CPU. What no budget bounds is one `unlink(2)` that blocks in the kernel while the
+    /// a unit's own work about 1 ms on CPU (1.01–1.14 ms at most across the close-out runs). What no budget bounds is one `unlink(2)` that blocks in the kernel while the
     /// volume commits (4.6–9.3 ms, about every 150 ms of sustained unlinking; ADR draft B-9's P-13 profile).
     static let budget: TimeInterval = 0.001
 
