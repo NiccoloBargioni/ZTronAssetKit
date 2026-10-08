@@ -41,7 +41,7 @@ public final class LiveDeviceConditionsSource: DeviceConditionsSource {
     /// Creates the source (no observation starts until `conditions()`).
     public init(center: NotificationCenter = .default) {
         self.center = center
-        self.makePathObserver = { LivePathObserver() }
+        self.makePathObserver = LiveDeviceConditionsSource.livePathObserver
         self.power = LiveDeviceConditionsSource.processPower
     }
 
@@ -84,6 +84,12 @@ public final class LiveDeviceConditionsSource: DeviceConditionsSource {
     /// Returns once exactly `count` observations are active (a terminated one stops after a hop); event-driven.
     package func waitForObservations(equalTo count: Int) async {
         await self.registry.wait(for: count)
+    }
+
+    /// A new `NWPathMonitor` behind `PathObserving`: what the public initialiser observes, available to tests that
+    /// wrap the live observer (to count its deliveries) through the package initialiser.
+    package static let livePathObserver: @Sendable () -> any PathObserving = {
+        LivePathObserver()
     }
 
     /// `ProcessInfo`'s Low Power Mode and thermal state.

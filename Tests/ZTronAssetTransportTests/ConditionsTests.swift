@@ -70,6 +70,46 @@ struct ConditionsTests {
         }
     }
 
+    /// The live `NWPathMonitor` observer, wrapped to count its deliveries: the host's network may report a change
+    /// at any time, so a test counts what was delivered instead of assuming nothing was.
+    @available(macOS 15.0, *)
+    final class CountingPath: PathObserving {
+        private let inner: any PathObserving
+        private let queue = Mutex<DispatchQueue?>(nil)
+        private let deliveries = ReadCounter()
+
+        init(_ inner: any PathObserving) {
+            self.inner = inner
+        }
+
+        func start(queue: DispatchQueue, onUpdate: @escaping @Sendable (NetworkConditions) -> Void) {
+            self.queue.withLock { $0 = queue }
+            self.inner.start(queue: queue) { [deliveries] network in
+                deliveries.increment()
+                onUpdate(network)
+            }
+        }
+
+        var current: NetworkConditions {
+            self.inner.current
+        }
+
+        func cancel() {
+            self.inner.cancel()
+        }
+
+        /// The deliveries so far and `read()`, both taken on the observation's serial queue, where every delivery
+        /// and every notification runs: no event is half-way through while they are read.
+        func settled<T>(_ read: () -> T) -> (deliveries: Int, value: T) {
+            guard let queue = self.queue.withLock({ $0 }) else {
+                return (0, read())
+            }
+            return queue.sync {
+                (self.deliveries.count, read())
+            }
+        }
+    }
+
     /// Counts calls from any thread.
     @available(macOS 15.0, *)
     final class ReadCounter: Sendable {
@@ -84,10 +124,18 @@ struct ConditionsTests {
         }
     }
 
+    @available(macOS 15.0, *)
     @Test("R-NET-9: the live conditions source yields the current state first, then on change, without polling", .timeLimit(.minutes(1)))
     func liveSourceIsEventDriven() async throws {
         let center = NotificationCenter()
-        let source = LiveDeviceConditionsSource(center: center)
+        // The live path monitor and the live power reading, each counted: an observation that polled would read
+        // power more often than events arrive.
+        let path = CountingPath(LiveDeviceConditionsSource.livePathObserver())
+        let reads = ReadCounter()
+        let source = LiveDeviceConditionsSource(center: center, makePathObserver: { path }, power: {
+            reads.increment()
+            return LiveDeviceConditionsSource.processPower()
+        })
         let stream = await source.conditions()
         var iterator = stream.makeAsyncIterator()
         let first = try #require(await iterator.next())
@@ -101,6 +149,11 @@ struct ConditionsTests {
         let third = try #require(await iterator.next())
         #expect(third.network == second.network)
         #expect(await source.activeObservations == 1)
+        // One power reading per event and none in between: the path's deliveries (at least the first, more only if
+        // the host's network changed meanwhile) plus the two posts.
+        let settled = path.settled { reads.count }
+        #expect(settled.deliveries >= 1)
+        #expect(settled.value == settled.deliveries + 2)
     }
 
     @available(macOS 15.0, *)
