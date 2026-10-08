@@ -22,25 +22,40 @@ final class FileHandleChunkReader: PackFileReader {
 
     /// At most `maxBytes` bytes, or `nil` at the end of the file.
     func nextChunk(maxBytes: Int) throws(StagingError) -> Data? {
-        try self.handle.withLock { (handle: inout FileHandle?) throws(StagingError) -> Data? in
-            if handle == nil {
-                switch self.open() {
-                case .success(let opened):
-                    handle = opened
-                case .failure(let error):
-                    throw .source(PackErrorMapping.sourceFailure(error))
-                }
+        let handle = try self.openedHandle()
+        let chunk: Data?
+        do {
+            chunk = try handle.read(upToCount: maxBytes)
+        } catch {
+            throw .source(.readFailed)
+        }
+        guard let chunk, !chunk.isEmpty else {
+            return nil
+        }
+        return chunk
+    }
+
+    /// The handle, opened on the first pull. The lock only publishes the handle between pulls: neither the open nor
+    /// a read runs inside it (orchestrator ruling, L2 close-out: no I/O in a `Mutex`'s critical section). The sink
+    /// pulls one chunk at a time, so the open runs once; should two first pulls ever overlap, the handle stored first
+    /// wins and the other is closed when it is released (the live opener creates handles with `closeOnDealloc`).
+    private func openedHandle() throws(StagingError) -> FileHandle {
+        if let handle = self.handle.withLock({ $0 }) {
+            return handle
+        }
+        let opened: FileHandle
+        switch self.open() {
+        case .success(let handle):
+            opened = handle
+        case .failure(let error):
+            throw .source(PackErrorMapping.sourceFailure(error))
+        }
+        return self.handle.withLock { stored in
+            if let stored {
+                return stored
             }
-            let chunk: Data?
-            do {
-                chunk = try handle?.read(upToCount: maxBytes)
-            } catch {
-                throw .source(.readFailed)
-            }
-            guard let chunk, !chunk.isEmpty else {
-                return nil
-            }
-            return chunk
+            stored = opened
+            return opened
         }
     }
 }
