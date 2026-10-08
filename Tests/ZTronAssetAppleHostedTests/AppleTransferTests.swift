@@ -1,0 +1,321 @@
+import Foundation
+import Testing
+@testable import ZTronAssetAppleHosted
+import ZTronAssetModel
+import ZTronAssetTestSupport
+
+private let assetA = PackAsset("ZTronMedia/images/a.heic", "pixels of a")
+private let assetB = PackAsset("ZTronMedia/images/b.heic", "pixels of b, longer")
+private let extra = PackAsset("ZTronExtras/sounds/c.wav", "a sound")
+
+private let mediaFiles = [assetA.path: assetA.bytes, assetB.path: assetB.bytes]
+
+/// R-APL-1, R-APL-3: assets are copied out of packs into staging (transport.md §11.3, ADR-027).
+@Suite("Apple tier: transfers")
+struct AppleTransferTests {
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: the Apple source satisfies RemoteSource end to end against a fake PackBackend", .timeLimit(.minutes(1)))
+    func endToEnd() async throws {
+        let fixture = AppleTierFixture(installed: [
+            Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: mediaFiles, Packs.extras: [extra.path: extra.bytes],
+        ])
+        let source: any RemoteSource = fixture.source
+        #expect(source.originID == "apple-hosted")
+        #expect(
+            source.capabilities
+                == RemoteSourceCapabilities(
+                    tier: .appleHosted, supportsPriority: false, supportsResume: false, supportsBackground: false,
+                    keepsSourceCopies: true
+                )
+        )
+
+        let manifest = try await source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        guard case .fetched(let payload) = manifest else {
+            Issue.record("expected the catalog, got \(manifest)")
+            return
+        }
+        #expect(payload.bytes == AppleTierFixture.catalogBytes)
+
+        let request = assetA.request()
+        let handle = await source.transfer(request)
+        #expect(handle.id == request.id)
+        #expect(handle.attempt == request.attempt)
+        let updates = await collect(handle)
+        let staged = StagedFile(name: request.partialName, byteCount: Int64(assetA.bytes.count), resumed: false, httpStatus: nil, etag: nil)
+        #expect(updates == [.staged(staged)])
+        #expect(fixture.staging.contents[request.partialName] == assetA.bytes)
+
+        #expect(await source.reattachedTransfers().isEmpty)
+        await source.cancelTransfer(request.partialName)
+        await source.handleBackgroundEvents(identifier: "com.example.background")
+        #expect(fixture.staging.contents[request.partialName] == assetA.bytes, "neither call touches staging")
+
+        let reclaim = await source.reclaimSourceCopies(
+            AdoptionReport(
+                manifestRemotePaths: [assetA.remotePath, assetB.remotePath, extra.remotePath],
+                adoptedRemotePaths: [assetA.remotePath, assetB.remotePath, extra.remotePath]
+            )
+        )
+        #expect(reclaim == ReclaimReport(released: ["ZTronExtras", "ZTronMedia"]))
+        #expect(fixture.backend.installedPacks == [Packs.catalog])
+        #expect(await source.sourceCopyBytes() == 0)
+        await source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: constructing the Apple source and selecting the tier call no pack API", .timeLimit(.minutes(1)))
+    func constructionTouchesNoPack() async throws {
+        let backend = FakePackBackend(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+        let resolved = AppleHostedTier.resolve(
+            configuration: RemoteConfiguration(http: nil, appleHosted: AppleTierConfiguration(), awsOnly: false),
+            staging: FakeStagingSink(),
+            packBackend: backend,
+            log: .tapOnly(nil),
+            makeAWS: { _ in FakeRemoteSource(originID: "https://unused.example.com:443") }
+        )
+        let source = try resolved.get()
+        #expect(source.originID == "apple-hosted")
+        #expect(source.capabilities.tier == .appleHosted)
+        #expect(source is AppleHostedRemoteSource)
+        #expect(backend.calls.isEmpty)
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: concurrent fetches of assets in one pack trigger one ensureAvailable", .timeLimit(.minutes(1)))
+    func concurrentFetchesShareOnePackDownload() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let first = await fixture.source.transfer(assetA.request())
+        let second = await fixture.source.transfer(assetB.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 2)
+        fixture.backend.releaseEnsure(Packs.media, with: .install(progress: []))
+
+        let firstUpdates = await collect(first)
+        let secondUpdates = await collect(second)
+        #expect(firstUpdates.last.map(Self.isStaged) == true, "\(firstUpdates)")
+        #expect(secondUpdates.last.map(Self.isStaged) == true, "\(secondUpdates)")
+        #expect(fixture.backend.calls.filter { $0 == .ensure(Packs.media) }.count == 1)
+        #expect(fixture.staging.contents[assetB.request().partialName] == assetB.bytes)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a cancelled waiter leaves the shared pack download running for the others", .timeLimit(.minutes(1)))
+    func cancelledWaiterLeavesOthersRunning() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let first = await fixture.source.transfer(assetA.request())
+        let second = await fixture.source.transfer(assetB.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 2)
+
+        first.cancel()
+        #expect(await collect(first) == [.failed(.cancelled(.byClient))])
+        #expect(await fixture.source.packs.waiterCount(on: Packs.media) == 1)
+        #expect(!fixture.backend.calls.contains(.ensureCancelled(Packs.media)))
+
+        fixture.backend.releaseEnsure(Packs.media, with: .install(progress: []))
+        #expect(await collect(second).last.map(Self.isStaged) == true)
+        #expect(fixture.staging.contents[assetA.request().partialName] == nil)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: the pack download is cancelled when its last waiter leaves", .timeLimit(.minutes(1)))
+    func lastWaiterLeavingCancelsTheDownload() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let handle = await fixture.source.transfer(assetA.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        handle.cancel()
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+        await fixture.backend.waitFor(.ensureCancelled(Packs.media))
+        #expect(await fixture.source.packs.waiterCount(on: Packs.media) == 0)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: pause ends a pack transfer as not resumable and keeps nothing in staging", .timeLimit(.minutes(1)))
+    func pauseEndsNotResumable() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let handle = await fixture.source.transfer(assetA.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        handle.setPriority(.bulk)
+        handle.pause()
+        handle.cancel()
+        #expect(await collect(handle) == [.paused(resumable: false)])
+        #expect(fixture.staging.contents.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a control after the copy finished discards the staged file and ends the stream once", .timeLimit(.minutes(1)))
+    func controlAfterCopyDiscardsTheFile() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
+        gated.arm()
+        let handle = await fixture.source.transfer(assetA.request())
+        await gated.waitForHeldWrites(1)
+        handle.cancel()
+        gated.open()
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+        #expect(gated.base.contents.isEmpty)
+        #expect(gated.events == ["write returned", "discard"])
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: dropping the update stream cancels the transfer", .timeLimit(.minutes(1)))
+    func droppingTheStreamCancels() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let handle = await fixture.source.transfer(assetA.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        let consumer = Task {
+            await collect(handle)
+        }
+        consumer.cancel()
+        _ = await consumer.value
+        await fixture.backend.waitFor(.ensureCancelled(Packs.media))
+        #expect(fixture.staging.contents.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: invalidate cancels pack waiters and returns only after in-flight staging writes", .timeLimit(.minutes(1)))
+    func invalidateDrainsStagingWrites() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], remote: [Packs.extras: [extra.path: extra.bytes]], staging: gated)
+        fixture.backend.scriptEnsure(Packs.extras, [.hold])
+        let waiting = await fixture.source.transfer(extra.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.extras, count: 1)
+        gated.note("armed")
+        gated.arm()
+        let copying = await fixture.source.transfer(assetA.request())
+        await gated.waitForHeldWrites(1)
+
+        let invalidation = Task {
+            await fixture.source.invalidate()
+            gated.note("invalidate returned")
+        }
+        #expect(await collect(waiting) == [.failed(.cancelled(.byClient))])
+        await fixture.source.state.waitForDrain()
+        #expect(!gated.events.contains("invalidate returned"))
+        gated.open()
+        await invalidation.value
+        let sinceArmed = gated.events.drop(while: { $0 != "armed" }).dropFirst()
+        #expect(Array(sinceArmed.prefix(2)) == ["write returned", "invalidate returned"])
+        #expect(await collect(copying).last.map(Self.isStaged) == true)
+
+        let late = await fixture.source.transfer(assetB.request())
+        #expect(await collect(late) == [.failed(.cancelled(.byClient))])
+        #expect(gated.base.contents[assetB.request().partialName] == nil)
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: an invalid remote path is rejected without touching any pack", .timeLimit(.minutes(1)))
+    func invalidRemotePathIsRejected() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        var request = assetA.request()
+        request.remotePath = "ZTronMedia/../secrets.json"
+        #expect(await collect(await fixture.source.transfer(request)) == [.failed(.rejected(.invalidURL))])
+        #expect(fixture.backend.calls.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a pack the system does not know is permanently missing", .timeLimit(.minutes(1)))
+    func unknownPackIsMissing() async throws {
+        let fixture = AppleTierFixture()
+        let updates = await collect(await fixture.source.transfer(assetA.request()))
+        #expect(updates == [.failed(.permanentMissing(httpStatus: 404))])
+        #expect(fixture.backend.calls.filter { $0 == .ensure(Packs.media) }.count == 1)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a staging failure maps into the transfer taxonomy and leaves no partial", .timeLimit(.minutes(1)))
+    func stagingFailureIsMapped() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        fixture.staging.failNext(.writeStaged, with: .insufficientSpace)
+        let request = assetA.request()
+        #expect(await collect(await fixture.source.transfer(request)) == [.failed(.insufficientSpace(requiredBytes: Int64(assetA.bytes.count)))])
+        #expect(fixture.staging.contents.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a checksum-less entry is staged without a checksum comparison", .timeLimit(.minutes(1)))
+    func legacyEntryIsStagedBySizeOnly() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        let request = TransferRequest(
+            id: .legacy(identifier: AssetID(rawValue: "bo7.menu.background"), remotePath: assetA.remotePath),
+            attempt: TransferAttempt(epoch: 1, sequence: 1),
+            remotePath: assetA.remotePath,
+            expectedBytes: nil,
+            maxBytes: 1 << 20,
+            priority: .bulk
+        )
+        let updates = await collect(await fixture.source.transfer(request))
+        #expect(updates == [.staged(StagedFile(name: request.partialName, byteCount: Int64(assetA.bytes.count), resumed: false, httpStatus: nil, etag: nil))])
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-OBS-1: an Apple transfer runs inside the transfer signpost interval", .timeLimit(.minutes(1)))
+    func transferIsWrappedInTheInterval() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        let request = assetA.request()
+        _ = await collect(await fixture.source.transfer(request))
+        let intervals = fixture.tap.lines.compactMap(LogIntervalEvent.init(line:))
+        #expect(
+            intervals == [
+                LogIntervalEvent(category: .apple, name: .transfer, phase: .began, message: "attempt \(request.attempt.token)"),
+                LogIntervalEvent(category: .apple, name: .transfer, phase: .ended, message: "attempt \(request.attempt.token)"),
+            ]
+        )
+        #expect(fixture.tap.lines.allSatisfy { $0.subsystem == AssetLog.subsystem })
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-3: an adopted asset is served from blobs and never from a pack location", .timeLimit(.minutes(1)))
+    func adoptedAssetIsServedFromBlobs() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: mediaFiles])
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        let request = assetA.request()
+        let updates = await collect(await fixture.source.transfer(request))
+
+        // What the engine receives names a staging file of this transfer, never a pack: the bytes are a copy in
+        // the store's own staging area, which the store hashes and publishes into blobs/.
+        guard case .staged(let file) = updates.last else {
+            Issue.record("expected a staged copy, got \(updates)")
+            return
+        }
+        #expect(file.name == request.partialName && file.name.transfer == request.id)
+        #expect(file.httpStatus == nil && file.etag == nil && !file.resumed)
+        #expect(fixture.staging.contents[file.name] == assetA.bytes)
+
+        // Once every entry of the pack is adopted the pack is released; the store's copy is unaffected and no pack
+        // file is opened again to serve it.
+        let reclaim = await fixture.source.reclaimSourceCopies(
+            AdoptionReport(
+                manifestRemotePaths: [assetA.remotePath, assetB.remotePath],
+                adoptedRemotePaths: [assetA.remotePath, assetB.remotePath]
+            )
+        )
+        #expect(reclaim.released == ["ZTronMedia"])
+        let opensBefore = fixture.backend.calls.filter { if case .open = $0 { true } else { false } }.count
+        #expect(!fixture.backend.installedPacks.contains(Packs.media))
+        #expect(fixture.staging.contents[file.name] == assetA.bytes)
+        #expect(fixture.backend.calls.filter { if case .open = $0 { true } else { false } }.count == opensBefore)
+        await fixture.source.invalidate()
+    }
+
+    static func isStaged(_ update: TransferUpdate) -> Bool {
+        if case .staged = update {
+            return true
+        }
+        return false
+    }
+}
