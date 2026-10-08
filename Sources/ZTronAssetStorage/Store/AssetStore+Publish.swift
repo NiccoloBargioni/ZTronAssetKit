@@ -85,10 +85,17 @@ extension AssetStore {
             // work; the phase is re-checked first.
             (digest, hashedBytes) = try await self.hashFileInternal(at: verifying)
         } catch .cancelled {
-            // The caller may retry with the same staged file: hand the claim back.
+            // The caller may retry with the same staged file: hand the claim back. When that fails (a producer
+            // recreated `.part` meanwhile, so the exclusive rename finds it), the claimed bytes are discarded with their
+            // sidecar instead of staying stranded as `.verifying` (ADR draft B-31); the new `.part` is the producer's.
             // REENTRANCY: b-3 (proposed) — nothing: the call throws right after.
             await self.runUnit(on: self.environment.metadataExecutor) {
-                try? fileSystem.rename(from: verifying, to: part, mode: .exclusive)
+                do throws(FileSystemError) {
+                    try fileSystem.rename(from: verifying, to: part, mode: .exclusive)
+                } catch {
+                    try? fileSystem.removeItem(at: verifying)
+                    try? fileSystem.removeItem(at: sidecar)
+                }
             }
             throw .cancelled
         } catch .fileSystem(let failure) {

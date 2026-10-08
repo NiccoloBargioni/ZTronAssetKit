@@ -150,6 +150,11 @@ Since fix round 1 a replaced root also stops the reaper: `deletionBlocker` retur
 - **Decision.** (b): `AssetStore.admittedDigest(after:revision:)` = SHA-256(`"ZTronAssetKit.admitted-manifest.v1"` ‖ 0x00 ‖ previous digest ‖ manifest revision, big-endian words). A fetched digest is the SHA-256 of the payload bytes, so equality would need a SHA-256 preimage; each admission yields a new value (the revision grows); a no-op admission changes nothing. The ETag is untouched (sync-2 S2-28: an admission never stores the point fetch's ETag; the stored one still validates the last applied full manifest, so a 304 means that manifest is unchanged, and the engine's run applies it anyway when its digest differs).
 - **Consequences.** After an admission the next fetched manifest is always applied (and prunes admitted entries it does not list); the applied digest survives a relaunch with the entries. WP-F may keep a digest short-circuit. Test: `R-SYN-8: after a point admission the applied digest matches no fetched manifest, so the server's manifest is applied again and prunes it`.
 
+## B-31 — A cancelled hash whose claim cannot be handed back discards it (fix round 3, review "publish cancellation hand-back")
+- **Context.** A cancelled hash renames `.verifying` back to `.part` (exclusive) so the caller can retry with the same `StagedFile` (B-11 (3)). When a producer recreated `.part` meanwhile (an append opens it with `O_CREAT`), the rename failed inside `try?` and the claimed full-size file stayed in staging as `.verifying` until staging GC.
+- **Decision.** The same metadata unit, on a failed hand-back, removes the claimed `.verifying` and its sidecar (as B-26 does for other failures; the sidecar describes the discarded bytes, not the producer's new `.part`), and leaves the new `.part` alone. The call still throws `.cancelled`.
+- **Consequences.** A retry with the same `StagedFile` then claims the producer's new `.part` and is judged on those bytes (size, hash). Test: `R-INT-1: a cancelled hash whose claim cannot be handed back discards the claimed file and keeps the producer's new .part`.
+
 ## Fix round 1 — dispositions
 | Review item | Disposition |
 |---|---|

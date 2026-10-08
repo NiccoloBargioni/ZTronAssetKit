@@ -120,6 +120,41 @@ struct StorePublishTests {
         #expect(locations[entry.identifier] != nil)
     }
 
+    /// Review round 3, "publish cancellation hand-back": the hand-back renames `.verifying` back to `.part`
+    /// exclusively; when a producer recreated `.part` meanwhile (an `O_CREAT` append), the rename fails and the claimed
+    /// full-size file must not stay stranded in staging as `.verifying` until staging GC.
+    @Test("R-INT-1: a cancelled hash whose claim cannot be handed back discards the claimed file and keeps the producer's new .part", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func cancelledHashHandBackFails() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.make(configuration: CoreFixture.configuration(hashChunkBytes: 100), bulk: bulk)
+        let bytes = CoreFixture.bytes(10, count: 1_000)
+        let entry = CoreFixture.entry("a", bytes)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([entry]), etag: nil, eviction: nil)
+        let staged = try await harness.stage(bytes, for: entry, sidecar: true)
+        let part = harness.layout.stagingURL(staged.name)
+        let verifying = harness.layout.stagingURL(staged.name.with(kind: .verifying))
+        await bulk.setHolding(true)
+        let publishing = Task {
+            try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
+        }
+        await bulk.waitForHeldUnits(atLeast: 1)
+        #expect(harness.exists(verifying) && !harness.exists(part), "the claim renamed .part to .verifying")
+        let tail = Data([1, 2, 3])
+        try harness.fileSystem.write(tail, to: part, mode: .append)
+        publishing.cancel()
+        await bulk.setHolding(false)
+        await #expect(throws: StoreError.cancelled) {
+            try await publishing.value
+        }
+        #expect(!harness.exists(verifying), "the claimed file is discarded, not stranded in staging")
+        #expect(!harness.exists(harness.layout.stagingURL(staged.name.with(kind: .sidecar))), "its sidecar describes the discarded bytes")
+        #expect(harness.content(part) == tail, "the producer's new .part is left alone")
+        #expect(await harness.state.core.blobTable.isEmpty)
+        #expect(await harness.store.location(for: entry.identifier, extensions: [], recordingAccess: false) == nil)
+    }
+
     @Test("R-INT-2: a checksum mismatch deletes the staged bytes, throws integrity, counts a metric and publishes nothing", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func checksumMismatch() async throws {
