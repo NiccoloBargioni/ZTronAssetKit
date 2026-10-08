@@ -104,7 +104,7 @@ struct StoreSnapshotTests {
         #expect(await harness.store.metrics().acknowledgedInstalls >= 3)
     }
 
-    @Test("R-SYN-10: availability counts present, missing, stale, failed and unverified entries of a scope without I/O", .timeLimit(.minutes(1)))
+    @Test("R-STO-7: the store's availability counts present, missing, stale, failed and unverified entries of a scope without I/O", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func availabilityCounts() async throws {
         let harness = CoreHarness.make()
@@ -159,7 +159,7 @@ struct StoreSnapshotTests {
         #expect(events.allSatisfy { $0.category == .store })
     }
 
-    @Test("R-SYN-11: freeSpace reads both capacities once and reports usage, pending reclaim and the resolved budget", .timeLimit(.minutes(1)))
+    @Test("R-CLN-1: freeSpace reads both capacities once and reports usage, the pending reclaim of doomed blobs and the resolved budget", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func freeSpaceFigures() async throws {
         let harness = CoreHarness.make(importantCapacity: 10_000)

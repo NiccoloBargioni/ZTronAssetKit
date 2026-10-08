@@ -105,6 +105,9 @@ enum FirstSync {
             }
             let after = await CoreInvariants.violations(of: harness)
             #expect(after.isEmpty, "\(label) after convergence: \(after)")
+            // I-3: the convergence prunes nothing and lets no grace pass, so no blob a reader may hold is unlinked.
+            let unlinked = CoreInvariants.blobRemovals(harness.fileSystem.operations, layout: harness.layout)
+            #expect(unlinked.isEmpty, "\(label) after convergence: \(unlinked)")
             await harness.store.close()
             return downloaded
         } catch {
@@ -126,6 +129,7 @@ struct StoreCrashTests {
         let clean = CoreHarness.make()
         let cleanTrace = await FirstSync.run(clean)
         #expect(cleanTrace.returned.count == 5 && cleanTrace.committed == cleanTrace.returned)
+        #expect(CoreInvariants.blobRemovals(clean.fileSystem.operations, layout: clean.layout).isEmpty)
         let total = clean.fileSystem.mutationCount
         let cleanOps = clean.fileSystem.operations.filter(\.kind.isMutation)
         #expect(total > 40)
@@ -138,6 +142,8 @@ struct StoreCrashTests {
                 continue
             }
             crashes += 1
+            // I-3 in the crashed lifetime: nothing it handed out was unlinked.
+            #expect(CoreInvariants.blobRemovals(harness.fileSystem.operations, layout: harness.layout).isEmpty, "\(mode) at \(point)")
             // The crash run performs the clean run's operations, in the same order, up to the crash (store-2 S2-08).
             let ran = harness.fileSystem.operations.filter(\.kind.isMutation).prefix(point)
             #expect(Array(ran).map { "\($0.kind) \($0.url.path)" } == cleanOps.prefix(point).map { "\($0.kind) \($0.url.path)" }, "\(mode) at \(point)")
@@ -175,6 +181,7 @@ struct StoreCrashTests {
                 let second = CoreHarness.make(disk: killed, crashBefore: secondPoint < secondTotal ? secondPoint : nil, mode: mode)
                 await StoreCrashTests.secondLifetime(second)
                 let label = "kill at \(point), \(mode) at \(secondPoint)"
+                #expect(CoreInvariants.blobRemovals(second.fileSystem.operations, layout: second.layout).isEmpty, "\(label)")
                 // What a commit of the first lifetime covered survives the second lifetime's power loss.
                 let downloaded = await FirstSync.reopenAndConverge(second.fileSystem.survivingDisk(), after: FirstSync.Trace(), mode: mode, label: label)
                 #expect(downloaded.isDisjoint(with: trace.committed), "\(label): \(downloaded)")

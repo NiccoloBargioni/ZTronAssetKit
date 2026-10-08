@@ -121,7 +121,7 @@ struct StoreApplyTests {
         #expect(await CoreInvariants.violations(of: reopened).isEmpty)
     }
 
-    @Test("R-CLN-12: applying the same manifest twice is a no-op the second time", .timeLimit(.minutes(1)))
+    @Test("R-SYN-8: applying the same manifest twice is a no-op the second time", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func applyIsIdempotent() async throws {
         let harness = CoreHarness.make()
@@ -136,7 +136,7 @@ struct StoreApplyTests {
         #expect(await harness.sink.offeredKeys.count == installs)
     }
 
-    @Test("R-CLN-6: markSynced refuses a stamp from before a purge and markSyncDue clears the stamp", .timeLimit(.minutes(1)))
+    @Test("R-STO-2: markSynced refuses a stamp from before a purge and markSyncDue clears the stamp", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func stamps() async throws {
         let harness = CoreHarness.make()

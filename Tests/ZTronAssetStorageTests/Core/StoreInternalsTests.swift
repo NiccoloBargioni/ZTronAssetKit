@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 /// The primitives WP-C builds on (ARCHITECTURE §1.1 `StoreInternals.swift`).
 @Suite("Core: primitives for WP-C")
 struct StoreInternalsTests {
-    @Test("R-STO-11: adoptVerifiedFile moves a verified file into blobs for every record expecting it and installs no snapshot", .timeLimit(.minutes(1)))
+    @Test("R-STO-3: adoptVerifiedFile moves a verified file into blobs for every record expecting it and installs no snapshot", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func adoptVerifiedFile() async throws {
         let harness = CoreHarness.make()
@@ -38,7 +38,7 @@ struct StoreInternalsTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
-    @Test("R-STO-5: ensureOpen, requireCommitted and publishSnapshot follow the phase, the durability and the install rate", .timeLimit(.minutes(1)))
+    @Test("R-STO-4: ensureOpen, requireCommitted and publishSnapshot follow the phase, the durability and the install rate", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func phaseCommitAndSnapshotPrimitives() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(installInterval: 0.1))
@@ -70,7 +70,7 @@ struct StoreInternalsTests {
         }
     }
 
-    @Test("R-CLN-6: setResidency dooms the last reference with the given reason, persists it, and refuses an unreferencable present key", .timeLimit(.minutes(1)))
+    @Test("R-CLN-1: setResidency dooms the last reference with the given reason, persists it, and refuses an unreferencable present key", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func setResidency() async throws {
         let harness = CoreHarness.make()

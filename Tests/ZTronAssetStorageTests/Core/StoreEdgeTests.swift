@@ -144,7 +144,7 @@ struct StoreEdgeTests {
         #expect(await harness.store.deletionBlocker(CoreFixture.key(bytes)) == .commit)
     }
 
-    @Test("R-STO-13: open runs once for concurrent callers, close waits for a running open, and close drains an in-flight publication", .timeLimit(.minutes(1)))
+    @Test("R-STO-9: open runs once for concurrent callers, close waits for a running open, and close drains an in-flight publication", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func openAndCloseInterleavings() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
@@ -200,6 +200,7 @@ struct StoreEdgeTests {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
         _ = try await harness.store.open()
+        let commitsBefore = await harness.store.metrics().commits
         await metadata.setHolding(true)
         let first = Task {
             try await harness.store.markSyncDue()
@@ -208,11 +209,14 @@ struct StoreEdgeTests {
         let second = Task {
             try await harness.store.flush(.ordered)
         }
+        // The flush is parked on the running commit before it is released.
+        await StoreRaceTests.waitForCommitWaiter(harness)
         await metadata.setHolding(false)
         try await first.value
         try await second.value
         let commits = await harness.state.core.commits
         #expect(commits.committedSerial == commits.mutationSerial)
+        #expect(await harness.store.metrics().commits == commitsBefore + 1, "the flush shared the held commit and ran none of its own")
 
         let windowed = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: 0.25))
         _ = try await windowed.store.open()
@@ -227,7 +231,7 @@ struct StoreEdgeTests {
         #expect(windowed.time.pendingSleepers == 0)
     }
 
-    @Test("R-CLN-3: stagingInventory lists our names with their metadata and everything else as foreign", .timeLimit(.minutes(1)))
+    @Test("R-STO-1: stagingInventory lists our names with their metadata and everything else as foreign", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func stagingInventory() async throws {
         let harness = CoreHarness.make()
