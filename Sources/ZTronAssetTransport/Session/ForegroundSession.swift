@@ -152,34 +152,46 @@ public final class ForegroundTransferBackend: TransferBackend {
             return ImmediateTransferHandle(id: job.id, attempt: job.attempt, terminal: .failed(.rejected(violation)))
         }
         let session = self.session
-        guard let task = await self.gate.makeTask({ session.dataTask(with: request) }) else {
+        let log = self.log
+        let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(4))
+        // The task gets its mailbox, priority and interval inside the gate, so no task ever exists without its
+        // mailbox: an invalidation right after the gate still finds the mailbox and ends the stream.
+        let made = await self.gate.makeTask {
+            let task = session.dataTask(with: request)
+            task.priority = job.priority.urlSessionTaskPriority
+            if let expected = job.expectedBytes {
+                task.countOfBytesClientExpectsToReceive = max(expected - (job.resume?.offset ?? 0), 0)
+            }
+            let purpose = job.purpose == .manifest ? "manifest" : "asset"
+            let interval = log.interval(.transfer, category: .transport, "attempt \(job.attempt) \(purpose)")
+            continuation.onTermination = { termination in
+                if case .cancelled = termination {
+                    // Nobody will read this transfer's outcome: append nothing more (a pause in progress keeps its mark).
+                    TaskMarker.requestIfUnmarked(.discard, on: task)
+                    task.cancel()
+                }
+                interval.end()
+            }
+            task.delegate = TaskMailbox(continuation: continuation, job: job)
+            return task
+        }
+        guard let task = made else {
+            continuation.finish()
             return ImmediateTransferHandle(id: job.id, attempt: job.attempt, terminal: .failed(.cancelled(.byClient)))
         }
-        let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(4))
-        let purpose = job.purpose == .manifest ? "manifest" : "asset"
-        let interval = self.log.interval(.transfer, category: .transport, "attempt \(job.attempt) \(purpose)")
-        continuation.onTermination = { termination in
-            if case .cancelled = termination {
-                // Nobody will read this transfer's outcome: append nothing more (a pause in progress keeps its mark).
-                TaskMarker.requestIfUnmarked(.discard, on: task)
-                task.cancel()
-            }
-            interval.end()
-        }
-        task.priority = job.priority.urlSessionTaskPriority
-        if let expected = job.expectedBytes {
-            task.countOfBytesClientExpectsToReceive = max(expected - (job.resume?.offset ?? 0), 0)
-        }
-        task.delegate = TaskMailbox(continuation: continuation, job: job)
         task.resume()
         return DataTransferHandle(job: job, updates: updates, task: task, staging: self.delegate.staging)
     }
 
-    /// The session's running and suspended data tasks, read from the tasks themselves (their mailboxes).
+    /// The session's running and suspended data tasks, read from the tasks themselves (their mailboxes). A task the
+    /// client discarded is not live although its cancellation may not have reached the task yet: a handle's
+    /// `cancel()` marks it synchronously and cancels it only after its partial was discarded.
     public func liveTransfers() async -> [LiveTransfer] {
         let tasks = await self.session.allTasks
         return tasks.compactMap { task in
-            guard let job = (task.delegate as? TaskMailbox)?.job, task.state == .running || task.state == .suspended else {
+            guard let job = (task.delegate as? TaskMailbox)?.job, task.state == .running || task.state == .suspended,
+                TaskMarker(decoding: task.taskDescription) != .discard
+            else {
                 return nil
             }
             return LiveTransfer(

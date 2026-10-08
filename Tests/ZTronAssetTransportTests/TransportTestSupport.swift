@@ -104,15 +104,18 @@ struct LoopbackRig {
         manifestPath: String = "manifest.json",
         background: (any TransferBackend)? = nil,
         staging: FakeStagingSink = FakeStagingSink(),
+        sink: (any StagingSink)? = nil,
         handler: @escaping LoopbackHandler
     ) async throws -> LoopbackRig {
+        // The delegate and the source write through `sink` when one is given (a wrapper over `staging`).
+        let sink = sink ?? staging
         let server = LoopbackHTTPServer(handler: handler)
         let port = try await server.start()
         let base = try #require(URL(string: "http://127.0.0.1:\(port)/"))
         let tap = RecordingLogTap()
         let log = LogRoute.tapOnly(tap)
         let policy = TransportSecurityPolicy.loopbackTesting(allowedHosts: allowedHosts)
-        let delegate = SessionDelegate(mode: .foreground, staging: staging, policy: policy)
+        let delegate = SessionDelegate(mode: .foreground, staging: sink, policy: policy)
         // A short request timeout: a missed event fails long before the test's time limit (transport.md §12).
         let foreground = ForegroundTransferBackend(
             delegate: delegate,
@@ -130,7 +133,7 @@ struct LoopbackRig {
         )
         let source = HTTPRemoteSource(
             configuration: configuration,
-            staging: staging,
+            staging: sink,
             policy: policy,
             foreground: foreground,
             background: background,
@@ -219,4 +222,83 @@ func awaitProgress(
         }
     }
     return false
+}
+
+/// A staging sink whose `discard` waits for `release()`; everything else goes straight to `base`. It holds a
+/// foreground handle's `cancel()` between its synchronous mark and the task's cancellation, so that window can be
+/// observed deterministically.
+@available(macOS 15.0, *)
+final class HeldDiscardSink: StagingSink {
+    let base: FakeStagingSink
+    private let gate = DiscardGate()
+
+    init(base: FakeStagingSink) {
+        self.base = base
+    }
+
+    func createPartial(_ name: StagingFileName) throws(StagingError) {
+        try self.base.createPartial(name)
+    }
+
+    func appendPartial(_ data: Data, to name: StagingFileName) throws(StagingError) -> Int64 {
+        try self.base.appendPartial(data, to: name)
+    }
+
+    func continuePartial(from previous: StagingFileName, as next: StagingFileName) throws(StagingError) -> Int64 {
+        try self.base.continuePartial(from: previous, as: next)
+    }
+
+    func adoptDownload(at location: URL, as name: StagingFileName) throws(StagingError) -> Int64 {
+        try self.base.adoptDownload(at: location, as: name)
+    }
+
+    func writeSidecar(_ sidecar: ResumeSidecar) {
+        self.base.writeSidecar(sidecar)
+    }
+
+    func readSidecar(for name: StagingFileName) async -> ResumeSidecar? {
+        await self.base.readSidecar(for: name)
+    }
+
+    func readStaged(_ name: StagingFileName, maxBytes: Int64) async throws(StagingError) -> Data {
+        try await self.base.readStaged(name, maxBytes: maxBytes)
+    }
+
+    func discard(_ name: StagingFileName) async {
+        await self.gate.wait()
+        await self.base.discard(name)
+    }
+
+    func writeStaged(_ name: StagingFileName, from source: any ChunkSource, maxBytes: Int64) async throws(StagingError) -> Int64 {
+        try await self.base.writeStaged(name, from: source, maxBytes: maxBytes)
+    }
+
+    /// Lets every held and later `discard` proceed.
+    func release() async {
+        await self.gate.release()
+    }
+}
+
+/// The gate behind `HeldDiscardSink`: closed until `release()`, open for good afterwards.
+actor DiscardGate {
+    private var open = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !self.open else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            self.waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        self.open = true
+        let waiters = self.waiters
+        self.waiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
 }

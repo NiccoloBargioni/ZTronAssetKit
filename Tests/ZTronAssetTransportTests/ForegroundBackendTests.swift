@@ -119,7 +119,10 @@ struct ForegroundBackendTests {
     @Test("R-NET-10: setPriority on a running transfer changes URLSessionTask.priority synchronously", .timeLimit(.minutes(1)))
     func priorityChangesInPlace() async throws {
         let arrivals = Arrivals()
-        let rig = try await LoopbackRig.make { request in
+        // The handle's discard is held, so its task is provably not cancelled yet when the live transfers are listed.
+        let staging = FakeStagingSink()
+        let sink = HeldDiscardSink(base: staging)
+        let rig = try await LoopbackRig.make(staging: staging, sink: sink) { request in
             arrivals.signal(request.target)
             return LoopbackResponse(body: TransportFixtures.payload(100_000), ending: .stallAfter(bodyBytes: 10))
         }
@@ -133,8 +136,10 @@ struct ForegroundBackendTests {
         #expect(live.map(\.name) == [request.partialName])
         #expect(live.allSatisfy { $0.backend == .foreground && $0.isRunning })
         handle.cancel()
-        // A cancelling task is no longer a live transfer, whether or not it has completed yet.
+        // A cancelling task is no longer a live transfer, whether or not it has completed yet: here its partial is
+        // still being discarded, so the task itself has not even been cancelled.
         #expect(await rig.foreground.liveTransfers().isEmpty)
+        await sink.release()
         #expect(await run(handle).terminal == .failed(.cancelled(.byClient)))
         // A control after the terminal element changes nothing.
         handle.setPriority(.prefetch)
