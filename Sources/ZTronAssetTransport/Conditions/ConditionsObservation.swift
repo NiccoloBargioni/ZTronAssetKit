@@ -61,19 +61,22 @@ actor ConditionsObservation {
         self.operations = operations
     }
 
-    /// Registers for power and thermal notifications and starts the path observer, all on one serial queue.
+    /// Starts the path observer, then registers for power and thermal notifications, all on one serial queue. The
+    /// path comes first so that a notification can never read `path.current` from an observer that has not started
+    /// (an `NWPathMonitor` that has not started reports an unsatisfied path, which would make the first element a
+    /// spurious offline snapshot instead of the current state, review round 3).
     func start(_ continuation: AsyncStream<DeviceConditions>.Continuation) {
         let path = self.path
         let power = self.power
+        path.start(queue: self.queue) { network in
+            continuation.yield(DeviceConditions(network: network, power: power()))
+        }
         let names = [ProcessInfo.thermalStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange]
         for name in names {
             let token = self.center.addObserver(forName: name, object: nil, queue: self.operations) { _ in
                 continuation.yield(DeviceConditions(network: path.current, power: power()))
             }
             self.tokens.append(token)
-        }
-        path.start(queue: self.queue) { network in
-            continuation.yield(DeviceConditions(network: network, power: power()))
         }
     }
 

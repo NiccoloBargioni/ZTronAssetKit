@@ -20,9 +20,12 @@ struct ConditionsTests {
         }
 
         private let state: Mutex<State>
+        private let onStart: @Sendable () -> Void
 
-        init(_ initial: NetworkConditions) {
+        /// `onStart` runs inside `start`, before the first delivery is queued: what happens as observation begins.
+        init(_ initial: NetworkConditions, onStart: @escaping @Sendable () -> Void = {}) {
             self.state = Mutex(State(current: initial))
+            self.onStart = onStart
         }
 
         func start(queue: DispatchQueue, onUpdate: @escaping @Sendable (NetworkConditions) -> Void) {
@@ -31,6 +34,7 @@ struct ConditionsTests {
                 state.update = onUpdate
                 return state.current
             }
+            self.onStart()
             queue.async { onUpdate(current) }
         }
 
@@ -126,6 +130,33 @@ struct ConditionsTests {
         // One reading for the first element, one per path change (2) and one per notification on `center` (1).
         #expect(reads.count == 4)
         #expect(path.reads == 1)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-9: the first element is the path observer's first delivery, even when a notification arrives as observation starts", .timeLimit(.minutes(1)))
+    func pathStartsBeforeNotifications() async throws {
+        let center = NotificationCenter()
+        let wifi = NetworkConditions(satisfied: true, expensive: false, constrained: false)
+        // A thermal notification delivered the moment the path observer starts, before its first delivery: had the
+        // notification observers been registered first, it would read a path that has not reported yet.
+        let path = ScriptedPath(wifi) {
+            center.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
+        }
+        let power = PowerConditions(lowPowerMode: false, thermal: .fair)
+        let reads = ReadCounter()
+        let source = LiveDeviceConditionsSource(center: center, makePathObserver: { path }, power: {
+            reads.increment()
+            return power
+        })
+        var iterator = await source.conditions().makeAsyncIterator()
+        #expect(await iterator.next() == DeviceConditions(network: wifi, power: power))
+        // Nothing read the path before it reported, and the only power reading is the first element's.
+        #expect(path.reads == 0)
+        #expect(reads.count == 1)
+        // Notifications registered after the start are observed as usual.
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(await iterator.next() == DeviceConditions(network: wifi, power: power))
+        #expect(path.reads == 1 && reads.count == 2)
     }
 
     @available(macOS 15.0, *)
