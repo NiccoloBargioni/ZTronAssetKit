@@ -85,8 +85,13 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
-    @Test("R-CLN-10: a released pack that a transfer downloaded again is released again once adopted", .timeLimit(.minutes(1)))
-    func redownloadedPackIsReleasedAgain() async throws {
+    @Test(
+        "R-CLN-10: a released pack a transfer downloaded again for an adopted asset stays installed until the next catalog generation",
+        .timeLimit(.minutes(1))
+    )
+    func redownloadedPackStaysUntilTheNextGeneration() async throws {
+        // ADR-027 as ruled at the L2 close-out (cycle 3): a pack is released at most once per catalog generation and
+        // never re-armed within one, so an adopted blob evicted and fetched again leaves its pack installed.
         let fixture = AppleTierFixture(
             installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)],
             remote: [Packs.media: pack(mediaA)]
@@ -98,20 +103,32 @@ struct PackReleaseTests {
         #expect(updates.last.map(AppleTransferTests.isStaged) == true, "\(updates)")
         #expect(fixture.backend.installedPacks.contains(Packs.media), "the transfer downloaded the pack again")
 
-        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "same catalog generation")
+        #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "same catalog generation")
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the pack stays until the next generation")
+        #expect(await fixture.source.sourceCopyBytes() == Int64(mediaA.utf8.count), "and its bytes count as a source copy")
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1)
+
+        fixture.backend.install(Packs.catalog, files: AppleTierFixture.catalogPack(Data(#"{"version":2}"#.utf8)))
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false, sequence: 2))
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "a new catalog generation")
         #expect(!fixture.backend.installedPacks.contains(Packs.media))
+        #expect(await fixture.source.sourceCopyBytes() == 0)
         #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 2)
         await fixture.source.invalidate()
     }
 
     @available(macOS 26.0, *)
     @Test(
-        "R-CLN-10: a pack a transfer downloaded again while its release call was running is released again once adopted",
+        "R-CLN-10: a pack a transfer downloaded again while its release call was running stays released for that generation",
         .timeLimit(.minutes(1))
     )
-    func redownloadDuringReleaseIsReleasedAgain() async throws {
-        let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)], remote: [Packs.media: pack(mediaA)])
+    func redownloadDuringReleaseStaysReleased() async throws {
+        let fixture = AppleTierFixture(
+            installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)],
+            remote: [Packs.media: pack(mediaA)]
+        )
         let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
         fixture.backend.holdRemove(Packs.media)
         let reclaim = Task {
             await fixture.source.reclaimSourceCopies(report)
@@ -126,9 +143,61 @@ struct PackReleaseTests {
         fixture.backend.releaseRemove(Packs.media)
         #expect(await reclaim.value.released == ["ZTronMedia"])
 
-        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "released once more")
-        #expect(!fixture.backend.installedPacks.contains(Packs.media), "no copy stays next to the adopted blob")
+        #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "released once in this generation")
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the copy stays until the next generation")
+        #expect(await fixture.source.sourceCopyBytes() == Int64(mediaA.utf8.count))
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1)
+
+        fixture.backend.install(Packs.catalog, files: AppleTierFixture.catalogPack(Data(#"{"version":2}"#.utf8)))
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false, sequence: 2))
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "a new catalog generation")
         #expect(await fixture.source.sourceCopyBytes() == 0)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test(
+        "R-CLN-10: requesting an excluded asset after its pack's release removes the pack once per catalog generation, never in a loop",
+        .timeLimit(.minutes(1))
+    )
+    func excludedAssetRequestsNeverLoopTheRelease() async throws {
+        // Verifier probe PROBE-C1-1g (ADR-027): the retention scope excludes `viewed`, which the pack holds; the store
+        // evicts out-of-scope entries first, so the asset is viewed on demand again and again. Re-arming the release
+        // on each staged copy removed and downloaded the whole pack once per request-then-maintenance round.
+        let adopted = PackAsset("ZTronMedia/a.bin", "adopted asset")
+        let viewed = PackAsset("ZTronMedia/x.bin", "excluded by the retention scope, viewed on demand")
+        let files = [adopted.path: adopted.bytes, viewed.path: viewed.bytes]
+        let fixture = AppleTierFixture(
+            installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: files],
+            remote: [Packs.media: files]
+        )
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        let report = AdoptionReport(
+            manifestRemotePaths: [adopted.remotePath, viewed.remotePath],
+            adoptedRemotePaths: [adopted.remotePath],
+            excludedRemotePaths: [viewed.remotePath]
+        )
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"])
+        for round in 1...4 {
+            let updates = await collect(await fixture.source.transfer(viewed.request(sequence: UInt32(round + 1))))
+            #expect(updates.last.map(AppleTransferTests.isStaged) == true, "round \(round): \(updates)")
+            #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "round \(round): released again")
+        }
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1, "one removal per generation")
+        #expect(fixture.backend.calls.filter { $0 == .ensure(Packs.media) }.count == 1, "one download per generation")
+        #expect(fixture.backend.installedPacks.contains(Packs.media))
+
+        // A new catalog generation releases the pack once again, and again never more than once.
+        fixture.backend.install(Packs.catalog, files: AppleTierFixture.catalogPack(Data(#"{"version":2}"#.utf8)))
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false, sequence: 2))
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "a new catalog generation")
+        for round in 5...6 {
+            let updates = await collect(await fixture.source.transfer(viewed.request(sequence: UInt32(round + 1))))
+            #expect(updates.last.map(AppleTransferTests.isStaged) == true, "round \(round): \(updates)")
+            #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "round \(round): released again")
+        }
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 2, "one removal per generation")
+        #expect(fixture.backend.calls.filter { $0 == .ensure(Packs.media) }.count == 2, "one download per generation")
         await fixture.source.invalidate()
     }
 

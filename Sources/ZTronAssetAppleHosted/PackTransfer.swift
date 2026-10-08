@@ -159,28 +159,24 @@ struct PackTransferDriver: Sendable {
         await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
     }
 
-    /// Turns a finished attempt into the terminal element; also the test seam for the window between a finished
-    /// copy and that element (tests call it with an attempt they staged themselves).
+    /// Turns the terminal element a finished attempt proposes into the one the stream ends with; also the test seam
+    /// for the window between a finished copy and that element (tests call it with a copy they staged themselves).
     ///
     /// The element is claimed against the handle's controls in one decision (`PackTransferStop.claimTerminal()`):
-    /// a pause or cancel recorded before the claim replaces the attempt's element, discarding a staged copy, and one
+    /// a pause or cancel recorded before the claim replaces the proposed element, discarding a staged copy, and one
     /// arriving later is a no-op, as a control after the terminal element is (ADR-021); nothing between the claim and
-    /// the yield is visible to the consumer. A pack this attempt downloaded on demand has its release forgotten only
-    /// when a staged copy is delivered, so it is released once more after that asset is adopted (R-CLN-10); a skew,
-    /// a failure or a stop re-arms nothing, so a pack lacking a catalog entry is never removed and downloaded again
-    /// in a loop within one catalog generation (ADR-027).
-    func conclude(_ attempt: AttemptResult) async -> TransferUpdate {
-        var terminal = attempt.terminal
-        if let stop = self.stop.claimTerminal() {
-            if case .staged(let file) = terminal {
-                await self.parts.copier.discard(file.name)
-            }
-            terminal = stop.terminal
+    /// the yield is visible to the consumer. Nothing here touches pack releases: a pack this attempt downloaded on
+    /// demand after its release stays released for the catalog generation and installed until the next one, whatever
+    /// the attempt ended with, so no request can make maintenance remove and download a whole pack in a loop
+    /// (ADR-027, R-CLN-10).
+    func conclude(_ proposed: TransferUpdate) async -> TransferUpdate {
+        guard let stop = self.stop.claimTerminal() else {
+            return proposed
         }
-        if let pack = attempt.downloaded, case .staged = terminal {
-            await self.parts.state.forgetRelease(pack)
+        if case .staged(let file) = proposed {
+            await self.parts.copier.discard(file.name)
         }
-        return terminal
+        return stop.terminal
     }
 
     /// Ends the stream with `terminal`. A consumer can drop the stream after the terminal was claimed and before this
@@ -197,22 +193,15 @@ struct PackTransferDriver: Sendable {
         updates.finish()
     }
 
-    /// What one attempt ended with, before the handle's controls are consulted.
-    struct AttemptResult: Sendable, Hashable {
-        /// The terminal element the attempt proposes.
-        var terminal: TransferUpdate
-        /// The pack this attempt made available on demand after finding it or the file absent, if any.
-        var downloaded: PackID?
-    }
-
-    private func attempt() async -> AttemptResult {
+    /// The terminal element one attempt proposes, before the handle's controls are consulted.
+    private func attempt() async -> TransferUpdate {
         guard let location = PackLocation(remotePath: self.request.remotePath) else {
             self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): remote path is not a pack location")
-            return AttemptResult(terminal: .failed(.rejected(.invalidURL)))
+            return .failed(.rejected(.invalidURL))
         }
         var outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
         guard case .sourceMissing = outcome else {
-            return AttemptResult(terminal: await self.settle(outcome))
+            return await self.settle(outcome)
         }
         switch await self.ensure(location.pack) {
         case .available:
@@ -220,12 +209,12 @@ struct PackTransferDriver: Sendable {
         case .failed(let error):
             let reason = String(describing: error)
             self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): pack \(location.pack) unavailable: \(reason)")
-            return AttemptResult(terminal: .failed(PackErrorMapping.transferError(error)))
+            return .failed(PackErrorMapping.transferError(error))
         case .cancelled:
-            return AttemptResult(terminal: .failed(.cancelled(.byClient)))
+            return .failed(.cancelled(.byClient))
         }
         outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
-        return AttemptResult(terminal: await self.settle(outcome), downloaded: location.pack)
+        return await self.settle(outcome)
     }
 
     /// The staged bytes are capped at the catalog size when it is known, so a pack file that grew is stopped early.

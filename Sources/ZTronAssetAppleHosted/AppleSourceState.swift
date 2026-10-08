@@ -39,11 +39,10 @@ actor AppleSourceState {
 
     private var catalogETag: ETag?
     private var generation: UInt64 = 0
+    /// Packs released in this generation. Nothing removes a pack from it within the generation, not even a transfer
+    /// that downloads the pack again on demand (ADR-027 as ruled at the L2 close-out, cycle 3).
     private var released: Set<PackID> = []
     private var releasing: Set<PackID> = []
-    /// Packs in `releasing` that a transfer of this source made available again while their release call ran: the
-    /// call may have returned after the download, so its success must not mark the pack released (E-10(b)).
-    private var forgottenWhileReleasing: Set<PackID> = []
     private var adoptedPacks: Set<PackID> = []
 
     /// Creates an open state.
@@ -205,9 +204,10 @@ actor AppleSourceState {
     // MARK: Releases and source copies (R-CLN-9, R-CLN-10, H-7)
 
     /// Records the installed catalog's digest. A new digest starts a new release generation, in which a media pack
-    /// may be released once more (ADR-027: at most once per pack per generation, so a pack that comes back is never
-    /// released in a loop). The first digest of the process does not: releases made before it (an offline launch's
-    /// maintenance) belong to the generation it opens, so they are neither repeated nor reported twice.
+    /// may be released once more (ADR-027: at most once per pack per generation, so a pack that comes back, whether
+    /// the OS restored it or a transfer of this source downloaded it on demand, is never released in a loop). The
+    /// first digest of the process does not: releases made before it (an offline launch's maintenance) belong to the
+    /// generation it opens, so they are neither repeated nor reported twice.
     func noteCatalog(_ etag: ETag?) {
         guard etag != self.catalogETag else {
             return
@@ -230,32 +230,19 @@ actor AppleSourceState {
         return ReleasePlan(packs: packs, generation: self.generation)
     }
 
-    /// Ends one planned release; a success counts for the generation it was planned in only, and not at all when a
-    /// transfer made the pack available again while the call ran (`forgetRelease`): the removal may have run before
-    /// that download, so the pack may be installed again. If it ran after it, the next reclaim gets `packNotFound`,
-    /// which counts as released.
+    /// Ends one planned release; a success counts for the generation it was planned in only. It counts even when a
+    /// transfer made the pack available again while the call ran: the pack is released at most once per generation,
+    /// so a copy downloaded around the removal stays installed until the next generation (ADR-027).
     func finishRelease(_ pack: PackID, succeeded: Bool, generation: UInt64) {
         self.releasing.remove(pack)
-        let forgotten = self.forgottenWhileReleasing.remove(pack) != nil
-        if succeeded && generation == self.generation && !forgotten {
+        if succeeded && generation == self.generation {
             self.released.insert(pack)
         }
     }
 
-    /// Forgets that `pack` was released in this generation because a transfer of this source downloaded it again on
-    /// demand and staged an asset from it (an adopted blob was evicted or repaired and fetched once more): once its
-    /// entries are adopted again it is released once more. Only a staged copy does this — never a transfer that
-    /// ended in skew, failed or was stopped, and never the OS bringing a pack back on its own — so releases still
-    /// never loop. A release call still running for `pack` is remembered as forgotten too.
-    func forgetRelease(_ pack: PackID) {
-        self.released.remove(pack)
-        if self.releasing.contains(pack) {
-            self.forgottenWhileReleasing.insert(pack)
-        }
-    }
-
     /// Media packs holding adopted content, sorted. Released packs stay listed: the OS reports no bytes for a removed
-    /// pack, and a pack a transfer downloaded again holds bytes the device really keeps twice (R-CLN-9).
+    /// pack, and a pack a transfer downloaded again after its release stays installed until the next catalog
+    /// generation, holding bytes the device really keeps twice (R-CLN-9).
     func sourceCopyPacks() -> [PackID] {
         self.adoptedPacks.sorted()
     }

@@ -58,7 +58,7 @@ struct PackTransferStopTests {
         for control in [TransferControl.cancel, .pause] {
             let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: asset.bytes]])
             let request = asset.request()
-            let staged = try await Self.stagedAttempt(of: request, in: fixture, downloaded: nil)
+            let staged = try await Self.stagedCopy(of: request, in: fixture)
             let driver = Self.driver(for: request, in: fixture)
             driver.stop.request(control == .pause ? .pause : .cancel)
             let terminal = await driver.conclude(staged)
@@ -73,10 +73,10 @@ struct PackTransferStopTests {
     func controlAfterClaimIsANoOp() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: asset.bytes]])
         let request = asset.request()
-        let staged = try await Self.stagedAttempt(of: request, in: fixture, downloaded: nil)
+        let staged = try await Self.stagedCopy(of: request, in: fixture)
         let driver = Self.driver(for: request, in: fixture)
         let terminal = await driver.conclude(staged)
-        #expect(terminal == staged.terminal)
+        #expect(terminal == staged)
         driver.stop.request(.cancel)
         driver.stop.request(.pause)
         #expect(driver.stop.requested == nil)
@@ -85,54 +85,60 @@ struct PackTransferStopTests {
     }
 
     @available(macOS 26.0, *)
-    @Test("R-CLN-10: only a delivered staged copy re-arms the release of a pack downloaded on demand", .timeLimit(.minutes(1)))
-    func onlyADeliveredCopyRearmsTheRelease() async throws {
-        let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: asset.bytes]])
+    @Test(
+        "R-CLN-10: a copy staged from a pack downloaded on demand that reaches no consumer leaves the pack released for the generation",
+        .timeLimit(.minutes(1))
+    )
+    func undeliveredCopyLeavesThePackReleased() async throws {
+        // Verifier probe PROBE-C1-6: the consumer drops the stream after the driver claimed the terminal element and
+        // before it yields it. Here the stream has no consumer at all and no stop is wired to it, which is the state
+        // after the claim. The driver used to re-arm the release before the yield, so the pack was removed and
+        // downloaded again although no consumer received the copy.
+        let fixture = AppleTierFixture(
+            installed: [Packs.media: [asset.path: asset.bytes]],
+            remote: [Packs.media: [asset.path: asset.bytes]]
+        )
         let report = AdoptionReport(manifestRemotePaths: [asset.remotePath], adoptedRemotePaths: [asset.remotePath])
         #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"])
 
-        // The pack came back for this transfer, but the transfer was cancelled before its terminal was claimed.
-        fixture.backend.install(Packs.media, files: [asset.path: asset.bytes])
-        let cancelledRequest = asset.request(sequence: 2)
-        let cancelled = Self.driver(for: cancelledRequest, in: fixture)
-        cancelled.stop.request(.cancel)
-        let cancelledAttempt = try await Self.stagedAttempt(of: cancelledRequest, in: fixture, downloaded: Packs.media)
-        #expect(await cancelled.conclude(cancelledAttempt) == .failed(.cancelled(.byClient)))
-        #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "a stopped transfer re-arms nothing")
-
-        // The same download delivered as a staged copy: the pack is released once more after adoption.
-        let deliveredRequest = asset.request(sequence: 3)
-        let deliveredAttempt = try await Self.stagedAttempt(of: deliveredRequest, in: fixture, downloaded: Packs.media)
-        #expect(await Self.driver(for: deliveredRequest, in: fixture).conclude(deliveredAttempt) == deliveredAttempt.terminal)
-        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"])
+        let request = asset.request(sequence: 2)
+        await Self.driver(for: request, in: fixture).run()
+        #expect(fixture.backend.calls.filter { $0 == .ensure(Packs.media) }.count == 1, "the pack was downloaded on demand")
+        #expect(fixture.staging.contents[request.partialName] == nil, "the copy nobody received is discarded")
+        #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "released once in this generation")
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1)
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the pack stays until the next generation")
         await fixture.source.invalidate()
     }
 
-    /// A driver over the fixture's source with its own stop, as `PackTransferHandle.start` builds one.
+    /// A driver over the fixture's source with its own stop, as `PackTransferHandle.start` builds one, yielding into
+    /// `updates`; without one, into a stream nobody holds (a consumer that dropped it after the terminal was claimed,
+    /// since no stop is wired to it).
     @available(macOS 26.0, *)
-    static func driver(for request: TransferRequest, in fixture: AppleTierFixture) -> PackTransferDriver {
+    static func driver(
+        for request: TransferRequest,
+        in fixture: AppleTierFixture,
+        updates: AsyncStream<TransferUpdate>.Continuation? = nil
+    ) -> PackTransferDriver {
         let parts = PackTransferDriver.Parts(
             copier: fixture.source.copier,
             packs: fixture.source.packs,
             state: fixture.source.state,
             log: fixture.source.log
         )
-        let (_, updates) = AsyncStream.makeStream(of: TransferUpdate.self)
-        return PackTransferDriver(request: request, parts: parts, updates: updates, stop: PackTransferStop())
+        let continuation = updates ?? AsyncStream.makeStream(of: TransferUpdate.self).continuation
+        return PackTransferDriver(request: request, parts: parts, updates: continuation, stop: PackTransferStop())
     }
 
-    /// Copies the asset into `request`'s staging file as an attempt would, and returns that attempt's staged result.
+    /// Copies the asset into `request`'s staging file as an attempt would, and returns the staged element the
+    /// attempt proposes.
     @available(macOS 26.0, *)
-    static func stagedAttempt(
-        of request: TransferRequest,
-        in fixture: AppleTierFixture,
-        downloaded: PackID?
-    ) async throws -> PackTransferDriver.AttemptResult {
+    static func stagedCopy(of request: TransferRequest, in fixture: AppleTierFixture) async throws -> TransferUpdate {
         let location = try #require(PackLocation(remotePath: request.remotePath))
         let copied = await fixture.source.copier.copy(location, as: request.partialName, maxBytes: request.maxBytes)
         let size = Int64(asset.bytes.count)
         try #require(copied == .copied(bytes: size, digest: ContentHash.sha256(of: asset.bytes)))
         let file = StagedFile(name: request.partialName, byteCount: size, resumed: false, httpStatus: nil, etag: nil)
-        return PackTransferDriver.AttemptResult(terminal: .staged(file), downloaded: downloaded)
+        return .staged(file)
     }
 }
