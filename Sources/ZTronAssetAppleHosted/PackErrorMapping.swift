@@ -6,8 +6,10 @@ import ZTronAssetModel
 /// The concrete error types `ensureLocalAvailability`, `checkForUpdates` and `remove` throw are UNVERIFIED
 /// (APPLE-API-VERIFICATION §1.8), so an undocumented system error must never become `integrity`: that would make the
 /// engine quarantine good content (transport-2 T2-12). An `NSURLErrorDomain` code reuses the connectivity rows of the
-/// URLError table (transport.md §3.4.2), so an offline pack download is reported as offline; every other system
-/// error is `transient(.unknown)`, which the engine backs off and retries. Pure, so every row is tested on the host.
+/// URLError table (transport.md §3.4.2), so an offline pack download is reported as offline; a full disk (`ENOSPC`,
+/// `NSFileWriteOutOfSpaceError`) is `insufficientSpace`, so the engine frees space instead of retrying into a full
+/// device; every other system error is `transient(.unknown)`, which the engine backs off and retries. Pure, so every
+/// row is tested on the host.
 enum PackErrorMapping {
     /// A `PackError` from the pack seam.
     static func transferError(_ error: PackError) -> TransferError {
@@ -67,10 +69,14 @@ enum PackErrorMapping {
         }
     }
 
-    /// An undocumented system error: connectivity codes of `NSURLErrorDomain` keep their meaning, everything else is
+    /// An undocumented system error: connectivity codes of `NSURLErrorDomain` keep their meaning, an out-of-space
+    /// code is `insufficientSpace` (the space a pack download needs is unknown here), everything else is
     /// `transient(.unknown)`. A code of another domain is not a URL error code, so it is reported as 0 (the source
-    /// logs the domain and code).
+    /// logs the domain and code). Which errors BackgroundAssets throws is UNVERIFIED (APPLE-API-VERIFICATION §1.8).
     static func systemError(domain: String, code: Int) -> TransferError {
+        if (domain == NSPOSIXErrorDomain && code == Int(ENOSPC)) || (domain == NSCocoaErrorDomain && code == NSFileWriteOutOfSpaceError) {
+            return .insufficientSpace(requiredBytes: nil)
+        }
         guard domain == NSURLErrorDomain else {
             return .transient(.unknown(urlErrorCode: 0), retryAfter: nil)
         }

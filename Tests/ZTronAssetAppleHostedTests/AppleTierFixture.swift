@@ -115,6 +115,7 @@ final class GatedStagingSink: StagingSink {
         var held: [CheckedContinuation<Void, Never>] = []
         var arrivalWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
         var events: [String] = []
+        var writeLimits: [Int64] = []
     }
 
     let base = FakeStagingSink()
@@ -170,6 +171,11 @@ final class GatedStagingSink: StagingSink {
         self.state.withLock { $0.events }
     }
 
+    /// The `maxBytes` of every `writeStaged` call, in order.
+    var writeLimits: [Int64] {
+        self.state.withLock { $0.writeLimits }
+    }
+
     /// Appends a note to `events`.
     func note(_ event: String) {
         self.state.withLock { $0.events.append(event) }
@@ -179,6 +185,7 @@ final class GatedStagingSink: StagingSink {
         defer {
             self.note("write returned")
         }
+        self.state.withLock { $0.writeLimits.append(maxBytes) }
         await self.pass(.beforeWrite)
         let result: Result<Int64, StagingError>
         do {

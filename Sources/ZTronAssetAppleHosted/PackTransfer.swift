@@ -166,7 +166,7 @@ struct PackTransferDriver: Sendable {
         if case .sourceMissing = outcome {
             switch await self.ensure(location.pack) {
             case .available:
-                // A pack released earlier and downloaded again for this asset may be released once more (R-CLN-9).
+                // A pack released earlier and downloaded again for this asset may be released once more (R-CLN-10).
                 await self.parts.state.forgetRelease(location.pack)
             case .failed(let error):
                 let reason = String(describing: error)

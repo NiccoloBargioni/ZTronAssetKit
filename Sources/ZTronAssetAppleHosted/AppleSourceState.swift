@@ -41,6 +41,9 @@ actor AppleSourceState {
     private var generation: UInt64 = 0
     private var released: Set<PackID> = []
     private var releasing: Set<PackID> = []
+    /// Packs in `releasing` that a transfer of this source made available again while their release call ran: the
+    /// call may have returned after the download, so its success must not mark the pack released (E-10(b)).
+    private var forgottenWhileReleasing: Set<PackID> = []
     private var adoptedPacks: Set<PackID> = []
 
     /// Creates an open state.
@@ -227,10 +230,14 @@ actor AppleSourceState {
         return ReleasePlan(packs: packs, generation: self.generation)
     }
 
-    /// Ends one planned release; a success counts for the generation it was planned in only.
+    /// Ends one planned release; a success counts for the generation it was planned in only, and not at all when a
+    /// transfer made the pack available again while the call ran (`forgetRelease`): the removal may have run before
+    /// that download, so the pack may be installed again. If it ran after it, the next reclaim gets `packNotFound`,
+    /// which counts as released.
     func finishRelease(_ pack: PackID, succeeded: Bool, generation: UInt64) {
         self.releasing.remove(pack)
-        if succeeded && generation == self.generation {
+        let forgotten = self.forgottenWhileReleasing.remove(pack) != nil
+        if succeeded && generation == self.generation && !forgotten {
             self.released.insert(pack)
         }
     }
@@ -238,9 +245,12 @@ actor AppleSourceState {
     /// Forgets that `pack` was released in this generation because a transfer of this source made it available
     /// again (an adopted blob was evicted or repaired and fetched once more): once its entries are adopted again it
     /// is released once more. Only the source's own demand does this, never the OS bringing a pack back on its own,
-    /// so releases still never loop.
+    /// so releases still never loop. A release call still running for `pack` is remembered as forgotten too.
     func forgetRelease(_ pack: PackID) {
         self.released.remove(pack)
+        if self.releasing.contains(pack) {
+            self.forgottenWhileReleasing.insert(pack)
+        }
     }
 
     /// Media packs holding adopted content, sorted. Released packs stay listed: the OS reports no bytes for a removed

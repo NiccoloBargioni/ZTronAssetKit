@@ -50,6 +50,7 @@ final class FakePackBackend: PackBackend {
     private enum Held {
         case ensure(PackID, CheckedContinuation<EnsureStep?, Never>)
         case check(CheckedContinuation<CheckStep?, Never>)
+        case remove(PackID, CheckedContinuation<Bool?, Never>)
     }
 
     private struct CallWaiter {
@@ -65,6 +66,8 @@ final class FakePackBackend: PackBackend {
         var ensureSteps: [PackID: [EnsureStep]] = [:]
         var checkSteps: [CheckStep] = []
         var removeFailures: [PackID: PackError] = [:]
+        var removeHolds: Set<PackID> = []
+        var pendingRemoveReleases: Set<PackID> = []
         var installedBytesOverride: [PackID: Int64] = [:]
         var calls: [Call] = []
         var held: [UInt64: Held] = [:]
@@ -109,6 +112,32 @@ final class FakePackBackend: PackBackend {
     /// Makes `remove(pack)` throw `error` (`nil`: succeed again).
     func failRemove(_ pack: PackID, with error: PackError?) {
         self.state.withLock { $0.removeFailures[pack] = error }
+    }
+
+    /// Makes the next `remove(pack)` take effect at once but return only after `releaseRemove(pack)`: a release call
+    /// the OS has not returned from yet, while the pack is already gone.
+    func holdRemove(_ pack: PackID) {
+        self.state.withLock { _ = $0.removeHolds.insert(pack) }
+    }
+
+    /// Lets every held `remove(pack)` return (or the next one, like `releaseEnsure`).
+    func releaseRemove(_ pack: PackID) {
+        let continuations = self.state.withLock { state -> [CheckedContinuation<Bool?, Never>] in
+            var found: [CheckedContinuation<Bool?, Never>] = []
+            for (key, held) in state.held {
+                if case .remove(let heldPack, let continuation) = held, heldPack == pack {
+                    found.append(continuation)
+                    state.held[key] = nil
+                }
+            }
+            if found.isEmpty {
+                state.pendingRemoveReleases.insert(pack)
+            }
+            return found
+        }
+        for continuation in continuations {
+            continuation.resume(returning: true)
+        }
     }
 
     /// Reports `bytes` for `pack` instead of the sum of its files.
@@ -280,13 +309,20 @@ final class FakePackBackend: PackBackend {
         }
     }
 
+    /// Removes the pack, then records the call (so a test that waited for it sees the pack gone), then holds the
+    /// return when `holdRemove(pack)` asked for it.
     func remove(_ pack: PackID) async throws(PackError) {
-        self.record(.remove(pack))
-        let failure = self.state.withLock { state -> PackError? in
+        let (failure, holding) = self.state.withLock { state -> (PackError?, Bool) in
+            let holding = state.removeHolds.remove(pack) != nil
             if let failure = state.removeFailures[pack] {
-                return failure
+                return (failure, holding)
             }
-            return state.installed.removeValue(forKey: pack) == nil ? .packNotFound : nil
+            return (state.installed.removeValue(forKey: pack) == nil ? .packNotFound : nil, holding)
+        }
+        self.record(.remove(pack))
+        if holding {
+            let pending = { (state: inout State) -> Bool? in state.pendingRemoveReleases.remove(pack).map { _ in true } }
+            _ = await self.hold(pending: pending, cancellable: false, { .remove(pack, $0) })
         }
         if let failure {
             throw failure
@@ -375,6 +411,8 @@ final class FakePackBackend: PackBackend {
             case .ensure(_, let continuation):
                 continuation.resume(returning: nil)
             case .check(let continuation):
+                continuation.resume(returning: nil)
+            case .remove(_, let continuation):
                 continuation.resume(returning: nil)
             case nil:
                 break

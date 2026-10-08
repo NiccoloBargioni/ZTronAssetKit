@@ -312,4 +312,10 @@ struct AppleCatalogTests {
         }
         #expect(fixture.backend.calls.isEmpty)
     }
+
+    @Test("R-APL-4: update-check results keep only valid pack identifiers")
+    func updateCheckIdentifiers() {
+        let check = PackUpdateCheck(updatingIDs: ["ZTronMedia", "../x"], removedIDs: ["ZTronExtras", ""])
+        #expect(check == PackUpdateCheck(updating: [PackID(rawValue: "ZTronMedia")!], removed: [PackID(rawValue: "ZTronExtras")!]))
+    }
 }

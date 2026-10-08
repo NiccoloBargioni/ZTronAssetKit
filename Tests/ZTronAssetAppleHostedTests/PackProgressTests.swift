@@ -128,6 +128,44 @@ struct PackProgressTests {
         }
     }
 
+    @Test("R-APL-2: scaled progress is exact integer arithmetic and never traps for an asset size near Int64.max")
+    func scalerArithmeticIsExact() {
+        var exact = PackProgressScaler(expectedBytes: 100)
+        #expect(exact.received(for: PackProgress(completed: 29, total: 100)) == 29, "0.29 × 100 is 28.999… in Double")
+        let top = Int64.max
+        var largest = PackProgressScaler(expectedBytes: top)
+        #expect(largest.received(for: PackProgress(completed: 1, total: 2)) == top / 2)
+        #expect(largest.received(for: PackProgress(completed: top, total: top)) == top)
+        var nearTop = PackProgressScaler(expectedBytes: top - 511)
+        #expect(nearTop.received(for: PackProgress(completed: 1, total: 1)) == top - 511, "Double rounds this to 2^63")
+        var hugeTotal = PackProgressScaler(expectedBytes: top)
+        #expect(hugeTotal.received(for: PackProgress(completed: top - 1, total: top)) == top - 1)
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-2: progress reported under another flight's id never reaches the current flight's waiters", .timeLimit(.minutes(1)))
+    func progressOfAnotherFlightIsDropped() async throws {
+        let backend = FakePackBackend(remote: [Packs.media: ["a.png": Data("a".utf8)]])
+        backend.scriptEnsure(Packs.media, [.hold])
+        let coordinator = PackAvailabilityCoordinator(backend: backend)
+        let (stream, progress) = AsyncStream.makeStream(of: PackProgress.self)
+        let waiter = Task {
+            await coordinator.ensure(Packs.media, progress: progress)
+        }
+        await coordinator.waitForWaiters(on: Packs.media, count: 1)
+        // A value an abandoned flight took from its stream just before it was cancelled (E-6): never this flight's.
+        await coordinator.broadcast(PackProgress(completed: 1, total: 4), pack: Packs.media, flightID: .max)
+        backend.releaseEnsure(Packs.media, with: .install(progress: [PackProgress(completed: 3, total: 4)]))
+        #expect(await waiter.value == .available)
+        progress.finish()
+        var received: [PackProgress] = []
+        for await value in stream {
+            received.append(value)
+        }
+        #expect(received == [PackProgress(completed: 3, total: 4)], "only the current flight's progress")
+        await coordinator.close()
+    }
+
     @Test("R-APL-2: unknown totals and empty assets report no progress, and overshoot is clamped")
     func scalerEdges() {
         var unknownTotal = PackProgressScaler(expectedBytes: 100)

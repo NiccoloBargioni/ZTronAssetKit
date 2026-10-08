@@ -5,10 +5,11 @@ import Testing
 @testable import ZTronAssetAppleHosted
 import ZTronAssetModel
 
-/// R-APL-2 / R-NET-6: Apple-tier failures in the closed taxonomy (APPLE-API-VERIFICATION §1.8).
+/// R-NET-6: Apple-tier failures in the closed taxonomy (APPLE-API-VERIFICATION §1.8); R-APL-2: the BackgroundAssets
+/// error types at the live boundary.
 @Suite("Apple tier: error mapping")
 struct PackErrorMappingTests {
-    @Test("R-APL-2: undocumented pack errors map to transient and never to integrity")
+    @Test("R-NET-6: undocumented pack errors map to transient and never to integrity")
     func undocumentedErrorsAreTransient() {
         let seed: UInt64 = 0xA9_1E
         var random = SplitMix64(seed: seed)
@@ -22,12 +23,13 @@ struct PackErrorMappingTests {
                 PackErrorMapping.transferError(StagingError.source(.system(domain: domain, code: code)), expectedBytes: nil),
             ] {
                 let failure = error.failureClass
-                #expect(failure == .transient || failure == .offline, "seed \(seed) round \(round): \(domain) \(code) → \(error)")
+                let allowed: Set<FailureClass> = Self.isOutOfSpace(domain: domain, code: code) ? [.insufficientSpace] : [.transient, .offline]
+                #expect(failure.map(allowed.contains) == true, "seed \(seed) round \(round): \(domain) \(code) → \(error)")
             }
         }
     }
 
-    @Test("R-APL-2: URL connectivity codes keep their meaning and other domains are unknown")
+    @Test("R-NET-6: URL connectivity codes keep their meaning and other domains are unknown")
     func urlCodesKeepTheirMeaning() {
         let table: [(Int, TransferError)] = [
             (NSURLErrorNotConnectedToInternet, .offline(.noConnection)),
@@ -51,7 +53,7 @@ struct PackErrorMappingTests {
         #expect(PackErrorMapping.systemError(domain: NSPOSIXErrorDomain, code: Int(ENOENT)) == .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
     }
 
-    @Test("R-APL-2: documented pack and staging failures map to their transfer errors")
+    @Test("R-NET-6: documented pack and staging failures map to their transfer errors")
     func documentedFailures() {
         #expect(PackErrorMapping.transferError(PackError.packNotFound) == .permanentMissing(httpStatus: 404))
         #expect(PackErrorMapping.transferError(PackError.fileNotFound) == .permanentMissing(httpStatus: 404))
@@ -67,13 +69,23 @@ struct PackErrorMappingTests {
         #expect(PackErrorMapping.transferError(StagingError.source(.notFound), expectedBytes: nil) == .permanentMissing(httpStatus: 404))
     }
 
-    @Test("R-APL-2: a pack error met while opening a file is reported to the sink as a source failure")
+    @Test("R-NET-6: a pack error met while opening a file is reported to the sink as a source failure")
     func sourceFailures() {
         #expect(PackErrorMapping.sourceFailure(.packNotFound) == .notInstalled)
         #expect(PackErrorMapping.sourceFailure(.fileNotFound) == .notFound)
         #expect(PackErrorMapping.sourceFailure(.system(domain: "d", code: 3)) == .system(domain: "d", code: 3))
         #expect(PackErrorMapping.sourceFailure(.readFailed) == .readFailed)
         #expect(PackErrorMapping.sourceFailure(.tooLarge(limit: 1)) == .readFailed)
+    }
+
+    @Test("R-NET-6: an out-of-space pack error is insufficientSpace, so the engine frees space instead of retrying")
+    func outOfSpaceIsInsufficientSpace() {
+        let full = TransferError.insufficientSpace(requiredBytes: nil)
+        #expect(PackErrorMapping.systemError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC)) == full)
+        #expect(PackErrorMapping.systemError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError) == full)
+        #expect(PackErrorMapping.transferError(PackError.system(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))) == full)
+        #expect(PackErrorMapping.systemError(domain: NSPOSIXErrorDomain, code: Int(EDOM)) == .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
+        #expect(PackErrorMapping.systemError(domain: NSCocoaErrorDomain, code: Int(ENOSPC)) == .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
     }
 
     @available(macOS 26.0, *)
@@ -83,5 +95,9 @@ struct PackErrorMappingTests {
         #expect(LiveAssetPackBackend.packError(ManagedBackgroundAssetsError.fileNotFound(at: FilePath("a.png"))) == .fileNotFound)
         let network = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
         #expect(LiveAssetPackBackend.packError(network) == .system(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet))
+    }
+
+    private static func isOutOfSpace(domain: String, code: Int) -> Bool {
+        (domain == NSPOSIXErrorDomain && code == Int(ENOSPC)) || (domain == NSCocoaErrorDomain && code == NSFileWriteOutOfSpaceError)
     }
 }

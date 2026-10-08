@@ -28,8 +28,11 @@ struct PackProgressScaler: Sendable {
             return nil
         }
         let completed = min(max(progress.completed, 0), progress.total)
-        let fraction = Double(completed) / Double(progress.total)
-        let value = min(self.expectedBytes, Int64((Double(self.expectedBytes) * fraction).rounded(.down)))
+        // Exact: `expectedBytes × completed / total` in 128-bit integers, rounded down. Because
+        // `0 ≤ completed ≤ total`, the quotient is at most `expectedBytes` and cannot overflow; a `Double` product
+        // rounds sizes within 512 bytes of `Int64.max` up to 2^63 and traps on the conversion, and is inexact
+        // (0.29 × 100 = 28.999…).
+        let value = progress.total.dividingFullWidth(self.expectedBytes.multipliedFullWidth(by: completed)).quotient
         if let last = self.lastReported {
             let step = self.step
             guard value > last, value - last >= step || value == self.expectedBytes else {

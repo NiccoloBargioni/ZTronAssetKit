@@ -104,6 +104,8 @@ actor PackAvailabilityCoordinator {
     /// calling task was cancelled (so a test's time limit ends a wait that a defect would make endless). `registered`
     /// runs on the actor once the wait is registered, so a test can cancel a wait it knows is pending.
     func waitForWaiters(on pack: PackID, count: Int, registered: (@Sendable () -> Void)? = nil) async {
+        // REENTRANCY: e-5 (proposed) — nothing: a terminal wait (see `wait(for:registered:)`); the caller re-reads
+        // the census.
         await self.wait(for: .waiters(pack, count: count), registered: registered)
     }
 
@@ -111,6 +113,8 @@ actor PackAvailabilityCoordinator {
     /// (their last waiter left, or the coordinator closed), the coordinator closed, or the calling task was cancelled.
     /// Such a report is ignored; this lets a test order a newer flight after it.
     func waitForStaleCompletions(_ count: Int) async {
+        // REENTRANCY: e-5 (proposed) — nothing: a terminal wait (see `wait(for:registered:)`); the caller re-reads
+        // the census.
         await self.wait(for: .staleCompletions(count: count), registered: nil)
     }
 

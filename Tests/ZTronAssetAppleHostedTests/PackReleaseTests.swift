@@ -105,6 +105,34 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test(
+        "R-CLN-10: a pack a transfer downloaded again while its release call was running is released again once adopted",
+        .timeLimit(.minutes(1))
+    )
+    func redownloadDuringReleaseIsReleasedAgain() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)], remote: [Packs.media: pack(mediaA)])
+        let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+        fixture.backend.holdRemove(Packs.media)
+        let reclaim = Task {
+            await fixture.source.reclaimSourceCopies(report)
+        }
+        await fixture.backend.waitFor(.remove(Packs.media))
+        #expect(!fixture.backend.installedPacks.contains(Packs.media), "the pack is gone, the release call has not returned")
+
+        // The adopted blob was evicted meanwhile; the engine fetches it again while the release call still runs.
+        let updates = await collect(await fixture.source.transfer(PackAsset(mediaA, mediaA).request()))
+        #expect(updates.last.map(AppleTransferTests.isStaged) == true, "\(updates)")
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the transfer downloaded the pack again")
+        fixture.backend.releaseRemove(Packs.media)
+        #expect(await reclaim.value.released == ["ZTronMedia"])
+
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "released once more")
+        #expect(!fixture.backend.installedPacks.contains(Packs.media), "no copy stays next to the adopted blob")
+        #expect(await fixture.source.sourceCopyBytes() == 0)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-10: a failed release is reported and planned again by the next reclaim", .timeLimit(.minutes(1)))
     func failedReleaseIsRetried() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)])

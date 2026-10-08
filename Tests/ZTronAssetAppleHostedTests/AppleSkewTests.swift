@@ -31,14 +31,20 @@ struct AppleSkewTests {
     @Test("R-APL-4: a pack file of another size than the catalog's is skew, stopped at the catalog size", .timeLimit(.minutes(1)))
     func sizeSkewIsTransient() async throws {
         let asset = PackAsset("ZTronMedia/images/a.heic", "0123456789")
-        let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: Data("0123456789abcdef".utf8)]])
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: Data("0123456789abcdef".utf8)]], staging: gated)
         let larger = await collect(await fixture.source.transfer(asset.request()))
         fixture.backend.install(Packs.media, files: [asset.path: Data("01234".utf8)])
         let smaller = await collect(await fixture.source.transfer(asset.request(sequence: 2)))
 
         #expect(larger == [.failed(.transient(.sourceVersionSkew, retryAfter: nil))])
         #expect(smaller == [.failed(.transient(.sourceVersionSkew, retryAfter: nil))])
-        #expect(fixture.staging.contents.isEmpty)
+        #expect(gated.writeLimits == [10, 10], "each copy is capped at the catalog's 10 bytes, not at the 1 MiB maxBytes")
+        #expect(
+            fixture.tap.lines.contains { $0.category == .apple && $0.message.contains("larger than the catalog says") },
+            "the 16-byte file was stopped by the cap, not copied whole and compared afterwards"
+        )
+        #expect(gated.base.contents.isEmpty)
         await fixture.source.invalidate()
     }
 
