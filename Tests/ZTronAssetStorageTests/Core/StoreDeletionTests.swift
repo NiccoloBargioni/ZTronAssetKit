@@ -227,9 +227,12 @@ struct DeletionUnitTests {
         let result = await store.reapDeletable(maxKeys: .max)
         clock.setStepping(false)
         #expect(result.filesRemoved == 20)
-        // Each unlink is seen to take 1 ms (one clock read): after two, 2 ms spent plus the slowest unlink (1 ms)
-        // would pass the 2 ms budget, so every unit stops at two and the next one carries on.
-        #expect(await metadata.units - before == 10, "a 2 ms budget that predicts the last 1 ms unlink admits two unlinks per unit")
+        // Each unlink is seen to take 1 ms (one clock read). Before its k-th unlink a unit has spent k − 1 ms and
+        // predicts 1 ms more, so it admits k unlinks while k ms ≤ the budget: one per unit at the 1 ms budget (without
+        // the prediction it would make two, ADR draft B-10), and the next unit carries on.
+        let perUnit = max(1, Int((BlobDeletionUnit.budget * 1_000).rounded(.down)))
+        #expect(perUnit == 1)
+        #expect(await metadata.units - before == (20 + perUnit - 1) / perUnit, "the budget that predicts the last 1 ms unlink admits \(perUnit) per unit")
         #expect(await store.state.core.blobTable.isEmpty)
         let removed = fake.operations.filter { $0.kind == .removeItem && $0.url.path.contains("/blobs/") }.map(\.url)
         #expect(removed == payloads.map { CoreFixture.layout.blobURL(CoreFixture.key($0)) }.sorted { $0.lastPathComponent < $1.lastPathComponent })

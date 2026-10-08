@@ -11,16 +11,17 @@ extension ZTronAssetKitBenchmarks {
     /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
     /// (`.build-tests/`, git-ignored). Every threshold comes from `QualityBudgets`.
     ///
-    /// **Statistics (ADR draft B-9).** Durations are judged on their p95, never their maximum: the store design
-    /// measured single-sample tails 2–3× the p95 on this Mac (store.md §11 R1), which are scheduler noise on a shared
-    /// machine and would make a max-based budget flaky (Q-5); a regression moves the p95. P-5's budget applies to the
-    /// ordered commit a bulk sync performs (≤ 4/s); durable commits (flush, close, adoption report) are judged on
-    /// their median, because their tail is the device-wide cache flush of `F_FULLFSYNC`, shared with every other
-    /// process's I/O. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
+    /// **Statistics (ADR draft B-9, as ruled by the orchestrator at the L2 close-out).** P-2 judges the p95 of cold
+    /// loads. P-5 judges **both** the ordered commit a bulk sync performs and the durable one (flush, close, adoption
+    /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
+    /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
     /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
-    /// alive. P-13's batch budget is applied to the p95 of the deletion-unit durations; the maximum is printed beside
-    /// it, so a single slow outlier stays visible (ADR draft B-9). C2 has no budget key: its test reports the longest
-    /// hold of the store's actor seen by a probe, best of five runs, against the rule's own 10 ms.
+    /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+    /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
+    /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+    /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
+    /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
+    /// runs, against the rule's own 10 ms.
     @Suite("StorageBenchmarks")
     struct StorageBenchmarks {
         @Test("P-2: cold index load of 10,000 records off the main thread is under budget", .timeLimit(.minutes(1)))
@@ -105,11 +106,7 @@ extension ZTronAssetKitBenchmarks {
                 let p95 = StorageBench.percentile(timings, 0.95)
                 let p50 = StorageBench.percentile(timings, 0.5)
                 report.append("\(durability) p50 \(p50) ms, p95 \(p95) ms, max \(timings.max() ?? 0) ms")
-                if durability == .ordered {
-                    #expect(p95 <= commitBudget, "ordered commit p95 \(p95) ms")
-                } else {
-                    #expect(p50 <= commitBudget, "durable commit p50 \(p50) ms")
-                }
+                #expect(p95 <= commitBudget, "\(durability) commit p95 \(p95) ms")
             }
             // The rate: a simulated ten-second bulk sync on the manual clock, the engine's alarm served at every
             // deadline, commits counted per sliding second.
@@ -224,12 +221,17 @@ extension ZTronAssetKitBenchmarks {
             let work = await store.runDueWork()
             let total = StorageBench.milliseconds(ContinuousClock.now - started) / 1_000
             let units = timer.durations
+            let onCPU = timer.onCPUDurations
             await store.close()
-            let p95 = StorageBench.percentile(units, 0.95)
-            print("P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(p95) ms, max \(units.max() ?? 0) ms; budgets \(totalBudget) s, \(batchBudget) ms")
+            let longest = units.max() ?? 0
+            let slowUnits = units.indices.filter { units[$0] > batchBudget }.map { "\(units[$0]) ms wall, \(onCPU[$0]) ms on CPU" }
+            let unlinks = try StorageBench.unlinkProfile(count: 2_000)
+            print(
+                "P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit max \(longest) ms (p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(StorageBench.percentile(units, 0.95)) ms); budgets \(totalBudget) s, \(batchBudget) ms per batch; unit time budget \(BlobDeletionUnit.budget * 1_000) ms; unlink profile of this volume: p50 \(StorageBench.percentile(unlinks, 0.5)) ms, p99 \(StorageBench.percentile(unlinks, 0.99)) ms, max \(unlinks.max() ?? 0) ms; unit on-CPU max \(onCPU.max() ?? 0) ms; units over the batch budget: \(slowUnits)"
+            )
             #expect(work.reapedKeys == count && work.reapedBytes == Int64(64 * count))
             #expect(total <= totalBudget)
-            #expect(p95 <= batchBudget)
+            #expect(longest <= batchBudget, "every batch between suspension points: the longest deletion unit took \(longest) ms")
             #expect(units.count >= count / StoreConfiguration().deletionBatchSize)
         }
 
@@ -367,6 +369,25 @@ enum StorageBench {
         return AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
     }
 
+    /// The duration of each of `count` unlinks of 64-byte files through `LiveFileSystem.removeItem` in one directory
+    /// inside this repository, in milliseconds: the profile that justifies the deletion unit's time budget (P-13).
+    static func unlinkProfile(count: Int) throws -> [Double] {
+        let directory = try StorageBench.directory("p13-unlinks")
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let fileSystem = LiveFileSystem()
+        let urls = (0..<count).map { directory.appendingPathComponent(String(format: "%064x.png", $0)) }
+        for url in urls {
+            try fileSystem.write(Data(count: 64), to: url, mode: .truncate)
+        }
+        return try urls.map { url in
+            let started = ContinuousClock.now
+            try fileSystem.removeItem(at: url)
+            return StorageBench.milliseconds(ContinuousClock.now - started)
+        }
+    }
+
     /// `count` realistic present records (store.md §2.3's measurement shape).
     static func content(records count: Int) -> IndexContent {
         var records: [AssetID: AssetRecord] = [:]
@@ -469,11 +490,13 @@ enum StorageBench {
     }
 }
 
-/// Records the execution time of every unit run on the wrapped executor (P-13: batches between suspension points).
+/// Records the execution time of every unit run on the wrapped executor (P-13: batches between suspension points):
+/// the wall time, which is what the budget bounds, and the time the unit's thread spent on a CPU meanwhile, which tells
+/// the unit's own work from preemption by other processes (the profile behind ADR draft B-9's P-13 ruling).
 @available(macOS 15.0, *)
 final class TimingExecutor: BlockingExecutor {
     private let base: any BlockingExecutor
-    private let recorded = Mutex<[Double]>([])
+    private let recorded = Mutex<[(wall: Double, onCPU: Double)]>([])
 
     init(_ base: any BlockingExecutor) {
         self.base = base
@@ -482,16 +505,23 @@ final class TimingExecutor: BlockingExecutor {
     func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
         await self.base.run {
             let started = ContinuousClock.now
+            let cpuStarted = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
             let value = work()
+            let onCPU = Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - cpuStarted) / 1_000_000
             let elapsed = StorageBench.milliseconds(ContinuousClock.now - started)
-            self.recorded.withLock { $0.append(elapsed) }
+            self.recorded.withLock { $0.append((elapsed, onCPU)) }
             return value
         }
     }
 
-    /// Unit durations in milliseconds since the last reset.
+    /// Unit wall-clock durations in milliseconds since the last reset.
     var durations: [Double] {
-        self.recorded.withLock { $0 }
+        self.recorded.withLock { $0.map(\.wall) }
+    }
+
+    /// The on-CPU time of each unit's thread in milliseconds since the last reset, in the order of `durations`.
+    var onCPUDurations: [Double] {
+        self.recorded.withLock { $0.map(\.onCPU) }
     }
 
     func reset() {

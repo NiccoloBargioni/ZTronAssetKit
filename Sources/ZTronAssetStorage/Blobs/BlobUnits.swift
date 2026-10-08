@@ -152,10 +152,12 @@ enum BlobDeletionUnit {
         var attempted: Int
     }
 
-    /// The time a deletion unit may take before it yields. P-13 allows 5 ms between suspension points; 3 ms left
-    /// about 2 ms for preemption and a slow last unlink, and a loaded machine used it up (unit p95 5.26–5.27 ms in
-    /// review round 2), so 3 ms of margin are kept.
-    static let budget: TimeInterval = 0.002
+    /// The time a deletion unit may take before it yields. P-13 bounds **every** batch between suspension points by
+    /// `batch_ms_max` (5 ms; orchestrator ruling on ADR draft B-9, L2 close-out), so the unit's own work is kept to a
+    /// fifth of it: one unit plus one slow last unlink stays far below 5 ms, and the remaining 4 ms absorb the
+    /// scheduler. Measured on this Mac (release, 64-byte blobs): a single unlink p50 ≈ 0.05 ms, p99 < 0.3 ms; units of
+    /// the previous 2 ms budget had p50 1.95 ms and maxima of 6–10 ms only under load (preemption), see B-10.
+    static let budget: TimeInterval = 0.001
 
     /// Removes each key's blob until the budget would be spent; absent files count as removed (idempotent sweeps,
     /// R-CLN-12).
