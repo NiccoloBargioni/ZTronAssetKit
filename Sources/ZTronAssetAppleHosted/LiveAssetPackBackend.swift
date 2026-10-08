@@ -1,24 +1,32 @@
 #if canImport(BackgroundAssets)
 import BackgroundAssets
 import Foundation
-import Synchronization
 import System
 import ZTronAssetModel
 
 /// The live pack backend over `AssetPackManager` (R-APL-1): one of the two coverage-excluded, device-only files
-/// (SPEC §4.1, ≤ 250 lines). It uses only the iOS 26.0 surface (`assetPack(withID:)`, `ensureLocalAvailability`,
-/// `statusUpdates`, `descriptor(for:searchingInAssetPackWithID:)`, `checkForUpdates()`,
-/// `remove(assetPackWithID:)`), converts `Foundation.Progress` to `PackProgress` at the boundary (D-12), reads
-/// through `FileHandle(fileDescriptor:closeOnDealloc:)` without pointers, references `AssetPackManager.shared` only
-/// inside method bodies, and maps errors to `PackError` (never integrity). WP-E.
+/// (SPEC §4.1, ≤ 250 lines; working ceiling 100 executable lines). It uses only the iOS 26.0 surface
+/// (`assetPack(withID:)`, `ensureLocalAvailability`, `statusUpdates`, `descriptor(for:searchingInAssetPackWithID:)`,
+/// `checkForUpdates()`, `remove(assetPackWithID:)`, `status(ofAssetPackWithID:)`), converts `Foundation.Progress` to
+/// `PackProgress` at the boundary (D-12), reads through `FileHandle(fileDescriptor:closeOnDealloc:)` without pointers
+/// (the tested `FileHandleChunkReader`), references `AssetPackManager.shared` only inside method bodies, and maps
+/// errors to `PackError` (never integrity). Every decision lives in tested files. WP-E.
 @available(iOS 26.0, macOS 26.0, *)
 public struct LiveAssetPackBackend: PackBackend {
     /// Creates the backend; touches no pack API.
     public init() {}
 
-    /// A lazy descriptor reader.
+    /// A lazy descriptor reader: `descriptor(for:searchingInAssetPackWithID:)` runs on its first read.
     public func reader(for path: String, in pack: PackID) -> any PackFileReader {
-        LivePackFileReader(path: path, pack: pack)
+        FileHandleChunkReader {
+            do {
+                let manager = AssetPackManager.shared
+                let descriptor = try manager.descriptor(for: FilePath(path), searchingInAssetPackWithID: pack.rawValue)
+                return .success(FileHandle(fileDescriptor: descriptor.rawValue, closeOnDealloc: true))
+            } catch {
+                return .failure(Self.packError(error))
+            }
+        }
     }
 
     /// `ensureLocalAvailability(of:)` plus `statusUpdates` progress.
@@ -45,10 +53,7 @@ public struct LiveAssetPackBackend: PackBackend {
     public func checkForUpdates() async throws(PackError) -> PackUpdateCheck {
         do {
             let result = try await AssetPackManager.shared.checkForUpdates()
-            return PackUpdateCheck(
-                updating: Set(result.updatingIDs.compactMap(PackID.init(rawValue:))),
-                removed: Set(result.removedIDs.compactMap(PackID.init(rawValue:)))
-            )
+            return PackUpdateCheck(updatingIDs: result.updatingIDs, removedIDs: result.removedIDs)
         } catch {
             throw Self.packError(error)
         }
@@ -89,37 +94,4 @@ public struct LiveAssetPackBackend: PackBackend {
     }
 }
 
-/// Opens the pack file on the first read, inside the store's bulk executor, and reads it in bounded chunks.
-@available(iOS 26.0, macOS 26.0, *)
-final class LivePackFileReader: PackFileReader {
-    private let path: String
-    private let pack: PackID
-    private let handle: Mutex<FileHandle?>
-
-    init(path: String, pack: PackID) {
-        self.path = path
-        self.pack = pack
-        self.handle = Mutex(nil)
-    }
-
-    func nextChunk(maxBytes: Int) throws(StagingError) -> Data? {
-        try self.handle.withLock { (handle: inout FileHandle?) throws(StagingError) -> Data? in
-            if handle == nil {
-                do {
-                    let descriptor = try AssetPackManager.shared.descriptor(
-                        for: FilePath(self.path), searchingInAssetPackWithID: self.pack.rawValue)
-                    handle = FileHandle(fileDescriptor: descriptor.rawValue, closeOnDealloc: true)
-                } catch {
-                    throw .source(PackErrorMapping.sourceFailure(LiveAssetPackBackend.packError(error)))
-                }
-            }
-            do {
-                let chunk = try handle?.read(upToCount: maxBytes)
-                return chunk?.isEmpty == false ? chunk : nil
-            } catch {
-                throw .source(.readFailed)
-            }
-        }
-    }
-}
 #endif

@@ -178,6 +178,23 @@ struct AppleCatalogTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-APL-4: a fetch cancelled while the catalog pack downloads ends at once and stops the download", .timeLimit(.minutes(1)))
+    func fetchCancelledDuringCatalogDownload() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.catalog: AppleTierFixture.catalogPack()])
+        fixture.backend.scriptEnsure(Packs.catalog, [.hold])
+        let fetch = Task {
+            try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        }
+        await fixture.source.packs.waitForWaiters(on: Packs.catalog, count: 1)
+        fetch.cancel()
+        await #expect(throws: TransferError.cancelled(.byClient)) {
+            try await fetch.value
+        }
+        await fixture.backend.waitFor(.ensureCancelled(Packs.catalog))
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-APL-4: a missing catalog pack while offline reports offline", .timeLimit(.minutes(1)))
     func missingCatalogPackOfflineReportsOffline() async throws {
         let fixture = AppleTierFixture()

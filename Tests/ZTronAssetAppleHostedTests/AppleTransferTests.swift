@@ -165,6 +165,42 @@ struct AppleTransferTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-APL-1: a transfer cancelled before it waits for its pack starts no pack download", .timeLimit(.minutes(1)))
+    func cancelBeforePackWaitStartsNothing() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles], staging: gated)
+        gated.arm()
+        let handle = await fixture.source.transfer(assetA.request())
+        await gated.waitForHeldWrites(1)
+        handle.cancel()
+        gated.open()
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+        #expect(!fixture.backend.calls.contains(.ensure(Packs.media)))
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a stopped transfer whose copy outlives invalidate leaves the copy for staging GC", .timeLimit(.minutes(1)))
+    func stoppedCopyOutlivingInvalidate() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
+        gated.arm()
+        let request = assetA.request()
+        let handle = await fixture.source.transfer(request)
+        await gated.waitForHeldWrites(1)
+        handle.cancel()
+        let invalidation = Task {
+            await fixture.source.invalidate()
+        }
+        await fixture.source.state.waitForDrain()
+        gated.open()
+        await invalidation.value
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+        #expect(gated.base.contents[request.partialName] == assetA.bytes)
+        #expect(!gated.events.contains("discard"))
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-APL-1: dropping the update stream cancels the transfer", .timeLimit(.minutes(1)))
     func droppingTheStreamCancels() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
