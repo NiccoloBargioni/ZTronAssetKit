@@ -70,6 +70,9 @@ Owner: WP-B. The orchestrator numbers these into `DECISIONS.md` at merge (ARCHIT
 - `AssetStore.testSetLease`, `testClearLeases`, `testSetRetentionScope`, `testSetIntegrity`, `testBumpPurgeEpoch`, `testExpect`, `testInsertRecord` (test-target extensions) write WP-C's fields the way WP-C's APIs will, so WP-B's reaper, adoption report and stamp logic are tested before WP-C exists. WP-C may switch these tests to its APIs.
 - Live file-system tests and benchmarks use directories under `.build-tests/` at the repository root (git-ignored through `.build*`), removed by each test.
 
+## Measured in this level (release, this Mac, shared with other worktrees: load average 7–15)
+A passing run of `swift test -c release --scratch-path .build-b-perf -Xswiftc -enable-testing --filter StorageBenchmarks` (load average 14.5): P-2 index load of 10,000 records (1.41 MB) p50 11.3 ms, p95 12.4 ms (budget 25); P-5 ordered commit p50 17.9 ms, p95 21.4 ms, durable p50 29.3 ms, p95 34.0 ms (budget 40), bulk sync 40 commits in 10 s, at most 4 in any second (budget 4); P-6 2,192 MB/s, 0.80× one-shot (2,723 MB/s), peak resident delta 0.0 MiB (floors 800 MB/s, 0.7×, cap 4 MiB); P-13 10,000 blobs in 1.29 s, unit p95 4.9 ms (budgets 2 s, 5 ms). Runs minutes apart on the same build failed during I/O contention spikes from other worktrees (P-5 ordered p50 267–289 ms, P-2 p95 245–265 ms): environment, not the code; the orchestrator's perf run on a quiet machine is the reference.
+
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.1)
 | Row | Await | Re-validated afterwards |
 |---|---|---|
