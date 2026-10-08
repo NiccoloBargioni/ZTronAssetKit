@@ -252,13 +252,14 @@ public final class HTTPRemoteSource: RemoteSource {
 
     /// ADR-026 and transport.md §10.7: a transfer may use the background session only when it is
     /// background-eligible, on the bulk lane, an asset, not a Range resume (the background session cannot continue
-    /// our partial), of a `byteSize` known and within the cap (R-NET-7: the OS downloads a background task whole
-    /// before a byte reaches us, so only the staged size can be checked, and it must equal `byteSize`), and free of
-    /// the key unless the owner accepted redirect exposure. Whether the coordinator has room (not disabled for the
-    /// process, under the task cap) is its own decision, taken together with the reservation (`startIfAdmitted`).
+    /// our partial), of a `byteSize` known, not negative and within the cap (`TransferJob.backgroundByteSize`, R-NET-7:
+    /// the OS downloads a background task whole before a byte reaches us, so only the staged size can be checked, and
+    /// it must equal `byteSize`), and free of the key unless the owner accepted redirect exposure. Whether the
+    /// coordinator has room (not disabled for the process, under the task cap) is its own decision, taken together
+    /// with the reservation (`startIfAdmitted`).
     func routesToBackground(_ request: TransferRequest, job: TransferJob) -> Bool {
         guard request.route == .backgroundEligible, job.priority == .bulk, job.purpose == .asset, job.resume == nil,
-            let expected = job.expectedBytes, expected <= job.maxBytes
+            job.backgroundByteSize != nil
         else {
             return false
         }

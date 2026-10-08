@@ -174,6 +174,10 @@ struct SourceTests {
         RouteCase(key: false, exposure: .refuse, expected: nil, background: false),
         RouteCase(key: false, exposure: .refuse, expected: 1_001, background: false),
         RouteCase(key: false, exposure: .refuse, expected: 1_000, background: true),
+        RouteCase(key: false, exposure: .refuse, expected: 0, background: true),
+        // A negative byteSize is no size at all: its tag would not decode, so the OS task could not be tracked.
+        RouteCase(key: false, exposure: .refuse, expected: -1, background: false),
+        RouteCase(key: false, exposure: .refuse, expected: .min, background: false),
     ]
 
     @available(macOS 15.0, *)
@@ -238,6 +242,44 @@ struct SourceTests {
         await source.cancelTransfer(StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial))
         #expect(await driver.cancellations.isEmpty)
         withExtendedLifetime(background) {}
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-7: a negative byteSize never creates a background task: the source runs it in the foreground and the coordinator refuses it", .timeLimit(.minutes(1)), arguments: [Int64(-1), .min])
+    func negativeSizeStaysInForeground(_ expected: Int64) async throws {
+        let fixtures = try TransportFixtures.directory("negative-size-\(expected)")
+        defer { try? FileManager.default.removeItem(at: fixtures) }
+        let staging = FakeStagingSink()
+        let policy = TransportSecurityPolicy.production(allowedHosts: ["cdn.example.com"])
+        let identifier = try #require(BackgroundSessionIdentifier(namespace: "media"))
+        let driver = FakeBackgroundSessionDriver(identifier: identifier, delegate: SessionDelegate(mode: .background, staging: staging, policy: policy), fixtures: fixtures)
+        let options = BackgroundTransferOptions(namespace: "media", maxTasks: 4)
+        let coordinator = BackgroundTransferCoordinator(driver: driver, staging: staging, options: options)
+        let foreground = FakeTransferBackend()
+        let source = HTTPRemoteSource(
+            configuration: HTTPSourceConfiguration(baseURL: Self.base, background: .enabled(options)),
+            staging: staging,
+            policy: policy,
+            foreground: foreground,
+            background: coordinator,
+            log: .tapOnly(nil)
+        )
+        let request = TransferRequest(
+            id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), remotePath: "v1.bin", expectedBytes: expected,
+            maxBytes: 10, priority: .bulk, route: .backgroundEligible)
+        let handle = await source.transfer(request)
+        #expect(await foreground.jobs.map(\.expectedBytes) == [expected])
+        // Called directly, the coordinator refuses such a job too, so no OS task with an undecodable tag (one that no
+        // callback could route and the next launch would cancel as foreign) is ever created.
+        let job = TransportFixtures.job(
+            id: TransportFixtures.contentID(2), attempt: TransportFixtures.attempt(1), url: BackgroundCoordinatorTests.url, expected: expected,
+            maxBytes: 10, priority: .bulk)
+        #expect(await coordinator.startIfAdmitted(job) == nil)
+        let refused = await coordinator.start(job)
+        try #require(await driver.starts.isEmpty)
+        #expect(await run(refused).terminal == .failed(.transient(.backgroundSessionUnavailable(urlErrorCode: NSURLErrorUnknown), retryAfter: nil)))
+        #expect(await coordinator.admits())
+        withExtendedLifetime(handle) {}
     }
 
     @available(macOS 15.0, *)

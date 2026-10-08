@@ -227,9 +227,9 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         guard !self.invalidated else {
             return Self.refused(job, .cancelled(.byClient))
         }
-        // R-NET-7: the source routes only bounded transfers here; anything else goes back to the foreground, whose
-        // size guard aborts while streaming.
-        guard let expected = job.expectedBytes, expected <= job.maxBytes else {
+        // R-NET-7: the source routes only bounded transfers here; anything else (no size, a negative one, or one past
+        // the cap) goes back to the foreground, whose size guard aborts while streaming.
+        guard let expected = job.backgroundByteSize else {
             return Self.refused(job, .transient(.backgroundSessionUnavailable(urlErrorCode: NSURLErrorUnknown), retryAfter: nil))
         }
         // REENTRANCY: D-2 (proposed) — activation; nothing is read between it and the listing below.
@@ -344,9 +344,10 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     /// before the first await, so concurrent callers cannot exceed `maxTasks` together (a separate `admits()` then
     /// `start` let each of them pass the check while the others were still listing tasks). `nil`, with nothing
     /// started and background left enabled, when the cap is reached, the session is disabled or invalidated, or the
-    /// job is unbounded (R-NET-7): the source then runs it in the foreground.
+    /// job has no background size (`TransferJob.backgroundByteSize`, R-NET-7): the source then runs it in the
+    /// foreground.
     package func startIfAdmitted(_ job: TransferJob) async -> (any TransferHandle)? {
-        guard self.admits(), let expected = job.expectedBytes, expected <= job.maxBytes else {
+        guard self.admits(), job.backgroundByteSize != nil else {
             return nil
         }
         self.reserved += 1

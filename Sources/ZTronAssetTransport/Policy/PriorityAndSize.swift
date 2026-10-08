@@ -57,3 +57,19 @@ public enum SizeGuard {
         max(limit, 0)
     }
 }
+
+extension TransferJob {
+    /// The size a background task may be created for (R-NET-7): the manifest's `byteSize` when it is known, not
+    /// negative and within the cap; `nil` otherwise, and the transfer runs in the foreground, whose size guard aborts
+    /// while streaming. The OS downloads a background task whole, so only the staged size can be checked against it.
+    /// A negative size would also be written into a task tag that `BackgroundTaskTag(decoding:)` refuses, so no
+    /// callback could route the OS task and the next launch would cancel it as foreign (close-out probe VDC-H2). The
+    /// bounds are compared one by one, never as a range, so a negative cap cannot trap. One rule for the source's
+    /// routing and both coordinator entry points.
+    var backgroundByteSize: Int64? {
+        guard let expected = self.expectedBytes, expected >= 0, expected <= self.maxBytes else {
+            return nil
+        }
+        return expected
+    }
+}
