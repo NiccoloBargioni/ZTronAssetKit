@@ -171,11 +171,20 @@ struct StorePublishTests {
         entry.byteSize = 299
         _ = try await harness.store.open()
         _ = try await harness.store.apply(CoreFixture.manifest([entry]), etag: nil, eviction: nil)
-        let staged = try await harness.stage(bytes, for: entry)
+        let installsBefore = await harness.sink.offeredKeys.count
+        let staged = try await harness.stage(bytes, for: entry, sidecar: true)
         await #expect(throws: StoreError.integrity(.sizeMismatch(expected: 299, actual: 300))) {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        #expect(!harness.fileSystem.operations.contains { $0.kind == .read && $0.url.lastPathComponent.hasSuffix(".verifying") })
+        #expect(!harness.fileSystem.operations.contains { $0.kind == .read && $0.url.lastPathComponent.hasSuffix(".verifying") }, "nothing was hashed")
+        // R-INT-2: the staged bytes (the claimed file and its sidecar) are deleted, as for a checksum mismatch.
+        for kind in [StagingFileName.Kind.partial, .verifying, .sidecar] {
+            #expect(!harness.exists(harness.layout.stagingURL(staged.name.with(kind: kind))), "\(kind) left behind")
+        }
+        #expect(await harness.store.metrics().integrityFailures == 1)
+        #expect(!harness.exists(harness.layout.blobURL(CoreFixture.key(bytes))))
+        #expect(await harness.store.location(for: entry.identifier, extensions: [], recordingAccess: false) == nil)
+        #expect(await harness.sink.offeredKeys.count == installsBefore)
     }
 
     @Test("R-INT-5: unverified entries are rejected when allowUnverifiedAssets is false and flagged unverified otherwise", .timeLimit(.minutes(1)))
