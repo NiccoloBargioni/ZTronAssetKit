@@ -29,6 +29,39 @@ struct FileHandleChunkReaderTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-APL-1: overlapping first reads continue on the handle stored first and never read from two handles")
+    func overlappingFirstReadsShareOneHandle() throws {
+        let first = Pipe()
+        let second = Pipe()
+        try first.fileHandleForWriting.write(contentsOf: Data("first".utf8))
+        try first.fileHandleForWriting.close()
+        try second.fileHandleForWriting.write(contentsOf: Data("second".utf8))
+        try second.fileHandleForWriting.close()
+        let shared = Mutex<FileHandleChunkReader?>(nil)
+        let opens = Mutex(0)
+        let nestedChunk = Mutex<Data?>(nil)
+        let reader = FileHandleChunkReader {
+            let call = opens.withLock { count -> Int in
+                count += 1
+                return count
+            }
+            guard call == 1 else {
+                return .success(second.fileHandleForReading)
+            }
+            // A second pull arrives while the first is still opening (the open runs outside the reader's lock).
+            let nested = shared.withLock { $0 }
+            let chunk = try? nested?.nextChunk(maxBytes: 3)
+            nestedChunk.withLock { $0 = chunk }
+            return .success(first.fileHandleForReading)
+        }
+        shared.withLock { $0 = reader }
+        let outer = try reader.nextChunk(maxBytes: 3)
+        #expect(nestedChunk.withLock { $0 } == Data("sec".utf8), "the nested pull opened and stored its handle first")
+        #expect(outer == Data("ond".utf8), "the outer pull reads on from the stored handle, not the one it opened")
+        #expect(opens.withLock { $0 } == 2)
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-APL-1: an absent pack or file asks for the pack and a failed read is readFailed")
     func failuresMapToSourceFailures() {
         for (error, expected) in [
