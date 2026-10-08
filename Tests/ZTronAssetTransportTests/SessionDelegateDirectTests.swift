@@ -176,6 +176,9 @@ struct SessionDelegateDirectTests {
         var maxBytes: Int64 = 1 << 30
         var marker: TaskMarker?
         var errorCode: Int?
+        var status = 200
+        /// A strong validator, so a sidecar would be written if the ending were mistaken for a resumable loss.
+        var validated = false
         var outcome: TransferUpdate
 
         var testDescription: String {
@@ -197,6 +200,17 @@ struct SessionDelegateDirectTests {
                outcome: .failed(.cancelled(.byClient))),
         Ending(label: "a pause raced by the completion", staged: 4_000, expected: 4_000, marker: .pause,
                outcome: .staged(StagedFile(name: SessionDelegateDirectTests.name, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil))),
+        // The guard's cancel can follow a completion with another error already queued: the verdict still stands.
+        Ending(label: "a byteSize verdict before a lost connection", staged: 1_500, expected: 1_000, marker: .exceedsExpected(written: 1_500),
+               errorCode: NSURLErrorNetworkConnectionLost, validated: true, outcome: .failed(.integrity(.sizeMismatch(expected: 1_000, actual: 1_500)))),
+        Ending(label: "an oversize verdict before a timeout", staged: 3_000, expected: nil, maxBytes: 2_000, marker: .oversize(announced: nil),
+               errorCode: NSURLErrorTimedOut, validated: true, outcome: .failed(.integrity(.oversize(announced: nil, limit: 2_000)))),
+        Ending(label: "a full disk before a timeout", staged: 4_000, expected: 8_000, marker: .staging(.insufficientSpace),
+               errorCode: NSURLErrorTimedOut, validated: true, outcome: .failed(.insufficientSpace(requiredBytes: 8_000))),
+        Ending(label: "a range mismatch before a lost connection", staged: 4_000, expected: 8_000, marker: .rangeMismatch,
+               errorCode: NSURLErrorNetworkConnectionLost, validated: true, outcome: .failed(.transient(.resumeRejected, retryAfter: nil))),
+        Ending(label: "an error body past its evidence cap before a lost connection", staged: 0, expected: 8_000, marker: .finalStatus,
+               errorCode: NSURLErrorNetworkConnectionLost, status: 404, validated: true, outcome: .failed(.permanentMissing(httpStatus: 404))),
     ]
 
     @available(macOS 15.0, *)
@@ -212,7 +226,8 @@ struct SessionDelegateDirectTests {
         _ = try staging.appendPartial(TransportFixtures.payload(ending.staged), to: job.partialName)
         let task = session.dataTask(with: Self.url)
         task.taskDescription = ending.marker?.encoded
-        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]))
+        let headers = ending.validated ? ["ETag": "\"v1\""] : [:]
+        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: ending.status, httpVersion: "HTTP/1.1", headerFields: headers))
         let error = ending.errorCode.map { NSError(domain: NSURLErrorDomain, code: $0) }
         let outcome = delegate.foregroundOutcome(task: task, job: job, response: response, error: error)
         #expect(outcome == ending.outcome)
@@ -240,5 +255,60 @@ struct SessionDelegateDirectTests {
         #expect(await events.next() == .finished(name: full, update: .staged(StagedFile(name: full, byteCount: 700, resumed: false, httpStatus: 200, etag: nil))))
         #expect(staging.contents[full] == TransportFixtures.payload(700))
     }
-}
 
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a response that arrives after the client's discard opens no partial, moves no earlier partial, and stops the task", .timeLimit(.minutes(1)))
+    func responseAfterDiscard() async throws {
+        let staging = FakeStagingSink()
+        let delegate = SessionDelegate(mode: .foreground, staging: staging, policy: Self.policy)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let earlier = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial)
+        try staging.createPartial(earlier)
+        _ = try staging.appendPartial(TransportFixtures.payload(300), to: earlier)
+        let tag = try #require(ETag(rawValue: "\"v1\""))
+        let fresh = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(2), url: Self.url, expected: 1_000)
+        let resumed = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(3), url: Self.url, expected: 1_000,
+                                            resume: ResumePoint(previous: earlier, offset: 300, validator: .strongETag(tag)))
+        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Length": "1000"]))
+        for job in [fresh, resumed] {
+            let (_, continuation) = AsyncStream.makeStream(of: TransferUpdate.self)
+            let task = session.dataTask(with: Self.url)
+            task.delegate = TaskMailbox(continuation: continuation, job: job)
+            TaskMarker.requestDiscard(on: task)
+            let disposition = await withCheckedContinuation { result in
+                delegate.urlSession(session, dataTask: task, didReceive: response) { result.resume(returning: $0) }
+            }
+            #expect(disposition == .cancel)
+            #expect(staging.contents[job.partialName] == nil)
+        }
+        // The earlier attempt's partial is left exactly where and as it was.
+        #expect(staging.contents[earlier] == TransportFixtures.payload(300))
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-7: a chunk that arrives after a verdict or the client's discard is not written, while a pausing task keeps writing", .timeLimit(.minutes(1)))
+    func chunkAfterMarker() async throws {
+        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]))
+        let cases: [(TaskMarker, Int)] = [(.discard, 0), (.oversize(announced: nil), 0), (.exceedsExpected(written: 2_000), 0), (.pause, 50)]
+        for (marker, kept) in cases {
+            let staging = FakeStagingSink()
+            let delegate = SessionDelegate(mode: .foreground, staging: staging, policy: Self.policy)
+            let session = URLSession(configuration: .ephemeral)
+            let job = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.url, expected: 1_000)
+            try staging.createPartial(job.partialName)
+            let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self)
+            let task = session.dataTask(with: Self.url)
+            let mailbox = TaskMailbox(continuation: continuation, job: job)
+            task.delegate = mailbox
+            task.taskDescription = marker.encoded
+            delegate.receive(TransportFixtures.payload(50), task: task, mailbox: mailbox, response: response)
+            #expect(staging.contents[job.partialName]?.count == kept, "\(marker)")
+            // A written chunk is reported (the first one always is); an ignored one is not.
+            continuation.finish()
+            var iterator = updates.makeAsyncIterator()
+            #expect(await iterator.next() == (kept > 0 ? .progress(received: 50, expected: 1_000) : nil), "\(marker)")
+            session.invalidateAndCancel()
+        }
+    }
+}

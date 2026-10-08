@@ -14,7 +14,7 @@ extension SessionDelegate {
 
     /// Decides what to do with a response before any body byte arrives: success statuses open (or continue) the
     /// partial and pass the announced size through the size guard; other statuses are let through so their body
-    /// length can serve as 403 evidence.
+    /// length can serve as 403 evidence. A task the client already discarded is stopped without touching staging.
     public func urlSession(
         _ session: URLSession,
         dataTask: URLSessionDataTask,
@@ -22,6 +22,11 @@ extension SessionDelegate {
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
         guard let mailbox = dataTask.delegate as? TaskMailbox else {
+            completionHandler(.cancel)
+            return
+        }
+        guard TaskMarker(decoding: dataTask.taskDescription) != .discard else {
+            // The client discarded this transfer and its cancel is on its way: open, move or truncate nothing.
             completionHandler(.cancel)
             return
         }
@@ -39,6 +44,12 @@ extension SessionDelegate {
         guard let mailbox = dataTask.delegate as? TaskMailbox, let http = dataTask.response as? HTTPURLResponse else {
             return
         }
+        self.receive(data, task: dataTask, mailbox: mailbox, response: http)
+    }
+
+    /// One chunk of `dataTask`'s body under `http`: the data callback passes the task's response; tests pass one,
+    /// since an unresumed task has none (ARCHITECTURE §14).
+    package func receive(_ data: Data, task dataTask: URLSessionDataTask, mailbox: TaskMailbox, response http: HTTPURLResponse) {
         let job = mailbox.job
         guard Self.isStagedStatus(http.statusCode, job: job) else {
             if dataTask.countOfBytesReceived > Self.errorBodyEvidenceCap {
@@ -283,21 +294,26 @@ extension SessionDelegate {
         return .staged(StagedFile(name: job.partialName, byteCount: staged, resumed: resumed, httpStatus: http.statusCode, etag: facts.etag))
     }
 
+    /// The outcome of a task that ended with `error`. A delegate verdict stands whatever the error: the guard's
+    /// `cancel()` can follow a completion with another error (a lost connection, a timeout) that was already queued
+    /// behind the chunk it judged, and that error must neither hide the verdict nor keep the judged bytes for resume.
+    /// Only a client pause depends on the error being the cancellation it asked for.
     private func failureOutcome(task: URLSessionTask, job: TransferJob, http: HTTPURLResponse?, error: any Error, marker: TaskMarker?) -> TransferUpdate {
-        let errorFacts = HTTPResponseReading.errorFacts(error)
-        if errorFacts.code == NSURLErrorCancelled, let marker {
-            switch marker {
-            case .pause:
-                return .paused(resumable: self.keepForResume(job: job, http: http))
-            case .finalStatus:
-                // Set only after a response arrived.
-                let completed = http.map { self.completedOutcome(task: task, job: job, http: $0, marker: marker) }
-                return completed ?? .failed(.transient(.badServerResponse, retryAfter: nil))
-            default:
-                if let verdict = Self.verdict(of: marker, job: job) {
-                    return verdict
-                }
+        switch marker {
+        case .finalStatus?:
+            // Set only after a response arrived.
+            let completed = http.map { self.completedOutcome(task: task, job: job, http: $0, marker: .finalStatus) }
+            return completed ?? .failed(.transient(.badServerResponse, retryAfter: nil))
+        case let marker?:
+            if let verdict = Self.verdict(of: marker, job: job) {
+                return verdict
             }
+        case nil:
+            break
+        }
+        let errorFacts = HTTPResponseReading.errorFacts(error)
+        if errorFacts.code == NSURLErrorCancelled, marker == .pause {
+            return .paused(resumable: self.keepForResume(job: job, http: http))
         }
         let failure = TransferClassifier.classify(
             urlErrorCode: errorFacts.code,
