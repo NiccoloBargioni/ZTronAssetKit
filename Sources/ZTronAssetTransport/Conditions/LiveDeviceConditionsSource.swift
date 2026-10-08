@@ -34,14 +34,61 @@ public enum ConditionsMapping {
 public final class LiveDeviceConditionsSource: DeviceConditionsSource {
     /// The notification center for power and thermal changes.
     public let center: NotificationCenter
+    private let makePathObserver: @Sendable () -> any PathObserving
+    private let power: @Sendable () -> PowerConditions
+    private let registry = ObservationRegistry()
 
     /// Creates the source (no observation starts until `conditions()`).
     public init(center: NotificationCenter = .default) {
         self.center = center
+        self.makePathObserver = { LivePathObserver() }
+        self.power = LiveDeviceConditionsSource.processPower
     }
 
-    /// Starts one observation (`.bufferingNewest(1)`).
+    /// The path-ingest seam of ARCHITECTURE §6.5: an `NWPath` change cannot be injected in-process, so tests give
+    /// their own path observer (and may give the power reading) and drive both halves without the network.
+    package init(
+        center: NotificationCenter,
+        makePathObserver: @escaping @Sendable () -> any PathObserving,
+        power: @escaping @Sendable () -> PowerConditions = LiveDeviceConditionsSource.processPower
+    ) {
+        self.center = center
+        self.makePathObserver = makePathObserver
+        self.power = power
+    }
+
+    /// Starts one observation (`.bufferingNewest(1)`): the path observer's first delivery is the current state;
+    /// every later path change and every power or thermal notification on `center` yields a full snapshot.
     public func conditions() async -> AsyncStream<DeviceConditions> {
-        fatalError("WP-D: LiveDeviceConditionsSource.conditions not implemented")
+        let (stream, continuation) = AsyncStream.makeStream(of: DeviceConditions.self, bufferingPolicy: .bufferingNewest(1))
+        let observation = ConditionsObservation(center: self.center, path: self.makePathObserver(), power: self.power)
+        let registry = self.registry
+        await registry.add()
+        continuation.onTermination = { _ in
+            Task {
+                await observation.stop()
+                await registry.remove()
+            }
+        }
+        await observation.start(continuation)
+        return stream
+    }
+
+    /// Observations started and not yet stopped (the census an idle engine is checked against, R-SYN-14).
+    package var activeObservations: Int {
+        get async {
+            await self.registry.active
+        }
+    }
+
+    /// Returns once exactly `count` observations are active (a terminated one stops after a hop); event-driven.
+    package func waitForObservations(equalTo count: Int) async {
+        await self.registry.wait(for: count)
+    }
+
+    /// `ProcessInfo`'s Low Power Mode and thermal state.
+    package static let processPower: @Sendable () -> PowerConditions = {
+        let info = ProcessInfo.processInfo
+        return PowerConditions(lowPowerMode: info.isLowPowerModeEnabled, thermal: ConditionsMapping.thermal(info.thermalState))
     }
 }
