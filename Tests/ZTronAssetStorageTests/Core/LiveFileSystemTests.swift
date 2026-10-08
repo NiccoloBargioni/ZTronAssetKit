@@ -148,6 +148,33 @@ struct LiveFileSystemTests {
         }
         #expect(try fileSystem.read(from: file, offset: 0, maxLength: 0).isEmpty)
     }
+
+    @Test("R-STO-6: the live conformer reports a capacity query on a vanished root and a refused attribute write as typed errors")
+    func liveCapacityAndAttributeFailures() throws {
+        let directory = try CoreFixture.liveDirectory("capacity")
+        let locked = directory.appendingPathComponent("locked.bin")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let fileSystem = LiveFileSystem()
+        // `freeSpace()` over a root that vanished surfaces a typed error, never a bogus figure.
+        #expect(throws: FileSystemError.notFound) {
+            _ = try fileSystem.availableCapacity(at: directory.appendingPathComponent("vanished", isDirectory: true), for: .important)
+        }
+        #expect(try fileSystem.availableCapacity(at: directory, for: .opportunistic) > 0)
+        // Backup exclusion is an extended attribute: on an item the process may not write it is refused with an error
+        // of the closed taxonomy. Foundation reports it as NSFileWriteUnknownError over an OSStatus on this macOS (so
+        // `.io`, an unknown write failure); a release that reports NSFileWriteNoPermissionError maps to
+        // `.permissionDenied`.
+        try fileSystem.write(Data([1]), to: locked, mode: .truncate)
+        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: locked.path)
+        let refused = #expect(throws: FileSystemError.self) {
+            try fileSystem.applyStoreAttributes(.storeDefault, at: locked)
+        }
+        #expect(refused == .io || refused == .permissionDenied, "\(String(describing: refused))")
+        #expect(try fileSystem.storeAttributes(at: locked).excludedFromBackup == false, "nothing was applied")
+    }
 }
 
 /// Builds stores over `LiveFileSystem` for the live tests.
