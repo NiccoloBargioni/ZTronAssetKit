@@ -423,6 +423,30 @@ struct BackgroundCoordinatorTests {
         await rig.driver.releaseCancel()
         #expect(await run(handle).terminal == .paused(resumable: true))
         #expect(await coordinator.keptResumeData(for: job.partialName) == data)
+        // Nothing is outstanding any more, so no pump is left parked on the session stream (T2-10).
+        #expect(await !coordinator.isPumping)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-3: the pump ends once it absorbed a pause's cancellation, also when the paused handle's consumer then goes away", .timeLimit(.minutes(1)))
+    func pumpEndsAfterAbsorbedPause() async throws {
+        let rig = try Rig("pause-absorbed")
+        defer { rig.cleanUp() }
+        await rig.driver.setResumeData(ResumeData(bytes: Data("archived".utf8)), holdingCancellationEvents: false)
+        let coordinator = rig.coordinator()
+        let handle = try #require(await coordinator.start(rig.job()) as? BackgroundTransferHandle)
+        await rig.driver.holdNextCancel(.afterReporting)
+        handle.pause()
+        await rig.awaitSignal("cancel")
+        // The events barrier: once it returns, the pump has processed the reported cancellation.
+        await rig.driver.finishEvents()
+        await coordinator.awaitBackgroundEvents()
+        // Only the pause's own call still waits (for the resume data); the session stream has nothing left for us.
+        #expect(await !coordinator.isPumping)
+        await coordinator.consumerGone(handle.name, token: handle.token)
+        #expect(await !coordinator.isPumping)
+        #expect(await rig.driver.cancellations.count == 1)
+        await rig.driver.releaseCancel()
     }
 
     @available(macOS 15.0, *)

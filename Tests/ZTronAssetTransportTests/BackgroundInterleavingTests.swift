@@ -64,6 +64,29 @@ struct BackgroundInterleavingTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-10: a priority change from a handle replaced while it listed the tasks never reaches the transfer that replaced it", .timeLimit(.minutes(1)))
+    func replacedDuringPriorityChange() async throws {
+        let rig = try Rig("replaced-during-priority")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let job = rig.job(1)
+        let first = try #require(await coordinator.start(job) as? BackgroundTransferHandle)
+        await rig.driver.holdNextSnapshot(.afterListing)
+        let changing = Task { await coordinator.setPriority(.userInitiated, of: first.name, token: first.token) }
+        await rig.awaitSignal("snapshot")
+        // A later start for the same content joins the live task while the first handle's listing is in flight.
+        let second = await coordinator.start(rig.job(2))
+        #expect(second.attempt == job.attempt)
+        await rig.driver.releaseSnapshot()
+        await changing.value
+        #expect(await rig.driver.priorityChanges.isEmpty)
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        #expect(await run(first).terminal == .failed(.cancelled(.byClient)))
+        await rig.driver.complete(job.partialName, body: TransportFixtures.payload(4_000))
+        #expect(await run(second).terminal == Self.staged(job))
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-3: dropping a handle while a later start lists the tasks never ends the later transfer", .timeLimit(.minutes(1)))
     func dropDuringStart() async throws {
         let rig = try Rig("drop-during-start")
@@ -217,6 +240,32 @@ struct BackgroundInterleavingTests {
         #expect(next.attempt == job.attempt)
         #expect(await run(next).terminal == Self.staged(job))
         #expect(await rig.driver.starts.count == 1)
+        withExtendedLifetime(firstLaunch) {}
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-3: a buffered download is handed only to a start that expects its size, else a new download is created", .timeLimit(.minutes(1)))
+    func bufferedOutcomeOfAnotherSize() async throws {
+        let rig = try Rig("buffered-other-size")
+        defer { rig.cleanUp() }
+        // Checksum-less identities are keyed by identifier and path only: the manifest may change their size.
+        let legacy = { (sequence: UInt32, expected: Int64) in
+            TransportFixtures.job(
+                id: TransportFixtures.legacyID, attempt: TransportFixtures.attempt(sequence), url: BackgroundCoordinatorTests.url, expected: expected, priority: .bulk)
+        }
+        let job = legacy(1, 4_000)
+        let firstLaunch = await rig.coordinator().start(job)
+        await rig.relaunch()
+        await rig.driver.complete(job.partialName, body: TransportFixtures.payload(4_000))
+        await rig.driver.finishEvents()
+        let coordinator = rig.coordinator()
+        await coordinator.awaitBackgroundEvents()
+        let changed = legacy(2, 5_000)
+        let next = await coordinator.start(changed)
+        #expect(next.attempt == changed.attempt)
+        #expect(await rig.driver.starts.map(\.name) == [job.partialName, changed.partialName])
+        await rig.driver.complete(changed.partialName, body: TransportFixtures.payload(5_000))
+        #expect(await run(next).terminal == Self.staged(changed, bytes: 5_000))
         withExtendedLifetime(firstLaunch) {}
     }
 

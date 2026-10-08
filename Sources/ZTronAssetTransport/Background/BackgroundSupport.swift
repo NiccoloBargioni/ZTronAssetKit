@@ -226,7 +226,12 @@ package actor BackgroundTransferCoordinator: TransferBackend {
             return Self.refused(job, .cancelled(.byClient))
         }
         if let name = self.outcomes.first(where: { $0.transfer == job.id }), let staged = self.outcomes.remove(name) {
-            return ImmediateTransferHandle(id: job.id, attempt: staged.name.attempt, terminal: .staged(staged))
+            // Only bytes of the size this job expects: a checksum-less identity (identifier and path) survives a
+            // manifest change of its size. Otherwise the outcome is dropped (its file is left to staging GC, R-CLN-3)
+            // and a new download is created.
+            if staged.byteCount == expected {
+                return ImmediateTransferHandle(id: job.id, attempt: staged.name.attempt, terminal: .staged(staged))
+            }
         }
         let joinable = snapshot.compactMap(\.name).filter { $0.transfer == job.id && self.isJoinable($0) }
         if let name = joinable.max(by: { $0.attempt < $1.attempt }) {
@@ -377,9 +382,13 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         if let token, self.waiters[name]?.token != token {
             return
         }
-        // REENTRANCY: D-9 (proposed) — the task is looked up in this listing and the name re-checked against the
-        // processed terminals, so a priority is recorded only for a task still live.
+        // REENTRANCY: D-9 (proposed) — the task is looked up in this listing, the name re-checked against the
+        // processed terminals, and the attach token checked again, so a priority is recorded only for a task still
+        // live and never by a handle a later attach replaced meanwhile.
         let snapshot = await self.driver.snapshot()
+        if let token, self.waiters[name]?.token != token {
+            return
+        }
         guard !self.processed.contains(name), let task = snapshot.first(where: { $0.name == name }) else {
             return
         }
@@ -485,8 +494,18 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         }
     }
 
+    /// Whether the session stream still owes us something: a waiter whose terminal was not processed yet, a known
+    /// live task, or an events waiter. A waiter whose cancellation the pump already absorbed for a pause waits for
+    /// the pause's own call (which returns the resume data and ends it), not for the stream.
     private var hasOutstanding: Bool {
-        !self.waiters.isEmpty || !self.live.isEmpty || !self.finishWaiters.isEmpty
+        self.waiters.keys.contains { !self.isAbsorbedPause($0) } || !self.live.isEmpty || !self.finishWaiters.isEmpty
+    }
+
+    private func isAbsorbedPause(_ name: StagingFileName) -> Bool {
+        if case .cancellationArrived? = self.pauses[name] {
+            return true
+        }
+        return false
     }
 
     private func ensurePump() {
