@@ -218,7 +218,17 @@ enum IndexCommitUnit {
         let previousExists = currentExists ? try fileSystem.itemInfo(at: previous) != nil : false
         let moved = currentExists && (!previousExists || IndexCommitUnit.currentHolds(committed, layout: layout, fileSystem: fileSystem))
         if moved {
-            try fileSystem.rename(from: current, to: previous, mode: .replacing)
+            do throws(FileSystemError) {
+                try fileSystem.rename(from: current, to: previous, mode: .replacing)
+            } catch {
+                // A rename can take effect and still report a failure (its result lost): when index.bin is gone, step 4
+                // happened, so it is undone as after a failed step 5, and a failed commit never leaves index.bin
+                // missing (close-out cycle 3, found by the state-space enumeration).
+                if IndexCommitUnit.isAbsent(current, fileSystem) {
+                    try? fileSystem.rename(from: previous, to: current, mode: .exclusive)
+                }
+                throw error
+            }
         }
         do throws(FileSystemError) {
             try fileSystem.rename(from: source, to: current, mode: .replacing)
@@ -261,6 +271,15 @@ enum IndexCommitUnit {
             return false
         }
         return info.byteSize == Int64(IndexHeader.length) + Int64(header.bodyLength) + Int64(IndexHeader.trailerLength)
+    }
+
+    /// Whether nothing is at `url`; `false` when the stat fails, so an unknown state is never taken for absence.
+    private static func isAbsent(_ url: URL, _ fileSystem: any FileSystem) -> Bool {
+        do throws(FileSystemError) {
+            return try fileSystem.itemInfo(at: url) == nil
+        } catch {
+            return false
+        }
     }
 
     /// A barrier sync that tolerates a directory that vanished (nothing in it can be referenced then).
