@@ -71,7 +71,10 @@ changed, E-15) — flagged for the orchestrator.
   `readFailed` → `transient(.localIO(EIO))`; `.system(domain, code)`: `NSURLErrorDomain` keeps the connectivity rows
   of transport.md §3.4.2 (−1009/−1018/−1019/−1020 offline; −1001, −1005, −1004, −1003/−1006, −1011/−1017, −1200…−1206
   transient) and every other code is `transient(.unknown(code))`; any other domain is `transient(.unknown(0))` (the
-  domain and code go to the `apple` log). Rows of §3.4.2 that would yield `integrity` or `rejected` are deliberately
+  domain and code go to the `apple` log), except a full disk (fix round 2): `NSPOSIXErrorDomain` `ENOSPC` and
+  `NSCocoaErrorDomain` `NSFileWriteOutOfSpaceError` (640) are `insufficientSpace(requiredBytes: nil)`, so the engine
+  runs its space handling (§7.6: `blocked(.awaitingSpace / .insufficientSpace)`) instead of backing off into a full
+  device. Which errors BackgroundAssets really throws stays UNVERIFIED (AAV §1.8; request below). Rows of §3.4.2 that would yield `integrity` or `rejected` are deliberately
   not reused: an undocumented pack error is never integrity (AAV §1.8). Staging: `insufficientSpace` →
   `insufficientSpace(expectedBytes)`, `io` → `localIO`, `nameInUse` → `localIO(EEXIST)` and the file is **not**
   discarded (it is someone else's). Reader open: `packNotFound` → `.notInstalled`, `fileNotFound` → `.notFound` (both
@@ -92,10 +95,21 @@ changed, E-15) — flagged for the orchestrator.
 - **Consequences.** If the OS ignores cancellation, a cancelled flight's task lives until the OS returns (UNVERIFIED,
   AAV §5); nobody waits on it and a new caller starts a new flight. Tested (fix round 1): such a flight's outcome and
   progress never reach a newer flight's waiter (`FakePackBackend` step `holdIgnoringCancellation`). The stale branch
-  of `broadcast` is **not reachable deterministically**: cancelling a flight's task also ends its progress stream (an
-  `AsyncStream` iterator returns `nil` when its task is cancelled), so a stale value is at most one already taken
-  from the stream when the cancellation landed — a scheduling race. The guard stays (defence for that one value); a
-  test calling `broadcast` directly would test a private detail (SPEC §7.2), so that line stays uncovered by design.
+  of `broadcast` is **not reachable through the source deterministically**: cancelling a flight's task also ends its
+  progress stream (an `AsyncStream` iterator returns `nil` when its task is cancelled), so a stale value is at most
+  one already taken from the stream when the cancellation landed — a scheduling race. The guard stays (defence for
+  that one value). Fix round 2: `broadcast` is the coordinator's internal interface to its flights, so a test now
+  calls it with an id that is not the current flight's while a waiter waits and expects only the current flight's
+  progress (`R-APL-2: progress reported under another flight's id never reaches the current flight's waiters`;
+  removing `flight.id == flightID` fails it). The flight-id guard is now covered and verified.
+- **Declined (fix round 2): re-adopting abandoned flights.** If the OS ignores cancellation (UNVERIFIED), each round
+  of "last waiter leaves, a new one joins" during one download leaves one more abandoned flight (its OS await and
+  its `statusUpdates` watcher) alive until the OS download ends. Re-adopting a cancelled-but-running flight is not
+  safe: when the OS **does** honour cancellation (the case AAV §5 expects), that flight ends with the cancellation
+  error, which the new waiter would receive as a spurious failure. A grace period before cancelling needs a clock
+  the source does not have (C4: no `TimeSource` reaches a `RemoteSource`) and contradicts T2-14 Timeline B. The
+  growth is bounded by the swipes made during one download and freed when it ends; the observation ("abandoned
+  flights per swipe while a pack downloads") is requested for DEVICE-TEST-PLAN next to AAV §5 (below).
 
 ## E-7 — Progress (R-APL-2)
 
@@ -105,7 +119,11 @@ changed, E-15) — flagged for the orchestrator.
   ≤ the asset size, so at most 101 progress elements per waiter: after the first value at most 100 full steps fit
   below the size, and a final partial step replaces one. No progress for an unknown or zero `expectedBytes`.
   (Fix round 1: the step used to round down, so assets of 100…~300 bytes got up to ~2× that; a test now feeds sizes
-  1…10,001 one unit at a time and the property test's bound is 101.)
+  1…10,001 one unit at a time and the property test's bound is 101.) Fix round 2: the value is exact 128-bit integer
+  arithmetic, `total.dividingFullWidth(expectedBytes.multipliedFullWidth(by: completed)).quotient` (at most
+  `expectedBytes` because `completed ≤ total`, so it cannot overflow). The `Double` product trapped for sizes within
+  512 bytes of `Int64.max` (reachable through the public `transfer` and an uncapped `ManifestLimits.maxAssetBytes`)
+  and was inexact (0.29 × 100 → 28); regression test with `expectedBytes = Int64.max`.
 
 ## E-8 — Transfer handle controls
 
@@ -145,6 +163,12 @@ changed, E-15) — flagged for the orchestrator.
   pack was missing and this source downloaded it on demand, e.g. an adopted blob evicted or repaired) forgets the
   pack's release, so once its entries are adopted again it is released once more in the same generation (tested).
   Only the source's own demand does this, never the OS bringing a pack back, so releases still never loop.
+  Fix round 2 (verifier PROBE-R2-3): a forget that arrives while that pack's release call is still running is
+  remembered (`forgottenWhileReleasing`), and the call's success then does not mark the pack released: the removal
+  may have run before the re-download (the pack is installed again and must be released once more) or after it
+  (the next reclaim gets `packNotFound`, which counts as released, harmless under (c)). Regression test
+  `R-CLN-10: a pack a transfer downloaded again while its release call was running is released again once adopted`
+  (`FakePackBackend.holdRemove`/`releaseRemove`: the pack is gone at once, the call returns when released).
   (c) Declined: keying generations on the digest the **engine applied** (a fetched catalog the engine rejects also
   starts a generation here) needs that digest in `AdoptionReport` — a contract change. Consequence for WP-F: a pack
   id can appear in `ReclaimReport.released` again in a later generation (or after a demand re-download); the engine
@@ -162,6 +186,13 @@ changed, E-15) — flagged for the orchestrator.
   bytes twice on the device, which `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the
   verifier's PROBE-1). Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
   as entries of the applied manifest), see E-16.
+- **Limitation (fix round 2, handed to WP-F).** The adopted packs are known only from an `AdoptionReport`, which only
+  `reclaimSourceCopies` delivers, and they live in memory: a fresh source (every launch) reports 0 until its first
+  reclaim, as does a source whose `catalogPackID` is invalid (it releases and records nothing). `RemoteSource` has no
+  other way to hand the report over without a contract change. So the engine must run `reclaimSourceCopies` (its
+  maintenance step) before the first `storageReport()` it answers, and WP-F's
+  `R-CLN-9: storageReport counts bytes the OS still holds in adopted packs` (RE-S32) should cover a fresh source
+  instance (request below).
 
 ## E-12 — `LiveAssetPackBackend` (device-only, coverage-excluded)
 
@@ -191,9 +222,25 @@ changed, E-15) — flagged for the orchestrator.
   either before its first chunk (`.beforeWrite`: tests of copies stopped at a chunk) or after its last
   (`.afterWrite`: tests of copies that finished before a stop or a close), and `FakePackBackend` gained
   `holdIgnoringCancellation` and `releaseEnsure(_:with:oldestOnly:)` for the stale-flight test (E-6).
+- **Seam tests (fix round 2, for the orchestrator).** The four `Seams:` tests in `AppleTestSeamTests` verify that the
+  internal test-only waits (`waitForWaiters`, `waitForDrain`, `settleUpdateCheck`) end when their caller is cancelled
+  or the coordinator closes; they carry no requirement ID because they verify test infrastructure, and the seams'
+  lines count as production lines. Each fails at its `.timeLimit` if its seam ignored cancellation, so none is
+  assertion-free. Whether internal seams in production targets, and tests of them, are accepted is an orchestrator
+  decision for DECISIONS (request below); the alternative is a test-support protocol for the waits.
+- **Trace labels (fix round 2).** The four pure error-mapping tests are `R-NET-6` (the closed taxonomy); only the
+  `LiveAssetPackBackend.packError` boundary test keeps `R-APL-2` (the BackgroundAssets error types). The update-check
+  identifier test moved to `AppleCatalogTests`. `R-APL-4: a pack file of another size than the catalog's is skew,
+  stopped at the catalog size` now asserts the stop: the sink receives `maxBytes` 10 (not the 1 MiB cap) and the
+  source logs the oversize path (a `cap = maxBytes` mutant fails it).
 - Coverage after fix round 1 (gate export over every test bundle): `COVERAGE target=ZTronAssetAppleHosted lines=
   99.50% (1203/1209)`; the six lines not reached are `AppleHostedTier.swift:43,48` (contract code), the two
-  pre-cancelled seam branches above and the stale `broadcast` branch (E-6). They let tests synchronise on
+  pre-cancelled seam branches above and the stale `broadcast` branch (E-6). Fix round 2: `COVERAGE
+  target=ZTronAssetAppleHosted lines= 99.51% (1222/1228)`; `llvm-cov show` lists `AppleHostedTier.swift:43,48`, the
+  two pre-cancelled seam branches (`AppleSourceState.swift:120`, `PackAvailabilityCoordinator.swift:131`) and
+  `AppleSourceState.swift:67` (`endStaging` while another staging call still runs: reached only when two copies
+  overlap by scheduling — round 1's run reached it, this one did not; `invalidate` waiting for every write is tested
+  with one held write). The stale `broadcast` branch is now covered (E-6). The seam waits let tests synchronise on
   actor state without sleeping, and each returns when the calling task is cancelled, so a defect that makes a wait
   endless fails the test at its `.timeLimit` instead of hanging the run (found by the mutation probes below: a
   non-cancellable seam kept a probe run alive for 30 minutes). `FakePackBackend.releaseEnsure`/`releaseCheck` issued
@@ -203,7 +250,8 @@ changed, E-15) — flagged for the orchestrator.
   (no pack location exists in any output), that the pack's release leaves the copy intact, and that the release opens
   no pack file (fix round 1: the open count is now taken before the reclaim; it was taken after, which made the
   check always true). The store/engine end-to-end proof belongs to WP-F/WP-G with the merged store — see "Requests
-  for the orchestrator".
+  for the orchestrator". The name is the one ARCHITECTURE §11 assigns to WP-E, so it is kept; this test is the
+  source-level half (fix round 2 verifier: agreed).
 - Additional tests beyond §11 (transport.md §16.6 and the review dispositions): single-flight, cancelled waiter,
   last-waiter cancel, pause, stream drop, invalidate drain, skew variants, removal reporting, offline catalog,
   releases once per generation, failed releases, `sourceCopyBytes`, error-mapping tables, the R-OBS-1 `transfer`
@@ -263,13 +311,30 @@ changed, E-15) — flagged for the orchestrator.
   files).
 - **Benchmarks (optional):** a timed maintenance-run case at 100,000 manifest entries (E-16), e.g. in P-9.
 
+## Requests for the orchestrator (fix round 2)
+
+- **ARCHITECTURE §11, WP-F R-CLN-9 row / RE-S32 (E-11):** the engine runs `reclaimSourceCopies` before the first
+  `storageReport()`, and `R-CLN-9: storageReport counts bytes the OS still holds in adopted packs` covers a fresh
+  source instance (a relaunch).
+- **ARCHITECTURE §11, WP-F or WP-G row (repeat of round 1):** the end-to-end R-APL-3 test (an asset adopted from a
+  `FakePackBackend` source is served from `blobs/` after its pack is released); WP-E's test stays the source half.
+- **DECISIONS:** whether internal test seams in production targets, and the `Seams:` tests that exercise them,
+  are accepted (E-13); if not, the waits move behind a test-support protocol.
+- **APPLE-API-VERIFICATION §5 / DEVICE-TEST-PLAN:** (a) abandoned pack flights per swipe while a pack downloads, if
+  `ensureLocalAvailability`/`statusUpdates` ignore cancellation (E-6, declined change); (b) which error a pack
+  download throws on a full disk, and that it reaches the engine as `insufficientSpace` (E-5).
+
 ## Mutation probes run by the author (not a substitute for Stage 3's independent ones)
 
 Each mutant applied alone to `Sources/ZTronAssetAppleHosted`, the tier's tests run, the file restored; all 8 killed:
 skew reported as integrity (3 skew tests fail); no single-flight (3: concurrent fetches, cancelled waiter, per-waiter
 progress); `invalidate` without drain (2: invalidate drain, catalog copy outliving invalidate); released set not reset
 per catalog generation (1); `notModified` dropping removals (1); unscaled progress (2); flight cancelled on any leave
-(1); update check awaited before the catalog read (4, the hanging-check test among them).
+(1); update check awaited before the catalog read (4, the hanging-check test among them). Fix round 2, each
+killed: the copy cap returning `maxBytes` (the size-skew test, 2 expectations); `broadcast` without the flight-id
+check (the foreign-flight progress test); `forgetRelease` without `forgottenWhileReleasing` (the release-race test,
+3 expectations, run before the fix); the `Double` scaler (the exact-arithmetic test traps, run before the fix); no
+out-of-space row (3 expectations, run before the fix).
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10, new subsection for `ZTronAssetAppleHosted` actors)
 
@@ -279,7 +344,7 @@ per catalog generation (1); `notModified` dropping removals (1); unscaled progre
 | e-2 | `AppleSourceState.scheduleUpdateCheck`'s task: `backend.checkForUpdates()` | `finishCheck` runs on the actor and only clears `checkTask` and appends findings; a `close()` meanwhile is harmless (no new check starts after close, and none starts while this one is recorded as running) |
 | e-3 | `AppleSourceState.settleUpdateCheck()` (test seam): `task.value` | nothing: a terminal wait; the caller re-reads the report |
 | e-4 | `PackAvailabilityCoordinator.ensure`: `withTaskCancellationHandler` + `withCheckedContinuation` | nothing is read after resumption (the outcome travels in the continuation); `join`, `leave`, `complete` and `close` each re-read the waiter and flight tables, and a waiter is resumed exactly once by whichever removes it |
-| e-5 | `PackAvailabilityCoordinator.wait(for:registered:)` behind `waitForWaiters` / `waitForStaleCompletions` (test seams) | nothing: a terminal wait resumed by the turn that made the condition hold, by `close`, or by the cancellation turn |
+| e-5 | `PackAvailabilityCoordinator.wait(for:registered:)`, and the `await self.wait(…)` calls in `waitForWaiters` / `waitForStaleCompletions` (test seams; cited at each call since fix round 2) | nothing: a terminal wait resumed by the turn that made the condition hold, by `close`, or by the cancellation turn; the caller re-reads the census |
 | e-6 | the flight task created in `join`: `await PackFlight.fly(...)` | nothing runs after it; `fly` reports through `broadcast` and `complete`, which drop a stale flight by id |
 | e-7 | `AppleSourceState.waitForDrain()` (test seam) | nothing: a terminal wait resumed by the `drain()` turn that registered its waiter or the `endStaging()` turn that reached zero |
 | e-8 | `Task { await self.leave(id) / releaseConditionWaiters() / releaseDrainObservers() }` in the `onCancel` handlers of `ensure`, the coordinator's seam waits and `waitForDrain` | a hop onto the actor from a cancellation handler, which cannot touch actor state synchronously; the hopped call re-reads the table it changes, so a continuation already resumed and removed by the regular path is never resumed twice |
