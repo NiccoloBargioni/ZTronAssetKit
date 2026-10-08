@@ -141,6 +141,10 @@ struct StoreCoreState: Sendable {
     var unitsInFlight = 0
     /// `close()` waiting for `unitsInFlight` to reach zero.
     var drainWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Later `close()` calls that arrived while the first one was draining or flushing: each returns only once the
+    /// first one's durable commit and lock release are done (phase `closed`), so a caller may reopen the root right
+    /// after (proposed REENTRANCY row b-9).
+    var closeWaiters: [CheckedContinuation<Void, Never>] = []
     /// The root was replaced or vanished while running: no further commit (store-1 S1-08).
     var unavailable: StorageUnavailableReason?
     /// The staging sequence of the next extra-extension copy (`bindCopy`): allocated by the store, counting down

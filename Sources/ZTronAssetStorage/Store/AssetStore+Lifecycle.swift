@@ -149,12 +149,21 @@ extension AssetStore {
 
     // MARK: Close
 
-    /// `close()`: no new mutation, drain in-flight units, durable flush, unlock, resume every waiter.
+    /// `close()`: no new mutation, drain in-flight units, durable flush, unlock, resume every waiter. A `close()` that
+    /// arrives while another one is draining or flushing returns only once that one finished (phase `closed`): every
+    /// return of `close()` means "flushed durably, lock released", so its caller may reopen the root at once (review
+    /// round 3, probe 2).
     func performClose() async {
         while true {
             switch self.state.core.phase {
-            case .closing, .closed:
+            case .closed:
                 return
+            case .closing:
+                // REENTRANCY: b-9 (proposed) — the loop re-reads the phase: the running close resumes this waiter only
+                // after its durable commit and lock release, when the phase is `closed`.
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.state.core.closeWaiters.append(continuation)
+                }
             case .created:
                 self.state.core.phase = .closed
                 self.resumeOpenWaiters()
@@ -208,6 +217,11 @@ extension AssetStore {
             self.state.core.lock = nil
         }
         self.state.core.phase = .closed
+        let closeWaiters = self.state.core.closeWaiters
+        self.state.core.closeWaiters = []
+        for waiter in closeWaiters {
+            waiter.resume()
+        }
         self.resumeCommitWaiters()
         self.resumeOpenWaiters()
         self.resumeApplyWaiters()
