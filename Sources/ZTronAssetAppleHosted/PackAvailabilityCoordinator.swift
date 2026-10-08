@@ -31,16 +31,24 @@ actor PackAvailabilityCoordinator {
         var waiters: Set<UInt64>
     }
 
-    private struct CountWaiter {
-        let pack: PackID
-        let count: Int
+    /// What a test-seam wait waits for.
+    private enum Condition {
+        /// At least `count` callers wait on `pack`'s flight.
+        case waiters(PackID, count: Int)
+        /// At least `count` flights reported their outcome after they had stopped being current.
+        case staleCompletions(count: Int)
+    }
+
+    private struct ConditionWaiter {
+        let condition: Condition
         let continuation: CheckedContinuation<Void, Never>
     }
 
     private let backend: any PackBackend
     private var flights: [PackID: Flight] = [:]
     private var waiters: [UInt64: Waiter] = [:]
-    private var countWaiters: [CountWaiter] = []
+    private var conditionWaiters: [ConditionWaiter] = []
+    private var staleCompletions = 0
     private var nextID: UInt64 = 0
     private var closed = false
 
@@ -64,6 +72,9 @@ actor PackAvailabilityCoordinator {
             }
         } onCancel: {
             Task {
+                // REENTRANCY: e-8 (proposed) — a hop onto the actor from a cancellation handler, which cannot touch
+                // actor state synchronously; `leave` re-reads the waiter table, so a waiter already resumed and
+                // removed by `complete` or `close` is left alone.
                 await self.leave(id)
             }
         }
@@ -81,7 +92,7 @@ actor PackAvailabilityCoordinator {
         for waiter in waiting {
             waiter.continuation.resume(returning: .cancelled)
         }
-        self.notifyCountWaiters()
+        self.notifyConditionWaiters()
     }
 
     /// Test seam: the callers waiting on `pack`'s flight.
@@ -90,32 +101,59 @@ actor PackAvailabilityCoordinator {
     }
 
     /// Test seam: returns once at least `count` callers wait on `pack`'s flight, the coordinator closed, or the
-    /// calling task was cancelled (so a test's time limit ends a wait that a defect would make endless).
-    func waitForWaiters(on pack: PackID, count: Int) async {
-        guard !self.closed, self.waiterCount(on: pack) < count else {
+    /// calling task was cancelled (so a test's time limit ends a wait that a defect would make endless). `registered`
+    /// runs on the actor once the wait is registered, so a test can cancel a wait it knows is pending.
+    func waitForWaiters(on pack: PackID, count: Int, registered: (@Sendable () -> Void)? = nil) async {
+        await self.wait(for: .waiters(pack, count: count), registered: registered)
+    }
+
+    /// Test seam: returns once at least `count` flights reported their outcome after they had stopped being current
+    /// (their last waiter left, or the coordinator closed), the coordinator closed, or the calling task was cancelled.
+    /// Such a report is ignored; this lets a test order a newer flight after it.
+    func waitForStaleCompletions(_ count: Int) async {
+        await self.wait(for: .staleCompletions(count: count), registered: nil)
+    }
+
+    private func wait(for condition: Condition, registered: (@Sendable () -> Void)?) async {
+        guard !self.holds(condition) else {
             return
         }
         // REENTRANCY: e-5 (proposed) — nothing: a terminal wait registered synchronously and resumed only by the
-        // turn that reached the count, `close`, or the cancellation turn; the caller re-reads the census.
+        // turn that made the condition hold, `close`, or the cancellation turn; the caller re-reads the census.
         await withTaskCancellationHandler {
             // REENTRANCY: e-5 (proposed) — as above.
             await withCheckedContinuation { continuation in
                 if Task.isCancelled {
                     continuation.resume()
                 } else {
-                    self.countWaiters.append(CountWaiter(pack: pack, count: count, continuation: continuation))
+                    self.conditionWaiters.append(ConditionWaiter(condition: condition, continuation: continuation))
+                    registered?()
                 }
             }
         } onCancel: {
             Task {
-                await self.releaseCountWaiters()
+                // REENTRANCY: e-8 (proposed) — a hop onto the actor from a cancellation handler;
+                // `releaseConditionWaiters` re-reads the list, so a wait already resumed is never resumed twice.
+                await self.releaseConditionWaiters()
             }
         }
     }
 
-    private func releaseCountWaiters() {
-        let waiting = self.countWaiters
-        self.countWaiters.removeAll()
+    private func holds(_ condition: Condition) -> Bool {
+        guard !self.closed else {
+            return true
+        }
+        switch condition {
+        case .waiters(let pack, let count):
+            return self.waiterCount(on: pack) >= count
+        case .staleCompletions(let count):
+            return self.staleCompletions >= count
+        }
+    }
+
+    private func releaseConditionWaiters() {
+        let waiting = self.conditionWaiters
+        self.conditionWaiters.removeAll()
         for waiter in waiting {
             waiter.continuation.resume()
         }
@@ -148,11 +186,11 @@ actor PackAvailabilityCoordinator {
             let task = Task {
                 // REENTRANCY: e-6 (proposed) — nothing runs after the flight: `fly` reports through `broadcast`
                 // and `complete`, which re-check that the flight is still current.
-                await Self.fly(pack, flightID: flightID, backend: backend, coordinator: self)
+                await PackFlight.fly(pack, flightID: flightID, backend: backend, coordinator: self)
             }
             self.flights[pack] = Flight(id: flightID, task: task, waiters: [id])
         }
-        self.notifyCountWaiters()
+        self.notifyConditionWaiters()
     }
 
     private func leave(_ id: UInt64) {
@@ -169,20 +207,73 @@ actor PackAvailabilityCoordinator {
                 self.flights[waiter.pack] = flight
             }
         }
-        self.notifyCountWaiters()
+        self.notifyConditionWaiters()
     }
 
-    // MARK: Flights
+    // MARK: Flight reports
 
-    /// One `ensureAvailable`, off the actor: progress is forwarded while the call runs, and the outcome is reported
-    /// only after every progress value was, so a waiter sees all progress before its wait ends.
-    private nonisolated static func fly(
+    /// Forwards one progress value of the current flight of `pack` to its waiters. A flight that stopped being
+    /// current had its task cancelled, which also ends its progress stream, so a stale value can only be one that
+    /// was already taken from the stream when the flight was cancelled; it is dropped here by flight id.
+    func broadcast(_ progress: PackProgress, pack: PackID, flightID: UInt64) {
+        guard let flight = self.flights[pack], flight.id == flightID else {
+            return
+        }
+        for id in flight.waiters {
+            self.waiters[id]?.progress?.yield(progress)
+        }
+    }
+
+    /// Ends the wait of every caller of the current flight of `pack`. The outcome of a flight that stopped being
+    /// current (an OS await that outlived its cancellation, APPLE-API-VERIFICATION §5) is ignored: a newer flight's
+    /// waiters get their own outcome.
+    func complete(_ pack: PackID, flightID: UInt64, outcome: Outcome) {
+        guard let flight = self.flights[pack], flight.id == flightID else {
+            self.staleCompletions += 1
+            self.notifyConditionWaiters()
+            return
+        }
+        self.flights[pack] = nil
+        for id in flight.waiters {
+            self.waiters.removeValue(forKey: id)?.continuation.resume(returning: outcome)
+        }
+        self.notifyConditionWaiters()
+    }
+
+    private func notifyConditionWaiters() {
+        var remaining: [ConditionWaiter] = []
+        for waiter in self.conditionWaiters {
+            if self.holds(waiter.condition) {
+                waiter.continuation.resume()
+            } else {
+                remaining.append(waiter)
+            }
+        }
+        self.conditionWaiters = remaining
+    }
+}
+
+/// One `ensureAvailable` of one flight, run in the flight's task outside the coordinator: progress is forwarded
+/// while the call runs, and the outcome is reported only after every progress value was, so a waiter sees all
+/// progress before its wait ends.
+@available(iOS 26.0, macOS 26.0, *)
+enum PackFlight {
+    /// Pack progress values buffered between the OS and a consumer. Progress only grows, and the scaler reports at
+    /// most 101 values per waiter, so when a consumer falls behind a chatty OS status stream the oldest values are
+    /// dropped and memory stays bounded; the newest value, and `finish()` after it, are always kept.
+    static let progressBuffer = 64
+
+    /// Runs the flight `flightID` of `pack` and reports to `coordinator`.
+    static func fly(
         _ pack: PackID,
         flightID: UInt64,
         backend: any PackBackend,
         coordinator: PackAvailabilityCoordinator
     ) async {
-        let (stream, continuation) = AsyncStream.makeStream(of: PackProgress.self)
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: PackProgress.self,
+            bufferingPolicy: .bufferingNewest(Self.progressBuffer)
+        )
         async let outcome = Self.ensureOnce(pack, backend: backend, progress: continuation)
         for await progress in stream {
             await coordinator.broadcast(progress, pack: pack, flightID: flightID)
@@ -190,11 +281,11 @@ actor PackAvailabilityCoordinator {
         await coordinator.complete(pack, flightID: flightID, outcome: await outcome)
     }
 
-    private nonisolated static func ensureOnce(
+    private static func ensureOnce(
         _ pack: PackID,
         backend: any PackBackend,
         progress: AsyncStream<PackProgress>.Continuation
-    ) async -> Outcome {
+    ) async -> PackAvailabilityCoordinator.Outcome {
         defer {
             progress.finish()
         }
@@ -204,37 +295,5 @@ actor PackAvailabilityCoordinator {
         } catch {
             return .failed(error)
         }
-    }
-
-    private func broadcast(_ progress: PackProgress, pack: PackID, flightID: UInt64) {
-        guard let flight = self.flights[pack], flight.id == flightID else {
-            return
-        }
-        for id in flight.waiters {
-            self.waiters[id]?.progress?.yield(progress)
-        }
-    }
-
-    private func complete(_ pack: PackID, flightID: UInt64, outcome: Outcome) {
-        guard let flight = self.flights[pack], flight.id == flightID else {
-            return
-        }
-        self.flights[pack] = nil
-        for id in flight.waiters {
-            self.waiters.removeValue(forKey: id)?.continuation.resume(returning: outcome)
-        }
-        self.notifyCountWaiters()
-    }
-
-    private func notifyCountWaiters() {
-        var remaining: [CountWaiter] = []
-        for waiter in self.countWaiters {
-            if self.closed || self.waiterCount(on: waiter.pack) >= waiter.count {
-                waiter.continuation.resume()
-            } else {
-                remaining.append(waiter)
-            }
-        }
-        self.countWaiters = remaining
     }
 }

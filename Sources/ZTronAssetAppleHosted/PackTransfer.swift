@@ -47,8 +47,9 @@ final class PackTransferStop: Sendable {
 }
 
 /// A running Apple-tier transfer (ADR-021). Controls are synchronous: they record the stop and cancel the driver,
-/// whose pack wait ends at once (`PackAvailabilityCoordinator`); a copy already inside the store's sink finishes
-/// first, and its file is then discarded. `setPriority` has no effect: the OS schedules packs.
+/// whose pack wait ends at once (`PackAvailabilityCoordinator`); a copy inside the store's sink stops at its next
+/// chunk (`HashingChunkSource`), and one that had already finished is discarded. `setPriority` has no effect: the OS
+/// schedules packs.
 @available(iOS 26.0, macOS 26.0, *)
 final class PackTransferHandle: TransferHandle {
     let id: TransferID
@@ -138,9 +139,22 @@ struct PackTransferDriver: Sendable {
             }
             terminal = stop.terminal
         }
-        self.updates.yield(terminal)
-        self.updates.finish()
+        await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
         interval.end()
+    }
+
+    /// Ends the stream with `terminal`. A consumer can drop the stream after the stop check above and before this
+    /// yield (nothing suspends in between, but another thread can); a staged copy that therefore reaches nobody is
+    /// discarded here, so no staging file outlives its transfer until the next launch's staging GC.
+    static func deliver(
+        _ terminal: TransferUpdate,
+        to updates: AsyncStream<TransferUpdate>.Continuation,
+        copier: PackCopier
+    ) async {
+        if case .terminated = updates.yield(terminal), case .staged(let file) = terminal {
+            await copier.discard(file.name)
+        }
+        updates.finish()
     }
 
     private func attempt() async -> TransferUpdate {
@@ -148,11 +162,12 @@ struct PackTransferDriver: Sendable {
             self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): remote path is not a pack location")
             return .failed(.rejected(.invalidURL))
         }
-        var outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap)
+        var outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
         if case .sourceMissing = outcome {
             switch await self.ensure(location.pack) {
             case .available:
-                break
+                // A pack released earlier and downloaded again for this asset may be released once more (R-CLN-9).
+                await self.parts.state.forgetRelease(location.pack)
             case .failed(let error):
                 let reason = String(describing: error)
                 self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): pack \(location.pack) unavailable: \(reason)")
@@ -160,7 +175,7 @@ struct PackTransferDriver: Sendable {
             case .cancelled:
                 return .failed(.cancelled(.byClient))
             }
-            outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap)
+            outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
         }
         return await self.settle(outcome)
     }
@@ -201,7 +216,7 @@ struct PackTransferDriver: Sendable {
             return .failed(PackErrorMapping.transferError(error, expectedBytes: self.request.expectedBytes))
         case .sourceMissing:
             return await self.skew("the pack holds no file at the catalog's path", discarding: false)
-        case .closed:
+        case .stopped, .closed:
             return .failed(.cancelled(.byClient))
         }
     }
@@ -221,7 +236,10 @@ struct PackTransferDriver: Sendable {
         guard let expected = self.request.expectedBytes, expected > 0 else {
             return await self.parts.packs.ensure(pack, progress: nil)
         }
-        let (stream, progress) = AsyncStream.makeStream(of: PackProgress.self)
+        let (stream, progress) = AsyncStream.makeStream(
+            of: PackProgress.self,
+            bufferingPolicy: .bufferingNewest(PackFlight.progressBuffer)
+        )
         async let forwarded: Void = Self.forward(stream, expectedBytes: expected, to: self.updates)
         let outcome = await self.parts.packs.ensure(pack, progress: progress)
         progress.finish()

@@ -4,46 +4,75 @@ import Testing
 import ZTronAssetModel
 import ZTronAssetTestSupport
 
+private let seamAsset = PackAsset("ZTronMedia/seams/a.png", "pixels for the seam tests")
+
 /// The tier's test seams wait without sleeping and end on cancellation, so a test's time limit turns a defect that
 /// would make a wait endless into a failure instead of a hung run (ADR draft E-13).
 @Suite("Apple tier: test seams")
 struct AppleTestSeamTests {
     @available(macOS 26.0, *)
-    @Test("Seams: waits return at once when their condition already holds", .timeLimit(.minutes(1)))
-    func immediateReturns() async throws {
-        let fixture = AppleTierFixture()
-        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 0)
-        await fixture.source.state.waitForDrain()
-        await fixture.source.state.settleUpdateCheck()
-        await fixture.source.invalidate()
-        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
-        #expect(await fixture.source.packs.waiterCount(on: Packs.media) == 0)
-    }
-
-    @available(macOS 26.0, *)
-    @Test("Seams: a cancelled wait for pack waiters returns", .timeLimit(.minutes(1)))
+    @Test("Seams: a cancelled wait for pack waiters returns while the count is still unmet", .timeLimit(.minutes(1)))
     func cancelledWaiterWaitReturns() async throws {
-        let fixture = AppleTierFixture()
+        let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let handle = await fixture.source.transfer(seamAsset.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        let (registered, signal) = AsyncStream.makeStream(of: Void.self)
         let wait = Task {
-            await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+            await fixture.source.packs.waitForWaiters(on: Packs.media, count: 2, registered: { _ = signal.yield() })
+            return await fixture.source.packs.waiterCount(on: Packs.media)
+        }
+        for await _ in registered {
+            break
         }
         wait.cancel()
-        await wait.value
-        #expect(await fixture.source.packs.waiterCount(on: Packs.media) == 0)
+        #expect(await wait.value == 1, "the wait ended by cancellation, not because a second caller joined")
+        handle.cancel()
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
         await fixture.source.invalidate()
     }
 
     @available(macOS 26.0, *)
-    @Test("Seams: a cancelled wait for a drain returns while staging is still busy", .timeLimit(.minutes(1)))
-    func cancelledDrainWaitReturns() async throws {
-        let fixture = AppleTierFixture()
-        #expect(await fixture.source.state.beginStaging())
+    @Test("Seams: a wait for pack waiters ends when the coordinator closes with the count unmet", .timeLimit(.minutes(1)))
+    func waiterWaitEndsOnClose() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
+        fixture.backend.scriptEnsure(Packs.media, [.hold])
+        let handle = await fixture.source.transfer(seamAsset.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        let (registered, signal) = AsyncStream.makeStream(of: Void.self)
         let wait = Task {
-            await fixture.source.state.waitForDrain()
+            await fixture.source.packs.waitForWaiters(on: Packs.media, count: 2, registered: { _ = signal.yield() })
+            return await fixture.source.packs.waiterCount(on: Packs.media)
+        }
+        for await _ in registered {
+            break
+        }
+        await fixture.source.invalidate()
+        #expect(await wait.value == 0, "closing ended every pack wait, and the seam's wait with them")
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+    }
+
+    @available(macOS 26.0, *)
+    @Test("Seams: a cancelled wait for a drain returns while a staging write is still open", .timeLimit(.minutes(1)))
+    func cancelledDrainWaitReturns() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: [seamAsset.path: seamAsset.bytes]], staging: gated)
+        gated.arm(.afterWrite)
+        let handle = await fixture.source.transfer(seamAsset.request())
+        await gated.waitForHeldWrites(1)
+        let (registered, signal) = AsyncStream.makeStream(of: Void.self)
+        let wait = Task {
+            await fixture.source.state.waitForDrain(registered: { _ = signal.yield() })
+            gated.note("wait returned")
+        }
+        for await _ in registered {
+            break
         }
         wait.cancel()
         await wait.value
-        await fixture.source.state.endStaging()
+        #expect(gated.events == ["wait returned"], "the write was still held when the wait returned")
+        gated.open()
+        #expect(await collect(handle).last.map(AppleTransferTests.isStaged) == true)
         await fixture.source.invalidate()
     }
 

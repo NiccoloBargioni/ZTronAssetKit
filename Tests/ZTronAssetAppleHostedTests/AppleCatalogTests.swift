@@ -248,7 +248,7 @@ struct AppleCatalogTests {
     func catalogCopyOutlivingInvalidate() async throws {
         let gated = GatedStagingSink()
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()], staging: gated)
-        gated.arm()
+        gated.arm(.afterWrite)
         let fetch = Task {
             try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
         }
@@ -265,6 +265,29 @@ struct AppleCatalogTests {
         let name = StagingFileName(transfer: .manifest, attempt: TransferAttempt(epoch: 1, sequence: 1), kind: .partial)
         #expect(gated.base.contents[name] == AppleTierFixture.catalogBytes)
         #expect(!gated.events.contains("discard"))
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-4: invalidate stops a catalog copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
+    func invalidateStopsACatalogCopyInFlight() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()], staging: gated)
+        gated.arm(.beforeWrite)
+        let fetch = Task {
+            try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        }
+        await gated.waitForHeldWrites(1)
+        let invalidation = Task {
+            await fixture.source.invalidate()
+        }
+        await fixture.source.state.waitForDrain()
+        gated.open()
+        await invalidation.value
+        await #expect(throws: TransferError.cancelled(.byClient)) {
+            try await fetch.value
+        }
+        #expect(!fixture.backend.calls.contains(.open(Packs.catalog, "catalog.json")))
+        #expect(gated.base.contents.isEmpty)
     }
 
     @available(macOS 26.0, *)

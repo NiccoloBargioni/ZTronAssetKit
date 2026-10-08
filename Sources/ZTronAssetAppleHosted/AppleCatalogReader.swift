@@ -55,7 +55,7 @@ struct AppleCatalogReader: Sendable {
             return .failure(.permanentMissing(httpStatus: 404))
         case .failed(let error):
             return .failure(PackErrorMapping.transferError(error, expectedBytes: nil))
-        case .closed:
+        case .stopped, .closed:
             return .failure(.cancelled(.byClient))
         }
     }

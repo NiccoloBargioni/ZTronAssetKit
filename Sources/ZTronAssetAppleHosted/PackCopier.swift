@@ -18,6 +18,9 @@ struct PackCopier: Sendable {
         case sourceMissing
         /// The sink failed; the staging file was removed unless the name belonged to someone else.
         case failed(StagingError)
+        /// The copy stopped at a chunk boundary because its transfer was paused or cancelled or the source began
+        /// invalidating; the staging file was removed.
+        case stopped
         /// The source was invalidated; staging was not touched.
         case closed
     }
@@ -29,18 +32,24 @@ struct PackCopier: Sendable {
     /// Staging admission.
     let state: AppleSourceState
 
-    /// Streams `location` into `staging/<name>`, refusing more than `maxBytes`.
-    func copy(_ location: PackLocation, as name: StagingFileName, maxBytes: Int64) async -> Outcome {
+    /// Streams `location` into `staging/<name>`, refusing more than `maxBytes`. The copy stops at its next chunk
+    /// once `stop` is requested or the source begins invalidating (`AppleSourceState.shutdown`).
+    func copy(_ location: PackLocation, as name: StagingFileName, maxBytes: Int64, stop: PackTransferStop? = nil) async -> Outcome {
         guard await self.state.beginStaging() else {
             return .closed
         }
-        let reader = HashingChunkSource(self.backend.reader(for: location.path, in: location.pack))
+        let shutdown = self.state.shutdown
+        let reader = HashingChunkSource(self.backend.reader(for: location.path, in: location.pack)) {
+            stop?.requested != nil || shutdown.requested != nil
+        }
         let outcome: Outcome
         do {
             let bytes = try await self.staging.writeStaged(name, from: reader, maxBytes: maxBytes)
             outcome = .copied(bytes: bytes, digest: reader.digest)
         } catch {
             switch error {
+            case _ where reader.stopped:
+                outcome = .stopped
             case .source(.notFound), .source(.notInstalled):
                 outcome = .sourceMissing
             default:

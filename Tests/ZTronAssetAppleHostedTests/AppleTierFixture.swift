@@ -98,12 +98,20 @@ func collect(_ handle: any TransferHandle) async -> [TransferUpdate] {
     return updates
 }
 
-/// A staging sink whose `writeStaged` can be held at its start, so a test can act while a copy is in flight;
-/// everything else goes to a `FakeStagingSink`.
+/// A staging sink whose `writeStaged` can be held before it pulls any chunk or after it wrote the whole file, so a
+/// test can act while a copy is in flight; everything else goes to a `FakeStagingSink`.
 @available(macOS 15.0, *)
 final class GatedStagingSink: StagingSink {
+    /// Where an armed gate holds a write.
+    enum Gate: Sendable, Hashable {
+        /// Before the sink pulls the first chunk from its source.
+        case beforeWrite
+        /// After the sink wrote every chunk, before `writeStaged` returns.
+        case afterWrite
+    }
+
     private struct State {
-        var armed = false
+        var armed: Gate?
         var held: [CheckedContinuation<Void, Never>] = []
         var arrivalWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
         var events: [String] = []
@@ -112,15 +120,15 @@ final class GatedStagingSink: StagingSink {
     let base = FakeStagingSink()
     private let state = Mutex(State())
 
-    /// Makes later `writeStaged` calls wait for `open()`.
-    func arm() {
-        self.state.withLock { $0.armed = true }
+    /// Makes later `writeStaged` calls wait at `gate` for `open()`.
+    func arm(_ gate: Gate = .beforeWrite) {
+        self.state.withLock { $0.armed = gate }
     }
 
     /// Releases every held and later write.
     func open() {
         let held = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
-            state.armed = false
+            state.armed = nil
             defer { state.held.removeAll() }
             return state.held
         }
@@ -168,9 +176,25 @@ final class GatedStagingSink: StagingSink {
     }
 
     func writeStaged(_ name: StagingFileName, from source: any ChunkSource, maxBytes: Int64) async throws(StagingError) -> Int64 {
+        defer {
+            self.note("write returned")
+        }
+        await self.pass(.beforeWrite)
+        let result: Result<Int64, StagingError>
+        do {
+            result = .success(try await self.base.writeStaged(name, from: source, maxBytes: maxBytes))
+        } catch {
+            result = .failure(error)
+        }
+        await self.pass(.afterWrite)
+        return try result.get()
+    }
+
+    /// Holds the calling write when the gate is armed at `point`.
+    private func pass(_ point: Gate) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let ready = self.state.withLock { state -> [CheckedContinuation<Void, Never>]? in
-                guard state.armed else {
+                guard state.armed == point else {
                     return nil
                 }
                 state.held.append(continuation)
@@ -187,10 +211,6 @@ final class GatedStagingSink: StagingSink {
                 waiter.resume()
             }
         }
-        defer {
-            self.note("write returned")
-        }
-        return try await self.base.writeStaged(name, from: source, maxBytes: maxBytes)
     }
 
     func createPartial(_ name: StagingFileName) throws(StagingError) {

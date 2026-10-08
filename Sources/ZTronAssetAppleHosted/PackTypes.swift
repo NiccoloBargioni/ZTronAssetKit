@@ -10,7 +10,7 @@ public struct PackID: Hashable, Comparable, Sendable, CustomStringConvertible {
 
     /// Validates `rawValue`.
     public init?(rawValue: String) {
-        let utf8 = Array(rawValue.utf8)
+        let utf8 = rawValue.utf8
         guard (1...64).contains(utf8.count), rawValue != ".", rawValue != ".." else {
             return nil
         }
@@ -42,7 +42,9 @@ public struct PackID: Hashable, Comparable, Sendable, CustomStringConvertible {
 ///
 /// The path is untrusted manifest text: every component must be non-empty, not `.` or `..`, and free of control
 /// characters; the whole path is relative and at most 1,024 bytes (R-SEC-2 defence in depth; it is only ever
-/// passed to BackgroundAssets, never joined to a file URL).
+/// passed to BackgroundAssets, never joined to a file URL). Components are split at every `/` scalar, where a file
+/// system splits them: splitting by `Character` would let a combining mark glue a slash to the next segment and hide
+/// a `..` component (`"../\u{301}x"` is one `Character` component but two path components).
 public struct PackLocation: Hashable, Sendable, CustomStringConvertible {
     /// The pack.
     public let pack: PackID
@@ -51,27 +53,41 @@ public struct PackLocation: Hashable, Sendable, CustomStringConvertible {
 
     /// Parses `"<packID>/<path>"`; `nil` for anything else.
     public init?(remotePath: String) {
-        guard remotePath.utf8.count <= 1_024, let slash = remotePath.firstIndex(of: "/") else {
+        let scalars = remotePath.unicodeScalars
+        guard remotePath.utf8.count <= 1_024, let slash = scalars.firstIndex(of: "/") else {
             return nil
         }
-        guard let pack = PackID(rawValue: String(remotePath[..<slash])) else {
+        guard let pack = PackID(rawValue: String(Substring(scalars[..<slash]))) else {
             return nil
         }
-        let path = String(remotePath[remotePath.index(after: slash)...])
-        let components = path.split(separator: "/", omittingEmptySubsequences: false)
-        guard !components.isEmpty else {
-            return nil
-        }
+        let pathScalars = scalars[scalars.index(after: slash)...]
+        // Never empty: splitting without omitting empty pieces yields one empty component for an empty path.
+        let components = pathScalars.split(separator: "/", omittingEmptySubsequences: false)
         for component in components {
-            guard !component.isEmpty, component != ".", component != ".." else {
+            guard !component.isEmpty, !Self.isDotSegment(component) else {
                 return nil
             }
-            guard !component.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) else {
+            guard !component.contains(where: Self.isControl) else {
                 return nil
             }
         }
         self.pack = pack
-        self.path = path
+        self.path = String(Substring(pathScalars))
+    }
+
+    /// Whether `component` is exactly `.` or `..`.
+    private static func isDotSegment(_ component: Substring.UnicodeScalarView) -> Bool {
+        component.allSatisfy { $0 == "." } && component.count <= 2
+    }
+
+    /// Whether `scalar` is a control character (general category Cc). Manifest paths are almost always ASCII, whose
+    /// control characters are exactly U+0000…U+001F and U+007F, so the Unicode property table is consulted only for
+    /// other scalars: a report of 100,000 paths is parsed in slices on the cooperative pool (C2).
+    private static func isControl(_ scalar: Unicode.Scalar) -> Bool {
+        guard scalar.isASCII else {
+            return scalar.properties.generalCategory == .control
+        }
+        return scalar.value < 0x20 || scalar.value == 0x7F
     }
 
     /// `"<packID>/<path>"`.

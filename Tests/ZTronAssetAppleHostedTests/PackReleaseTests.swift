@@ -56,6 +56,55 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-CLN-10: a report larger than one survey slice releases exactly the packs settled in every slice", .timeLimit(.minutes(1)))
+    func reportAcrossSurveySlices() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA), Packs.extras: pack(extraC)])
+        let media = (0..<1_500).map { "ZTronMedia/images/\($0).heic" }
+        let extras = (0..<1_500).map { "ZTronExtras/sounds/\($0).wav" }
+        // The one unadopted extra sits in the last slice; every media entry is adopted.
+        let report = AdoptionReport(
+            manifestRemotePaths: media + extras,
+            adoptedRemotePaths: Set(media + extras.dropLast())
+        )
+        #expect(report.manifestRemotePaths.count > ReleaseSurvey.sliceSize * 2)
+        #expect(await fixture.source.reclaimSourceCopies(report) == ReclaimReport(released: ["ZTronMedia"]))
+        #expect(fixture.backend.installedPacks == [Packs.extras])
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-CLN-10: a release made before the first catalog fetch counts for that catalog's generation", .timeLimit(.minutes(1)))
+    func releaseBeforeFirstFetchIsNotRepeated() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)])
+        let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "an offline launch's maintenance")
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        #expect(await fixture.source.reclaimSourceCopies(report) == ReclaimReport(), "reported once, never again")
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-CLN-10: a released pack that a transfer downloaded again is released again once adopted", .timeLimit(.minutes(1)))
+    func redownloadedPackIsReleasedAgain() async throws {
+        let fixture = AppleTierFixture(
+            installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)],
+            remote: [Packs.media: pack(mediaA)]
+        )
+        let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"])
+        let updates = await collect(await fixture.source.transfer(PackAsset(mediaA, mediaA).request()))
+        #expect(updates.last.map(AppleTransferTests.isStaged) == true, "\(updates)")
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the transfer downloaded the pack again")
+
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"], "same catalog generation")
+        #expect(!fixture.backend.installedPacks.contains(Packs.media))
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 2)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-10: a failed release is reported and planned again by the next reclaim", .timeLimit(.minutes(1)))
     func failedReleaseIsRetried() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)])
@@ -130,6 +179,27 @@ struct PackReleaseTests {
         )
         #expect(third.released == ["ZTronExtras"])
         #expect(await fixture.source.sourceCopyBytes() == 0)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-CLN-9: a released pack re-downloaded for an adopted asset counts as a source copy again", .timeLimit(.minutes(1)))
+    func redownloadedPackCountsAsASourceCopy() async throws {
+        let fixture = AppleTierFixture(
+            installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)],
+            remote: [Packs.media: pack(mediaA)]
+        )
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        let reclaim = await fixture.source.reclaimSourceCopies(
+            AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+        )
+        #expect(reclaim.released == ["ZTronMedia"])
+        #expect(await fixture.source.sourceCopyBytes() == 0)
+
+        // The adopted blob was evicted and is fetched again: the copy finds the pack gone and downloads it.
+        let updates = await collect(await fixture.source.transfer(PackAsset(mediaA, mediaA).request()))
+        #expect(updates.last.map(AppleTransferTests.isStaged) == true, "\(updates)")
+        #expect(await fixture.source.sourceCopyBytes() == Int64(mediaA.utf8.count), "the OS holds the pack again")
         await fixture.source.invalidate()
     }
 

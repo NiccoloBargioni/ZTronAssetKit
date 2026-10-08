@@ -5,9 +5,10 @@ import ZTronAssetModel
 ///
 /// A pack holds many assets and the OS reports progress for the pack only, so a waiter for one asset sees the
 /// pack's completed fraction times the asset's catalog size: the engine's per-asset progress (R-SYN-12) stays in the
-/// asset's own byte units whatever the pack's size. Values are quantised to steps of 1 % of the asset (and always
-/// the final value), never decrease and never exceed the asset size, so one pack download yields at most 101
-/// progress elements per waiter however chatty the OS is.
+/// asset's own byte units whatever the pack's size. Values are quantised to steps of at least 1 % of the asset (the
+/// step rounds up, so a 150-byte asset steps by 2; the final value is always reported), never decrease and never
+/// exceed the asset size, so one pack download yields at most 101 progress elements per waiter however chatty the OS
+/// is: after the first value, at most 100 full steps fit below the asset size, and a final partial step replaces one.
 struct PackProgressScaler: Sendable {
     /// The asset's catalog size.
     let expectedBytes: Int64
@@ -30,13 +31,18 @@ struct PackProgressScaler: Sendable {
         let fraction = Double(completed) / Double(progress.total)
         let value = min(self.expectedBytes, Int64((Double(self.expectedBytes) * fraction).rounded(.down)))
         if let last = self.lastReported {
-            let step = max(1, self.expectedBytes / 100)
+            let step = self.step
             guard value > last, value - last >= step || value == self.expectedBytes else {
                 return nil
             }
         }
         self.lastReported = value
         return value
+    }
+
+    /// One percent of the asset, rounded up (never zero for a positive size, never overflowing).
+    private var step: Int64 {
+        self.expectedBytes / 100 + (self.expectedBytes % 100 == 0 ? 0 : 1)
     }
 }
 

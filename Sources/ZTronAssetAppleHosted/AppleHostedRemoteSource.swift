@@ -111,14 +111,17 @@ public final class AppleHostedRemoteSource: RemoteSource {
     /// Runs `PackReleasePlanner` and removes the packs it selects.
     ///
     /// The report is the store's durably committed adoption (ADR-027, store-1 S1-10); the source also remembers
-    /// which media packs hold adopted content, for `sourceCopyBytes()`. A pack the system no longer has counts as
-    /// released; a failed removal is reported and planned again by the next call. Each pack is released at most once
-    /// per catalog generation (the catalog's pseudo-ETag), so a pack that comes back is never released in a loop.
+    /// which media packs hold adopted content, for `sourceCopyBytes()`. The report is surveyed in this task in
+    /// bounded slices (C2) before the state actor is entered. A pack the system no longer has counts as released; a
+    /// failed removal is reported and planned again by the next call. Each pack is released at most once per catalog
+    /// generation (the catalog's pseudo-ETag), so a pack that comes back is never released in a loop, unless a
+    /// transfer of this source downloaded it again on demand.
     public func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
         guard let catalogPack = PackID(rawValue: self.configuration.catalogPackID) else {
             return ReclaimReport()
         }
-        let plan = await self.state.planRelease(report, catalogPack: catalogPack, retention: self.configuration.retention)
+        let survey = await ReleaseSurvey.survey(report, catalogPack: catalogPack, retention: self.configuration.retention)
+        let plan = await self.state.planRelease(survey)
         var reclaim = ReclaimReport()
         for pack in plan.packs {
             let succeeded: Bool
@@ -142,8 +145,8 @@ public final class AppleHostedRemoteSource: RemoteSource {
         return reclaim
     }
 
-    /// Bytes the OS still holds in media packs whose entries were adopted and that were not released yet, summed
-    /// from `PackBackend.installedBytes` (R-CLN-9, H-7, transport-2 T2-13).
+    /// Bytes the OS still holds in media packs whose entries were adopted, summed from `PackBackend.installedBytes`
+    /// (R-CLN-9, H-7, transport-2 T2-13): a released pack reports nothing, and one a transfer downloaded again counts.
     public func sourceCopyBytes() async -> Int64 {
         var total: Int64 = 0
         for pack in await self.state.sourceCopyPacks() {
@@ -157,8 +160,10 @@ public final class AppleHostedRemoteSource: RemoteSource {
 
     /// Cancels pack waiters and returns after every in-flight `writeStaged` of this source returned.
     ///
-    /// Staging admission closes first, so no staging call starts afterwards; a transfer whose copy finishes later
-    /// leaves its file for the next launch's staging GC (ADR-028). The update check is cancelled, not awaited.
+    /// Staging admission closes first, so no staging call starts afterwards, and a copy in flight stops at its next
+    /// chunk and removes its file, so the drain waits for at most one more ≤ 1 MiB unit per copy. A copy that had
+    /// already written its last chunk finishes; if its transfer was stopped, its file is left for the next launch's
+    /// staging GC (ADR-028). The update check is cancelled, not awaited.
     public func invalidate() async {
         await self.state.close()
         await self.packs.close()

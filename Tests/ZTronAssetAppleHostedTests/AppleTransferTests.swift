@@ -153,7 +153,7 @@ struct AppleTransferTests {
     func controlAfterCopyDiscardsTheFile() async throws {
         let gated = GatedStagingSink()
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
-        gated.arm()
+        gated.arm(.afterWrite)
         let handle = await fixture.source.transfer(assetA.request())
         await gated.waitForHeldWrites(1)
         handle.cancel()
@@ -169,7 +169,7 @@ struct AppleTransferTests {
     func cancelBeforePackWaitStartsNothing() async throws {
         let gated = GatedStagingSink()
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles], staging: gated)
-        gated.arm()
+        gated.arm(.afterWrite)
         let handle = await fixture.source.transfer(assetA.request())
         await gated.waitForHeldWrites(1)
         handle.cancel()
@@ -184,7 +184,7 @@ struct AppleTransferTests {
     func stoppedCopyOutlivingInvalidate() async throws {
         let gated = GatedStagingSink()
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
-        gated.arm()
+        gated.arm(.afterWrite)
         let request = assetA.request()
         let handle = await fixture.source.transfer(request)
         await gated.waitForHeldWrites(1)
@@ -198,6 +198,58 @@ struct AppleTransferTests {
         #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
         #expect(gated.base.contents[request.partialName] == assetA.bytes)
         #expect(!gated.events.contains("discard"))
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a transfer stopped before its copy reads a chunk opens no pack file", .timeLimit(.minutes(1)))
+    func stopBeforeTheFirstChunkReadsNothing() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
+        gated.arm(.beforeWrite)
+        let handle = await fixture.source.transfer(assetA.request())
+        await gated.waitForHeldWrites(1)
+        handle.pause()
+        gated.open()
+        #expect(await collect(handle) == [.paused(resumable: false)])
+        #expect(!fixture.backend.calls.contains(.open(Packs.media, assetA.path)))
+        #expect(gated.base.contents.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: invalidate stops a copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
+    func invalidateStopsACopyInFlight() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles], staging: gated)
+        gated.arm(.beforeWrite)
+        let handle = await fixture.source.transfer(assetA.request())
+        await gated.waitForHeldWrites(1)
+        let invalidation = Task {
+            await fixture.source.invalidate()
+        }
+        await fixture.source.state.waitForDrain()
+        gated.open()
+        await invalidation.value
+        #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+        #expect(!fixture.backend.calls.contains(.open(Packs.media, assetA.path)))
+        #expect(gated.base.contents.isEmpty)
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a staged copy whose update stream already ended is discarded instead of delivered", .timeLimit(.minutes(1)))
+    func stagedCopyForAnEndedStreamIsDiscarded() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        let request = assetA.request()
+        let location = try #require(PackLocation(remotePath: assetA.remotePath))
+        let copied = await fixture.source.copier.copy(location, as: request.partialName, maxBytes: request.maxBytes)
+        #expect(copied == .copied(bytes: Int64(assetA.bytes.count), digest: ContentHash.sha256(of: assetA.bytes)))
+        // The consumer dropped the stream after the driver's stop check: the stream has ended before the yield.
+        let (_, updates) = AsyncStream.makeStream(of: TransferUpdate.self)
+        updates.finish()
+        let file = StagedFile(name: request.partialName, byteCount: Int64(assetA.bytes.count), resumed: false, httpStatus: nil, etag: nil)
+        await PackTransferDriver.deliver(.staged(file), to: updates, copier: fixture.source.copier)
+        #expect(fixture.staging.contents[request.partialName] == nil)
+        await fixture.source.invalidate()
     }
 
     @available(macOS 26.0, *)
@@ -226,7 +278,7 @@ struct AppleTransferTests {
         let waiting = await fixture.source.transfer(extra.request())
         await fixture.source.packs.waitForWaiters(on: Packs.extras, count: 1)
         gated.note("armed")
-        gated.arm()
+        gated.arm(.afterWrite)
         let copying = await fixture.source.transfer(assetA.request())
         await gated.waitForHeldWrites(1)
 
@@ -347,8 +399,10 @@ struct AppleTransferTests {
         #expect(file.httpStatus == nil && file.etag == nil && !file.resumed)
         #expect(fixture.staging.contents[file.name] == assetA.bytes)
 
-        // Once every entry of the pack is adopted the pack is released; the store's copy is unaffected and no pack
-        // file is opened again to serve it.
+        // Once every entry of the pack is adopted the pack is released; the store's copy is unaffected, and neither
+        // the release nor anything after it opens a pack file.
+        let opensBefore = fixture.backend.calls.filter { if case .open = $0 { true } else { false } }.count
+        #expect(fixture.backend.calls.filter { $0 == .open(Packs.media, assetA.path) }.count == 1, "the transfer's own copy")
         let reclaim = await fixture.source.reclaimSourceCopies(
             AdoptionReport(
                 manifestRemotePaths: [assetA.remotePath, assetB.remotePath],
@@ -356,7 +410,6 @@ struct AppleTransferTests {
             )
         )
         #expect(reclaim.released == ["ZTronMedia"])
-        let opensBefore = fixture.backend.calls.filter { if case .open = $0 { true } else { false } }.count
         #expect(!fixture.backend.installedPacks.contains(Packs.media))
         #expect(fixture.staging.contents[file.name] == assetA.bytes)
         #expect(fixture.backend.calls.filter { if case .open = $0 { true } else { false } }.count == opensBefore)

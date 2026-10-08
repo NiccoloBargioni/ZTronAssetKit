@@ -53,6 +53,39 @@ struct PackProgressTests {
         await fixture.source.invalidate()
     }
 
+    @available(macOS 26.0, *)
+    @Test("R-APL-2: a pack download that outlived its waiters never reports into a newer download's waiters", .timeLimit(.minutes(1)))
+    func staleFlightNeverReachesANewerWaiter() async throws {
+        let abandoned = PackAsset("ZTronMedia/a.png", String(repeating: "a", count: 400))
+        let current = PackAsset("ZTronMedia/b.png", String(repeating: "b", count: 400))
+        let fixture = AppleTierFixture(remote: [Packs.media: [abandoned.path: abandoned.bytes, current.path: current.bytes]])
+        // The first download ignores its cancellation, as an OS await may (APPLE-API-VERIFICATION §5).
+        fixture.backend.scriptEnsure(Packs.media, [.holdIgnoringCancellation, .hold])
+        let first = await fixture.source.transfer(abandoned.request())
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        first.cancel()
+        #expect(await collect(first) == [.failed(.cancelled(.byClient))])
+
+        let request = current.request()
+        let second = await fixture.source.transfer(request)
+        await fixture.backend.waitFor(.ensure(Packs.media), count: 2)
+        await fixture.source.packs.waitForWaiters(on: Packs.media, count: 1)
+        fixture.backend.releaseEnsure(
+            Packs.media,
+            with: .fail(.packNotFound, progress: [PackProgress(completed: 1, total: 4)]),
+            oldestOnly: true
+        )
+        await fixture.source.packs.waitForStaleCompletions(1)
+        fixture.backend.releaseEnsure(Packs.media, with: .install(progress: [PackProgress(completed: 3, total: 4)]))
+        #expect(
+            await collect(second) == [
+                .progress(received: 300, expected: 400),
+                .staged(StagedFile(name: request.partialName, byteCount: 400, resumed: false, httpStatus: nil, etag: nil)),
+            ]
+        )
+        await fixture.source.invalidate()
+    }
+
     @Test("R-APL-2: scaled progress is quantised, monotonic and never exceeds the asset size")
     func scalerProperties() {
         let seed: UInt64 = 0x5EED_A2
@@ -72,11 +105,26 @@ struct PackProgressTests {
             if let value = scaler.received(for: PackProgress(completed: total, total: total)) {
                 reported.append(value)
             }
-            let step = max(1, expected / 100)
+            let step = expected / 100 + (expected % 100 == 0 ? 0 : 1)
             #expect(reported.last == expected, "seed \(seed) round \(round)")
             #expect(reported.allSatisfy { (0...expected).contains($0) }, "seed \(seed) round \(round)")
             #expect(zip(reported, reported.dropFirst()).allSatisfy { $1 > $0 && ($1 - $0 >= step || $1 == expected) }, "seed \(seed) round \(round)")
-            #expect(reported.count <= 102, "seed \(seed) round \(round)")
+            #expect(reported.count <= 101, "seed \(seed) round \(round)")
+        }
+    }
+
+    @Test("R-APL-2: a pack download fed one unit at a time yields at most 101 values for an asset of any size")
+    func smallAssetsStayWithinTheBound() {
+        for expected: Int64 in [1, 2, 99, 100, 101, 150, 199, 250, 1_000, 10_001] {
+            var scaler = PackProgressScaler(expectedBytes: expected)
+            var reported: [Int64] = []
+            for completed in 0...expected {
+                if let value = scaler.received(for: PackProgress(completed: completed, total: expected)) {
+                    reported.append(value)
+                }
+            }
+            #expect(reported.count <= 101, "\(expected) bytes: \(reported.count) values")
+            #expect(reported.first == 0 && reported.last == expected, "\(expected) bytes")
         }
     }
 

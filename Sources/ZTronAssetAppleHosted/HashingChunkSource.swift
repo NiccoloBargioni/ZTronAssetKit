@@ -12,26 +12,47 @@ import ZTronAssetModel
 /// `Mutex` only publishes the hasher state between those calls; it exists wherever the Apple tier does (iOS 26).
 @available(iOS 26.0, macOS 26.0, *)
 final class HashingChunkSource: ChunkSource {
-    private let base: any ChunkSource
-    private let hasher: Mutex<SHA256>
-
-    /// Wraps `base`; reads nothing yet.
-    init(_ base: any ChunkSource) {
-        self.base = base
-        self.hasher = Mutex(SHA256())
+    private struct State {
+        var hasher = SHA256()
+        var stopped = false
     }
 
-    /// The base reader's next chunk, hashed on the way through.
+    /// The domain of the failure a stopped copy reports to the sink (the copier recognises the stop by `stopped`).
+    static let stopDomain = "ZTronAssetAppleHosted.copyStopped"
+
+    private let base: any ChunkSource
+    private let shouldStop: @Sendable () -> Bool
+    private let state: Mutex<State>
+
+    /// Wraps `base`; reads nothing yet. `shouldStop` is asked before every chunk: once it says yes, the copy ends at
+    /// that chunk boundary without reading the pack file further, so a paused or cancelled transfer, or an
+    /// invalidating source, waits for at most one more ≤ 1 MiB unit instead of a whole pack file.
+    init(_ base: any ChunkSource, shouldStop: @escaping @Sendable () -> Bool) {
+        self.base = base
+        self.shouldStop = shouldStop
+        self.state = Mutex(State())
+    }
+
+    /// The base reader's next chunk, hashed on the way through; a source failure once the copy should stop.
     func nextChunk(maxBytes: Int) throws(StagingError) -> Data? {
+        guard !self.shouldStop() else {
+            self.state.withLock { $0.stopped = true }
+            throw .source(.system(domain: Self.stopDomain, code: Int(ECANCELED)))
+        }
         guard let chunk = try self.base.nextChunk(maxBytes: maxBytes) else {
             return nil
         }
-        self.hasher.withLock { $0.update(data: chunk) }
+        self.state.withLock { $0.hasher.update(data: chunk) }
         return chunk
+    }
+
+    /// Whether the copy was stopped (the sink then failed with the stop's source failure).
+    var stopped: Bool {
+        self.state.withLock { $0.stopped }
     }
 
     /// The SHA-256 of every byte forwarded so far.
     var digest: ContentHash {
-        self.hasher.withLock { ContentHash(digest: $0.finalize()) }
+        self.state.withLock { ContentHash(digest: $0.hasher.finalize()) }
     }
 }

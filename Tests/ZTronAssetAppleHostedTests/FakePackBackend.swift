@@ -10,7 +10,7 @@ import ZTronAssetModel
 /// `ensureAvailable` installs. Each `ensureAvailable` and `checkForUpdates` call takes the next scripted step (an
 /// install with progress values, a failure, or a hold the test releases); every call is recorded in order, and a
 /// test can wait for a call without sleeping. A held call that is cancelled records `ensureCancelled` and returns
-/// a failure, like an OS await that honours cancellation. Gated for `Mutex` (ADR-014).
+/// a failure, like an OS await that honours cancellation (`holdIgnoringCancellation` models one that does not). Gated for `Mutex` (ADR-014).
 @available(macOS 15.0, iOS 18.0, *)
 final class FakePackBackend: PackBackend {
     /// One call on the seam (or on a reader it made).
@@ -32,6 +32,9 @@ final class FakePackBackend: PackBackend {
         case fail(PackError, progress: [PackProgress])
         /// Suspends until `releaseEnsure(_:with:)` names the step to finish with.
         case hold
+        /// Like `hold`, but cancellation does not end it: an OS await that outlives its cancellation
+        /// (APPLE-API-VERIFICATION §5, UNVERIFIED).
+        case holdIgnoringCancellation
     }
 
     /// What the next `checkForUpdates()` does.
@@ -118,21 +121,28 @@ final class FakePackBackend: PackBackend {
         self.state.withLock { $0.installed[pack] = files }
     }
 
-    /// Finishes every held `ensureAvailable(pack)` with `step`; when none is held yet (the call has not reached
-    /// its hold), the next hold of `pack` finishes with `step` at once, so a test never races the fake.
-    func releaseEnsure(_ pack: PackID, with step: EnsureStep) {
+    /// Finishes every held `ensureAvailable(pack)` (only the one held longest with `oldestOnly`) with `step`; when
+    /// none is held yet (the call has not reached its hold), the next hold of `pack` finishes with `step` at once, so
+    /// a test never races the fake.
+    func releaseEnsure(_ pack: PackID, with step: EnsureStep, oldestOnly: Bool = false) {
         let continuations = self.state.withLock { state -> [CheckedContinuation<EnsureStep?, Never>] in
-            var found: [CheckedContinuation<EnsureStep?, Never>] = []
+            var found: [(key: UInt64, continuation: CheckedContinuation<EnsureStep?, Never>)] = []
             for (key, held) in state.held {
                 if case .ensure(let heldPack, let continuation) = held, heldPack == pack {
-                    found.append(continuation)
-                    state.held[key] = nil
+                    found.append((key, continuation))
                 }
+            }
+            found.sort { $0.key < $1.key }
+            if oldestOnly {
+                found = Array(found.prefix(1))
+            }
+            for entry in found {
+                state.held[entry.key] = nil
             }
             if found.isEmpty {
                 state.pendingEnsureReleases[pack] = step
             }
-            return found
+            return found.map(\.continuation)
         }
         for continuation in continuations {
             continuation.resume(returning: step)
@@ -206,9 +216,10 @@ final class FakePackBackend: PackBackend {
             state.ensureSteps[pack] = steps
             return first
         }
-        if case .hold = step {
+        if step == .hold || step == .holdIgnoringCancellation {
             let pending = { (state: inout State) -> EnsureStep? in state.pendingEnsureReleases.removeValue(forKey: pack) }
-            guard let released = await self.hold(pending: pending, { .ensure(pack, $0) }) else {
+            let cancellable = step == .hold
+            guard let released = await self.hold(pending: pending, cancellable: cancellable, { .ensure(pack, $0) }) else {
                 self.record(.ensureCancelled(pack))
                 throw .system(domain: "FakePackBackend", code: -999)
             }
@@ -234,7 +245,7 @@ final class FakePackBackend: PackBackend {
                 progress?.yield(value)
             }
             throw error
-        case .hold:
+        case .hold, .holdIgnoringCancellation:
             throw .system(domain: "FakePackBackend", code: -1)
         }
     }
@@ -249,7 +260,7 @@ final class FakePackBackend: PackBackend {
                 defer { state.pendingCheckRelease = nil }
                 return state.pendingCheckRelease
             }
-            guard let released = await self.hold(pending: pending, { .check($0) }) else {
+            guard let released = await self.hold(pending: pending, cancellable: true, { .check($0) }) else {
                 throw .system(domain: "FakePackBackend", code: -999)
             }
             step = released
@@ -329,9 +340,10 @@ final class FakePackBackend: PackBackend {
         }
     }
 
-    /// Suspends until released (the step) or cancelled (`nil`).
+    /// Suspends until released (the step) or, when `cancellable`, cancelled (`nil`).
     private func hold<Step: Sendable>(
         pending: (inout State) -> Step?,
+        cancellable: Bool,
         _ make: (CheckedContinuation<Step?, Never>) -> Held
     ) async -> Step? {
         let key = self.state.withLock { state -> UInt64 in
@@ -341,7 +353,7 @@ final class FakePackBackend: PackBackend {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Step?, Never>) in
                 let immediate = self.state.withLock { state -> Step?? in
-                    guard !Task.isCancelled else {
+                    guard !(cancellable && Task.isCancelled) else {
                         return .some(nil)
                     }
                     if let released = pending(&state) {
@@ -355,6 +367,9 @@ final class FakePackBackend: PackBackend {
                 }
             }
         } onCancel: {
+            guard cancellable else {
+                return
+            }
             let held = self.state.withLock { $0.held.removeValue(forKey: key) }
             switch held {
             case .ensure(_, let continuation):

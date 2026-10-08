@@ -15,13 +15,17 @@ actor AppleSourceState {
         var updateChecked: Bool
     }
 
-    /// The packs one `reclaimSourceCopies` call releases, and the catalog generation it planned in.
+    /// The packs one `reclaimSourceCopies` call releases, and the release generation it planned in.
     struct ReleasePlan: Sendable, Hashable {
         /// The packs to remove, sorted.
         var packs: [PackID]
-        /// The catalog digest current when planned.
-        var generation: ETag?
+        /// The release generation current when planned (see `noteCatalog`).
+        var generation: UInt64
     }
+
+    /// Requested (as `.cancel`) by `close()`: a copy in flight stops at its next chunk (`HashingChunkSource`), so
+    /// `invalidate()` waits for at most one more chunk of each copy instead of whole pack files.
+    nonisolated let shutdown = PackTransferStop()
 
     private var closed = false
     private var stagingCalls = 0
@@ -34,6 +38,7 @@ actor AppleSourceState {
     private var unreportedSuccess = false
 
     private var catalogETag: ETag?
+    private var generation: UInt64 = 0
     private var released: Set<PackID> = []
     private var releasing: Set<PackID> = []
     private var adoptedPacks: Set<PackID> = []
@@ -69,6 +74,7 @@ actor AppleSourceState {
     /// Stops admitting staging calls and update checks and cancels the running check (it touches no staging).
     func close() {
         self.closed = true
+        self.shutdown.request(.cancel)
         self.checkTask?.cancel()
         self.checkTask = nil
     }
@@ -96,8 +102,9 @@ actor AppleSourceState {
     }
 
     /// Test seam: returns once a `drain()` call is waiting, nothing is left to drain, or the calling task was
-    /// cancelled (so a test's time limit ends a wait that a defect would make endless).
-    func waitForDrain() async {
+    /// cancelled (so a test's time limit ends a wait that a defect would make endless). `registered` runs on the actor
+    /// once the wait is registered, so a test can cancel a wait it knows is pending.
+    func waitForDrain(registered: (@Sendable () -> Void)? = nil) async {
         guard self.drainWaiters.isEmpty, self.stagingCalls > 0 else {
             return
         }
@@ -110,10 +117,14 @@ actor AppleSourceState {
                     continuation.resume()
                 } else {
                     self.drainObservers.append(continuation)
+                    registered?()
                 }
             }
         } onCancel: {
             Task {
+                // REENTRANCY: e-8 (proposed) — a hop onto the actor from a cancellation handler, which cannot touch
+                // actor state synchronously; `releaseDrainObservers` re-reads the observer list, so an observer
+                // already resumed and removed by another turn is never resumed twice.
                 await self.releaseDrainObservers()
             }
         }
@@ -190,46 +201,51 @@ actor AppleSourceState {
 
     // MARK: Releases and source copies (R-CLN-9, R-CLN-10, H-7)
 
-    /// Records the installed catalog's digest. A new digest starts a new catalog generation, in which a media pack
+    /// Records the installed catalog's digest. A new digest starts a new release generation, in which a media pack
     /// may be released once more (ADR-027: at most once per pack per generation, so a pack that comes back is never
-    /// released in a loop).
+    /// released in a loop). The first digest of the process does not: releases made before it (an offline launch's
+    /// maintenance) belong to the generation it opens, so they are neither repeated nor reported twice.
     func noteCatalog(_ etag: ETag?) {
         guard etag != self.catalogETag else {
             return
         }
+        let first = self.catalogETag == nil
         self.catalogETag = etag
-        self.released.removeAll()
+        if !first {
+            self.generation += 1
+            self.released.removeAll()
+        }
     }
 
-    /// Records which media packs hold adopted content and returns the packs `PackReleasePlanner` releases now,
-    /// marked in flight so a concurrent call never plans them again.
-    func planRelease(_ report: AdoptionReport, catalogPack: PackID, retention: PackRetention) -> ReleasePlan {
-        let entries = report.manifestRemotePaths.compactMap(PackLocation.init(remotePath:))
-        let adopted = Set(report.adoptedRemotePaths.compactMap(PackLocation.init(remotePath:)))
-        let excluded = Set(report.excludedRemotePaths.compactMap(PackLocation.init(remotePath:)))
-        self.adoptedPacks = Set(adopted.map(\.pack)).subtracting([catalogPack])
-        let packs = PackReleasePlanner.packsToRelease(
-            catalogEntries: entries,
-            adopted: adopted,
-            excluded: excluded,
-            catalogPack: catalogPack,
-            retention: retention,
-            alreadyReleased: self.released.union(self.releasing)
-        )
+    /// Records which media packs hold adopted content and returns the settled packs not released in this generation,
+    /// marked in flight so a concurrent call never plans them again. `survey` was computed off the actor (C2); this
+    /// turn only filters it, so the bookkeeping is re-validated against the sets as they are now.
+    func planRelease(_ survey: ReleaseSurvey) -> ReleasePlan {
+        self.adoptedPacks = survey.adopted
+        let packs = survey.settled.subtracting(self.released).subtracting(self.releasing).sorted()
         self.releasing.formUnion(packs)
-        return ReleasePlan(packs: packs, generation: self.catalogETag)
+        return ReleasePlan(packs: packs, generation: self.generation)
     }
 
     /// Ends one planned release; a success counts for the generation it was planned in only.
-    func finishRelease(_ pack: PackID, succeeded: Bool, generation: ETag?) {
+    func finishRelease(_ pack: PackID, succeeded: Bool, generation: UInt64) {
         self.releasing.remove(pack)
-        if succeeded && generation == self.catalogETag {
+        if succeeded && generation == self.generation {
             self.released.insert(pack)
         }
     }
 
-    /// Media packs holding adopted content that were not released in this catalog generation, sorted.
+    /// Forgets that `pack` was released in this generation because a transfer of this source made it available
+    /// again (an adopted blob was evicted or repaired and fetched once more): once its entries are adopted again it
+    /// is released once more. Only the source's own demand does this, never the OS bringing a pack back on its own,
+    /// so releases still never loop.
+    func forgetRelease(_ pack: PackID) {
+        self.released.remove(pack)
+    }
+
+    /// Media packs holding adopted content, sorted. Released packs stay listed: the OS reports no bytes for a removed
+    /// pack, and a pack a transfer downloaded again holds bytes the device really keeps twice (R-CLN-9).
     func sourceCopyPacks() -> [PackID] {
-        self.adoptedPacks.subtracting(self.released).sorted()
+        self.adoptedPacks.sorted()
     }
 }
