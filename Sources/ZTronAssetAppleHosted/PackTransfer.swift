@@ -3,7 +3,9 @@ import Synchronization
 import ZTronAssetModel
 
 /// A stop requested through a handle's synchronous controls (ADR-021): the first request wins, and the driver turns
-/// it into the stream's terminal element, so exactly one terminal element is ever yielded.
+/// it into the stream's terminal element, so exactly one terminal element is ever yielded. The driver claims the
+/// terminal element under the same lock (`claimTerminal()`), so a stop either lands before the claim and becomes the
+/// terminal element or lands after it and is a no-op, never between the driver's check and its yield.
 @available(iOS 26.0, macOS 26.0, *)
 final class PackTransferStop: Sendable {
     /// What was asked.
@@ -24,25 +26,41 @@ final class PackTransferStop: Sendable {
         }
     }
 
-    private let kind: Mutex<Kind?>
+    /// The recorded stop and whether the terminal element was claimed, decided together.
+    private struct State {
+        var kind: Kind?
+        var claimed = false
+    }
+
+    private let state: Mutex<State>
 
     /// No stop yet.
     init() {
-        self.kind = Mutex(nil)
+        self.state = Mutex(State())
     }
 
-    /// Records `kind` unless a stop was already requested.
+    /// Records `kind` unless a stop was already requested or the terminal element was already claimed (a control
+    /// after the terminal element is a no-op, ADR-021).
     func request(_ kind: Kind) {
-        self.kind.withLock { current in
-            if current == nil {
-                current = kind
+        self.state.withLock { state in
+            if state.kind == nil && !state.claimed {
+                state.kind = kind
             }
         }
     }
 
-    /// The first stop requested, if any.
+    /// The first stop requested before the claim, if any (a copy checks it before every chunk).
     var requested: Kind? {
-        self.kind.withLock { $0 }
+        self.state.withLock { $0.kind }
+    }
+
+    /// Claims the terminal element and returns the stop requested before the claim, as one decision: from now on
+    /// `request(_:)` records nothing. The critical section neither awaits nor does I/O.
+    func claimTerminal() -> Kind? {
+        self.state.withLock { state in
+            state.claimed = true
+            return state.kind
+        }
     }
 }
 
@@ -136,25 +154,36 @@ struct PackTransferDriver: Sendable {
     /// interval is still open.
     func run() async {
         let interval = self.parts.log.interval(.transfer, category: .apple, "attempt \(self.request.attempt.token)")
-        let attempt = await self.attempt()
+        let terminal = await self.conclude(await self.attempt())
+        interval.end()
+        await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
+    }
+
+    /// Turns a finished attempt into the terminal element; also the test seam for the window between a finished
+    /// copy and that element (tests call it with an attempt they staged themselves).
+    ///
+    /// The element is claimed against the handle's controls in one decision (`PackTransferStop.claimTerminal()`):
+    /// a pause or cancel recorded before the claim replaces the attempt's element, discarding a staged copy, and one
+    /// arriving later is a no-op, as a control after the terminal element is (ADR-021); nothing between the claim and
+    /// the yield is visible to the consumer. A pack this attempt downloaded on demand has its release forgotten only
+    /// when a staged copy is delivered, so it is released once more after that asset is adopted (R-CLN-10); a skew,
+    /// a failure or a stop re-arms nothing, so a pack lacking a catalog entry is never removed and downloaded again
+    /// in a loop within one catalog generation (ADR-027).
+    func conclude(_ attempt: AttemptResult) async -> TransferUpdate {
         var terminal = attempt.terminal
-        if let stop = self.stop.requested {
+        if let stop = self.stop.claimTerminal() {
             if case .staged(let file) = terminal {
                 await self.parts.copier.discard(file.name)
             }
             terminal = stop.terminal
         }
         if let pack = attempt.downloaded, case .staged = terminal {
-            // A pack released earlier and downloaded again for an asset this transfer staged may be released once
-            // more once that asset is adopted (R-CLN-10). A skew, a failure or a stop re-arms nothing, so a pack
-            // whose catalog entry it lacks is never removed and downloaded again in a loop (ADR-027).
             await self.parts.state.forgetRelease(pack)
         }
-        interval.end()
-        await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
+        return terminal
     }
 
-    /// Ends the stream with `terminal`. A consumer can drop the stream after the stop check above and before this
+    /// Ends the stream with `terminal`. A consumer can drop the stream after the terminal was claimed and before this
     /// yield (nothing suspends in between, but another thread can); a staged copy that therefore reaches nobody is
     /// discarded here, so no staging file outlives its transfer until the next launch's staging GC.
     static func deliver(
