@@ -137,4 +137,108 @@ struct SessionDelegateDirectTests {
         #expect(await iterator.next() == .failed(.transient(.timedOut, retryAfter: nil)))
         #expect(staging.sidecars.isEmpty)
     }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-6: a client's discard is never turned into a staging failure by a later write into the discarded partial", .timeLimit(.minutes(1)))
+    func discardIsSticky() async throws {
+        let delegate = SessionDelegate(mode: .foreground, staging: FakeStagingSink(), policy: Self.policy)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let job = TransportFixtures.job(id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.url, expected: 5)
+        let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self)
+        let task = session.dataTask(with: Self.url)
+        task.delegate = TaskMailbox(continuation: continuation, job: job)
+        // The backend marked the task and discarded the partial; a chunk already past its marker check then fails to
+        // write into the vanished file and records that failure.
+        TaskMarker.requestDiscard(on: task)
+        TaskMarker.record(.staging(.io(posixCode: ENOENT)), on: task)
+        TaskMarker.requestIfUnmarked(.pause, on: task)
+        #expect(TaskMarker(decoding: task.taskDescription) == .discard)
+        delegate.urlSession(session, task: task, didCompleteWithError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled))
+        var iterator = updates.makeAsyncIterator()
+        #expect(await iterator.next() == .failed(.cancelled(.byClient)))
+        // A discard supersedes a pause, never a verdict that already explains why the task stopped.
+        let pausing = session.dataTask(with: Self.url)
+        TaskMarker.requestIfUnmarked(.pause, on: pausing)
+        TaskMarker.requestDiscard(on: pausing)
+        #expect(TaskMarker(decoding: pausing.taskDescription) == .discard)
+        let judged = session.dataTask(with: Self.url)
+        TaskMarker.record(.oversize(announced: 9), on: judged)
+        TaskMarker.requestDiscard(on: judged)
+        #expect(TaskMarker(decoding: judged.taskDescription) == .oversize(announced: 9))
+    }
+
+    /// One foreground completion: what staging holds, what marks the task, how it ended, and the one outcome.
+    struct Ending: Sendable, CustomTestStringConvertible {
+        var label: String
+        var staged: Int
+        var expected: Int64?
+        var maxBytes: Int64 = 1 << 30
+        var marker: TaskMarker?
+        var errorCode: Int?
+        var outcome: TransferUpdate
+
+        var testDescription: String {
+            self.label
+        }
+    }
+
+    static let endings: [Ending] = [
+        Ending(label: "more than byteSize", staged: 4_001, expected: 4_000, outcome: .failed(.integrity(.sizeMismatch(expected: 4_000, actual: 4_001)))),
+        Ending(label: "more than the cap without byteSize", staged: 2_000, expected: nil, maxBytes: 1_000, outcome: .failed(.integrity(.oversize(announced: nil, limit: 1_000)))),
+        Ending(label: "an oversize verdict raced by the completion", staged: 4_000, expected: 4_000, maxBytes: 8_000, marker: .oversize(announced: 9_000),
+               outcome: .failed(.integrity(.oversize(announced: 9_000, limit: 8_000)))),
+        Ending(label: "a byteSize verdict raced by the completion", staged: 4_000, expected: 4_000, marker: .exceedsExpected(written: 4_100),
+               outcome: .failed(.integrity(.sizeMismatch(expected: 4_000, actual: 4_100)))),
+        Ending(label: "a staging failure raced by the completion", staged: 4_000, expected: 4_000, marker: .staging(.insufficientSpace),
+               outcome: .failed(.insufficientSpace(requiredBytes: 4_000))),
+        Ending(label: "a discard raced by the completion", staged: 4_000, expected: 4_000, marker: .discard, outcome: .failed(.cancelled(.byClient))),
+        Ending(label: "a discard before a lost connection", staged: 4_000, expected: 8_000, marker: .discard, errorCode: NSURLErrorNetworkConnectionLost,
+               outcome: .failed(.cancelled(.byClient))),
+        Ending(label: "a pause raced by the completion", staged: 4_000, expected: 4_000, marker: .pause,
+               outcome: .staged(StagedFile(name: SessionDelegateDirectTests.name, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil))),
+    ]
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-7: a completion that races a verdict, or stages more than byteSize or the cap, is never reported staged", .timeLimit(.minutes(1)), arguments: SessionDelegateDirectTests.endings)
+    func completionHonoursVerdicts(_ ending: Ending) async throws {
+        let staging = FakeStagingSink()
+        let delegate = SessionDelegate(mode: .foreground, staging: staging, policy: Self.policy)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let job = TransportFixtures.job(
+            id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.url, expected: ending.expected, maxBytes: ending.maxBytes)
+        try staging.createPartial(job.partialName)
+        _ = try staging.appendPartial(TransportFixtures.payload(ending.staged), to: job.partialName)
+        let task = session.dataTask(with: Self.url)
+        task.taskDescription = ending.marker?.encoded
+        let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]))
+        let error = ending.errorCode.map { NSError(domain: NSURLErrorDomain, code: $0) }
+        let outcome = delegate.foregroundOutcome(task: task, job: job, response: response, error: error)
+        #expect(outcome == ending.outcome)
+        // Nothing of a judged or discarded transfer is kept for resume.
+        #expect(staging.sidecars.isEmpty)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-7: a background download tagged without byteSize is staged only when it holds bytes", .timeLimit(.minutes(1)))
+    func untaggedSizeBackgroundDownload() async throws {
+        let staging = FakeStagingSink()
+        let delegate = SessionDelegate(mode: .background, staging: staging, policy: Self.policy)
+        let directory = try TransportFixtures.directory("direct-unsized")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let facts = ResponseFacts(status: 200, bodyBytes: 0, contentTypeIsXML: false, retryAfter: nil, etag: nil, contentRangeStart: nil, keyPresented: false)
+        let empty = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial)
+        let full = StagingFileName(transfer: TransportFixtures.contentID(2), attempt: TransportFixtures.attempt(2), kind: .partial)
+        for (name, bytes) in [(empty, 0), (full, 700)] {
+            let location = directory.appendingPathComponent("\(bytes).tmp")
+            try TransportFixtures.payload(bytes).write(to: location)
+            delegate.finishDownload(tag: BackgroundTaskTag(name: name, expectedBytes: nil), response: facts, originalURL: Self.url, finalURL: Self.url, location: location)
+        }
+        var events = delegate.sessionEvents.makeAsyncIterator()
+        #expect(await events.next() == .finished(name: empty, update: .failed(.integrity(.truncated(expected: nil, received: 0)))))
+        #expect(await events.next() == .finished(name: full, update: .staged(StagedFile(name: full, byteCount: 700, resumed: false, httpStatus: 200, etag: nil))))
+        #expect(staging.contents[full] == TransportFixtures.payload(700))
+    }
 }
+

@@ -105,7 +105,7 @@ extension SessionDelegate {
             guard let mailbox = task.delegate as? TaskMailbox else {
                 return
             }
-            let update = self.foregroundOutcome(task: task, job: mailbox.job, error: error)
+            let update = self.foregroundOutcome(task: task, job: mailbox.job, response: task.response as? HTTPURLResponse, error: error)
             mailbox.continuation.yield(update)
             mailbox.continuation.finish()
         case .background:
@@ -208,21 +208,30 @@ extension SessionDelegate {
         )
     }
 
-    /// The one terminal update of a foreground task.
-    func foregroundOutcome(task: URLSessionTask, job: TransferJob, error: (any Error)?) -> TransferUpdate {
-        let http = task.response as? HTTPURLResponse
+    /// The one terminal update of a foreground task whose response is `http`: the completion callback reads it off
+    /// the task; tests pass one, since an unresumed task has none (ARCHITECTURE §14). The task's marker is honoured
+    /// whatever ended the task: a client `discard` is always the client's cancellation (nothing is kept, no sidecar),
+    /// and a delegate verdict stands even when the completion was already queued when its cancel was issued.
+    package func foregroundOutcome(task: URLSessionTask, job: TransferJob, response http: HTTPURLResponse?, error: (any Error)?) -> TransferUpdate {
+        let marker = TaskMarker(decoding: task.taskDescription)
+        if marker == .discard {
+            return .failed(.cancelled(.byClient))
+        }
         if let error {
-            return self.failureOutcome(task: task, job: job, http: http, error: error)
+            return self.failureOutcome(task: task, job: job, http: http, error: error, marker: marker)
         }
         guard let http else {
             return .failed(.transient(.badServerResponse, retryAfter: nil))
         }
-        return self.completedOutcome(task: task, job: job, http: http)
+        return self.completedOutcome(task: task, job: job, http: http, marker: marker)
     }
 
-    private func completedOutcome(task: URLSessionTask, job: TransferJob, http: HTTPURLResponse) -> TransferUpdate {
+    private func completedOutcome(task: URLSessionTask, job: TransferJob, http: HTTPURLResponse, marker: TaskMarker?) -> TransferUpdate {
         let facts = self.facts(of: http, task: task)
         if Self.isStagedStatus(http.statusCode, job: job) {
+            if let marker, let verdict = Self.verdict(of: marker, job: job) {
+                return verdict
+            }
             // `open` already checked a 206's `Content-Range` against the partial, so the status needs no classifier.
             return self.stagedOutcome(job: job, http: http, facts: facts)
         }
@@ -255,10 +264,17 @@ extension SessionDelegate {
         } catch {
             return .failed(error.transferError(requiredBytes: job.expectedBytes))
         }
-        // The size guard stopped every chunk past the cap or `byteSize`, so only a short body remains to catch.
+        // The size guard stops every chunk past the cap or `byteSize`, but a completion already queued when its
+        // cancel was issued arrives here too: the whole staged size is checked again.
+        if staged > job.maxBytes {
+            return .failed(.integrity(.oversize(announced: nil, limit: job.maxBytes)))
+        }
         if let expected = job.expectedBytes {
-            if staged < expected {
-                return .failed(.integrity(.truncated(expected: expected, received: staged)))
+            if staged != expected {
+                let failure: TransferIntegrityFailure = staged < expected
+                    ? .truncated(expected: expected, received: staged)
+                    : .sizeMismatch(expected: expected, actual: staged)
+                return .failed(.integrity(failure))
             }
         } else if staged == 0 && job.purpose == .asset {
             return .failed(.integrity(.truncated(expected: nil, received: 0)))
@@ -267,27 +283,20 @@ extension SessionDelegate {
         return .staged(StagedFile(name: job.partialName, byteCount: staged, resumed: resumed, httpStatus: http.statusCode, etag: facts.etag))
     }
 
-    private func failureOutcome(task: URLSessionTask, job: TransferJob, http: HTTPURLResponse?, error: any Error) -> TransferUpdate {
+    private func failureOutcome(task: URLSessionTask, job: TransferJob, http: HTTPURLResponse?, error: any Error, marker: TaskMarker?) -> TransferUpdate {
         let errorFacts = HTTPResponseReading.errorFacts(error)
-        if errorFacts.code == NSURLErrorCancelled {
-            switch TaskMarker(decoding: task.taskDescription) {
+        if errorFacts.code == NSURLErrorCancelled, let marker {
+            switch marker {
             case .pause:
                 return .paused(resumable: self.keepForResume(job: job, http: http))
-            case .oversize(let announced):
-                return .failed(.integrity(.oversize(announced: announced, limit: job.maxBytes)))
-            case .exceedsExpected(let written):
-                return .failed(.integrity(.sizeMismatch(expected: job.expectedBytes ?? written, actual: written)))
-            case .staging(let failure):
-                return .failed(failure.transferError(requiredBytes: job.expectedBytes))
-            case .rangeMismatch:
-                return .failed(.transient(.resumeRejected, retryAfter: nil))
             case .finalStatus:
                 // Set only after a response arrived.
-                return http.map { self.completedOutcome(task: task, job: job, http: $0) } ?? .failed(.transient(.badServerResponse, retryAfter: nil))
-            case .notHTTP:
-                return .failed(.transient(.badServerResponse, retryAfter: nil))
-            case .discard, nil:
-                break
+                let completed = http.map { self.completedOutcome(task: task, job: job, http: $0, marker: marker) }
+                return completed ?? .failed(.transient(.badServerResponse, retryAfter: nil))
+            default:
+                if let verdict = Self.verdict(of: marker, job: job) {
+                    return verdict
+                }
             }
         }
         let failure = TransferClassifier.classify(
@@ -305,6 +314,25 @@ extension SessionDelegate {
             return .failed(failure)
         default:
             return .failed(failure)
+        }
+    }
+
+    /// The failure a delegate verdict on the task stands for; `nil` for the client's markers and for `finalStatus`,
+    /// which is classified by the response's status.
+    static func verdict(of marker: TaskMarker, job: TransferJob) -> TransferUpdate? {
+        switch marker {
+        case .oversize(let announced):
+            return .failed(.integrity(.oversize(announced: announced, limit: job.maxBytes)))
+        case .exceedsExpected(let written):
+            return .failed(.integrity(.sizeMismatch(expected: job.expectedBytes ?? written, actual: written)))
+        case .staging(let failure):
+            return .failed(failure.transferError(requiredBytes: job.expectedBytes))
+        case .rangeMismatch:
+            return .failed(.transient(.resumeRejected, retryAfter: nil))
+        case .notHTTP:
+            return .failed(.transient(.badServerResponse, retryAfter: nil))
+        case .pause, .discard, .finalStatus:
+            return nil
         }
     }
 

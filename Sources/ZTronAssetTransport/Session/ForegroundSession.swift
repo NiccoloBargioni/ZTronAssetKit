@@ -172,7 +172,7 @@ public final class ForegroundTransferBackend: TransferBackend {
         }
         task.delegate = TaskMailbox(continuation: continuation, job: job)
         task.resume()
-        return DataTransferHandle(job: job, updates: updates, task: task)
+        return DataTransferHandle(job: job, updates: updates, task: task, staging: self.delegate.staging)
     }
 
     /// The session's running and suspended data tasks, read from the tasks themselves (their mailboxes).
@@ -203,7 +203,7 @@ public final class ForegroundTransferBackend: TransferBackend {
             if keepingPartial {
                 TaskMarker.requestIfUnmarked(.pause, on: task)
             } else {
-                TaskMarker.record(.discard, on: task)
+                TaskMarker.requestDiscard(on: task)
             }
             task.cancel()
         }

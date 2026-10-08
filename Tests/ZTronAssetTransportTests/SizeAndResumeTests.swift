@@ -190,6 +190,10 @@ struct SizeAndResumeTests {
         let past = rig.request(id, attempt: TransportFixtures.attempt(2), path: "a.bin", expected: 2_000,
                                resume: ResumePoint(previous: tooLong.partialName, offset: 3_000, validator: .strongETag(tag)))
         #expect(await run(await rig.source.transfer(past)).terminal == .failed(.transient(.resumeRejected, retryAfter: nil)))
+        // Nothing was appended to the refused partial and nothing was staged under the new attempt: the engine
+        // discards the earlier partial on resumeRejected (ARCHITECTURE §7.6), else staging GC collects it.
+        #expect(rig.staging.contents[tooLong.partialName] == TransportFixtures.payload(3_000))
+        #expect(rig.staging.contents[past.partialName] == nil)
         // A partial shorter than the offset the sidecar claims: the 206 cannot be appended.
         let short = rig.request(id, attempt: TransportFixtures.attempt(3), path: "a.bin", expected: 2_000)
         try rig.staging.createPartial(short.partialName)
@@ -197,6 +201,10 @@ struct SizeAndResumeTests {
         let mismatched = rig.request(id, attempt: TransportFixtures.attempt(4), path: "a.bin", expected: 2_000,
                                      resume: ResumePoint(previous: short.partialName, offset: 1_000, validator: .strongETag(tag)))
         #expect(await run(await rig.source.transfer(mismatched)).terminal == .failed(.transient(.resumeRejected, retryAfter: nil)))
+        // The partial was taken over by the attempt (exclusive rename) and left exactly as it was: not one byte of the
+        // 206 was appended to it.
+        #expect(rig.staging.contents[mismatched.partialName] == body.prefix(900))
+        #expect(rig.staging.contents[short.partialName] == nil)
         // An earlier partial that vanished (collected meanwhile) cannot be continued either.
         let vanished = rig.request(id, attempt: TransportFixtures.attempt(6), path: "a.bin", expected: 2_000,
                                    resume: ResumePoint(previous: tooLong.partialName, offset: 500, validator: .strongETag(tag)))
@@ -210,6 +218,7 @@ struct SizeAndResumeTests {
             return
         }
         #expect(!file.resumed && rig.staging.contents[file.name] == body)
+        #expect(await rig.server.requests.last?.header("range") == nil)
         await rig.stop()
     }
 

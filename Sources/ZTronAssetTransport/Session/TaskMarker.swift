@@ -8,11 +8,13 @@ import ZTronAssetModel
 /// the per-task slot that both sides can reach: the task is `Sendable` and the property is atomic (`copy`, not
 /// `nonatomic`, NSURLSession.h). Foreground tasks route through their `TaskMailbox`, so the slot is free for this.
 ///
-/// Precedence: the delegate's own verdicts (size, staging, range) overwrite whatever is there, because they explain
-/// the bytes; a client `pause` is written only onto an unmarked task, so it never hides a verdict. The remaining
-/// race (a verdict written between the pause's check and its write) loses the verdict and reports `paused`; the
-/// next attempt meets the same verdict again.
-enum TaskMarker: Sendable, Hashable {
+/// Precedence: the delegate's own verdicts (size, staging, range) overwrite a client `pause` or an earlier verdict,
+/// because they explain the bytes; a client `pause` is written only onto an unmarked task, so it never hides a
+/// verdict. A client `discard` replaces nothing but a `pause`, and nothing replaces it: once the client discarded the
+/// partial, a write into it that fails (`ENOENT`) is a consequence of that discard and must not turn the client's
+/// cancellation into `localIO`. The remaining race (a verdict written between the pause's check and its write)
+/// loses the verdict and reports `paused`; the next attempt meets the same verdict again.
+package enum TaskMarker: Sendable, Hashable {
     /// `TransferHandle.pause()` or `cancel(_:keepingPartial: true)`: keep the partial, report `paused`.
     case pause
     /// `cancel(_:keepingPartial: false)`: the partial is being discarded, append nothing more.
@@ -33,7 +35,7 @@ enum TaskMarker: Sendable, Hashable {
     private static let prefix = "ztak-marker "
 
     /// The encoded marker, prefixed so a foreign description never decodes.
-    var encoded: String {
+    package var encoded: String {
         Self.prefix + self.body
     }
 
@@ -72,7 +74,7 @@ enum TaskMarker: Sendable, Hashable {
     /// Decodes a task description; `nil` for an unmarked task or anything that is not a marker. Only `encoded`
     /// writes markers, so the verbs are decoded exactly and their numbers leniently (a number that does not parse
     /// reads as unknown).
-    init?(decoding description: String?) {
+    package init?(decoding description: String?) {
         guard let description, description.hasPrefix(Self.prefix) else {
             return nil
         }
@@ -115,15 +117,29 @@ enum TaskMarker: Sendable, Hashable {
         }
     }
 
-    /// Writes a delegate verdict onto `task`, replacing any client marker.
-    static func record(_ marker: TaskMarker, on task: URLSessionTask) {
+    /// Writes a delegate verdict onto `task`, replacing a client `pause` or an earlier verdict, never a `discard`.
+    package static func record(_ marker: TaskMarker, on task: URLSessionTask) {
+        guard TaskMarker(decoding: task.taskDescription) != .discard else {
+            return
+        }
         task.taskDescription = marker.encoded
     }
 
     /// Writes a client marker onto `task` only when it carries none yet.
-    static func requestIfUnmarked(_ marker: TaskMarker, on task: URLSessionTask) {
+    package static func requestIfUnmarked(_ marker: TaskMarker, on task: URLSessionTask) {
         if TaskMarker(decoding: task.taskDescription) == nil {
             task.taskDescription = marker.encoded
+        }
+    }
+
+    /// Writes the client's `discard` onto an unmarked or pausing task; a delegate verdict stays (the task is already
+    /// stopping, and the verdict explains its bytes).
+    package static func requestDiscard(on task: URLSessionTask) {
+        switch TaskMarker(decoding: task.taskDescription) {
+        case nil, .pause?:
+            task.taskDescription = TaskMarker.discard.encoded
+        default:
+            break
         }
     }
 }

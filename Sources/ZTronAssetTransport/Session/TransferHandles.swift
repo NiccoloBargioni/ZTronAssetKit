@@ -9,12 +9,16 @@ final class DataTransferHandle: TransferHandle {
     let attempt: TransferAttempt
     let updates: AsyncStream<TransferUpdate>
     private let task: URLSessionDataTask
+    private let staging: any StagingSink
+    private let partial: StagingFileName
 
-    init(job: TransferJob, updates: AsyncStream<TransferUpdate>, task: URLSessionDataTask) {
+    init(job: TransferJob, updates: AsyncStream<TransferUpdate>, task: URLSessionDataTask, staging: any StagingSink) {
         self.id = job.id
         self.attempt = job.attempt
         self.updates = updates
         self.task = task
+        self.staging = staging
+        self.partial = job.partialName
     }
 
     /// Changes `URLSessionTask.priority` in place (R-NET-10); the transfer is not restarted.
@@ -28,9 +32,19 @@ final class DataTransferHandle: TransferHandle {
         self.task.cancel()
     }
 
-    /// Cancels the task; it ends with `cancelled(.byClient)`.
+    /// Stops the task and discards its partial (the Model's `cancel`); it ends with `cancelled(.byClient)`. The
+    /// `discard` mark comes first, so no chunk is appended any more and whatever ends the task reports the client's
+    /// cancellation; the partial is discarded before the task is cancelled, so the terminal element follows the
+    /// discard. After the terminal element the task is completed and nothing happens: a staged file is the engine's.
     func cancel() {
-        self.task.cancel()
+        guard self.task.state != .completed else {
+            return
+        }
+        TaskMarker.requestDiscard(on: self.task)
+        Task { [task, staging, partial] in
+            await staging.discard(partial)
+            task.cancel()
+        }
     }
 }
 

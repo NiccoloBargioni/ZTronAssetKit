@@ -11,7 +11,8 @@ struct ForegroundBackendTests {
     @available(macOS 15.0, *)
     @Test("R-NET-2: 500 downloads through one backend use at most maxConnectionsPerHost TCP connections", .timeLimit(.minutes(1)))
     func connectionReuse() async throws {
-        let rig = try await LoopbackRig.make(maxConnections: 6) { request in
+        // 3 is below URLSession's own default per-host limit (6 on macOS), so only the configured cap explains it.
+        let rig = try await LoopbackRig.make(maxConnections: 3) { request in
             LoopbackResponse(body: Data(request.target.utf8) + TransportFixtures.payload(1_000))
         }
         let outcomes = await withTaskGroup(of: (Int, TransferUpdate?).self) { group in
@@ -39,7 +40,7 @@ struct ForegroundBackendTests {
             #expect(rig.staging.contents[file.name]?.prefix(("/asset/\(index).bin").utf8.count) == Data("/asset/\(index).bin".utf8))
         }
         let connections = await rig.server.acceptedConnections
-        #expect(connections >= 1 && connections <= 6, "\(connections) connections")
+        #expect(connections >= 1 && connections <= 3, "\(connections) connections")
         #expect(await rig.server.requests.count == 500)
         await rig.stop()
     }
@@ -164,8 +165,42 @@ struct ForegroundBackendTests {
         #expect(await keptIterator.next() == .paused(resumable: true))
         #expect(rig.staging.contents[kept.partialName]?.isEmpty == false)
         #expect(rig.staging.sidecars[kept.partialName]?.validator == .strongETag(try #require(ETag(rawValue: "\"v1\""))))
-        // A name that no task writes is ignored.
+        // A name that no task writes is ignored: staging and the session are left as they were.
+        let contents = rig.staging.contents
+        let sidecars = rig.staging.sidecars
         await rig.foreground.cancel(rig.request(TransportFixtures.contentID(3), path: "none", expected: 1).partialName, keepingPartial: false)
+        #expect(rig.staging.contents == contents)
+        #expect(rig.staging.sidecars == sidecars)
+        #expect(await rig.foreground.liveTransfers().isEmpty)
+        await rig.stop()
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing", .timeLimit(.minutes(1)))
+    func handleCancelDiscards() async throws {
+        let rig = try await LoopbackRig.make { request in
+            request.target == "/small.bin"
+                ? LoopbackResponse(body: TransportFixtures.payload(1_000))
+                : LoopbackResponse(
+                    headers: ["Last-Modified": "Wed, 21 Oct 2026 07:28:00 GMT"],
+                    body: TransportFixtures.payload(1 << 20),
+                    ending: .stallAfter(bodyBytes: 512 * 1_024)
+                )
+        }
+        let request = rig.request(TransportFixtures.contentID(1), path: "a.bin", expected: 1 << 20)
+        let handle = await rig.source.transfer(request)
+        var iterator = handle.updates.makeAsyncIterator()
+        #expect(await awaitProgress(&iterator, reaching: 512 * 1_024))
+        handle.cancel()
+        #expect(await iterator.next() == .failed(.cancelled(.byClient)))
+        #expect(rig.staging.contents[request.partialName] == nil)
+        #expect(rig.staging.sidecars[request.partialName] == nil)
+        // After its terminal element the staged file is the engine's: a late cancel must not discard it.
+        let small = rig.request(TransportFixtures.contentID(2), path: "small.bin", expected: 1_000)
+        let finished = await rig.source.transfer(small)
+        #expect(await run(finished).terminal == .staged(StagedFile(name: small.partialName, byteCount: 1_000, resumed: false, httpStatus: 200, etag: nil)))
+        finished.cancel()
+        #expect(rig.staging.contents[small.partialName] == TransportFixtures.payload(1_000))
         await rig.stop()
     }
 
