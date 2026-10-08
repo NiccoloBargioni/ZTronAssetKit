@@ -76,11 +76,16 @@ struct StoreReentrancyTests {
         }
         await metadata.waitForHeldUnits(atLeast: 2)
         let held = await metadata.heldUnits
+        let key = CoreFixture.key(bytes)
         await metadata.release(held[1])  // Y's claim: Y reaches the key while X's publication is in flight
+        // Y hashes, then parks on the key X holds in `publishing` (REENTRANCY R3), before X's placement is released.
+        while await harness.state.core.keyWaiters[key]?.count != 1 {
+            await Task.yield()
+        }
+        #expect(await harness.state.core.publishing.contains(key))
         await metadata.setHolding(false)
         let locationX = try #require(try await publishX.value[x.identifier])
         let locationY = try #require(try await publishY.value[y.identifier])
-        let key = CoreFixture.key(bytes)
         #expect(locationX.url == locationY.url && locationX.url == harness.layout.blobURL(key))
         #expect(await harness.state.core.blobTable[key] == .live(references: 2))
         #expect(harness.fileSystem.operations.filter { $0.kind == .rename && $0.destination == harness.layout.blobURL(key) }.count == 1)

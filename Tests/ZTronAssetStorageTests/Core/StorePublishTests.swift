@@ -267,6 +267,27 @@ struct StorePublishTests {
         }
         _ = await harness.store.runDueWork()
         let root = harness.layout.root
+        // Nothing reaches outside the root but the fixed container and base (as in the R-STO-1 test of `open`):
+        // a hostile name that steered a path elsewhere fails here, before the per-component check below.
+        let fixedOutside: Set<String> = [harness.layout.container.path, CoreFixture.base.path]
+        let mutationsOutside: Set<String> = [
+            "createDirectory \(harness.layout.container.path)",
+            "synchronizeDirectory \(harness.layout.container.path)",
+            "synchronizeDirectory \(CoreFixture.base.path)",
+        ]
+        for record in harness.fileSystem.operations {
+            for url in [record.url] + (record.destination.map { [$0] } ?? []) {
+                let path = url.standardizedFileURL.path
+                guard !(path + "/").hasPrefix(root.path + "/") else {
+                    continue
+                }
+                if record.kind.isMutation {
+                    #expect(mutationsOutside.contains("\(record.kind.rawValue) \(path)"), "seed \(seed): \(record.kind) outside the root: \(path)")
+                } else {
+                    #expect(fixedOutside.contains(path), "seed \(seed): \(record.kind) outside the root: \(path)")
+                }
+            }
+        }
         for record in harness.fileSystem.operations {
             for url in [record.url] + (record.destination.map { [$0] } ?? []) where url.path.hasPrefix(root.path + "/") {
                 let components = url.pathComponents.dropFirst(root.pathComponents.count)
