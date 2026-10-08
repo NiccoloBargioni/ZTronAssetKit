@@ -146,7 +146,8 @@ the public signature is unchanged, E-13) — flagged likewise.
   lands before the claim and becomes the terminal element (`.paused(resumable: false)` /
   `.failed(.cancelled(.byClient))`, a staged copy discarded) or lands after it and is a no-op, as a control after the
   terminal element is (ADR-021); nothing between the claim and the yield is visible to the consumer. The
-  post-attempt step is `PackTransferDriver.conclude(_:)`, a documented test seam (E-13): `PackTransferStopTests`
+  post-attempt step is `PackTransferDriver.conclude(_:)` (since cycle 3 it takes the proposed terminal element, E-10),
+  a documented test seam (E-13): `PackTransferStopTests`
   stages a copy, records a stop and concludes (cancel and pause both end stopped and discard the copy), concludes
   and then records a stop (ignored, copy intact), and races a request against a claim 500 times (the stop is
   recorded exactly when the claim reports it). The verifier could not reproduce the original window (no suspension
@@ -168,36 +169,60 @@ the public signature is unchanged, E-13) — flagged likewise.
   planned packs in flight (a concurrent reclaim never plans them again), removes them in order, and counts a
   `packNotFound` removal as released. The released set is per **catalog generation** (the catalog pseudo-ETag of the
   last successful fetch); a new digest clears it. A failed removal is reported in `ReclaimReport.failed` and planned
-  again next time. An invalid `catalogPackID` releases nothing.
+  again next time. An invalid `catalogPackID` releases nothing. **A pack is released at most once per pack per
+  catalog generation and is never re-armed within one** (ADR-027 literally; orchestrator ruling, L2 close-out
+  cycle 3, below): a pack that comes back after its release — restored by the OS, or downloaded again on demand by a
+  transfer of this source, whatever that transfer ended with — stays installed until the next catalog generation,
+  and its `installedBytes` keep counting in `sourceCopyBytes()` meanwhile (E-11).
 - **Fix round 1.** (a) The first digest of a process does **not** start a new generation: releases made before the
   first successful fetch (an offline launch's maintenance) belong to the generation it opens, so they are neither
   repeated nor reported twice (tested). Generations are a counter bumped when the released set is cleared, and a
-  release counts only for the generation it was planned in. (b) A transfer whose pack wait ends `.available` (the
-  pack was missing and this source downloaded it on demand, e.g. an adopted blob evicted or repaired) forgets the
-  pack's release, so once its entries are adopted again it is released once more in the same generation (tested).
-  Only the source's own demand does this, never the OS bringing a pack back, so releases still never loop.
-  **L2 close-out (verifier round 3, blocking, PROBE-R3-1):** (b) as first written forgot the release whenever the
-  pack wait ended `.available`, including a file missing from the pack (skew) and a second copy ending in skew: a
-  catalog entry the pack lacks then re-armed the release on every retry, so each maintenance run removed the pack
-  and each retry downloaded it again, all in one generation (probe: 3 skewed transfers, 4 releases, 4 removals).
-  Now a release is forgotten only when the pack was **downloaded again and staged**: the attempt reports the pack it
-  made available on demand, and `conclude` forgets its release only when the terminal element it delivers is
-  `.staged` — never on skew, a failure, or a stop that replaced a staged copy. Regression tests: `R-CLN-10: a
-  transfer that ends in skew never re-arms its pack's release within a catalog generation` (the probe's timeline,
-  one removal; failed with 4 removals before the fix) and `R-CLN-10: only a delivered staged copy re-arms the
-  release of a pack downloaded on demand` (through the `conclude` seam). Consequence: a pack downloaded for an entry
-  it lacks stays installed until the next catalog generation (its bytes count in `sourceCopyBytes`), which is the
-  price of never looping; the skew's update check is what brings the fix.
-  Fix round 2 (verifier PROBE-R2-3): a forget that arrives while that pack's release call is still running is
-  remembered (`forgottenWhileReleasing`), and the call's success then does not mark the pack released: the removal
-  may have run before the re-download (the pack is installed again and must be released once more) or after it
-  (the next reclaim gets `packNotFound`, which counts as released, harmless under (c)). Regression test
-  `R-CLN-10: a pack a transfer downloaded again while its release call was running is released again once adopted`
-  (`FakePackBackend.holdRemove`/`releaseRemove`: the pack is gone at once, the call returns when released).
-  (c) Declined: keying generations on the digest the **engine applied** (a fetched catalog the engine rejects also
-  starts a generation here) needs that digest in `AdoptionReport` — a contract change. Consequence for WP-F: a pack
-  id can appear in `ReclaimReport.released` again in a later generation (or after a demand re-download); the engine
-  must treat `released` as "removed now", not as a set it accumulates without duplicates.
+  release counts only for the generation it was planned in. (b) *Withdrawn in L2 close-out cycle 3.* A transfer
+  whose pack wait ended `.available` forgot the pack's release, so the pack was released once more in the same
+  generation once its entries were adopted again.
+- **History of (b), all superseded by the cycle 3 ruling.** L2 close-out (verifier round 3, blocking, PROBE-R3-1):
+  (b) as first written re-armed the release for a file missing from the pack too (skew), so each maintenance run
+  removed the pack and each retry downloaded it again (probe: 3 skewed transfers, 4 releases, 4 removals); it was
+  narrowed to a downloaded pack whose copy staged (`conclude` forgot the release for a `.staged` terminal element).
+  Fix round 2 (verifier PROBE-R2-3): a forget arriving while that pack's release call ran was remembered
+  (`forgottenWhileReleasing`). The close-out verifiers then showed that even the narrowed (b) still looped and could
+  fire for a copy nobody received: PROBE-C1-1g (an entry the retention scope excludes but the pack holds, viewed on
+  demand: 4 request-then-reclaim rounds in one generation, `released=5 removes=5 mediaEnsures=4`) and PROBE-C1-6
+  (`conclude` re-armed the release before `run()` yielded, so a consumer dropping the stream in that window left the
+  release re-armed although the staged copy was discarded: `copyDelivered=false released=2 removes=2`).
+- **Orchestrator ruling (L2 close-out cycle 3).** ADR-027's decision stands literally: a pack is released at most
+  once per pack per catalog generation and is never re-armed within a generation; E-10(b)'s re-arm is withdrawn. A
+  pack downloaded again on demand after its release stays installed until the next catalog generation, and its
+  `installedBytes` keep counting in `sourceCopyBytes`. This removes PROBE-C1-1g's whole-pack re-download loop and
+  PROBE-C1-6's re-arm-before-yield defect together.
+- **Implementation (cycle 3).** The re-arm path is deleted: `AppleSourceState.forgetRelease`, its
+  `forgottenWhileReleasing` set and the check in `finishRelease` (a release call's success now always counts for the
+  generation it was planned in, even when a transfer downloaded the pack around the removal), and the driver's
+  `AttemptResult.downloaded` with the forget in `conclude` (`conclude(_:)` now takes the proposed terminal element and
+  touches no release). Tests, each run against the old code first (`Test run with 100 tests in 14 suites failed
+  after 0.379 seconds with 23 issues`; the four below failed with 11, 3, 5 and 4 issues, in this order), then green:
+  - new, `R-CLN-10: requesting an excluded asset after its pack's release removes the pack once per catalog
+    generation, never in a loop` (PROBE-C1-1g's timeline: 4 rounds, then a new catalog generation releases it once
+    again, then 2 more rounds; one removal and one download per generation);
+  - replaces `R-CLN-10: only a delivered staged copy re-arms the release of a pack downloaded on demand` (it asserted
+    the withdrawn re-arm): `R-CLN-10: a copy staged from a pack downloaded on demand that reaches no consumer leaves
+    the pack released for the generation` (PROBE-C1-6, driven through `PackTransferDriver.run()` over a stream nobody
+    holds);
+  - replaces `R-CLN-10: a released pack that a transfer downloaded again is released again once adopted`: `R-CLN-10: a
+    released pack a transfer downloaded again for an adopted asset stays installed until the next catalog generation`
+    (same timeline; now the pack stays, its bytes count, and the next generation releases it);
+  - replaces `R-CLN-10: a pack a transfer downloaded again while its release call was running is released again once
+    adopted`: `R-CLN-10: a pack a transfer downloaded again while its release call was running stays released for that
+    generation` (same `holdRemove`/`releaseRemove` timeline; one removal until the next generation).
+  `R-CLN-10: a transfer that ends in skew never re-arms its pack's release within a catalog generation` (PROBE-R3-1)
+  is unchanged and still passes. None of the replaced tests is a pre-existing CDN test (G3); each assertion they lose
+  is the withdrawn behaviour, and each replacement asserts the ruled one on the same timeline.
+- **Consequence.** An asset viewed on demand after its pack's release keeps the whole pack installed for the rest of
+  the catalog generation (bounded: one download and one removal per pack per generation, never a loop). For WP-F: a
+  pack id can appear in `ReclaimReport.released` again in a later generation; the engine must treat `released` as
+  "removed now", not as a set it accumulates without duplicates.
+- **(c) Declined.** Keying generations on the digest the **engine applied** (a fetched catalog the engine rejects
+  also starts a generation here) needs that digest in `AdoptionReport` — a contract change.
 - **Residual.** transport-2 T2-13 fix 5 asked to persist `alreadyReleased` in `index.bin`; no contract field exists, so
   it lives in memory. Effect: after a relaunch, a pack the OS re-downloaded may be released once more per process
   (bounded: once per pack per process, never a loop within one). Persisting it needs a store field (orchestrator).
@@ -211,7 +236,8 @@ the public signature is unchanged, E-13) — flagged likewise.
   before the first report. Fix round 1: released packs are **no longer subtracted** — `installedBytes` is `nil` for a
   removed pack (fake and live: no `.downloaded` status), and a released pack a transfer downloaded again really holds
   bytes twice on the device, which `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the
-  verifier's PROBE-1). Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
+  verifier's PROBE-1). Since cycle 3 (E-10) such a pack stays installed, and counted, until the next catalog
+  generation releases it. Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
   as entries of the applied manifest), see E-16.
 - **L2 close-out (verifier round 3, non-blocking, PROBE-R3-2).** The sum saturates at `Int64.max`
   (`addingReportingOverflow`): `PackBackend` is public and injectable, and two packs reporting `Int64.max / 2 + 1`
@@ -281,10 +307,12 @@ the public signature is unchanged, E-13) — flagged likewise.
   non-cancellable seam kept a probe run alive for 30 minutes). `FakePackBackend.releaseEnsure`/`releaseCheck` issued
   before the call reaches its hold finish that hold at once (a release-before-hold race hung one run under load).
 - **L2 close-out.** Two seams were added under the ruling below: `PackTransferDriver.conclude(_:)` (the step after a
-  finished attempt, E-8, E-10) and the internal `AppleHostedTier.resolve(…, select:)` overload, which takes the tier
+  finished attempt, E-8) and the internal `AppleHostedTier.resolve(…, select:)` overload, which takes the tier
   decision so the `.noSourceConfigured` returns for a decision naming a tier the configuration cannot build (the
   verifier's 0-hit `AppleHostedTier.swift:43,48`) are reached; the public `resolve` passes `TierSelection.select`,
-  which never makes such a decision, so the seam is inert in production. Tests: `AppleTierResolutionTests` (R-APL-5:
+  which never makes such a decision, so the seam is inert in production (cycle 3: the orchestrator acknowledged this
+  overload, a declaration added to the contract file `AppleHostedTier.swift`, as covered by the E-13 ratification; no
+  change). Tests: `AppleTierResolutionTests` (R-APL-5:
   every configuration resolving to `.noSourceConfigured` builds no source and touches no pack; a decision without a
   buildable source fails closed and sees the OS fact and the configuration; resolve follows the injected decision).
   The four `Seams:` tests keep no requirement ID: they verify test-only waits (that a cancelled or closed wait
@@ -294,6 +322,9 @@ the public signature is unchanged, E-13) — flagged likewise.
   pre-cancelled seam branches (`AppleSourceState.swift:120`, `PackAvailabilityCoordinator.swift:131`) and the
   implicit closure of `packBackend ?? LiveAssetPackBackend()` in `resolve` (it builds the device-only live backend,
   which no test constructs).
+  Cycle 3 (the re-arm path deleted, E-10): `COVERAGE target=ZTronAssetAppleHosted lines= 99.76% (1242/1245)
+  min=70.0 OK` and `COVERAGE device-only-excluded lines=110 share=1.69% max=3.0% OK`; the same three lines are not
+  reached (the seam branch is now `AppleSourceState.swift:119`).
 - `R-APL-3: an adopted asset is served from blobs and never from a pack location` is written at the source level: at
   L2 the store is WP-B's stub, so the test asserts that what reaches the engine is a staging copy of this transfer
   (no pack location exists in any output), that the pack's release leaves the copy intact, and that the release opens
@@ -323,6 +354,15 @@ the public signature is unchanged, E-13) — flagged likewise.
   interval before its terminal update` covers skew, cancel and pause. Evidence: against the old driver,
   `--repeat-until fail --maximum-repetitions 3000` failed at repetition 76 (both tests; load average 2.9 on 8
   cores); with the fix, 3000 repetitions passed (figures in the close-out report).
+- **L2 close-out cycle 3 (verifier, non-blocking: test strength).** Both tests above read the tap on the consumer's
+  thread, so they catch the old ordering only by chance (the verifier needed 319 repetitions under load 16–30). A
+  deterministic regression test now drives `PackTransferDriver.run()` with a continuation the test creates, whose
+  `onTermination` snapshots the tap's interval events; `finish()` runs that handler synchronously on the driver's
+  task, so the snapshot is taken exactly when the stream ends: `R-OBS-1: the transfer interval is already closed when
+  the driver ends its stream`. Evidence, in a scratch copy of the package (`.build-e/mut/obs`) with the old ordering
+  mutant (`interval.end()` after `deliver`): 3 of 3 single runs failed (the snapshot held only the `began` edge), and
+  `--repeat-until pass --maximum-repetitions 200` failed all 200 repetitions; against the fixed driver,
+  `--repeat-until fail --maximum-repetitions 1000` passed all 1000.
 
 ## E-15 — `PackLocation` splits at `/` scalars; ASCII fast path (fix round 1) · contract body change, no signature
 
@@ -391,6 +431,15 @@ the public signature is unchanged, E-13) — flagged likewise.
   deferred (the entry stays). The optional `AdoptionReport` digest field is declined for now.
 - **NetworkAccess:** E-17.
 
+## Orchestrator rulings (L2 close-out cycle 3)
+
+- **ADR-027 / E-10(b).** ADR-027's decision stands literally: a pack is released at most once per pack per catalog
+  generation and is never re-armed within a generation; E-10(b)'s re-arm is withdrawn. A pack downloaded again on
+  demand after its release stays installed until the next catalog generation, and its `installedBytes` keep counting
+  in `sourceCopyBytes`. Implemented in E-10 (failing tests first; the re-arm path deleted).
+- **E-13.** The internal `resolve(…, select:)` overload in `AppleHostedTier.swift` is acknowledged under the E-13
+  ratification (no change).
+
 ## Requests for the orchestrator (L2 close-out)
 
 - **ARCHITECTURE §11, WP-F rows (E-17):** WP-F gates Apple-tier dispatch and manifest fetches that allow an update
@@ -400,6 +449,16 @@ the public signature is unchanged, E-13) — flagged likewise.
 - **ARCHITECTURE §11, WP-F or WP-G row (repeat of rounds 1 and 2, verifier round 3 agreed):** the end-to-end R-APL-3
   test (an asset adopted from a `FakePackBackend` source is served from `blobs/` after its pack is released);
   WP-E's test stays the source half.
+- **DECISIONS ADR-003 and APPLE-API-VERIFICATION §4.7 (row 19 and item 7), cycle 3:** amend both at merge with the
+  ratified Mutex exception (see "Orchestrator rulings (L2 close-out)"). Row 19 says "Not allowed in production" and
+  item 7 says no `Mutex` in production; a later verifier reading them would flag the tier's three gated uses as
+  violations. The exception: `Synchronization.Mutex` is allowed only inside code gated
+  `@available(iOS 26.0, macOS 26.0, *)`, never `@unchecked`, with no await and no I/O in a critical section; it is
+  used by exactly three types, `PackTransferStop`, `HashingChunkSource` and `FileHandleChunkReader`.
+- **ARCHITECTURE §6.6 (cycle 3, E-10/E-11):** "`sourceCopyBytes()` sums `PackBackend.installedBytes` of adopted,
+  unreleased packs" predates fix round 1; the sum covers every media pack holding adopted content, released or not,
+  because a released pack reports no bytes and one downloaded again after its release stays installed until the next
+  catalog generation.
 
 ## Requests for the orchestrator (fix round 1)
 
@@ -439,6 +498,9 @@ out-of-space row (3 expectations, run before the fix). L2 close-out, each new te
 before its fix: the interval ended after `deliver` (both R-OBS-1 tests failed at repetition 76 of
 `--repeat-until fail`); the release forgotten on every `.available` pack wait (the PROBE-R3-1 test, 5 issues, 4
 removals); the unsaturated `+=` (the saturation test crashed the test helper with signal 5).
+L2 close-out cycle 3: the R-OBS-1 ordering mutant (`interval.end()` after `deliver`) against the deterministic
+interval test (3/3 single runs and 200/200 repetitions failed, scratch copy); the re-arm code itself, as the old
+behaviour, against the four E-10 tests (23 issues).
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10, new subsection for `ZTronAssetAppleHosted` actors)
 
