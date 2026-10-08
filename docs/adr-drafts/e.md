@@ -237,7 +237,9 @@ the public signature is unchanged, E-13) — flagged likewise.
   `FileHandleChunkReader`: the live file only supplies its opener (`descriptor(for:searchingInAssetPackWithID:)` →
   `FileHandle(fileDescriptor:closeOnDealloc: true)`), which runs on the first `nextChunk`, inside the bulk executor;
   the handle lives in a `Mutex` (E-1) and reads go through `read(upToCount:)`. L2 close-out (Mutex ruling): the open
-  and every read now run outside the lock, which only publishes the handle between pulls. Error mapping:
+  and every read now run outside the lock, which only publishes the handle between pulls; should two first pulls
+  overlap, the handle stored first wins (tested deterministically by a pull nested inside the opener; a
+  last-store-wins mutant fails it). Error mapping:
   `ManagedBackgroundAssetsError` → `packNotFound`/`fileNotFound`, anything else → `.system(NSError domain, code)`
   (tested on the host by constructing the errors; the manager is never touched). Measured: **81 llvm-cov lines**
   (working ceiling 100); `COVERAGE device-only-excluded lines=110 share=1.74% max=3.0% OK` with WP-D's file at L2.
@@ -288,7 +290,7 @@ the public signature is unchanged, E-13) — flagged likewise.
   The four `Seams:` tests keep no requirement ID: they verify test-only waits (that a cancelled or closed wait
   returns), and no SPEC requirement covers test infrastructure; the waits stay documented as test seams, internal,
   and unreachable from production paths. Coverage (gate export over all 8 test bundles): `COVERAGE
-  target=ZTronAssetAppleHosted lines= 99.76% (1257/1260) min=70.0 OK`. The three lines not reached are the two
+  target=ZTronAssetAppleHosted lines= 99.76% (1255/1258) min=70.0 OK`. The three lines not reached are the two
   pre-cancelled seam branches (`AppleSourceState.swift:120`, `PackAvailabilityCoordinator.swift:131`) and the
   implicit closure of `packBackend ?? LiveAssetPackBackend()` in `resolve` (it builds the device-only live backend,
   which no test constructs).
