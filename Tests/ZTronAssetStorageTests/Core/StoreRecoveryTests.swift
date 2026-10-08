@@ -64,6 +64,27 @@ struct StoreRecoveryTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    @Test("R-INT-1: EIO on placing a copy under a second extension binds nothing under it and leaves no copy in staging", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func copyPlacementFails() async throws {
+        let bytes = CoreFixture.bytes(262)
+        let png = CoreFixture.entry("a", bytes, ext: "png")
+        let jpg = CoreFixture.entry("b", bytes, ext: "jpg")
+        let jpgKey = CoreFixture.key(bytes, ext: "jpg")
+        let harness = CoreHarness.make()
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([png, jpg]), etag: nil, eviction: nil)
+        // The source of the copy's placement rename is the verified `.parttmp` copy.
+        harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".parttmp"), occurrence: .nth(1), error: .io))
+        let bound = try await harness.publish(bytes, [png, jpg])
+        #expect(Set(bound.keys) == [png.identifier], "the png is bound; the jpg copy failed")
+        #expect(await harness.state.core.blobTable[jpgKey] == nil)
+        #expect(await harness.state.core.publishing.isEmpty)
+        #expect(!harness.exists(harness.layout.blobURL(jpgKey)))
+        #expect(StoreRecoveryTests.stagingNames(harness).isEmpty, "the copy is removed, not stranded in staging")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     /// Review round 2, probe 3: while a `corrupt` name is being replaced the key is live (held in `publishing`), so a
     /// commit captured then must still record its doom; otherwise a crash before the replacement rename leaves an
     /// unreferenced, undoomed name that launch adopts with the rotten bytes still under it.

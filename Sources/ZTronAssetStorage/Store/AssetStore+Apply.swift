@@ -111,13 +111,9 @@ extension AssetStore {
         self.state.core.applyGate.held = true
     }
 
-    /// Releases the gate and resumes every waiter; each re-checks it. The fence is already down (`apply` lowers it
-    /// after its last write, before any throwing await); lowering it here too keeps a future early exit from
-    /// stranding the callers parked on it.
+    /// Releases the gate and resumes every waiter; each re-checks it. The commit fence is already down: nothing
+    /// between raising it and `endApplyWrites()` can throw (the compiler checks it: no `try` in that region).
     private func releaseApplyGate() {
-        if self.state.core.applyGate.writing {
-            self.endApplyWrites()
-        }
         self.state.core.applyGate.held = false
         self.resumeApplyWaiters()
     }
