@@ -256,7 +256,8 @@ struct IndexCommitUnorderedNamesTests {
     )
     @available(macOS 15.0, *)
     func everyUnorderedSurvivor(row: IndexSpaceRow) async throws {
-        let survivors = await UnorderedSurvivors.shared.survivors(of: row)
+        let index = try #require(IndexSpaceRow.all.firstIndex { $0.testDescription == row.testDescription })
+        let survivors = await UnorderedSurvivors.shared.survivors(at: index)
         let results = await withTaskGroup(of: IndexSpace.SliceResult.self) { group in
             for (index, survivor) in survivors.enumerated() {
                 group.addTask(priority: .low) {
@@ -298,35 +299,38 @@ struct IndexCommitUnorderedNamesTests {
     }
 }
 
-/// The kill survivors of `IndexCommitUnorderedNamesTests`, computed once for the whole suite: each row enumerates the
-/// survivors first met in its own lifetimes, so a survivor that two rows' lifetimes both leave runs once. Read-only once
-/// computed, and the same on every run (the lifetimes are deterministic).
+/// The kill survivors of `IndexCommitUnorderedNamesTests`, computed once for the whole suite and row by row: each row
+/// enumerates the survivors first met in its own lifetimes, so a survivor that two rows' lifetimes both leave runs once,
+/// and a row computes only its own lifetimes when the rows run in order (the first one does not pay for all 49). Rows
+/// are appended in the order of `IndexSpaceRow.all`; read-only once appended, and the same on every run (the lifetimes
+/// are deterministic).
 @available(macOS 15.0, *)
 actor UnorderedSurvivors {
     static let shared = UnorderedSurvivors()
-    private var rows: [[IndexSpace.Survivor]]?
+    private var rows: [[IndexSpace.Survivor]] = []
+    private var seen: Set<IndexSpace.ViewsKey> = []
+
+    /// The survivors first met in the row at `index` of `IndexSpaceRow.all`, computing the rows before it first.
+    func survivors(at index: Int) async -> [IndexSpace.Survivor] {
+        while self.rows.count <= index {
+            let next = self.rows.count
+            var seen = self.seen
+            // REENTRANCY: test support — the row is kept only if no other caller appended it meanwhile (the loop re-reads
+            // the count); both computed the same row from the same `seen`.
+            let survivors = await IndexSpace.unorderedSurvivors(of: IndexSpaceRow.all[next], excluding: &seen)
+            if self.rows.count == next {
+                self.rows.append(survivors)
+                self.seen = seen
+            }
+        }
+        return self.rows[index]
+    }
 
     /// The survivors of every row, in the order of `IndexSpaceRow.all`.
     func all() async -> [[IndexSpace.Survivor]] {
-        if let rows = self.rows {
-            return rows
-        }
-        var seen: Set<IndexSpace.ViewsKey> = []
-        var rows: [[IndexSpace.Survivor]] = []
-        for row in IndexSpaceRow.all {
-            // REENTRANCY: test support — nothing is re-read: the result is a function of the row alone, and a caller that
-            // arrived meanwhile computes the same rows.
-            rows.append(await IndexSpace.unorderedSurvivors(of: row, excluding: &seen))
-        }
-        self.rows = rows
-        return rows
-    }
-
-    /// The survivors first met in `row`'s lifetimes.
-    func survivors(of row: IndexSpaceRow) async -> [IndexSpace.Survivor] {
-        let index = IndexSpaceRow.all.firstIndex { $0.testDescription == row.testDescription } ?? 0
-        // REENTRANCY: test support — nothing is re-read after the rows are computed.
-        return await self.all()[index]
+        // REENTRANCY: test support — nothing is re-read: every row is appended once the call returns.
+        _ = await self.survivors(at: IndexSpaceRow.all.count - 1)
+        return self.rows
     }
 }
 
