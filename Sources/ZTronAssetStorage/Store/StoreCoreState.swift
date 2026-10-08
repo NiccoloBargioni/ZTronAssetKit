@@ -115,8 +115,12 @@ struct StoreCoreState: Sendable {
     var nextGeneration: UInt64 = 1
     /// What `open()` returned, for a second call.
     var openReport: OpenReport?
-    /// Callers suspended until `open()` finishes (REENTRANCY R1).
+    /// Callers suspended until `open()` finishes (REENTRANCY R1); each re-reads the phase.
     var openWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Further `open()` calls made while one runs. The running open hands each of them its own outcome (its report, or
+    /// `nil` when it failed) instead of letting them re-read the phase: a `close()` that began between that open's end
+    /// and their resumption would otherwise decide what they return (close-out cycle 4, ADR draft B-35).
+    var openReportWaiters: [CheckedContinuation<OpenReport?, Never>] = []
     /// Commit scheduling (P-5, ARCHITECTURE §4.1).
     var commits = CommitBookkeeping()
     /// Snapshot versions, installs and acknowledgements (ADR-016, ADR-017).

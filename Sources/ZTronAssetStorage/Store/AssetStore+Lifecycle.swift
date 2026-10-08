@@ -85,8 +85,16 @@ extension AssetStore {
 
     // MARK: Waiters
 
-    /// Resumes every caller waiting for `open()`.
+    /// Resumes every caller waiting for `open()`. Further `open()` calls get the report of the open they waited for:
+    /// `openReport` is set only by a successful open, never while one runs, so it is that open's report when it
+    /// succeeded and `nil` when it failed. The other callers re-read the phase.
     func resumeOpenWaiters() {
+        let report = self.state.core.openReport
+        let reportWaiters = self.state.core.openReportWaiters
+        self.state.core.openReportWaiters = []
+        for waiter in reportWaiters {
+            waiter.resume(returning: report)
+        }
         let waiters = self.state.core.openWaiters
         self.state.core.openWaiters = []
         for waiter in waiters {

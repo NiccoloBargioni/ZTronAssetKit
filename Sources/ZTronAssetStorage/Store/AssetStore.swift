@@ -47,7 +47,8 @@ package actor AssetStore {
     /// phase 1 runs here through WP-C's `runLegacyPhaseOne()` hook, only when `configuration.legacy.enabled`;
     /// phase 2 runs afterwards through `migrateLegacy(maxFiles:)`. Releases the lock on every throwing path
     /// (store-1 S1-08). Never fails because a post-load commit failed: it then serves the loaded state read-only
-    /// (store-1 S1-07).
+    /// (store-1 S1-07). A call made while another `open()` runs returns that open's report once it succeeded (also when
+    /// a `close()` began meanwhile) and throws `.notOpen` when it failed.
     package func open() async throws(StoreError) -> OpenReport {
         // REENTRANCY: R1 — `performOpen` re-checks the phase after each of its units.
         try await self.performOpen()

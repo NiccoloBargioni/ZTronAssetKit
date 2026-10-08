@@ -144,9 +144,14 @@ struct StoreEdgeTests {
         #expect(await harness.store.deletionBlocker(CoreFixture.key(bytes)) == .commit)
     }
 
-    @Test("R-STO-9: open runs once for concurrent callers, close waits for a running open, and close drains an in-flight publication", .timeLimit(.minutes(1)))
+    // The interleavings of `open()` and `close()` (close-out cycle 4): each scenario on its own harness, so none depends
+    // on the order in which the scheduler resumes the callers parked on a running open. Before, one test parked a second
+    // open and a close on the same open and assumed the second open would reach the store first; it failed when the
+    // close did (`Caught error: .closed`, under load).
+
+    @Test("R-STO-9: open runs once for concurrent callers: a call made while an open runs returns that open's report", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
-    func openAndCloseInterleavings() async throws {
+    func concurrentOpensShareOneReport() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
         let harness = CoreHarness.make(metadata: metadata)
         let first = Task {
@@ -156,24 +161,110 @@ struct StoreEdgeTests {
         let second = Task {
             try await harness.store.open()
         }
-        // The second open, then close, park on the running open in that order before it is released: started together,
-        // close could reach the store first and the second open would then find it closing (close-out cycle 3: failed
-        // under load and on the third of a run of repetitions).
-        await StoreEdgeTests.waitForOpenWaiters(1, harness)
+        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
+        await metadata.setHolding(false)
+        let report = try await first.value
+        #expect(try await second.value == report)
+        #expect(try await harness.store.open() == report, "a call after the open returns the same report")
+        #expect(await harness.state.core.phase == .open)
+        #expect(harness.fileSystem.operations.filter { $0.kind == .acquireExclusiveLock }.count == 1, "one open ran")
+        await harness.store.close()
+    }
+
+    @Test("R-STO-9: close() during a running open waits for it, then flushes and releases the lock", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func closeWaitsForARunningOpen() async throws {
+        let metadata = SteppedBlockingExecutor(holding: true)
+        let harness = CoreHarness.make(metadata: metadata)
+        let first = Task {
+            try await harness.store.open()
+        }
+        await metadata.waitForHeldUnits(atLeast: 1)
         let closing = Task {
             await harness.store.close()
         }
-        await StoreEdgeTests.waitForOpenWaiters(2, harness)
+        await StoreEdgeTests.waitForOpenWaiters(opens: 0, others: 1, harness)
+        #expect(await harness.state.core.phase == .opening, "close parked without cutting the open short")
+        await metadata.setHolding(false)
+        await closing.value
+        // `openReport` is set only by a successful open: close returned after the open it waited for had finished.
+        let finished = try #require(await harness.state.core.openReport)
+        #expect(try await first.value == finished)
+        #expect(await harness.state.core.phase == .closed)
+        await #expect(throws: StoreError.closed) {
+            try await harness.store.open()
+        }
+        // The lock is released: a new store over the same volume opens the root.
+        let next = CoreHarness.make(fileSystem: harness.fileSystem, configuration: CoreFixture.configuration(), time: harness.time)
+        let reopened = try await next.store.open()
+        #expect(reopened.generation > finished.generation, "the next launch commits past the closed store's generation")
+        await next.store.close()
+    }
+
+    @Test("R-STO-9: an open() parked beside a close() on a running open returns that open's report, whichever resumes first", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func parkedOpenAndCloseOnARunningOpen() async throws {
+        let metadata = SteppedBlockingExecutor(holding: true)
+        let harness = CoreHarness.make(metadata: metadata)
+        let first = Task {
+            try await harness.store.open()
+        }
+        await metadata.waitForHeldUnits(atLeast: 1)
+        // Started together: the store resumes both when the open finishes, in no order the test controls. The running
+        // open hands the parked call its report, so a close that reaches the store first cannot turn it into `.closed`
+        // (ADR draft B-35).
+        let second = Task {
+            try await harness.store.open()
+        }
+        let closing = Task {
+            await harness.store.close()
+        }
+        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 1, harness)
         await metadata.setHolding(false)
         let report = try await first.value
         #expect(try await second.value == report)
         await closing.value
         #expect(await harness.state.core.phase == .closed)
+        await #expect(throws: StoreError.closed) {
+            try await harness.store.open()
+        }
+    }
 
+    @Test("R-STO-9: an open() parked on an open that fails throws notOpen, and a later call opens", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func parkedOpenOnAFailedOpen() async throws {
+        let metadata = SteppedBlockingExecutor(holding: true)
+        let harness = CoreHarness.make(metadata: metadata)
+        // Another holder has the lock, once.
+        harness.fileSystem.addFault(FaultRule(operation: .acquireExclusiveLock, occurrence: .nth(1), error: .wouldBlock))
+        let first = Task {
+            try await harness.store.open()
+        }
+        await metadata.waitForHeldUnits(atLeast: 1)
+        let second = Task {
+            try await harness.store.open()
+        }
+        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
+        await metadata.setHolding(false)
+        await #expect(throws: StoreError.locked) {
+            try await first.value
+        }
+        await #expect(throws: StoreError.notOpen) {
+            try await second.value
+        }
+        #expect(await harness.state.core.phase == .created)
+        let report = try await harness.store.open()
+        #expect(try await harness.store.open() == report)
+        await harness.store.close()
+    }
+
+    @Test("R-STO-9: close() drains an in-flight publication, which unwinds with closed, and the next launch adopts its blob", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func closeDrainsAnInFlightPublication() async throws {
         // A publication whose placement unit is in flight when close begins: close drains it, the publication
         // unwinds with `.closed`, and the blob it placed is adopted by the next launch.
         let draining = SteppedBlockingExecutor(holding: false)
-        let next = CoreHarness.make(disk: harness.fileSystem.survivingDisk(), metadata: draining)
+        let next = CoreHarness.make(metadata: draining)
         let bytes = CoreFixture.bytes(196)
         let entry = CoreFixture.entry("a", bytes)
         _ = try await next.store.open()
@@ -298,10 +389,15 @@ extension AssetStore {
 }
 
 extension StoreEdgeTests {
-    /// Waits until `count` callers are parked on a running `open()` (polled between yields; no sleeping).
+    /// Waits until `opens` further `open()` calls and `others` other callers (a `close()`, an async API) are parked on a
+    /// running `open()` (polled between yields; no sleeping).
     @available(macOS 15.0, *)
-    static func waitForOpenWaiters(_ count: Int, _ harness: CoreHarness) async {
-        while await harness.state.core.openWaiters.count < count {
+    static func waitForOpenWaiters(opens: Int, others: Int, _ harness: CoreHarness) async {
+        while true {
+            let core = await harness.state.core
+            if core.openReportWaiters.count >= opens, core.openWaiters.count >= others {
+                return
+            }
             await Task.yield()
         }
     }

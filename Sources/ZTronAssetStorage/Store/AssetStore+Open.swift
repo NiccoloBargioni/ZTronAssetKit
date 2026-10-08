@@ -7,6 +7,11 @@ import ZTronAssetModel
 /// listed here (the engine's launch reconciliation does it, ADR-028).
 extension AssetStore {
     /// Opens once; a second call returns the first report; a failed open releases the lock and can be retried.
+    ///
+    /// A call made while an open runs returns that open's report once it succeeded, even when a `close()` began before
+    /// the call resumed (the call overlapped the open, so it may return like a call made just before the close), and
+    /// throws `.notOpen` when that open failed. Its outcome is handed over by the running open rather than read from the
+    /// phase afterwards, so it never depends on the order in which the scheduler resumes the waiters (ADR draft B-35).
     func performOpen() async throws(StoreError) -> OpenReport {
         switch self.state.core.phase {
         case .open:
@@ -14,12 +19,15 @@ extension AssetStore {
                 return report
             }
         case .opening:
-            // REENTRANCY: R1 — the report is read after the running open finished.
-            try await self.awaitOpen()
-            if let report = self.state.core.openReport {
-                return report
+            // REENTRANCY: R1 — nothing is re-read: the running open hands this call its own outcome (`resumeOpenWaiters`),
+            // so whatever ran on the store between that open's end and this resumption cannot change it.
+            let report = await withCheckedContinuation { (continuation: CheckedContinuation<OpenReport?, Never>) in
+                self.state.core.openReportWaiters.append(continuation)
             }
-            throw .notOpen
+            guard let report else {
+                throw .notOpen
+            }
+            return report
         case .closing, .closed:
             throw .closed
         case .created:
