@@ -46,6 +46,24 @@ struct IndexCodecTests {
         #expect(try IndexCodec.decode([UInt8](empty)).get() == content)
     }
 
+    @Test("R-STO-12: a non-finite date is clamped when written, so every later generation stays loadable")
+    func nonFiniteDatesAreClamped() throws {
+        var content = GoldenIndex.content
+        let id = try #require(content.records.keys.sorted().first)
+        var record = try #require(content.records[id])
+        record.residency = .quarantined(until: Date(timeIntervalSinceReferenceDate: .infinity))
+        record.integrity = IntegrityHistory(attempts: 1, nextEligibleAt: Date(timeIntervalSinceReferenceDate: -.infinity))
+        record.lastAccess = Date(timeIntervalSinceReferenceDate: .nan)
+        content.records[id] = record
+        let encoded = try #require(IndexCodec.encode(content))
+        let decoded = try IndexCodec.decode([UInt8](encoded)).get()
+        #expect(decoded.records[id]?.residency == .quarantined(until: .distantFuture))
+        #expect(decoded.records[id]?.integrity.nextEligibleAt == .distantPast)
+        #expect(decoded.records[id]?.lastAccess == .distantPast)
+        #expect(IndexLoadRule.choose([.current: IndexFileRead(size: Int64(encoded.count), bytes: [UInt8](encoded))]).content == decoded)
+        #expect(IndexCodec.encode(decoded) == encoded, "the clamped state re-encodes byte-identically")
+    }
+
     @Test("R-STO-12: a header with a maximal generation or body length never traps")
     func maximalHeaderNeverTraps() throws {
         let valid = try #require(IndexCodec.encode(GoldenIndex.content))
@@ -91,6 +109,10 @@ struct IndexCodecTests {
         }
         let chosen = IndexLoadRule.choose([.current: try read(older), .temporary: try read(newer)])
         #expect(chosen.content?.generation == 9 && chosen.chosen == .temporary && !chosen.degraded && chosen.nextGeneration == 10)
+        // index.tmp is truncated by the launch commit: only index.bin's generation survives its failure.
+        #expect(chosen.survivingGeneration == 5)
+        #expect(IndexLoadRule.choose([.temporary: try read(newer)]).survivingGeneration == 0)
+        #expect(IndexLoadRule.choose([.current: try read(newer), .previous: try read(older)]).survivingGeneration == 9)
         // The newest valid file names the lineage; an older file of another lineage is ignored.
         let lineage = IndexLoadRule.choose([.current: try read(newer), .previous: try read(GoldenIndex.content.with(storeID: StoreIdentifier(high: 9, low: 9)))])
         #expect(lineage.content?.generation == 9)

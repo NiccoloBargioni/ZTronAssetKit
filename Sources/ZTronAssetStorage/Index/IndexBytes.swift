@@ -52,9 +52,22 @@ struct IndexByteWriter {
         self.varint(UInt64(bitPattern: (value << 1) ^ (value >> 63)))
     }
 
-    /// A date as the bit pattern of its reference-date interval: exact round trips, 8 bytes.
+    /// A date as the bit pattern of its reference-date interval: exact round trips, 8 bytes. The decoder rejects
+    /// non-finite intervals, so one written by a caller's bug (`quarantined(until:)` or an integrity deadline computed
+    /// with `.infinity`) is clamped here: `+∞` to `distantFuture`, `−∞` and NaN to `distantPast`. Otherwise every
+    /// later commit would write an index no launch can load, and once `index.prev` was overwritten no valid
+    /// generation would remain.
     mutating func date(_ value: Date) {
-        self.u64(value.timeIntervalSinceReferenceDate.bitPattern)
+        let interval = value.timeIntervalSinceReferenceDate
+        let finite: TimeInterval
+        if interval.isFinite {
+            finite = interval
+        } else if interval == .infinity {
+            finite = Date.distantFuture.timeIntervalSinceReferenceDate
+        } else {
+            finite = Date.distantPast.timeIntervalSinceReferenceDate
+        }
+        self.u64(finite.bitPattern)
     }
 
     /// The 32 digest bytes (each word big-endian, so the bytes are the digest's own order).
