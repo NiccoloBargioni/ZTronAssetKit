@@ -14,6 +14,27 @@ public enum AppleHostedTier {
         log: LogRoute,
         makeAWS: (HTTPSourceConfiguration) -> any RemoteSource
     ) -> Result<any RemoteSource, TierUnavailable> {
+        self.resolve(
+            configuration: configuration,
+            staging: staging,
+            packBackend: packBackend,
+            log: log,
+            makeAWS: makeAWS,
+            select: TierSelection.select
+        )
+    }
+
+    /// The resolution with its decision injected. Test seam (E-13): production passes `TierSelection.select`, which
+    /// never names a tier the configuration cannot build; a decision that does fails closed with
+    /// `.noSourceConfigured` instead of building a source the client did not configure.
+    static func resolve(
+        configuration: RemoteConfiguration,
+        staging: any StagingSink,
+        packBackend: (any PackBackend)?,
+        log: LogRoute,
+        makeAWS: (HTTPSourceConfiguration) -> any RemoteSource,
+        select: (TierInputs) -> Result<AssetTier, TierUnavailable>
+    ) -> Result<any RemoteSource, TierUnavailable> {
         var osSupportsAppleTier = false
         var appleSource: (any RemoteSource)? = nil
         #if canImport(BackgroundAssets)
@@ -35,7 +56,7 @@ public enum AppleHostedTier {
             awsConfigured: configuration.http != nil,
             awsOnly: configuration.awsOnly
         )
-        switch TierSelection.select(inputs) {
+        switch select(inputs) {
         case .success(.appleHosted):
             if let appleSource {
                 return .success(appleSource)
