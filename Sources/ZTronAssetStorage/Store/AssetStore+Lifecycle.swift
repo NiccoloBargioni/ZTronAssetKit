@@ -103,6 +103,15 @@ extension AssetStore {
         }
     }
 
+    /// Resumes every caller waiting for the `apply`/`admit` gate; each re-checks the gate and the phase.
+    func resumeApplyWaiters() {
+        let waiters = self.state.core.applyGate.waiters
+        self.state.core.applyGate.waiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
     /// Suspends until the in-flight publication or deletion of `key` finishes (REENTRANCY R3).
     func waitForKey(_ key: BlobKey) async {
         // REENTRANCY: R3 — nothing here: the caller re-reads `blobTable[key]` and `publishing` and decides anew.
@@ -175,6 +184,7 @@ extension AssetStore {
         self.state.core.phase = .closed
         self.resumeCommitWaiters()
         self.resumeOpenWaiters()
+        self.resumeApplyWaiters()
         for key in Array(self.state.core.keyWaiters.keys) {
             self.resumeKeyWaiters(key)
         }

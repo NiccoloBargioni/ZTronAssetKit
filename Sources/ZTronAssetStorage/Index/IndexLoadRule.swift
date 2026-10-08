@@ -18,6 +18,10 @@ struct IndexLoadOutcome: Sendable, Equatable {
     var chosen: IndexFile?
     /// `1 + max(generation, launch epoch)` over every header that parsed (1 when none did).
     var nextGeneration: UInt64
+    /// The newest valid generation, agreeing with the chosen one's store ID, outside `index.tmp` (0 when none): what
+    /// survives when the chosen file is `index.tmp`, which the launch commit truncates (and removes on ENOSPC). Keys
+    /// the chosen generation dooms wait for a commit above it (review: load rule vs commit protocol).
+    var survivingGeneration: UInt64
     /// No valid generation although an index file existed, an invalid `index.bin`, a newer schema, or a chosen
     /// generation that was itself degraded.
     var degraded: Bool
@@ -76,12 +80,14 @@ enum IndexLoadRule {
         let newest = valid.max { $0.content.generation < $1.content.generation }
         let agreeing = valid.filter { $0.content.storeID == newest?.content.storeID }
         let chosen = agreeing.max { $0.content.generation < $1.content.generation }
+        let surviving = agreeing.filter { $0.file != .temporary }.map(\.content.generation).max() ?? 0
         let anyFile = !files.isEmpty
         let degraded = (anyFile && chosen == nil) || binInvalid || newerSchema || (chosen?.content.degraded ?? false)
         return IndexLoadOutcome(
             content: chosen?.content,
             chosen: chosen?.file,
             nextGeneration: next,
+            survivingGeneration: surviving,
             degraded: degraded,
             newerSchema: newerSchema,
             anyFileExisted: anyFile

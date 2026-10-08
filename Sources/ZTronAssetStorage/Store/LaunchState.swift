@@ -1,0 +1,54 @@
+import Foundation
+import ZTronAssetModel
+
+/// Everything `open()` installs from the loaded generation, computed in one bulk unit off the actor (C2): launch
+/// reconciliation and the snapshot table of 10,000 present records took about 60 ms in release on the actor (review
+/// probe P4), so `open()` now only assigns the results.
+struct LaunchState: Sendable {
+    /// The loaded generation, or an empty one.
+    var content: IndexContent
+    /// The index lineage: the loaded one, or one derived from the seed for a new or unreadable index.
+    var storeID: StoreIdentifier
+    /// The next generation to allocate; the launch commit takes it, and it is the launch epoch (ADR draft B-5).
+    var nextGeneration: UInt64
+    /// The newest generation that survives a failed launch commit (`IndexLoadOutcome.survivingGeneration` when the
+    /// load rule chose `index.tmp`, which the launch commit truncates; the loaded generation otherwise).
+    var committedGeneration: UInt64
+    /// Records, blob table and orphans reconciled with the listing.
+    var reconciled: LaunchReconciliation.Result
+    /// The snapshot entry of every present reconciled record.
+    var presentTable: [AssetID: SnapshotEntry]
+    /// Degraded until the next `apply` plus adoption (R-STO-4, store-1 S1-11).
+    var degraded: Bool
+
+    /// Builds the launch state; pure.
+    static func build(
+        outcome: IndexLoadOutcome,
+        onDisk: [BlobKey: Int64],
+        blobsRecreated: Bool,
+        seed: UInt64,
+        now: Date,
+        layout: StoreLayout
+    ) -> LaunchState {
+        let derived = StoreIdentifier.derived(fromSeed: seed)
+        let content = outcome.content ?? IndexContent.empty(storeID: derived)
+        let nextGeneration = max(outcome.nextGeneration, 1)
+        let reconciled = LaunchReconciliation.reconcile(
+            content: content,
+            onDisk: onDisk,
+            blobsRecreated: blobsRecreated,
+            openGeneration: nextGeneration,
+            now: now
+        )
+        return LaunchState(
+            content: content,
+            storeID: content.storeID == .zero ? derived : content.storeID,
+            nextGeneration: nextGeneration,
+            committedGeneration: outcome.chosen == .temporary ? outcome.survivingGeneration : content.generation,
+            reconciled: reconciled,
+            presentTable: SnapshotTable.build(records: reconciled.records, layout: layout),
+            // No valid index although blobs exist (or an index existed but failed).
+            degraded: outcome.degraded || (outcome.content == nil && !onDisk.isEmpty)
+        )
+    }
+}

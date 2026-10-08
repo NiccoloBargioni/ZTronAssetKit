@@ -59,16 +59,27 @@ extension AssetStore {
         self.state.core.lock = prepared.lock
         try self.checkLive()
         let layout = prepared.layout
-        // REENTRANCY: R1 — phase `opening`.
-        let reads = try await self.readIndexFiles(layout)
-        // REENTRANCY: R1 — phase `opening`; decoding runs off the actor.
-        let outcome = await self.runUnit(on: self.environment.bulkExecutor) {
-            IndexLoadRule.choose(reads)
-        }
+        // REENTRANCY: R1 — phase `opening`; reading and decoding run off the actor (`IndexLoader`, shared with P-2).
+        let outcome = await IndexLoader.load(
+            layout: layout,
+            fileSystem: fileSystem,
+            metadata: self.environment.metadataExecutor,
+            bulk: self.environment.bulkExecutor
+        )
+        try self.checkLive()
         // REENTRANCY: R1 — phase `opening`.
         let listing = try await self.listBlobs(layout)
         try self.checkLive()
-        let reconciled = self.installLoadedState(outcome, listing: listing, blobsRecreated: prepared.blobsRecreated)
+        let onDisk = listing.onDisk
+        let blobsRecreated = prepared.blobsRecreated
+        let seed = self.environment.random.seed
+        let now = self.environment.time.now()
+        // REENTRANCY: R1 — phase `opening`; reconciliation and the snapshot table are pure and built off the actor (C2).
+        let loaded = await self.runUnit(on: self.environment.bulkExecutor) {
+            LaunchState.build(outcome: outcome, onDisk: onDisk, blobsRecreated: blobsRecreated, seed: seed, now: now, layout: layout)
+        }
+        try self.checkLive()
+        let reconciled = self.installLoadedState(loaded)
         var legacyPending = false
         if self.configuration.legacy.enabled {
             // REENTRANCY: R1, R11 — phase `opening`; WP-C's phase 1 re-validates its own steps.
@@ -109,21 +120,15 @@ extension AssetStore {
         )
     }
 
-    /// Installs the loaded and reconciled generation as the store's state, synchronously.
-    private func installLoadedState(_ outcome: IndexLoadOutcome, listing: BlobListing, blobsRecreated: Bool) -> LaunchReconciliation.Result {
-        let content = outcome.content ?? IndexContent.empty(storeID: StoreIdentifier.derived(fromSeed: self.environment.random.seed))
-        self.state.core.storeID = content.storeID == .zero ? StoreIdentifier.derived(fromSeed: self.environment.random.seed) : content.storeID
-        self.state.core.nextGeneration = max(outcome.nextGeneration, 1)
-        self.state.core.committedGeneration = content.generation
+    /// Installs the loaded and reconciled generation (built off the actor) as the store's state: assignments only.
+    private func installLoadedState(_ loaded: LaunchState) -> LaunchReconciliation.Result {
+        let content = loaded.content
+        let reconciled = loaded.reconciled
+        self.state.core.storeID = loaded.storeID
+        self.state.core.nextGeneration = loaded.nextGeneration
+        self.state.core.committedGeneration = loaded.committedGeneration
         // The launch epoch is the generation the launch commit carries: persisted and strictly increasing (ADR-013).
-        self.state.core.launchEpoch = self.state.core.nextGeneration
-        let reconciled = LaunchReconciliation.reconcile(
-            content: content,
-            onDisk: listing.onDisk,
-            blobsRecreated: blobsRecreated,
-            openGeneration: self.state.core.launchEpoch,
-            now: self.environment.time.now()
-        )
+        self.state.core.launchEpoch = loaded.nextGeneration
         self.state.core.records = reconciled.records
         self.state.core.blobTable = reconciled.blobTable
         self.state.core.blobBytes = reconciled.blobBytes
@@ -132,62 +137,16 @@ extension AssetStore {
         self.state.core.etag = content.etag
         self.state.core.stamp = reconciled.osPurgeDetected ? nil : content.stamp
         self.state.core.syncDue = reconciled.osPurgeDetected || content.syncDue
-        // No valid index although blobs exist (or an index existed but failed): degraded until the next `apply`
-        // plus adoption (R-STO-4, store-1 S1-11).
-        self.state.core.degraded = outcome.degraded || (outcome.content == nil && !listing.onDisk.isEmpty)
+        self.state.core.degraded = loaded.degraded
         self.state.migration.phase = content.legacyPhase
         self.state.migration.legacyStamp = content.legacyStamp
         self.state.cleanup.lastCleanupAt = content.lastCleanupAt
         self.state.core.metrics.doomedRepairs += reconciled.doomedRepairs
-        if let layout = self.state.core.layout {
-            self.state.core.presentTable = SnapshotTable.build(records: reconciled.records, layout: layout)
-        }
+        self.state.core.presentTable = loaded.presentTable
         self.state.core.commits.dirtyFanOuts = reconciled.adoptedFanOuts
         self.state.core.commits.blobsDirectoryDirty = true
         self.markDirtyInternal(.soon)
         return reconciled
-    }
-
-    /// Reads `index.bin`, `index.tmp` and `index.prev` in ≤ 1 MiB units (only the header of a file too large to be
-    /// valid). A read failure leaves what was read, which the load rule then sees as torn.
-    private func readIndexFiles(_ layout: StoreLayout) async throws(StoreError) -> [IndexFile: IndexFileRead] {
-        let fileSystem = self.environment.fileSystem
-        // REENTRANCY: R1 — phase `opening`.
-        let sizes = await self.runUnit(on: self.environment.metadataExecutor) { () -> [IndexFile: Int64] in
-            var sizes: [IndexFile: Int64] = [:]
-            for file in IndexFile.allCases {
-                if let info = try? fileSystem.itemInfo(at: layout.indexURL(file)), info.kind == .file {
-                    sizes[file] = info.byteSize
-                }
-            }
-            return sizes
-        }
-        try self.checkLive()
-        var reads: [IndexFile: IndexFileRead] = [:]
-        for file in IndexFile.allCases {
-            guard let size = sizes[file] else {
-                continue
-            }
-            let url = layout.indexURL(file)
-            let wanted = size <= IndexHeader.maxFileLength ? size : Int64(IndexHeader.length)
-            var bytes: [UInt8] = []
-            bytes.reserveCapacity(Int(wanted))
-            reading: while Int64(bytes.count) < wanted {
-                let offset = Int64(bytes.count)
-                let length = Int(min(Int64(1 << 20), wanted - offset))
-                // REENTRANCY: R1 — phase `opening`.
-                let chunk = await self.runUnit(on: self.environment.metadataExecutor) {
-                    try? fileSystem.read(from: url, offset: offset, maxLength: length)
-                }
-                try self.checkLive()
-                guard let chunk, !chunk.isEmpty else {
-                    break reading
-                }
-                bytes.append(contentsOf: chunk)
-            }
-            reads[file] = IndexFileRead(size: size, bytes: bytes)
-        }
-        return reads
     }
 
     /// Lists `blobs/` and every fan-out (one unit each); everything that is not a well-named blob in its fan-out is

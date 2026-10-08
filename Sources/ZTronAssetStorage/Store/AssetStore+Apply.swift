@@ -10,24 +10,39 @@ extension AssetStore {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
         try self.checkWritable()
+        // REENTRANCY: b-7 (proposed) — the gate loop re-reads the gate and the phase: one `apply` or `admit` at a time.
+        try await self.acquireApplyGate()
+        defer {
+            self.releaseApplyGate()
+        }
         // REENTRANCY: b-5 (proposed) — `confirmOrphans` re-checks the phase and the orphan table after its unit.
         let confirmed = try await self.confirmOrphans(for: manifest)
-        let diff = ManifestDiff.compute(from: self.state.core.appliedManifest, to: manifest)
-        let unchanged =
-            diff.isEmpty && eviction == nil && !self.state.core.degraded && manifest == self.state.core.appliedManifest
-            && etag == self.state.core.etag
         let now = self.environment.time.now()
+        // REENTRANCY: b-6 (proposed) — `planOffActor` re-checks the phase and recomputes when the applied manifest
+        // changed during its unit; the writes below re-read the live state, and every adoption candidate is
+        // re-validated by `adoptKnownBlob`.
+        let plan = try await self.planOffActor(to: manifest, orphans: confirmed, now: now)
+        let diff = plan.diff
+        let unchanged = diff.isEmpty && eviction == nil && !self.state.core.degraded && plan.identical && etag == self.state.core.etag
         var report = ApplyReport(generation: 0)
+        var swept = 0
         if !unchanged {
-            report = self.applyDiff(diff, manifest: manifest, etag: etag, now: now)
+            // REENTRANCY: b-7 (proposed) — `applyDiff` yields between chunks; each write re-reads the record it changes.
+            report = try await self.applyDiff(diff, newRecords: plan.newRecords, manifest: manifest, etag: etag, now: now, swept: &swept)
         }
         // Adoption before any dereference (store-1 S1-05): a key moving from a removed id to an added one is bound
         // before the prune releases it, so it is never doomed.
-        for id in diff.targetOrder where self.adoptKnownBlob(for: id, orphans: confirmed, now: now) {
-            report.reused.append(id)
+        for id in plan.adoptionCandidates {
+            if self.adoptKnownBlob(for: id, orphans: confirmed, now: now) {
+                report.reused.append(id)
+            }
+            // REENTRANCY: b-7 (proposed) — the phase and writability; the next candidate is re-validated by
+            // `adoptKnownBlob` against the state as it is then.
+            try await self.pace(&swept)
         }
         if !unchanged {
-            report.pruned = self.prune(diff.removed)
+            // REENTRANCY: b-7 (proposed) — `prune` yields between chunks and removes only records still present.
+            report.pruned = try await self.prune(diff.removed, swept: &swept)
         }
         if !unchanged || !report.reused.isEmpty {
             if let eviction {
@@ -36,8 +51,8 @@ extension AssetStore {
             self.state.core.degraded = false
             self.markDirtyInternal(.soon)
         }
-        // REENTRANCY: R5 — nothing but the phase: every mutation above was made synchronously; the report describes
-        // them and the generation is read after the commit.
+        // REENTRANCY: R5 — nothing but the phase: every mutation above was made before the await; the report
+        // describes them and the generation is read after the commit.
         try await self.requireCommittedInternal(.ordered)
         report.generation = self.state.core.committedGeneration
         if !unchanged || !report.reused.isEmpty {
@@ -47,51 +62,133 @@ extension AssetStore {
         return report
     }
 
-    /// Applies additions, content changes and relocations synchronously (adoption and prunes follow).
-    private func applyDiff(_ diff: ManifestDiff, manifest: ValidatedManifest, etag: ETag?, now: Date) -> ApplyReport {
-        var report = ApplyReport(generation: 0)
-        for id in diff.added {
-            guard let entry = diff.upserts[id] else {
-                continue
+    /// How many records a sweep of `apply` handles between two yields of the actor (C2: about 6 µs per adoption in
+    /// release on a Mac, so a chunk holds the actor for a few milliseconds even on a slower device).
+    static let sweepChunk = 512
+
+    /// Counts one item of a long sweep and yields the actor after every `sweepChunk` items (C2, as REENTRANCY R8
+    /// does for eviction and reconciliation chunks).
+    private func pace(_ swept: inout Int) async throws(StoreError) {
+        swept += 1
+        guard swept % AssetStore.sweepChunk == 0 else {
+            return
+        }
+        // REENTRANCY: b-7 (proposed) — the phase and writability; `apply` and `admit` are serialised by the gate, so
+        // the plan and the applied manifest are unchanged; every caller re-reads the record it touches next.
+        await Task.yield()
+        try self.checkLive()
+        try self.checkWritable()
+    }
+
+    /// Waits until no other `apply` or `admit` runs, then holds the gate: their plans and writes, which yield
+    /// between chunks, never interleave (C2, proposed REENTRANCY row b-7).
+    private func acquireApplyGate() async throws(StoreError) {
+        while self.state.core.applyGate.held {
+            // REENTRANCY: b-7 (proposed) — the loop re-reads the gate and the phase once the holder released it.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.state.core.applyGate.waiters.append(continuation)
             }
-            self.insertRecord(for: entry, now: now)
-            report.added.append(id)
+            try self.checkLive()
+        }
+        self.state.core.applyGate.held = true
+    }
+
+    /// Releases the gate and resumes every waiter; each re-checks it.
+    private func releaseApplyGate() {
+        self.state.core.applyGate.held = false
+        self.resumeApplyWaiters()
+    }
+
+    /// The apply plan (diff, identity, new records, adoption candidates), computed on the bulk executor from values
+    /// captured here (C2, review probe P4). It is used only if no `apply` or `admit` replaced the applied manifest
+    /// during the unit; otherwise it is computed again against the new one.
+    private func planOffActor(to manifest: ValidatedManifest, orphans: [BlobKey: Int64], now: Date) async throws(StoreError) -> ApplyPlan {
+        while true {
+            let revision = self.state.core.manifestRevision
+            let applied = self.state.core.appliedManifest
+            let records = self.state.core.records
+            let blobTable = self.state.core.blobTable
+            // REENTRANCY: b-6 (proposed) — the phase and writability, then `manifestRevision`: a plan made against a
+            // manifest replaced meanwhile is discarded and made again; records and blobs that changed meanwhile are
+            // re-read by the synchronous writes and by `adoptKnownBlob`.
+            let plan = await self.runUnit(on: self.environment.bulkExecutor) {
+                ApplyPlan.compute(applied: applied, manifest: manifest, records: records, blobTable: blobTable, orphans: orphans, now: now)
+            }
+            try self.checkLive()
+            try self.checkWritable()
+            if self.state.core.manifestRevision == revision {
+                return plan
+            }
+        }
+    }
+
+    /// Applies additions, content changes and relocations (adoption and prunes follow), yielding between chunks.
+    private func applyDiff(
+        _ diff: ManifestDiff,
+        newRecords: [AssetID: AssetRecord],
+        manifest: ValidatedManifest,
+        etag: ETag?,
+        now: Date,
+        swept: inout Int
+    ) async throws(StoreError) -> ApplyReport {
+        var report = ApplyReport(generation: 0)
+        self.state.core.appliedManifest = manifest
+        self.state.core.manifestRevision += 1
+        self.state.core.etag = etag
+        report.added.reserveCapacity(diff.added.count)
+        for id in diff.added {
+            if let record = newRecords[id] {
+                // A record the manifest did not list (detached) is replaced as `insertRecord` would.
+                if let previous = self.state.core.records.updateValue(record, forKey: id) {
+                    if let blob = previous.referencedBlob {
+                        self.releaseReference(blob, dooming: .unreferenced)
+                    }
+                    self.refreshPresentEntry(id)
+                }
+                report.added.append(id)
+            } else if let entry = diff.upserts[id] {
+                self.insertRecord(for: entry, now: now)
+                report.added.append(id)
+            }
+            // REENTRANCY: b-7 (proposed) — the phase and writability; the next id's record is re-read.
+            try await self.pace(&swept)
         }
         for id in diff.contentChanged {
-            guard let entry = diff.upserts[id] else {
-                continue
+            if let entry = diff.upserts[id] {
+                self.changeContent(of: id, to: entry, now: now)
+                report.contentChanged.append(id)
             }
-            self.changeContent(of: id, to: entry, now: now)
-            report.contentChanged.append(id)
+            // REENTRANCY: b-7 (proposed) — as above.
+            try await self.pace(&swept)
         }
         for id in diff.metadataChanged {
-            guard let entry = diff.upserts[id], var record = self.state.core.records[id] else {
-                continue
+            if let entry = diff.upserts[id], var record = self.state.core.records[id] {
+                record.entry = entry
+                record.revision += 1
+                self.state.core.records[id] = record
+                self.refreshPresentEntry(id)
+                report.relocated.append(id)
             }
-            record.entry = entry
-            record.revision += 1
-            self.state.core.records[id] = record
-            self.refreshPresentEntry(id)
-            report.relocated.append(id)
+            // REENTRANCY: b-7 (proposed) — as above.
+            try await self.pace(&swept)
         }
-        self.state.core.appliedManifest = manifest
-        self.state.core.etag = etag
         return report
     }
 
-    /// Removes the records of ids the manifest no longer lists and dooms their blobs (R-CLN-1); the reaper deletes
-    /// them after acknowledgement, grace, commit and leases (ARCHITECTURE §4.4).
-    private func prune(_ removed: [AssetID]) -> [AssetID] {
+    /// Removes the records of ids the manifest no longer lists and dooms their blobs (R-CLN-1), yielding between
+    /// chunks; the reaper deletes them after acknowledgement, grace, commit and leases (ARCHITECTURE §4.4).
+    private func prune(_ removed: [AssetID], swept: inout Int) async throws(StoreError) -> [AssetID] {
         var pruned: [AssetID] = []
         for id in removed {
-            guard let record = self.state.core.records.removeValue(forKey: id) else {
-                continue
+            if let record = self.state.core.records.removeValue(forKey: id) {
+                self.state.core.presentTable[id] = nil
+                pruned.append(id)
+                if let blob = record.referencedBlob {
+                    self.releaseReference(blob, dooming: .unreferenced)
+                }
             }
-            self.state.core.presentTable[id] = nil
-            pruned.append(id)
-            if let blob = record.referencedBlob {
-                self.releaseReference(blob, dooming: .unreferenced)
-            }
+            // REENTRANCY: b-7 (proposed) — the phase and writability; the next id is removed only if still present.
+            try await self.pace(&swept)
         }
         return pruned
     }
@@ -223,6 +320,11 @@ extension AssetStore {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
         try self.checkWritable()
+        // REENTRANCY: b-7 (proposed) — the gate loop re-reads the gate and the phase: one `apply` or `admit` at a time.
+        try await self.acquireApplyGate()
+        defer {
+            self.releaseApplyGate()
+        }
         let id = entry.identifier
         let now = self.environment.time.now()
         if let existing = self.state.core.records[id] {
@@ -256,6 +358,7 @@ extension AssetStore {
             digest: applied.digest
         ) {
             self.state.core.appliedManifest = manifest
+            self.state.core.manifestRevision += 1
         }
         let adopted = self.adoptKnownBlob(for: id, orphans: [:], now: now)
         self.markDirtyInternal(.soon)

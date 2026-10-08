@@ -46,20 +46,28 @@ enum MemoryProbe {
     /// Tracks the largest resident size seen between `start()` and the last `sample()`, from any thread.
     @available(macOS 15.0, *)
     final class PeakSampler: Sendable {
-        private let state = Mutex<(baseline: UInt64, peak: UInt64)>((0, 0))
+        private let state = Mutex<(baseline: UInt64, peak: UInt64, samples: Int)>((0, 0, 0))
 
         init() {}
 
-        /// Records the baseline (and resets the peak to it).
+        /// Records the baseline (and resets the peak to it and the sample count to zero).
         func start() {
             let now = MemoryProbe.residentBytes()
-            self.state.withLock { $0 = (now, now) }
+            self.state.withLock { $0 = (now, now, 0) }
         }
 
         /// Samples the resident size now.
         func sample() {
             let now = MemoryProbe.residentBytes()
-            self.state.withLock { $0.peak = max($0.peak, now) }
+            self.state.withLock { state in
+                state.peak = max(state.peak, now)
+                state.samples += 1
+            }
+        }
+
+        /// How many samples were taken since `start()`.
+        var samples: Int {
+            self.state.withLock { $0.samples }
         }
 
         /// The peak above the baseline, in bytes.

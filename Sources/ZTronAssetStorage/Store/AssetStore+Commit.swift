@@ -69,7 +69,9 @@ extension AssetStore {
             dirtyFanOuts: fanOuts.sorted(),
             blobsDirectoryDirty: blobsDirty,
             durability: durability,
-            lock: self.state.core.lock
+            lock: self.state.core.lock,
+            blobTable: self.state.core.blobTable,
+            deletingDooms: self.state.core.deletingDooms
         )
         self.state.core.commits.inFlight = true
         self.state.core.commits.dirtyFanOuts = []
@@ -113,21 +115,11 @@ extension AssetStore {
         }
     }
 
-    /// The persisted state, captured synchronously (O(1) copies of the dictionaries; DOOMED derived from the blob
-    /// table now, store-2 S2-04).
+    /// The persisted state, captured synchronously (O(1) copies of the dictionaries). DOOMED is left empty here: the
+    /// commit unit derives it from the blob table captured at the same instant (`IndexCommitInput.completeContent`,
+    /// store-2 S2-04), off the actor.
     func captureContent(generation: UInt64) -> IndexContent {
         let core = self.state.core
-        var doomed: [BlobKey: DoomReason] = [:]
-        for (key, blobState) in core.blobTable {
-            switch blobState {
-            case .doomed(let info):
-                doomed[key] = info.reason
-            case .deleting:
-                doomed[key] = core.deletingDooms[key]?.reason ?? .unreferenced
-            case .live:
-                break
-            }
-        }
         let millis = (self.environment.time.now().timeIntervalSince1970 * 1_000).rounded()
         return IndexContent(
             storeID: core.storeID,
@@ -143,7 +135,7 @@ extension AssetStore {
             lastCleanupAt: self.state.cleanup.lastCleanupAt,
             legacyPhase: self.state.migration.phase,
             legacyStamp: self.state.migration.legacyStamp,
-            doomed: doomed
+            doomed: [:]
         )
     }
 

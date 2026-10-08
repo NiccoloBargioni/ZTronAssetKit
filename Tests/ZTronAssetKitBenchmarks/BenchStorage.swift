@@ -17,7 +17,10 @@ extension ZTronAssetKitBenchmarks {
     /// ordered commit a bulk sync performs (≤ 4/s); durable commits (flush, close, adoption report) are judged on
     /// their median, because their tail is the device-wide cache flush of `F_FULLFSYNC`, shared with every other
     /// process's I/O. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
-    /// ever slows a run down. Memory (P-6) is the peak resident delta sampled after every hash unit.
+    /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
+    /// alive. P-13's batch budget is applied to the p95 of the deletion-unit durations; the maximum is printed beside
+    /// it, so a single slow outlier stays visible (ADR draft B-9). C2 has no budget key: its test reports the longest
+    /// hold of the store's actor seen by a probe, best of five runs, against the rule's own 10 ms.
     @Suite("StorageBenchmarks")
     struct StorageBenchmarks {
         @Test("P-2: cold index load of 10,000 records off the main thread is under budget", .timeLimit(.minutes(1)))
@@ -38,8 +41,10 @@ extension ZTronAssetKitBenchmarks {
             let bulk = DispatchBlockingExecutor(label: "bench.p2.bulk")
             var timings: [Double] = []
             for run in 0..<28 {
+                // The store's own load path (`open()` calls the same function): a stat unit, ≤ 1 MiB read units,
+                // then decoding and the load rule on the bulk executor.
                 let started = ContinuousClock.now
-                let outcome = await StorageBench.load(layout.indexURL(.current), fileSystem: fileSystem, metadata: metadata, bulk: bulk)
+                let outcome = await IndexLoader.load(layout: layout, fileSystem: fileSystem, metadata: metadata, bulk: bulk)
                 let elapsed = StorageBench.milliseconds(ContinuousClock.now - started)
                 #expect(outcome.content?.records.count == 10_000)
                 if run >= 3 {
@@ -138,19 +143,24 @@ extension ZTronAssetKitBenchmarks {
             }
             try handle.close()
 
+            // The resident size is sampled inside every read unit, while the chunk just read is still alive, so a
+            // buffer allocated and freed within a unit is seen; the baseline is taken before the warm-up, so the
+            // first chunk buffer counts too.
             let sampler = MemoryProbe.PeakSampler()
-            let store = StorageBench.liveStore(directory: directory, bulk: SamplingExecutor(DispatchBlockingExecutor(label: "bench.p6.bulk"), sampler: sampler))
+            let store = StorageBench.liveStore(
+                directory: directory,
+                bulk: DispatchBlockingExecutor(label: "bench.p6.bulk"),
+                fileSystem: ReadSamplingFileSystem(sampler: sampler)
+            )
             _ = try await store.open()
+            sampler.start()
             _ = try await store.hashFile(at: file)
             var rates: [Double] = []
             var digest: ContentHash?
-            var peak: UInt64 = 0
             for _ in 0..<5 {
-                sampler.start()
                 let started = ContinuousClock.now
                 let result = try await store.hashFile(at: file)
                 let seconds = StorageBench.milliseconds(ContinuousClock.now - started) / 1_000
-                peak = max(peak, sampler.peakDelta)
                 #expect(result.byteCount == Int64(size))
                 digest = result.digest
                 rates.append(Double(size) / 1_000_000 / seconds)
@@ -167,8 +177,9 @@ extension ZTronAssetKitBenchmarks {
                 oneShotRates.append(Double(size) / 1_000_000 / (StorageBench.milliseconds(ContinuousClock.now - started) / 1_000))
             }
             let reference = oneShotRates.max() ?? 0
-            let peakMiB = MemoryProbe.mebibytes(peak)
-            print("P-6 streaming SHA-256 of 256 MiB: \(streaming) MB/s, one-shot \(reference) MB/s, ratio \(streaming / reference), peak resident delta \(peakMiB) MiB; floors \(floor) MB/s, \(ratioFloor)x, cap \(memoryCap) MiB")
+            #expect(sampler.samples >= 6 * 256, "a sample per 1 MiB read")
+            let peakMiB = MemoryProbe.mebibytes(sampler.peakDelta)
+            print("P-6 streaming SHA-256 of 256 MiB: \(streaming) MB/s, one-shot \(reference) MB/s, ratio \(streaming / reference), peak resident delta \(peakMiB) MiB over \(sampler.samples) in-read samples; floors \(floor) MB/s, \(ratioFloor)x, cap \(memoryCap) MiB")
             #expect(digest == oneShot)
             #expect(streaming >= floor)
             #expect(streaming / reference >= ratioFloor)
@@ -221,6 +232,92 @@ extension ZTronAssetKitBenchmarks {
             #expect(p95 <= batchBudget)
             #expect(units.count >= count / StoreConfiguration().deletionBatchSize)
         }
+
+        @Test("C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch", .timeLimit(.minutes(1)))
+        @available(macOS 15.0, *)
+        func actorStretches() async throws {
+            // CLAUDE.md C2: nothing blocks a cooperative-pool thread for more than ~10 ms at a stretch. No quality-gates
+            // key exists for it, so the rule's own figure is the budget.
+            let budget = 10.0
+            let count = 10_000
+            let directory = try StorageBench.directory("c2")
+            defer {
+                try? FileManager.default.removeItem(at: directory)
+            }
+            let payloads = (0..<count).map { GeneratedPayload.bytes(seed: UInt64(50_000 + $0), offset: 0, length: 64) }
+            let entries = payloads.enumerated().map { index, bytes in
+                ManifestEntry(identifier: AssetID("c2.asset.\(index)"), fileExtension: "png", remotePath: "media/\(index).png", byteSize: 64, checksum: ContentHash.sha256(of: bytes))
+            }
+            let manifest = try ValidatedManifest(entries: entries, digest: ContentHash.sha256(of: Data("c2".utf8)))
+            // The first apply of a 10,000-entry manifest, on five fresh roots.
+            var applyHolds: [Double] = []
+            for run in 0..<5 {
+                let root = directory.appendingPathComponent("apply-\(run)", isDirectory: true)
+                try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                let store = StorageBench.liveStore(directory: root)
+                _ = try await store.open()
+                applyHolds.append(
+                    try await ActorHoldProbe.longestHold(of: store) {
+                        _ = try await store.apply(manifest, etag: nil, eviction: nil)
+                    }
+                )
+                await store.close()
+            }
+            // A root holding 10,000 present records and their blobs (the first open adopts them by hash).
+            let root = directory.appendingPathComponent("open", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let first = StorageBench.liveStore(directory: root)
+            _ = try await first.open()
+            _ = try await first.apply(manifest, etag: nil, eviction: nil)
+            await first.close()
+            let layout = StoreLayout(base: root)
+            for (entry, bytes) in zip(entries, payloads) {
+                let key = BlobKey(hash: entry.checksum!, ext: AssetFileExtension("png")!)
+                try FileManager.default.createDirectory(at: layout.fanOutDirectory(for: key.hash), withIntermediateDirectories: true)
+                try bytes.write(to: layout.blobURL(key))
+            }
+            var openHolds: [Double] = []
+            var reapplyHolds: [Double] = []
+            var pruneHolds: [Double] = []
+            var readoptHolds: [Double] = []
+            for _ in 0..<5 {
+                let store = StorageBench.liveStore(directory: root)
+                openHolds.append(
+                    try await ActorHoldProbe.longestHold(of: store) {
+                        _ = try await store.open()
+                    }
+                )
+                #expect(try await store.planningView().records.values.allSatisfy { $0.referencedBlob != nil })
+                reapplyHolds.append(
+                    try await ActorHoldProbe.longestHold(of: store) {
+                        _ = try await store.apply(manifest, etag: nil, eviction: nil)
+                    }
+                )
+                // Every asset pruned, then adopted again by hash (its doomed blob is rescued): 10,000 releases, then
+                // 10,000 adoptions, as in a rebuild after the index was lost (R-STO-4).
+                pruneHolds.append(
+                    try await ActorHoldProbe.longestHold(of: store) {
+                        _ = try await store.apply(ValidatedManifest.empty(), etag: nil, eviction: nil)
+                    }
+                )
+                readoptHolds.append(
+                    try await ActorHoldProbe.longestHold(of: store) {
+                        let report = try await store.apply(manifest, etag: nil, eviction: nil)
+                        #expect(report.reused.count == count)
+                    }
+                )
+                await store.close()
+            }
+            // Interference only lengthens a hold: each figure is the best of its five runs (ADR draft B-9).
+            let figures = [
+                ("first apply", applyHolds), ("open", openHolds), ("unchanged re-apply", reapplyHolds),
+                ("prune of all", pruneHolds), ("re-adoption of all", readoptHolds),
+            ]
+            print("C2 longest actor hold at 10,000 assets: " + figures.map { "\($0.0) \($0.1.min() ?? 0) ms (max of runs \($0.1.max() ?? 0) ms)" }.joined(separator: ", ") + "; budget \(budget) ms")
+            for (name, runs) in figures {
+                #expect((runs.min() ?? .infinity) <= budget, "\(name): \(runs)")
+            }
+        }
     }
 }
 
@@ -244,7 +341,8 @@ enum StorageBench {
         directory: URL,
         metadata: any BlockingExecutor = DispatchBlockingExecutor(label: "bench.metadata"),
         bulk: any BlockingExecutor = DispatchBlockingExecutor(label: "bench.bulk"),
-        time: any TimeSource = ManualTimeSource()
+        time: any TimeSource = ManualTimeSource(),
+        fileSystem: any FileSystem = LiveFileSystem()
     ) -> AssetStore {
         var policy = StoragePolicy()
         policy.deletionGrace = 0
@@ -256,7 +354,7 @@ enum StorageBench {
             snapshotInstallInterval: 0
         )
         let environment = AssetEnvironment(
-            fileSystem: LiveFileSystem(),
+            fileSystem: fileSystem,
             metadataExecutor: metadata,
             bulkExecutor: bulk,
             time: time,
@@ -298,24 +396,6 @@ enum StorageBench {
         content.appliedManifest = (try? ValidatedManifest(entries: entries, digest: ContentHash.sha256(of: Data("bench".utf8)))) ?? .empty()
         content.generation = 1
         return content
-    }
-
-    /// The store's load path for one file: a stat unit, ≤ 1 MiB read units, then decoding on the bulk executor.
-    static func load(_ url: URL, fileSystem: LiveFileSystem, metadata: any BlockingExecutor, bulk: any BlockingExecutor) async -> IndexLoadOutcome {
-        let size = await metadata.run { (try? fileSystem.itemInfo(at: url))??.byteSize ?? 0 }
-        var bytes: [UInt8] = []
-        bytes.reserveCapacity(Int(size))
-        while Int64(bytes.count) < size {
-            let offset = Int64(bytes.count)
-            guard let chunk = await metadata.run({ try? fileSystem.read(from: url, offset: offset, maxLength: 1 << 20) }), !chunk.isEmpty else {
-                break
-            }
-            bytes.append(contentsOf: chunk)
-        }
-        let read = IndexFileRead(size: size, bytes: bytes)
-        return await bulk.run {
-            IndexLoadRule.choose([.current: read])
-        }
     }
 
     /// The commit instants (seconds on the manual clock) of a simulated bulk sync: `publications` bulk publications
@@ -419,22 +499,101 @@ final class TimingExecutor: BlockingExecutor {
     }
 }
 
-/// Samples the resident size after every unit (P-6: the peak while hashing).
+/// The live file system, sampling the resident size inside every read while the bytes read are still alive (P-6:
+/// the peak while hashing, transient chunk buffers included).
 @available(macOS 15.0, *)
-final class SamplingExecutor: BlockingExecutor {
-    private let base: any BlockingExecutor
-    private let sampler: MemoryProbe.PeakSampler
+struct ReadSamplingFileSystem: FileSystem {
+    let base = LiveFileSystem()
+    let sampler: MemoryProbe.PeakSampler
 
-    init(_ base: any BlockingExecutor, sampler: MemoryProbe.PeakSampler) {
-        self.base = base
-        self.sampler = sampler
+    func read(from url: URL, offset: Int64, maxLength: Int) throws(FileSystemError) -> Data {
+        let data = try self.base.read(from: url, offset: offset, maxLength: maxLength)
+        self.sampler.sample()
+        return data
     }
 
-    func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await self.base.run {
-            let value = work()
-            self.sampler.sample()
-            return value
+    func standardDirectory(_ directory: StandardDirectory) throws(FileSystemError) -> URL {
+        try self.base.standardDirectory(directory)
+    }
+
+    func itemInfo(at url: URL) throws(FileSystemError) -> FileItemInfo? {
+        try self.base.itemInfo(at: url)
+    }
+
+    func contentsOfDirectory(at url: URL) throws(FileSystemError) -> [FileItemInfo] {
+        try self.base.contentsOfDirectory(at: url)
+    }
+
+    func availableCapacity(at url: URL, for purpose: CapacityPurpose) throws(FileSystemError) -> Int64 {
+        try self.base.availableCapacity(at: url, for: purpose)
+    }
+
+    func storeAttributes(at url: URL) throws(FileSystemError) -> StoreAttributes {
+        try self.base.storeAttributes(at: url)
+    }
+
+    func createDirectory(at url: URL) throws(FileSystemError) {
+        try self.base.createDirectory(at: url)
+    }
+
+    func write(_ data: Data, to url: URL, mode: WriteMode) throws(FileSystemError) {
+        try self.base.write(data, to: url, mode: mode)
+    }
+
+    func synchronizeFile(at url: URL, level: SyncLevel) throws(FileSystemError) {
+        try self.base.synchronizeFile(at: url, level: level)
+    }
+
+    func synchronizeDirectory(at url: URL, level: SyncLevel) throws(FileSystemError) {
+        try self.base.synchronizeDirectory(at: url, level: level)
+    }
+
+    func rename(from source: URL, to destination: URL, mode: RenameMode) throws(FileSystemError) {
+        try self.base.rename(from: source, to: destination, mode: mode)
+    }
+
+    func removeItem(at url: URL) throws(FileSystemError) {
+        try self.base.removeItem(at: url)
+    }
+
+    func applyStoreAttributes(_ attributes: StoreAttributes, at url: URL) throws(FileSystemError) {
+        try self.base.applyStoreAttributes(attributes, at: url)
+    }
+
+    func acquireExclusiveLock(at url: URL) throws(FileSystemError) -> FileLockToken {
+        try self.base.acquireExclusiveLock(at: url)
+    }
+
+    func releaseLock(_ token: FileLockToken) {
+        self.base.releaseLock(token)
+    }
+}
+
+/// Measures how long the store's actor is held at a stretch while a call runs (C2): a probe task calls a cheap
+/// synchronous API of the store in a loop and records the longest wait. Units run on their executors, off the actor,
+/// so the probe is served while one runs; it waits only while the actor executes a synchronous stretch.
+@available(macOS 15.0, *)
+enum ActorHoldProbe {
+    /// Runs `call` and returns the longest probe wait, in milliseconds.
+    static func longestHold(of store: AssetStore, _ call: () async throws -> Void) async throws -> Double {
+        let done = Mutex(false)
+        let probe = Task {
+            var longest: Duration = .zero
+            while !done.withLock({ $0 }) {
+                let started = ContinuousClock.now
+                _ = await store.metrics()
+                longest = max(longest, ContinuousClock.now - started)
+            }
+            return longest
         }
+        do {
+            try await call()
+        } catch {
+            done.withLock { $0 = true }
+            _ = await probe.value
+            throw error
+        }
+        done.withLock { $0 = true }
+        return StorageBench.milliseconds(await probe.value)
     }
 }

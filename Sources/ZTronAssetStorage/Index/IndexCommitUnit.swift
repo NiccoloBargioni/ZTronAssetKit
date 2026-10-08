@@ -2,8 +2,8 @@ import Foundation
 import ZTronAssetModel
 
 /// Everything one commit unit needs, captured synchronously on the actor (ARCHITECTURE §4.1): the generation is
-/// already allocated and the DOOMED set already derived from the blob table, so the unit runs off the actor on an
-/// immutable value.
+/// already allocated and the blob table copied (copy-on-write) at capture, so the unit derives DOOMED from that
+/// capture and runs off the actor on an immutable value.
 struct IndexCommitInput: Sendable {
     /// The layout of the open store.
     var layout: StoreLayout
@@ -17,6 +17,31 @@ struct IndexCommitInput: Sendable {
     var durability: CommitDurability
     /// The held lock, whose file identity is re-checked first (store-1 S1-08).
     var lock: FileLockToken?
+    /// The blob table captured with the content: the unit derives DOOMED from it (ADR-018, store-2 S2-04), off the
+    /// actor (C2: deriving it for 10,000 doomed keys took milliseconds on the actor). Empty when `content.doomed`
+    /// is already complete.
+    var blobTable: [BlobKey: BlobState] = [:]
+    /// The doom bookkeeping of the keys whose deletion unit is in flight when the state was captured.
+    var deletingDooms: [BlobKey: DoomInfo] = [:]
+
+    /// The content to encode: `content` with DOOMED completed from the captured blob table.
+    var completeContent: IndexContent {
+        guard !self.blobTable.isEmpty else {
+            return self.content
+        }
+        var content = self.content
+        for (key, blobState) in self.blobTable {
+            switch blobState {
+            case .doomed(let info):
+                content.doomed[key] = info.reason
+            case .deleting:
+                content.doomed[key] = self.deletingDooms[key]?.reason ?? .unreferenced
+            case .live:
+                break
+            }
+        }
+        return content
+    }
 }
 
 /// The index commit protocol, one metadata unit (ARCHITECTURE §4.1, ADR-015):
@@ -36,7 +61,7 @@ enum IndexCommitUnit {
         if let lock = input.lock, case .failure(let error) = StoreLock.verifyRoot(fileSystem: fileSystem, layout: layout, token: lock) {
             return .failure(error)
         }
-        guard let data = IndexCodec.encode(input.content) else {
+        guard let data = IndexCodec.encode(input.completeContent) else {
             return .failure(.storageUnavailable(.ioFailure))
         }
         let temporary = layout.indexURL(.temporary)
