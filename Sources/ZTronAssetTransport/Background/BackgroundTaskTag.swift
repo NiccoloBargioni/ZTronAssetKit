@@ -44,7 +44,7 @@ package struct BackgroundTaskTag: Sendable, Hashable {
             return nil
         }
         let fields = description.split(separator: " ", omittingEmptySubsequences: false)
-        guard fields.count == 3 || (fields.count == 4 && fields[3] == Self.resumeField[...]), fields[0] == Self.version[...],
+        guard fields.count == 3 || (fields.count == 4 && fields[3] == Self.resumeField), fields[0] == Self.version[...],
             let name = StagingFileName(parsing: String(fields[1])), name.kind == .partial
         else {
             return nil
