@@ -24,9 +24,16 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
     /// Holds the session once created.
     private let holder = BackgroundSessionHolder()
 
-    /// Creates the background session (once) and returns `delegate.sessionEvents`.
+    /// Whether the session exists yet: building the source creates none (ADR-028), activation does.
+    package var hasSession: Bool {
+        get async {
+            await self.holder.existing != nil
+        }
+    }
+
+    /// Creates the background session (once, never after `invalidate()`) and returns `delegate.sessionEvents`.
     public func activate() async -> AsyncStream<SessionEvent> {
-        _ = await self.holder.session(self.makeSession)
+        await self.holder.withSession(self.makeSession) { _ in }
         return self.delegate.sessionEvents
     }
 
@@ -45,16 +52,14 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
         }
     }
 
-    /// A tagged download task.
+    /// A tagged download task, created inside the holder so it never meets an invalidated session.
     public func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async {
-        let session = await self.holder.session(self.makeSession)
-        let task = session.downloadTask(with: request)
-        task.taskDescription = BackgroundTaskTag(name: name, expectedBytes: expectedBytes).encoded
-        task.priority = priority
-        if let expectedBytes {
-            task.countOfBytesClientExpectsToReceive = expectedBytes
+        let tag = BackgroundTaskTag(name: name, expectedBytes: expectedBytes)
+        await self.holder.withSession(self.makeSession) { session in
+            let task = session.downloadTask(with: request)
+            tag.label(task, priority: priority)
+            task.resume()
         }
-        task.resume()
     }
 
     /// `cancel()` or `cancelByProducingResumeData()`.
@@ -76,45 +81,46 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
         }
     }
 
-    /// `finishTasksAndInvalidate()`.
+    /// `finishTasksAndInvalidate()`; later starts create nothing.
     public func invalidate() async {
-        await self.holder.existing?.finishTasksAndInvalidate()
+        await self.holder.invalidate()
     }
 
     private func task(_ identifier: Int) async -> URLSessionTask? {
         await self.holder.existing?.allTasks.first { $0.taskIdentifier == identifier }
     }
 
-    /// The configuration of transport.md §10.4: no cache, cookies or credentials, no `httpAdditionalHeaders`
-    /// (R-NET-4), launch events on, the shared delegate in `.background` mode.
+    /// The session of `BackgroundSessionConfiguration` (transport.md §10.4) with the shared delegate in
+    /// `.background` mode.
     private func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.background(withIdentifier: self.identifier.rawValue)
-        configuration.isDiscretionary = self.discretionary
-        configuration.sessionSendsLaunchEvents = true
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.httpAdditionalHeaders = [:]
-        configuration.httpMaximumConnectionsPerHost = 4
+        let configuration = BackgroundSessionConfiguration.make(identifier: self.identifier, discretionary: self.discretionary)
         return URLSession(configuration: configuration, delegate: self.delegate, delegateQueue: nil)
     }
 }
 
-/// Creates the background session at most once (a second session with one identifier is an error).
+/// Creates the background session at most once (a second session with one identifier is an error), and orders task
+/// creation against invalidation: creating a task on an invalidated session raises an Objective-C exception.
 private actor BackgroundSessionHolder {
     private var session: URLSession?
+    private var invalidated = false
 
     var existing: URLSession? {
         self.session
     }
 
-    func session(_ make: @Sendable () -> URLSession) -> URLSession {
-        if let session = self.session {
-            return session
+    /// Runs `body` with the session (created first when needed) unless the session was invalidated.
+    func withSession(_ make: @Sendable () -> URLSession, _ body: @Sendable (URLSession) -> Void) {
+        guard !self.invalidated else {
+            return
         }
-        let made = make()
-        self.session = made
-        return made
+        let session = self.session ?? make()
+        self.session = session
+        body(session)
+    }
+
+    /// Releases the session without cancelling the OS's tasks and refuses every later `withSession`.
+    func invalidate() {
+        self.invalidated = true
+        self.session?.finishTasksAndInvalidate()
     }
 }

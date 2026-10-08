@@ -42,9 +42,17 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     private var heldCancellations: [Delivery] = []
     private var fileCount = 0
     private var snapshotGate: CheckedContinuation<Void, Never>?
-    private var holdSnapshot = false
+    private var holdSnapshot: SnapshotHold?
     private var cancelGate: CheckedContinuation<Void, Never>?
     private var holdCancel: CancelHold?
+
+    /// Where the next `snapshot` waits for `releaseSnapshot()`.
+    enum SnapshotHold: Sendable {
+        /// Before the tasks are listed: the listing reflects whatever happens while it waits.
+        case beforeListing
+        /// After the tasks were listed: the caller receives a listing that went stale while it waited.
+        case afterListing
+    }
 
     /// Where the next `cancel` waits for `releaseCancel()`.
     enum CancelHold: Sendable {
@@ -110,14 +118,27 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     }
 
     func snapshot() async -> [BackgroundTaskSnapshot] {
-        if self.holdSnapshot {
-            self.holdSnapshot = false
-            await withCheckedContinuation { continuation in
-                self.snapshotGate = continuation
-                self.signal.yield("snapshot")
-            }
+        let hold = self.holdSnapshot
+        self.holdSnapshot = nil
+        if hold == .beforeListing {
+            await self.waitForSnapshotRelease()
         }
-        return self.tasks.keys.sorted().compactMap { identifier in
+        let listing = self.listing()
+        if hold == .afterListing {
+            await self.waitForSnapshotRelease()
+        }
+        return listing
+    }
+
+    private func waitForSnapshotRelease() async {
+        await withCheckedContinuation { continuation in
+            self.snapshotGate = continuation
+            self.signal.yield("snapshot")
+        }
+    }
+
+    private func listing() -> [BackgroundTaskSnapshot] {
+        self.tasks.keys.sorted().compactMap { identifier in
             guard let task = self.tasks[identifier] else {
                 return nil
             }
@@ -132,8 +153,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
 
     func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async {
         let task = self.session.downloadTask(with: request)
-        task.taskDescription = BackgroundTaskTag(name: name, expectedBytes: expectedBytes).encoded
-        task.priority = priority
+        BackgroundTaskTag(name: name, expectedBytes: expectedBytes).label(task, priority: priority)
         self.tasks[task.taskIdentifier] = task
         self.starts.append(Start(
             url: request.url,
@@ -186,9 +206,9 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
 
     // MARK: - The test's "OS"
 
-    /// Makes the next `snapshot()` wait for `releaseSnapshot()` (after signalling `"snapshot"`).
-    func holdNextSnapshot() {
-        self.holdSnapshot = true
+    /// Makes the next `snapshot()` wait for `releaseSnapshot()` at `hold` (after signalling `"snapshot"`).
+    func holdNextSnapshot(_ hold: SnapshotHold = .beforeListing) {
+        self.holdSnapshot = hold
     }
 
     /// Lets a held `snapshot()` continue.

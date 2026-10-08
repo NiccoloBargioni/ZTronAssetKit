@@ -19,7 +19,8 @@ struct SourceTests {
             additionalAllowedHosts: ["Media.Example.com."],
             maxConnectionsPerHost: 12
         )
-        let source = HTTPRemoteSource(configuration: configuration, staging: FakeStagingSink(), log: .tapOnly(nil))
+        let staging = FakeStagingSink()
+        let source = HTTPRemoteSource(configuration: configuration, staging: staging, log: .tapOnly(nil))
         #expect(source.policy.allowedHosts == ["cdn.example.com", "media.example.com"])
         #expect(source.policy.plaintext == .never)
         #expect(source.background == nil)
@@ -31,8 +32,12 @@ struct SourceTests {
         #expect(await source.reclaimSourceCopies(AdoptionReport(manifestRemotePaths: ["a"], adoptedRemotePaths: ["a"])) == ReclaimReport())
         #expect(await source.sourceCopyBytes() == 0)
         #expect(await source.reattachedTransfers().isEmpty)
-        await source.cancelTransfer(StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial))
-        await source.handleBackgroundEvents(identifier: "com.ztron.assetkit.bg.default.v1")
+        // Without a background session there is nothing to cancel: staging is left alone.
+        let name = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial)
+        try staging.createPartial(name)
+        _ = try staging.appendPartial(Data("kept".utf8), to: name)
+        await source.cancelTransfer(name)
+        #expect(staging.contents == [name: Data("kept".utf8)])
         await source.invalidate()
     }
 
@@ -50,19 +55,29 @@ struct SourceTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("R-NET-3: an enabled background policy builds a coordinator and reports background support without creating a session")
-    func productionBackground() throws {
+    @Test("R-NET-3: an enabled background policy builds a coordinator and reports background support without creating a session", .timeLimit(.minutes(1)))
+    func productionBackground() async throws {
         let options = BackgroundTransferOptions(namespace: "media", keyRedirectExposure: .acceptedByOwner)
         let configuration = HTTPSourceConfiguration(baseURL: Self.base, appKey: TransportFixtures.canaryKey, background: .enabled(options))
         let source = HTTPRemoteSource(configuration: configuration, staging: FakeStagingSink(), log: .tapOnly(nil))
         let coordinator = try #require(source.background as? BackgroundTransferCoordinator)
         #expect(coordinator.options == options)
         #expect(source.capabilities.supportsBackground)
-        #expect((coordinator.driver as? LiveBackgroundSessionDriver)?.identifier.rawValue == "com.ztron.assetkit.bg.media.v1")
+        let driver = try #require(coordinator.driver as? LiveBackgroundSessionDriver)
+        #expect(driver.identifier.rawValue == "com.ztron.assetkit.bg.media.v1")
+        // The session is created by the coordinator's first activation, after the store opened (ADR-028).
+        #expect(await !driver.hasSession)
+        // What that activation will configure (transport.md §10.4): building a configuration creates no session.
+        let made = BackgroundSessionConfiguration.make(identifier: driver.identifier, discretionary: driver.discretionary)
+        #expect(made.identifier == "com.ztron.assetkit.bg.media.v1")
+        #expect(made.isDiscretionary == options.discretionary && made.sessionSendsLaunchEvents)
+        #expect(made.urlCache == nil && made.httpCookieStorage == nil && !made.httpShouldSetCookies && made.urlCredentialStorage == nil)
+        #expect(made.httpAdditionalHeaders?.isEmpty == true)
+        #expect(made.httpMaximumConnectionsPerHost == 4)
     }
 
     @available(macOS 15.0, *)
-    @Test("R-NET-1: a base URL without a host falls back to its text as the origin identifier")
+    @Test("R-SYN-5: a base URL without a host falls back to its text as the origin identifier the circuit breaker is keyed by")
     func originFallback() {
         let source = HTTPRemoteSource(configuration: HTTPSourceConfiguration(baseURL: URL(string: "file:///srv/assets/")!), staging: FakeStagingSink(), log: .tapOnly(nil))
         #expect(source.originID == "file:///srv/assets/")
@@ -101,10 +116,11 @@ struct SourceTests {
         var route: TransferRoute = .backgroundEligible
         var purpose: TransferPurpose = .asset
         var resumed = false
+        var expected: Int64? = 100
         var background: Bool
 
         var testDescription: String {
-            "key=\(self.key) \(self.exposure) \(self.priority) \(self.route) \(self.purpose) resumed=\(self.resumed)"
+            "key=\(self.key) \(self.exposure) \(self.priority) \(self.route) \(self.purpose) resumed=\(self.resumed) byteSize=\(String(describing: self.expected))"
         }
     }
 
@@ -117,6 +133,10 @@ struct SourceTests {
         RouteCase(key: false, exposure: .refuse, route: .foreground, background: false),
         RouteCase(key: false, exposure: .refuse, purpose: .manifest, background: false),
         RouteCase(key: false, exposure: .refuse, resumed: true, background: false),
+        // R-NET-7: the OS downloads a background task whole, so only a size the manifest fixed within the cap goes there.
+        RouteCase(key: false, exposure: .refuse, expected: nil, background: false),
+        RouteCase(key: false, exposure: .refuse, expected: 1_001, background: false),
+        RouteCase(key: false, exposure: .refuse, expected: 1_000, background: true),
     ]
 
     @available(macOS 15.0, *)
@@ -138,7 +158,7 @@ struct SourceTests {
             ? ResumePoint(previous: StagingFileName(transfer: id, attempt: TransportFixtures.attempt(1), kind: .partial), offset: 10, validator: .lastModified("x"))
             : nil
         let request = TransferRequest(
-            id: id, attempt: TransportFixtures.attempt(2), purpose: route.purpose, remotePath: "video/a.bin", expectedBytes: 100,
+            id: id, attempt: TransportFixtures.attempt(2), purpose: route.purpose, remotePath: "video/a.bin", expectedBytes: route.expected,
             maxBytes: 1_000, priority: route.priority, route: route.route, resume: resume)
         _ = await source.transfer(request)
         let jobs = route.background ? await background.jobs : await foreground.jobs
@@ -184,7 +204,7 @@ struct SourceTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("R-NET-3: re-attachment through a plain background backend reports its live transfers as running")
+    @Test("R-NET-3: re-attachment through a plain background backend reports its live transfers as running", .timeLimit(.minutes(1)))
     func reattachedThroughPlainBackend() async {
         let background = FakeTransferBackend(kind: .background)
         let name = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial)
@@ -200,7 +220,10 @@ struct SourceTests {
         #expect(await source.reattachedTransfers() == [ReattachedTransfer(name: name, isRunning: true, bytesReceived: 7)])
         await source.cancelTransfer(name)
         #expect(await background.cancellations == [FakeBackendCancellation(name: name, keepingPartial: false)])
-        // A source whose background is not a coordinator has no session to hand events to.
+        // A source whose background is not a coordinator has no session to hand events to: the backend sees nothing.
         await source.handleBackgroundEvents(identifier: "com.ztron.assetkit.bg.default.v1")
+        #expect(await background.cancellations.count == 1)
+        #expect(await background.jobs.isEmpty)
+        #expect(await background.invalidations == 0)
     }
 }

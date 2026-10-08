@@ -88,11 +88,7 @@ struct BackgroundCoordinatorTests {
         await relaunched.awaitBackgroundEvents()
         #expect(rig.staging.contents[job.partialName] == body)
         #expect(await relaunched.reattached() == [ReattachedTransfer(name: job.partialName, isRunning: false, bytesReceived: 4_000)])
-
-        // Not re-downloaded: the engine's next attempt for the content is handed the staged file.
-        let next = await relaunched.start(rig.job(2))
-        #expect(next.attempt == job.attempt)
-        #expect(await run(next).terminal == .staged(StagedFile(name: job.partialName, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil)))
+        // Not re-downloaded by the transport: launch reconciliation adopts the reported file from staging.
         #expect(await rig.driver.starts.count == 1)
         withExtendedLifetime(firstLaunch) {}
     }
@@ -294,22 +290,21 @@ struct BackgroundCoordinatorTests {
     struct Completion: Sendable, CustomTestStringConvertible {
         var status: Int
         var bodyBytes: Int
-        var expected: Int64?
+        var expected: Int64
         var verdict: TransferUpdate?
 
         var testDescription: String {
-            "\(self.status) \(self.bodyBytes) bytes, expected \(String(describing: self.expected))"
+            "\(self.status) \(self.bodyBytes) bytes, expected \(self.expected)"
         }
     }
 
     static let completions: [Completion] = [
         Completion(status: 200, bodyBytes: 3_000, expected: 4_000, verdict: .failed(.integrity(.truncated(expected: 4_000, received: 3_000)))),
         Completion(status: 200, bodyBytes: 5_000, expected: 4_000, verdict: .failed(.integrity(.sizeMismatch(expected: 4_000, actual: 5_000)))),
-        Completion(status: 200, bodyBytes: 0, expected: nil, verdict: .failed(.integrity(.truncated(expected: nil, received: 0)))),
         Completion(status: 404, bodyBytes: 10, expected: 4_000, verdict: .failed(.permanentMissing(httpStatus: 404))),
         Completion(status: 503, bodyBytes: 10, expected: 4_000, verdict: .failed(.transient(.serverError(httpStatus: 503), retryAfter: nil))),
         Completion(status: 206, bodyBytes: 10, expected: 4_000, verdict: .failed(.rejected(.unexpectedStatus(206)))),
-        Completion(status: 200, bodyBytes: 700, expected: nil, verdict: nil),
+        Completion(status: 200, bodyBytes: 4_000, expected: 4_000, verdict: nil),
     ]
 
     @available(macOS 15.0, *)
@@ -548,7 +543,7 @@ struct BackgroundCoordinatorTests {
         #expect(!relay.hasHandler(for: ours))
     }
 
-    @Test("R-NET-3: the background task tag round-trips through taskDescription and rejects foreign or over-long tags")
+    @Test("R-NET-3: the background task tag round-trips through taskDescription, rejects foreign or over-long tags, and labels a download")
     func tagCodec() throws {
         let seed: UInt64 = 0x5eed_7a6
         var state = seed
@@ -582,6 +577,16 @@ struct BackgroundCoordinatorTests {
             #expect(BackgroundTaskTag(decoding: foreign) == nil, "\(String(describing: foreign))")
         }
         #expect(BackgroundTaskTag(decoding: "ztak1 \(name.rawValue) -")?.expectedBytes == nil)
+        // A labelled download carries the tag, the lane's priority and, when known, the size as the OS's hint.
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let sized = session.downloadTask(with: Self.url)
+        BackgroundTaskTag(name: name, expectedBytes: 4_000).label(sized, priority: 0.25)
+        #expect(BackgroundTaskTag(decoding: sized.taskDescription) == BackgroundTaskTag(name: name, expectedBytes: 4_000))
+        #expect(sized.priority == 0.25 && sized.countOfBytesClientExpectsToReceive == 4_000)
+        let unsized = session.downloadTask(with: Self.url)
+        BackgroundTaskTag(name: name, expectedBytes: nil).label(unsized, priority: 0.75)
+        #expect(unsized.priority == 0.75 && unsized.countOfBytesClientExpectsToReceive == NSURLSessionTransferSizeUnknown)
     }
 
     private func rigName() -> StagingFileName {

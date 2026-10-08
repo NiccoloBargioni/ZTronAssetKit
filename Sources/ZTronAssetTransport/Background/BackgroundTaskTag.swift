@@ -53,4 +53,15 @@ package struct BackgroundTaskTag: Sendable, Hashable {
     package var encoded: String {
         "\(Self.version) \(self.name.rawValue) \(self.expectedBytes.map(String.init) ?? "-")"
     }
+
+    /// Labels a new download task before it is resumed: this tag as its `taskDescription` (what survives a
+    /// relaunch), the lane's `priority`, and the decoded size as the OS's scheduling hint when known. Shared by the
+    /// live driver and the fake one, so the device-only file stays decision-free (ARCHITECTURE §14).
+    package func label(_ task: URLSessionTask, priority: Float) {
+        task.taskDescription = self.encoded
+        task.priority = priority
+        if let expectedBytes = self.expectedBytes {
+            task.countOfBytesClientExpectsToReceive = expectedBytes
+        }
+    }
 }

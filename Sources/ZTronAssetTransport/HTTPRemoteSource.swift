@@ -249,11 +249,14 @@ public final class HTTPRemoteSource: RemoteSource {
     }
 
     /// ADR-026 and transport.md §10.7: a transfer uses the background session only when it is background-eligible,
-    /// on the bulk lane, an asset, not a Range resume (the background session cannot continue our partial), free of
-    /// the key unless the owner accepted redirect exposure, and the coordinator admits it (not disabled for the
-    /// process, under the task cap).
+    /// on the bulk lane, an asset, not a Range resume (the background session cannot continue our partial), of a
+    /// `byteSize` known and within the cap (R-NET-7: the OS downloads a background task whole before a byte reaches
+    /// us, so only the staged size can be checked, and it must equal `byteSize`), free of the key unless the owner
+    /// accepted redirect exposure, and the coordinator admits it (not disabled for the process, under the task cap).
     func routesToBackground(_ request: TransferRequest, url: URL, backend: any TransferBackend) async -> Bool {
-        guard request.route == .backgroundEligible, request.priority == .bulk, request.purpose == .asset, request.resume == nil else {
+        guard request.route == .backgroundEligible, request.priority == .bulk, request.purpose == .asset, request.resume == nil,
+            let expected = request.expectedBytes, expected <= request.maxBytes
+        else {
             return false
         }
         var exposure = KeyRedirectExposure.refuse
