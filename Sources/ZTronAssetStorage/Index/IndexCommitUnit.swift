@@ -59,7 +59,8 @@ struct IndexCommitInput: Sendable {
 struct IndexCommitOutcome: Sendable {
     /// The encoded size on success (diagnostics), or the failure.
     var result: Result<Int, StoreError>
-    /// The loaded `index.tmp` was renamed to `index.bin` (the promotion is no longer pending, whatever followed).
+    /// The loaded `index.tmp` was renamed to `index.bin`, or had vanished (the promotion is no longer pending, whatever
+    /// followed).
     var promotedName = false
     /// The promoted file's data was synced before that rename, and the rename was ordered by the root's sync: the
     /// promoted generation is committed.
@@ -68,8 +69,9 @@ struct IndexCommitOutcome: Sendable {
 
 /// The index commit protocol, one metadata unit (ARCHITECTURE §4.1, ADR-015, as amended by ADR draft B-28):
 /// 0. when the launch loaded `index.tmp`, promote it first: sync `index.tmp` (a killed process may have written it
-///    without step 3), `index.bin → index.prev`, `index.tmp → index.bin`, sync the root (it is valid, so this completes
-///    the interrupted commit instead of truncating its generation);
+///    without step 3), `index.bin → index.prev` (under the condition of step 4), `index.tmp → index.bin`, sync the root
+///    (it is valid, so this completes the interrupted commit instead of truncating its generation); a vanished
+///    `index.tmp` completes the promotion without a commit;
 /// 1. barrier-sync dirty fan-outs, then `blobs/`;
 /// 2. `write(index.tmp, .truncate)` — on ENOSPC remove `index.tmp`, and `index.prev` only when `index.bin` holds the
 ///    committed generation, then retry once;
@@ -94,15 +96,9 @@ enum IndexCommitUnit {
         var committed = input.committedGeneration
         if let promotion = input.promotion {
             do throws(FileSystemError) {
-                // The load rule accepts any complete `index.tmp`, also one a killed process wrote at step 2 and never
-                // synced (step 3): its data must be durable before it becomes `index.bin` and counts as committed,
-                // or the ENOSPC fallback could drop `index.prev` for a file a power loss empties (probe VP7).
-                try fileSystem.synchronizeFile(at: layout.indexURL(.temporary), level: level)
-                try IndexCommitUnit.replaceCurrent(with: layout.indexURL(.temporary), committed: committed, layout: layout, fileSystem: fileSystem)
-                outcome.promotedName = true
-                try fileSystem.synchronizeDirectory(at: layout.root, level: level)
-                outcome.promotedDurably = true
-                committed = promotion
+                if try IndexCommitUnit.promote(committed: committed, level: level, layout: layout, fileSystem: fileSystem, outcome: &outcome) {
+                    committed = promotion
+                }
             } catch {
                 outcome.result = .failure(.fileSystem(error))
                 return outcome
@@ -144,6 +140,39 @@ enum IndexCommitUnit {
         }
         outcome.result = .success(data.count)
         return outcome
+    }
+
+    /// Step 0, the promotion of the loaded `index.tmp` (ADR draft B-28); returns whether its generation is committed now.
+    ///
+    /// The load rule accepts any complete `index.tmp`, also one a killed process wrote at step 2 and never synced (step
+    /// 3): its data is synced at the commit's level before it becomes `index.bin` and counts as committed, or the ENOSPC
+    /// fallback could drop `index.prev` for a file a power loss empties (probe VP7). A vanished `index.tmp` (an outside
+    /// deletion inside the private root, or a rename that took effect but reported failure) completes the promotion
+    /// without a commit (probe VPC2-K): nothing is left to promote, and whatever reached `index.bin` was never ordered by
+    /// a root sync, so it does not count as committed; the commit goes on with steps 1–6 and supersedes it. Before, the
+    /// sync threw `notFound` on every attempt and the promotion blocked every later commit, `close()`'s included.
+    private static func promote(
+        committed: UInt64,
+        level: SyncLevel,
+        layout: StoreLayout,
+        fileSystem: any FileSystem,
+        outcome: inout IndexCommitOutcome
+    ) throws(FileSystemError) -> Bool {
+        let temporary = layout.indexURL(.temporary)
+        do throws(FileSystemError) {
+            guard try fileSystem.itemInfo(at: temporary) != nil else {
+                throw .notFound
+            }
+            try fileSystem.synchronizeFile(at: temporary, level: level)
+        } catch .notFound {
+            outcome.promotedName = true
+            return false
+        }
+        try IndexCommitUnit.replaceCurrent(with: temporary, committed: committed, layout: layout, fileSystem: fileSystem)
+        outcome.promotedName = true
+        try fileSystem.synchronizeDirectory(at: layout.root, level: level)
+        outcome.promotedDurably = true
+        return true
     }
 
     /// Steps 4 and 5: `index.bin → index.prev`, then `source → index.bin`. Step 4 runs only when `index.bin` exists and

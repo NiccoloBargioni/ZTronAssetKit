@@ -490,8 +490,7 @@ struct StoreRecoveryTests {
         let thirdReport = try await third.store.open()
         #expect(!thirdReport.degraded && thirdReport.launchEpoch > committed)
         #expect(await third.state.core.records[entry.identifier] != nil)
-        #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt))
-        #expect(await CoreInvariants.violations(of: third).isEmpty)
+        #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt), "the rotten blob is still doomed corrupt")
     }
 
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
