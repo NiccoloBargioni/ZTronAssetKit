@@ -16,6 +16,7 @@ struct ConditionsTests {
             var queue: DispatchQueue?
             var update: (@Sendable (NetworkConditions) -> Void)?
             var cancelled = false
+            var reads = 0
         }
 
         private let state: Mutex<State>
@@ -34,7 +35,15 @@ struct ConditionsTests {
         }
 
         var current: NetworkConditions {
-            self.state.withLock { $0.current }
+            self.state.withLock { state in
+                state.reads += 1
+                return state.current
+            }
+        }
+
+        /// How often the observation read `current` (only a notification needs it).
+        var reads: Int {
+            self.state.withLock { $0.reads }
         }
 
         func cancel() {
@@ -54,6 +63,20 @@ struct ConditionsTests {
             if let queue, let update {
                 queue.async { update(conditions) }
             }
+        }
+    }
+
+    /// Counts calls from any thread.
+    @available(macOS 15.0, *)
+    final class ReadCounter: Sendable {
+        private let value = Mutex(0)
+
+        func increment() {
+            self.value.withLock { $0 += 1 }
+        }
+
+        var count: Int {
+            self.value.withLock { $0 }
         }
     }
 
@@ -77,14 +100,19 @@ struct ConditionsTests {
     }
 
     @available(macOS 15.0, *)
-    @Test("R-NET-9: path changes reach the stream as full snapshots and power notifications carry the current path", .timeLimit(.minutes(1)))
+    @Test("R-NET-9: path changes reach the stream as full snapshots, power notifications carry the current path, and nothing is read between changes", .timeLimit(.minutes(1)))
     func pathSeam() async throws {
         let center = NotificationCenter()
         let wifi = NetworkConditions(satisfied: true, expensive: false, constrained: false)
         let cellular = NetworkConditions(satisfied: true, expensive: true, constrained: true)
         let path = ScriptedPath(wifi)
         let power = PowerConditions(lowPowerMode: true, thermal: .serious)
-        let source = LiveDeviceConditionsSource(center: center, makePathObserver: { path }, power: { power })
+        // Every power reading is counted: an observation that polled would read more often than things change.
+        let reads = ReadCounter()
+        let source = LiveDeviceConditionsSource(center: center, makePathObserver: { path }, power: {
+            reads.increment()
+            return power
+        })
         var iterator = await source.conditions().makeAsyncIterator()
         #expect(await iterator.next() == DeviceConditions(network: wifi, power: power))
         path.send(cellular)
@@ -95,6 +123,9 @@ struct ConditionsTests {
         NotificationCenter().post(name: .NSProcessInfoPowerStateDidChange, object: nil)
         path.send(wifi)
         #expect(await iterator.next() == DeviceConditions(network: wifi, power: power))
+        // One reading for the first element, one per path change (2) and one per notification on `center` (1).
+        #expect(reads.count == 4)
+        #expect(path.reads == 1)
     }
 
     @available(macOS 15.0, *)
