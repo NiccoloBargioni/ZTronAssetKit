@@ -1,0 +1,29 @@
+{
+  "detached" : [
+    "detached.bin"
+  ],
+  "doomed" : {
+    "0e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7.png" : "unreferenced",
+    "2d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff06.jpg" : "purged",
+    "4c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e25.wav" : "corrupt"
+  },
+  "generation" : 7,
+  "launchEpoch" : 6,
+  "manifestOrder" : [
+    "bo7.ri.map",
+    "bo7.ri.icon",
+    "legacy.wav",
+    "stale.png",
+    "heal.jpg",
+    "quarantined.mp3",
+    "failed.mp4",
+    "evicted.heic",
+    "purged.svg",
+    "healing.png",
+    "café",
+    "café"
+  ],
+  "note" : "Generated from Tests\/ZTronAssetStorageTests\/Core\/GoldenIndex.swift (WP-B, R-STO-12). Never regenerate: a schema change adds a v2 directory and a decoder v1 -> v2.",
+  "records" : 13,
+  "schemaVersion" : 1
+}

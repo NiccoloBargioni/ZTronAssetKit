@@ -104,4 +104,92 @@ struct StoreCoreState: Sendable {
     var publishing: Set<BlobKey> = []
     /// Counters (R-OBS-2). WP-C increments `evictions`, `evictedBytes` and `gcBytes`.
     var metrics = StoreMetrics()
+
+    // MARK: WP-B bookkeeping (not read or written by WP-C)
+
+    /// The index lineage (store.md §2.3).
+    var storeID = StoreIdentifier.zero
+    /// The next generation to allocate: every commit **attempt** takes one at capture (I-5, store-1 S1-16).
+    var nextGeneration: UInt64 = 1
+    /// What `open()` returned, for a second call.
+    var openReport: OpenReport?
+    /// Callers suspended until `open()` finishes (REENTRANCY R1).
+    var openWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Commit scheduling (P-5, ARCHITECTURE §4.1).
+    var commits = CommitBookkeeping()
+    /// Snapshot versions, installs and acknowledgements (ADR-016, ADR-017).
+    var snapshots = SnapshotBookkeeping()
+    /// The snapshot entry of every present record, maintained per changed record (O(1) publication).
+    var presentTable: [AssetID: SnapshotEntry] = [:]
+    /// The size of every blob the table knows (live, doomed or being deleted): usage, pending reclaim, reaped bytes.
+    var blobBytes: [BlobKey: Int64] = [:]
+    /// The doom bookkeeping of each key whose deletion unit is in flight (`BlobState.deleting` carries none): a
+    /// commit captured meanwhile still persists the reason in DOOMED, and a failed unlink restores it with backoff.
+    var deletingDooms: [BlobKey: DoomInfo] = [:]
+    /// Publishers waiting for an in-flight publication or deletion of the same key (REENTRANCY R3, R7).
+    var keyWaiters: [BlobKey: [CheckedContinuation<Void, Never>]] = [:]
+    /// Unreferenced, undoomed blobs listed at launch: adoptable by a later `apply` (degraded rebuild, store.md
+    /// §2.6); each is stat-ed again before it is bound.
+    var orphans: [BlobKey: Int64] = [:]
+    /// Units and installs whose continuation has not resumed yet; `close()` drains them (store-1 S1-09).
+    var unitsInFlight = 0
+    /// `close()` waiting for `unitsInFlight` to reach zero.
+    var drainWaiters: [CheckedContinuation<Void, Never>] = []
+    /// The root was replaced or vanished while running: no further commit (store-1 S1-08).
+    var unavailable: StorageUnavailableReason?
+}
+
+/// Commit scheduling (P-5): mutations are counted, commits cover a prefix of them, and at most one commit runs at
+/// a time; `.soon` mutations are flushed within `commitMinimumInterval` through `nextDeadline()`/`runDueWork()`.
+struct CommitBookkeeping: Sendable {
+    /// Bumped by every `markDirty`.
+    var mutationSerial: UInt64 = 0
+    /// The serial of the newest `.soon` mutation.
+    var soonSerial: UInt64 = 0
+    /// Mutations up to this serial are in a committed generation.
+    var committedSerial: UInt64 = 0
+    /// Mutations up to this serial are in a durably committed generation.
+    var durableSerial: UInt64 = 0
+    /// Monotonic start of the latest commit attempt: the coalescing window opens `commitMinimumInterval` later.
+    var lastAttemptAt: MonotonicInstant?
+    /// A commit unit is running.
+    var inFlight = false
+    /// Callers waiting for the running commit to finish (REENTRANCY R5).
+    var waiters: [CheckedContinuation<Void, Never>] = []
+    /// Fan-outs that received or adopted a blob since the last successful commit.
+    var dirtyFanOuts: Set<String> = []
+    /// `blobs/` must be barrier-synced by the next commit (after open, or when a fan-out was created).
+    var blobsDirectoryDirty = false
+
+    /// Whether a `.soon` mutation is not yet committed.
+    var soonPending: Bool {
+        self.soonSerial > self.committedSerial
+    }
+
+    /// Whether every mutation up to `serial` is committed at `durability`.
+    func covers(_ serial: UInt64, _ durability: CommitDurability) -> Bool {
+        switch durability {
+        case .ordered:
+            return self.committedSerial >= serial
+        case .durable:
+            return self.durableSerial >= serial
+        }
+    }
+}
+
+/// Snapshot publication and acknowledgement (ADR-016, ADR-017, ARCHITECTURE §5).
+struct SnapshotBookkeeping: Sendable {
+    /// The last version allocated (versions are allocated when a snapshot is built, store-2 S2-13).
+    var version: UInt64 = 0
+    /// The newest version of this epoch the sink acknowledged.
+    var acknowledgedVersion: UInt64 = 0
+    /// Awake-clock start of the newest install whose acknowledgement was of this epoch: a doomed key whose grace
+    /// ended before it is proven unobserved by the main actor (the "fresh acknowledgement" of ADR-017).
+    var lastAcknowledgedInstallStart: MonotonicInstant?
+    /// Awake-clock start of the newest install, acknowledged or not.
+    var lastInstallStart: MonotonicInstant?
+    /// Monotonic time of the newest install (bulk and prefetch installs are rate-limited from it).
+    var lastInstallAt: MonotonicInstant?
+    /// A bulk or prefetch publication is not installed yet: the trailing install is a deadline.
+    var installDue = false
 }

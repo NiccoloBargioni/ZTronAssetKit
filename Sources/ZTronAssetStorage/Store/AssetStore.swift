@@ -49,44 +49,59 @@ package actor AssetStore {
     /// (store-1 S1-08). Never fails because a post-load commit failed: it then serves the loaded state read-only
     /// (store-1 S1-07).
     package func open() async throws(StoreError) -> OpenReport {
-        fatalError("WP-B: AssetStore.open not implemented")
+        // REENTRANCY: R1 — `performOpen` re-checks the phase after each of its units.
+        try await self.performOpen()
     }
 
     /// Commits now (respecting the P-5 interval) at the given durability.
     package func flush(_ durability: CommitDurability) async throws(StoreError) {
-        fatalError("WP-B: AssetStore.flush not implemented")
+        // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
+        try await self.awaitOpen()
+        // REENTRANCY: R5 — `requireCommittedInternal` re-reads coverage, the window and the phase after each await.
+        try await self.requireCommittedInternal(durability)
     }
 
     /// Drains in-flight units, flushes durably, releases the lock. Every later call throws `.closed`.
     package func close() async {
-        fatalError("WP-B: AssetStore.close not implemented")
+        // REENTRANCY: R1, R5 — `performClose` re-reads the phase and the drain counter after each await.
+        await self.performClose()
     }
 
     /// The transport's staging sink over this store's `FileSystem` and layout (available after `open()`).
     package func makeStagingSink() throws(StoreError) -> StoreStagingSink {
-        fatalError("WP-B: AssetStore.makeStagingSink not implemented")
+        try self.ensureOpenInternal()
+        guard let layout = self.state.core.layout else {
+            throw .notOpen
+        }
+        return StoreStagingSink(
+            fileSystem: self.environment.fileSystem,
+            layout: layout,
+            bulkExecutor: self.environment.bulkExecutor,
+            metadataExecutor: self.environment.metadataExecutor
+        )
     }
 
     // MARK: Reads (no I/O; WP-B)
 
     /// The planner's view (R-SYN-1): values only, O(1) copy-on-write.
     package func planningView() throws(StoreError) -> StorePlanningView {
-        fatalError("WP-B: AssetStore.planningView not implemented")
+        try self.makePlanningView()
     }
 
     /// The resolve fast path: reads current actor state, never a stale snapshot copy (store-2 S2-12).
     package func location(for id: AssetID, extensions: [String], recordingAccess: Bool) -> AssetLocation? {
-        fatalError("WP-B: AssetStore.location not implemented")
+        self.currentLocation(for: id, extensions: extensions, recordingAccess: recordingAccess)
     }
 
     /// Counts for `availability(scope:)` (R-SYN-10); `manifestFresh` is left false for the engine to set.
     package func availability(of scope: AssetScope) -> AvailabilityReport {
-        fatalError("WP-B: AssetStore.availability not implemented")
+        self.currentAvailability(of: scope)
     }
 
     /// One free-space read through `FileSystem`, plus usage, pending reclaim and the resolved budget (R-SYN-11).
     package func freeSpace() async throws(StoreError) -> FreeSpace {
-        fatalError("WP-B: AssetStore.freeSpace not implemented")
+        // REENTRANCY: R13 — `measureFreeSpace` re-checks the phase after its unit.
+        try await self.measureFreeSpace()
     }
 
     // MARK: Manifest (reconcile-before-download, R-SYN-8, ADR-030; WP-B)
@@ -101,23 +116,27 @@ package actor AssetStore {
         etag: ETag?,
         eviction: EvictionPlan?
     ) async throws(StoreError) -> ApplyReport {
-        fatalError("WP-B: AssetStore.apply not implemented")
+        // REENTRANCY: R5, R6 — `performApply` mutates synchronously, then awaits the commit and the install.
+        try await self.performApply(manifest, etag: etag, eviction: eviction)
     }
 
     /// Point admission (sync.md §6.5): adds or updates one entry without reconciling anything else and without
     /// storing the fetched manifest's ETag (sync-2 S2-28).
     package func admit(_ entry: ManifestEntry) async throws(StoreError) {
-        fatalError("WP-B: AssetStore.admit not implemented")
+        // REENTRANCY: R5, R6 — `performAdmit` mutates synchronously, then awaits the commit and the install.
+        try await self.performAdmit(entry)
     }
 
     /// Writes the stamp unless a purge happened since `purgeEpoch` (R-CLN-6); `.purgeRaced` otherwise.
     package func markSynced(_ stamp: SyncStamp, ifPurgeEpoch purgeEpoch: UInt64) async throws(StoreError) {
-        fatalError("WP-B: AssetStore.markSynced not implemented")
+        // REENTRANCY: R5 — `performMarkSynced` compares the purge epoch before its only await.
+        try await self.performMarkSynced(stamp, ifPurgeEpoch: purgeEpoch)
     }
 
     /// Clears the stamp and sets the persisted "sync due" flag.
     package func markSyncDue() async throws(StoreError) {
-        fatalError("WP-B: AssetStore.markSyncDue not implemented")
+        // REENTRANCY: R5 — nothing but the phase after the commit.
+        try await self.performMarkSyncDue()
     }
 
     /// What an Apple source may release (R-CLN-10, H-7, store-1 S1-10), built atomically: captures, synchronously
@@ -128,14 +147,16 @@ package actor AssetStore {
     /// that lands while the commit runs is not in the report, so a pack is released only for adoptions that survive
     /// power loss (REENTRANCY R15). Throws when the durable commit fails, so nothing is released.
     package func adoptionReport() async throws(StoreError) -> AdoptionReport {
-        fatalError("WP-B: AssetStore.adoptionReport not implemented")
+        // REENTRANCY: R15 — the report is captured before the durable commit.
+        try await self.performAdoptionReport()
     }
 
     // MARK: Staging and publication (WP-B)
 
     /// Lists `staging/` (launch reconciliation runs it **after** `reattachedTransfers()`, ADR-028).
     package func stagingInventory() async throws(StoreError) -> StagingInventory {
-        fatalError("WP-B: AssetStore.stagingInventory not implemented")
+        // REENTRANCY: R14 — `listStaging` re-checks the phase after its unit.
+        try await self.listStaging()
     }
 
     /// Publishes a staged file for every id in `ids` whose current content identity is `identity`:
@@ -158,7 +179,8 @@ package actor AssetStore {
         expecting identity: ContentIdentity,
         urgency: AssetPriority
     ) async throws(StoreError) -> [AssetID: AssetLocation] {
-        fatalError("WP-B: AssetStore.publish not implemented")
+        // REENTRANCY: R2, R3, R4, R5, R6 — `performPublish` re-validates identity and phase after every await.
+        try await self.performPublish(staged, binding: ids, expecting: identity, urgency: urgency)
     }
 
     // MARK: Access (WP-B)
@@ -167,12 +189,12 @@ package actor AssetStore {
     /// now (store-2 S2-19). WP-B's, because every acknowledged install (REENTRANCY R6) delivers
     /// `InstallAck.accesses` here; WP-C's eviction only reads the result.
     package func recordAccesses(_ stamps: [AssetID: Date]) {
-        fatalError("WP-B: AssetStore.recordAccesses not implemented")
+        self.recordAccessesInternal(stamps)
     }
 
     /// The store's counters (R-OBS-2).
     package func metrics() -> StoreMetrics {
-        fatalError("WP-B: AssetStore.metrics not implemented")
+        self.state.core.metrics
     }
 
     // MARK: Engine-driven scheduling (ADR-022; WP-B)
@@ -182,13 +204,15 @@ package actor AssetStore {
     /// is the awake-clock grace; `nil` when nothing is time-blocked (lease- or ack-blocked keys never keep a
     /// deadline, store-1 S1-13).
     package func nextDeadline() -> MonotonicInstant? {
-        fatalError("WP-B: AssetStore.nextDeadline not implemented")
+        self.nextDeadlineInternal()
     }
 
     /// Runs what is due: a coalesced commit, the trailing snapshot install, then reap batches whose ack, awake-clock
     /// grace, commit and lease conditions hold (leases from `state.cleanup`), after one fresh no-op install proved
     /// the main actor ran (ADR-017).
     package func runDueWork() async -> StoreWorkReport {
-        fatalError("WP-B: AssetStore.runDueWork not implemented")
+        // REENTRANCY: R5, R6, R7, R12 — `performRunDueWork` re-checks the phase and recomputes deletable state after
+        // each await.
+        await self.performRunDueWork()
     }
 }
