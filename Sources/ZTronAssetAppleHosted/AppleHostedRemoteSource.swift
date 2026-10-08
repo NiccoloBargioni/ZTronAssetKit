@@ -147,10 +147,13 @@ public final class AppleHostedRemoteSource: RemoteSource {
 
     /// Bytes the OS still holds in media packs whose entries were adopted, summed from `PackBackend.installedBytes`
     /// (R-CLN-9, H-7, transport-2 T2-13): a released pack reports nothing, and one a transfer downloaded again counts.
+    /// The sum saturates at `Int64.max`: the backend is injectable, and a report must never trap the process.
     public func sourceCopyBytes() async -> Int64 {
         var total: Int64 = 0
         for pack in await self.state.sourceCopyPacks() {
-            total += max(0, await self.backend.installedBytes(of: pack) ?? 0)
+            let bytes = max(0, await self.backend.installedBytes(of: pack) ?? 0)
+            let (sum, overflow) = total.addingReportingOverflow(bytes)
+            total = overflow ? .max : sum
         }
         return total
     }

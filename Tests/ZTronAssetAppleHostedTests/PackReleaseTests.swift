@@ -261,6 +261,27 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-CLN-9: sourceCopyBytes saturates instead of trapping when the installed sizes sum past Int64.max", .timeLimit(.minutes(1)))
+    func sourceCopyBytesSaturates() async throws {
+        // Verifier probe PROBE-R3-2: `PackBackend` is public, so any injected backend can report such sizes.
+        let fixture = AppleTierFixture(
+            installed: [Packs.media: pack(mediaA), Packs.extras: pack(extraC)],
+            configuration: AppleTierConfiguration(retention: .keepPacks)
+        )
+        fixture.backend.setInstalledBytes(Packs.media, Int64.max / 2 + 1)
+        fixture.backend.setInstalledBytes(Packs.extras, Int64.max / 2 + 1)
+        _ = await fixture.source.reclaimSourceCopies(
+            AdoptionReport(manifestRemotePaths: [mediaA, extraC], adoptedRemotePaths: [mediaA, extraC])
+        )
+        #expect(await fixture.source.sourceCopyBytes() == Int64.max)
+
+        fixture.backend.setInstalledBytes(Packs.media, Int64.max)
+        fixture.backend.setInstalledBytes(Packs.extras, -5)
+        #expect(await fixture.source.sourceCopyBytes() == Int64.max, "a negative size counts as nothing")
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-9: packs kept by keepPacks keep counting as source copies", .timeLimit(.minutes(1)))
     func keptPacksCount() async throws {
         let fixture = AppleTierFixture(
