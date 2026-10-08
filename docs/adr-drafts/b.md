@@ -174,6 +174,11 @@ Since fix round 1 a replaced root also stops the reaper: `deletionBlocker` retur
 - **Decision.** The same metadata unit, on a failed hand-back, removes the claimed `.verifying` and its sidecar (as B-26 does for other failures; the sidecar describes the discarded bytes, not the producer's new `.part`), and leaves the new `.part` alone. The call still throws `.cancelled`.
 - **Consequences.** A retry with the same `StagedFile` then claims the producer's new `.part` and is judged on those bytes (size, hash). Test: `R-INT-1: a cancelled hash whose claim cannot be handed back discards the claimed file and keeps the producer's new .part`.
 
+## B-32 — Every return of `close()` means "flushed durably, lock released" (fix round 3, review probe 2) · blocking
+- **Context.** A `close()` arriving while another was draining or flushing returned at once (`phase == .closing`), before the durable commit and the lock release, although `close()` documents both; a caller that then reopened the root (facade shutdown and re-create, two shutdown paths) got `.locked`.
+- **Decision.** `StoreCoreState.closeWaiters`: a later `close()` parks there (proposed REENTRANCY row b-9) and loops on the phase; the running close resumes the waiters right after it set `closed`, which it does after its durable commit and lock release. Only `closed` returns at once.
+- **Consequences.** Concurrent closes all return after the same durable commit and unlock. Test: `R-STO-9: a second close() during the first one's durable commit returns only after the commit and the lock release` (probe 2: close #1's durable commit held on a `SteppedBlockingExecutor`; close #2 parks; once it returns a new store on the same root opens).
+
 ## Fix round 1 — dispositions
 | Review item | Disposition |
 |---|---|
@@ -209,6 +214,21 @@ Since fix round 1 a replaced root also stops the reaper: `deletionBlocker` retur
 | b-6/b-7 re-validation never run (reqs, coverage (b)) | fixed: `R-SYN-8: apply's writes re-read records changed during its plan unit, and adoption re-validates every planned candidate` (purged candidate rejected, rescued candidate adopted, content change re-reads the evicted record) |
 | `LiveFileSystem.standardDirectory` (reqs, coverage (a)) | for the orchestrator, as in round 1: list it under ARCHITECTURE §14 "known deliberately untested lines" (it would create directories under `~/Library`); `AssetRecord`/`StoreTypes` package inits are WP-C's to construct (G4: no coverage-only tests) |
 | P-2, P-5, P-6 under load; B-9 statistics (reqs, correct) | no code change (the p50s stayed normal while the p95s rose with the load); for the orchestrator: a quiet-machine `--perf` run and the B-9 ruling |
+
+## Fix round 3 (L2 close-out) — dispositions
+| Review item | Disposition |
+|---|---|
+| R-INT-2 size-mismatch test asserts no deletion (reqs), blocking | fixed: the test stages with a sidecar and asserts `.partial`/`.verifying`/sidecar deleted, `integrityFailures == 1`, no blob, no location, no install; it fails against the verifier's bare-throw mutant (2 issues: the claimed file and its sidecar left behind) |
+| index commit crash consistency (correct, probe 1), blocking | fixed: B-28 (guarded ENOSPC fallback, step-5 rollback, launch promotion of a loaded `index.tmp`); probe 1 is `R-STO-4: ENOSPC at a launch after a crash between commit steps 4 and 5…` (crash and EIO variants); the enumeration now includes EIO on `tmp → bin`, EIO on `bin → prev`, EIO on the root sync and ENOSPC on the write at every commit, each followed by a full-volume launch, and a full-volume launch after every crash point of all four crash modes |
+| fan-out of a failed placement never synced (correct, probe 4), blocking | fixed: B-27, test `R-STO-5: a fan-out created by a failed placement is synced into blobs/…` under `powerLossDropUnsynced` |
+| second `close()` returns early (correct, probe 2), blocking | fixed: B-32, row b-9 (proposed) |
+| no backoff of failed commits (correct, probe 6) | fixed: B-29 |
+| digest kept after `admit` (correct) | fixed: B-30 (derived digest no fetched manifest can match) |
+| failed cancelled-hash hand-back strands the claim (correct) | fixed: B-31 |
+| `LiveFileSystem.swift` per-file coverage (reqs) | fixed where reachable inside the repository: `R-STO-6: the live conformer reports a capacity query on a vanished root and a refused attribute write as typed errors` (lines 102 and 231). `standardDirectory` (7 lines) stays for the orchestrator to list under ARCHITECTURE §14 next to `LiveLegacyDefaults`; the remaining catch paths (write after a successful open, the `rmdir` ENOENT race, `lseek`/identity failures after the lock was taken, the `fsync` fallback closure) cannot be provoked on APFS inside the repository: a FIFO lock file already fails at `open` (ENOTSUP), and the fallback needs a volume without `F_BARRIERFSYNC` |
+| `AssetRecord`/`StoreTypes` package inits (reqs) | no WP-B change: only WP-C's L3 APIs construct them; a WP-B test would be coverage-only (G4) |
+| P-13 statistic (reqs) | orchestrator ruling (1) applied: B-9, B-10 |
+| shared scratch paths between verifiers (reqs) | for the orchestrator; this round used only `.build-b`, `.build-b-perf`, `.build-b-tsan`, `.build-b/xcode`, `.build-b/tmp` |
 
 ## Measured in this level (release, this Mac, shared with other worktrees: load average 7–15)
 A passing run of `swift test -c release --scratch-path .build-b-perf -Xswiftc -enable-testing --filter StorageBenchmarks` (load average 14.5): P-2 index load of 10,000 records (1.41 MB) p50 11.3 ms, p95 12.4 ms (budget 25); P-5 ordered commit p50 17.9 ms, p95 21.4 ms, durable p50 29.3 ms, p95 34.0 ms (budget 40), bulk sync 40 commits in 10 s, at most 4 in any second (budget 4); P-6 2,192 MB/s, 0.80× one-shot (2,723 MB/s), peak resident delta 0.0 MiB (floors 800 MB/s, 0.7×, cap 4 MiB); P-13 10,000 blobs in 1.29 s, unit p95 4.9 ms (budgets 2 s, 5 ms). Runs minutes apart on the same build failed during I/O contention spikes from other worktrees (P-5 ordered p50 267–289 ms, P-2 p95 245–265 ms): environment, not the code; the orchestrator's perf run on a quiet machine is the reference.
