@@ -125,16 +125,16 @@ extension AssetStore {
             }
         }
         self.state.core.commits.inFlight = false
-        if outcome.promotedName {
-            // The loaded index.tmp is index.bin now, whether or not the rest of the unit succeeded (ADR draft B-28).
-            self.state.core.commits.pendingPromotion = nil
-        }
-        if outcome.promotedDurably, let promoted = input.promotion {
-            self.state.core.committedGeneration = max(self.state.core.committedGeneration, promoted)
-        }
+        // The loaded index.tmp is index.bin now (or gone), whether or not the rest of the unit succeeded; a durable
+        // promotion and a success raise the committed generation (ADR draft B-28).
+        let ledger = IndexCommitLedger(
+            committedGeneration: self.state.core.committedGeneration,
+            pendingPromotion: self.state.core.commits.pendingPromotion
+        ).recording(outcome, of: input)
+        self.state.core.committedGeneration = ledger.committedGeneration
+        self.state.core.commits.pendingPromotion = ledger.pendingPromotion
         switch outcome.result {
         case .success:
-            self.state.core.committedGeneration = max(self.state.core.committedGeneration, generation)
             self.state.core.commits.committedSerial = max(self.state.core.commits.committedSerial, serial)
             if durability == .durable {
                 self.state.core.commits.durableSerial = max(self.state.core.commits.durableSerial, serial)

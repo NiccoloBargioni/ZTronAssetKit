@@ -67,6 +67,33 @@ struct IndexCommitOutcome: Sendable {
     var promotedDurably = false
 }
 
+/// What the store knows about its index files between two commit units (ADR draft B-28): the newest committed
+/// generation and the loaded `index.tmp` still to promote. `AssetStore.commitNow` folds every unit's outcome through
+/// `recording(_:of:)`, and so does the state-space test of the protocol, so the two cannot drift apart.
+struct IndexCommitLedger: Sendable, Equatable {
+    /// The newest committed generation (`StoreCoreState.committedGeneration`).
+    var committedGeneration: UInt64
+    /// The generation of the loaded `index.tmp` still to promote (`CommitBookkeeping.pendingPromotion`).
+    var pendingPromotion: UInt64?
+
+    /// The ledger after a unit that ran on `input` returned `outcome`: a promotion that renamed its file, or found it
+    /// gone, is no longer pending; a durable promotion and a successful commit raise the committed generation (never
+    /// lower it), and nothing else does.
+    func recording(_ outcome: IndexCommitOutcome, of input: IndexCommitInput) -> IndexCommitLedger {
+        var ledger = self
+        if outcome.promotedName {
+            ledger.pendingPromotion = nil
+        }
+        if outcome.promotedDurably, let promoted = input.promotion {
+            ledger.committedGeneration = max(ledger.committedGeneration, promoted)
+        }
+        if case .success = outcome.result {
+            ledger.committedGeneration = max(ledger.committedGeneration, input.content.generation)
+        }
+        return ledger
+    }
+}
+
 /// The index commit protocol, one metadata unit (ARCHITECTURE §4.1, ADR-015, as amended by ADR draft B-28):
 /// 0. when the launch loaded `index.tmp`, promote it first: sync `index.tmp` (a killed process may have written it
 ///    without step 3), `index.bin → index.prev` (under the condition of step 4), `index.tmp → index.bin`, sync the root
