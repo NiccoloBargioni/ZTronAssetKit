@@ -11,7 +11,9 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
 `PackErrorMapping.swift`, `FileHandleChunkReader.swift` (the live reader's mechanics, plus `PackUpdateCheck(updatingIDs:removedIDs:)`),
 `ReleaseSurvey.swift` (fix round 1: the sliced release decision, E-16). Fix round 1 also changed the **bodies** of two
 contract types in `PackTypes.swift` (`PackID.init?(rawValue:)`, `PackLocation.init?(remotePath:)`; no signature
-changed, E-15) — flagged for the orchestrator.
+changed, E-15) — flagged for the orchestrator. The L2 close-out changed the **body** of the contract function
+`AppleHostedTier.resolve` (it now delegates to an internal overload that takes the tier decision as a test seam;
+the public signature is unchanged, E-13) — flagged likewise.
 
 ## E-1 — The catalog digest and the asset check are computed inside the staging pull
 
@@ -138,6 +140,17 @@ changed, E-15) — flagged for the orchestrator.
   also covers "check the stop before each copy" without a second, race-only check. (b) `deliver` checks the terminal
   yield: when the consumer dropped the stream between the stop check and the yield, a `.staged` copy is discarded
   (tested through `deliver` on an ended stream; the race itself has no suspension point to hold).
+- **L2 close-out (verifier round 3, non-blocking).** "Terminal claimed" and "stop requested" are now one decision
+  under the stop's `Mutex`: the driver calls `PackTransferStop.claimTerminal()`, which marks the terminal claimed and
+  returns the stop recorded so far; `request(_:)` records nothing after the claim. A pause or cancel therefore either
+  lands before the claim and becomes the terminal element (`.paused(resumable: false)` /
+  `.failed(.cancelled(.byClient))`, a staged copy discarded) or lands after it and is a no-op, as a control after the
+  terminal element is (ADR-021); nothing between the claim and the yield is visible to the consumer. The
+  post-attempt step is `PackTransferDriver.conclude(_:)`, a documented test seam (E-13): `PackTransferStopTests`
+  stages a copy, records a stop and concludes (cancel and pause both end stopped and discard the copy), concludes
+  and then records a stop (ignored, copy intact), and races a request against a claim 500 times (the stop is
+  recorded exactly when the claim reports it). The verifier could not reproduce the original window (no suspension
+  point); the old code has no claim, so the new tests failed to compile against it rather than failing at run time.
 
 ## E-9 — Shutdown (`invalidate()`)
 
@@ -163,6 +176,18 @@ changed, E-15) — flagged for the orchestrator.
   pack was missing and this source downloaded it on demand, e.g. an adopted blob evicted or repaired) forgets the
   pack's release, so once its entries are adopted again it is released once more in the same generation (tested).
   Only the source's own demand does this, never the OS bringing a pack back, so releases still never loop.
+  **L2 close-out (verifier round 3, blocking, PROBE-R3-1):** (b) as first written forgot the release whenever the
+  pack wait ended `.available`, including a file missing from the pack (skew) and a second copy ending in skew: a
+  catalog entry the pack lacks then re-armed the release on every retry, so each maintenance run removed the pack
+  and each retry downloaded it again, all in one generation (probe: 3 skewed transfers, 4 releases, 4 removals).
+  Now a release is forgotten only when the pack was **downloaded again and staged**: the attempt reports the pack it
+  made available on demand, and `conclude` forgets its release only when the terminal element it delivers is
+  `.staged` — never on skew, a failure, or a stop that replaced a staged copy. Regression tests: `R-CLN-10: a
+  transfer that ends in skew never re-arms its pack's release within a catalog generation` (the probe's timeline,
+  one removal; failed with 4 removals before the fix) and `R-CLN-10: only a delivered staged copy re-arms the
+  release of a pack downloaded on demand` (through the `conclude` seam). Consequence: a pack downloaded for an entry
+  it lacks stays installed until the next catalog generation (its bytes count in `sourceCopyBytes`), which is the
+  price of never looping; the skew's update check is what brings the fix.
   Fix round 2 (verifier PROBE-R2-3): a forget that arrives while that pack's release call is still running is
   remembered (`forgottenWhileReleasing`), and the call's success then does not mark the pack released: the removal
   may have run before the re-download (the pack is installed again and must be released once more) or after it
@@ -176,6 +201,8 @@ changed, E-15) — flagged for the orchestrator.
 - **Residual.** transport-2 T2-13 fix 5 asked to persist `alreadyReleased` in `index.bin`; no contract field exists, so
   it lives in memory. Effect: after a relaunch, a pack the OS re-downloaded may be released once more per process
   (bounded: once per pack per process, never a loop within one). Persisting it needs a store field (orchestrator).
+  Orchestrator ruling (L2 close-out): released packs stay tracked in memory, once per process; persisting them is
+  deferred (this entry stays NEEDS-HUMAN-REVIEW). The optional `AdoptionReport` digest field of (c) is declined.
 
 ## E-11 — `sourceCopyBytes()`
 
@@ -186,6 +213,11 @@ changed, E-15) — flagged for the orchestrator.
   bytes twice on the device, which `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the
   verifier's PROBE-1). Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
   as entries of the applied manifest), see E-16.
+- **L2 close-out (verifier round 3, non-blocking, PROBE-R3-2).** The sum saturates at `Int64.max`
+  (`addingReportingOverflow`): `PackBackend` is public and injectable, and two packs reporting `Int64.max / 2 + 1`
+  bytes trapped the process (SIGTRAP; the test `R-CLN-9: sourceCopyBytes saturates instead of trapping when the
+  installed sizes sum past Int64.max` crashed the test helper with signal 5 before the fix). Negative sizes still
+  count as 0.
 - **Limitation (fix round 2, handed to WP-F).** The adopted packs are known only from an `AdoptionReport`, which only
   `reclaimSourceCopies` delivers, and they live in memory: a fresh source (every launch) reports 0 until its first
   reclaim, as does a source whose `catalogPackID` is invalid (it releases and records nothing). `RemoteSource` has no
@@ -204,7 +236,8 @@ changed, E-15) — flagged for the orchestrator.
   **UNVERIFIED approximation** (compressed download size; for `DEVICE-TEST-PLAN.md`). The reader is the tested
   `FileHandleChunkReader`: the live file only supplies its opener (`descriptor(for:searchingInAssetPackWithID:)` →
   `FileHandle(fileDescriptor:closeOnDealloc: true)`), which runs on the first `nextChunk`, inside the bulk executor;
-  the handle lives in a `Mutex` (E-1) and reads go through `read(upToCount:)`. Error mapping:
+  the handle lives in a `Mutex` (E-1) and reads go through `read(upToCount:)`. L2 close-out (Mutex ruling): the open
+  and every read now run outside the lock, which only publishes the handle between pulls. Error mapping:
   `ManagedBackgroundAssetsError` → `packNotFound`/`fileNotFound`, anything else → `.system(NSError domain, code)`
   (tested on the host by constructing the errors; the manager is never touched). Measured: **81 llvm-cov lines**
   (working ceiling 100); `COVERAGE device-only-excluded lines=110 share=1.74% max=3.0% OK` with WP-D's file at L2.
@@ -245,6 +278,20 @@ changed, E-15) — flagged for the orchestrator.
   endless fails the test at its `.timeLimit` instead of hanging the run (found by the mutation probes below: a
   non-cancellable seam kept a probe run alive for 30 minutes). `FakePackBackend.releaseEnsure`/`releaseCheck` issued
   before the call reaches its hold finish that hold at once (a release-before-hold race hung one run under load).
+- **L2 close-out.** Two seams were added under the ruling below: `PackTransferDriver.conclude(_:)` (the step after a
+  finished attempt, E-8, E-10) and the internal `AppleHostedTier.resolve(…, select:)` overload, which takes the tier
+  decision so the `.noSourceConfigured` returns for a decision naming a tier the configuration cannot build (the
+  verifier's 0-hit `AppleHostedTier.swift:43,48`) are reached; the public `resolve` passes `TierSelection.select`,
+  which never makes such a decision, so the seam is inert in production. Tests: `AppleTierResolutionTests` (R-APL-5:
+  every configuration resolving to `.noSourceConfigured` builds no source and touches no pack; a decision without a
+  buildable source fails closed and sees the OS fact and the configuration; resolve follows the injected decision).
+  The four `Seams:` tests keep no requirement ID: they verify test-only waits (that a cancelled or closed wait
+  returns), and no SPEC requirement covers test infrastructure; the waits stay documented as test seams, internal,
+  and unreachable from production paths. Coverage (gate export over all 8 test bundles): `COVERAGE
+  target=ZTronAssetAppleHosted lines= 99.76% (1257/1260) min=70.0 OK`. The three lines not reached are the two
+  pre-cancelled seam branches (`AppleSourceState.swift:120`, `PackAvailabilityCoordinator.swift:131`) and the
+  implicit closure of `packBackend ?? LiveAssetPackBackend()` in `resolve` (it builds the device-only live backend,
+  which no test constructs).
 - `R-APL-3: an adopted asset is served from blobs and never from a pack location` is written at the source level: at
   L2 the store is WP-B's stub, so the test asserts that what reaches the engine is a staging copy of this transfer
   (no pack location exists in any output), that the pack's release leaves the copy intact, and that the release opens
@@ -266,6 +313,14 @@ changed, E-15) — flagged for the orchestrator.
   identifier, so WP-A's call-site scan (`R-OBS-1: every log line uses subsystem …`) passes without hashing. Errors are
   logged as `String(describing:)` of `PackError`/`StagingError`, bound to `reason` first: those enums carry only
   domains, codes and limits, never an identifier. The `transfer` interval's message is `attempt <token>`.
+- **L2 close-out (verifier round 3, blocking: R-OBS-1 flake).** The driver ended the interval after `deliver`, whose
+  `yield`/`finish` resume the consumer on another thread, so a consumer could see the terminal update while the
+  interval was still open (the verifier saw the test fail at repetitions 398 and 808 under load). The interval now
+  ends before the terminal element is yielded, on every path. Both R-OBS-1 tests read the tap **when the terminal
+  update arrives** (`collectNotingIntervals`), and `R-OBS-1: a failed, cancelled or paused Apple transfer closes its
+  interval before its terminal update` covers skew, cancel and pause. Evidence: against the old driver,
+  `--repeat-until fail --maximum-repetitions 3000` failed at repetition 76 (both tests; load average 2.9 on 8
+  cores); with the fix, 3000 repetitions passed (figures in the close-out report).
 
 ## E-15 — `PackLocation` splits at `/` scalars; ASCII fast path (fix round 1) · contract body change, no signature
 
@@ -299,6 +354,50 @@ changed, E-15) — flagged for the orchestrator.
   deterministic suite and WP-E owns no benchmark file): 100,000 entries in 100 slices, 1.0 ms per slice on average,
   4.7 ms for the slowest. A P-9-style benchmark of a maintenance run at 100,000 entries would be the durable proof
   (request below).
+
+## E-17 — Network access policy is the engine's: BackgroundAssets cannot honour `NetworkAccess` (L2 close-out)
+
+- **Context.** Verifier round 3 (non-blocking): `TransferRequest.access` and `ManifestRequest.access` (the
+  OS-enforced network permissions) are ignored by the Apple tier, so `ensureAvailable` and `checkForUpdates` (from a
+  manifest fetch or a skew) download over whatever network the OS chooses; a Wi-Fi-only or constrained-network
+  policy is not enforced for pack downloads.
+- **Decision (orchestrator ruling).** The tier ignores `access` **by necessity**: the verified BackgroundAssets 26.0
+  surface (AAV §1.1) has no per-call network constraint for `ensureLocalAvailability(of:)` or `checkForUpdates()`.
+  The tier gets no policy code. **WP-F must gate Apple-tier dispatch (transfers that may make a pack available) and
+  update checks (manifest fetches with `allowsUpdateCheck`) on its own `DeviceConditions`**; the orchestrator assigns
+  that obligation to the WP-F rows of ARCHITECTURE §11.
+- **Consequences.** A transfer the engine dispatches may download a whole pack on any network the OS allows; a
+  skew's best-effort update check is scheduled by the source regardless of policy (it is reached only through a
+  dispatched transfer, so the engine's gate bounds it). Rows requested for APPLE-API-VERIFICATION §5 and
+  DEVICE-TEST-PLAN (below): which networks the OS uses for on-demand packs and update checks, and whether the app's
+  cellular settings apply.
+
+## Orchestrator rulings (L2 close-out)
+
+- **Mutex.** ADR-003 and APPLE-API-VERIFICATION §4.7 forbid `Mutex` in production because it is unavailable at the
+  iOS 15 floor. The Apple-hosted tier is gated `@available(iOS 26.0, macOS 26.0, *)` as a whole, so
+  `Synchronization.Mutex` is **ratified** inside code whose every use site carries that gate (never in ungated code,
+  never `@unchecked`). Each critical section stays free of awaits and I/O: `PackTransferStop` (request, read, claim),
+  `HashingChunkSource` (hasher update of one ≤ 1 MiB chunk and finalise, stop flag; the base reader's I/O runs
+  outside the lock), `FileHandleChunkReader` (publishes the handle only; its open and reads were moved out of the
+  lock in this close-out, E-12).
+- **Ratified:** E-1 (the extra hash pass for skew detection), E-4 (a file missing after the pack was made available
+  is `transient(.sourceVersionSkew)`, ADR-032), E-15 (the stricter `PackID`/`PackLocation` bodies, body-only), E-13
+  (internal test seams in the production target, documented as test seams, never public, inert on production paths;
+  their tests carry a requirement ID where one applies — see E-13 for the four `Seams:` tests, which have none).
+- **E-10:** released packs stay tracked in memory, once per process; persisting them needs a store field and is
+  deferred (the entry stays). The optional `AdoptionReport` digest field is declined for now.
+- **NetworkAccess:** E-17.
+
+## Requests for the orchestrator (L2 close-out)
+
+- **ARCHITECTURE §11, WP-F rows (E-17):** WP-F gates Apple-tier dispatch and manifest fetches that allow an update
+  check on its own `DeviceConditions`, since the tier cannot honour `NetworkAccess`.
+- **APPLE-API-VERIFICATION §5 / DEVICE-TEST-PLAN (E-17):** the networks BackgroundAssets uses for on-demand pack
+  downloads and update checks, and whether the app's cellular-data setting constrains them.
+- **ARCHITECTURE §11, WP-F or WP-G row (repeat of rounds 1 and 2, verifier round 3 agreed):** the end-to-end R-APL-3
+  test (an asset adopted from a `FakePackBackend` source is served from `blobs/` after its pack is released);
+  WP-E's test stays the source half.
 
 ## Requests for the orchestrator (fix round 1)
 
@@ -334,7 +433,10 @@ per catalog generation (1); `notModified` dropping removals (1); unscaled progre
 killed: the copy cap returning `maxBytes` (the size-skew test, 2 expectations); `broadcast` without the flight-id
 check (the foreign-flight progress test); `forgetRelease` without `forgottenWhileReleasing` (the release-race test,
 3 expectations, run before the fix); the `Double` scaler (the exact-arithmetic test traps, run before the fix); no
-out-of-space row (3 expectations, run before the fix).
+out-of-space row (3 expectations, run before the fix). L2 close-out, each new test run against the old code
+before its fix: the interval ended after `deliver` (both R-OBS-1 tests failed at repetition 76 of
+`--repeat-until fail`); the release forgotten on every `.available` pack wait (the PROBE-R3-1 test, 5 issues, 4
+removals); the unsaturated `+=` (the saturation test crashed the test helper with signal 5).
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10, new subsection for `ZTronAssetAppleHosted` actors)
 
