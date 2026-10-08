@@ -73,25 +73,18 @@ enum HTTPDate {
         return Self.epochSeconds(year: year, month: month, day: day, time: time)
     }
 
+    /// The bytes at `start..<start + count` as text (empty or short past the end, never a trap).
     private static func text(_ b: [UInt8], _ start: Int, _ count: Int) -> String {
-        guard start >= 0, count >= 0, start + count <= b.count else {
-            return ""
-        }
-        return String(decoding: b[start..<(start + count)], as: UTF8.self)
+        String(decoding: b.dropFirst(start).prefix(count), as: UTF8.self)
     }
 
+    /// `count` decimal digits at `start`, else `nil`.
     private static func number(_ b: [UInt8], _ start: Int, _ count: Int) -> Int? {
-        guard start + count <= b.count else {
+        let digits = b.dropFirst(start).prefix(count)
+        guard digits.count == count, digits.allSatisfy({ (0x30...0x39).contains($0) }) else {
             return nil
         }
-        var value = 0
-        for byte in b[start..<(start + count)] {
-            guard (0x30...0x39).contains(byte) else {
-                return nil
-            }
-            value = value * 10 + Int(byte - 0x30)
-        }
-        return value
+        return digits.reduce(0) { $0 * 10 + Int($1 - 0x30) }
     }
 
     private static func month(_ b: [UInt8], _ start: Int) -> Int? {
@@ -100,7 +93,7 @@ enum HTTPDate {
 
     /// `HH:MM:SS` → seconds of the day; a leap second (60) is accepted, as the grammar allows.
     private static func time(_ b: [UInt8], _ start: Int) -> Int? {
-        guard start + 8 <= b.count, b[start + 2] == UInt8(ascii: ":"), b[start + 5] == UInt8(ascii: ":"),
+        guard b.count >= start + 8, b[start + 2] == UInt8(ascii: ":"), b[start + 5] == UInt8(ascii: ":"),
             let hour = Self.number(b, start, 2), let minute = Self.number(b, start + 3, 2),
             let second = Self.number(b, start + 6, 2), hour <= 23, minute <= 59, second <= 60
         else {

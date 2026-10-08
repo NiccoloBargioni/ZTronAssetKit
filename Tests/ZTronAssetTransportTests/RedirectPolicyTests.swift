@@ -76,4 +76,13 @@ struct RedirectPolicyTests {
         let none = TransportSecurityPolicy.loopbackTesting(allowedHosts: ["cdn.example.com"], maxRedirects: 0)
         #expect(RedirectPolicy.decide(original: original, previous: original, proposed: Self.origin("https://cdn.example.com/b"), hop: 1, keyStillPresent: true, policy: none) == .refuse(.tooManyRedirects))
     }
+
+    @Test("R-NET-4: an origin needs an http or https scheme and a host, and an absent origin is an invalid URL")
+    func originRules() throws {
+        #expect(Self.origin("https://./a") == nil)
+        #expect(Self.origin("ftp://cdn.example.com/a") == nil)
+        #expect(Self.origin("http://cdn.example.com/a")?.port == 80)
+        #expect(Self.origin("https://cdn.example.com:8443/a")?.description == "https://cdn.example.com:8443")
+        #expect(Self.policy.check(nil) == .invalidURL)
+    }
 }
