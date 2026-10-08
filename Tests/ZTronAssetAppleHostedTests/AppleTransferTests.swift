@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import ZTronAssetAppleHosted
 import ZTronAssetModel
@@ -409,6 +410,30 @@ struct AppleTransferTests {
         }
     }
 
+    @available(macOS 26.0, *)
+    @Test("R-OBS-1: the transfer interval is already closed when the driver ends its stream", .timeLimit(.minutes(1)))
+    func intervalClosesBeforeTheStreamEnds() async throws {
+        // Deterministic: `finish()` runs the termination handler synchronously on the driver's own task, so the
+        // snapshot is taken exactly when the stream ends, after the terminal element was yielded. The two tests
+        // above read the tap on the consumer's thread and catch an interval ended after delivery only by chance.
+        let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        let request = assetA.request()
+        let (stream, updates) = AsyncStream.makeStream(of: TransferUpdate.self)
+        let atEnd = IntervalSnapshot()
+        let tap = fixture.tap
+        updates.onTermination = { _ in
+            atEnd.take(tap.lines.compactMap(LogIntervalEvent.init(line:)))
+        }
+        await PackTransferStopTests.driver(for: request, in: fixture, updates: updates).run()
+        var delivered: [TransferUpdate] = []
+        for await update in stream {
+            delivered.append(update)
+        }
+        #expect(delivered.count == 1 && delivered.last.map(Self.isStaged) == true, "\(delivered)")
+        #expect(atEnd.events == Self.closedInterval(of: request), "\(String(describing: atEnd.events))")
+        await fixture.source.invalidate()
+    }
+
     /// The two edges of `request`'s `transfer` interval.
     static func closedInterval(of request: TransferRequest) -> [LogIntervalEvent] {
         [
@@ -457,5 +482,25 @@ struct AppleTransferTests {
             return true
         }
         return false
+    }
+}
+
+/// The interval edges a stream's termination handler saw, taken once.
+@available(macOS 15.0, *)
+private final class IntervalSnapshot: Sendable {
+    private let state = Mutex<[LogIntervalEvent]?>(nil)
+
+    /// Records `events` unless a snapshot was already taken.
+    func take(_ events: [LogIntervalEvent]) {
+        self.state.withLock { state in
+            if state == nil {
+                state = events
+            }
+        }
+    }
+
+    /// The snapshot, `nil` before the stream ended.
+    var events: [LogIntervalEvent]? {
+        self.state.withLock { $0 }
     }
 }
