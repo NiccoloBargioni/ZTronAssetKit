@@ -41,7 +41,9 @@ enum HTTPResponseReading {
 
     /// The decoded length the response announces for the whole resource: `nil` when unknown, and always under a
     /// `Content-Encoding` other than identity, where `Content-Length` counts encoded bytes (R-NET-7). For a 206 it
-    /// is the resumed offset plus the announced remainder.
+    /// is the resumed offset plus the announced remainder, saturated at `Int64.max`: both figures come from outside
+    /// (the server's `Content-Length`, the sidecar's offset) and Swift traps on overflow, so a hostile length must
+    /// read as "too large" and fail the size guard, never end the process (review round 3).
     static func announcedTotal(of response: HTTPURLResponse, offset: Int64) -> Int64? {
         if let encoding = response.value(forHTTPHeaderField: "Content-Encoding")?.trimmingCharacters(in: .whitespaces),
             !encoding.isEmpty, encoding.lowercased() != "identity"
@@ -52,7 +54,7 @@ enum HTTPResponseReading {
         guard length >= 0 else {
             return nil
         }
-        return response.statusCode == 206 ? offset + length : length
+        return response.statusCode == 206 ? Saturating.add(offset, length) : length
     }
 
     /// The `If-Range` validator a later attempt may send (RFC 9110 §13.1.5): a strong `ETag`, else `Last-Modified`.
