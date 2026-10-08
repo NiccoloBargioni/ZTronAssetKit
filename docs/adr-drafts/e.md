@@ -140,7 +140,10 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
 
 - Internal seams used through `@testable import`: `PackAvailabilityCoordinator.waiterCount(on:)` /
   `waitForWaiters(on:count:)`, `AppleSourceState.settleUpdateCheck()` / `waitForDrain()`. They let tests synchronise on
-  actor state without sleeping.
+  actor state without sleeping, and each returns when the calling task is cancelled, so a defect that makes a wait
+  endless fails the test at its `.timeLimit` instead of hanging the run (found by the mutation probes below: a
+  non-cancellable seam kept a probe run alive for 30 minutes). `FakePackBackend.releaseEnsure`/`releaseCheck` issued
+  before the call reaches its hold finish that hold at once (a release-before-hold race hung one run under load).
 - `R-APL-3: an adopted asset is served from blobs and never from a pack location` is written at the source level: at
   L2 the store is WP-B's stub, so the test asserts that what reaches the engine is a staging copy of this transfer
   (no pack location exists in any output), that the pack's release leaves the copy intact, and that no pack file is
@@ -159,6 +162,14 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   identifier, so WP-A's call-site scan (`R-OBS-1: every log line uses subsystem …`) passes without hashing. Errors are
   logged as `String(describing:)` of `PackError`/`StagingError`, bound to `reason` first: those enums carry only
   domains, codes and limits, never an identifier. The `transfer` interval's message is `attempt <token>`.
+
+## Mutation probes run by the author (not a substitute for Stage 3's independent ones)
+
+Each mutant applied alone to `Sources/ZTronAssetAppleHosted`, the tier's tests run, the file restored; all 8 killed:
+skew reported as integrity (3 skew tests fail); no single-flight (3: concurrent fetches, cancelled waiter, per-waiter
+progress); `invalidate` without drain (2: invalidate drain, catalog copy outliving invalidate); released set not reset
+per catalog generation (1); `notModified` dropping removals (1); unscaled progress (2); flight cancelled on any leave
+(1); update check awaited before the catalog read (4, the hanging-check test among them).
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10, new subsection for `ZTronAssetAppleHosted` actors)
 
