@@ -30,6 +30,9 @@ struct IndexLoadOutcome: Sendable, Equatable {
     var newerSchema: Bool
     /// Whether any index file existed.
     var anyFileExisted: Bool
+    /// The index files whose stat or read failed with an error (`IndexLoader`; the pure rule never sets it): the rule saw
+    /// such a file as absent or torn without knowing either, so the launch must not write over it (ADR draft B-34).
+    var unreadable: Set<IndexFile> = []
 }
 
 /// The load rule, as a pure function over what was read (store.md §2.5 as amended by ARCHITECTURE §4.2).

@@ -24,6 +24,10 @@ struct LaunchState: Sendable {
     var presentTable: [AssetID: SnapshotEntry]
     /// Degraded until the next `apply` plus adoption (R-STO-4, store-1 S1-11).
     var degraded: Bool
+    /// `.ioFailure` when the load could not stat or read an index file (`IndexLoadOutcome.unreadable`): the lifetime
+    /// serves the loaded state read-only and writes no index file, so it never commits over a generation it did not
+    /// read (ADR draft B-34); a later launch reads again.
+    var unavailable: StorageUnavailableReason?
 
     /// Builds the launch state; pure.
     static func build(
@@ -52,8 +56,9 @@ struct LaunchState: Sendable {
             promotion: outcome.chosen == .temporary ? content.generation : nil,
             reconciled: reconciled,
             presentTable: SnapshotTable.build(records: reconciled.records, layout: layout),
-            // No valid index although blobs exist (or an index existed but failed).
-            degraded: outcome.degraded || (outcome.content == nil && !onDisk.isEmpty)
+            // No valid index although blobs exist (or an index existed but failed), or an index file was unreadable.
+            degraded: outcome.degraded || (outcome.content == nil && !onDisk.isEmpty) || !outcome.unreadable.isEmpty,
+            unavailable: outcome.unreadable.isEmpty ? nil : .ioFailure
         )
     }
 }

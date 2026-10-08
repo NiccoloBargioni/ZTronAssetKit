@@ -92,14 +92,19 @@ extension AssetStore {
             (try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)) != nil
         }
         try self.checkLive()
-        do throws(StoreError) {
-            // REENTRANCY: R5 — phase `opening`; a failure leaves the state dirty and the store serves it read-only
-            // until a later commit succeeds (store-1 S1-07).
-            try await self.commitNow(.ordered)
-        } catch {
-            self.environment.log.log(.store, .error, "launch commit failed; serving the loaded state")
+        if let reason = self.state.core.unavailable {
+            // ADR draft B-34: the load could not read an index file, so no commit may write over it in this lifetime.
+            self.environment.log.log(.store, .error, "an index file could not be read (\(String(describing: reason))); serving the loaded state read-only")
+        } else {
+            do throws(StoreError) {
+                // REENTRANCY: R5 — phase `opening`; a failure leaves the state dirty and the store serves it read-only
+                // until a later commit succeeds (store-1 S1-07).
+                try await self.commitNow(.ordered)
+            } catch {
+                self.environment.log.log(.store, .error, "launch commit failed; serving the loaded state")
+            }
+            try self.checkLive()
         }
-        try self.checkLive()
         // REENTRANCY: R6 — phase `opening`; the acknowledgement is folded in by `installSnapshot`.
         await self.installSnapshot()
         try self.checkLive()
@@ -139,6 +144,7 @@ extension AssetStore {
         self.state.core.stamp = reconciled.osPurgeDetected ? nil : content.stamp
         self.state.core.syncDue = reconciled.osPurgeDetected || content.syncDue
         self.state.core.degraded = loaded.degraded
+        self.state.core.unavailable = loaded.unavailable
         self.state.migration.phase = content.legacyPhase
         self.state.migration.legacyStamp = content.legacyStamp
         self.state.cleanup.lastCleanupAt = content.lastCleanupAt

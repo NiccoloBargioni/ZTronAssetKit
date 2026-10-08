@@ -365,6 +365,9 @@ enum IndexSpace {
         var storeID: StoreIdentifier
         var generation: UInt64
         var launchCommitted = false
+        /// The load could not read an index file: `open()` commits nothing in this lifetime and `close()` flushes
+        /// nothing (`LaunchState.unavailable`, ADR draft B-34).
+        var readOnly = false
     }
 
     /// The load, as `open()` does it, and `open()`'s root barrier before the launch commit (ADR-015; a failed barrier is
@@ -382,13 +385,17 @@ enum IndexSpace {
             epoch: launch.nextGeneration,
             loaded: outcome.content?.generation ?? 0,
             storeID: launch.storeID,
-            generation: launch.nextGeneration
+            generation: launch.nextGeneration,
+            readOnly: launch.unavailable != nil
         )
     }
 
     /// The commit at `index` (0: the ordered launch commit, 1: close()'s durable flush), folded as `commitNow` folds it;
-    /// returns whether it succeeded.
+    /// returns whether it succeeded. A read-only lifetime runs no commit, as `open()` and `close()` run none.
     static func commit(_ index: Int, _ progress: inout Progress, on fileSystem: any FileSystem) -> Bool {
+        guard !progress.readOnly else {
+            return false
+        }
         var content = IndexContent.empty(storeID: progress.storeID)
         content.generation = progress.generation
         content.launchEpoch = progress.epoch
@@ -449,6 +456,9 @@ enum IndexSpace {
             let succeeded = IndexSpace.commit(index, &progress, on: fileSystem)
             disk = fake.survivingDisk()
             let after = IndexSpace.summary(disk.files, &memo)
+            guard !progress.readOnly else {
+                continue
+            }
             let attempt = "\(label), after the \(index == 0 ? "launch commit" : "durable flush") (\(succeeded ? "succeeded" : "failed"))"
             let committed = progress.ledger.committedGeneration
             if committed > 0, !after.generations.contains(committed) {
