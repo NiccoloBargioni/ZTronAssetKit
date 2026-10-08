@@ -21,33 +21,100 @@ public final class LiveBackgroundSessionDriver: BackgroundSessionDriver {
         self.discretionary = discretionary
     }
 
+    /// Holds the session once created.
+    private let holder = BackgroundSessionHolder()
+
     /// Creates the background session (once) and returns `delegate.sessionEvents`.
     public func activate() async -> AsyncStream<SessionEvent> {
-        fatalError("WP-D: LiveBackgroundSessionDriver.activate not implemented")
+        _ = await self.holder.session(self.makeSession)
+        return self.delegate.sessionEvents
     }
 
-    /// `getAllTasks`.
+    /// `getAllTasks`, each task's tag decoded (`nil` for a foreign one).
     public func snapshot() async -> [BackgroundTaskSnapshot] {
-        fatalError("WP-D: LiveBackgroundSessionDriver.snapshot not implemented")
+        guard let session = await self.holder.existing else {
+            return []
+        }
+        return await session.allTasks.map { task in
+            BackgroundTaskSnapshot(
+                taskIdentifier: task.taskIdentifier,
+                name: BackgroundTaskTag(decoding: task.taskDescription)?.name,
+                isRunning: task.state == .running,
+                bytesReceived: task.countOfBytesReceived
+            )
+        }
     }
 
     /// A tagged download task.
     public func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?) async {
-        fatalError("WP-D: LiveBackgroundSessionDriver.startDownload not implemented")
+        let session = await self.holder.session(self.makeSession)
+        let task = session.downloadTask(with: request)
+        task.taskDescription = BackgroundTaskTag(name: name, expectedBytes: expectedBytes).encoded
+        task.priority = priority
+        if let expectedBytes {
+            task.countOfBytesClientExpectsToReceive = expectedBytes
+        }
+        task.resume()
     }
 
     /// `cancel()` or `cancelByProducingResumeData()`.
     public func cancel(taskIdentifier: Int, producingResumeData: Bool) async -> ResumeData? {
-        fatalError("WP-D: LiveBackgroundSessionDriver.cancel not implemented")
+        guard let task = await self.task(taskIdentifier) else {
+            return nil
+        }
+        guard producingResumeData, let download = task as? URLSessionDownloadTask else {
+            task.cancel()
+            return nil
+        }
+        return await download.cancelByProducingResumeData().map { ResumeData(bytes: $0) }
     }
 
     /// `URLSessionTask.priority`.
     public func setPriority(taskIdentifier: Int, _ priority: Float) async {
-        fatalError("WP-D: LiveBackgroundSessionDriver.setPriority not implemented")
+        if let task = await self.task(taskIdentifier) {
+            task.priority = priority
+        }
     }
 
     /// `finishTasksAndInvalidate()`.
     public func invalidate() async {
-        fatalError("WP-D: LiveBackgroundSessionDriver.invalidate not implemented")
+        await self.holder.existing?.finishTasksAndInvalidate()
+    }
+
+    private func task(_ identifier: Int) async -> URLSessionTask? {
+        await self.holder.existing?.allTasks.first { $0.taskIdentifier == identifier }
+    }
+
+    /// The configuration of transport.md §10.4: no cache, cookies or credentials, no `httpAdditionalHeaders`
+    /// (R-NET-4), launch events on, the shared delegate in `.background` mode.
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.background(withIdentifier: self.identifier.rawValue)
+        configuration.isDiscretionary = self.discretionary
+        configuration.sessionSendsLaunchEvents = true
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCredentialStorage = nil
+        configuration.httpAdditionalHeaders = [:]
+        configuration.httpMaximumConnectionsPerHost = 4
+        return URLSession(configuration: configuration, delegate: self.delegate, delegateQueue: nil)
+    }
+}
+
+/// Creates the background session at most once (a second session with one identifier is an error).
+private actor BackgroundSessionHolder {
+    private var session: URLSession?
+
+    var existing: URLSession? {
+        self.session
+    }
+
+    func session(_ make: @Sendable () -> URLSession) -> URLSession {
+        if let session = self.session {
+            return session
+        }
+        let made = make()
+        self.session = made
+        return made
     }
 }

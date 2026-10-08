@@ -40,9 +40,18 @@ public final class HTTPRemoteSource: RemoteSource {
             foreground: ForegroundTransferBackend(
                 delegate: delegate,
                 maxConnectionsPerHost: configuration.maxConnectionsPerHost,
-                requestTimeout: configuration.requestTimeout
+                requestTimeout: configuration.requestTimeout,
+                appKey: configuration.appKey,
+                log: log
             ),
-            background: HTTPRemoteSource.makeBackgroundBackend(configuration.background, staging: staging, policy: policy),
+            background: HTTPRemoteSource.makeBackgroundBackend(
+                configuration.background,
+                staging: staging,
+                policy: policy,
+                appKey: configuration.appKey,
+                requestTimeout: configuration.requestTimeout,
+                log: log
+            ),
             log: log
         )
     }
@@ -74,6 +83,20 @@ public final class HTTPRemoteSource: RemoteSource {
         staging: any StagingSink,
         policy: TransportSecurityPolicy
     ) -> (any TransferBackend)? {
+        HTTPRemoteSource.makeBackgroundBackend(background, staging: staging, policy: policy, appKey: nil, requestTimeout: 60, log: .tapOnly(nil))
+    }
+
+    /// The production background backend with the request factory it needs: the policy always, the key only when
+    /// the owner accepted redirect exposure (ADR-026), so under the default `.refuse` no background request can
+    /// carry it even if a routing defect sent one there.
+    static func makeBackgroundBackend(
+        _ background: BackgroundTransferPolicy,
+        staging: any StagingSink,
+        policy: TransportSecurityPolicy,
+        appKey: AppKey?,
+        requestTimeout: TimeInterval,
+        log: LogRoute
+    ) -> (any TransferBackend)? {
         guard case .enabled(let options) = background,
             let identifier = BackgroundSessionIdentifier(namespace: options.namespace)
         else {
@@ -81,7 +104,16 @@ public final class HTTPRemoteSource: RemoteSource {
         }
         let delegate = SessionDelegate(mode: .background, staging: staging, policy: policy)
         let driver = LiveBackgroundSessionDriver(identifier: identifier, delegate: delegate, discretionary: options.discretionary)
-        return BackgroundTransferCoordinator(driver: driver, staging: staging, options: options)
+        let key = options.keyRedirectExposure == .acceptedByOwner ? appKey : nil
+        return BackgroundTransferCoordinator(
+            driver: driver,
+            staging: staging,
+            options: options,
+            policy: policy,
+            appKey: key,
+            requestTimeout: requestTimeout,
+            log: log
+        )
     }
 
     /// `scheme://host:port` of `baseURL`.
@@ -100,26 +132,94 @@ public final class HTTPRemoteSource: RemoteSource {
         )
     }
 
-    /// Conditional GET of the manifest through a data task into staging (R-NET-5, ADR-019).
+    /// Conditional GET of the manifest through a data task into staging (R-NET-5, ADR-019): `If-None-Match` with
+    /// the stored tag, a session without a cache, the cap enforced while streaming; a 304 is `notModified`, a 200's
+    /// staged bytes are read back off the pool and the staged file discarded. Every terminal discards the attempt's
+    /// partial, so a failed fetch leaves nothing behind.
     public func fetchManifest(_ request: ManifestRequest) async throws(TransferError) -> ManifestFetchResult {
-        fatalError("WP-D: HTTPRemoteSource.fetchManifest not implemented")
+        guard let url = RemoteURL.make(base: self.configuration.baseURL, path: self.configuration.manifestPath) else {
+            throw .rejected(.invalidURL)
+        }
+        let job = TransferJob(
+            id: .manifest,
+            attempt: request.attempt,
+            url: url,
+            purpose: .manifest,
+            ifNoneMatch: request.ifNoneMatch,
+            expectedBytes: nil,
+            maxBytes: request.maxBytes,
+            priority: .userInitiated,
+            access: request.access
+        )
+        let handle = await self.foreground.start(job)
+        let terminal = await Self.terminal(of: handle.updates)
+        switch terminal {
+        case .staged(let file) where file.httpStatus == 304:
+            self.log.log(.transport, .debug, "manifest not modified")
+            return .notModified(removedSources: [])
+        case .staged(let file):
+            let bytes: Data
+            do {
+                bytes = try await self.staging.readStaged(file.name, maxBytes: request.maxBytes)
+            } catch {
+                await self.staging.discard(job.partialName)
+                throw error.transferError(requiredBytes: nil)
+            }
+            await self.staging.discard(job.partialName)
+            self.log.log(.transport, .debug, "manifest fetched bytes=\(bytes.count)")
+            return .fetched(ManifestPayload(bytes: bytes, etag: file.etag, origin: .network))
+        case .failed(let failure):
+            await self.staging.discard(job.partialName)
+            let kind = failure.failureClass.map { String(describing: $0) } ?? "cancelled"
+            self.log.log(.transport, .info, "manifest fetch failed: \(kind)")
+            throw failure
+        case .paused, .progress, nil:
+            await self.staging.discard(job.partialName)
+            throw Task.isCancelled ? .cancelled(.byClient) : .transient(.incompleteCallbackSequence, retryAfter: nil)
+        }
     }
 
-    /// Starts one attempt on the foreground backend (or the background one when ADR-026 allows it).
+    /// Starts one attempt: the URL is `baseURL` joined with the validated `remotePath` (TR1-10); the background
+    /// backend is used only when ADR-026 allows it (`routesToBackground`), the foreground one otherwise.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
-        fatalError("WP-D: HTTPRemoteSource.transfer not implemented")
+        guard let url = RemoteURL.make(base: self.configuration.baseURL, path: request.remotePath) else {
+            return ImmediateTransferHandle(id: request.id, attempt: request.attempt, terminal: .failed(.rejected(.invalidURL)))
+        }
+        let job = TransferJob(
+            id: request.id,
+            attempt: request.attempt,
+            url: url,
+            purpose: request.purpose,
+            expectedBytes: request.expectedBytes,
+            maxBytes: request.maxBytes,
+            priority: request.priority,
+            access: request.access,
+            resume: request.resume
+        )
+        if let background = self.background, await self.routesToBackground(request, url: url, backend: background) {
+            return await background.start(job)
+        }
+        return await self.foreground.start(job)
     }
 
-    /// Background tasks left by an earlier process (empty when background is disabled).
+    /// Background tasks left by an earlier process (empty when background is disabled): live OS tasks and downloads
+    /// the OS finished into staging while nobody waited (H-6).
     public func reattachedTransfers() async -> [ReattachedTransfer] {
-        fatalError("WP-D: HTTPRemoteSource.reattachedTransfers not implemented")
+        guard let background = self.background else {
+            return []
+        }
+        if let coordinator = background as? BackgroundTransferCoordinator {
+            return await coordinator.reattached()
+        }
+        return await background.liveTransfers().map {
+            ReattachedTransfer(name: $0.name, isRunning: true, bytesReceived: $0.bytesReceived)
+        }
     }
 
-    /// Cancels a re-attached task.
+    /// Cancels a re-attached task (background only: foreground tasks never outlive their handles).
     public func cancelTransfer(_ name: StagingFileName) async {
-        fatalError("WP-D: HTTPRemoteSource.cancelTransfer not implemented")
+        await self.background?.cancel(name, keepingPartial: false)
     }
-
     /// HTTP keeps no source copies: an empty report.
     public func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
         ReclaimReport()
@@ -130,14 +230,53 @@ public final class HTTPRemoteSource: RemoteSource {
         0
     }
 
-    /// Activates the background session for `identifier` and waits for its pending events to be staged.
+    /// Activates the background session for `identifier` and waits for its pending events to be staged. A no-op for
+    /// an identifier that is not this source's session, or when background transfers are disabled.
     public func handleBackgroundEvents(identifier: String) async {
-        fatalError("WP-D: HTTPRemoteSource.handleBackgroundEvents not implemented")
+        guard let coordinator = self.background as? BackgroundTransferCoordinator,
+            coordinator.driver.identifier.rawValue == identifier
+        else {
+            return
+        }
+        await coordinator.awaitBackgroundEvents()
     }
 
     /// Invalidates the foreground backend and waits for its delegate's last callback (transport-2 T2-04); releases
     /// the background backend without waiting for the OS's tasks (`RemoteSource.invalidate` doc, ADR-028).
     public func invalidate() async {
-        fatalError("WP-D: HTTPRemoteSource.invalidate not implemented")
+        await self.foreground.invalidate()
+        await self.background?.invalidate()
     }
+
+    /// ADR-026 and transport.md §10.7: a transfer uses the background session only when it is background-eligible,
+    /// on the bulk lane, an asset, not a Range resume (the background session cannot continue our partial), free of
+    /// the key unless the owner accepted redirect exposure, and the coordinator admits it (not disabled for the
+    /// process, under the task cap).
+    func routesToBackground(_ request: TransferRequest, url: URL, backend: any TransferBackend) async -> Bool {
+        guard request.route == .backgroundEligible, request.priority == .bulk, request.purpose == .asset, request.resume == nil else {
+            return false
+        }
+        var exposure = KeyRedirectExposure.refuse
+        if case .enabled(let options) = self.configuration.background {
+            exposure = options.keyRedirectExposure
+        }
+        let carriesKey = self.configuration.appKey != nil && self.policy.check(Origin(url: url)) == nil
+        guard !carriesKey || exposure == .acceptedByOwner else {
+            return false
+        }
+        guard let coordinator = backend as? BackgroundTransferCoordinator else {
+            return true
+        }
+        return await coordinator.admits()
+    }
+
+    /// The first terminal element of `updates`, or `nil` when the stream ended without one (its consumer was
+    /// cancelled, which cancels the transfer).
+    static func terminal(of updates: AsyncStream<TransferUpdate>) async -> TransferUpdate? {
+        for await update in updates where update.isTerminal {
+            return update
+        }
+        return nil
+    }
+
 }
