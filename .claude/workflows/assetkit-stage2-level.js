@@ -58,16 +58,17 @@ const VERIFY_SCHEMA = { type: 'object', properties: {
   evidence: { type: 'string' },
 }, required: ['issues', 'evidence'] }
 
-const COMMON = (w, k) => `Repository: ${ROOT} (git; integration branch feature/asset-kit; harness frozen at tag harness-frozen; contracts at tag contracts). Your worktree: ${ROOT}/.worktrees/${k} on branch wp/${k}, based on ${BASE}. cd into the worktree for EVERY command and never edit outside it.
+const COMMON = (w, k, S = '.build-' + k) => `Repository: ${ROOT} (git; integration branch feature/asset-kit; harness frozen at tag harness-frozen; contracts at tag contracts). Your worktree: ${ROOT}/.worktrees/${k} on branch wp/${k}, based on ${BASE}. cd into the worktree for EVERY command and never edit outside it.
 Owner directives: standalone package - never write outside the repository (set TMPDIR and the Swift module cache inside your scratch path for xcrun/xcodebuild, and ALWAYS pass -derivedDataPath inside your scratch path to every xcodebuild invocation, -list included; never real download tasks, real UserDefaults or the unified log); never run an unscoped pkill/killall - other worktrees run concurrently, so kill only processes whose command line contains your own worktree path; ../ZTronCarouselCore and ../ZTronCarousel are read-only; iOS 15.0 / macOS 12.0 floors (never raise). Never edit Scripts/, SPEC.md, PROMPT.md, CLAUDE.md, KICKOFF-README.md, docs/ARCHITECTURE.md, docs/DECISIONS.md, docs/TRACEABILITY.md, Package.swift, or any *ContractTests.swift.
 TOKEN DISCIPLINE (this run is metered; every token you put in context is re-read on every later turn): never let long command output into the conversation - redirect builds and test runs to a log under your scratch path and read only summary lines (e.g. grep -E 'error:|warning:|Test run|passed|failed|VERIFY|COVERAGE' log | tail -40); read large documents by section (grep -n '^#' first, then Read with offset/limit) rather than whole, and never re-read a file you already read unless it changed; batch independent commands into one Bash call; keep notes and reports compact. None of this lowers the bar: run every check the task requires.
+YOUR SwiftPM scratch path is ${S} (plus ${S}-perf, ${S}-tsan and ${S}/xcode); other agents work in this worktree concurrently with their own paths, so never use, delete or reuse another agent's .build-* directory (CLAUDE.md P2).
 Run swift / xcodebuild with the Bash tool's dangerouslyDisableSandbox: true. Commands (from the worktree):
-  SWIFTPM_SCRATCH=.build-${k} bash Scripts/verify.sh --quick
-  swift build -c release --scratch-path .build-${k} -Xswiftc -warnings-as-errors
+  SWIFTPM_SCRATCH=${S} bash Scripts/verify.sh --quick
+  swift build -c release --scratch-path ${S} -Xswiftc -warnings-as-errors
   python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md && python3 Scripts/gates.py docs --sources "$PWD/Sources"
-  coverage: swift test --scratch-path .build-${k} --enable-code-coverage --skip Benchmarks; then P=.build-${k}/out/Products/Debug; xcrun llvm-cov export -summary-only -instr-profile $P/codecov/default.profdata <first .xctest binary> -object <each other .xctest binary> (binaries are $P/<Name>.xctest/Contents/MacOS/<Name>) > .build-${k}/cov.json; python3 Scripts/gates.py coverage --json .build-${k}/cov.json (other WPs' stubbed targets will fail - read the line for ${w.target})
-  benchmarks: swift test -c release --scratch-path .build-${k}-perf -Xswiftc -enable-testing --filter Benchmarks
-  iOS: xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-${k}/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet
+  coverage: swift test --scratch-path ${S} --enable-code-coverage --skip Benchmarks; then P=${S}/out/Products/Debug; xcrun llvm-cov export -summary-only -instr-profile $P/codecov/default.profdata <first .xctest binary> -object <each other .xctest binary> (binaries are $P/<Name>.xctest/Contents/MacOS/<Name>) > ${S}/cov.json; python3 Scripts/gates.py coverage --json ${S}/cov.json (other WPs' stubbed targets will fail - read the line for ${w.target})
+  benchmarks: swift test -c release --scratch-path .build-${S}-perf -Xswiftc -enable-testing --filter Benchmarks
+  iOS: xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath ${S}/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet
   If you ran --gates-only or --full, restore docs/TRACEABILITY.md (git checkout -- docs/TRACEABILITY.md).`
 
 const AUTHOR = (w, k) => `TASK: You are the author of ${w.name} - ${w.title} - in Stage 2, level ${LEVEL}.
@@ -86,10 +87,10 @@ const LENSES = [
   { key: 'correct', text: `LENS: correctness and concurrency of the production code against ARCHITECTURE and SPEC. Look for logic bugs, crash-consistency gaps (what a crash or power loss at each file-system step leaves), races and actor reentrancy (every await in an actor must carry a // REENTRANCY: comment and the named re-validation must actually happen), cancellation leaks or double resumes, unbounded growth, C2 violations (blocking work on the cooperative pool), C4 (time/randomness), forbidden APIs, iOS 15 availability, error mapping mistakes, security issues (path traversal, key leakage). For each suspected bug PROVE it: write a failing probe test under .build-verify-KEY/probes (a scratch SwiftPM test you run, or a temporary test file you delete afterwards - leave the worktree exactly as you found it) or give the exact failing timeline. Proven bugs are blocking; unproven suspicions are non-blocking.` },
 ]
 
-const VERIFY = (w, k, lens, round) => `TASK: Independent verification (round ${round}, ${lens.key}) of ${w.name} - ${w.title} - on branch wp/${k}. You did NOT write this code (CLAUDE.md P4). Do NOT modify or commit production code or tests; scratch files only under .build-verify-${k}-${lens.key}/ in the worktree, and leave the worktree clean (git status must be unchanged when you finish).
-${COMMON(w, k).split('KEY').join(k)}
+const VERIFY = (w, k, lens, round) => `TASK: Independent verification (round ${round}, ${lens.key}) of ${w.name} - ${w.title} - on branch wp/${k}. You did NOT write this code (CLAUDE.md P4). Do NOT modify or commit production code or tests; scratch files only under your own scratch path in the worktree, and leave the worktree clean (git status must be unchanged when you finish).
+${COMMON(w, k, '.build-verify-' + k + '-' + lens.key + '-r' + round)}
 Read CLAUDE.md, docs/ARCHITECTURE.md section 1.2, ${w.sections}, section 11 rows for ${w.name.slice(3)}, section 13.5, docs/adr-drafts/${k}.md, the SPEC requirements in scope, and the diff git diff ${BASE}...HEAD.
-${lens.text.split('KEY').join(k + '-' + lens.key).split('TESTTARGET').join(w.testTarget)}
+${lens.text.split('.build-verify-KEY').join('.build-verify-' + k + '-' + lens.key + '-r' + round).split('TESTTARGET').join(w.testTarget)}
 Return structured issues (blocking vs non-blocking) with file:line and a concrete fix, plus the evidence lines you observed.`
 
 const FIX = (w, k, issues, round) => `TASK: Fix round ${round} for ${w.name} - ${w.title} - on branch wp/${k}. Independent verifiers reported these issues (JSON):
