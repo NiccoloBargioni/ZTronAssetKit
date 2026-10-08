@@ -29,6 +29,16 @@ struct LaunchState: Sendable {
     /// read (ADR draft B-34); a later launch reads again.
     var unavailable: StorageUnavailableReason?
 
+    /// What the launch counts committed once `open()`'s root barrier ran (ADR draft B-36): `committedGeneration` when the
+    /// barrier ordered the names the load read, and nothing (0) when it failed. A killed process may have renamed an
+    /// index file and died before its root sync; until a root sync orders that name, a power loss can bring the older
+    /// names back, so the loaded generation is not yet durable. Counting it committed let the reaper unlink a blob that
+    /// the generation a power loss brings back still binds or expects, and let the ENOSPC fallback and step 4 treat
+    /// `index.bin` as the committed file. The next successful commit (its own root sync) raises the committed generation.
+    func committedGeneration(rootOrdered: Bool) -> UInt64 {
+        rootOrdered ? self.committedGeneration : 0
+    }
+
     /// Builds the launch state; pure.
     static func build(
         outcome: IndexLoadOutcome,

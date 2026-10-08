@@ -530,6 +530,62 @@ struct StoreRecoveryTests {
         #expect(await third.state.core.records[entry.identifier] != nil, "the record of the promoted generation survives")
     }
 
+    /// Close-out cycle 4, found by enumerating the kill survivors whose index names are not yet ordered (review
+    /// "state-space enumeration: pruning justification"): a launch reads the names a killed process renamed but never
+    /// synced. `open()`'s root barrier orders them; when that barrier failed, the store still counted the loaded
+    /// generation committed, although a power loss can revert it. With the launch commit failing as well (a full
+    /// volume), the reaper then unlinked a blob that generation had dropped while the older generation a power loss
+    /// brings back still lists its entry: the bytes it would have adopted again were gone (a needless download). A
+    /// launch now counts nothing committed until a root sync ordered the names it read (ADR draft B-36).
+    @Test("R-CLN-5: a launch whose root barrier fails unlinks nothing a power loss could still need, until a commit succeeds", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func failedLaunchBarrierBlocksTheReaper() async throws {
+        // Lifetime 1 prunes `a` and is killed right before that commit's root sync: index.bin names the generation that
+        // dropped `a`'s blob, and only a kill keeps that name.
+        let (clean, _, _) = try await StoreDeletionTests.prunedStore()
+        let start = clean.fileSystem.operations.count
+        _ = try await clean.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
+        let operations = clean.fileSystem.operations
+        let rootSync = try #require(operations[start...].first { $0.kind == .synchronizeDirectory && $0.url == clean.layout.root })
+        let crashPoint = operations[..<rootSync.index].filter(\.kind.isMutation).count
+        let killed = CoreHarness.make(crashBefore: crashPoint, mode: .processKill)
+        let entryA = CoreFixture.entry("a", CoreFixture.bytes(70))
+        let keyA = CoreFixture.key(CoreFixture.bytes(70))
+        _ = try await killed.store.open()
+        _ = try await killed.store.apply(CoreFixture.manifest([entryA, CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
+        try await killed.publish(CoreFixture.bytes(70), [entryA], sequence: 1)
+        try await killed.publish(CoreFixture.bytes(71), [CoreFixture.entry("b", CoreFixture.bytes(71))], sequence: 2)
+        await #expect(throws: StoreError.self) {
+            _ = try await killed.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
+        }
+        #expect(killed.fileSystem.crashed)
+        let survivor = killed.fileSystem.survivingDisk()
+        let loaded = try #require(StoreRecoveryTests.loadRule(survivor).content)
+        #expect(loaded.records[entryA.identifier] == nil, "the kill keeps the generation that pruned a")
+        let reverted = try #require(StoreRecoveryTests.loadRule(IndexSpace.surviving(survivor, .powerLossDropUnsynced)).content)
+        #expect(reverted.records[entryA.identifier] != nil && reverted.generation < loaded.generation, "a power loss brings back the generation that still lists a")
+        // Lifetime 2: open()'s root barrier fails and the volume is full, so the launch commit fails too.
+        let second = CoreHarness.make(disk: survivor, mode: .powerLossDropUnsynced)
+        second.fileSystem.addFault(FaultRule(operation: .synchronizeDirectory, matching: URLMatcher(lastComponentSuffix: second.layout.root.lastPathComponent), occurrence: .nth(1), error: .io))
+        second.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .every, error: .noSpace))
+        _ = try await second.store.open()
+        let barrier = try #require(second.fileSystem.operations.first { $0.kind == .synchronizeDirectory && $0.url == second.layout.root })
+        #expect(barrier.failure == .io, "the fault hit open()'s root barrier")
+        #expect(StoreRecoveryTests.isDoomed(await second.state.core.blobTable[keyA], .unreferenced))
+        await second.store.publishSnapshot(urgency: .userInitiated)
+        second.time.advance(by: 3_600)
+        let work = await second.store.runDueWork()
+        #expect(work.reapedKeys == 0 && second.exists(second.layout.blobURL(keyA)), "nothing is unlinked on the strength of a generation whose name is not ordered")
+        #expect(await second.store.deletionBlocker(keyA) == .commit)
+        // A file system also persists metadata on its own; the fake does so only on a sync, so the test syncs the blob's
+        // fan-out as the system would (only the root's sync failed): an unlink made above would now survive a power loss.
+        try second.fileSystem.synchronizeDirectory(at: second.layout.blobURL(keyA).deletingLastPathComponent(), level: .barrier)
+        // A power loss now: lifetime 3 loads the generation that still lists a, finds its bytes and binds them again.
+        let third = CoreHarness.make(disk: second.fileSystem.survivingDisk())
+        _ = try await third.store.open()
+        #expect(await third.store.location(for: entryA.identifier, extensions: [], recordingAccess: false) != nil, "a's bytes survive")
+    }
+
     /// Close-out cycle 3, found by the state-space enumeration: an I/O error while the launch read an index file made
     /// the load rule see that file as absent (a failed stat) or torn (a failed read), so the launch committed over it:
     /// it rewrote or moved the newest valid generation it had not read (with only index.tmp valid, a fresh empty store

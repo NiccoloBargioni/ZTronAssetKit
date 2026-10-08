@@ -492,17 +492,19 @@ enum IndexSpace {
     }
 
     /// The load, as `open()` does it, and `open()`'s root barrier before the launch commit (ADR-015; a failed barrier is
-    /// tolerated). `recorder` learns the loaded committed generation before the barrier.
-    static func open(on fileSystem: any FileSystem, fake: FakeFileSystem, recorder: MutationRecorder? = nil) async -> Run {
+    /// tolerated, and the loaded generation then counts as committed only after a commit succeeded, ADR draft B-36).
+    /// Before the barrier the store counts nothing committed (a `MutationRecorder` starts at 0); the caller tells the
+    /// recorder what the store counts from the launch commit on.
+    static func open(on fileSystem: any FileSystem, fake: FakeFileSystem) async -> Run {
         let inline = InlineBlockingExecutor()
         let layout = IndexSpace.layout
         let outcome = await IndexLoader.load(layout: layout, fileSystem: fileSystem, metadata: inline, bulk: inline)
         let launch = LaunchState.build(outcome: outcome, onDisk: [:], blobsRecreated: false, seed: IndexSpace.seed, now: IndexSpace.now, layout: layout)
-        recorder?.setClaimed(launch.committedGeneration)
-        _ = try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)
+        let rootOrdered = (try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)) != nil
+        let committed = launch.committedGeneration(rootOrdered: rootOrdered)
         let progress = Progress(
-            ledger: IndexCommitLedger(committedGeneration: launch.committedGeneration, pendingPromotion: launch.promotion),
-            claimed: launch.committedGeneration,
+            ledger: IndexCommitLedger(committedGeneration: committed, pendingPromotion: launch.promotion),
+            claimed: committed,
             epoch: launch.nextGeneration,
             loaded: outcome.content?.generation ?? 0,
             storeID: launch.storeID,
@@ -720,7 +722,7 @@ enum IndexSpace {
         // No fault, recorded: the disk before every mutation, and at the start of every commit.
         let clean = IndexSpace.fake(initial)
         let recorder = MutationRecorder(clean)
-        var run = await IndexSpace.open(on: recorder, fake: clean, recorder: recorder)
+        var run = await IndexSpace.open(on: recorder, fake: clean)
         run.currentIsValid = IndexSpace.summary(clean.survivingDisk().files, &memo).currentIsValid
         var phases: [Phase] = []
         IndexSpace.runCommits(from: 0, &run, on: recorder, fake: clean, volume: volume, memo: &memo) { index, run in

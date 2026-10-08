@@ -95,11 +95,15 @@ extension AssetStore {
             try self.checkLive()
         }
         // ADR-015: the root's listing is ordered before any launch deletion, even if the commit below fails.
-        // REENTRANCY: R1 — phase `opening`; a failed barrier is retried by the commit's own root sync.
-        _ = await self.runUnit(on: self.environment.metadataExecutor) { () -> Bool in
+        // REENTRANCY: R1 — phase `opening`; a failed barrier is retried by the commit's own root sync, and until one
+        // succeeds the store counts nothing committed (below).
+        let rootOrdered = await self.runUnit(on: self.environment.metadataExecutor) { () -> Bool in
             (try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)) != nil
         }
         try self.checkLive()
+        // ADR draft B-36: the loaded generation counts as committed only once the root's names are ordered (never lowered:
+        // a commit made before the barrier, by legacy phase 1, was ordered by its own root sync).
+        self.state.core.committedGeneration = max(self.state.core.committedGeneration, loaded.committedGeneration(rootOrdered: rootOrdered))
         if let reason = self.state.core.unavailable {
             // ADR draft B-34: the load could not read an index file, so no commit may write over it in this lifetime.
             self.environment.log.log(.store, .error, "an index file could not be read (\(String(describing: reason))); serving the loaded state read-only")
@@ -139,7 +143,8 @@ extension AssetStore {
         let reconciled = loaded.reconciled
         self.state.core.storeID = loaded.storeID
         self.state.core.nextGeneration = loaded.nextGeneration
-        self.state.core.committedGeneration = loaded.committedGeneration
+        // Nothing counts as committed before `open()`'s root barrier ordered the names the load read (ADR draft B-36).
+        self.state.core.committedGeneration = 0
         self.state.core.commits.pendingPromotion = loaded.promotion
         // The launch epoch is the generation the launch commit carries: persisted and strictly increasing (ADR-013).
         self.state.core.launchEpoch = loaded.nextGeneration
