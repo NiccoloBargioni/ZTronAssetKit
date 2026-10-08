@@ -42,6 +42,42 @@ struct SessionDelegateDirectTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-8: the background delegate reads a task's answers as a continuation's only when its tag says so and it is checksummed content", .timeLimit(.minutes(1)))
+    func continuationNeedsFlagAndChecksummedContent() async throws {
+        let staging = FakeStagingSink()
+        let delegate = SessionDelegate(mode: .background, staging: staging, policy: Self.policy)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let directory = try TransportFixtures.directory("direct-continuation")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // A checksum-less identity never keeps resume data (TR1-3): a flag on its tag is not believed.
+        let legacy = StagingFileName(transfer: TransportFixtures.legacyID, attempt: TransportFixtures.attempt(1), kind: .partial)
+        let fresh = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(2), kind: .partial)
+        let cases = [(Self.name, true), (legacy, true), (fresh, false)]
+        let ranged = ResponseFacts(status: 206, bodyBytes: 5, contentTypeIsXML: false, retryAfter: nil, etag: nil, contentRangeStart: 2, keyPresented: false)
+        for (index, (name, flagged)) in cases.enumerated() {
+            let location = directory.appendingPathComponent("os-\(index).tmp")
+            try Data("bytes".utf8).write(to: location)
+            let tag = BackgroundTaskTag(name: name, expectedBytes: 5, createdFromResumeData: flagged)
+            delegate.finishDownload(tag: tag, response: ranged, originalURL: Self.url, finalURL: Self.url, location: location)
+        }
+        // The error path follows the same rule: −1002 means stale resume data only on a believed continuation.
+        for (name, flagged) in cases {
+            let task = session.downloadTask(with: Self.url)
+            task.taskDescription = BackgroundTaskTag(name: name, expectedBytes: 5, createdFromResumeData: flagged).encoded
+            delegate.urlSession(session, task: task, didCompleteWithError: NSError(domain: NSURLErrorDomain, code: NSURLErrorUnsupportedURL))
+        }
+        var events = delegate.sessionEvents.makeAsyncIterator()
+        #expect(await events.next() == .finished(name: Self.name, update: .staged(StagedFile(name: Self.name, byteCount: 5, resumed: true, httpStatus: 206, etag: nil))))
+        #expect(await events.next() == .finished(name: legacy, update: .failed(.rejected(.unexpectedStatus(206)))))
+        #expect(await events.next() == .finished(name: fresh, update: .failed(.rejected(.unexpectedStatus(206)))))
+        #expect(await events.next() == .finished(name: Self.name, update: .failed(.transient(.resumeRejected, retryAfter: nil))))
+        #expect(await events.next() == .finished(name: legacy, update: .failed(.rejected(.invalidURL))))
+        #expect(await events.next() == .finished(name: fresh, update: .failed(.rejected(.invalidURL))))
+        #expect(staging.contents.keys.sorted() == [Self.name])
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-6: background cancel reasons map to cancelled by the system and file errors keep their POSIX code", .timeLimit(.minutes(1)))
     func backgroundFailures() async throws {
         let delegate = SessionDelegate(mode: .background, staging: FakeStagingSink(), policy: Self.policy)

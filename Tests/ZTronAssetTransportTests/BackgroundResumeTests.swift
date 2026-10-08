@@ -129,6 +129,117 @@ struct BackgroundResumeTests {
         withExtendedLifetime(restarted) {}
     }
 
+    /// The identity of a background download that was not created from resume data.
+    enum Identity: Sendable, CaseIterable {
+        /// Checksummed content: it may keep resume data, but this download was created without any.
+        case content
+        /// A checksum-less identity, which never keeps resume data (transport-1 TR1-3).
+        case checksumLess
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a background download not created from resume data refuses a 206, even one with a Content-Range", .timeLimit(.minutes(1)), arguments: Identity.allCases)
+    func freshDownloadRefusesPartialContent(_ identity: Identity) async throws {
+        let rig = try Rig("bg-resume-fresh-206-\(identity)")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let id = identity == .content ? TransportFixtures.contentID(1) : TransportFixtures.legacyID
+        let job = TransportFixtures.job(id: id, attempt: TransportFixtures.attempt(1), url: BackgroundCoordinatorTests.url, expected: 4_000, priority: .bulk)
+        let handle = await coordinator.start(job)
+        #expect(await rig.driver.starts.map(\.resumeData) == [nil])
+        // Nobody asked for a range, so a ranged answer is not ours to adopt (D-4, ARCHITECTURE §6.3, TR1-3), even when
+        // its size matches.
+        await rig.driver.complete(job.partialName, status: 206, body: TransportFixtures.payload(4_000), contentRangeStart: 1_000)
+        #expect(await run(handle).terminal == .failed(.rejected(.unexpectedStatus(206))))
+        #expect(rig.staging.contents[job.partialName] == nil)
+    }
+
+    /// What the OS answers a continuation that a relaunched process re-attached.
+    enum ReattachedAnswer: Sendable, CaseIterable {
+        /// −1002: the resume state is unusable.
+        case unusableResumeState
+        /// 416: the range is not satisfiable any more.
+        case unsatisfiableRange
+        /// A 206 without a `Content-Range`.
+        case partialWithoutRange
+        /// A 206 with a `Content-Range`: the OS continued the data and moves the whole body.
+        case rangedContinuation
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a continuation re-attached after a relaunch keeps its meaning: a refusal reads resumeRejected, a ranged answer is staged as resumed", .timeLimit(.minutes(1)), arguments: ReattachedAnswer.allCases)
+    func continuationSurvivesRelaunch(_ answer: ReattachedAnswer) async throws {
+        let rig = try Rig("bg-resume-relaunch-\(answer)")
+        defer { rig.cleanUp() }
+        let first = rig.coordinator()
+        let data = ResumeData(bytes: Data("archive".utf8))
+        #expect(await Self.pause(rig.job(1), returning: data, rig: rig, coordinator: first) == .paused(resumable: true))
+        let continued = rig.job(2)
+        // The first process's handle stays alive: dropping it would cancel the OS task, a killed process cancels nothing.
+        let firstLaunch = await first.start(continued)
+        #expect(await rig.driver.starts.map(\.resumeData) == [nil, data])
+        // The process dies while the OS still holds the (discretionary) continuation; the next process joins it.
+        await rig.relaunch()
+        let second = rig.coordinator()
+        #expect(await second.reattached().map(\.name) == [continued.partialName])
+        let joined = await second.start(rig.job(3))
+        #expect(await rig.driver.starts.count == 2)
+        switch answer {
+        case .unusableResumeState:
+            await rig.driver.fail(continued.partialName, code: NSURLErrorUnsupportedURL)
+        case .unsatisfiableRange:
+            await rig.driver.complete(continued.partialName, status: 416, body: Data())
+        case .partialWithoutRange:
+            await rig.driver.complete(continued.partialName, status: 206, body: TransportFixtures.payload(3_000))
+        case .rangedContinuation:
+            await rig.driver.complete(continued.partialName, status: 206, body: TransportFixtures.payload(4_000), contentRangeStart: 1_000)
+        }
+        // ARCHITECTURE §7.6: resumeRejected makes the engine's next attempt immediate and fresh.
+        let expected: TransferUpdate = answer == .rangedContinuation
+            ? .staged(StagedFile(name: continued.partialName, byteCount: 4_000, resumed: true, httpStatus: 206, etag: nil))
+            : .failed(.transient(.resumeRejected, retryAfter: nil))
+        #expect(await run(joined).terminal == expected)
+        withExtendedLifetime(firstLaunch) {}
+    }
+
+    /// What the OS answers a task an earlier build tagged without the continuation flag.
+    enum UnflaggedAnswer: Sendable, CaseIterable {
+        /// 416.
+        case unsatisfiableRange
+        /// A 206 with a `Content-Range`.
+        case rangedPartial
+        /// A 200 with the whole body.
+        case whole
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a task tagged without the continuation flag is re-attached as a fresh download", .timeLimit(.minutes(1)), arguments: UnflaggedAnswer.allCases)
+    func unflaggedTagIsFresh(_ answer: UnflaggedAnswer) async throws {
+        let rig = try Rig("bg-resume-unflagged-\(answer)")
+        defer { rig.cleanUp() }
+        let old = rig.job(1)
+        // The description an earlier build wrote: three fields, no flag. It must still decode (and mean "fresh").
+        await rig.driver.addTask(description: "ztak1 \(old.partialName.rawValue) 4000", url: BackgroundCoordinatorTests.url)
+        let coordinator = rig.coordinator()
+        #expect(await coordinator.reattached().map(\.name) == [old.partialName])
+        let joined = await coordinator.start(rig.job(2))
+        #expect(await rig.driver.starts.isEmpty)
+        let expected: TransferUpdate
+        switch answer {
+        case .unsatisfiableRange:
+            await rig.driver.complete(old.partialName, status: 416, body: Data())
+            // A fresh download never asked for a range: restarting it on a 416 would loop (D-4).
+            expected = .failed(.rejected(.unexpectedStatus(416)))
+        case .rangedPartial:
+            await rig.driver.complete(old.partialName, status: 206, body: TransportFixtures.payload(4_000), contentRangeStart: 1_000)
+            expected = .failed(.rejected(.unexpectedStatus(206)))
+        case .whole:
+            await rig.driver.complete(old.partialName, status: 200, body: TransportFixtures.payload(4_000))
+            expected = .staged(StagedFile(name: old.partialName, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil))
+        }
+        #expect(await run(joined).terminal == expected)
+    }
+
     @available(macOS 15.0, *)
     @Test("R-NET-8: resume data the task cap evicted is not used: that restart downloads afresh", .timeLimit(.minutes(1)))
     func evictedDataIsNotUsed() async throws {

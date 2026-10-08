@@ -596,7 +596,7 @@ struct BackgroundCoordinatorTests {
         #expect(!relay.hasHandler(for: ours))
     }
 
-    @Test("R-NET-3: the background task tag round-trips through taskDescription, rejects foreign or over-long tags, and labels a download")
+    @Test("R-NET-3: the background task tag round-trips through taskDescription with its continuation flag, rejects foreign or over-long tags, and labels a download")
     func tagCodec() throws {
         let seed: UInt64 = 0x5eed_7a6
         var state = seed
@@ -611,7 +611,7 @@ struct BackgroundCoordinatorTests {
             let hash = ContentHash(w0: next(), w1: next(), w2: next(), w3: next())
             let name = StagingFileName(transfer: .content(hash), attempt: TransferAttempt(epoch: next() % 1_000, sequence: UInt32(truncatingIfNeeded: next())), kind: .partial)
             let expected: Int64? = next() % 4 == 0 ? nil : Int64(next() % (1 << 40))
-            let tag = BackgroundTaskTag(name: name, expectedBytes: expected)
+            let tag = BackgroundTaskTag(name: name, expectedBytes: expected, createdFromResumeData: next() % 2 == 0)
             #expect(BackgroundTaskTag(decoding: tag.encoded) == tag, "seed \(seed)")
             // Any mutation either fails to decode or decodes to a tag that re-encodes to itself: never a trap.
             var bytes = Array(tag.encoded.utf8)
@@ -626,10 +626,18 @@ struct BackgroundCoordinatorTests {
             "ztak1 \(name.with(kind: .sidecar).rawValue) 10", "ztak1 \(name.rawValue) -5", "ztak1 \(name.rawValue) +5",
             "ztak1 \(name.rawValue) 12345678901234567890", "ztak1 \(name.rawValue)  10", "ztak1 not-a-name 10",
             "ztak1 \(name.rawValue) " + String(repeating: "1", count: 300),
+            "ztak1 \(name.rawValue) 10 Resume", "ztak1 \(name.rawValue) 10 resume extra", "ztak1 \(name.rawValue) 10 resume ",
+            "ztak1 \(name.rawValue) 10  resume", "ztak1 \(name.rawValue) resume 10",
         ] as [String?] {
             #expect(BackgroundTaskTag(decoding: foreign) == nil, "\(String(describing: foreign))")
         }
         #expect(BackgroundTaskTag(decoding: "ztak1 \(name.rawValue) -")?.expectedBytes == nil)
+        // A fresh download is written exactly as before the flag existed, so a tag an earlier build left with the OS
+        // decodes, as a fresh download; only a task created from resume data carries the fourth field.
+        #expect(BackgroundTaskTag(name: name, expectedBytes: 10).encoded == "ztak1 \(name.rawValue) 10")
+        #expect(BackgroundTaskTag(decoding: "ztak1 \(name.rawValue) 10") == BackgroundTaskTag(name: name, expectedBytes: 10, createdFromResumeData: false))
+        #expect(BackgroundTaskTag(name: name, expectedBytes: nil, createdFromResumeData: true).encoded == "ztak1 \(name.rawValue) - resume")
+        #expect(BackgroundTaskTag(decoding: "ztak1 \(name.rawValue) 10 resume") == BackgroundTaskTag(name: name, expectedBytes: 10, createdFromResumeData: true))
         // A labelled download carries the tag, the lane's priority and, when known, the size as the OS's hint.
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }

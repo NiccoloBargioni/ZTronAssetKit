@@ -164,8 +164,8 @@ public enum TransferClassifier {
 
     /// A failure classified for a plain request, as it reads once the request turns out to have resumed: what
     /// `resumed: true` changes in both tables (a 206 without `Content-Range`, a 416, −1002) is `resumeRejected`.
-    /// The background session classifies its tasks without knowing which ones the OS continued from resume data;
-    /// the coordinator, which handed the data over, applies this (orchestrator ruling D-14.2). `rejected(.invalidURL)`
+    /// The background delegate classifies every download as a plain one and applies this to a task whose tag says it
+    /// continues resume data (orchestrator ruling D-14.2; the tag carries it across a relaunch). `rejected(.invalidURL)`
     /// also stands for −1000, which a task continuing resume data built from a validated URL cannot produce.
     static func asResumed(_ failure: TransferError) -> TransferError {
         switch failure {

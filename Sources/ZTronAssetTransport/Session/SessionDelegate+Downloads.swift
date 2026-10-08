@@ -46,9 +46,11 @@ extension SessionDelegate: URLSessionDownloadDelegate {
     ///
     /// The OS follows redirects in a background session without asking (NSURLSession.h), so the hop rules are
     /// checked after the fact: bytes that arrived from another origin are refused and never adopted (ADR-026). The
-    /// staged size is compared with `byteSize` (R-NET-7). A 206 with a `Content-Range` is the OS continuing resume
-    /// data the coordinator handed it (checksummed content only, TR1-3; we never send a `Range` in the background):
-    /// the OS's file holds the whole body, staged as resumed (and hashed at publication).
+    /// staged size is compared with `byteSize` (R-NET-7). We never send a `Range` in the background, so a 206 answers
+    /// only the OS's continuation of resume data the coordinator handed it (`continuesResumeData`): only there is a
+    /// 206 with a `Content-Range` staged, as resumed (the OS's file holds the whole body, hashed at publication),
+    /// and only there do −1002, 416 and a 206 without a range read as stale data (`resumeRejected`). On any other
+    /// task a 206 is `unexpectedStatus(206)` (D-4, TR1-3).
     private func downloadOutcome(
         tag: BackgroundTaskTag,
         response: ResponseFacts?,
@@ -64,10 +66,11 @@ extension SessionDelegate: URLSessionDownloadDelegate {
         else {
             return .failed(.rejected(.redirectRefused(.unenforceableInBackground)))
         }
-        let continued = response.status == 206 && response.contentRangeStart != nil
+        let continuation = Self.continuesResumeData(tag)
+        let continued = continuation && response.status == 206 && response.contentRangeStart != nil
         guard response.status == 200 || continued else {
             let failure = TransferClassifier.classify(response, purpose: .asset, sentConditional: false, resumed: false, keyWithheld: false)
-            return .failed(failure ?? .transient(.badServerResponse, retryAfter: nil))
+            return .failed(Self.read(failure ?? .transient(.badServerResponse, retryAfter: nil), continuation: continuation))
         }
         let size: Int64
         do {
@@ -102,6 +105,21 @@ extension SessionDelegate: URLSessionDownloadDelegate {
             resumed: false,
             underlyingPOSIXCode: facts.posix
         )
-        self.sessionEventSink.yield(.finished(name: tag.name, update: .failed(failure)))
+        let update = TransferUpdate.failed(Self.read(failure, continuation: Self.continuesResumeData(tag)))
+        self.sessionEventSink.yield(.finished(name: tag.name, update: update))
+    }
+
+    /// Whether `tag`'s OS task continues resume data the coordinator handed over: created from resume data (the tag
+    /// says so, in this process and after a relaunch) and of checksummed content, the only identity that keeps any
+    /// (transport-1 TR1-3), so the flag is not believed on any other tag.
+    private static func continuesResumeData(_ tag: BackgroundTaskTag) -> Bool {
+        tag.createdFromResumeData && tag.name.transfer.kind == .content
+    }
+
+    /// A failure classified for a plain download, as it reads for a continuation (`TransferClassifier.asResumed`:
+    /// its refusal signals mean the data was stale, so the engine's next attempt is immediate and fresh, ARCHITECTURE
+    /// §7.6), or unchanged for a fresh download, where the same signals keep their meaning (no retry loop, D-4).
+    private static func read(_ failure: TransferError, continuation: Bool) -> TransferError {
+        continuation ? TransferClassifier.asResumed(failure) : failure
     }
 }

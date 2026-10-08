@@ -156,7 +156,8 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
 
     func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async {
         let task = self.session.downloadTask(with: request)
-        BackgroundTaskTag(name: name, expectedBytes: expectedBytes).label(task, priority: priority)
+        // Labelled like the live driver: a task continuing resume data says so in its tag (it outlives the process).
+        BackgroundTaskTag(name: name, expectedBytes: expectedBytes, createdFromResumeData: resumeData != nil).label(task, priority: priority)
         self.tasks[task.taskIdentifier] = task
         self.starts.append(Start(
             url: request.url,
