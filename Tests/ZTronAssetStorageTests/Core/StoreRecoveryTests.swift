@@ -448,6 +448,52 @@ struct StoreRecoveryTests {
         #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[QuarantineFixture.key], .corrupt))
     }
 
+    /// Close-out cycle 3, probe VPC2-K: while a promotion of the loaded `index.tmp` is pending, every commit first syncs
+    /// `index.tmp`. When that file is gone (an outside deletion inside the private root, or a rename that took effect
+    /// but reported failure), the sync threw `notFound`, the promotion stayed pending, and every later commit failed,
+    /// `close()`'s durable flush included. A vanished `index.tmp` now completes the promotion without a commit: it is no
+    /// longer pending, its generation never counts as committed, and the commit goes on with steps 1–6.
+    @Test("R-STO-4: a pending promotion whose index.tmp vanished stops blocking commits and never counts as committed", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func vanishedPromotionStopsBlockingCommits() async throws {
+        // Lifetime 1 is killed right before its last commit's step 4: its synced index.tmp is the newest generation.
+        let (killed, entry, key) = try await StoreRecoveryTests.killedInLastCommit { $0.kind == .rename && $0.url.lastPathComponent == "index.bin" }
+        let loaded = StoreRecoveryTests.loadRule(killed)
+        #expect(loaded.chosen == .temporary)
+        let promoted = try #require(loaded.content?.generation)
+        // Lifetime 2: the launch commit's promotion fails at its sync of index.tmp, so the promotion stays pending.
+        let second = CoreHarness.make(disk: killed)
+        second.fileSystem.addFault(FaultRule(operation: .synchronizeFile, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        let report = try await second.store.open()
+        let surviving = report.generation
+        #expect(surviving < promoted)
+        #expect(await second.state.core.commits.pendingPromotion == promoted)
+        try second.fileSystem.removeItem(at: second.layout.indexURL(.temporary))
+        // The next commit resolves the promotion, then fails on its own write: the vanished generation is not pending
+        // any more and was never committed.
+        second.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        await #expect(throws: StoreError.fileSystem(.io)) {
+            try await second.store.flush(.ordered)
+        }
+        #expect(await second.state.core.commits.pendingPromotion == nil, "a vanished index.tmp is no longer pending")
+        #expect(await second.state.core.committedGeneration == surviving, "the vanished generation never counts as committed")
+        // Later commits and close()'s durable flush succeed.
+        try await second.store.flush(.durable)
+        let committed = await second.state.core.committedGeneration
+        #expect(committed > promoted)
+        await second.store.close()
+        #expect(CoreInvariants.blobRemovals(second.fileSystem.operations, layout: second.layout).isEmpty)
+        let left = StoreRecoveryTests.loadRule(second.fileSystem.survivingDisk())
+        #expect(!left.degraded && (left.content?.generation ?? 0) >= committed)
+        // Lifetime 3 keeps the record and the corrupt doom that lifetime 2 carried over from the vanished generation.
+        let third = CoreHarness.make(disk: second.fileSystem.survivingDisk())
+        let thirdReport = try await third.store.open()
+        #expect(!thirdReport.degraded && thirdReport.launchEpoch > committed)
+        #expect(await third.state.core.records[entry.identifier] != nil)
+        #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt))
+        #expect(await CoreInvariants.violations(of: third).isEmpty)
+    }
+
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
     /// stopped between its renames; returns the disk the killed process leaves.
     @available(macOS 15.0, *)
