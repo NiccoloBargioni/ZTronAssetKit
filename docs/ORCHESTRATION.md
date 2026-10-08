@@ -14,7 +14,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 | Branch | `feature/asset-kit` (never `main`, never push) |
 | Tags | `harness-frozen`, `contracts` (Stage 1), `l1-merged` (WP-H fakes + WP-A Model) |
 | Worktrees | `.worktrees/b`, `.worktrees/d`, `.worktrees/e` on `wp/b`, `wp/d`, `wp/e` at `l1-merged`, clean, nothing implemented |
-| Paused run | Level 2 workflow `wf_262e4b03-7f6`, paused in the original session after ~27 calls (~$2). It uses the older prompts: **stop it before launching Level 2 anywhere else** (two runs on one worktree conflict) |
+| Paused run | Level 2 workflow `wf_262e4b03-7f6`, paused in the original session after ~27 calls (~$2). It uses the older prompts: **never resume it** (two runs on one worktree conflict) |
+| Live run | Level 2 launched 2026-10-08 16:47 CEST as `wf_181ccd6d-2bb` (args `{level: "L2", base: "l1-merged", wps: ["b","d","e"]}`) in session `7fbcfa21…`. If that session dies, resume in the same session with `Workflow({scriptPath, resumeFromRunId: "wf_181ccd6d-2bb"})`; from another session, inspect the worktrees' `git log` and hand-author a continuation |
 | Gates at `l1-merged` | `--quick` PASS; unsafe 0; docs 1270/1270; trace: 35 MUSTs still without tests (all owned by L2–L5) |
 
 ## Run Level 2
