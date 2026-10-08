@@ -76,6 +76,9 @@ struct StoreSweepTests {
         let closing = Task {
             await harness.store.close()
         }
+        // C's plan unit is released only once close() is draining: released earlier, C could plan, write and commit
+        // while the store is still open and return normally (close-out cycle 3: failed once under load).
+        await StoreSweepTests.waitForPhase(.closing, harness)
         await bulk.setHolding(false)
         await closing.value
         await #expect(throws: StoreError.closed) {
