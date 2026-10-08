@@ -199,9 +199,10 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     }
 
     /// How many processed names are remembered: far more terminals than can be processed while one listing is
-    /// awaited (a few per live task, and live tasks are capped by `maxTasks`).
+    /// awaited (a few per live task, and live tasks are capped by `maxTasks`). `maxTasks` is public configuration, so
+    /// it is clamped before it is multiplied (`Int.max` must not trap, review round 3).
     private static func processedCapacity(_ options: BackgroundTransferOptions) -> Int {
-        max(4 * max(options.maxTasks, 1), 64)
+        max(4 * min(max(options.maxTasks, 1), Int.max / 4), 64)
     }
 
     // MARK: - TransferBackend

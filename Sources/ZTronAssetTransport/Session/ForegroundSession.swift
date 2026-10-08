@@ -160,7 +160,9 @@ public final class ForegroundTransferBackend: TransferBackend {
             let task = session.dataTask(with: request)
             task.priority = job.priority.urlSessionTaskPriority
             if let expected = job.expectedBytes {
-                task.countOfBytesClientExpectsToReceive = max(expected - (job.resume?.offset ?? 0), 0)
+                // The offset comes from a sidecar on disk: clamped into 0…expected first, so the remainder never
+                // overflows whatever the sidecar says (review round 3).
+                task.countOfBytesClientExpectsToReceive = expected - min(max(job.resume?.offset ?? 0, 0), expected)
             }
             let purpose = job.purpose == .manifest ? "manifest" : "asset"
             let interval = log.interval(.transfer, category: .transport, "attempt \(job.attempt) \(purpose)")
@@ -185,7 +187,8 @@ public final class ForegroundTransferBackend: TransferBackend {
 
     /// The session's running and suspended data tasks, read from the tasks themselves (their mailboxes). A task the
     /// client discarded is not live although its cancellation may not have reached the task yet: a handle's
-    /// `cancel()` marks it synchronously and cancels it only after its partial was discarded.
+    /// `cancel()` marks it synchronously and cancels it only after its partial was discarded. `bytesReceived` is what
+    /// the partial holds: the resume offset counts only once a 206 continued it.
     public func liveTransfers() async -> [LiveTransfer] {
         let tasks = await self.session.allTasks
         return tasks.compactMap { task in
@@ -194,11 +197,15 @@ public final class ForegroundTransferBackend: TransferBackend {
             else {
                 return nil
             }
+            // The resume offset is part of the partial only when the origin continued it (206); a 200 answering a
+            // resumed request restarted the partial from zero (the validator changed).
+            let continued = (task.response as? HTTPURLResponse)?.statusCode == 206
+            let offset = continued ? job.resume?.offset ?? 0 : 0
             return LiveTransfer(
                 name: job.partialName,
                 backend: .foreground,
                 isRunning: task.state == .running,
-                bytesReceived: (job.resume?.offset ?? 0) + task.countOfBytesReceived,
+                bytesReceived: Saturating.add(offset, task.countOfBytesReceived),
                 priority: task.priority
             )
         }

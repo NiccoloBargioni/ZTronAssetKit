@@ -131,4 +131,66 @@ struct ArithmeticSafetyTests {
         #expect(rig.staging.contents[none.partialName] == nil)
         await rig.stop()
     }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a resume offset of Int64.min from a corrupt sidecar never traps, and the origin's 200 is staged from zero", .timeLimit(.minutes(1)))
+    func corruptResumeOffset() async throws {
+        let body = TransportFixtures.payload(1_000)
+        let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: body) }
+        let id = TransportFixtures.contentID(1)
+        let earlier = StagingFileName(transfer: id, attempt: TransportFixtures.attempt(1), kind: .partial)
+        let tag = try #require(ETag(rawValue: "\"v1\""))
+        let resumed = rig.request(id, attempt: TransportFixtures.attempt(2), path: "a.bin", expected: 1_000,
+                                  resume: ResumePoint(previous: earlier, offset: .min, validator: .strongETag(tag)))
+        guard case .staged(let file)? = await run(await rig.source.transfer(resumed)).terminal else {
+            Issue.record("not staged")
+            await rig.stop()
+            return
+        }
+        #expect(!file.resumed && file.byteCount == 1_000 && rig.staging.contents[file.name] == body)
+        await rig.stop()
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-8: a live resumed transfer counts the resume offset only when the origin continued it with a 206", .timeLimit(.minutes(1)), arguments: [true, false])
+    func liveBytesCountTheOffsetOnlyFor206(_ continued: Bool) async throws {
+        // 600,000 bytes give a progress quantum of 256 KiB, so the chunk that reaches 262,144 staged bytes is reported
+        // exactly when the server stalls: the staged size is known when the live transfer is listed.
+        let quantum = 262_144
+        let body = TransportFixtures.payload(600_000)
+        let rig = try await LoopbackRig.make { _ in
+            LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: continued ? quantum - 1_000 : quantum), rangeETag: "\"v1\"")
+        }
+        let id = TransportFixtures.contentID(1)
+        let earlier = rig.request(id, attempt: TransportFixtures.attempt(1), path: "a.bin", expected: 600_000)
+        try rig.staging.createPartial(earlier.partialName)
+        _ = try rig.staging.appendPartial(body.prefix(1_000), to: earlier.partialName)
+        // A matching validator continues the partial (206); a changed one makes the origin send everything (200).
+        let validator = try #require(ETag(rawValue: continued ? "\"v1\"" : "\"v0\""))
+        let resumed = rig.request(id, attempt: TransportFixtures.attempt(2), path: "a.bin", expected: 600_000,
+                                  resume: ResumePoint(previous: earlier.partialName, offset: 1_000, validator: .strongETag(validator)))
+        let handle = await rig.source.transfer(resumed)
+        var iterator = handle.updates.makeAsyncIterator()
+        #expect(await awaitProgress(&iterator, reaching: Int64(quantum)))
+        #expect(rig.staging.contents[resumed.partialName]?.count == quantum)
+        // The figure the engine sees is what the partial holds, whether or not the offset was continued.
+        #expect(await rig.foreground.liveTransfers().map(\.bytesReceived) == [Int64(quantum)])
+        handle.cancel()
+        #expect(await iterator.next() == .failed(.cancelled(.byClient)))
+        await rig.stop()
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-3: a background task cap of Int.max sizes the coordinator's tables without trapping", .timeLimit(.minutes(1)))
+    func unboundedTaskCap() async throws {
+        let rig = try BackgroundCoordinatorTests.Rig("cap-int-max", maxTasks: .max)
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        #expect(await coordinator.admits())
+        let job = rig.job()
+        let handle = await coordinator.start(job)
+        await rig.driver.complete(job.partialName, body: TransportFixtures.payload(4_000))
+        #expect(await run(handle).terminal == .staged(StagedFile(name: job.partialName, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil)))
+        #expect(await coordinator.admits())
+    }
 }
