@@ -50,6 +50,7 @@ final class FakePackBackend: PackBackend {
     }
 
     private struct CallWaiter {
+        let key: UInt64
         let call: Call
         let count: Int
         let continuation: CheckedContinuation<Void, Never>
@@ -158,19 +159,33 @@ final class FakePackBackend: PackBackend {
         }
     }
 
-    /// Returns once `call` was recorded at least `count` times.
+    /// Returns once `call` was recorded at least `count` times, or the calling task was cancelled.
     func waitFor(_ call: Call, count: Int = 1) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let ready = self.state.withLock { state -> Bool in
-                guard state.calls.filter({ $0 == call }).count < count else {
-                    return true
+        let key = self.state.withLock { state -> UInt64 in
+            state.nextHeld += 1
+            return state.nextHeld
+        }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let ready = self.state.withLock { state -> Bool in
+                    guard !Task.isCancelled, state.calls.filter({ $0 == call }).count < count else {
+                        return true
+                    }
+                    state.callWaiters.append(CallWaiter(key: key, call: call, count: count, continuation: continuation))
+                    return false
                 }
-                state.callWaiters.append(CallWaiter(call: call, count: count, continuation: continuation))
-                return false
+                if ready {
+                    continuation.resume()
+                }
             }
-            if ready {
-                continuation.resume()
+        } onCancel: {
+            let waiter = self.state.withLock { state -> CallWaiter? in
+                guard let index = state.callWaiters.firstIndex(where: { $0.key == key }) else {
+                    return nil
+                }
+                return state.callWaiters.remove(at: index)
             }
+            waiter?.continuation.resume()
         }
     }
 

@@ -95,14 +95,28 @@ actor AppleSourceState {
         }
     }
 
-    /// Test seam: returns once a `drain()` call is waiting (or nothing is left to drain).
+    /// Test seam: returns once a `drain()` call is waiting, nothing is left to drain, or the calling task was
+    /// cancelled (so a test's time limit ends a wait that a defect would make endless).
     func waitForDrain() async {
         guard self.drainWaiters.isEmpty, self.stagingCalls > 0 else {
             return
         }
         // REENTRANCY: e-7 (proposed) — nothing: a terminal wait, registered synchronously and resumed by the
-        // `drain()` turn that registered its own waiter or by the `endStaging()` turn that reached zero.
-        await withCheckedContinuation { self.drainObservers.append($0) }
+        // `drain()` turn that registered its own waiter, the `endStaging()` turn that reached zero, or cancellation.
+        await withTaskCancellationHandler {
+            // REENTRANCY: e-7 (proposed) — as above.
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume()
+                } else {
+                    self.drainObservers.append(continuation)
+                }
+            }
+        } onCancel: {
+            Task {
+                await self.releaseDrainObservers()
+            }
+        }
     }
 
     // MARK: Update checks (R-APL-4, transport-2 T2-14, T2-20)
@@ -160,13 +174,18 @@ actor AppleSourceState {
         }
     }
 
-    /// Test seam: waits for the check running now, if any.
+    /// Test seam: waits for the check running now, if any; cancelling the caller cancels the check.
     func settleUpdateCheck() async {
         guard let task = self.checkTask else {
             return
         }
         // REENTRANCY: e-3 (proposed) — nothing: a terminal wait on the task; the caller re-reads the report.
-        await task.value
+        await withTaskCancellationHandler {
+            // REENTRANCY: e-3 (proposed) — as above.
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     // MARK: Releases and source copies (R-CLN-9, R-CLN-10, H-7)

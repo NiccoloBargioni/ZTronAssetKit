@@ -245,9 +245,24 @@ struct AppleTransferTests {
     }
 
     @available(macOS 26.0, *)
-    @Test("R-APL-1: a checksum-less entry is staged without a checksum comparison", .timeLimit(.minutes(1)))
-    func legacyEntryIsStagedBySizeOnly() async throws {
+    @Test("R-APL-1: a staging name already in use is reported and never discarded", .timeLimit(.minutes(1)))
+    func nameInUseIsNeverDiscarded() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+        let request = assetA.request()
+        let foreign = Data("someone else's bytes".utf8)
+        try fixture.staging.createPartial(request.partialName)
+        _ = try fixture.staging.appendPartial(foreign, to: request.partialName)
+        let updates = await collect(await fixture.source.transfer(request))
+        #expect(updates == [.failed(.transient(.localIO(posixCode: EEXIST), retryAfter: nil))])
+        #expect(fixture.staging.contents[request.partialName] == foreign)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-1: a checksum-less entry of unknown size is staged without progress or checksum comparison", .timeLimit(.minutes(1)))
+    func legacyEntryIsStagedBySizeOnly() async throws {
+        let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+        fixture.backend.scriptEnsure(Packs.media, [.install(progress: [PackProgress(completed: 1, total: 2)])])
         let request = TransferRequest(
             id: .legacy(identifier: AssetID(rawValue: "bo7.menu.background"), remotePath: assetA.remotePath),
             attempt: TransferAttempt(epoch: 1, sequence: 1),

@@ -129,19 +129,31 @@ final class GatedStagingSink: StagingSink {
         }
     }
 
-    /// Returns once `count` writes are held.
+    /// Returns once `count` writes are held, or the calling task was cancelled (which also opens the gate, so a
+    /// test's time limit never leaves a write held).
     func waitForHeldWrites(_ count: Int) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let ready = self.state.withLock { state -> Bool in
-                guard state.held.count < count else {
-                    return true
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let ready = self.state.withLock { state -> Bool in
+                    guard !Task.isCancelled, state.held.count < count else {
+                        return true
+                    }
+                    state.arrivalWaiters.append((count, continuation))
+                    return false
                 }
-                state.arrivalWaiters.append((count, continuation))
-                return false
+                if ready {
+                    continuation.resume()
+                }
             }
-            if ready {
-                continuation.resume()
+        } onCancel: {
+            let waiters = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
+                defer { state.arrivalWaiters.removeAll() }
+                return state.arrivalWaiters.map(\.continuation)
             }
+            for waiter in waiters {
+                waiter.resume()
+            }
+            self.open()
         }
     }
 

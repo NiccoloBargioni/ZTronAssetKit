@@ -215,6 +215,42 @@ struct AppleCatalogTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-APL-4: a staged catalog that cannot be read back fails and is removed", .timeLimit(.minutes(1)))
+    func unreadableStagedCatalogFails() async throws {
+        let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+        fixture.staging.failNext(.readStaged, with: .io(posixCode: EIO))
+        await #expect(throws: TransferError.transient(.localIO(posixCode: EIO), retryAfter: nil)) {
+            try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        }
+        #expect(fixture.staging.contents.isEmpty)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
+    @Test("R-APL-4: a catalog copy that outlives invalidate cancels the fetch and is left for staging GC", .timeLimit(.minutes(1)))
+    func catalogCopyOutlivingInvalidate() async throws {
+        let gated = GatedStagingSink()
+        let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()], staging: gated)
+        gated.arm()
+        let fetch = Task {
+            try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        }
+        await gated.waitForHeldWrites(1)
+        let invalidation = Task {
+            await fixture.source.invalidate()
+        }
+        await fixture.source.state.waitForDrain()
+        gated.open()
+        await invalidation.value
+        await #expect(throws: TransferError.cancelled(.byClient)) {
+            try await fetch.value
+        }
+        let name = StagingFileName(transfer: .manifest, attempt: TransferAttempt(epoch: 1, sequence: 1), kind: .partial)
+        #expect(gated.base.contents[name] == AppleTierFixture.catalogBytes)
+        #expect(!gated.events.contains("discard"))
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-APL-4: an invalid catalog location is rejected without touching any pack", .timeLimit(.minutes(1)))
     func invalidCatalogLocationIsRejected() async throws {
         let fixture = AppleTierFixture(configuration: AppleTierConfiguration(catalogPackID: "..", catalogPath: "catalog.json"))

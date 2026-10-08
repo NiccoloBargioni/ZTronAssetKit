@@ -89,15 +89,35 @@ actor PackAvailabilityCoordinator {
         self.flights[pack]?.waiters.count ?? 0
     }
 
-    /// Test seam: returns once at least `count` callers wait on `pack`'s flight (or the coordinator closed).
+    /// Test seam: returns once at least `count` callers wait on `pack`'s flight, the coordinator closed, or the
+    /// calling task was cancelled (so a test's time limit ends a wait that a defect would make endless).
     func waitForWaiters(on pack: PackID, count: Int) async {
         guard !self.closed, self.waiterCount(on: pack) < count else {
             return
         }
         // REENTRANCY: e-5 (proposed) — nothing: a terminal wait registered synchronously and resumed only by the
-        // turn that reached the count (or `close`); the caller re-reads the census.
-        await withCheckedContinuation { continuation in
-            self.countWaiters.append(CountWaiter(pack: pack, count: count, continuation: continuation))
+        // turn that reached the count, `close`, or the cancellation turn; the caller re-reads the census.
+        await withTaskCancellationHandler {
+            // REENTRANCY: e-5 (proposed) — as above.
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume()
+                } else {
+                    self.countWaiters.append(CountWaiter(pack: pack, count: count, continuation: continuation))
+                }
+            }
+        } onCancel: {
+            Task {
+                await self.releaseCountWaiters()
+            }
+        }
+    }
+
+    private func releaseCountWaiters() {
+        let waiting = self.countWaiters
+        self.countWaiters.removeAll()
+        for waiter in waiting {
+            waiter.continuation.resume()
         }
     }
 
