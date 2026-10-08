@@ -75,27 +75,23 @@ public final class HTTPRemoteSource: RemoteSource {
 
     /// The production background backend for `policy` (R-NET-3, ADR-026): `nil` when background transfers are
     /// disabled (the default) or the namespace is not `[0-9a-z-]{1,32}`; otherwise a `BackgroundTransferCoordinator`
-    /// over `LiveBackgroundSessionDriver` and its own `.background` `SessionDelegate`. Builds no `URLSession` and
-    /// performs no I/O: the driver creates the session in `activate()`, which `start()` calls after the store opened
+    /// over the driver `makeDriver` builds (`LiveBackgroundSessionDriver` unless a test passes a fake) and its own
+    /// `.background` `SessionDelegate`. Its requests are checked against `policy`, time out after
+    /// `requestTimeout`, and carry `appKey` **only when** the owner accepted redirect exposure
+    /// (`keyRedirectExposure == .acceptedByOwner`), so under the default `.refuse` no background request can carry
+    /// the key even if a routing defect sent one there; its intervals go to `log`. Builds no `URLSession` and performs
+    /// no I/O: the driver creates the session in `activate()`, which `start()` calls after the store opened
     /// (ADR-028).
     package static func makeBackgroundBackend(
         _ background: BackgroundTransferPolicy,
         staging: any StagingSink,
-        policy: TransportSecurityPolicy
-    ) -> (any TransferBackend)? {
-        HTTPRemoteSource.makeBackgroundBackend(background, staging: staging, policy: policy, appKey: nil, requestTimeout: 60, log: .tapOnly(nil))
-    }
-
-    /// The production background backend with the request factory it needs: the policy always, the key only when
-    /// the owner accepted redirect exposure (ADR-026), so under the default `.refuse` no background request can
-    /// carry it even if a routing defect sent one there.
-    static func makeBackgroundBackend(
-        _ background: BackgroundTransferPolicy,
-        staging: any StagingSink,
         policy: TransportSecurityPolicy,
-        appKey: AppKey?,
-        requestTimeout: TimeInterval,
-        log: LogRoute
+        appKey: AppKey? = nil,
+        requestTimeout: TimeInterval = 60,
+        log: LogRoute = .tapOnly(nil),
+        makeDriver: (BackgroundSessionIdentifier, SessionDelegate, Bool) -> any BackgroundSessionDriver = { identifier, delegate, discretionary in
+            LiveBackgroundSessionDriver(identifier: identifier, delegate: delegate, discretionary: discretionary)
+        }
     ) -> (any TransferBackend)? {
         guard case .enabled(let options) = background,
             let identifier = BackgroundSessionIdentifier(namespace: options.namespace)
@@ -103,7 +99,7 @@ public final class HTTPRemoteSource: RemoteSource {
             return nil
         }
         let delegate = SessionDelegate(mode: .background, staging: staging, policy: policy)
-        let driver = LiveBackgroundSessionDriver(identifier: identifier, delegate: delegate, discretionary: options.discretionary)
+        let driver = makeDriver(identifier, delegate, options.discretionary)
         let key = options.keyRedirectExposure == .acceptedByOwner ? appKey : nil
         return BackgroundTransferCoordinator(
             driver: driver,

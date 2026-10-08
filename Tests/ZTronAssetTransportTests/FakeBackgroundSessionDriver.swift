@@ -23,6 +23,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
         var priority: Float
         var expectedBytes: Int64?
         var keyHeader: String?
+        var timeout: TimeInterval
     }
 
     private enum Delivery {
@@ -160,7 +161,8 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
             name: name,
             priority: priority,
             expectedBytes: expectedBytes,
-            keyHeader: request.value(forHTTPHeaderField: self.keyHeaderName)
+            keyHeader: request.value(forHTTPHeaderField: self.keyHeaderName),
+            timeout: request.timeoutInterval
         ))
     }
 

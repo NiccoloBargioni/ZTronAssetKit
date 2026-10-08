@@ -77,6 +77,43 @@ struct SourceTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-4: the production background backend carries the key only when the owner accepted redirect exposure, with the configured timeout and log route", .timeLimit(.minutes(1)), arguments: [
+        KeyRedirectExposure.refuse, .acceptedByOwner,
+    ])
+    func productionBackgroundKeyRule(_ exposure: KeyRedirectExposure) async throws {
+        let fixtures = try TransportFixtures.directory("production-key-\(exposure)")
+        defer { try? FileManager.default.removeItem(at: fixtures) }
+        let staging = FakeStagingSink()
+        let tap = RecordingLogTap()
+        let options = BackgroundTransferOptions(namespace: "media", keyRedirectExposure: exposure)
+        // The package function itself decides what the coordinator gets; only the device-only driver is replaced.
+        let backend = HTTPRemoteSource.makeBackgroundBackend(
+            .enabled(options),
+            staging: staging,
+            policy: .production(allowedHosts: ["cdn.example.com"]),
+            appKey: TransportFixtures.canaryKey,
+            requestTimeout: 42,
+            log: .tapOnly(tap)
+        ) { identifier, delegate, _ in
+            FakeBackgroundSessionDriver(identifier: identifier, delegate: delegate, fixtures: fixtures)
+        }
+        let coordinator = try #require(backend as? BackgroundTransferCoordinator)
+        let driver = try #require(coordinator.driver as? FakeBackgroundSessionDriver)
+        let job = TransportFixtures.job(
+            id: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), url: Self.base.appendingPathComponent("v.bin"), expected: 4, priority: .bulk)
+        let handle = await coordinator.start(job)
+        let start = try #require(await driver.starts.first)
+        #expect(start.keyHeader == (exposure == .acceptedByOwner ? TransportFixtures.canaryValue : nil))
+        #expect(start.timeout == 42)
+        #expect(transferIntervalEdges(tap).began == 1)
+        // The driver reports through the delegate the function built: the transfer completes end to end.
+        await driver.complete(job.partialName, body: TransportFixtures.payload(4))
+        #expect(await run(handle).terminal == .staged(StagedFile(name: job.partialName, byteCount: 4, resumed: false, httpStatus: 200, etag: nil)))
+        #expect(transferIntervalEdges(tap) == (began: 1, ended: 1))
+        #expect(!tap.lines.contains { $0.message.contains(TransportFixtures.canaryValue) })
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-SYN-5: a base URL without a host falls back to its text as the origin identifier the circuit breaker is keyed by")
     func originFallback() {
         let source = HTTPRemoteSource(configuration: HTTPSourceConfiguration(baseURL: URL(string: "file:///srv/assets/")!), staging: FakeStagingSink(), log: .tapOnly(nil))
