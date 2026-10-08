@@ -117,6 +117,35 @@ struct BackgroundCoordinatorTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-7: a start that joins a live OS task is never handed a staged file of another byteSize", .timeLimit(.minutes(1)), arguments: [
+        Int64(4_000), Int64(6_000),
+    ])
+    func joinChecksTheJoiningJobsSize(_ taggedBytes: Int64) async throws {
+        // Review round 3 (PROBE-R3-2): the dead process tagged an OS task for a checksum-less identity with its
+        // byteSize then; the new manifest says 5,000 for the same identity. No hash catches a checksum-less file, so
+        // the joining job's own size is the check.
+        let rig = try Rig("join-size-\(taggedBytes)")
+        defer { rig.cleanUp() }
+        let old = TransportFixtures.job(id: TransportFixtures.legacyID, attempt: TransportFixtures.attempt(1), url: Self.url, expected: taggedBytes, priority: .bulk)
+        await rig.driver.addTask(description: BackgroundTaskTag(name: old.partialName, expectedBytes: taggedBytes).encoded, url: Self.url)
+        let coordinator = rig.coordinator()
+        #expect(await coordinator.reattached().map(\.name) == [old.partialName])
+        let new = TransportFixtures.job(id: TransportFixtures.legacyID, attempt: TransportFixtures.attempt(1, epoch: 2), url: Self.url, expected: 5_000, priority: .bulk)
+        let handle = await coordinator.start(new)
+        // Joined, not duplicated (R-NET-3).
+        #expect(await rig.driver.starts.isEmpty)
+        let body = TransportFixtures.payload(Int(taggedBytes))
+        await rig.driver.complete(old.partialName, body: body)
+        let failure: TransferIntegrityFailure = taggedBytes < 5_000
+            ? .truncated(expected: 5_000, received: taggedBytes)
+            : .sizeMismatch(expected: 5_000, actual: taggedBytes)
+        #expect(await run(handle).terminal == .failed(.integrity(failure)))
+        // The OS's file stays in staging for the engine's discard or staging GC (R-CLN-3).
+        #expect(rig.staging.contents[old.partialName] == body)
+        await coordinator.invalidate()
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-3: foreign or undecodable background tasks are cancelled at launch and never reported", .timeLimit(.minutes(1)))
     func foreignTasksAreCancelled() async throws {
         let rig = try Rig("foreign-tasks")

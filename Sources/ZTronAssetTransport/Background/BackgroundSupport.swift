@@ -138,9 +138,11 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         case dataReturned(ResumeData?)
     }
 
-    /// One attached consumer of a name; `token` tells it apart from earlier and later attaches to that name.
+    /// One attached consumer of a name; `token` tells it apart from earlier and later attaches to that name, and
+    /// `expected` is the attaching job's `byteSize`, which a joined OS task's file must match (R-NET-7).
     private struct Waiter {
         let token: UInt64
+        let expected: Int64?
         let continuation: AsyncStream<TransferUpdate>.Continuation
     }
 
@@ -236,7 +238,9 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         }
         let joinable = snapshot.compactMap(\.name).filter { $0.transfer == job.id && self.isJoinable($0) }
         if let name = joinable.max(by: { $0.attempt < $1.attempt }) {
-            return self.attach(name, id: job.id)
+            // The OS task was tagged with the size its creator expected, which a checksum-less identity may have
+            // changed since: `deliver` checks the staged size against this job's (review round 3).
+            return self.attach(name, id: job.id, expected: expected)
         }
         let name = job.partialName
         // This very attempt is still being created or ended: a second OS task under one name would hand one task's
@@ -254,7 +258,7 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         let priority = job.priority.urlSessionTaskPriority
         self.processed.remove(name)
         // The waiter exists before the OS can finish the task, so no completion finds nobody.
-        let handle = self.attach(name, id: job.id)
+        let handle = self.attach(name, id: job.id, expected: expected)
         self.priorities[name] = priority
         // REENTRANCY: D-3 (proposed) — nothing is read after the start: the waiter was registered before it, and a
         // completion that raced ahead was delivered to that waiter by the pump.
@@ -569,16 +573,27 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         if case .failed(.transient(.backgroundSessionUnavailable, _)) = update {
             self.disabled = true
         }
+        if case .staged(let file) = update, let expected = self.waiters[name]?.expected, file.byteCount != expected {
+            // A joined OS task fetched the size its creator expected, not the waiting job's (a checksum-less identity
+            // whose manifest entry changed meanwhile): R-NET-7 compares with the waiter's `byteSize`. The file stays
+            // in staging for the engine's discard or staging GC.
+            update = .failed(.integrity(Self.sizeFailure(expected: expected, staged: file.byteCount)))
+        }
         if !self.finishWaiter(name, with: update), case .staged(let file) = update {
             self.outcomes.set(file, for: file.name)
         }
     }
 
-    private func attach(_ name: StagingFileName, id: TransferID) -> any TransferHandle {
+    /// The integrity failure of a staged size other than the expected one, as the delegates report it.
+    private static func sizeFailure(expected: Int64, staged: Int64) -> TransferIntegrityFailure {
+        staged < expected ? .truncated(expected: expected, received: staged) : .sizeMismatch(expected: expected, actual: staged)
+    }
+
+    private func attach(_ name: StagingFileName, id: TransferID, expected: Int64?) -> any TransferHandle {
         let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(4))
         self.nextToken += 1
         let token = self.nextToken
-        if let previous = self.waiters.updateValue(Waiter(token: token, continuation: continuation), forKey: name) {
+        if let previous = self.waiters.updateValue(Waiter(token: token, expected: expected, continuation: continuation), forKey: name) {
             previous.continuation.yield(.failed(.cancelled(.byClient)))
             previous.continuation.finish()
         }
