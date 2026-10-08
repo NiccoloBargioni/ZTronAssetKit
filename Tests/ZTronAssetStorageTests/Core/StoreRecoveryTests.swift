@@ -493,6 +493,43 @@ struct StoreRecoveryTests {
         #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt), "the rotten blob is still doomed corrupt")
     }
 
+    /// Close-out cycle 4 (review "ADR accuracy, B-28 amendment 2"): only a stat that finds no `index.tmp` completes a
+    /// pending promotion without a commit. A `notFound` from the promotion's sync of a file the stat just found is an
+    /// error like any other: the promotion stays pending, `index.tmp` is left as it was (it may hold the newest loaded
+    /// generation), and the next attempt's stat decides. Before, the sync's `notFound` was taken for a vanish: the
+    /// launch commit then truncated and rewrote the loaded `index.tmp` in place, so a failed or torn write there would
+    /// have dropped the newest generation.
+    @Test("R-STO-4: a notFound from the promotion's sync of an index.tmp that exists keeps the promotion pending and the file unchanged", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func promotionSyncNotFoundStaysPending() async throws {
+        // Lifetime 1 is killed right before its last commit's step 4: its synced index.tmp is the newest generation.
+        let (killed, entry, _) = try await StoreRecoveryTests.killedInLastCommit { $0.kind == .rename && $0.url.lastPathComponent == "index.bin" }
+        let loaded = StoreRecoveryTests.loadRule(killed)
+        #expect(loaded.chosen == .temporary)
+        let promoted = try #require(loaded.content?.generation)
+        let temporary = CoreFixture.layout.indexURL(.temporary).path
+        let before = try #require(killed.files[temporary])
+        // Lifetime 2: the launch commit's promotion finds index.tmp, and its sync reports notFound.
+        let second = CoreHarness.make(disk: killed)
+        second.fileSystem.addFault(FaultRule(operation: .synchronizeFile, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .notFound))
+        let report = try await second.store.open()
+        #expect(report.generation < promoted, "the launch commit failed: the store reports the surviving generation")
+        #expect(await second.state.core.commits.pendingPromotion == promoted, "the promotion stays pending")
+        #expect(await second.state.core.committedGeneration == report.generation)
+        #expect(second.fileSystem.survivingDisk().files[temporary] == before, "index.tmp is unchanged")
+        #expect(!second.fileSystem.operations.contains { $0.kind == .write && $0.url.lastPathComponent == "index.tmp" }, "nothing wrote over index.tmp")
+        // The next attempt's stat finds the file and promotes it.
+        try await second.store.flush(.durable)
+        #expect(await second.state.core.commits.pendingPromotion == nil)
+        let committed = await second.state.core.committedGeneration
+        #expect(committed > promoted)
+        await second.store.close()
+        let third = CoreHarness.make(disk: second.fileSystem.survivingDisk())
+        let thirdReport = try await third.store.open()
+        #expect(!thirdReport.degraded && thirdReport.launchEpoch > committed)
+        #expect(await third.state.core.records[entry.identifier] != nil, "the record of the promoted generation survives")
+    }
+
     /// Close-out cycle 3, found by the state-space enumeration: an I/O error while the launch read an index file made
     /// the load rule see that file as absent (a failed stat) or torn (a failed read), so the launch committed over it:
     /// it rewrote or moved the newest valid generation it had not read (with only index.tmp valid, a fresh empty store

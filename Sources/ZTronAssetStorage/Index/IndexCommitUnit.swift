@@ -178,6 +178,9 @@ enum IndexCommitUnit {
     /// without a commit (probe VPC2-K): nothing is left to promote, and whatever reached `index.bin` was never ordered by
     /// a root sync, so it does not count as committed; the commit goes on with steps 1–6 and supersedes it. Before, the
     /// sync threw `notFound` on every attempt and the promotion blocked every later commit, `close()`'s included.
+    /// Only the stat decides that the file vanished: a `notFound` from the sync of a file the stat just found fails the
+    /// attempt like any other error, so the promotion stays pending and `index.tmp`, which may hold the newest loaded
+    /// generation, is not rewritten by this attempt's step 2; the next attempt's stat decides (close-out cycle 4).
     private static func promote(
         committed: UInt64,
         level: SyncLevel,
@@ -186,15 +189,11 @@ enum IndexCommitUnit {
         outcome: inout IndexCommitOutcome
     ) throws(FileSystemError) -> Bool {
         let temporary = layout.indexURL(.temporary)
-        do throws(FileSystemError) {
-            guard try fileSystem.itemInfo(at: temporary) != nil else {
-                throw .notFound
-            }
-            try fileSystem.synchronizeFile(at: temporary, level: level)
-        } catch .notFound {
+        guard try fileSystem.itemInfo(at: temporary) != nil else {
             outcome.promotedName = true
             return false
         }
+        try fileSystem.synchronizeFile(at: temporary, level: level)
         try IndexCommitUnit.replaceCurrent(with: temporary, committed: committed, layout: layout, fileSystem: fileSystem)
         outcome.promotedName = true
         try fileSystem.synchronizeDirectory(at: layout.root, level: level)
