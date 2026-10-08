@@ -336,7 +336,9 @@ extension AssetStore {
     }
 
     /// `admit(_:)`: adds or updates one entry without reconciling anything else and without the fetched
-    /// manifest's ETag (sync.md §6.5, sync-2 S2-28); committed before it returns.
+    /// manifest's ETag (sync.md §6.5, sync-2 S2-28); committed before it returns. The applied manifest's digest becomes
+    /// `admittedDigest(after:revision:)`, which matches no fetched manifest (ADR draft B-30): the applied entries no
+    /// longer are any server payload, so a planner comparing digests always applies the next fetched manifest.
     func performAdmit(_ entry: ManifestEntry) async throws(StoreError) {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -371,15 +373,16 @@ extension AssetStore {
             entries.append(entry)
         }
         let applied = self.state.core.appliedManifest
+        let revision = self.state.core.manifestRevision + 1
         if let manifest = try? ValidatedManifest(
             entries: entries,
             quarantined: applied.quarantined,
             quarantinedCount: applied.quarantinedCount,
             shape: applied.shape,
-            digest: applied.digest
+            digest: AssetStore.admittedDigest(after: applied.digest, revision: revision)
         ) {
             self.state.core.appliedManifest = manifest
-            self.state.core.manifestRevision += 1
+            self.state.core.manifestRevision = revision
         }
         let adopted = self.adoptKnownBlob(for: id, orphans: [:], now: now)
         self.markDirtyInternal(.soon)
@@ -389,6 +392,19 @@ extension AssetStore {
             // REENTRANCY: R6 — nothing.
             await self.publishSnapshotInternal(urgency: .userInitiated)
         }
+    }
+
+    /// The applied manifest's digest after an admission (ADR draft B-30): SHA-256 of a domain tag, the previous
+    /// digest and the manifest revision. A fetched manifest's digest is the SHA-256 of its payload bytes
+    /// (`ValidatedManifest`), so matching this one would take a SHA-256 preimage of it; every admission yields a new
+    /// value, and it is persisted with the entries like any applied digest.
+    static func admittedDigest(after previous: ContentHash, revision: UInt64) -> ContentHash {
+        var message = Data("ZTronAssetKit.admitted-manifest.v1".utf8)
+        message.append(0)
+        for word in [previous.w0, previous.w1, previous.w2, previous.w3, revision] {
+            message.append(contentsOf: (0..<8).map { UInt8(truncatingIfNeeded: word >> (56 - 8 * $0)) })
+        }
+        return ContentHash.sha256(of: message)
     }
 
     /// `markSynced(_:ifPurgeEpoch:)` (R-CLN-6).

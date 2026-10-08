@@ -208,6 +208,41 @@ struct StoreReentrancyTests {
         try await harness.store.admit(changed)
         #expect(try await harness.store.planningView().records["twin"]?.isStale == true)
     }
+
+    /// Review round 3: `ValidatedManifest.digest` means "equal digests: nothing to reconcile". An admission changes the
+    /// applied entries without a server payload, so the applied digest must stop matching the fetched one; otherwise
+    /// a planner that skips `apply` on equal digests would never prune an admitted entry the server dropped again.
+    @Test("R-SYN-8: after a point admission the applied digest matches no fetched manifest, so the server's manifest is applied again and prunes it", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func admissionInvalidatesTheAppliedDigest() async throws {
+        let harness = CoreHarness.make()
+        let server = CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(152))])
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(server, etag: ETag(rawValue: "\"m1\""), eviction: nil)
+        #expect(try await harness.store.planningView().appliedManifest.digest == server.digest)
+        try await harness.store.admit(CoreFixture.entry("extra", CoreFixture.bytes(153)))
+        let first = try await harness.store.planningView().appliedManifest.digest
+        #expect(first != server.digest, "the admitted state is no server payload")
+        try await harness.store.admit(CoreFixture.entry("more", CoreFixture.bytes(154)))
+        let second = try await harness.store.planningView().appliedManifest.digest
+        #expect(second != first && second != server.digest, "every admission moves the digest")
+        let unchanged = try await harness.store.planningView().appliedManifest.digest
+        try await harness.store.admit(CoreFixture.entry("more", CoreFixture.bytes(154)))
+        #expect(try await harness.store.planningView().appliedManifest.digest == unchanged, "a no-op admission changes nothing")
+        // The digest is persisted with the admitted entries.
+        await harness.store.close()
+        let reopened = CoreHarness.make(disk: harness.fileSystem.survivingDisk())
+        _ = try await reopened.store.open()
+        let view = try await reopened.store.planningView()
+        #expect(view.appliedManifest.digest == second)
+        #expect(view.appliedManifest.entries.map(\.identifier) == ["a", "extra", "more"])
+        // The server still serves the manifest it served before: its digest differs from the applied one, so it is
+        // applied, and the admitted entries it does not list are pruned.
+        _ = try await reopened.store.apply(server, etag: ETag(rawValue: "\"m1\""), eviction: nil)
+        let applied = try await reopened.store.planningView()
+        #expect(applied.appliedManifest.digest == server.digest)
+        #expect(applied.records.keys.sorted() == ["a"])
+    }
 }
 
 extension AssetStore {
