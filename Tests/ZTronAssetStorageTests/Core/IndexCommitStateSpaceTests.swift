@@ -130,6 +130,8 @@ struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
 ///   leaves it), and at the end of every run and of every reopen under each crash view. A crash inside a unit is held to
 ///   I-a against what the store counted committed before that unit: a promotion inside the unit may replace it.
 /// - **I-c** a failed commit leaves `index.bin` present and valid whenever it was valid before.
+/// - **I-e** (liveness) on a free volume, a fault before close()'s durable flush does not outlive its commit: the flush,
+///   meeting no fault of its own, succeeds (probe VPC2-K: a promotion left pending by a lost rename blocked every commit).
 /// - **I-d** a second launch reaches the same generation as the first or a newer one, with a later epoch (I-5): the
 ///   reopen's epoch exceeds every generation the case counted committed, its fault-free launch commit succeeds, and the
 ///   launch after it loads at least the reopen's generation with a larger epoch. A launch whose own launch commit failed
@@ -143,7 +145,7 @@ struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
 @Suite("Core: index commit state space (R-STO-4, R-STO-5)")
 struct IndexCommitStateSpaceTests {
     @Test(
-        "R-STO-4: every initial index state, with one fault at every operation, a kill or a power loss at every mutation, keeps I-a…I-d",
+        "R-STO-4: every initial index state, with one fault at every operation, a kill or a power loss at every mutation, keeps I-a…I-e",
         .timeLimit(.minutes(1)),
         arguments: IndexSpaceSlice.all
     )
@@ -365,6 +367,8 @@ enum IndexSpace {
         var storeID: StoreIdentifier
         var generation: UInt64
         var launchCommitted = false
+        /// Whether close()'s durable flush succeeded.
+        var flushCommitted = false
         /// The load could not read an index file: `open()` commits nothing in this lifetime and `close()` flushes
         /// nothing (`LaunchState.unavailable`, ADR draft B-34).
         var readOnly = false
@@ -416,6 +420,8 @@ enum IndexSpace {
         let succeeded = (try? result.result.get()) != nil
         if index == 0 {
             progress.launchCommitted = succeeded
+        } else {
+            progress.flushCommitted = succeeded
         }
         return succeeded
     }
@@ -654,6 +660,11 @@ enum IndexSpace {
         )
         if !fired() {
             violations.append("\(label): the fault never fired")
+        }
+        // I-e: on a free volume, a fault before close()'s flush does not outlive its commit: the flush, which meets no
+        // fault of its own, succeeds (unless the load could not read the index, when nothing is committed at all).
+        if volume == .free, (phase?.commit ?? 0) == 0, !progress.readOnly, !progress.flushCommitted {
+            violations.append("\(label): I-e, close()'s durable flush failed after the fault, with none of its own")
         }
         violations += await IndexSpace.checkEnd(end, start: start, claimed: progress.claimed, label: label, &memo)
         return violations
