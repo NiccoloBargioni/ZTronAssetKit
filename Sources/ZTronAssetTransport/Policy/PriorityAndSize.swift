@@ -33,19 +33,27 @@ public enum SizeVerdict: Sendable, Hashable {
 /// `written` is the partial file's size after the append (data tasks, ADR-019), `announced` the decoded length
 /// the response announced (−1 or `nil` when unknown, which is always the case under a `Content-Encoding`),
 /// `expected` the manifest's `byteSize`, `limit` the cap. The announced size gets a small slack
-/// (`limit / 1024 + 64`) for an origin that reports an encoded length.
+/// (`limit / 1024 + 64`) for an origin that reports an encoded length; the cap plus its slack saturates at the
+/// bounds of `Int64`, because `limit` is public configuration (`Int64.max` may mean "unlimited") and Swift traps on
+/// overflow (review round 3).
 public enum SizeGuard {
     /// The verdict for the bytes seen so far.
     public static func verdict(written: Int64, announced: Int64?, expected: Int64?, limit: Int64) -> SizeVerdict {
         if written > limit {
             return .abortOversize
         }
-        if let announced, announced >= 0, announced > limit + limit / 1024 + 64 {
+        if let announced, announced >= 0, announced > Saturating.add(limit, limit / 1_024 + 64) {
             return .abortOversize
         }
         if let expected, written > expected {
             return .abortExceedsExpected
         }
         return .proceed
+    }
+
+    /// The cap a job is built with: a negative configured cap allows nothing, read as 0, so every figure compared
+    /// with or derived from it stays in range.
+    static func clampedLimit(_ limit: Int64) -> Int64 {
+        max(limit, 0)
     }
 }

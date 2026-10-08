@@ -81,4 +81,54 @@ struct ArithmeticSafetyTests {
         #expect(await iterator.next() == nil)
         #expect(staging.sidecars.isEmpty)
     }
+
+    /// One size-guard input at the edges of `Int64`.
+    struct GuardRow: Sendable, CustomTestStringConvertible {
+        var label: String
+        var written: Int64
+        var announced: Int64?
+        var expected: Int64?
+        var limit: Int64
+        var verdict: SizeVerdict
+
+        var testDescription: String {
+            self.label
+        }
+    }
+
+    /// The contract table (`TransportContractTests`) covers ordinary sizes; these rows are the extremes a
+    /// configuration (`maxAssetBytes = Int64.max` meaning "unlimited") or a server can produce.
+    static let guardRows: [GuardRow] = [
+        GuardRow(label: "an announced length under a cap of Int64.max", written: 0, announced: 100, expected: nil, limit: .max, verdict: .proceed),
+        GuardRow(label: "Int64.max announced under a cap of Int64.max", written: 0, announced: .max, expected: nil, limit: .max, verdict: .proceed),
+        GuardRow(label: "Int64.max announced under a cap just below it", written: 0, announced: .max, expected: nil, limit: .max - 1, verdict: .proceed),
+        GuardRow(label: "Int64.max announced under an ordinary cap", written: 0, announced: .max, expected: nil, limit: 1 << 30, verdict: .abortOversize),
+        GuardRow(label: "Int64.max written and expected under a cap of Int64.max", written: .max, announced: nil, expected: .max, limit: .max, verdict: .proceed),
+        GuardRow(label: "a negative cap whose slack underflows", written: .min, announced: 0, expected: nil, limit: .min, verdict: .abortOversize),
+        GuardRow(label: "a negative cap with nothing written", written: 0, announced: nil, expected: nil, limit: -1, verdict: .abortOversize),
+    ]
+
+    @Test("R-NET-7: the size guard decides at the edges of Int64 without trapping", arguments: ArithmeticSafetyTests.guardRows)
+    func sizeGuardExtremes(_ row: GuardRow) {
+        #expect(SizeGuard.verdict(written: row.written, announced: row.announced, expected: row.expected, limit: row.limit) == row.verdict)
+    }
+
+    @available(macOS 15.0, *)
+    @Test("R-NET-7: a size cap of Int64.max means unlimited and a negative one nothing, both through a whole transfer", .timeLimit(.minutes(1)))
+    func extremeConfiguredCaps() async throws {
+        let body = TransportFixtures.payload(1_000)
+        let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: body) }
+        let unlimited = rig.request(TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), path: "a.bin", expected: 1_000, maxBytes: .max)
+        guard case .staged(let file)? = await run(await rig.source.transfer(unlimited)).terminal else {
+            Issue.record("not staged under a cap of Int64.max")
+            await rig.stop()
+            return
+        }
+        #expect(file.byteCount == 1_000 && rig.staging.contents[file.name] == body)
+        // A negative cap is read as 0 when the job is built: nothing is allowed, and the failure names that cap.
+        let none = rig.request(TransportFixtures.contentID(2), attempt: TransportFixtures.attempt(2), path: "a.bin", expected: 1_000, maxBytes: .min)
+        #expect(await run(await rig.source.transfer(none)).terminal == .failed(.integrity(.oversize(announced: 1_000, limit: 0))))
+        #expect(rig.staging.contents[none.partialName] == nil)
+        await rig.stop()
+    }
 }

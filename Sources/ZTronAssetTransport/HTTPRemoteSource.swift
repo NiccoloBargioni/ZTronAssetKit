@@ -147,7 +147,7 @@ public final class HTTPRemoteSource: RemoteSource {
             purpose: .manifest,
             ifNoneMatch: request.ifNoneMatch,
             expectedBytes: nil,
-            maxBytes: request.maxBytes,
+            maxBytes: SizeGuard.clampedLimit(request.maxBytes),
             priority: .userInitiated,
             access: request.access
         )
@@ -160,7 +160,7 @@ public final class HTTPRemoteSource: RemoteSource {
         case .staged(let file):
             let bytes: Data
             do {
-                bytes = try await self.staging.readStaged(file.name, maxBytes: request.maxBytes)
+                bytes = try await self.staging.readStaged(file.name, maxBytes: job.maxBytes)
             } catch {
                 await self.staging.discard(job.partialName)
                 throw error.transferError(requiredBytes: nil)
@@ -191,7 +191,7 @@ public final class HTTPRemoteSource: RemoteSource {
             url: url,
             purpose: request.purpose,
             expectedBytes: request.expectedBytes,
-            maxBytes: request.maxBytes,
+            maxBytes: SizeGuard.clampedLimit(request.maxBytes),
             priority: request.priority,
             access: request.access,
             resume: request.resume
