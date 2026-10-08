@@ -129,12 +129,13 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   `statusUpdates(forAssetPackWithID:)` `.downloading` to `PackProgress(snapshotOf:)` and is cancelled when
   `ensureLocalAvailability(of: assetPack(withID:))` returns. `installedBytes`: `AssetPack.downloadSize` of a pack whose
   `status(ofAssetPackWithID:)` contains `.downloaded` — the 26.0 surface has no installed size, so this is an
-  **UNVERIFIED approximation** (compressed download size; for `DEVICE-TEST-PLAN.md`). The reader opens
-  `descriptor(for:searchingInAssetPackWithID:)` on its first `nextChunk` (inside the bulk executor) and reads through
-  `FileHandle(fileDescriptor:closeOnDealloc: true)`; the handle lives in a `Mutex` (E-1). Error mapping:
-  `ManagedBackgroundAssetsError` → `packNotFound`/`fileNotFound`, anything else → `.system(NSError domain, code)`;
-  the reader's mapping to `SourceFailure` is in the tested `PackErrorMapping`. Executable lines: see the coverage
-  report's device-only line.
+  **UNVERIFIED approximation** (compressed download size; for `DEVICE-TEST-PLAN.md`). The reader is the tested
+  `FileHandleChunkReader`: the live file only supplies its opener (`descriptor(for:searchingInAssetPackWithID:)` →
+  `FileHandle(fileDescriptor:closeOnDealloc: true)`), which runs on the first `nextChunk`, inside the bulk executor;
+  the handle lives in a `Mutex` (E-1) and reads go through `read(upToCount:)`. Error mapping:
+  `ManagedBackgroundAssetsError` → `packNotFound`/`fileNotFound`, anything else → `.system(NSError domain, code)`
+  (tested on the host by constructing the errors; the manager is never touched). Measured: **81 llvm-cov lines**
+  (working ceiling 100); `COVERAGE device-only-excluded lines=110 share=1.74% max=3.0% OK` with WP-D's file at L2.
 
 ## E-13 — Test seams and test placement
 
