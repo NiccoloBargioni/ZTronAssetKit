@@ -392,6 +392,62 @@ struct StoreRecoveryTests {
         #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt))
     }
 
+    /// Close-out cycle 3, probe VPC2-D: commit step 4 renamed an invalid `index.bin` over `index.prev` although
+    /// `index.prev` held the only valid generation. Lifetime 1 dooms a rotten blob `corrupt` and closes durably; one body
+    /// byte of `index.bin` then flips, so the load rule picks `index.prev`. Lifetime 2's launch commit fails at step 5
+    /// (EIO): before the fix step 4 had already moved the rotten file over `index.prev` (and the rollback moved it back),
+    /// so the only valid generation was the synced `index.tmp`, which the next commit's ENOSPC fallback removed on the
+    /// now full volume. Lifetime 3 then found no valid index, lost the record and served the `corrupt`-doomed name.
+    @Test(
+        "R-STO-4: a rotten index.bin never replaces a valid index.prev, so EIO on step 5 and then a full volume keep a valid generation",
+        .timeLimit(.minutes(1)),
+        arguments: [CrashMode.processKill, .powerLossKeepMetadata]
+    )
+    @available(macOS 15.0, *)
+    func rottenCurrentNeverReplacesPrevious(end: CrashMode) async throws {
+        // Lifetime 1: the corrupt doom is committed durably, then two more commits (the last one close()'s durable flush).
+        let first = CoreHarness.make()
+        try await StoreRecoveryTests.quarantine(first)
+        try await first.store.markSyncDue()
+        await first.store.close()
+        var disk = first.fileSystem.survivingDisk()
+        let binPath = CoreFixture.layout.indexURL(.current).path
+        let prevPath = CoreFixture.layout.indexURL(.previous).path
+        let previous = try IndexCodec.decode(try #require(disk.files[prevPath], "index.prev exists after three commits")).get().generation
+        // One body byte of index.bin flips, durably (bit rot, not an unsynced write).
+        var rotten = try #require(disk.files[binPath])
+        rotten[IndexHeader.length] ^= 0xFF
+        disk.files[binPath] = rotten
+        disk.makeDurable()
+        let loaded = StoreRecoveryTests.loadRule(disk)
+        #expect(loaded.chosen == .previous && loaded.degraded && loaded.content?.generation == previous)
+        // Lifetime 2: the launch commit's step 5 (index.tmp → index.bin) fails with EIO; then the volume is full.
+        let second = CoreHarness.make(disk: disk, mode: end)
+        second.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        let report = try await second.store.open()
+        #expect(report.degraded && report.generation == previous)
+        let kept = second.content(second.layout.indexURL(.previous)).flatMap { try? IndexCodec.decode([UInt8]($0)).get().generation }
+        #expect(kept == previous, "the committed generation \(previous) is still on disk after the failed launch commit: index.prev holds \(String(describing: kept))")
+        second.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .every, error: .noSpace))
+        await #expect(throws: StoreError.fileSystem(.noSpace)) {
+            try await second.store.markSyncDue()
+        }
+        await second.store.close()
+        #expect(CoreInvariants.blobRemovals(second.fileSystem.operations, layout: second.layout).isEmpty)
+        let afterFull = second.fileSystem.survivingDisk()
+        let left = StoreRecoveryTests.loadRule(afterFull)
+        #expect((left.content?.generation ?? 0) >= previous, "\(end): a valid generation is left after the full volume: \(String(describing: left.chosen))")
+        // Lifetime 3: space is back.
+        let headers = IndexFile.allCases.compactMap { afterFull.files[CoreFixture.layout.indexURL($0).path].flatMap(IndexHeader.parse) }
+        let third = CoreHarness.make(disk: afterFull)
+        let thirdReport = try await third.store.open()
+        #expect(headers.allSatisfy { thirdReport.launchEpoch > $0.generation }, "I-5: the launch epoch reuses a generation")
+        #expect(await third.state.core.records[QuarantineFixture.entry.identifier] != nil, "\(end): the quarantined record survived")
+        _ = try await third.store.apply(CoreFixture.manifest([QuarantineFixture.entry]), etag: nil, eviction: nil)
+        #expect(await third.store.location(for: QuarantineFixture.entry.identifier, extensions: [], recordingAccess: false) == nil, "\(end): the corrupt name is never re-adopted (§4.4)")
+        #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[QuarantineFixture.key], .corrupt))
+    }
+
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
     /// stopped between its renames; returns the disk the killed process leaves.
     @available(macOS 15.0, *)
