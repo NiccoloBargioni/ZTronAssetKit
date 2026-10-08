@@ -95,6 +95,24 @@ struct BackgroundResumeTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-8: any other failure of a continued background download keeps its meaning, and the data is not used again", .timeLimit(.minutes(1)))
+    func otherFailuresOfAContinuation() async throws {
+        let rig = try Rig("bg-resume-timeout")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let data = ResumeData(bytes: Data("archive".utf8))
+        #expect(await Self.pause(rig.job(1), returning: data, rig: rig, coordinator: coordinator) == .paused(resumable: true))
+        let continued = rig.job(2)
+        let handle = await coordinator.start(continued)
+        await rig.driver.fail(continued.partialName, code: NSURLErrorTimedOut)
+        // A timeout is a timeout (backoff, ARCHITECTURE §7.6), not a refused resume.
+        #expect(await run(handle).terminal == .failed(.transient(.timedOut, retryAfter: nil)))
+        let next = await coordinator.start(rig.job(3))
+        #expect(await rig.driver.starts.map(\.resumeData) == [nil, data, nil])
+        withExtendedLifetime(next) {}
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-8: a checksum-less background transfer is never resumed: its pause keeps no resume data", .timeLimit(.minutes(1)))
     func checksumLessPauseKeepsNothing() async throws {
         let rig = try Rig("bg-resume-legacy")
