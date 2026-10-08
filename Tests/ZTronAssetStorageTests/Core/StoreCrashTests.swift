@@ -242,12 +242,14 @@ struct StoreCrashTests {
 
     /// How the full-volume lifetime of the enumerations below ends: killed (the volatile state survives), or by a power
     /// loss that drops what it never synced (review close-out, probe VP7: an unsynced generation promoted at launch
-    /// was lost only once the power failed).
+    /// was lost only once the power failed). Both enumerations run their cases one at a time (`.serialized`, close-out
+    /// cycle 3): run side by side with everything else, each case took about a third of its time limit under TSan.
     static let fullVolumeEnds: [CrashMode] = [.processKill, .powerLossDropUnsynced, .powerLossKeepMetadata]
 
     @Test(
         "R-STO-5: a fault at every commit step, a kill, then a launch on a full volume that ends in a kill or a power loss preserve I-1…I-5",
         .timeLimit(.minutes(1)),
+        .serialized,
         arguments: CommitFault.allCases, StoreCrashTests.fullVolumeEnds
     )
     @available(macOS 15.0, *)
@@ -284,6 +286,7 @@ struct StoreCrashTests {
     @Test(
         "R-STO-5: crash at every boundary, then a launch on a full volume that ends in a kill or a power loss, preserves I-1…I-5",
         .timeLimit(.minutes(1)),
+        .serialized,
         arguments: CrashMode.allCases, StoreCrashTests.fullVolumeEnds
     )
     @available(macOS 15.0, *)
