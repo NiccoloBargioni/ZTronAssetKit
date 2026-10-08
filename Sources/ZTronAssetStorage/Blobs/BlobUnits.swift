@@ -99,9 +99,11 @@ enum BlobPlacementUnit {
 /// One deletion unit of the reaper (P-13): up to `deletionBatchSize` unlinks in sorted order, each result kept, so
 /// a failure keeps only its own key doomed (ARCHITECTURE §4.4).
 ///
-/// The unit also stops once `budget` seconds of the injected monotonic clock have passed (after at least one
-/// unlink), so a slow volume shortens the batch instead of lengthening the time between suspension points; the keys
-/// it did not attempt go to the next unit (ADR draft B-10). On `ManualTimeSource` time never passes inside a unit.
+/// The unit is also bounded by time on the injected monotonic clock (ADR draft B-10, tightened in review round 2):
+/// before each unlink after the first it stops when the time spent so far **plus the slowest unlink it has seen**
+/// would pass `budget`, so the last unlink is predicted instead of overshooting; the keys it did not attempt go to
+/// the next unit. A slow volume therefore shortens the batch instead of lengthening the time between suspension
+/// points. On `ManualTimeSource` time never passes inside a unit, so deterministic tests see count-bounded units.
 enum BlobDeletionUnit {
     /// What the unit did: the failed unlinks, and how many keys (a prefix of the input) it attempted.
     struct Outcome: Sendable {
@@ -111,17 +113,20 @@ enum BlobDeletionUnit {
         var attempted: Int
     }
 
-    /// The time a deletion unit may take before it yields: P-13's 5 ms batch budget less the overshoot of the last
-    /// unlink and the scheduling noise of a busy device.
-    static let budget: TimeInterval = 0.003
+    /// The time a deletion unit may take before it yields. P-13 allows 5 ms between suspension points; 3 ms left
+    /// about 2 ms for preemption and a slow last unlink, and a loaded machine used it up (unit p95 5.26–5.27 ms in
+    /// review round 2), so 3 ms of margin are kept.
+    static let budget: TimeInterval = 0.002
 
-    /// Removes each key's blob until the budget is spent; absent files count as removed (idempotent sweeps,
+    /// Removes each key's blob until the budget would be spent; absent files count as removed (idempotent sweeps,
     /// R-CLN-12).
     static func run(fileSystem: any FileSystem, layout: StoreLayout, keys: [BlobKey], time: any TimeSource, budget: TimeInterval) -> Outcome {
-        let deadline = time.monotonicNow().adding(seconds: budget)
+        let start = time.monotonicNow()
+        var last = start
+        var slowest: TimeInterval = 0
         var outcome = Outcome(failures: [:], attempted: 0)
         for key in keys {
-            if outcome.attempted > 0, time.monotonicNow() >= deadline {
+            if outcome.attempted > 0, last.seconds(since: start) + slowest > budget {
                 break
             }
             outcome.attempted += 1
@@ -130,6 +135,9 @@ enum BlobDeletionUnit {
             } catch {
                 outcome.failures[key] = error
             }
+            let now = time.monotonicNow()
+            slowest = max(slowest, now.seconds(since: last))
+            last = now
         }
         return outcome
     }
