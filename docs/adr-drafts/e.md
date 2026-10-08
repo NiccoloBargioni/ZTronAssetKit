@@ -8,7 +8,7 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10 at merge.
 New internal files: `AppleSourceState.swift` (the source's only mutable state, an actor), `PackAvailabilityCoordinator.swift`
 (single-flight `ensureAvailable`), `PackCopier.swift` (every staging call), `AppleCatalogReader.swift`, `PackTransfer.swift`
 (handle, stop request, driver), `HashingChunkSource.swift`, `PackProgressScaler.swift` (+ `PackProgress(snapshotOf:)`),
-`PackErrorMapping.swift`.
+`PackErrorMapping.swift`, `FileHandleChunkReader.swift` (the live reader's mechanics, plus `PackUpdateCheck(updatingIDs:removedIDs:)`).
 
 ## E-1 — The catalog digest and the asset check are computed inside the staging pull
 
