@@ -91,6 +91,12 @@ extension AssetStore {
                 try? fileSystem.rename(from: verifying, to: part, mode: .exclusive)
             }
             throw .cancelled
+        } catch .fileSystem(let failure) {
+            // The engine retries under a new attempt name, so the claimed bytes are of no further use: they are
+            // removed rather than stranded in staging until the next collection (ARCHITECTURE §3).
+            // REENTRANCY: b-3 (proposed) — nothing: the call throws right after.
+            await self.discardClaimed(verifying, sidecar)
+            throw .fileSystem(failure)
         } catch {
             throw error
         }
@@ -117,15 +123,24 @@ extension AssetStore {
             throw .superseded(firstKnown)
         }
         let primaryKey = BlobKey(hash: digest, ext: primary.ext)
-        // REENTRANCY: R3, R4 — `bindVerifiedFile` re-validates every record after its awaits.
-        var (locations, rescued) = try await self.bindVerifiedFile(
-            at: verifying,
-            sidecar: sidecar,
-            key: primaryKey,
-            byteCount: size,
-            ids: primary.ids,
-            expecting: expectation
-        )
+        let bound: (locations: [AssetID: AssetLocation], rescued: Bool)
+        do throws(StoreError) {
+            // REENTRANCY: R3, R4 — `bindVerifiedFile` re-validates every record after its awaits.
+            bound = try await self.bindVerifiedFile(
+                at: verifying,
+                sidecar: sidecar,
+                key: primaryKey,
+                byteCount: size,
+                ids: primary.ids,
+                expecting: expectation
+            )
+        } catch .fileSystem(let failure) {
+            // The placement failed and nothing was bound: the claimed bytes are removed, as after a failed hash.
+            // REENTRANCY: b-3 (proposed) — nothing: the call throws right after.
+            await self.discardClaimed(verifying, sidecar)
+            throw .fileSystem(failure)
+        }
+        var (locations, rescued) = bound
         for group in groups.dropFirst() {
             // REENTRANCY: R4 — as above, for the copy bound under the group's extension.
             if let extra = try? await self.bindCopy(of: primaryKey, ext: group.ext, byteCount: size, ids: group.ids, expecting: expectation) {
@@ -306,16 +321,25 @@ extension AssetStore {
             self.abandonAcquisition(key, acquisition)
             throw error
         }
-        // REENTRANCY: R4 — `placeAndBind` re-validates every record after its placement unit.
-        return try await self.placeAndBind(
-            source: copy,
-            sidecar: nil,
-            key: key,
-            byteCount: byteCount,
-            ids: ids,
-            expecting: expectation,
-            acquisition: acquisition
-        )
+        do throws(StoreError) {
+            // REENTRANCY: R4 — `placeAndBind` re-validates every record after its placement unit.
+            return try await self.placeAndBind(
+                source: copy,
+                sidecar: nil,
+                key: key,
+                byteCount: byteCount,
+                ids: ids,
+                expecting: expectation,
+                acquisition: acquisition
+            )
+        } catch .fileSystem(let failure) {
+            let fileSystem = self.environment.fileSystem
+            // REENTRANCY: b-3 (proposed) — nothing: the call throws right after removing the copy.
+            await self.runUnit(on: self.environment.metadataExecutor) {
+                try? fileSystem.removeItem(at: copy)
+            }
+            throw .fileSystem(failure)
+        }
     }
 
     /// Copies the blob `source` into `staging/<transfer>.<epoch>-<seq>.parttmp` in ≤ 1 MiB units on the bulk

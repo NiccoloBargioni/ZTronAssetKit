@@ -5,7 +5,9 @@ import ZTronAssetModel
 /// ADR-030; WP-B).
 extension AssetStore {
     /// `apply(_:etag:eviction:)`: one committed generation holding relocations, prunes, content changes and adoption
-    /// by hash (before any dereference, store-1 S1-05); installs a snapshot at once.
+    /// by hash (before any dereference, store-1 S1-05); installs a snapshot at once. Its writes yield between chunks
+    /// (C2) behind the commit fence, so no generation ever holds the new manifest and ETag with part of the records
+    /// (R-NET-5: a later `304` would keep them at the old content for good; ADR draft B-23).
     func performApply(_ manifest: ValidatedManifest, etag: ETag?, eviction: EvictionPlan?) async throws(StoreError) -> ApplyReport {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -26,9 +28,14 @@ extension AssetStore {
         let unchanged = diff.isEmpty && eviction == nil && !self.state.core.degraded && plan.identical && etag == self.state.core.etag
         var report = ApplyReport(generation: 0)
         var swept = 0
+        // The commit fence (ADR draft B-23), raised in the same turn as the phase check above: from the first write
+        // to the last, no commit, adoption report or `close()` captures a half-applied manifest, and the writes run
+        // to the end whatever happens meanwhile (nothing below throws until the commit).
+        self.state.core.applyGate.writing = true
         if !unchanged {
-            // REENTRANCY: b-7 (proposed) — `applyDiff` yields between chunks; each write re-reads the record it changes.
-            report = try await self.applyDiff(diff, newRecords: plan.newRecords, manifest: manifest, etag: etag, now: now, swept: &swept)
+            // REENTRANCY: b-7 (proposed) — `applyDiff` yields between chunks behind the fence; each write re-reads
+            // the record it changes.
+            report = await self.applyDiff(diff, newRecords: plan.newRecords, manifest: manifest, etag: etag, now: now, swept: &swept)
         }
         // Adoption before any dereference (store-1 S1-05): a key moving from a removed id to an added one is bound
         // before the prune releases it, so it is never doomed.
@@ -36,13 +43,14 @@ extension AssetStore {
             if self.adoptKnownBlob(for: id, orphans: confirmed, now: now) {
                 report.reused.append(id)
             }
-            // REENTRANCY: b-7 (proposed) — the phase and writability; the next candidate is re-validated by
-            // `adoptKnownBlob` against the state as it is then.
-            try await self.pace(&swept)
+            // REENTRANCY: b-7 (proposed) — behind the fence; the next candidate is re-validated by `adoptKnownBlob`
+            // against the state as it is then.
+            await self.pace(&swept)
         }
         if !unchanged {
-            // REENTRANCY: b-7 (proposed) — `prune` yields between chunks and removes only records still present.
-            report.pruned = try await self.prune(diff.removed, swept: &swept)
+            // REENTRANCY: b-7 (proposed) — `prune` yields between chunks behind the fence and removes only records
+            // still present.
+            report.pruned = await self.prune(diff.removed, swept: &swept)
         }
         if !unchanged || !report.reused.isEmpty {
             if let eviction {
@@ -51,6 +59,7 @@ extension AssetStore {
             self.state.core.degraded = false
             self.markDirtyInternal(.soon)
         }
+        self.endApplyWrites()
         // REENTRANCY: R5 — nothing but the phase: every mutation above was made before the await; the report
         // describes them and the generation is read after the commit.
         try await self.requireCommittedInternal(.ordered)
@@ -67,17 +76,26 @@ extension AssetStore {
     static let sweepChunk = 512
 
     /// Counts one item of a long sweep and yields the actor after every `sweepChunk` items (C2, as REENTRANCY R8
-    /// does for eviction and reconciliation chunks).
-    private func pace(_ swept: inout Int) async throws(StoreError) {
+    /// does for eviction and reconciliation chunks). It never throws: the writes run behind the commit fence and
+    /// always run to the end, because a half-applied state must never be the one a commit or `close()` persists
+    /// (ADR draft B-23).
+    private func pace(_ swept: inout Int) async {
         swept += 1
         guard swept % AssetStore.sweepChunk == 0 else {
             return
         }
-        // REENTRANCY: b-7 (proposed) — the phase and writability; `apply` and `admit` are serialised by the gate, so
-        // the plan and the applied manifest are unchanged; every caller re-reads the record it touches next.
+        // REENTRANCY: b-7 (proposed) — nothing stops the writes: the fence is up, so nothing persists or reports
+        // the half-applied state and `close()` waits for the fence before its durable commit; the gate keeps the
+        // plan and the applied manifest unchanged; every caller re-reads the record it touches next; the phase and
+        // writability are re-checked by `apply`'s commit after the last write.
         await Task.yield()
-        try self.checkLive()
-        try self.checkWritable()
+    }
+
+    /// Lowers the commit fence after `apply`'s last write and resumes everything that waited for it (ADR draft
+    /// B-23).
+    func endApplyWrites() {
+        self.state.core.applyGate.writing = false
+        self.resumeApplyWriteWaiters()
     }
 
     /// Waits until no other `apply` or `admit` runs, then holds the gate: their plans and writes, which yield
@@ -93,8 +111,13 @@ extension AssetStore {
         self.state.core.applyGate.held = true
     }
 
-    /// Releases the gate and resumes every waiter; each re-checks it.
+    /// Releases the gate and resumes every waiter; each re-checks it. The fence is already down (`apply` lowers it
+    /// after its last write, before any throwing await); lowering it here too keeps a future early exit from
+    /// stranding the callers parked on it.
     private func releaseApplyGate() {
+        if self.state.core.applyGate.writing {
+            self.endApplyWrites()
+        }
         self.state.core.applyGate.held = false
         self.resumeApplyWaiters()
     }
@@ -122,7 +145,8 @@ extension AssetStore {
         }
     }
 
-    /// Applies additions, content changes and relocations (adoption and prunes follow), yielding between chunks.
+    /// Applies additions, content changes and relocations (adoption and prunes follow), yielding between chunks
+    /// behind the commit fence.
     private func applyDiff(
         _ diff: ManifestDiff,
         newRecords: [AssetID: AssetRecord],
@@ -130,7 +154,7 @@ extension AssetStore {
         etag: ETag?,
         now: Date,
         swept: inout Int
-    ) async throws(StoreError) -> ApplyReport {
+    ) async -> ApplyReport {
         var report = ApplyReport(generation: 0)
         self.state.core.appliedManifest = manifest
         self.state.core.manifestRevision += 1
@@ -150,8 +174,8 @@ extension AssetStore {
                 self.insertRecord(for: entry, now: now)
                 report.added.append(id)
             }
-            // REENTRANCY: b-7 (proposed) — the phase and writability; the next id's record is re-read.
-            try await self.pace(&swept)
+            // REENTRANCY: b-7 (proposed) — behind the fence (see `pace`); the next id's record is re-read.
+            await self.pace(&swept)
         }
         for id in diff.contentChanged {
             if let entry = diff.upserts[id] {
@@ -159,7 +183,7 @@ extension AssetStore {
                 report.contentChanged.append(id)
             }
             // REENTRANCY: b-7 (proposed) — as above.
-            try await self.pace(&swept)
+            await self.pace(&swept)
         }
         for id in diff.metadataChanged {
             if let entry = diff.upserts[id], var record = self.state.core.records[id] {
@@ -170,14 +194,15 @@ extension AssetStore {
                 report.relocated.append(id)
             }
             // REENTRANCY: b-7 (proposed) — as above.
-            try await self.pace(&swept)
+            await self.pace(&swept)
         }
         return report
     }
 
     /// Removes the records of ids the manifest no longer lists and dooms their blobs (R-CLN-1), yielding between
-    /// chunks; the reaper deletes them after acknowledgement, grace, commit and leases (ARCHITECTURE §4.4).
-    private func prune(_ removed: [AssetID], swept: inout Int) async throws(StoreError) -> [AssetID] {
+    /// chunks behind the commit fence; the reaper deletes them after acknowledgement, grace, commit and leases
+    /// (ARCHITECTURE §4.4).
+    private func prune(_ removed: [AssetID], swept: inout Int) async -> [AssetID] {
         var pruned: [AssetID] = []
         for id in removed {
             if let record = self.state.core.records.removeValue(forKey: id) {
@@ -187,8 +212,8 @@ extension AssetStore {
                     self.releaseReference(blob, dooming: .unreferenced)
                 }
             }
-            // REENTRANCY: b-7 (proposed) — the phase and writability; the next id is removed only if still present.
-            try await self.pace(&swept)
+            // REENTRANCY: b-7 (proposed) — behind the fence (see `pace`); the next id is removed only if still present.
+            await self.pace(&swept)
         }
         return pruned
     }
@@ -403,6 +428,13 @@ extension AssetStore {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
         try self.checkWritable()
+        while self.state.core.applyGate.writing {
+            // REENTRANCY: b-8 (proposed) — the phase and writability, then the fence again: the report is captured
+            // only from a state no `apply` is half way through (ADR draft B-23).
+            await self.waitForApplyWrites()
+            try self.checkLive()
+            try self.checkWritable()
+        }
         let manifest = self.state.core.appliedManifest
         let scope = self.state.eviction.retentionScope
         var adopted: Set<String> = []

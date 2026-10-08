@@ -23,6 +23,9 @@ struct IndexCommitInput: Sendable {
     var blobTable: [BlobKey: BlobState] = [:]
     /// The doom bookkeeping of the keys whose deletion unit is in flight when the state was captured.
     var deletingDooms: [BlobKey: DoomInfo] = [:]
+    /// The doom of each key whose replacement placement was in flight when the state was captured: `live` in the
+    /// table, but the bytes under its name are still the doomed ones (ADR draft B-24).
+    var replacingDooms: [BlobKey: DoomInfo] = [:]
 
     /// The content to encode: `content` with DOOMED completed from the captured blob table.
     var completeContent: IndexContent {
@@ -37,7 +40,9 @@ struct IndexCommitInput: Sendable {
             case .deleting:
                 content.doomed[key] = self.deletingDooms[key]?.reason ?? .unreferenced
             case .live:
-                break
+                if let replacing = self.replacingDooms[key] {
+                    content.doomed[key] = replacing.reason
+                }
             }
         }
         return content

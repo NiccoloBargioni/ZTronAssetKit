@@ -29,10 +29,12 @@ enum ReferenceAcquisition: Sendable, Hashable {
     case new
     /// The key was live: one more reference; the existing file is kept if it is complete (dedupe).
     case reused
-    /// The key was doomed `unreferenced`: rescued (ADR-018); `previous` is restored if nothing ends up bound.
+    /// The key was doomed `unreferenced`: rescued (ADR-018); if nothing ends up bound it is doomed again afresh
+    /// with `previous`'s reason (ADR draft B-25).
     case rescued(previous: DoomInfo)
     /// The key was doomed `purged` or `corrupt`: the verified bytes replace the name (ADR-018, store-1 S1-06); the
-    /// key is held in `publishing` until the replacement is in place.
+    /// key is held in `publishing`, and its doom in `replacingDooms` (so every commit meanwhile still records it),
+    /// until the replacement is in place.
     case replaced(previous: DoomInfo)
 }
 
@@ -132,6 +134,10 @@ extension AssetStore {
             case .doomed(let info)?:
                 self.state.core.blobTable[key] = .live(references: 1)
                 self.state.core.publishing.insert(key)
+                // Until the replacement rename, the bytes under the name are still the doomed ones: a commit
+                // captured meanwhile must keep the doom, or a crash would let launch adopt them (review round 2
+                // probe 3, ADR draft B-24).
+                self.state.core.replacingDooms[key] = info
                 return .replaced(previous: info)
             case nil:
                 self.state.core.publishing.insert(key)
@@ -296,24 +302,39 @@ extension AssetStore {
         self.resumeKeyWaiters(key)
     }
 
-    /// A new or replaced key leaves `publishing` once its placement finished (or was given up).
+    /// A new or replaced key leaves `publishing` once its placement finished (or was given up); a replaced key's
+    /// persisted doom goes with it (the bytes under the name are now the verified ones, or the doom is renewed by
+    /// `dropProvisionalReference` in the same turn).
     private func releasePublishing(_ key: BlobKey, _ acquisition: ReferenceAcquisition) {
         switch acquisition {
-        case .new, .replaced:
+        case .new:
             self.state.core.publishing.remove(key)
+        case .replaced:
+            self.state.core.publishing.remove(key)
+            self.state.core.replacingDooms[key] = nil
         case .reused, .rescued:
             break
         }
     }
 
     /// Releases the provisional reference `acquireReference` took. A rescued or replaced key that ended up bound to
-    /// nothing gets its previous doom back (its dropping generation may not be committed yet); a new key that ended
-    /// up bound to nothing is doomed as never committed (`droppedInGeneration = 0`, REENTRANCY R4).
+    /// nothing is doomed again with its previous reason, but **afresh** (ADR draft B-25): while the reference was
+    /// held the key was live, so another record may have gained it, appeared in an acknowledged snapshot and lost it
+    /// again (a plain decrement, no doom); the old `eligibleAt` would then let the reaper unlink it with no grace
+    /// after the snapshot that dropped it (I-3, review round 2 probe 1). A new key that ended up bound to nothing is
+    /// doomed as never committed (`droppedInGeneration = 0`, REENTRANCY R4).
     private func dropProvisionalReference(_ key: BlobKey, _ acquisition: ReferenceAcquisition, boundAny: Bool) {
         switch acquisition {
         case .rescued(let previous), .replaced(let previous):
             if !boundAny, case .live(references: 1)? = self.state.core.blobTable[key] {
-                self.state.core.blobTable[key] = .doomed(previous)
+                self.state.core.blobTable[key] = .doomed(
+                    DoomInfo(
+                        reason: previous.reason,
+                        sinceSnapshotVersion: self.state.core.snapshots.version + 1,
+                        droppedInGeneration: max(previous.droppedInGeneration, self.state.core.nextGeneration),
+                        failedUnlinks: previous.failedUnlinks
+                    )
+                )
                 self.scheduleDoomedKey()
                 return
             }

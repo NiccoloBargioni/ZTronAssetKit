@@ -17,13 +17,21 @@ extension AssetStore {
         }
     }
 
-    /// Returns once every mutation counted before the call is committed at `durability` (REENTRANCY R5).
+    /// Returns once every mutation counted before the call is committed at `durability` (REENTRANCY R5). While
+    /// `apply` writes its chunks (the commit fence, ADR draft B-23) it waits for all of them: a generation never
+    /// holds a half-applied manifest.
     func requireCommittedInternal(_ durability: CommitDurability) async throws(StoreError) {
         try self.checkLive()
         let target = self.state.core.commits.mutationSerial
         while !self.state.core.commits.covers(target, durability) {
             try self.checkLive()
             try self.checkWritable()
+            if self.state.core.applyGate.writing {
+                // REENTRANCY: b-8 (proposed) — the loop re-reads coverage, the phase, the fence and the in-flight
+                // flag once `apply`'s writes are complete.
+                await self.waitForApplyWrites()
+                continue
+            }
             if self.state.core.commits.inFlight {
                 // REENTRANCY: R5 — the loop re-reads coverage, the phase and the in-flight flag after the running
                 // commit finished (successfully or not).
@@ -71,7 +79,8 @@ extension AssetStore {
             durability: durability,
             lock: self.state.core.lock,
             blobTable: self.state.core.blobTable,
-            deletingDooms: self.state.core.deletingDooms
+            deletingDooms: self.state.core.deletingDooms,
+            replacingDooms: self.state.core.replacingDooms
         )
         self.state.core.commits.inFlight = true
         self.state.core.commits.dirtyFanOuts = []

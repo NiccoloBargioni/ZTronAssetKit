@@ -128,6 +128,10 @@ struct StoreCoreState: Sendable {
     /// The doom bookkeeping of each key whose deletion unit is in flight (`BlobState.deleting` carries none): a
     /// commit captured meanwhile still persists the reason in DOOMED, and a failed unlink restores it with backoff.
     var deletingDooms: [BlobKey: DoomInfo] = [:]
+    /// The doom of each `purged` or `corrupt` key whose replacement placement is in flight (`acquireReference`'s
+    /// `.replaced`; the table says `live` meanwhile): a commit captured before the replacement rename still persists
+    /// it in DOOMED, so launch never adopts the doomed bytes still under the name (ADR draft B-24).
+    var replacingDooms: [BlobKey: DoomInfo] = [:]
     /// Publishers waiting for an in-flight publication or deletion of the same key (REENTRANCY R3, R7).
     var keyWaiters: [BlobKey: [CheckedContinuation<Void, Never>]] = [:]
     /// Unreferenced, undoomed blobs listed at launch: adoptable by a later `apply` (degraded rebuild, store.md
@@ -149,12 +153,19 @@ struct StoreCoreState: Sendable {
     var applyGate = ApplyGate()
 }
 
-/// The gate that lets one `apply` or `admit` run at a time.
+/// The gate that lets one `apply` or `admit` run at a time, and the commit fence of `apply`'s writes.
 struct ApplyGate: Sendable {
     /// An `apply` or `admit` holds the gate.
     var held = false
     /// Callers waiting for it; `close()` resumes them and they unwind with `.closed`.
     var waiters: [CheckedContinuation<Void, Never>] = []
+    /// The commit fence (ADR draft B-23): `apply` is writing its chunks, so the state is half applied (the new
+    /// manifest and ETag are installed, records are not all added, changed or pruned yet). No commit captures it
+    /// (`requireCommitted` waits, `runDueWork` skips its commit), `adoptionReport()` does not capture it, and
+    /// `close()` waits before its durable commit. Raised before `apply`'s first write, lowered after its last.
+    var writing = false
+    /// Callers waiting for the fence to drop (proposed REENTRANCY row b-8).
+    var writeWaiters: [CheckedContinuation<Void, Never>] = []
 }
 
 /// Commit scheduling (P-5): mutations are counted, commits cover a prefix of them, and at most one commit runs at

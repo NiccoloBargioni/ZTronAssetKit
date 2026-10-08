@@ -112,6 +112,23 @@ extension AssetStore {
         }
     }
 
+    /// Suspends until `apply`'s writes are complete (the commit fence is down, ADR draft B-23).
+    func waitForApplyWrites() async {
+        // REENTRANCY: b-8 (proposed) — nothing here: every caller re-reads the fence and the phase in its loop.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.state.core.applyGate.writeWaiters.append(continuation)
+        }
+    }
+
+    /// Resumes every caller waiting for the commit fence; each re-checks it.
+    func resumeApplyWriteWaiters() {
+        let waiters = self.state.core.applyGate.writeWaiters
+        self.state.core.applyGate.writeWaiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
     /// Suspends until the in-flight publication or deletion of `key` finishes (REENTRANCY R3).
     func waitForKey(_ key: BlobKey) async {
         // REENTRANCY: R3 — nothing here: the caller re-reads `blobTable[key]` and `publishing` and decides anew.
@@ -161,11 +178,20 @@ extension AssetStore {
         for key in Array(self.state.core.keyWaiters.keys) {
             self.resumeKeyWaiters(key)
         }
-        while self.state.core.unitsInFlight > 0 {
-            // REENTRANCY: b-1 (proposed) — the loop re-reads the counter; units resuming meanwhile see `closing` and
-            // drop their mutation.
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                self.state.core.drainWaiters.append(continuation)
+        while true {
+            if self.state.core.unitsInFlight > 0 {
+                // REENTRANCY: b-1 (proposed) — the loop re-reads the counter and the fence; units resuming meanwhile
+                // see `closing` and drop their mutation.
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.state.core.drainWaiters.append(continuation)
+                }
+            } else if self.state.core.applyGate.writing {
+                // REENTRANCY: b-8 (proposed) — the loop re-reads the counter and the fence: `apply` runs its writes to
+                // the end even once closing, so the durable commit below never captures them half done (ADR draft
+                // B-23); `apply` itself then unwinds with `.closed` at its commit.
+                await self.waitForApplyWrites()
+            } else {
+                break
             }
         }
         if self.state.core.unavailable == nil, !self.state.core.commits.covers(self.state.core.commits.mutationSerial, .durable) {
@@ -185,6 +211,7 @@ extension AssetStore {
         self.resumeCommitWaiters()
         self.resumeOpenWaiters()
         self.resumeApplyWaiters()
+        self.resumeApplyWriteWaiters()
         for key in Array(self.state.core.keyWaiters.keys) {
             self.resumeKeyWaiters(key)
         }

@@ -147,9 +147,11 @@ struct StoreRaceTests {
         await metadata.release(await metadata.heldUnits[1])
         _ = try await applying.value
         await metadata.release(placement)  // the sidecar removal fails: the provisional reference is dropped
+        await StoreRaceTests.step(metadata)  // the claimed file is discarded before the error is thrown (B-26)
         await #expect(throws: StoreError.fileSystem(.io)) {
             try await publishing.value
         }
+        #expect(!StoreRecoveryTests.stagingNames(harness).contains { $0.hasSuffix(".verifying") })
         await metadata.setHolding(false)
         guard case .doomed? = await harness.state.core.blobTable[key] else {
             Issue.record("the key is not doomed")
@@ -228,6 +230,78 @@ struct StoreRaceTests {
         await sink.setHolding(false)
         _ = try await applying.value
         #expect(await store.location(for: x.identifier, extensions: [], recordingAccess: false) == nil)
+    }
+
+    /// Review round 2, probe 1: while a rescue's placement is held the key is live, so another record can gain it,
+    /// appear in an acknowledged snapshot and lose it again (a decrement, no fresh doom). The dropped rescue must not
+    /// restore the old doom, whose grace ended long before that snapshot was replaced.
+    @Test("R-CLN-5: a rescue that binds nothing after another record gained and lost the key is doomed afresh and waits a new grace", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func droppedRescueIsDoomedAfresh() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.make(metadata: metadata)
+        let bytes = CoreFixture.bytes(900)
+        let key = CoreFixture.key(bytes)
+        let a = CoreFixture.entry("a", bytes)
+        let x = CoreFixture.entry("x", bytes)
+        let y = CoreFixture.entry("y", bytes)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([a, x]), etag: nil, eviction: nil)
+        try await harness.publish(bytes, [x], sequence: 1)
+        // `a` publishes the same bytes later; its purge-style residency keeps it from adopting them at `apply`.
+        await harness.store.setResidency(.absent(.purged), of: a.identifier, dooming: .purged)
+        _ = try await harness.store.apply(CoreFixture.manifest([a]), etag: nil, eviction: nil)
+        guard case .doomed(let first)? = await harness.state.core.blobTable[key], let oldEligibility = first.eligibleAt else {
+            Issue.record("the pruned key is not doomed and acknowledged")
+            return
+        }
+        harness.time.advance(by: 60)
+        // `a`'s publication rescues the key; its placement unit is held.
+        let staged = try await harness.stage(bytes, for: a, sequence: 2)
+        await metadata.setHolding(true)
+        let publication = Task {
+            try await harness.store.publish(staged, binding: [a.identifier], expecting: a.contentIdentity, urgency: .bulk)
+        }
+        await StoreRaceTests.step(metadata)  // the claim
+        await metadata.waitForHeldUnits(atLeast: 1)  // the placement
+        #expect(await harness.state.core.blobTable[key] == .live(references: 1))
+        // `y` adopts the live key and readers get a snapshot listing it.
+        let adopt = Task {
+            try await harness.store.apply(CoreFixture.manifest([a, y]), etag: nil, eviction: nil)
+        }
+        await metadata.waitForHeldUnits(atLeast: 2)
+        await metadata.release(await metadata.heldUnits[1])
+        #expect(try await adopt.value.reused == [y.identifier])
+        #expect(await harness.sink.installed.location(for: y.identifier, extensions: []) != nil)
+        // The next manifest prunes `y` and changes `a`, so the held publication binds nothing.
+        let prune = Task {
+            try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(901))]), etag: nil, eviction: nil)
+        }
+        await metadata.waitForHeldUnits(atLeast: 2)
+        await metadata.release(await metadata.heldUnits[1])
+        _ = try await prune.value
+        #expect(await harness.sink.installed.location(for: y.identifier, extensions: []) == nil)
+        let versionWithoutKey = await harness.state.core.snapshots.version
+        await metadata.setHolding(false)
+        await #expect(throws: StoreError.superseded(a.identifier)) {
+            try await publication.value
+        }
+        guard case .doomed(let renewed)? = await harness.state.core.blobTable[key] else {
+            Issue.record("the dropped rescue left the key undoomed")
+            return
+        }
+        #expect(renewed.eligibleAt == nil, "the old eligibility (\(oldEligibility)) must not come back")
+        #expect(renewed.sinceSnapshotVersion > versionWithoutKey && renewed.reason == .unreferenced)
+        // No time passes: the snapshot listing `y` at this key was replaced only now, so no grace has run.
+        let work = await harness.store.runDueWork()
+        #expect(work.reapedKeys == 0 && harness.exists(harness.layout.blobURL(key)), "I-3: unlinked with no grace")
+        // A full grace after the new acknowledgement, the key goes.
+        harness.time.advance(by: 11)
+        var reaped = await harness.store.runDueWork().reapedKeys
+        harness.time.advance(by: 11)
+        reaped += await harness.store.runDueWork().reapedKeys
+        #expect(reaped == 1 && !harness.exists(harness.layout.blobURL(key)))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
     /// Waits until a caller is parked on the running commit (no sleeping: the actor is polled between yields).
