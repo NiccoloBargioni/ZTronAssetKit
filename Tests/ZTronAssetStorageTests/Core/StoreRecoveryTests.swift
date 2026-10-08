@@ -493,6 +493,47 @@ struct StoreRecoveryTests {
         #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[key], .corrupt), "the rotten blob is still doomed corrupt")
     }
 
+    /// Close-out cycle 3, found by the state-space enumeration: an I/O error while the launch read an index file made
+    /// the load rule see that file as absent (a failed stat) or torn (a failed read), so the launch committed over it:
+    /// it rewrote or moved the newest valid generation it had not read (with only index.tmp valid, a fresh empty store
+    /// overwrote it). A launch that cannot read its index files now serves what it loaded read-only and writes nothing.
+    @Test(
+        "R-STO-4: a launch that cannot read an index file serves read-only and never writes over it",
+        .timeLimit(.minutes(1)),
+        arguments: [FSOpKind.itemInfo, .read]
+    )
+    @available(macOS 15.0, *)
+    func unreadableIndexOpensReadOnly(failing operation: FSOpKind) async throws {
+        let first = CoreHarness.make()
+        try await StoreRecoveryTests.quarantine(first)
+        try await first.store.markSyncDue()
+        await first.store.close()
+        let disk = first.fileSystem.survivingDisk()
+        let indexFiles = IndexFile.allCases.map { disk.files[CoreFixture.layout.indexURL($0).path] }
+        let newest = try #require(StoreRecoveryTests.loadRule(disk).content?.generation)
+        // Lifetime 2: the first stat or read of index.bin fails with EIO.
+        let second = CoreHarness.make(disk: disk)
+        second.fileSystem.addFault(FaultRule(operation: operation, matching: URLMatcher(lastComponentSuffix: "index.bin"), occurrence: .nth(1), error: .io))
+        let report = try await second.store.open()
+        #expect(report.degraded)
+        #expect(await second.state.core.unavailable == .ioFailure)
+        await #expect(throws: StoreError.storageUnavailable(.ioFailure)) {
+            try await second.store.markSyncDue()
+        }
+        await second.store.close()
+        let indexMutations = second.mutations.filter { $0.url.lastPathComponent.hasPrefix("index.") || $0.destination?.lastPathComponent.hasPrefix("index.") == true }
+        #expect(indexMutations.isEmpty, "\(operation): the launch wrote \(indexMutations.map { "\($0.kind) \($0.url.lastPathComponent)" })")
+        let after = second.fileSystem.survivingDisk()
+        #expect(IndexFile.allCases.map { after.files[CoreFixture.layout.indexURL($0).path] } == indexFiles, "\(operation): every index file is unchanged")
+        // Lifetime 3 reads everything again.
+        let third = CoreHarness.make(disk: after)
+        let thirdReport = try await third.store.open()
+        #expect(!thirdReport.degraded && thirdReport.launchEpoch > newest)
+        #expect(await third.state.core.unavailable == nil)
+        #expect(await third.state.core.records[QuarantineFixture.entry.identifier] != nil)
+        #expect(StoreRecoveryTests.isDoomed(await third.state.core.blobTable[QuarantineFixture.key], .corrupt))
+    }
+
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
     /// stopped between its renames; returns the disk the killed process leaves.
     @available(macOS 15.0, *)
