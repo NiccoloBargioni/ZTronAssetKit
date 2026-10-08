@@ -65,8 +65,15 @@ struct ManifestFetchTests {
     @Test("R-NET-5: a manifest over 32 MiB is aborted while streaming", .timeLimit(.minutes(1)))
     func streamingCap() async throws {
         let limit = ManifestLimits().maxPayloadBytes
+        // Close-delimited and stalled with the connection open after cap + 256 KiB: only an abort while streaming ends
+        // the fetch before the request timeout (an explicit Content-Type, so nothing is held back for MIME sniffing).
         let rig = try await LoopbackRig.make { _ in
-            LoopbackResponse(body: Data(repeating: 0x20, count: Int(limit) + 1), omitContentLength: true)
+            LoopbackResponse(
+                headers: ["Content-Type": "application/json"],
+                body: Data(repeating: 0x20, count: Int(limit) + (1 << 20)),
+                ending: .stallAfter(bodyBytes: Int(limit) + 256 * 1_024),
+                omitContentLength: true
+            )
         }
         await #expect(throws: TransferError.integrity(.oversize(announced: nil, limit: limit))) {
             try await rig.source.fetchManifest(Self.request(nil))

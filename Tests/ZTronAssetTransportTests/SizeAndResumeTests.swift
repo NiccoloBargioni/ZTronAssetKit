@@ -37,26 +37,39 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
+    /// A close-delimited body (no `Content-Length`, explicit `Content-Type` so nothing is held back for MIME
+    /// sniffing) of which the server sends `sent` bytes and then stalls with the connection open: only an abort while
+    /// streaming can end such a transfer before the request timeout, after which it would be reported timed out.
+    static func stalledUnannounced(_ body: Data, sent: Int) -> LoopbackResponse {
+        LoopbackResponse(headers: ["Content-Type": "application/octet-stream"], body: body, ending: .stallAfter(bodyBytes: sent), omitContentLength: true)
+    }
+
     @available(macOS 15.0, *)
     @Test("R-NET-7: a body written past the cap without an announced length is aborted while streaming", .timeLimit(.minutes(1)))
     func writtenOverCap() async throws {
-        let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data(repeating: 1, count: 3 << 20), omitContentLength: true) }
-        let request = rig.request(TransportFixtures.contentID(1), path: "big.bin", expected: nil, maxBytes: 1 << 20)
-        #expect(await run(await rig.source.transfer(request)).terminal == .failed(.integrity(.oversize(announced: nil, limit: 1 << 20))))
+        let cap: Int64 = 1 << 20
+        let body = Data(repeating: 1, count: 3 << 20)
+        let rig = try await LoopbackRig.make { _ in Self.stalledUnannounced(body, sent: Int(cap) + 256 * 1_024) }
+        let request = rig.request(TransportFixtures.contentID(1), path: "big.bin", expected: nil, maxBytes: cap)
+        #expect(await run(await rig.source.transfer(request)).terminal == .failed(.integrity(.oversize(announced: nil, limit: cap))))
+        // The guard stopped at the chunk that crossed the cap: the partial holds more than the cap, never the body.
+        let written = try #require(rig.staging.contents[request.partialName]).count
+        #expect(Int64(written) > cap && written < body.count)
         await rig.stop()
     }
 
     @available(macOS 15.0, *)
     @Test("R-NET-7: writing more than byteSize aborts early as a size mismatch", .timeLimit(.minutes(1)))
     func exceedsByteSize() async throws {
-        let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: TransportFixtures.payload(50_000), omitContentLength: true) }
+        let body = TransportFixtures.payload(2 << 20)
+        let rig = try await LoopbackRig.make { _ in Self.stalledUnannounced(body, sent: 512 * 1_024) }
         let request = rig.request(TransportFixtures.contentID(1), path: "a.bin", expected: 1_000)
         guard case .failed(.integrity(.sizeMismatch(let expected, let actual)))? = await run(await rig.source.transfer(request)).terminal else {
             Issue.record("no size mismatch")
             await rig.stop()
             return
         }
-        #expect(expected == 1_000 && actual > 1_000 && actual <= 50_000)
+        #expect(expected == 1_000 && actual > 1_000 && actual <= 512 * 1_024 && actual < Int64(body.count))
         await rig.stop()
     }
 
@@ -95,11 +108,17 @@ struct SizeAndResumeTests {
     /// connection drops mid-body after the client provably staged those bytes (ARCHITECTURE §6.7: `stallAfter` +
     /// `stop()`; a FIN right behind the bytes races URLSession, which may report the loss first).
     @available(macOS 15.0, *)
-    static func dropMidway(body: Data, stall: Int, staging: FakeStagingSink, appKey: AppKey) async throws -> (TransferRequest, TransferUpdate?) {
+    static func dropMidway(
+        body: Data,
+        stall: Int,
+        staging: FakeStagingSink,
+        appKey: AppKey,
+        id: TransferID = TransportFixtures.contentID(1)
+    ) async throws -> (TransferRequest, TransferUpdate?) {
         let rig = try await LoopbackRig.make(appKey: appKey, staging: staging) { _ in
             LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: stall), rangeETag: "\"v1\"")
         }
-        let first = rig.request(TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), path: "video.bin", expected: Int64(body.count))
+        let first = rig.request(id, attempt: TransportFixtures.attempt(1), path: "video.bin", expected: Int64(body.count))
         let handle = await rig.source.transfer(first)
         var iterator = handle.updates.makeAsyncIterator()
         #expect(await awaitProgress(&iterator, reaching: Int64(stall)))
@@ -167,13 +186,13 @@ struct SizeAndResumeTests {
     @available(macOS 15.0, *)
     @Test("R-NET-8: checksum-less transfers are never resumed", .timeLimit(.minutes(1)))
     func checksumLessNeverResumed() async throws {
-        let rig = try await LoopbackRig.make { _ in
-            LoopbackResponse(body: TransportFixtures.payload(100_000), ending: .closeAfter(bodyBytes: 40_000), rangeETag: "\"v1\"")
-        }
-        let request = rig.request(TransportFixtures.legacyID, path: "legacy.png", expected: 100_000)
-        #expect(await run(await rig.source.transfer(request)).terminal == .failed(.transient(.connectionLost(resumable: false), retryAfter: nil)))
-        #expect(rig.staging.sidecars.isEmpty)
-        await rig.stop()
+        // The connection drops after the client staged bytes under a validator: only the identity forbids a sidecar.
+        let staging = FakeStagingSink()
+        let (request, terminal) = try await Self.dropMidway(
+            body: TransportFixtures.payload(1 << 20), stall: 512 * 1_024, staging: staging, appKey: TransportFixtures.canaryKey, id: TransportFixtures.legacyID)
+        #expect(staging.contents[request.partialName]?.count == 512 * 1_024)
+        #expect(terminal == .failed(.transient(.connectionLost(resumable: false), retryAfter: nil)))
+        #expect(staging.sidecars.isEmpty)
     }
 
     @available(macOS 15.0, *)
