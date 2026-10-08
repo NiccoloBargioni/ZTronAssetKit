@@ -204,6 +204,54 @@ struct SourceTests {
     }
 
     @available(macOS 15.0, *)
+    @Test("R-NET-3: concurrent transfers never take more background tasks than the cap", .timeLimit(.minutes(1)))
+    func concurrentStartsRespectTheCap() async throws {
+        let fixtures = try TransportFixtures.directory("concurrent-cap")
+        defer { try? FileManager.default.removeItem(at: fixtures) }
+        let staging = FakeStagingSink()
+        let policy = TransportSecurityPolicy.production(allowedHosts: ["cdn.example.com"])
+        let identifier = try #require(BackgroundSessionIdentifier(namespace: "media"))
+        let driver = FakeBackgroundSessionDriver(identifier: identifier, delegate: SessionDelegate(mode: .background, staging: staging, policy: policy), fixtures: fixtures)
+        let options = BackgroundTransferOptions(namespace: "media", maxTasks: 1)
+        let coordinator = BackgroundTransferCoordinator(driver: driver, staging: staging, options: options)
+        let foreground = FakeTransferBackend()
+        let source = HTTPRemoteSource(
+            configuration: HTTPSourceConfiguration(baseURL: Self.base, background: .enabled(options)),
+            staging: staging,
+            policy: policy,
+            foreground: foreground,
+            background: coordinator,
+            log: .tapOnly(nil)
+        )
+        func request(_ sequence: UInt32) -> TransferRequest {
+            TransferRequest(id: TransportFixtures.contentID(UInt8(sequence)), attempt: TransportFixtures.attempt(sequence), remotePath: "v\(sequence).bin", expectedBytes: 4, maxBytes: 10, priority: .bulk, route: .backgroundEligible)
+        }
+        // The first start is held inside the coordinator, between the cap check and the task's creation.
+        await driver.holdNextSnapshot()
+        let first = Task { await source.transfer(request(1)) }
+        for await signal in driver.signals where signal == "snapshot" {
+            break
+        }
+        async let second = source.transfer(request(2))
+        async let third = source.transfer(request(3))
+        let others = await [second, third]
+        await driver.releaseSnapshot()
+        let held = await first.value
+        // One background task, as the cap says; the two others ran in the foreground, and background stays enabled.
+        #expect(await driver.starts.map(\.name) == [request(1).partialName])
+        #expect(await foreground.jobs.map(\.attempt).sorted() == [TransportFixtures.attempt(2), TransportFixtures.attempt(3)])
+        #expect(await coordinator.liveTransfers().map(\.name) == [request(1).partialName])
+        #expect(await !coordinator.admits())
+        await driver.complete(request(1).partialName, body: TransportFixtures.payload(4))
+        guard case .staged? = await run(held).terminal else {
+            Issue.record("not staged")
+            return
+        }
+        #expect(await coordinator.admits())
+        withExtendedLifetime(others) {}
+    }
+
+    @available(macOS 15.0, *)
     @Test("R-NET-3: re-attachment through a plain background backend reports its live transfers as running", .timeLimit(.minutes(1)))
     func reattachedThroughPlainBackend() async {
         let background = FakeTransferBackend(kind: .background)

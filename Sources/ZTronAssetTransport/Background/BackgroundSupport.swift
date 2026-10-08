@@ -155,6 +155,9 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     /// Names whose terminal event the pump processed: a listing taken before that still names the task.
     private var processed: BoundedNameTable<Bool>
     private var live: Set<StagingFileName> = []
+    /// Admitted starts that have not attached yet (`startIfAdmitted`): counted against the cap with `live`, so
+    /// concurrent admissions cannot exceed it together (review round 3).
+    private var reserved = 0
     /// Names a cancel or pause is ending: counted from before its first await until the terminal is processed.
     private var cancelling: [StagingFileName: Int] = [:]
     private var priorities: [StagingFileName: Float] = [:]
@@ -314,9 +317,28 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     // MARK: - Source-facing
 
     /// Whether a new background transfer may start: not disabled for the process (−995/−996/−997, transport.md
-    /// §10.7), not invalidated, and fewer outstanding tasks than `maxTasks` (re-attached ones included, T2-17).
+    /// §10.7), not invalidated, and fewer outstanding tasks than `maxTasks` (re-attached ones and admitted starts
+    /// still on their way to the OS included, T2-17).
     package func admits() -> Bool {
-        !self.disabled && !self.invalidated && self.live.count < max(self.options.maxTasks, 1)
+        !self.disabled && !self.invalidated && self.live.count + self.reserved < max(self.options.maxTasks, 1)
+    }
+
+    /// Starts `job` if a new background transfer may start, deciding and reserving its slot in one actor turn,
+    /// before the first await, so concurrent callers cannot exceed `maxTasks` together (a separate `admits()` then
+    /// `start` let each of them pass the check while the others were still listing tasks). `nil`, with nothing
+    /// started and background left enabled, when the cap is reached, the session is disabled or invalidated, or the
+    /// job is unbounded (R-NET-7): the source then runs it in the foreground.
+    package func startIfAdmitted(_ job: TransferJob) async -> (any TransferHandle)? {
+        guard self.admits(), let expected = job.expectedBytes, expected <= job.maxBytes else {
+            return nil
+        }
+        self.reserved += 1
+        // REENTRANCY: D-12 (proposed) — the reservation counts in `admits()` for as long as `start` awaits; it is
+        // released after `start` returned, when the transfer is in `live` (or was refused), so the cap holds
+        // throughout. Nothing else is read after the await.
+        let handle = await self.start(job)
+        self.reserved -= 1
+        return handle
     }
 
     /// Launch re-attachment (H-6): activates the session (so the OS delivers what finished while the app was dead),

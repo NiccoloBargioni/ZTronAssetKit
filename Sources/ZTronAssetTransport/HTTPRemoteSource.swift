@@ -180,7 +180,8 @@ public final class HTTPRemoteSource: RemoteSource {
     }
 
     /// Starts one attempt: the URL is `baseURL` joined with the validated `remotePath` (TR1-10); the background
-    /// backend is used only when ADR-026 allows it (`routesToBackground`), the foreground one otherwise.
+    /// backend is used only when ADR-026 allows it (`routesToBackground`) and the coordinator admits it, which it
+    /// decides and reserves in one step (`startIfAdmitted`), the foreground one otherwise.
     public func transfer(_ request: TransferRequest) async -> any TransferHandle {
         guard let url = RemoteURL.make(base: self.configuration.baseURL, path: request.remotePath) else {
             return ImmediateTransferHandle(id: request.id, attempt: request.attempt, terminal: .failed(.rejected(.invalidURL)))
@@ -196,8 +197,13 @@ public final class HTTPRemoteSource: RemoteSource {
             access: request.access,
             resume: request.resume
         )
-        if let background = self.background, await self.routesToBackground(request, url: url, backend: background) {
-            return await background.start(job)
+        if let background = self.background, self.routesToBackground(request, job: job) {
+            guard let coordinator = background as? BackgroundTransferCoordinator else {
+                return await background.start(job)
+            }
+            if let handle = await coordinator.startIfAdmitted(job) {
+                return handle
+            }
         }
         return await self.foreground.start(job)
     }
@@ -248,14 +254,15 @@ public final class HTTPRemoteSource: RemoteSource {
         await self.background?.invalidate()
     }
 
-    /// ADR-026 and transport.md §10.7: a transfer uses the background session only when it is background-eligible,
-    /// on the bulk lane, an asset, not a Range resume (the background session cannot continue our partial), of a
-    /// `byteSize` known and within the cap (R-NET-7: the OS downloads a background task whole before a byte reaches
-    /// us, so only the staged size can be checked, and it must equal `byteSize`), free of the key unless the owner
-    /// accepted redirect exposure, and the coordinator admits it (not disabled for the process, under the task cap).
-    func routesToBackground(_ request: TransferRequest, url: URL, backend: any TransferBackend) async -> Bool {
-        guard request.route == .backgroundEligible, request.priority == .bulk, request.purpose == .asset, request.resume == nil,
-            let expected = request.expectedBytes, expected <= request.maxBytes
+    /// ADR-026 and transport.md §10.7: a transfer may use the background session only when it is
+    /// background-eligible, on the bulk lane, an asset, not a Range resume (the background session cannot continue
+    /// our partial), of a `byteSize` known and within the cap (R-NET-7: the OS downloads a background task whole
+    /// before a byte reaches us, so only the staged size can be checked, and it must equal `byteSize`), and free of
+    /// the key unless the owner accepted redirect exposure. Whether the coordinator has room (not disabled for the
+    /// process, under the task cap) is its own decision, taken together with the reservation (`startIfAdmitted`).
+    func routesToBackground(_ request: TransferRequest, job: TransferJob) -> Bool {
+        guard request.route == .backgroundEligible, job.priority == .bulk, job.purpose == .asset, job.resume == nil,
+            let expected = job.expectedBytes, expected <= job.maxBytes
         else {
             return false
         }
@@ -263,14 +270,8 @@ public final class HTTPRemoteSource: RemoteSource {
         if case .enabled(let options) = self.configuration.background {
             exposure = options.keyRedirectExposure
         }
-        let carriesKey = self.configuration.appKey != nil && self.policy.check(Origin(url: url)) == nil
-        guard !carriesKey || exposure == .acceptedByOwner else {
-            return false
-        }
-        guard let coordinator = backend as? BackgroundTransferCoordinator else {
-            return true
-        }
-        return await coordinator.admits()
+        let carriesKey = self.configuration.appKey != nil && self.policy.check(Origin(url: job.url)) == nil
+        return !carriesKey || exposure == .acceptedByOwner
     }
 
     /// The first terminal element of `updates`, or `nil` when the stream ended without one (its consumer was

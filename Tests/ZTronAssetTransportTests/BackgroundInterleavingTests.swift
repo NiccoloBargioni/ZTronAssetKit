@@ -293,6 +293,8 @@ struct BackgroundInterleavingTests {
         // The OS downloads a background task whole before we see a byte, so the cap could only be checked after
         // the fact: such a transfer goes back to the foreground, whose size guard aborts while streaming.
         #expect(await run(await coordinator.start(refused)).terminal == .failed(.transient(.backgroundSessionUnavailable(urlErrorCode: NSURLErrorUnknown), retryAfter: nil)))
+        // The source's path declines such a job without a failure that would disable background for the process.
+        #expect(await coordinator.startIfAdmitted(refused) == nil)
         #expect(await rig.driver.starts.isEmpty)
         #expect(await coordinator.admits())
     }
