@@ -51,7 +51,51 @@ public enum TransferClassifier {
         resumed: Bool,
         keyWithheld: Bool
     ) -> TransferError? {
-        fatalError("WP-D: TransferClassifier.classify(status) not implemented")
+        let status = facts.status
+        switch status {
+        case 200:
+            return nil
+        case 206:
+            // Partial content answers only a resumed request, and only with a `Content-Range` to append at; the
+            // delegate compares its start with the partial's size (ARCHITECTURE §6.3).
+            guard resumed else {
+                return .rejected(.unexpectedStatus(status))
+            }
+            return facts.contentRangeStart == nil ? .transient(.resumeRejected, retryAfter: nil) : nil
+        case 304:
+            return sentConditional ? nil : .rejected(.unexpectedNotModified)
+        case 300...399:
+            // A redirect delivered as the final response was refused or had no usable `Location`; the delegate
+            // recomputes the precise refusal when it can (transport.md §5.2).
+            return .rejected(.redirectRefused(.invalidLocation))
+        case 401:
+            return .transient(.authenticationChallenge(httpStatus: status), retryAfter: nil)
+        case 403:
+            guard !keyWithheld else {
+                return .rejected(.keyWithheldOnRedirect)
+            }
+            let evidence = ForbiddenEvidence(
+                purpose: purpose,
+                bodyBytes: facts.bodyBytes,
+                contentTypeIsXML: facts.contentTypeIsXML,
+                keyPresented: facts.keyPresented,
+                resumed: resumed
+            )
+            return .authentication(.forbiddenAmbiguous(evidence))
+        case 404, 410:
+            return .permanentMissing(httpStatus: status)
+        case 408:
+            return .transient(.timedOut, retryAfter: facts.retryAfter)
+        case 416:
+            // Only a range we asked for can be unsatisfiable; restarting a fresh request on a 416 would loop.
+            return resumed ? .transient(.resumeRejected, retryAfter: nil) : .rejected(.unexpectedStatus(status))
+        case 429:
+            return .transient(.throttled, retryAfter: facts.retryAfter)
+        case 500...599:
+            return .transient(.serverError(httpStatus: status), retryAfter: facts.retryAfter)
+        default:
+            return .rejected(.unexpectedStatus(status))
+        }
     }
 
     /// Classifies a `URLError` code (with its network-unavailable reason and background cancel reason, when any).
@@ -62,7 +106,88 @@ public enum TransferClassifier {
         resumed: Bool,
         underlyingPOSIXCode: Int32?
     ) -> TransferError {
-        fatalError("WP-D: TransferClassifier.classify(urlError) not implemented")
+        switch urlErrorCode {
+        case -999:
+            guard let backgroundCancelReason else {
+                return .cancelled(.byClient)
+            }
+            return .cancelled(.bySystem(Self.systemReason(backgroundCancelReason)))
+        case -1001:
+            return .transient(.timedOut, retryAfter: nil)
+        case -1005:
+            // `resumable` is the delegate's to decide: only it knows whether a partial and a sidecar were kept.
+            return .transient(.connectionLost(resumable: false), retryAfter: nil)
+        case -1004:
+            return .transient(.cannotConnect, retryAfter: nil)
+        case -1003, -1006:
+            return .transient(.dnsFailure, retryAfter: nil)
+        case -1009:
+            return .offline(Self.offlineReason(networkUnavailableReason))
+        case -1018:
+            return .offline(.roamingDisabled)
+        case -1019:
+            return .offline(.callActive)
+        case -1020:
+            return .offline(.cellularDenied)
+        case -1007:
+            return .rejected(.redirectRefused(.tooManyRedirects))
+        case -1010:
+            return .rejected(.redirectRefused(.invalidLocation))
+        case -1022:
+            return .rejected(.insecureScheme)
+        case -1000:
+            return .rejected(.invalidURL)
+        case -1002:
+            // On a resumed request −1002 means unusable resume state (transport-1 TR1-4), not a bad URL.
+            return resumed ? .transient(.resumeRejected, retryAfter: nil) : .rejected(.invalidURL)
+        case -1012, -1013:
+            return .transient(.authenticationChallenge(httpStatus: 0), retryAfter: nil)
+        case -1011, -1017:
+            return .transient(.badServerResponse, retryAfter: nil)
+        case -1014:
+            return .integrity(.truncated(expected: nil, received: 0))
+        case -1015, -1016, -3006, -3007:
+            return .integrity(.undecodableContent(urlErrorCode: urlErrorCode))
+        case -1206 ... -1200:
+            return .transient(.secureConnectionFailed(urlErrorCode: urlErrorCode), retryAfter: nil)
+        case -3005 ... -3000:
+            if underlyingPOSIXCode == ENOSPC {
+                return .insufficientSpace(requiredBytes: nil)
+            }
+            return .transient(.localIO(posixCode: underlyingPOSIXCode ?? 0), retryAfter: nil)
+        case -997 ... -995:
+            return .transient(.backgroundSessionUnavailable(urlErrorCode: urlErrorCode), retryAfter: nil)
+        default:
+            return .transient(.unknown(urlErrorCode: urlErrorCode), retryAfter: nil)
+        }
+    }
+
+    /// `URLError.NetworkUnavailableReason` raw values (NSURLError.h): cellular 0, expensive 1, constrained 2.
+    private static func offlineReason(_ reason: Int?) -> OfflineReason {
+        switch reason {
+        case 0:
+            return .cellularDenied
+        case 1:
+            return .expensiveDenied
+        case 2:
+            return .constrainedDenied
+        default:
+            return .noConnection
+        }
+    }
+
+    /// `NSURLErrorBackgroundTaskCancelledReasonKey` raw values (NSURLError.h).
+    private static func systemReason(_ reason: Int) -> SystemCancellationReason {
+        switch reason {
+        case 0:
+            return .userForceQuitApplication
+        case 1:
+            return .backgroundUpdatesDisabled
+        case 2:
+            return .insufficientSystemResources
+        default:
+            return .unknown(reason)
+        }
     }
 }
 
@@ -72,6 +197,19 @@ public enum TransferClassifier {
 public enum RetryAfterParser {
     /// Parses a header value.
     public static func parse(_ value: String) -> RetryAfter? {
-        fatalError("WP-D: RetryAfterParser.parse not implemented")
+        let bytes = Array(value.utf8.drop { $0 == 0x20 || $0 == 0x09 }.reversed().drop { $0 == 0x20 || $0 == 0x09 }.reversed())
+        guard !bytes.isEmpty, bytes.count <= 64 else {
+            return nil
+        }
+        if bytes.allSatisfy({ (0x30...0x39).contains($0) }) {
+            guard bytes.count <= 10, let seconds = UInt32(String(decoding: bytes, as: UTF8.self)) else {
+                return nil
+            }
+            return .seconds(seconds)
+        }
+        guard let seconds = HTTPDate.parse(bytes) else {
+            return nil
+        }
+        return .date(Date(timeIntervalSince1970: TimeInterval(seconds)))
     }
 }
