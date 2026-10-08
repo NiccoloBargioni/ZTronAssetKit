@@ -123,6 +123,12 @@ Since fix round 1 a replaced root also stops the reaper: `deletionBlocker` retur
 - **Decision.** A hash unit or placement unit that fails with a file-system error discards the claimed `.verifying` file and its sidecar (`discardClaimed`) before `.fileSystem` is thrown; a failed placement of an extra-extension copy removes the copy. Cancellation still hands the claim back as `.part`; `.closed` leaves the files to staging collection (no I/O after close).
 - **Consequences.** The engine retries under a new attempt name, so the discarded bytes were of no further use; nothing full-size is stranded until the next staging collection. Tests: `R-INT-2: EIO while hashing the claimed file fails the publication and discards the claim and its sidecar`, `R-INT-1: EIO on placing a copy under a second extension binds nothing under it and leaves no copy in staging`, and `R-STO-5: EIO on the blob placement rename…` now also asserts an empty staging directory.
 
+## B-27 — A fan-out created by a failed placement still dirties `blobs/` (fix round 3, review probe 4) · blocking
+- **Context.** The placement unit creates `blobs/<aa>/` before its rename. When the rename failed, the store dropped the fact that the fan-out was new; the next placement into it found it present (`createdFanOut: false`), so the commit that referenced that blob barrier-synced the fan-out but never `blobs/`, and a power loss dropped the fan-out's entry with the committed blob in it (ARCHITECTURE §3 "barrier-synced before the commit that references a blob in it").
+- **Options.** (a) Report the creation on failure too and dirty `blobs/`. (b) Dirty `blobs/` after every failed placement. (c) Create the fan-out in a unit of its own.
+- **Decision.** (a): `BlobPlacementUnit.run` returns `BlobPlacementResult { outcome, createdFanOut }`; `createdFanOut` is set before `createDirectory` runs (so a `createDirectory` that fails after creating still counts), and `placeAndBind` sets `blobsDirectoryDirty` whenever it is true, before looking at the outcome.
+- **Consequences.** One extra `blobs/` barrier after a failed placement that created a fan-out; nothing else changes. Test: `R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it` (probe 4 under `powerLossDropUnsynced`; seeds printed).
+
 ## Fix round 1 — dispositions
 | Review item | Disposition |
 |---|---|

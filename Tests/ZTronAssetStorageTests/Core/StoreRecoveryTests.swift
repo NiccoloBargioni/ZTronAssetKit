@@ -38,6 +38,42 @@ struct StoreRecoveryTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Review round 3, probe 4: the placement unit creates `blobs/<aa>/` before its rename; when the rename fails, the
+    /// next placement into that fan-out finds it already there, so nothing would make the fan-out's own entry in
+    /// `blobs/` durable before the commit that references a blob in it (ARCHITECTURE §3, §4.1 step 1).
+    @Test("R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, *)
+    func failedPlacementFanOutIsSynced() async throws {
+        let firstSeed: UInt64 = 600
+        let first = CoreFixture.bytes(firstSeed)
+        let fanOut = ContentHash.sha256(of: first).fanOut
+        let secondSeed = try #require((firstSeed + 1..<firstSeed + 10_000).first { ContentHash.sha256(of: CoreFixture.bytes($0)).fanOut == fanOut })
+        let second = CoreFixture.bytes(secondSeed)
+        print("R-STO-5 fan-out probe: seeds \(firstSeed) and \(secondSeed) share fan-out \(fanOut)")
+        let harness = CoreHarness.make(mode: .powerLossDropUnsynced)
+        let a = CoreFixture.entry("a", first)
+        let b = CoreFixture.entry("b", second)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([a, b]), etag: nil, eviction: nil)
+        // a's placement creates the fan-out, then its rename fails.
+        harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .io))
+        let stagedA = try await harness.stage(first, for: a)
+        await #expect(throws: StoreError.fileSystem(.io)) {
+            try await harness.store.publish(stagedA, binding: [a.identifier], expecting: a.contentIdentity, urgency: .bulk)
+        }
+        #expect(harness.exists(harness.layout.fanOutDirectory(for: ContentHash.sha256(of: first))), "the failed placement created the fan-out")
+        // b lands in the same fan-out, and an ordered commit references it.
+        try await harness.publish(second, [b], sequence: 2)
+        try await harness.store.flush(.ordered)
+        // Power fails right after the commit returned.
+        let reopened = CoreHarness.make(disk: harness.fileSystem.survivingDisk())
+        let report = try await reopened.store.open()
+        #expect(report.missingBlobs == 0, "a committed blob was lost by the power loss")
+        let location = await reopened.store.location(for: b.identifier, extensions: [], recordingAccess: false)
+        #expect(location.flatMap { reopened.content($0.url) } == second)
+        #expect(await CoreInvariants.violations(of: reopened).isEmpty)
+    }
+
     @Test("R-INT-2: EIO while hashing the claimed file fails the publication and discards the claim and its sidecar", .timeLimit(.minutes(1)))
     @available(macOS 15.0, *)
     func hashReadFails() async throws {

@@ -213,7 +213,12 @@ extension AssetStore {
                 replaceExisting: replace
             )
         }
-        switch placement {
+        if placement.createdFanOut {
+            // On failure too: the fan-out exists now, and the next placement into it cannot know it is new (review
+            // round 3, probe 4), so `blobs/` is barrier-synced by the next commit either way.
+            self.state.core.commits.blobsDirectoryDirty = true
+        }
+        switch placement.outcome {
         case .failure(let error):
             self.abandonAcquisition(key, acquisition)
             throw .fileSystem(error)
@@ -222,10 +227,7 @@ extension AssetStore {
             if acquisition == .new {
                 self.state.core.blobTable[key] = .live(references: 1)
             }
-            if case .placed(createdFanOut: true) = outcome {
-                self.state.core.commits.blobsDirectoryDirty = true
-            }
-            if case .placed = outcome {
+            if outcome == .placed {
                 self.state.core.blobBytes[key] = byteCount
             } else if self.state.core.blobBytes[key] == nil {
                 self.state.core.blobBytes[key] = byteCount
