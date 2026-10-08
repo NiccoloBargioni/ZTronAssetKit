@@ -100,7 +100,9 @@ struct StoreCoreState: Sendable {
     /// Every blob the store knows: live, doomed or being deleted. WP-C reads it (GC mark set, storage report) and
     /// dooms through `setResidency(_:of:dooming:)`.
     var blobTable: [BlobKey: BlobState] = [:]
-    /// Keys whose publication or adoption is between claim and commit: never collected, never deleted (ADR-018).
+    /// Keys whose placement is in flight: a new key (not yet in `blobTable`), or a doomed `purged`/`corrupt` name
+    /// being replaced (already `live`). Never collected, never deleted; every other binder of the key waits until it
+    /// leaves the set (ADR-018, REENTRANCY R3; ADR draft B-18).
     var publishing: Set<BlobKey> = []
     /// Counters (R-OBS-2). WP-C increments `evictions`, `evictedBytes` and `gcBytes`.
     var metrics = StoreMetrics()
@@ -137,6 +139,22 @@ struct StoreCoreState: Sendable {
     var drainWaiters: [CheckedContinuation<Void, Never>] = []
     /// The root was replaced or vanished while running: no further commit (store-1 S1-08).
     var unavailable: StorageUnavailableReason?
+    /// The staging sequence of the next extra-extension copy (`bindCopy`): allocated by the store, counting down
+    /// from `UInt32.max` so it never meets the engine's start counter, and never shared by two copies.
+    var nextCopySequence: UInt32 = .max
+    /// Bumped whenever `apply` or `admit` replaces `appliedManifest`: a diff computed off the actor against an older
+    /// manifest is discarded (`apply`, proposed REENTRANCY row b-6).
+    var manifestRevision: UInt64 = 0
+    /// Serialises `apply` and `admit`, which yield between chunks (C2, proposed REENTRANCY row b-7).
+    var applyGate = ApplyGate()
+}
+
+/// The gate that lets one `apply` or `admit` run at a time.
+struct ApplyGate: Sendable {
+    /// An `apply` or `admit` holds the gate.
+    var held = false
+    /// Callers waiting for it; `close()` resumes them and they unwind with `.closed`.
+    var waiters: [CheckedContinuation<Void, Never>] = []
 }
 
 /// Commit scheduling (P-5): mutations are counted, commits cover a prefix of them, and at most one commit runs at

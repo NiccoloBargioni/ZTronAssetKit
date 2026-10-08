@@ -7,8 +7,9 @@ import ZTronAssetModel
 /// The store keeps `presentTable` (one `SnapshotEntry` per present record) up to date per changed record, so a
 /// publication wraps it in O(1). Versions are allocated when a snapshot is built (store-2 S2-13). `.userInitiated`
 /// installs at once; `.prefetch` and `.bulk` install at most once per `snapshotInstallInterval`, the trailing
-/// install being a deadline that `runDueWork()` serves. Only an acknowledgement of this store's own epoch counts
-/// (store-2 S2-02): it starts the deletion grace of the keys the acknowledged snapshot lacks, on the awake clock.
+/// install being a deadline that `runDueWork()` serves. Only an acknowledgement that the sink installed the offered
+/// snapshot of this store's own epoch counts (store-2 S2-02, `acknowledges`): it starts the deletion grace of the
+/// keys the acknowledged snapshot lacks, on the awake clock.
 extension AssetStore {
     /// Re-derives the snapshot entry of `id` after its record changed.
     func refreshPresentEntry(_ id: AssetID) {
@@ -50,15 +51,16 @@ extension AssetStore {
         self.state.core.snapshots.lastInstallAt = self.environment.time.monotonicNow()
         let start = self.environment.time.uptimeNow()
         self.state.core.snapshots.lastInstallStart = start
-        // REENTRANCY: R6 — the ack counts only if `installed.epoch == launchEpoch`; `acknowledgedVersion = max`; the
-        // ack time is read on the awake clock after the await; accesses merge through `recordAccesses`; `retired` is
-        // released here, off the main actor; a publication that arrived during the install set `installDue` again and
-        // keeps the trailing install due; nothing is recorded once the store closed.
+        // REENTRANCY: R6 — the ack counts only if the sink installed this very snapshot (`acknowledges`), which
+        // implies `installed.epoch == launchEpoch`; `acknowledgedVersion = max`; the ack time is read on the awake
+        // clock after the await; accesses merge through `recordAccesses`; `retired` is released here, off the main
+        // actor; a publication that arrived during the install set `installDue` again and keeps the trailing install
+        // due; nothing is recorded once the store closed.
         let ack = await self.installCounted(snapshot)
         guard self.state.core.phase != .closed else {
             return
         }
-        if ack.installed.epoch == self.state.core.launchEpoch, ack.installed.version > 0 {
+        if AssetStore.acknowledges(ack, snapshot.key, epoch: self.state.core.launchEpoch) {
             self.state.core.metrics.acknowledgedInstalls += 1
             let acknowledged = max(self.state.core.snapshots.acknowledgedVersion, ack.installed.version)
             self.state.core.snapshots.acknowledgedVersion = acknowledged
@@ -67,6 +69,16 @@ extension AssetStore {
             self.startGrace(acknowledgedVersion: acknowledged, at: self.environment.time.uptimeNow())
         }
         self.recordAccessesInternal(ack.accesses)
+    }
+
+    /// Whether `ack` proves that readers now see the snapshot `offered` (store-2 S2-02, ADR draft B-17): the sink
+    /// replaced its snapshot with this one (`retired` is set only by an install that swapped) and reports exactly
+    /// its key, of this store's epoch. A refused install proves nothing, even when the key the sink keeps carries
+    /// this epoch: a replacement store whose epoch repeats on a wiped root would otherwise take the previous
+    /// store's snapshot for its own (review probe P2). A refusal in favour of a newer snapshot of this store is
+    /// not counted either; that newer install's own acknowledgement is.
+    static func acknowledges(_ ack: InstallAck, _ offered: SnapshotKey, epoch: UInt64) -> Bool {
+        ack.retired != nil && ack.installed == offered && offered.epoch == epoch && offered.version > 0
     }
 
     /// Starts the awake-clock grace of every doomed key the acknowledged snapshot lacks (ADR-017).

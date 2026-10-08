@@ -169,7 +169,7 @@ struct CoreHarness {
     static func environment(
         fileSystem: any FileSystem,
         time: any TimeSource,
-        sink: ScriptedSnapshotSink = ScriptedSnapshotSink(),
+        sink: any SnapshotSink = ScriptedSnapshotSink(),
         metadata: any BlockingExecutor = InlineBlockingExecutor(),
         bulk: any BlockingExecutor = InlineBlockingExecutor()
     ) -> StoreEnvironment {
@@ -242,9 +242,19 @@ struct CoreHarness {
     }
 }
 
-/// Checks I-1, I-2 and I-4 over a reopened store and its disk (store.md §9.1 `InvariantChecker`).
+/// Checks I-1, I-2 and I-4 over a reopened store and its disk (store.md §9.1 `InvariantChecker`); the crash tests add
+/// I-3 (`blobRemovals`) and I-5 (the generations that returned).
 @available(macOS 15.0, *)
 enum CoreInvariants {
+    /// The unlinks of well-named blobs in `operations`, as I-3 violations: in a scenario that prunes nothing and lets
+    /// no grace pass, any such unlink removes a blob a reader may hold.
+    static func blobRemovals(_ operations: [FSOpRecord], layout: StoreLayout) -> [String] {
+        let prefix = layout.blobsDirectory.path + "/"
+        return operations.filter { operation in
+            operation.kind == .removeItem && operation.url.path.hasPrefix(prefix) && StoreLayout.parseBlobName(operation.url.lastPathComponent) != nil
+        }.map { "I-3: \($0.url.lastPathComponent) was unlinked" }
+    }
+
     /// The violated invariants, as readable lines; empty when I-1, I-2 and I-4 hold.
     static func violations(of harness: CoreHarness, allowNeedsHeal: Bool = false) async -> [String] {
         var found: [String] = []

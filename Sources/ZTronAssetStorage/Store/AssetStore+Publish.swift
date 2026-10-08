@@ -136,15 +136,42 @@ extension AssetStore {
         // Checksum-less and rescue publishes are committed before they return (store-1 S1-05): their blobs could
         // not be adopted by hash after a crash.
         if case .unverified = identity {
-            // REENTRANCY: R5 — nothing but the phase: the bound records were captured before the await.
+            // REENTRANCY: R5, R4 — the phase, then every bound record is re-validated below (store-2 S2-15).
             try await self.requireCommittedInternal(.ordered)
+            locations = try self.stillBound(locations, expectation, first: firstKnown)
         } else if rescued {
-            // REENTRANCY: R5 — as above.
+            // REENTRANCY: R5, R4 — as above.
             try await self.requireCommittedInternal(.ordered)
+            locations = try self.stillBound(locations, expectation, first: firstKnown)
         }
-        // REENTRANCY: R6 — the returned locations come from actor state captured above (ADR-016).
+        // REENTRANCY: R6, R4 — the phase, then every bound record is re-validated (store-2 S2-15): a record pruned or
+        // changed during the install is dropped, and `.superseded` is thrown when none remains; the returned
+        // locations are re-read from actor state (ADR-016).
         await self.publishSnapshotInternal(urgency: urgency)
-        return locations
+        return try self.stillBound(locations, expectation, first: firstKnown)
+    }
+
+    /// The bound locations that are still valid after an await (ARCHITECTURE §4.3 step 9, store-2 S2-15): each record
+    /// still exists, still wants these bytes and is still present at the returned blob; the location is re-read from
+    /// the current snapshot entry. Throws `.closed` once the store closed and `.superseded` when nothing remains, so a
+    /// URL of a doomed blob is never handed out.
+    private func stillBound(_ locations: [AssetID: AssetLocation], _ expectation: BindingExpectation, first: AssetID) throws(StoreError)
+        -> [AssetID: AssetLocation]
+    {
+        try self.checkLive()
+        var current: [AssetID: AssetLocation] = [:]
+        for (id, location) in locations {
+            guard let record = self.state.core.records[id], expectation.accepts(record),
+                let entry = self.state.core.presentTable[id], entry.location.url == location.url
+            else {
+                continue
+            }
+            current[id] = entry.location
+        }
+        guard !current.isEmpty else {
+            throw .superseded(first)
+        }
+        return current
     }
 
     /// `hashFile(at:)`: streaming SHA-256 in `hashChunkBytes` (≤ 1 MiB) units on the bulk executor, cancellation
@@ -248,8 +275,11 @@ extension AssetStore {
         return groups
     }
 
-    /// Identical bytes under a second extension (two entries with one checksum and different extensions): the
-    /// placed blob is copied into staging in ≤ 1 MiB units and bound like a verified file of its own.
+    /// Identical bytes under a second extension (two entries with one checksum and different extensions): one blob
+    /// per extension (ADR draft B-11). The destination key is acquired **before** any copy, so binders of one key are
+    /// serialised (review probe P1): a live or rescuable key is already on disk and is bound in place without
+    /// copying; a new or replaced key is held in `publishing` while the placed blob is copied into a staging name of
+    /// its own and verified (`copyBlob`), then placed like any verified file.
     private func bindCopy(
         of source: BlobKey,
         ext: AssetFileExtension,
@@ -257,50 +287,108 @@ extension AssetStore {
         ids: [AssetID],
         expecting expectation: BindingExpectation
     ) async throws(StoreError) -> (locations: [AssetID: AssetLocation], rescued: Bool) {
+        let key = BlobKey(hash: source.hash, ext: ext)
+        // REENTRANCY: R3 — `acquireReference` waits out a publication, replacement or deletion of `key` and decides
+        // from the blob table as it is then; the records are re-validated by `bindRecords` / `placeAndBind`.
+        let acquisition = try await self.acquireReference(key)
+        switch acquisition {
+        case .reused, .rescued:
+            // A live or rescuable key's file is complete (I-2): no copy, no I/O, no await before the binding.
+            return try self.bindRecords(key: key, byteCount: byteCount, ids: ids, expecting: expectation, acquisition: acquisition)
+        case .new, .replaced:
+            break
+        }
+        let copy: URL
+        do throws(StoreError) {
+            // REENTRANCY: b-4 (proposed) — `copyBlob` re-checks the phase after each unit; `key` stays held.
+            copy = try await self.copyBlob(source, byteCount: byteCount)
+        } catch {
+            self.abandonAcquisition(key, acquisition)
+            throw error
+        }
+        // REENTRANCY: R4 — `placeAndBind` re-validates every record after its placement unit.
+        return try await self.placeAndBind(
+            source: copy,
+            sidecar: nil,
+            key: key,
+            byteCount: byteCount,
+            ids: ids,
+            expecting: expectation,
+            acquisition: acquisition
+        )
+    }
+
+    /// Copies the blob `source` into `staging/<transfer>.<epoch>-<seq>.parttmp` in ≤ 1 MiB units on the bulk
+    /// executor, hashing the bytes as they are copied. The sequence is allocated by the store (counting down from
+    /// `UInt32.max`, away from the engine's start counter), so no two copies share a name; the copy is accepted only
+    /// with exactly `byteCount` bytes hashing to `source.hash`, so I-1 holds even if the source changed meanwhile.
+    private func copyBlob(_ source: BlobKey, byteCount: Int64) async throws(StoreError) -> URL {
         guard let layout = self.state.core.layout else {
             throw .notOpen
         }
+        let sequence = self.state.core.nextCopySequence
+        self.state.core.nextCopySequence = sequence > UInt32.max / 2 ? sequence - 1 : UInt32.max
         let copyName = StagingFileName(
             transfer: .content(source.hash),
-            attempt: TransferAttempt(epoch: self.state.core.launchEpoch, sequence: UInt32.max),
+            attempt: TransferAttempt(epoch: self.state.core.launchEpoch, sequence: sequence),
             kind: .partialTemporary
         )
         let destination = layout.stagingURL(copyName)
         let origin = layout.blobURL(source)
         let fileSystem = self.environment.fileSystem
+        var hasher = SHA256()
         var offset: Int64 = 0
+        var failure: StoreError?
         copying: while true {
             let start = offset
-            // REENTRANCY: b-4 (proposed) — the phase; the copy is a staging file nobody else names.
-            let step = await self.runUnit(on: self.environment.bulkExecutor) { () -> Result<Int, FileSystemError> in
+            let running = hasher
+            // REENTRANCY: b-4 (proposed) — the phase; the copy has a name no one else writes and its destination key
+            // is held in `publishing`, so no other binder writes or places it; the bytes are verified below.
+            let step = await self.runUnit(on: self.environment.bulkExecutor) { () -> Result<(hasher: SHA256, count: Int), FileSystemError> in
                 do throws(FileSystemError) {
                     let data = try fileSystem.read(from: origin, offset: start, maxLength: 1 << 20)
                     try fileSystem.write(data, to: destination, mode: start == 0 ? .truncate : .append)
-                    return .success(data.count)
+                    var next = running
+                    next.update(data: data)
+                    return .success((next, data.count))
                 } catch {
                     return .failure(error)
                 }
             }
-            try self.checkLive()
+            do throws(StoreError) {
+                try self.checkLive()
+            } catch {
+                failure = error
+                break copying
+            }
             switch step {
-            case .success(let count):
-                offset += Int64(count)
-                if count == 0 || offset >= byteCount {
+            case .success(let unit):
+                hasher = unit.hasher
+                offset += Int64(unit.count)
+                if unit.count == 0 || offset >= byteCount {
                     break copying
                 }
             case .failure(let error):
-                throw .fileSystem(error)
+                failure = .fileSystem(error)
+                break copying
             }
         }
-        // REENTRANCY: R3, R4 — `bindVerifiedFile` re-validates every record after its awaits.
-        return try await self.bindVerifiedFile(
-            at: destination,
-            sidecar: nil,
-            key: BlobKey(hash: source.hash, ext: ext),
-            byteCount: byteCount,
-            ids: ids,
-            expecting: expectation
-        )
+        if failure == nil {
+            let digest = ContentHash(digest: hasher.finalize())
+            if offset != byteCount {
+                failure = .integrity(.sizeMismatch(expected: byteCount, actual: offset))
+            } else if digest != source.hash {
+                failure = .integrity(.checksumMismatch(expected: source.hash, actual: digest))
+            }
+        }
+        guard let failure else {
+            return destination
+        }
+        // REENTRANCY: b-3 (proposed) — nothing: the call throws right after removing the copy.
+        await self.runUnit(on: self.environment.metadataExecutor) {
+            try? fileSystem.removeItem(at: destination)
+        }
+        throw failure
     }
 
     /// Deletes the claimed bytes and the sidecar of a publication that cannot proceed.

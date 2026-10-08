@@ -31,7 +31,8 @@ enum ReferenceAcquisition: Sendable, Hashable {
     case reused
     /// The key was doomed `unreferenced`: rescued (ADR-018); `previous` is restored if nothing ends up bound.
     case rescued(previous: DoomInfo)
-    /// The key was doomed `purged` or `corrupt`: the verified bytes replace the name (ADR-018, store-1 S1-06).
+    /// The key was doomed `purged` or `corrupt`: the verified bytes replace the name (ADR-018, store-1 S1-06); the
+    /// key is held in `publishing` until the replacement is in place.
     case replaced(previous: DoomInfo)
 }
 
@@ -56,6 +57,15 @@ extension AssetStore {
                 droppedInGeneration: droppedInGeneration ?? self.state.core.nextGeneration
             )
         )
+        self.scheduleDoomedKey()
+    }
+
+    /// A key just became doomed: the generation that drops it and a snapshot without it are both made deadlines,
+    /// so the deletion protocol advances even when no other mutation follows (a provisional reference dropped after
+    /// a failed placement, review probe P3); otherwise the bytes would stay `pendingReclaim` for good.
+    private func scheduleDoomedKey() {
+        self.markDirtyInternal(.soon)
+        self.state.core.snapshots.installDue = true
     }
 
     /// Gains a reference without I/O where that is safe: a live key, or a key doomed `unreferenced` whose file is
@@ -82,7 +92,8 @@ extension AssetStore {
             return
         }
         let previous = record.referencedBlob
-        if case .present(let blob, _, _) = residency, !self.gainReferenceInPlace(blob) {
+        // A key being placed or replaced (`publishing`) cannot be referenced without I/O yet.
+        if case .present(let blob, _, _) = residency, self.state.core.publishing.contains(blob) || !self.gainReferenceInPlace(blob) {
             return
         }
         record.residency = residency
@@ -95,17 +106,22 @@ extension AssetStore {
     }
 
     /// The one operation that gains a reference for a verified file (ADR-018, store-2 S2-01): it waits for an
-    /// in-flight publication or deletion of the same key, then decides from the blob table as it is **now**
-    /// (REENTRANCY R3), and holds a provisional reference until the caller binds its records.
+    /// in-flight publication, replacement or deletion of the same key, then decides from the blob table as it is
+    /// **now** (REENTRANCY R3), and holds a provisional reference until the caller binds its records. A new or
+    /// replaced key is held in `publishing` until its placement unit finished, so binders of one key are serialised:
+    /// nobody binds a record to a name whose file is still being written or replaced (review probe P1).
     func acquireReference(_ key: BlobKey) async throws(StoreError) -> ReferenceAcquisition {
         while true {
             try self.checkLive()
+            if self.state.core.publishing.contains(key) {
+                // REENTRANCY: R3 — the loop re-reads `publishing` and `blobTable[key]` once the other publication
+                // finished its placement.
+                await self.waitForKey(key)
+                continue
+            }
             switch self.state.core.blobTable[key] {
             case .deleting?:
                 // REENTRANCY: R3 — the loop re-reads `blobTable[key]` once the deletion unit finished.
-                await self.waitForKey(key)
-            case nil where self.state.core.publishing.contains(key):
-                // REENTRANCY: R3 — the loop re-reads `blobTable[key]` once the other publication finished.
                 await self.waitForKey(key)
             case .live(let references)?:
                 self.state.core.blobTable[key] = .live(references: references + 1)
@@ -115,6 +131,7 @@ extension AssetStore {
                 return .rescued(previous: info)
             case .doomed(let info)?:
                 self.state.core.blobTable[key] = .live(references: 1)
+                self.state.core.publishing.insert(key)
                 return .replaced(previous: info)
             case nil:
                 self.state.core.publishing.insert(key)
@@ -123,10 +140,9 @@ extension AssetStore {
         }
     }
 
-    /// Steps 7–10 of publication for a file that is already verified: acquire the reference, place the file
-    /// (barrier, fan-out, exclusive rename, or dedupe), re-validate every record after the await, bind the ones
-    /// that still want these bytes, and drop the provisional reference. Throws `.superseded` when none does.
-    /// Publishes no snapshot (callers decide the urgency, ARCHITECTURE §13.5 item 4).
+    /// Steps 7–10 of publication for a file that is already verified: acquire the reference, then place and bind
+    /// (`placeAndBind`). Throws `.superseded` when no record wants the bytes any more. Publishes no snapshot (callers
+    /// decide the urgency, ARCHITECTURE §13.5 item 4).
     func bindVerifiedFile(
         at source: URL,
         sidecar: URL?,
@@ -135,19 +151,46 @@ extension AssetStore {
         ids: [AssetID],
         expecting expectation: BindingExpectation
     ) async throws(StoreError) -> (locations: [AssetID: AssetLocation], rescued: Bool) {
-        guard let layout = self.state.core.layout else {
-            throw .notOpen
-        }
         // REENTRANCY: R3 — `acquireReference` re-reads the blob table after each of its waits.
         let acquisition = try await self.acquireReference(key)
+        // REENTRANCY: R4 — `placeAndBind` re-validates every record after its placement unit.
+        return try await self.placeAndBind(
+            source: source,
+            sidecar: sidecar,
+            key: key,
+            byteCount: byteCount,
+            ids: ids,
+            expecting: expectation,
+            acquisition: acquisition
+        )
+    }
+
+    /// Places `source` under `key` for a held acquisition (barrier, fan-out, exclusive rename, replacement or
+    /// dedupe), then binds the records that still want these bytes (`bindRecords`).
+    func placeAndBind(
+        source: URL,
+        sidecar: URL?,
+        key: BlobKey,
+        byteCount: Int64,
+        ids: [AssetID],
+        expecting expectation: BindingExpectation,
+        acquisition: ReferenceAcquisition
+    ) async throws(StoreError) -> (locations: [AssetID: AssetLocation], rescued: Bool) {
+        guard let layout = self.state.core.layout else {
+            self.abandonAcquisition(key, acquisition)
+            throw .notOpen
+        }
         let fileSystem = self.environment.fileSystem
-        let reuse = acquisition == .reused || { if case .rescued = acquisition { return true } else { return false } }()
-        let replace: Bool = {
-            if case .replaced = acquisition {
-                return true
-            }
-            return false
-        }()
+        let reuse: Bool
+        let replace: Bool
+        switch acquisition {
+        case .reused, .rescued:
+            (reuse, replace) = (true, false)
+        case .replaced:
+            (reuse, replace) = (false, true)
+        case .new:
+            (reuse, replace) = (false, false)
+        }
         // REENTRANCY: R4 — identity (or expectation) and extension are re-validated per record below; on a change
         // the key loses its provisional reference (doomed with `droppedInGeneration = 0` when it was new); no URL
         // is returned for a record that changed; `publishing[key]` is removed; every table update is
@@ -164,15 +207,12 @@ extension AssetStore {
                 replaceExisting: replace
             )
         }
-        if acquisition == .new {
-            self.state.core.publishing.remove(key)
-        }
         switch placement {
         case .failure(let error):
-            self.dropProvisionalReference(key, acquisition, boundAny: false)
-            self.resumeKeyWaiters(key)
+            self.abandonAcquisition(key, acquisition)
             throw .fileSystem(error)
         case .success(let outcome):
+            self.releasePublishing(key, acquisition)
             if acquisition == .new {
                 self.state.core.blobTable[key] = .live(references: 1)
             }
@@ -192,6 +232,19 @@ extension AssetStore {
             self.dropProvisionalReference(key, acquisition, boundAny: false)
             throw .closed
         }
+        return try self.bindRecords(key: key, byteCount: byteCount, ids: ids, expecting: expectation, acquisition: acquisition)
+    }
+
+    /// Binds every id whose record still wants the bytes to `key`, whose file is in place, and drops the
+    /// provisional reference. Synchronous: nothing can change between the decision and the binding. Throws
+    /// `.superseded` when no record wants the bytes any more.
+    func bindRecords(
+        key: BlobKey,
+        byteCount: Int64,
+        ids: [AssetID],
+        expecting expectation: BindingExpectation,
+        acquisition: ReferenceAcquisition
+    ) throws(StoreError) -> (locations: [AssetID: AssetLocation], rescued: Bool) {
         let now = self.environment.time.now()
         var locations: [AssetID: AssetLocation] = [:]
         for id in ids where locations[id] == nil {
@@ -235,6 +288,24 @@ extension AssetStore {
         return (locations, rescued)
     }
 
+    /// Gives up an acquisition before anything was bound: the key leaves `publishing`, the provisional reference is
+    /// dropped (a rescued or replaced key gets its doom back) and the binders waiting for the key are resumed.
+    func abandonAcquisition(_ key: BlobKey, _ acquisition: ReferenceAcquisition) {
+        self.releasePublishing(key, acquisition)
+        self.dropProvisionalReference(key, acquisition, boundAny: false)
+        self.resumeKeyWaiters(key)
+    }
+
+    /// A new or replaced key leaves `publishing` once its placement finished (or was given up).
+    private func releasePublishing(_ key: BlobKey, _ acquisition: ReferenceAcquisition) {
+        switch acquisition {
+        case .new, .replaced:
+            self.state.core.publishing.remove(key)
+        case .reused, .rescued:
+            break
+        }
+    }
+
     /// Releases the provisional reference `acquireReference` took. A rescued or replaced key that ended up bound to
     /// nothing gets its previous doom back (its dropping generation may not be committed yet); a new key that ended
     /// up bound to nothing is doomed as never committed (`droppedInGeneration = 0`, REENTRANCY R4).
@@ -243,6 +314,7 @@ extension AssetStore {
         case .rescued(let previous), .replaced(let previous):
             if !boundAny, case .live(references: 1)? = self.state.core.blobTable[key] {
                 self.state.core.blobTable[key] = .doomed(previous)
+                self.scheduleDoomedKey()
                 return
             }
             self.releaseReference(key, dooming: .unreferenced)

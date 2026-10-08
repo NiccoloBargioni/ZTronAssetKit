@@ -7,8 +7,11 @@ import ZTronAssetModel
 /// `deletable(k)` ⇔ `k` is doomed ∧ an acknowledged snapshot of this epoch lacks it (its grace started:
 /// `eligibleAt` is set) ∧ the grace passed on the awake clock **before** an install whose acknowledgement came back
 /// (the fresh acknowledgement) ∧ the generation that dropped it is committed ∧ no lease ∧ no publication of it in
-/// flight ∧ the store is not degraded (store-1 S1-11). The store owns no task: `nextDeadline()` reports only what time
-/// alone unblocks, and the engine's alarm calls `runDueWork()`.
+/// flight ∧ the store is not degraded (store-1 S1-11) ∧ its root was not replaced (ADR draft B-15). "No publication
+/// in flight" needs no check of its own: a key in `publishing` is never doomed, because `acquireReference` makes a
+/// rescued or replaced key live synchronously, before any await, and a new key enters the blob table only when its
+/// placement finished. The store owns no task: `nextDeadline()` reports only what time alone unblocks, and the
+/// engine's alarm calls `runDueWork()`.
 extension AssetStore {
     /// Why a doomed key cannot be deleted yet (or that it can).
     enum DeletionBlocker: Sendable, Hashable {
@@ -18,14 +21,15 @@ extension AssetStore {
         case notDoomed
         /// The store is degraded: every deletion waits for the next `apply` (store-1 S1-11).
         case degraded
+        /// The root was replaced or vanished (ADR draft B-15): the path may now belong to another store, so nothing
+        /// under it is deleted any more.
+        case unavailable
         /// No acknowledged snapshot of this epoch lacks it yet.
         case acknowledgement
         /// The generation that dropped it is not committed yet.
         case commit
         /// A lease holds it.
         case lease
-        /// A publication of the key is in flight.
-        case publishing
         /// Its awake-clock grace ends at this instant.
         case grace(MonotonicInstant)
         /// The grace ended, but no install has been acknowledged since (ADR-017). `unanswered` when an install
@@ -39,6 +43,9 @@ extension AssetStore {
         guard case .doomed(let info)? = self.state.core.blobTable[key] else {
             return .notDoomed
         }
+        if self.state.core.unavailable != nil {
+            return .unavailable
+        }
         if self.state.core.degraded {
             return .degraded
         }
@@ -50,9 +57,6 @@ extension AssetStore {
         }
         if let leases = self.state.cleanup.leases[key], !leases.isEmpty {
             return .lease
-        }
-        if self.state.core.publishing.contains(key) {
-            return .publishing
         }
         if eligibleAt > self.environment.time.uptimeNow() {
             return .grace(eligibleAt)
@@ -90,7 +94,7 @@ extension AssetStore {
                 // The grace runs on the awake clock; the alarm runs on the monotonic one. After a device sleep the
                 // alarm fires early and `runDueWork()` reports the rest.
                 consider(now.adding(seconds: eligibleAt.seconds(since: uptime)))
-            case .notDoomed, .degraded, .acknowledgement, .commit, .lease, .publishing, .freshAcknowledgement(unanswered: true):
+            case .notDoomed, .unavailable, .degraded, .acknowledgement, .commit, .lease, .freshAcknowledgement(unanswered: true):
                 continue
             }
         }
