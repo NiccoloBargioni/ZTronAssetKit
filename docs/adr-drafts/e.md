@@ -8,7 +8,10 @@ numbers these into `DECISIONS.md` and ARCHITECTURE §10 at merge.
 New internal files: `AppleSourceState.swift` (the source's only mutable state, an actor), `PackAvailabilityCoordinator.swift`
 (single-flight `ensureAvailable`), `PackCopier.swift` (every staging call), `AppleCatalogReader.swift`, `PackTransfer.swift`
 (handle, stop request, driver), `HashingChunkSource.swift`, `PackProgressScaler.swift` (+ `PackProgress(snapshotOf:)`),
-`PackErrorMapping.swift`, `FileHandleChunkReader.swift` (the live reader's mechanics, plus `PackUpdateCheck(updatingIDs:removedIDs:)`).
+`PackErrorMapping.swift`, `FileHandleChunkReader.swift` (the live reader's mechanics, plus `PackUpdateCheck(updatingIDs:removedIDs:)`),
+`ReleaseSurvey.swift` (fix round 1: the sliced release decision, E-16). Fix round 1 also changed the **bodies** of two
+contract types in `PackTypes.swift` (`PackID.init?(rawValue:)`, `PackLocation.init?(remotePath:)`; no signature
+changed, E-15) — flagged for the orchestrator.
 
 ## E-1 — The catalog digest and the asset check are computed inside the staging pull
 
@@ -80,16 +83,29 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   registered on the actor and resumed exactly once by `complete`, `leave` (the caller's cancellation handler) or
   `close`. A cancelled caller leaves at once; the flight is cancelled only when its last waiter left (T2-14 Timeline B).
   Progress fans out as values to every waiter; the outcome is delivered only after every progress value was, so a
-  waiter's stream is complete before its terminal element. Stale flights are ignored by flight id.
+  waiter's stream is complete before its terminal element. Stale flights are ignored by flight id. The flight itself
+  runs in `PackFlight` (a non-actor enum, fix round 1) so no await of it sits lexically inside the actor. Progress
+  streams (flight → coordinator, coordinator → driver) buffer the newest **64** values (fix round 1): progress only
+  grows and is quantised afterwards, so dropping the oldest keeps memory bounded however chatty the OS is; the
+  verifier proposed `.bufferingNewest(1)`, which would make the delivered sequence depend on scheduling and every
+  progress test flaky, while 64 keeps a test's short burst whole.
 - **Consequences.** If the OS ignores cancellation, a cancelled flight's task lives until the OS returns (UNVERIFIED,
-  AAV §5); nobody waits on it and a new caller starts a new flight.
+  AAV §5); nobody waits on it and a new caller starts a new flight. Tested (fix round 1): such a flight's outcome and
+  progress never reach a newer flight's waiter (`FakePackBackend` step `holdIgnoringCancellation`). The stale branch
+  of `broadcast` is **not reachable deterministically**: cancelling a flight's task also ends its progress stream (an
+  `AsyncStream` iterator returns `nil` when its task is cancelled), so a stale value is at most one already taken
+  from the stream when the cancellation landed — a scheduling race. The guard stays (defence for that one value); a
+  test calling `broadcast` directly would test a private detail (SPEC §7.2), so that line stays uncovered by design.
 
 ## E-7 — Progress (R-APL-2)
 
 - **Decision.** `PackProgress(snapshotOf: Foundation.Progress)` reads `completedUnitCount`/`totalUnitCount` once at the
   live boundary (D-12); an indeterminate total becomes 0/0; completed is clamped. `PackProgressScaler` reports
-  `fraction × expectedBytes`, quantised to 1 % steps of the asset (plus the final value), monotonic, ≤ the asset size,
-  so at most 101 progress elements per waiter. No progress for an unknown or zero `expectedBytes`.
+  `fraction × expectedBytes`, quantised to steps of 1 % of the asset **rounded up** (plus the final value), monotonic,
+  ≤ the asset size, so at most 101 progress elements per waiter: after the first value at most 100 full steps fit
+  below the size, and a final partial step replaces one. No progress for an unknown or zero `expectedBytes`.
+  (Fix round 1: the step used to round down, so assets of 100…~300 bytes got up to ~2× that; a test now feeds sizes
+  1…10,001 one unit at a time and the property test's bound is 101.)
 
 ## E-8 — Transfer handle controls
 
@@ -97,13 +113,23 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   task; the driver alone yields the single terminal element (`.paused(resumable: false)` — packs never resume — or
   `.failed(.cancelled(.byClient))`), discarding a copy that completed meanwhile. A consumer dropping the stream
   (`onTermination(.cancelled)`) is a cancel. `setPriority` is a no-op (`supportsPriority == false`).
+- **Fix round 1.** (a) A copy stops at its next chunk once the stop is requested: `HashingChunkSource` asks a
+  `shouldStop` closure before every chunk and throws a source failure (domain `ZTronAssetAppleHosted.copyStopped`,
+  `ECANCELED`), so the sink aborts at the next ≤ 1 MiB unit and removes its temporary file; the copier recognises the
+  stop by the reader's flag (`PackCopier.Outcome.stopped`). A stop before a copy thus opens no pack file (tested), which
+  also covers "check the stop before each copy" without a second, race-only check. (b) `deliver` checks the terminal
+  yield: when the consumer dropped the stream between the stop check and the yield, a `.staged` copy is discarded
+  (tested through `deliver` on an ended stream; the race itself has no suspension point to hold).
 
 ## E-9 — Shutdown (`invalidate()`)
 
 - **Decision.** `AppleSourceState` admits every staging call (`PackCopier`); `invalidate()` closes admission, closes
   the coordinator (every pack waiter ends `.cancelled`), cancels the update check, then drains: it returns after every
   admitted staging call returned. After that, transfers and fetches fail `.cancelled(.byClient)` without touching
-  staging, and a copy that finishes after close leaves its file for the next launch's staging GC (ADR-028).
+  staging. Fix round 1: closing also requests `AppleSourceState.shutdown`, so a copy in flight stops at its next
+  chunk and removes its file (the drain no longer waits for whole pack files, possibly hundreds of MB on the serial
+  bulk executor); a copy that had already written its last chunk finishes, and if its transfer was stopped its file
+  is left for the next launch's staging GC (ADR-028). Tested for transfers and for the catalog.
 
 ## E-10 — Releases: once per catalog generation, in memory · NEEDS-HUMAN-REVIEW (residual)
 
@@ -112,6 +138,17 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   `packNotFound` removal as released. The released set is per **catalog generation** (the catalog pseudo-ETag of the
   last successful fetch); a new digest clears it. A failed removal is reported in `ReclaimReport.failed` and planned
   again next time. An invalid `catalogPackID` releases nothing.
+- **Fix round 1.** (a) The first digest of a process does **not** start a new generation: releases made before the
+  first successful fetch (an offline launch's maintenance) belong to the generation it opens, so they are neither
+  repeated nor reported twice (tested). Generations are a counter bumped when the released set is cleared, and a
+  release counts only for the generation it was planned in. (b) A transfer whose pack wait ends `.available` (the
+  pack was missing and this source downloaded it on demand, e.g. an adopted blob evicted or repaired) forgets the
+  pack's release, so once its entries are adopted again it is released once more in the same generation (tested).
+  Only the source's own demand does this, never the OS bringing a pack back, so releases still never loop.
+  (c) Declined: keying generations on the digest the **engine applied** (a fetched catalog the engine rejects also
+  starts a generation here) needs that digest in `AdoptionReport` — a contract change. Consequence for WP-F: a pack
+  id can appear in `ReclaimReport.released` again in a later generation (or after a demand re-download); the engine
+  must treat `released` as "removed now", not as a set it accumulates without duplicates.
 - **Residual.** transport-2 T2-13 fix 5 asked to persist `alreadyReleased` in `index.bin`; no contract field exists, so
   it lives in memory. Effect: after a relaunch, a pack the OS re-downloaded may be released once more per process
   (bounded: once per pack per process, never a loop within one). Persisting it needs a store field (orchestrator).
@@ -119,8 +156,12 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
 ## E-11 — `sourceCopyBytes()`
 
 - **Decision.** Media packs (never the catalog pack) with at least one adopted entry in the **last**
-  `AdoptionReport` the source received, minus packs released in the current generation, summed from
-  `PackBackend.installedBytes` (`nil` → 0, negative clamped). 0 before the first report.
+  `AdoptionReport` the source received, summed from `PackBackend.installedBytes` (`nil` → 0, negative clamped). 0
+  before the first report. Fix round 1: released packs are **no longer subtracted** — `installedBytes` is `nil` for a
+  removed pack (fake and live: no `.downloaded` status), and a released pack a transfer downloaded again really holds
+  bytes twice on the device, which `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the
+  verifier's PROBE-1). Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
+  as entries of the applied manifest), see E-16.
 
 ## E-12 — `LiveAssetPackBackend` (device-only, coverage-excluded)
 
@@ -140,15 +181,29 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
 ## E-13 — Test seams and test placement
 
 - Internal seams used through `@testable import`: `PackAvailabilityCoordinator.waiterCount(on:)` /
-  `waitForWaiters(on:count:)`, `AppleSourceState.settleUpdateCheck()` / `waitForDrain()`. They let tests synchronise on
+  `waitForWaiters(on:count:registered:)` / `waitForStaleCompletions(_:)`, `AppleSourceState.settleUpdateCheck()` /
+  `waitForDrain(registered:)`, `PackTransferDriver.deliver(_:to:copier:)`, `ReleaseSurvey.survey(…, sliceSize:,
+  pause:)`. The `registered` hooks (fix round 1) run on the actor once a seam wait is registered, so the seam tests
+  cancel a wait known to be pending and assert it returned while its condition was still unmet (the three earlier
+  "Seams:" tests only ran the pre-cancelled branch and asserted always-true facts; replaced). The pre-cancelled
+  branches of the two seam waits (a task cancelled before it calls the seam) are now the only seam lines no test
+  reaches; they guard against a hop that runs before registration and are kept. `GatedStagingSink` holds a write
+  either before its first chunk (`.beforeWrite`: tests of copies stopped at a chunk) or after its last
+  (`.afterWrite`: tests of copies that finished before a stop or a close), and `FakePackBackend` gained
+  `holdIgnoringCancellation` and `releaseEnsure(_:with:oldestOnly:)` for the stale-flight test (E-6).
+- Coverage after fix round 1 (gate export over every test bundle): `COVERAGE target=ZTronAssetAppleHosted lines=
+  99.50% (1203/1209)`; the six lines not reached are `AppleHostedTier.swift:43,48` (contract code), the two
+  pre-cancelled seam branches above and the stale `broadcast` branch (E-6). They let tests synchronise on
   actor state without sleeping, and each returns when the calling task is cancelled, so a defect that makes a wait
   endless fails the test at its `.timeLimit` instead of hanging the run (found by the mutation probes below: a
   non-cancellable seam kept a probe run alive for 30 minutes). `FakePackBackend.releaseEnsure`/`releaseCheck` issued
   before the call reaches its hold finish that hold at once (a release-before-hold race hung one run under load).
 - `R-APL-3: an adopted asset is served from blobs and never from a pack location` is written at the source level: at
   L2 the store is WP-B's stub, so the test asserts that what reaches the engine is a staging copy of this transfer
-  (no pack location exists in any output), that the pack's release leaves the copy intact, and that no pack file is
-  opened again. The store/engine end-to-end proof belongs to WP-F/WP-G with the merged store.
+  (no pack location exists in any output), that the pack's release leaves the copy intact, and that the release opens
+  no pack file (fix round 1: the open count is now taken before the reclaim; it was taken after, which made the
+  check always true). The store/engine end-to-end proof belongs to WP-F/WP-G with the merged store — see "Requests
+  for the orchestrator".
 - Additional tests beyond §11 (transport.md §16.6 and the review dispositions): single-flight, cancelled waiter,
   last-waiter cancel, pause, stream drop, invalidate drain, skew variants, removal reporting, offline catalog,
   releases once per generation, failed releases, `sourceCopyBytes`, error-mapping tables, the R-OBS-1 `transfer`
@@ -163,6 +218,50 @@ New internal files: `AppleSourceState.swift` (the source's only mutable state, a
   identifier, so WP-A's call-site scan (`R-OBS-1: every log line uses subsystem …`) passes without hashing. Errors are
   logged as `String(describing:)` of `PackError`/`StagingError`, bound to `reason` first: those enums carry only
   domains, codes and limits, never an identifier. The `transfer` interval's message is `attempt <token>`.
+
+## E-15 — `PackLocation` splits at `/` scalars; ASCII fast path (fix round 1) · contract body change, no signature
+
+- **Context.** The C2 finding measured ~2.4 µs per `PackLocation(remotePath:)` (the Unicode property lookup per scalar
+  and an `Array(utf8)` copy in `PackID`). While speeding it up, the `Character`-based split showed a defence-in-depth
+  gap (R-SEC-2): a combining mark after a slash makes `"/\u{301}"` one `Character`, so `"ZTronMedia/../\u{301}x"`
+  was accepted although its second path component is `..` where a file system splits it.
+- **Decision.** Split at every `/` **scalar** (the UTF-8 byte 0x2F occurs only as that scalar); a dot segment is a
+  component of one or two `.` scalars; the control check consults the Unicode table only for non-ASCII scalars (ASCII
+  controls are exactly U+0000…U+001F and U+007F); `PackID` iterates the UTF-8 view without copying. Tested first
+  (`PackLocationTests`: three hidden dot segments, scalar-exact round trip, controls U+0000/1F/7F/85/9F).
+- **Consequences.** Stricter on hidden dot segments; a path whose segment starts with a combining mark is now
+  accepted (it was rejected only because the slash was absorbed). Measured, release build: 1.48 → 0.56 µs per parse.
+  The contract tests (`AppleHostedContractTests`) pass unchanged. Orchestrator: this is a body change in a contract
+  file implemented by WP-E.
+
+## E-16 — The release decision is surveyed in slices off the state actor (C2, fix round 1)
+
+- **Context.** `planRelease` parsed every manifest, adopted and excluded path and ran the planner in one actor turn:
+  47 ms at 10,000 entries and 512 ms at R-MAN-2's 100,000 (verifier, release build), holding a pool thread and the
+  actor every transfer needs for staging admission.
+- **Decision.** `ReleaseSurvey.survey` runs in the `reclaimSourceCopies` caller's task (not on the actor), parses
+  only the manifest entries, 1,000 per slice with `Task.yield()` between slices, and matches adopted/excluded paths
+  against the report's string sets (same membership: a remote path and its `PackLocation` correspond one to one).
+  Each slice is decided by `PackReleasePlanner` (the single release rule); a pack is settled when it appears in some
+  slice and no slice found an unsettled entry of it. The actor turn only filters the survey by the released and
+  in-flight sets, as they are then.
+- **Evidence.** Tests: a 100,000-entry report pauses after every 1,000 entries (99 pauses); a seeded property test
+  (300 rounds, slice sizes 1…8, invalid paths, `keepPacks`) matches `PackReleasePlanner` over the whole report.
+  Measured with a one-off release-build probe (`-enable-testing`, not committed: timing has no place in the
+  deterministic suite and WP-E owns no benchmark file): 100,000 entries in 100 slices, 1.0 ms per slice on average,
+  4.7 ms for the slowest. A P-9-style benchmark of a maintenance run at 100,000 entries would be the durable proof
+  (request below).
+
+## Requests for the orchestrator (fix round 1)
+
+- **ARCHITECTURE §11:** add to the WP-F or WP-G rows (a) the engine half of "R-APL-4: a missing catalog pack while
+  offline reports offline and leaves the applied manifest in force" (E tests only the source half), and (b) an
+  end-to-end R-APL-3 test: an asset adopted from a `FakePackBackend`-backed source is served from `blobs/` after
+  its pack was released.
+- **APPLE-API-VERIFICATION §5 / DEVICE-TEST-PLAN:** add E-12's `installedBytes ≈ AssetPack.downloadSize` (compressed
+  size, UNVERIFIED approximation feeding `StorageReport.sourceCopyBytes`) when E-12 is merged (WP-E does not own those
+  files).
+- **Benchmarks (optional):** a timed maintenance-run case at 100,000 manifest entries (E-16), e.g. in P-9.
 
 ## Mutation probes run by the author (not a substitute for Stage 3's independent ones)
 
@@ -180,9 +279,10 @@ per catalog generation (1); `notModified` dropping removals (1); unscaled progre
 | e-2 | `AppleSourceState.scheduleUpdateCheck`'s task: `backend.checkForUpdates()` | `finishCheck` runs on the actor and only clears `checkTask` and appends findings; a `close()` meanwhile is harmless (no new check starts after close, and none starts while this one is recorded as running) |
 | e-3 | `AppleSourceState.settleUpdateCheck()` (test seam): `task.value` | nothing: a terminal wait; the caller re-reads the report |
 | e-4 | `PackAvailabilityCoordinator.ensure`: `withTaskCancellationHandler` + `withCheckedContinuation` | nothing is read after resumption (the outcome travels in the continuation); `join`, `leave`, `complete` and `close` each re-read the waiter and flight tables, and a waiter is resumed exactly once by whichever removes it |
-| e-5 | `PackAvailabilityCoordinator.waitForWaiters` (test seam) | nothing: a terminal wait resumed by the turn that reached the count, or by `close` |
-| e-6 | the flight task created in `join`: `await Self.fly(...)` | nothing runs after it; `fly` reports through `broadcast` and `complete`, which drop a stale flight by id |
+| e-5 | `PackAvailabilityCoordinator.wait(for:registered:)` behind `waitForWaiters` / `waitForStaleCompletions` (test seams) | nothing: a terminal wait resumed by the turn that made the condition hold, by `close`, or by the cancellation turn |
+| e-6 | the flight task created in `join`: `await PackFlight.fly(...)` | nothing runs after it; `fly` reports through `broadcast` and `complete`, which drop a stale flight by id |
 | e-7 | `AppleSourceState.waitForDrain()` (test seam) | nothing: a terminal wait resumed by the `drain()` turn that registered its waiter or the `endStaging()` turn that reached zero |
+| e-8 | `Task { await self.leave(id) / releaseConditionWaiters() / releaseDrainObservers() }` in the `onCancel` handlers of `ensure`, the coordinator's seam waits and `waitForDrain` | a hop onto the actor from a cancellation handler, which cannot touch actor state synchronously; the hopped call re-reads the table it changes, so a continuation already resumed and removed by the regular path is never resumed twice |
 
 ## Contract changes
 
