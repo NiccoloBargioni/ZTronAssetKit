@@ -136,12 +136,19 @@ struct PackTransferDriver: Sendable {
     /// interval is still open.
     func run() async {
         let interval = self.parts.log.interval(.transfer, category: .apple, "attempt \(self.request.attempt.token)")
-        var terminal = await self.attempt()
+        let attempt = await self.attempt()
+        var terminal = attempt.terminal
         if let stop = self.stop.requested {
             if case .staged(let file) = terminal {
                 await self.parts.copier.discard(file.name)
             }
             terminal = stop.terminal
+        }
+        if let pack = attempt.downloaded, case .staged = terminal {
+            // A pack released earlier and downloaded again for an asset this transfer staged may be released once
+            // more once that asset is adopted (R-CLN-10). A skew, a failure or a stop re-arms nothing, so a pack
+            // whose catalog entry it lacks is never removed and downloaded again in a loop (ADR-027).
+            await self.parts.state.forgetRelease(pack)
         }
         interval.end()
         await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)
@@ -161,27 +168,35 @@ struct PackTransferDriver: Sendable {
         updates.finish()
     }
 
-    private func attempt() async -> TransferUpdate {
+    /// What one attempt ended with, before the handle's controls are consulted.
+    struct AttemptResult: Sendable, Hashable {
+        /// The terminal element the attempt proposes.
+        var terminal: TransferUpdate
+        /// The pack this attempt made available on demand after finding it or the file absent, if any.
+        var downloaded: PackID?
+    }
+
+    private func attempt() async -> AttemptResult {
         guard let location = PackLocation(remotePath: self.request.remotePath) else {
             self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): remote path is not a pack location")
-            return .failed(.rejected(.invalidURL))
+            return AttemptResult(terminal: .failed(.rejected(.invalidURL)))
         }
         var outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
-        if case .sourceMissing = outcome {
-            switch await self.ensure(location.pack) {
-            case .available:
-                // A pack released earlier and downloaded again for this asset may be released once more (R-CLN-10).
-                await self.parts.state.forgetRelease(location.pack)
-            case .failed(let error):
-                let reason = String(describing: error)
-                self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): pack \(location.pack) unavailable: \(reason)")
-                return .failed(PackErrorMapping.transferError(error))
-            case .cancelled:
-                return .failed(.cancelled(.byClient))
-            }
-            outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
+        guard case .sourceMissing = outcome else {
+            return AttemptResult(terminal: await self.settle(outcome))
         }
-        return await self.settle(outcome)
+        switch await self.ensure(location.pack) {
+        case .available:
+            break
+        case .failed(let error):
+            let reason = String(describing: error)
+            self.parts.log.log(.apple, .error, "attempt \(self.request.attempt.token): pack \(location.pack) unavailable: \(reason)")
+            return AttemptResult(terminal: .failed(PackErrorMapping.transferError(error)))
+        case .cancelled:
+            return AttemptResult(terminal: .failed(.cancelled(.byClient)))
+        }
+        outcome = await self.parts.copier.copy(location, as: self.request.partialName, maxBytes: self.cap, stop: self.stop)
+        return AttemptResult(terminal: await self.settle(outcome), downloaded: location.pack)
     }
 
     /// The staged bytes are capped at the catalog size when it is known, so a pack file that grew is stopped early.

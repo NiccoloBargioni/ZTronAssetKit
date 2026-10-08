@@ -115,7 +115,7 @@ public final class AppleHostedRemoteSource: RemoteSource {
     /// bounded slices (C2) before the state actor is entered. A pack the system no longer has counts as released; a
     /// failed removal is reported and planned again by the next call. Each pack is released at most once per catalog
     /// generation (the catalog's pseudo-ETag), so a pack that comes back is never released in a loop, unless a
-    /// transfer of this source downloaded it again on demand.
+    /// transfer of this source downloaded it again on demand and staged an asset from it.
     public func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
         guard let catalogPack = PackID(rawValue: self.configuration.catalogPackID) else {
             return ReclaimReport()

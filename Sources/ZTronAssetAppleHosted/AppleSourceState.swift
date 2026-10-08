@@ -242,10 +242,11 @@ actor AppleSourceState {
         }
     }
 
-    /// Forgets that `pack` was released in this generation because a transfer of this source made it available
-    /// again (an adopted blob was evicted or repaired and fetched once more): once its entries are adopted again it
-    /// is released once more. Only the source's own demand does this, never the OS bringing a pack back on its own,
-    /// so releases still never loop. A release call still running for `pack` is remembered as forgotten too.
+    /// Forgets that `pack` was released in this generation because a transfer of this source downloaded it again on
+    /// demand and staged an asset from it (an adopted blob was evicted or repaired and fetched once more): once its
+    /// entries are adopted again it is released once more. Only a staged copy does this — never a transfer that
+    /// ended in skew, failed or was stopped, and never the OS bringing a pack back on its own — so releases still
+    /// never loop. A release call still running for `pack` is remembered as forgotten too.
     func forgetRelease(_ pack: PackID) {
         self.released.remove(pack)
         if self.releasing.contains(pack) {

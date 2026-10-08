@@ -133,6 +133,35 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test("R-CLN-10: a transfer that ends in skew never re-arms its pack's release within a catalog generation", .timeLimit(.minutes(1)))
+    func skewedTransferDoesNotRearmTheRelease() async throws {
+        // Verifier probe PROBE-R3-1 (ADR-027): the catalog lists `missing`, which the retention scope excludes and the
+        // pack does not hold. Each request for it downloads the released pack on demand and ends in skew; if that
+        // re-armed the release, every maintenance run would remove the pack again and every retry download it again.
+        let adopted = PackAsset("ZTronMedia/a.bin", "adopted asset")
+        let missing = PackAsset("ZTronMedia/b.bin", "listed by the catalog but missing from the pack")
+        let fixture = AppleTierFixture(
+            installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: [adopted.path: adopted.bytes]],
+            remote: [Packs.media: [adopted.path: adopted.bytes]]
+        )
+        _ = try await fixture.source.fetchManifest(AppleTierFixture.manifestRequest(allowsUpdateCheck: false))
+        let report = AdoptionReport(
+            manifestRemotePaths: [adopted.remotePath, missing.remotePath],
+            adoptedRemotePaths: [adopted.remotePath],
+            excludedRemotePaths: [missing.remotePath]
+        )
+        #expect(await fixture.source.reclaimSourceCopies(report).released == ["ZTronMedia"])
+        for round in 1...3 {
+            let updates = await collect(await fixture.source.transfer(missing.request(sequence: UInt32(round + 1))))
+            #expect(updates == [.failed(.transient(.sourceVersionSkew, retryAfter: nil))], "round \(round)")
+            #expect(await fixture.source.reclaimSourceCopies(report).released.isEmpty, "round \(round): released again")
+        }
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.media) }.count == 1, "one release per generation")
+        #expect(fixture.backend.installedPacks.contains(Packs.media), "the pack downloaded for the skewed entry stays")
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-10: a failed release is reported and planned again by the next reclaim", .timeLimit(.minutes(1)))
     func failedReleaseIsRetried() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)])
