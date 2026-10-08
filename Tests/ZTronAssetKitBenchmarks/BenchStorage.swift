@@ -147,7 +147,7 @@ extension ZTronAssetKitBenchmarks {
             let store = StorageBench.liveStore(
                 directory: directory,
                 bulk: DispatchBlockingExecutor(label: "bench.p6.bulk"),
-                fileSystem: ReadSamplingFileSystem(sampler: sampler)
+                fileSystem: InstrumentedFileSystem(sampler: sampler)
             )
             _ = try await store.open()
             sampler.start()
@@ -211,7 +211,13 @@ extension ZTronAssetKitBenchmarks {
                 try bytes.write(to: layout.blobURL(key))
             }
             let timer = TimingExecutor(DispatchBlockingExecutor(label: "bench.p13.metadata"))
-            let store = StorageBench.liveStore(directory: directory, metadata: timer, time: LiveTimeSource())
+            let blobUnlinks = DurationRecorder()
+            let store = StorageBench.liveStore(
+                directory: directory,
+                metadata: timer,
+                time: LiveTimeSource(),
+                fileSystem: InstrumentedFileSystem(blobUnlinks: blobUnlinks)
+            )
             let report = try await store.open()
             #expect(report.missingBlobs == 0)
             #expect(try await store.planningView().records.values.allSatisfy { $0.referencedBlob != nil })
@@ -224,10 +230,12 @@ extension ZTronAssetKitBenchmarks {
             let onCPU = timer.onCPUDurations
             await store.close()
             let longest = units.max() ?? 0
+            let reclaimUnlinks = blobUnlinks.values.suffix(work.reapedKeys)
+            let stalledUnlinks = reclaimUnlinks.filter { $0 > batchBudget - BlobDeletionUnit.budget * 1_000 }
             let slowUnits = units.indices.filter { units[$0] > batchBudget }.map { "\(units[$0]) ms wall, \(onCPU[$0]) ms on CPU" }
             let unlinks = try StorageBench.unlinkProfile(count: 2_000)
             print(
-                "P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit max \(longest) ms (p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(StorageBench.percentile(units, 0.95)) ms); budgets \(totalBudget) s, \(batchBudget) ms per batch; unit time budget \(BlobDeletionUnit.budget * 1_000) ms; unlink profile of this volume: p50 \(StorageBench.percentile(unlinks, 0.5)) ms, p99 \(StorageBench.percentile(unlinks, 0.99)) ms, max \(unlinks.max() ?? 0) ms; unit on-CPU max \(onCPU.max() ?? 0) ms; units over the batch budget: \(slowUnits)"
+                "P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit max \(longest) ms (p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(StorageBench.percentile(units, 0.95)) ms); budgets \(totalBudget) s, \(batchBudget) ms per batch; unit time budget \(BlobDeletionUnit.budget * 1_000) ms; unlink profile of this volume: p50 \(StorageBench.percentile(unlinks, 0.5)) ms, p99 \(StorageBench.percentile(unlinks, 0.99)) ms, max \(unlinks.max() ?? 0) ms; unit on-CPU max \(onCPU.max() ?? 0) ms; units over the batch budget: \(slowUnits); blob unlinks inside the reclaim: max \(reclaimUnlinks.max() ?? 0) ms, \(stalledUnlinks.count) over \(batchBudget - BlobDeletionUnit.budget * 1_000) ms \(stalledUnlinks)"
             )
             #expect(work.reapedKeys == count && work.reapedBytes == Int64(64 * count))
             #expect(total <= totalBudget)
@@ -529,16 +537,34 @@ final class TimingExecutor: BlockingExecutor {
     }
 }
 
-/// The live file system, sampling the resident size inside every read while the bytes read are still alive (P-6:
-/// the peak while hashing, transient chunk buffers included).
+/// Durations in milliseconds, recorded from any thread.
 @available(macOS 15.0, *)
-struct ReadSamplingFileSystem: FileSystem {
+final class DurationRecorder: Sendable {
+    private let recorded = Mutex<[Double]>([])
+
+    func record(_ milliseconds: Double) {
+        self.recorded.withLock { $0.append(milliseconds) }
+    }
+
+    /// Everything recorded so far, in order.
+    var values: [Double] {
+        self.recorded.withLock { $0 }
+    }
+}
+
+/// The live file system, instrumented for one benchmark: P-6 samples the resident size inside every read while the
+/// bytes read are still alive (the peak while hashing, transient chunk buffers included); P-13 records the duration of
+/// every unlink under `blobs/`, so a deletion unit that overran its batch budget can be told apart: a stall inside the
+/// kernel's unlink (the volume) or outside it (the scheduler).
+@available(macOS 15.0, *)
+struct InstrumentedFileSystem: FileSystem {
     let base = LiveFileSystem()
-    let sampler: MemoryProbe.PeakSampler
+    var sampler: MemoryProbe.PeakSampler?
+    var blobUnlinks: DurationRecorder?
 
     func read(from url: URL, offset: Int64, maxLength: Int) throws(FileSystemError) -> Data {
         let data = try self.base.read(from: url, offset: offset, maxLength: maxLength)
-        self.sampler.sample()
+        self.sampler?.sample()
         return data
     }
 
@@ -583,6 +609,14 @@ struct ReadSamplingFileSystem: FileSystem {
     }
 
     func removeItem(at url: URL) throws(FileSystemError) {
+        guard let recorder = self.blobUnlinks, url.path.contains("/blobs/") else {
+            try self.base.removeItem(at: url)
+            return
+        }
+        let started = ContinuousClock.now
+        defer {
+            recorder.record(StorageBench.milliseconds(ContinuousClock.now - started))
+        }
         try self.base.removeItem(at: url)
     }
 
