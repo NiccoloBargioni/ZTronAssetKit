@@ -3,7 +3,9 @@ import ZTronAssetModel
 
 /// Deep verification of resident blobs (R-INT-4, R-SYN-16; store.md §5.6, REENTRANCY R16).
 extension AssetStore {
-    /// `verifyIntegrity(byteBudget:until:)`.
+    /// `verifyIntegrity(byteBudget:until:)`. The due list is built and sorted off the actor from a value snapshot (C2:
+    /// 13.5 ms at 10,000 records and 200 ms at `maxEntries` on the actor, review round 3; orchestrator ruling R4 at the
+    /// L3 close-out); each blob is re-validated before and after its hash (REENTRANCY R16).
     func performVerifyIntegrity(byteBudget: Int64, until deadline: MonotonicInstant) async throws(StoreError) -> VerificationReport {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -12,20 +14,34 @@ extension AssetStore {
         guard byteBudget > 0, !self.state.core.degraded, let layout = self.state.core.layout else {
             return report
         }
-        let index = self.referenceIndex()
-        var queue = self.blobsToVerify(index)[...]
+        let records = self.state.core.records
+        let blobTable = self.state.core.blobTable
+        let publishing = self.state.core.publishing
+        let done = self.state.integrity.verifiedInPass
+        // REENTRANCY: c-6 (proposed) — the phase and writability below; the due list describes the state when the unit
+        // was submitted, so each blob is checked again before its hash (live, not being placed, not verified in this
+        // pass meanwhile) and after it (R16), and its holders are read again (`holders(of:known:)`).
+        let due = await self.runUnit(on: self.environment.bulkExecutor) {
+            DeepVerification.due(records: records, blobTable: blobTable, publishing: publishing, done: done)
+        }
+        try self.checkLive()
+        try self.checkWritable()
+        var queue = due[...]
         while self.environment.time.monotonicNow() < deadline, !self.state.core.degraded {
-            guard let (key, size) = queue.first else {
+            guard let item = queue.first else {
                 report.completedPass = true
                 self.state.integrity.verifiedInPass = []
                 self.state.integrity.cursor = nil
                 break
             }
-            if report.bytesVerified > 0, report.bytesVerified.addingSaturating(size) > byteBudget {
+            if report.bytesVerified > 0, report.bytesVerified.addingSaturating(item.size) > byteBudget {
                 break
             }
             queue.removeFirst()
-            guard case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key) else {
+            let key = item.key
+            guard case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key),
+                !self.state.integrity.verifiedInPass.contains(key)
+            else {
                 continue
             }
             let url = layout.blobURL(key)
@@ -54,21 +70,21 @@ extension AssetStore {
             }
             self.state.integrity.verifiedInPass.insert(key)
             guard case .live? = self.state.core.blobTable[key], !self.state.core.degraded,
-                case let holders = (index[key] ?? []).filter({ self.state.core.records[$0]?.referencedBlob == key }),
+                case let holders = self.holders(of: key, known: item.holders),
                 let first = holders.min(by: { $0.rawValue < $1.rawValue })
             else {
                 continue
             }
             self.state.integrity.cursor = first
-            report.bytesVerified = report.bytesVerified.addingSaturating(outcome?.byteCount ?? size)
-            if let outcome, outcome.digest == key.hash, outcome.byteCount == size {
+            report.bytesVerified = report.bytesVerified.addingSaturating(outcome?.byteCount ?? item.size)
+            if let outcome, outcome.digest == key.hash, outcome.byteCount == item.size {
                 let now = self.environment.time.now()
                 for id in holders {
                     self.state.core.records[id]?.verifiedAt = now
                 }
                 self.markDirty(.lazy)
             } else {
-                report.corrupt.append(contentsOf: self.quarantine(blob: key))
+                report.corrupt.append(contentsOf: self.quarantine(blob: key, known: holders))
                 self.environment.log.log(.store, .error, "deep verification found a corrupt blob; it is quarantined")
             }
         }
@@ -96,23 +112,46 @@ extension AssetStore {
             }
         }
     }
+}
+
+/// The pure part of deep verification (run on the bulk executor, C2).
+enum DeepVerification {
+    /// One blob still to verify in the current pass.
+    struct Due: Sendable, Hashable {
+        /// The blob.
+        let key: BlobKey
+        /// Its recorded size.
+        let size: Int64
+        /// The records that referenced it in the snapshot.
+        let holders: [AssetID]
+    }
 
     /// The blobs of the current pass still to verify, in order: live, referenced, not being placed, not verified in this
-    /// pass; oldest `verifiedAt` over their records first (never verified first), then by key; with their sizes.
-    func blobsToVerify(_ index: [BlobKey: [AssetID]]) -> [(BlobKey, Int64)] {
-        let done = self.state.integrity.verifiedInPass
-        var due: [(key: BlobKey, verifiedAt: Date, size: Int64)] = []
-        for (key, ids) in index where !done.contains(key) {
-            guard case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key) else {
+    /// pass (`done`); oldest `verifiedAt` over their records first (never verified first), then by key.
+    static func due(records: [AssetID: AssetRecord], blobTable: [BlobKey: BlobState], publishing: Set<BlobKey>, done: Set<BlobKey>) -> [Due] {
+        var holders: [BlobKey: [AssetID]] = [:]
+        var oldest: [BlobKey: Date] = [:]
+        var sizes: [BlobKey: Int64] = [:]
+        for (id, record) in records {
+            guard let key = record.referencedBlob, !done.contains(key) else {
                 continue
             }
-            let records = ids.compactMap { self.state.core.records[$0] }
-            let oldest = records.map { $0.verifiedAt ?? .distantPast }.min() ?? .distantPast
-            let size = records.first.map(EvictionOrder.recordedSize) ?? 0
-            due.append((key, oldest, size))
+            holders[key, default: []].append(id)
+            oldest[key] = min(oldest[key] ?? .distantFuture, record.verifiedAt ?? .distantPast)
+            if sizes[key] == nil {
+                sizes[key] = EvictionOrder.recordedSize(record)
+            }
         }
-        due.sort { ($0.verifiedAt, $0.key) < ($1.verifiedAt, $1.key) }
-        return due.map { ($0.key, $0.size) }
+        var due: [(verifiedAt: Date, item: Due)] = []
+        due.reserveCapacity(holders.count)
+        for (key, ids) in holders {
+            guard case .live? = blobTable[key], !publishing.contains(key) else {
+                continue
+            }
+            due.append((oldest[key] ?? .distantPast, Due(key: key, size: sizes[key] ?? 0, holders: ids)))
+        }
+        due.sort { ($0.verifiedAt, $0.item.key) < ($1.verifiedAt, $1.item.key) }
+        return due.map(\.item)
     }
 }
 

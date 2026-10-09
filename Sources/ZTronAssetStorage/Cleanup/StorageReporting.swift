@@ -3,8 +3,9 @@ import ZTronAssetModel
 
 /// `storageReport()` (R-CLN-9).
 extension AssetStore {
-    /// Builds the report: one free-space unit and one staging listing (only once open) and one bulk unit for the
-    /// evictable bytes, then the other figures from the state as it is after those awaits.
+    /// Builds the report: one free-space unit and one staging listing (only once open), then one bulk unit that sums
+    /// the records and the evictable bytes from a value snapshot (C2: the per-blob sums held the actor 3.7 ms at 10,000
+    /// records and 63 ms at `maxEntries`, review round 3), then the few figures O(1) per lease or orphan on the actor.
     func performStorageReport() async -> StorageReport {
         var space: FreeSpace?
         var stagingBytes: Int64 = 0
@@ -15,38 +16,25 @@ extension AssetStore {
             // REENTRANCY: c-2 (proposed) — nothing: the staging size is a snapshot; the state is read afterwards.
             stagingBytes = await self.measureStagingBytes()
         }
-        // REENTRANCY: R13 — nothing: the evictable bytes are a snapshot computed off the actor (C2); the other figures
-        // are read from the state after this await.
-        let evictable = await self.evictionCandidatesOffActor().reduce(Int64(0)) { $0.addingSaturating($1.bytes) }
-        let core = self.state.core
-        var byKind: [String: Int64] = [:]
-        var present: Int64 = 0
-        var stale: Int64 = 0
-        var pinned: Int64 = 0
-        var essential: Int64 = 0
-        for (key, ids) in self.referenceIndex() {
-            guard case .live? = core.blobTable[key] else {
-                continue
-            }
-            let records = ids.compactMap { core.records[$0] }
-            let bytes = records.first.map(EvictionOrder.recordedSize) ?? 0
-            byKind[key.ext.rawValue, default: 0] = byKind[key.ext.rawValue, default: 0].addingSaturating(bytes)
-            if records.contains(where: { !$0.isStale }) {
-                present = present.addingSaturating(bytes)
-            } else {
-                stale = stale.addingSaturating(bytes)
-            }
-            if records.contains(where: \.pinned) {
-                pinned = pinned.addingSaturating(bytes)
-            }
-            if records.contains(where: { $0.entry.policy == .essential }) {
-                essential = essential.addingSaturating(bytes)
-            }
+        let rules = EvictionOrder.Rules(
+            policy: self.configuration.policy,
+            scope: self.state.eviction.retentionScope,
+            protecting: [],
+            now: self.environment.time.now()
+        )
+        let records = self.state.core.records
+        let blobTable = self.state.core.blobTable
+        let publishing = self.state.core.publishing
+        let leases = self.state.cleanup.leases
+        // REENTRANCY: c-2 (proposed), R13 — nothing: the sums describe the snapshot taken when the unit was submitted;
+        // the pending and orphan bytes are read from the state after it.
+        let figures = await self.runUnit(on: self.environment.bulkExecutor) {
+            StorageFigures(records: records, blobTable: blobTable, publishing: publishing, leases: leases, rules: rules)
         }
         // Doomed bytes: the unleased ones from `freeSpace()`, the leased ones from the sizes recorded with the leases.
         var pending = space?.pendingReclaim ?? 0
         for (key, bytes) in self.state.cleanup.leasedBytes where !(self.state.cleanup.leases[key]?.isEmpty ?? true) {
-            switch core.blobTable[key] {
+            switch self.state.core.blobTable[key] {
             case .doomed?, .deleting?:
                 pending = pending.addingSaturating(bytes)
             case .live?, nil:
@@ -54,27 +42,21 @@ extension AssetStore {
             }
         }
         // O(1) per orphan: one doomed or claimed since the last GC is no longer an orphan.
-        let orphans = (self.state.cleanup.orphans ?? [:]).filter { core.blobTable[$0.key] == nil && !core.publishing.contains($0.key) }
+        let orphans = (self.state.cleanup.orphans ?? [:]).filter { self.state.core.blobTable[$0.key] == nil && !self.state.core.publishing.contains($0.key) }
             .values.reduce(Int64(0)) { $0.addingSaturating($1) }
-        let unverified = core.records.values.filter { record in
-            if case .present(_, _, .unverified) = record.residency {
-                return true
-            }
-            return false
-        }.count
         return StorageReport(
-            bytesByKind: byKind,
-            bytesByState: ResidencyBytes(present: present, stale: stale, pendingDeletion: pending),
-            pinnedBytes: pinned,
-            essentialBytes: essential,
-            evictableBytes: evictable,
+            bytesByKind: figures.bytesByKind,
+            bytesByState: ResidencyBytes(present: figures.present, stale: figures.stale, pendingDeletion: pending),
+            pinnedBytes: figures.pinned,
+            essentialBytes: figures.essential,
+            evictableBytes: figures.evictable,
             stagingBytes: stagingBytes,
             orphanBytes: orphans,
             sourceCopyBytes: 0,
             budgetBytes: space?.budgetBytes ?? 0,
             freeBytesImportant: space?.volumeImportant ?? 0,
             freeBytesOpportunistic: space?.volumeOpportunistic ?? 0,
-            unverifiedCount: unverified,
+            unverifiedCount: figures.unverified,
             lastCleanupAt: self.state.cleanup.lastCleanupAt
         )
     }
@@ -94,5 +76,56 @@ extension AssetStore {
             return 0
         }
         return items.filter { $0.kind == .file }.reduce(Int64(0)) { $0.addingSaturating($1.byteSize) }
+    }
+}
+
+/// The figures of the storage report that sum over every record (pure; computed on the bulk executor, C2).
+struct StorageFigures: Sendable, Hashable {
+    /// Live bytes by the blob's extension.
+    var bytesByKind: [String: Int64] = [:]
+    /// Live bytes a current record still wants.
+    var present: Int64 = 0
+    /// Live bytes only stale records hold.
+    var stale: Int64 = 0
+    /// Live bytes a pinned record holds.
+    var pinned: Int64 = 0
+    /// Live bytes an essential record holds.
+    var essential: Int64 = 0
+    /// What quota eviction could take (`EvictionOrder.candidates`).
+    var evictable: Int64 = 0
+    /// Present records not verified against a checksum.
+    var unverified = 0
+
+    /// Sums `records` over the live blobs of `blobTable` (ADR draft C-11).
+    init(records: [AssetID: AssetRecord], blobTable: [BlobKey: BlobState], publishing: Set<BlobKey>, leases: [BlobKey: [UInt64: AssetID]], rules: EvictionOrder.Rules) {
+        self.evictable = EvictionOrder.candidates(records: records, blobTable: blobTable, publishing: publishing, leases: leases, rules: rules)
+            .reduce(Int64(0)) { $0.addingSaturating($1.bytes) }
+        var byKey: [BlobKey: [AssetRecord]] = [:]
+        for record in records.values {
+            if case .present(_, _, .unverified) = record.residency {
+                self.unverified += 1
+            }
+            if let key = record.referencedBlob {
+                byKey[key, default: []].append(record)
+            }
+        }
+        for (key, holders) in byKey {
+            guard case .live? = blobTable[key] else {
+                continue
+            }
+            let bytes = holders.first.map(EvictionOrder.recordedSize) ?? 0
+            self.bytesByKind[key.ext.rawValue, default: 0] = self.bytesByKind[key.ext.rawValue, default: 0].addingSaturating(bytes)
+            if holders.contains(where: { !$0.isStale }) {
+                self.present = self.present.addingSaturating(bytes)
+            } else {
+                self.stale = self.stale.addingSaturating(bytes)
+            }
+            if holders.contains(where: \.pinned) {
+                self.pinned = self.pinned.addingSaturating(bytes)
+            }
+            if holders.contains(where: { $0.entry.policy == .essential }) {
+                self.essential = self.essential.addingSaturating(bytes)
+            }
+        }
     }
 }

@@ -38,7 +38,8 @@ struct PurgeTests {
         }
         let after = try await harness.store.planningView()
         #expect(after.stamp == nil && after.syncDue)
-        #expect(after.purgeEpoch == view.purgeEpoch + 1)
+        // Bumped before the purge's first await and again in the turn of its last chunk (REENTRANCY c-5, review round 3).
+        #expect(after.purgeEpoch == view.purgeEpoch + 2)
         await #expect(throws: StoreError.purgeRaced) {
             try await harness.store.markSynced(stamp, ifPurgeEpoch: view.purgeEpoch)
         }
@@ -88,6 +89,83 @@ struct PurgeTests {
         _ = await harness.store.releaseLease(lease)
         _ = await harness.store.runDueWork()
         #expect(!harness.hasBlob(leased.key), "the deferred blob goes once the lease ends")
+    }
+
+    /// Review round 3 (C2, orchestrator ruling R4): the selection is computed off the actor, so the purge awaits before
+    /// it changes a record. The epoch and the stamp are written before that await, so a commit made meanwhile already
+    /// says a sync is due, and the epoch is bumped again in the turn of the last chunk, so a sync that read it while the
+    /// selection ran (and saw records the purge then removed) cannot stamp either.
+    @Test("R-CLN-6: a purge clears the stamp before its selection runs off the actor, and a sync that read the epoch meanwhile cannot stamp", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func stampClearedBeforeSelection() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(bulk: bulk)
+        let a = CleanupFixture.asset("a", seed: 235)
+        let b = CleanupFixture.asset("b", seed: 236)
+        try await harness.seed([a, b])
+        let view = try await harness.store.planningView()
+        let stamp = SyncStamp(appVersion: "1.0+1", completedAt: harness.time.now(), manifestETag: nil, manifestDigest: view.appliedManifest.digest)
+        try await harness.store.markSynced(stamp, ifPurgeEpoch: view.purgeEpoch)
+        await bulk.setHolding(true)
+        let purge = Task {
+            try await harness.store.purge(.all)
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let selection = try #require(await bulk.heldUnits.first)
+        let during = try await harness.store.planningView()
+        #expect(during.purgeEpoch == view.purgeEpoch + 1 && during.stamp == nil && during.syncDue)
+        #expect(await harness.isPresent(a.id, at: a.key) && harness.hasBlob(a.key), "nothing is purged before the selection")
+        // A commit made while the selection runs already says a sync is due.
+        _ = try await CleanupSteps.run(bulk, keeping: [selection]) {
+            try await harness.store.flush(.ordered)
+        }
+        let survivor = CoreHarness.cleanup(disk: harness.fileSystem.survivingDisk(), time: harness.time)
+        let report = try await survivor.store.open()
+        #expect(report.stamp == nil && report.syncDue)
+        await survivor.store.close()
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
+        try await harness.time.requireSleepers(atLeast: 1)
+        harness.time.advance(by: harness.configuration.policy.deletionGrace)
+        #expect(try await purge.value.assetsRemoved == 2)
+        await #expect(throws: StoreError.purgeRaced) {
+            try await harness.store.markSynced(stamp, ifPurgeEpoch: during.purgeEpoch)
+        }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    @Test("R-CLN-6: a purge releases the actor between chunks and re-validates every later record: one leased or re-bound meanwhile is kept", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func chunkYieldRevalidates() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let assets = (0..<4).map { CleanupFixture.asset("p\($0)", seed: 240 + UInt64($0)) }
+        try await harness.seed(assets)
+        await harness.store.testSetCleanupChunk(2)
+        await metadata.setHolding(true)
+        let purge = Task {
+            try await harness.store.purge(.evictable)
+        }
+        // The first chunk (p0, p1) is purged, then the release between chunks is held.
+        try await CorePoll.until("the first chunk is purged") {
+            await harness.record(assets[1].id)?.residency == .absent(.purged)
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        #expect(await harness.isPresent(assets[2].id, at: assets[2].key) && harness.hasBlob(assets[3].key))
+        // Meanwhile p3's blob is leased: the purge keeps it, and purges p2.
+        let lease = try await harness.store.acquireLease(assets[3].id)
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        try await harness.time.requireSleepers(atLeast: 1)
+        harness.time.advance(by: harness.configuration.policy.deletionGrace)
+        let result = try await purge.value
+        #expect(result.assetsRemoved == 3)
+        for asset in assets.prefix(3) {
+            #expect(await harness.record(asset.id)?.residency == .absent(.purged), "\(asset.id.rawValue) is purged")
+        }
+        #expect(await harness.isPresent(assets[3].id, at: assets[3].key), "the leased one is re-validated and kept")
+        _ = await harness.store.releaseLease(lease)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
     @Test("R-CLN-6: every purge bumps the purge epoch before it awaits, so a run that began before it cannot write its stamp", .timeLimit(.minutes(1)))

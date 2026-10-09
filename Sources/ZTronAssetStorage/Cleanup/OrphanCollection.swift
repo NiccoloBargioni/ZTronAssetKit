@@ -66,9 +66,10 @@ extension AssetStore {
         !self.state.core.degraded && (try? self.checkWritable()) != nil
     }
 
-    /// Lists every well-named blob in its fan-out, one unit per directory; `nil` when `deadline` passes first (a partial
-    /// listing decides nothing).
-    func listBlobFiles(_ layout: StoreLayout, until deadline: MonotonicInstant) async throws(StoreError) -> [BlobKey: FileItemInfo]? {
+    /// Lists every well-named blob in its fan-out, one unit per directory, as one array per fan-out (C2: a dictionary
+    /// grown across the units rehashed every blob in one turn, 5 ms at `maxEntries`); `nil` when `deadline` passes first
+    /// (a partial listing decides nothing).
+    func listBlobFiles(_ layout: StoreLayout, until deadline: MonotonicInstant) async throws(StoreError) -> [[OrphanCollection.Listed]]? {
         let fileSystem = self.environment.fileSystem
         let time = self.environment.time
         guard time.monotonicNow() < deadline else {
@@ -87,7 +88,8 @@ extension AssetStore {
         case .failure(let error):
             throw .fileSystem(error)
         }
-        var listed: [BlobKey: FileItemInfo] = [:]
+        var listed: [[OrphanCollection.Listed]] = []
+        listed.reserveCapacity(fanOuts.count)
         for fanOut in fanOuts {
             if Task.isCancelled {
                 throw .cancelled
@@ -103,11 +105,12 @@ extension AssetStore {
             try self.checkLive()
             switch items {
             case .success(let files):
-                for file in files where file.kind == .file {
-                    if let key = StoreLayout.parseBlobName(file.name), key.hash.fanOut == fanOut {
-                        listed[key] = file
+                listed.append(files.compactMap { file in
+                    guard file.kind == .file, let key = StoreLayout.parseBlobName(file.name), key.hash.fanOut == fanOut else {
+                        return nil
                     }
-                }
+                    return OrphanCollection.Listed(key: key, item: file)
+                })
             case .failure(let error):
                 throw .fileSystem(error)
             }
@@ -118,6 +121,14 @@ extension AssetStore {
 
 /// Pure helpers of orphan GC.
 enum OrphanCollection {
+    /// One well-named blob the listing found.
+    struct Listed: Sendable, Hashable {
+        /// Its key, parsed from its name.
+        let key: BlobKey
+        /// What the listing reported.
+        let item: FileItemInfo
+    }
+
     /// What one listing decides, from a snapshot of the state (C2: computed on the bulk executor).
     struct Decision: Sendable {
         /// Every listed blob the snapshot's blob table and `publishing` do not know, with its size: those left after the
@@ -130,7 +141,7 @@ enum OrphanCollection {
 
     /// The decision over `listed` (REENTRANCY R10: only after the full listing).
     static func decide(
-        listed: [BlobKey: FileItemInfo],
+        listed: [[Listed]],
         records: [AssetID: AssetRecord],
         blobTable: [BlobKey: BlobState],
         publishing: Set<BlobKey>,
@@ -139,12 +150,12 @@ enum OrphanCollection {
     ) -> Decision {
         let expected = Set(records.values.compactMap(\.expectedKey))
         var decision = Decision(unknown: [:], sweep: [:])
-        for (key, item) in listed where blobTable[key] == nil && !publishing.contains(key) {
-            decision.unknown[key] = item.byteSize
-            guard !expected.contains(key), let modified = item.modifiedAt, now.timeIntervalSince(modified) > grace else {
+        for blob in listed.joined() where blobTable[blob.key] == nil && !publishing.contains(blob.key) {
+            decision.unknown[blob.key] = blob.item.byteSize
+            guard !expected.contains(blob.key), let modified = blob.item.modifiedAt, now.timeIntervalSince(modified) > grace else {
                 continue
             }
-            decision.sweep[key] = item.byteSize
+            decision.sweep[blob.key] = blob.item.byteSize
         }
         return decision
     }

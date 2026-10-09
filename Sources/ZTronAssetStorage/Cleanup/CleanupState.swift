@@ -23,4 +23,8 @@ struct CleanupState: Sendable {
     /// their sizes: `StorageReport.orphanBytes`. `nil` until the first orphan GC of this lifetime: the report then counts
     /// no orphan bytes (ADR draft C-11; the orphans the launch listed are WP-B's bookkeeping, which WP-C does not read).
     var orphans: [BlobKey: Int64]?
+    /// Records a purge changes between two releases of the actor (C2, review round 3; proposed REENTRANCY row c-5):
+    /// `AssetStore.cleanupChunk`; a test lowers it so a handful of records reaches the release and its re-validation (G4:
+    /// the seam that release needs).
+    var chunk: Int = AssetStore.cleanupChunk
 }

@@ -250,6 +250,39 @@ struct IntegrityTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Review round 3 (C2, orchestrator ruling R4): the due list is built off the actor from a snapshot, so a blob
+    /// quarantined while it is built is skipped (proposed REENTRANCY row c-6) and the pass verifies the others.
+    @Test("R-INT-4: deep verification builds its due list off the actor and skips a blob quarantined while it is built", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func dueListRevalidated() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(bulk: bulk)
+        let assets = (0..<3).map { CleanupFixture.asset("d\($0)", seed: 370 + UInt64($0), count: 200) }
+        try await harness.seed(assets)
+        let blobStats = {
+            harness.fileSystem.operations.filter { $0.kind == .itemInfo && $0.url.path.hasPrefix(harness.layout.blobsDirectory.path) }.count
+        }
+        let seeded = blobStats()
+        await bulk.setHolding(true)
+        let verify = Task {
+            try await harness.store.verifyIntegrity(byteBudget: 10_000, until: harness.time.monotonicNow().adding(seconds: 60))
+        }
+        // The first unit is the due list; no blob has been stat-ed or hashed yet.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        #expect(blobStats() == seeded)
+        try await harness.store.reportUnreadable(assets[0].id)
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
+        let report = try await verify.value
+        #expect(report.completedPass && report.corrupt.isEmpty, "the quarantined blob is skipped, not quarantined again")
+        #expect(report.bytesVerified == 400)
+        #expect(await harness.record(assets[0].id)?.integrity.attempts == 1)
+        for asset in assets.dropFirst() {
+            #expect(await harness.record(asset.id)?.verifiedAt == harness.time.now())
+        }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-INT-4: deep verification stops at its deadline and does nothing while the store is degraded", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func verificationLimits() async throws {

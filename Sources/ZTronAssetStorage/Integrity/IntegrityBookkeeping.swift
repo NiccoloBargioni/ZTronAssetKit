@@ -37,11 +37,12 @@ enum IntegrityBookkeeping {
 extension AssetStore {
     /// Quarantines every record referencing `key` (R-CLN-8): each one's history counts a failure of its identity, it
     /// becomes `quarantined(until:)` or, at the cap, `failed(.unreadable)`, and the blob is doomed `corrupt` (never
-    /// re-adopted or rescued, ADR-018). Synchronous. Returns the ids it quarantined, sorted.
+    /// re-adopted or rescued, ADR-018). `known` are the holders the caller saw (`holders(of:known:)` finds the rest
+    /// without a full index unless the counts disagree, C2). Synchronous. Returns the ids it quarantined, sorted.
     @discardableResult
-    func quarantine(blob key: BlobKey) -> [AssetID] {
+    func quarantine(blob key: BlobKey, known: [AssetID]) -> [AssetID] {
         let now = self.environment.time.now()
-        let ids = (self.referenceIndex()[key] ?? []).sorted { $0.rawValue < $1.rawValue }
+        let ids = self.holders(of: key, known: known).sorted { $0.rawValue < $1.rawValue }
         for id in ids {
             guard var record = self.state.core.records[id] else {
                 continue

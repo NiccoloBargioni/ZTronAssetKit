@@ -187,6 +187,12 @@ extension AssetStore {
     func testSetEvictionChunk(_ chunk: Int) {
         self.state.eviction.chunk = chunk
     }
+
+    /// Test seam for `CleanupState.chunk` (as `testSetEvictionChunk`): lets a handful of records reach a purge's release
+    /// of the actor between chunks (proposed REENTRANCY row c-5).
+    func testSetCleanupChunk(_ chunk: Int) {
+        self.state.cleanup.chunk = chunk
+    }
 }
 
 /// Drives one operation through a `SteppedBlockingExecutor` while other units stay held (REENTRANCY tests: the

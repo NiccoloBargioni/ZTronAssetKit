@@ -71,11 +71,10 @@ extension AssetStore {
             return result
         }
         // REENTRANCY: R8 — the phase and writability below, then per candidate (in `evict`): still present at the same
-        // blob, unleased, not accessed since selection, still evictable, against holders read after this await.
+        // blob, unleased, not accessed since selection, still evictable, against its holders as they are then.
         let candidates = await self.evictionCandidatesOffActor()
         try self.checkLive()
         try self.checkWritable()
-        var holders = self.referenceIndex()
         let chunk = max(1, self.state.eviction.chunk)
         var visited = 0
         var evictedAny = false
@@ -84,14 +83,13 @@ extension AssetStore {
                 // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
                 // meanwhile, and a test can hold eviction at this very point.
                 // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob, unleased,
-                // not accessed since selection, still evictable; the holders are read again.
+                // not accessed since selection, still evictable; its holders are read again.
                 await self.runUnit(on: self.environment.metadataExecutor) {}
                 try self.checkLive()
                 try self.checkWritable()
-                holders = self.referenceIndex()
             }
             visited += 1
-            switch self.evict(candidate.victims, holders: holders[candidate.key] ?? []) {
+            switch self.evict(candidate.victims) {
             case .doomed(let bytes)?:
                 result.bytesFreed = result.bytesFreed.addingSaturating(bytes)
                 result.filesRemoved += 1
@@ -130,10 +128,9 @@ extension AssetStore {
             }
             groups[victim.blob, default: []].append(victim)
         }
-        let holders = self.referenceIndex()
         var evicted: Set<AssetID> = []
         for key in order {
-            if self.evict(groups[key] ?? [], holders: holders[key] ?? []) != nil {
+            if self.evict(groups[key] ?? []) != nil {
                 evicted.formUnion(groups[key]?.map(\.id) ?? [])
             }
         }
@@ -143,15 +140,20 @@ extension AssetStore {
         return plan.victims.map(\.id).filter { evicted.contains($0) }
     }
 
-    /// The ids of the present records referencing each blob (one pass over the records).
-    func referenceIndex() -> [BlobKey: [AssetID]] {
-        var index: [BlobKey: [AssetID]] = [:]
-        for (id, record) in self.state.core.records {
-            if let key = record.referencedBlob {
-                index[key, default: []].append(id)
-            }
+    /// The present records referencing `key` now: `known` (the ids a snapshot saw referencing it) re-read, in
+    /// O(`known`), when they account for every reference the blob table counts for it (each present record holds one,
+    /// ADR-018); otherwise, when a publication of the same bytes holds a provisional reference or a record was bound
+    /// after the snapshot, one scan of the records. Replaces the full reference index each chunk, quarantine and slice
+    /// rebuilt on the actor (C2, review round 3: 2.6 ms at 10,000 records, 45 ms at `maxEntries`).
+    func holders(of key: BlobKey, known: [AssetID]) -> [AssetID] {
+        guard case .live(let references)? = self.state.core.blobTable[key] else {
+            return []
         }
-        return index
+        let still = IntegrityBookkeeping.unique(known).filter { self.state.core.records[$0]?.referencedBlob == key }
+        if still.count == references {
+            return still
+        }
+        return self.state.core.records.compactMap { $0.value.referencedBlob == key ? $0.key : nil }
     }
 
     /// What evicting one blob's records did.
@@ -164,15 +166,15 @@ extension AssetStore {
     }
 
     /// Evicts one blob's records when the blob is still live, unleased and not being placed, its present records
-    /// (`holders`, from a `referenceIndex()` of the current state) are exactly `victims`, and each of them is still
-    /// evictable and was not accessed since the selection. Returns what happened to the blob, or `nil` when nothing
-    /// was evicted.
-    func evict(_ victims: [EvictionVictim], holders: [AssetID]) -> BlobEviction? {
+    /// (`holders(of:known:)`, read now) are exactly `victims`, and each of them is still evictable and was not accessed
+    /// since the selection. Returns what happened to the blob, or `nil` when nothing was evicted.
+    func evict(_ victims: [EvictionVictim]) -> BlobEviction? {
         guard let key = victims.first?.blob, case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key),
             self.state.cleanup.leases[key]?.isEmpty ?? true
         else {
             return nil
         }
+        let holders = self.holders(of: key, known: victims.map(\.id))
         let rules = EvictionOrder.Rules(
             policy: self.configuration.policy,
             scope: self.state.eviction.retentionScope,

@@ -20,7 +20,7 @@ extension AssetStore {
         guard let key = record.referencedBlob else {
             return
         }
-        self.quarantine(blob: key)
+        self.quarantine(blob: key, known: [id])
         self.environment.log.log(.store, .info, "an unreadable blob was quarantined")
         // REENTRANCY: R17 — nothing but the phase: the quarantine was made synchronously above.
         await self.publishSnapshot(urgency: .userInitiated)
