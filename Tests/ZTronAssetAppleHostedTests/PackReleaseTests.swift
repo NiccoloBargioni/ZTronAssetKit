@@ -422,6 +422,46 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test(
+        "R-CLN-9: a pack whose planned removal is still running or failed counts as a source copy until a removal succeeds",
+        .timeLimit(.minutes(1))
+    )
+    func packAwaitingRemovalCounts() async throws {
+        // Verifier probe PROBE-C5-3 (R-CLN-9 as ruled at the L2 merge): the retention scope excludes the only entry of
+        // the extras pack, so no report names it adopted and nothing released it yet. Its planned removal fails with a
+        // system error, so the OS still holds the pack, and its bytes count until a removal succeeds.
+        let excluded = PackAsset(extraC, "excluded by the retention scope")
+        let fixture = AppleTierFixture(installed: [
+            Packs.catalog: AppleTierFixture.catalogPack(), Packs.extras: [excluded.path: excluded.bytes],
+        ])
+        fixture.backend.setInstalledBytes(Packs.extras, 4_096)
+        let report = AdoptionReport(
+            manifestRemotePaths: [excluded.remotePath],
+            adoptedRemotePaths: [],
+            excludedRemotePaths: [excluded.remotePath]
+        )
+        fixture.backend.failRemove(Packs.extras, with: .system(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+        fixture.backend.holdRemove(Packs.extras)
+        let reclaim = Task {
+            await fixture.source.reclaimSourceCopies(report)
+        }
+        await fixture.backend.waitFor(.remove(Packs.extras))
+        #expect(await fixture.source.sourceCopyBytes() == 4_096, "the planned removal has not returned yet")
+
+        fixture.backend.releaseRemove(Packs.extras)
+        let failed = await reclaim.value
+        #expect(failed.released.isEmpty)
+        #expect(failed.failed.keys.sorted() == ["ZTronExtras"])
+        #expect(fixture.backend.installedPacks.contains(Packs.extras))
+        #expect(await fixture.source.sourceCopyBytes() == 4_096, "the removal failed, so the OS still holds the pack")
+
+        fixture.backend.failRemove(Packs.extras, with: nil)
+        #expect(await fixture.source.reclaimSourceCopies(report) == ReclaimReport(released: ["ZTronExtras"]))
+        #expect(await fixture.source.sourceCopyBytes() == 0, "a removed pack reports no bytes")
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-9: sourceCopyBytes saturates instead of trapping when the installed sizes sum past Int64.max", .timeLimit(.minutes(1)))
     func sourceCopyBytesSaturates() async throws {
         // Verifier probe PROBE-R3-2: `PackBackend` is public, so any injected backend can report such sizes.
