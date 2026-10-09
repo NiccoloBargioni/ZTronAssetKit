@@ -38,6 +38,14 @@ package struct BackgroundTaskTag: Sendable, Hashable {
         self.createdFromResumeData = createdFromResumeData
     }
 
+    /// The tag of a task a driver is about to start: a continuation exactly when the coordinator handed it resume
+    /// data (the driver decides nothing, it records what it was given). The only place this mapping is written:
+    /// `LiveBackgroundSessionDriver` and the tests' fake driver both call it, so the tests run the line the device
+    /// runs and the coverage-excluded live file keeps no expression of its own (ARCHITECTURE §14).
+    package static func forStart(name: StagingFileName, expectedBytes: Int64?, resumeData: ResumeData?) -> BackgroundTaskTag {
+        BackgroundTaskTag(name: name, expectedBytes: expectedBytes, createdFromResumeData: resumeData != nil)
+    }
+
     /// Decodes a task description; `nil` for anything that is not exactly one of our tags.
     package init?(decoding description: String?) {
         guard let description, description.utf8.count <= Self.maxBytes else {

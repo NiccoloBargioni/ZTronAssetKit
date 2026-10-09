@@ -650,6 +650,21 @@ struct BackgroundCoordinatorTests {
         #expect(unsized.priority == 0.75 && unsized.countOfBytesClientExpectsToReceive == NSURLSessionTransferSizeUnknown)
     }
 
+    @Test("R-NET-8: a driver tags a start as a continuation exactly when it was handed resume data, whatever the data holds")
+    func tagForStart() {
+        let name = self.rigName()
+        let fresh = BackgroundTaskTag.forStart(name: name, expectedBytes: 10, resumeData: nil)
+        #expect(fresh == BackgroundTaskTag(name: name, expectedBytes: 10, createdFromResumeData: false))
+        #expect(fresh.encoded == "ztak1 \(name.rawValue) 10")
+        let continued = BackgroundTaskTag.forStart(name: name, expectedBytes: nil, resumeData: ResumeData(bytes: Data("archived".utf8)))
+        #expect(continued == BackgroundTaskTag(name: name, expectedBytes: nil, createdFromResumeData: true))
+        #expect(continued.encoded == "ztak1 \(name.rawValue) - resume")
+        // The driver does not judge the data: a task created from data the OS will refuse is still a continuation,
+        // whose refusal the delegate then reads as resumeRejected.
+        let empty = BackgroundTaskTag.forStart(name: name, expectedBytes: 5, resumeData: ResumeData(bytes: Data()))
+        #expect(empty == BackgroundTaskTag(name: name, expectedBytes: 5, createdFromResumeData: true))
+    }
+
     private func rigName() -> StagingFileName {
         StagingFileName(transfer: TransportFixtures.contentID(9), attempt: TransportFixtures.attempt(3), kind: .partial)
     }
