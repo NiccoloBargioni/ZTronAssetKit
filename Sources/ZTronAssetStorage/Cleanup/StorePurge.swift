@@ -4,13 +4,14 @@ import ZTronAssetModel
 /// User purge (R-CLN-6; store.md §6.5): select, doom as `purged`, clear the stamp in the same commit, then wait out the
 /// deletion protocol in the caller's task and reap.
 extension AssetStore {
-    /// Records a purge changes between two releases of the actor (C2: one `setResidency` per record held the actor for
-    /// 17 ms at 10,000 records and 210 ms at `maxEntries`, review round 3).
+    /// Records a purge changes, or orphans a GC sweep dooms, between two releases of the actor (C2: one `setResidency`
+    /// per record held the actor for 17 ms at 10,000 records and 210 ms at `maxEntries`, review round 3; one doom per
+    /// orphan 9.7 ms for 10,000 orphans, review of the L3 close-out).
     static let cleanupChunk = 1_000
 
-    /// `purge(_:)`. The selection is computed and sorted off the actor from a value snapshot (C2, orchestrator ruling R4
-    /// at the L3 close-out), then applied in chunks of `CleanupState.chunk` records with the actor released in between,
-    /// each record re-validated when it is purged.
+    /// `purge(_:)`. The selection is computed, grouped by blob and sorted off the actor from a value snapshot (C2,
+    /// orchestrator ruling R4 at the L3 close-out), then applied in chunks of about `CleanupState.chunk` records that end
+    /// only at a blob boundary, with the actor released in between, each blob and record re-validated when it is purged.
     func performPurge(_ request: PurgeRequest) async throws(StoreError) -> PurgeResult {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -37,12 +38,18 @@ extension AssetStore {
         while start < selection.count {
             if start > 0 {
                 // The actor is released between chunks by a no-op metadata unit (C2), as quota eviction's (C-21).
-                // REENTRANCY: c-5 (proposed) — the phase and writability, then per record in `purgeChunk`.
+                // REENTRANCY: c-5 (proposed) — the phase and writability, then per blob and record in `purgeChunk`.
                 await self.runUnit(on: self.environment.metadataExecutor) {}
                 try self.checkLive()
                 try self.checkWritable()
             }
-            let end = min(start + max(1, self.state.cleanup.chunk), selection.count)
+            // A chunk ends only at a blob boundary: a blob's records are purged in one turn or not at all.
+            var end = start
+            var records = 0
+            repeat {
+                records += selection[end].ids.count
+                end += 1
+            } while end < selection.count && records < max(1, self.state.cleanup.chunk)
             purged += self.purgeChunk(selection[start..<end], request: request, reclaim: &reclaim)
             start = end
         }
@@ -85,26 +92,38 @@ extension AssetStore {
         return true
     }
 
-    /// Purges one chunk of the selection (one actor turn) and returns how many records it purged. Each record is
-    /// re-validated against the state as it is now: it still references the blob recorded at selection, and for
-    /// `.evictable` it is still neither essential nor pinned and its blob neither leased nor being placed (REENTRANCY
-    /// c-5). O(1) per record.
-    func purgeChunk(_ items: ArraySlice<PurgeSelection.Item>, request: PurgeRequest, reclaim: inout [BlobKey: Int64]) -> Int {
+    /// Purges one chunk of the selection (one actor turn) and returns how many records it purged. Each blob and record is
+    /// re-validated against the state as it is now (REENTRANCY c-5). `.all` and `.scope`: each selected record that still
+    /// references its blob. `.evictable`: a blob still live, unleased and not being placed, whose every current holder
+    /// (`holders(of:known:)`, O(holders) unless a record was bound to it since the selection) is still neither essential
+    /// nor pinned, loses all of them; one that is not stays with all of them, as the selection's rule says.
+    func purgeChunk(_ groups: ArraySlice<PurgeSelection.Group>, request: PurgeRequest, reclaim: inout [BlobKey: Int64]) -> Int {
         var purged = 0
-        for item in items {
-            guard let record = self.state.core.records[item.id], record.referencedBlob == item.blob else {
-                continue
-            }
-            if request == .evictable {
-                guard record.entry.policy != .essential, !record.pinned, self.state.cleanup.leases[item.blob]?.isEmpty ?? true,
-                    !self.state.core.publishing.contains(item.blob)
+        for group in groups {
+            let ids: [AssetID]
+            switch request {
+            case .evictable:
+                guard case .live? = self.state.core.blobTable[group.blob], self.state.cleanup.leases[group.blob]?.isEmpty ?? true,
+                    !self.state.core.publishing.contains(group.blob)
                 else {
                     continue
                 }
+                let holders = self.holders(of: group.blob, known: group.ids)
+                guard holders.allSatisfy({ self.state.core.records[$0].map { $0.entry.policy != .essential && !$0.pinned } ?? false }) else {
+                    continue
+                }
+                ids = holders
+            case .all, .scope:
+                ids = group.ids
             }
-            reclaim[item.blob] = EvictionOrder.recordedSize(record)
-            self.setResidency(.absent(.purged), of: item.id, dooming: .purged)
-            purged += 1
+            for id in ids {
+                guard let record = self.state.core.records[id], record.referencedBlob == group.blob else {
+                    continue
+                }
+                reclaim[group.blob] = EvictionOrder.recordedSize(record)
+                self.setResidency(.absent(.purged), of: id, dooming: .purged)
+                purged += 1
+            }
         }
         return purged
     }
@@ -178,49 +197,51 @@ extension AssetStore {
 
 /// The pure part of purge (run on the bulk executor, C2).
 enum PurgeSelection {
-    /// One selected record and the blob it held at selection.
-    struct Item: Sendable, Hashable {
-        /// The record.
-        let id: AssetID
-        /// The blob it referenced when the selection was made.
+    /// The selected records of one blob, as they were when the selection was made.
+    struct Group: Sendable, Hashable {
+        /// The blob.
         let blob: BlobKey
+        /// Its selected records, sorted by identifier.
+        let ids: [AssetID]
     }
 
-    /// The records a purge removes, sorted by identifier: every record holding a blob (`.all`), those in the scope
-    /// (`.scope`), or the records of every blob eviction could take regardless of residency (`.evictable`: live, not
-    /// being placed, unleased, and none of its records essential or pinned; a blob shared with such a record stays with
-    /// all its records).
+    /// The records a purge removes, grouped by the blob they hold and sorted by each group's first identifier: every
+    /// record holding a blob (`.all`), those in the scope (`.scope`), or the records of every blob eviction could take
+    /// regardless of residency (`.evictable`: live, not being placed, unleased, and none of its records essential or
+    /// pinned; a blob shared with such a record stays with all its records).
     static func select(
         _ request: PurgeRequest,
         records: [AssetID: AssetRecord],
         blobTable: [BlobKey: BlobState],
         publishing: Set<BlobKey>,
         leases: [BlobKey: [UInt64: AssetID]]
-    ) -> [Item] {
-        var selected: [Item] = []
-        switch request {
-        case .all:
-            selected = records.compactMap { id, record in record.referencedBlob.map { Item(id: id, blob: $0) } }
-        case .scope(let scope):
-            selected = records.compactMap { id, record in
-                scope.contains(record.entry) ? record.referencedBlob.map { Item(id: id, blob: $0) } : nil
+    ) -> [Group] {
+        var byKey: [BlobKey: [(AssetID, AssetRecord)]] = [:]
+        for (id, record) in records {
+            if let key = record.referencedBlob {
+                byKey[key, default: []].append((id, record))
             }
-        case .evictable:
-            var byKey: [BlobKey: [(AssetID, AssetRecord)]] = [:]
-            for (id, record) in records {
-                if let key = record.referencedBlob {
-                    byKey[key, default: []].append((id, record))
-                }
-            }
-            for (key, holders) in byKey {
+        }
+        var selected: [Group] = []
+        for (key, holders) in byKey {
+            let ids: [AssetID]
+            switch request {
+            case .all:
+                ids = holders.map(\.0)
+            case .scope(let scope):
+                ids = holders.filter { scope.contains($0.1.entry) }.map(\.0)
+            case .evictable:
                 guard case .live? = blobTable[key], !publishing.contains(key), leases[key]?.isEmpty ?? true,
                     holders.allSatisfy({ $0.1.entry.policy != .essential && !$0.1.pinned })
                 else {
                     continue
                 }
-                selected.append(contentsOf: holders.map { Item(id: $0.0, blob: key) })
+                ids = holders.map(\.0)
+            }
+            if !ids.isEmpty {
+                selected.append(Group(blob: key, ids: ids.sorted { $0.rawValue < $1.rawValue }))
             }
         }
-        return selected.sorted { $0.id.rawValue < $1.id.rawValue }
+        return selected.sorted { $0.ids[0].rawValue < $1.ids[0].rawValue }
     }
 }
