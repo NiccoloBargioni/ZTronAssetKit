@@ -20,6 +20,10 @@ struct LegacyRootTests {
         case insideStore
         /// The store's base, named through a symbolic link to one of its ancestors (paths differ, items do not).
         case throughLink
+        /// The store's base lies inside the legacy root, reached through a symbolic link to the root itself (`/A → R`,
+        /// base `/A/app`): the link sits exactly at a level the identity chain compares, where a stat that does not follow
+        /// a final link sees the link's own inode (review round 3).
+        case linkToRoot
 
         var testDescription: String {
             self.rawValue
@@ -38,6 +42,9 @@ struct LegacyRootTests {
             case .throughLink:
                 let alias = URL(fileURLWithPath: "/fake-volume/alias", isDirectory: true)
                 return (alias.appendingPathComponent("CDNAssets", isDirectory: true), legacy, (alias.path, legacy.deletingLastPathComponent().path))
+            case .linkToRoot:
+                let alias = URL(fileURLWithPath: "/fake-volume/alias-root", isDirectory: true)
+                return (alias.appendingPathComponent("app", isDirectory: true), legacy, (alias.path, legacy.path))
             }
         }
     }
@@ -54,9 +61,9 @@ struct LegacyRootTests {
         let fileSystem = FakeFileSystem(disk: try LegacyFixture.disk(files, root: placement.root), time: ManualTimeSource())
         if let (path, destination) = placement.link {
             try fileSystem.createSymbolicLink(at: URL(fileURLWithPath: path), destination: destination)
-        } else {
-            try LegacyFixture.makeDirectories(placement.base, on: fileSystem)
         }
+        // Through the link where there is one (its target's directories are created).
+        try LegacyFixture.makeDirectories(placement.base, on: fileSystem)
         var disk = fileSystem.survivingDisk()
         disk.makeDurable()
         let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
