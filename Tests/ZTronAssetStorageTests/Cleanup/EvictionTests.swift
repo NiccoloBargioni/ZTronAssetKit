@@ -47,6 +47,87 @@ struct EvictionTests {
         #expect(!harness.hasBlob(a.key), "the reaper deletes the evicted blob after acknowledgement and grace")
     }
 
+    /// How a test reaches eviction: the maintenance run, or the engine's dry run applied by `apply`.
+    enum Route: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case maintenance
+        case dryRunThenApply
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @Test(
+        "R-CLN-4: eviction goes down to the hysteresis target, not just under the budget, least recently used first even when smaller",
+        .timeLimit(.minutes(1)),
+        arguments: Route.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func downToHysteresisTargetLeastRecentFirst(route: Route) async throws {
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(1_000)))
+        let oldest = CleanupFixture.asset("oldest", seed: 70, count: 150)
+        let older = CleanupFixture.asset("older", seed: 71, count: 200)
+        let big = CleanupFixture.asset("big", seed: 72, count: 400)
+        let bigger = CleanupFixture.asset("bigger", seed: 73, count: 350)
+        let assets = [oldest, older, big, bigger]
+        try await EvictionTests.seedWithAccesses(harness, assets, recent: assets.map(\.id))
+        // 1,100 bytes against a budget of 1,000: evicting `oldest` alone would end under the budget (950), but the
+        // target is 90 % of it (900), so `older` goes too. Both are smaller than the two recent ones.
+        let space = try await harness.store.freeSpace()
+        #expect(space.usedBytes == 1_100)
+        let needed = EvictionOrder.bytesToFree(usedBytes: space.usedBytes, availableBytes: space.volumeImportant, pendingReclaim: space.pendingReclaim, policy: harness.configuration.policy)
+        #expect(needed == 200, "down to 900, not to 1,000")
+        switch route {
+        case .maintenance:
+            let result = try await harness.store.evictIfNeeded()
+            #expect(result.bytesFreed == 350 && result.filesRemoved == 2)
+        case .dryRunThenApply:
+            let plan = try #require(await harness.store.evictionPlan(toFree: needed, protecting: []))
+            #expect(plan.victims.map(\.id) == [oldest.id, older.id] && plan.bytes == 350)
+            let report = try await harness.store.apply(CoreFixture.manifest(assets.map(\.entry)), etag: nil, eviction: plan)
+            #expect(report.evicted == [oldest.id, older.id])
+        }
+        for evicted in [oldest, older] {
+            #expect(await harness.record(evicted.id)?.residency == .absent(.evicted), "\(evicted.id.rawValue) is evicted")
+        }
+        for kept in [big, bigger] {
+            #expect(await harness.isPresent(kept.id, at: kept.key), "\(kept.id.rawValue) is kept")
+        }
+        #expect(try await harness.store.freeSpace().usedBytes == 750)
+    }
+
+    @Test(
+        "R-CLN-5: eviction never takes an asset accessed within the deletion grace, even with no minimum residency",
+        .timeLimit(.minutes(1)),
+        arguments: Route.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func deletionGraceProtectsRecentAccess(route: Route) async throws {
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0), minimumResidency: 0, deletionGrace: 10))
+        let recent = CleanupFixture.asset("recent", seed: 80)
+        let stale = CleanupFixture.asset("stale", seed: 81)
+        try await harness.seed([recent, stale])
+        harness.time.advance(by: 3_600)
+        _ = await harness.store.location(for: stale.id, extensions: [], recordingAccess: true)
+        harness.time.advance(by: 6)
+        _ = await harness.store.location(for: recent.id, extensions: [], recordingAccess: true)
+        // Now `stale` was read 11 s ago (outside the 10 s grace) and `recent` 5 s ago (inside it).
+        harness.time.advance(by: 5)
+        #expect(await harness.store.evictionPlan(toFree: Int64(stale.bytes.count) + 1, protecting: []) == nil, "recent cannot be planned")
+        switch route {
+        case .maintenance:
+            let result = try await harness.store.evictIfNeeded()
+            #expect(result.filesRemoved == 1 && result.bytesFreed == Int64(stale.bytes.count))
+        case .dryRunThenApply:
+            let plan = try #require(await harness.store.evictionPlan(toFree: 1, protecting: []))
+            #expect(plan.victims.map(\.id) == [stale.id])
+            let report = try await harness.store.apply(CoreFixture.manifest([recent.entry, stale.entry]), etag: nil, eviction: plan)
+            #expect(report.evicted == [stale.id])
+        }
+        #expect(await harness.record(stale.id)?.residency == .absent(.evicted))
+        #expect(await harness.isPresent(recent.id, at: recent.key), "accessed within the grace window")
+    }
+
     @Test("R-CLN-4: essential, pinned, leased and recently accessed assets are never evicted", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func protectedAssetsStay() async throws {
