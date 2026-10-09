@@ -329,7 +329,8 @@ extension AssetStore {
     // MARK: Adopt on demand
 
     /// `adoptLegacyNow(_:)`: the current location when the asset is present; otherwise, while migration runs, adopts its
-    /// legacy file now (counted here only when this call took it from the queue) and installs the snapshot at once.
+    /// legacy file now and installs the snapshot at once. Each adoption is counted once, by the call that adopted the
+    /// file; a drop only by the call that took the file from the queue.
     func performAdoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -362,6 +363,9 @@ extension AssetStore {
         }
         if queued != nil {
             self.unclaimLegacyFile(file, requeue: false)
+            self.count(outcome)
+        } else if outcome == .adopted {
+            // A batch holds the file and will see it adopted (`alreadyAdopted`, uncounted): this call counts it.
             self.count(outcome)
         }
         // REENTRANCY: R17, R18 — nothing but the phase: the location is read from the record afterwards.
