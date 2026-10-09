@@ -310,6 +310,20 @@ extension IndexCommitStateSpaceTests {
 /// before B-36, all in lifetimes whose barrier failed, and none after it; this suite finds the same class (ADR draft B-36).
 @Suite("Core: index commit state space from unordered names (R-STO-4, R-STO-5)", .serialized)
 struct IndexCommitUnorderedNamesTests {
+    /// The kill survivors first met in each row of `IndexSpaceRow.unforged`, in its order: 1,780 in all (close-out cycle
+    /// 5). Pinned, so that a change that drops kill points, crash views or rows fails instead of shrinking the space.
+    /// They follow from the commit unit's sequence of mutations: a change to that sequence changes them, and they are
+    /// then pinned again from the suite's printed lines, with the reason recorded in ADR draft B-33.
+    static let survivorsPerRow: [Int] = [
+        68, 42, 38, 40, 57, 78, 57,
+        23, 34, 27, 33, 27, 37, 29,
+        25, 30, 37, 33, 30, 36, 32,
+        31, 39, 39, 46, 39, 39, 39,
+        63, 24, 27, 33, 22, 22, 22,
+        84, 33, 32, 33, 41, 22, 22,
+        63, 25, 28, 33, 22, 22, 22,
+    ]
+
     @Test(
         "R-STO-5: every kill survivor with unordered index names, with a fault at open()'s root barrier or a crash before it, keeps I-a…I-e",
         .timeLimit(.minutes(1)),
@@ -319,6 +333,7 @@ struct IndexCommitUnorderedNamesTests {
     func everyUnorderedSurvivor(row: IndexSpaceRow) async throws {
         let index = try #require(IndexSpaceRow.unforged.firstIndex { $0.testDescription == row.testDescription })
         let survivors = await UnorderedSurvivors.shared.survivors(at: index)
+        #expect(survivors.count == IndexCommitUnorderedNamesTests.survivorsPerRow[index], "the kill survivors first met in \(row.testDescription)")
         let results = await withTaskGroup(of: IndexSpace.SliceResult.self) { group in
             for (index, survivor) in survivors.enumerated() {
                 group.addTask(priority: .low) {
@@ -343,6 +358,7 @@ struct IndexCommitUnorderedNamesTests {
             #expect(counts.cases == counts.faultFree + counts.faults + counts.crashes)
         }
         let cases = results.map(\.counts.cases).reduce(0, +)
+        #expect(cases == 12 * survivors.count, "3 fault-free cases, 6 barrier faults and 3 crashes per survivor")
         print("R-STO-5 unordered names \(row.testDescription) tmp=*: \(survivors.count) kill survivors first met in this row, \(cases) cases enumerated")
     }
 
@@ -353,6 +369,11 @@ struct IndexCommitUnorderedNamesTests {
         let survivors = rows.flatMap { $0 }
         let keys = survivors.map { IndexSpace.ViewsKey(current: $0.start.current, dropped: $0.start.dropped, kept: $0.start.kept) }
         #expect(rows.count == IndexSpaceRow.unforged.count)
+        // The size is asserted, not only printed (close-out cycle 5): a refactor that skipped kill points or crash views
+        // would otherwise shrink the space and still pass.
+        #expect(IndexCommitUnorderedNamesTests.survivorsPerRow.count == IndexSpaceRow.unforged.count)
+        #expect(rows.map(\.count) == IndexCommitUnorderedNamesTests.survivorsPerRow, "kill survivors first met in each row")
+        #expect(survivors.count == 1_780 && IndexCommitUnorderedNamesTests.survivorsPerRow.reduce(0, +) == 1_780)
         #expect(Set(keys).count == survivors.count, "each survivor once")
         #expect(survivors.allSatisfy { $0.start.current != $0.start.dropped || $0.start.kept != $0.start.current }, "every crash view of a survivor is not the same")
         #expect(survivors.contains { $0.start.dropped != $0.start.kept }, "some survivor has a name a power loss undoes")
