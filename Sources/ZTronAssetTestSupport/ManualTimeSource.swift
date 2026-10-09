@@ -12,8 +12,9 @@ import ZTronAssetModel
 /// `(deadline, registration sequence)` order, recorded in `wakeLog`; cancellation removes a sleeper under the same
 /// lock, so each sleeper resumes exactly once. `pendingSleepers` and `nextDeadline` are the positive witnesses idle
 /// and "nothing before t" tests need (sync-2 S2-27); `waitForSleepers(atLeast:)` lets a test order registrations
-/// without sleeping (store-2 S2-08). `sleepDevice(for:)` advances wall and monotonic time but not the awake clock
-/// (ADR-017).
+/// without sleeping (store-2 S2-08) and ends when its caller is cancelled (L2 follow-up: a test past its time limit
+/// must not hang the run; `requireSleepers(atLeast:)` throws then). `sleepDevice(for:)` advances wall and monotonic
+/// time but not the awake clock (ADR-017).
 @available(macOS 15.0, iOS 18.0, *)
 public final class ManualTimeSource: TimeSource {
     private typealias Wake = CheckedContinuation<Result<Void, CancellationError>, Never>
@@ -24,9 +25,12 @@ public final class ManualTimeSource: TimeSource {
         case cancelled
     }
 
-    private struct SleeperWaiter {
-        let count: Int
-        let continuation: CheckedContinuation<Void, Never>
+    /// A `waitForSleepers` call, by id: allocated before its cancellation handler is installed, so a cancellation that
+    /// arrives before the wait registers is remembered (`cancelled`) under the same lock, like a sleeper's `Phase`.
+    private enum SleeperWaiter {
+        case allocated
+        case registered(count: Int, continuation: CheckedContinuation<Bool, Never>)
+        case cancelled
     }
 
     private struct State {
@@ -36,7 +40,8 @@ public final class ManualTimeSource: TimeSource {
         var nextSequence: UInt64 = 0
         var phases: [UInt64: Phase] = [:]
         var wakeLog: [UInt64] = []
-        var sleeperWaiters: [SleeperWaiter] = []
+        var nextSleeperWaiter: UInt64 = 0
+        var sleeperWaiters: [UInt64: SleeperWaiter] = [:]
 
         var pendingCount: Int {
             self.phases.values.reduce(0) { count, phase in
@@ -182,37 +187,89 @@ public final class ManualTimeSource: TimeSource {
         self.state.withLock { $0.wakeLog }
     }
 
-    /// Suspends until at least `count` sleepers are registered (event-driven, never polled).
+    /// Suspends until at least `count` sleepers are registered (event-driven, never polled), or until the calling task
+    /// is cancelled (a test past its time limit), when it returns with fewer registered so the caller's following
+    /// expectations on `pendingSleepers` fail instead of the run hanging.
     public func waitForSleepers(atLeast count: Int) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let ready = self.state.withLock { state -> Bool in
-                if state.pendingCount >= count {
-                    return true
+        _ = await self.sleepersRegistered(atLeast: count, registered: nil)
+    }
+
+    /// Suspends until at least `count` sleepers are registered; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test past its time limit ends at once instead of running on without the sleepers.
+    public func requireSleepers(atLeast count: Int) async throws(CancellationError) {
+        guard await self.sleepersRegistered(atLeast: count, registered: nil) else {
+            throw CancellationError()
+        }
+    }
+
+    /// Test seam for the wait itself: `true` once at least `count` sleepers are registered, `false` when the calling
+    /// task was cancelled first; `registered` runs once the wait is registered (outside the lock).
+    package func waitForSleepers(atLeast count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        await self.sleepersRegistered(atLeast: count, registered: registered)
+    }
+
+    /// The census wait: resumed exactly once, with `true` by the registration that reached `count` (or at once when
+    /// it is reached), with `false` by the caller's cancellation. Registration and cancellation decide under the lock,
+    /// so a cancellation before, during or after registration is never lost and never resumes the wait twice.
+    private func sleepersRegistered(atLeast count: Int, registered: (@Sendable () -> Void)?) async -> Bool {
+        let id = self.state.withLock { state -> UInt64 in
+            state.nextSleeperWaiter += 1
+            state.sleeperWaiters[state.nextSleeperWaiter] = .allocated
+            return state.nextSleeperWaiter
+        }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                let immediate = self.state.withLock { state -> Bool? in
+                    let met = state.pendingCount >= count
+                    switch state.sleeperWaiters[id] {
+                    case .allocated where !met:
+                        state.sleeperWaiters[id] = .registered(count: count, continuation: continuation)
+                        return nil
+                    case .allocated, .cancelled:
+                        state.sleeperWaiters[id] = nil
+                        return met
+                    case .registered, nil:
+                        // Unreachable: only this body registers the id, and only a registered id is removed elsewhere.
+                        return met
+                    }
                 }
-                state.sleeperWaiters.append(SleeperWaiter(count: count, continuation: continuation))
-                return false
+                if let immediate {
+                    continuation.resume(returning: immediate)
+                } else {
+                    registered?()
+                }
             }
-            if ready {
-                continuation.resume()
+        } onCancel: {
+            let continuation = self.state.withLock { state -> CheckedContinuation<Bool, Never>? in
+                switch state.sleeperWaiters[id] {
+                case .allocated:
+                    state.sleeperWaiters[id] = .cancelled
+                    return nil
+                case .registered(_, let continuation):
+                    state.sleeperWaiters[id] = nil
+                    return continuation
+                case .cancelled, nil:
+                    return nil
+                }
             }
+            continuation?.resume(returning: false)
         }
     }
 
     private func notifySleeperWaiters() {
-        let ready = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
+        let ready = self.state.withLock { state -> [CheckedContinuation<Bool, Never>] in
             let pending = state.pendingCount
-            var ready: [CheckedContinuation<Void, Never>] = []
-            state.sleeperWaiters.removeAll { waiter in
-                if waiter.count <= pending {
-                    ready.append(waiter.continuation)
-                    return true
+            var ready: [CheckedContinuation<Bool, Never>] = []
+            for (id, waiter) in state.sleeperWaiters {
+                if case .registered(let count, let continuation) = waiter, count <= pending {
+                    ready.append(continuation)
+                    state.sleeperWaiters[id] = nil
                 }
-                return false
             }
             return ready
         }
         for continuation in ready {
-            continuation.resume()
+            continuation.resume(returning: true)
         }
     }
 

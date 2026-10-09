@@ -43,12 +43,19 @@ actor AppleSourceState {
     /// Packs released in this generation. Nothing removes a pack from it within the generation, not even a transfer
     /// that downloads the pack again on demand (ADR-027 as ruled at the L2 close-out, cycle 3).
     private var released: Set<PackID> = []
+    /// Packs whose planned removal is running now. The OS still holds them until the call returns, so their bytes
+    /// count in `sourceCopyBytes()` whatever a later survey finds (R-CLN-9, verifier probe VP-A3).
     private var releasing: Set<PackID> = []
     /// Every pack this source released in this process, in any catalog generation: the packs released in this
     /// generation, and those released in an earlier one until this one releases them again. Their bytes count in
     /// `sourceCopyBytes()` whenever the OS holds them (R-CLN-9); a removed pack reports none.
     private var releasedInProcess: Set<PackID> = []
     private var adoptedPacks: Set<PackID> = []
+    /// The media packs the last survey found settled (every catalog entry adopted or excluded): the packs a reclaim
+    /// plans to remove. One whose removal failed is still on the device, so its bytes count in `sourceCopyBytes()`
+    /// while the last survey still finds it settled, until a removal succeeds (R-CLN-9, L2 follow-up, verifier probe
+    /// PROBE-C5-3). A running removal counts through `releasing` instead, since a later survey may reset this set.
+    private var settledPacks: Set<PackID> = []
 
     /// Creates an open state.
     init() {}
@@ -230,6 +237,7 @@ actor AppleSourceState {
     /// turn only filters it, so the bookkeeping is re-validated against the sets as they are now.
     func planRelease(_ survey: ReleaseSurvey) -> ReleasePlan {
         self.adoptedPacks = survey.adopted
+        self.settledPacks = survey.settled
         let packs = survey.settled.subtracting(self.released).subtracting(self.releasing).sorted()
         self.releasing.formUnion(packs)
         return ReleasePlan(packs: packs, generation: self.generation)
@@ -237,8 +245,8 @@ actor AppleSourceState {
 
     /// Ends one planned release; a success counts for the generation it was planned in only. It counts even when a
     /// transfer made the pack available again while the call ran: the pack is released at most once per generation,
-    /// so a copy downloaded around the removal stays installed until the next generation (ADR-027). Any success, in
-    /// whichever generation, makes the pack a source copy (`sourceCopyPacks`).
+    /// so a copy downloaded around the removal stays installed until a reclaim in a later catalog generation releases
+    /// it (ADR-027). Any success, in whichever generation, makes the pack a source copy (`sourceCopyPacks`).
     func finishRelease(_ pack: PackID, succeeded: Bool, generation: UInt64) {
         self.releasing.remove(pack)
         guard succeeded else {
@@ -251,12 +259,16 @@ actor AppleSourceState {
     }
 
     /// The packs whose installed bytes `sourceCopyBytes()` sums, sorted: media packs holding adopted content, released
-    /// or not, and every pack released in this process. A removed pack reports no bytes, so it adds nothing; one that
-    /// came back after its release (restored by the OS, or downloaded again on demand by a transfer of this source)
-    /// stays installed until a later catalog generation releases it, and the OS holds its bytes meanwhile (R-CLN-9,
-    /// ADR-027 as ruled at the L2 close-out, cycle 3). An excluded-only pack holds no adopted content, so only the
-    /// release makes it count (verifier probe VC3-E).
+    /// or not; every pack released in this process; and the packs whose planned removal has not succeeded yet. Those
+    /// are the packs whose removal is running now, whatever a later survey finds (a concurrent reclaim may survey a
+    /// newer report meanwhile), and the packs the last survey found settled, so one whose removal failed counts while
+    /// the last survey still finds it settled (the next reclaim plans it again). A removed pack reports no bytes, so it
+    /// adds nothing; one that came back after its release (restored by the OS, or downloaded again on demand by a
+    /// transfer of this source) stays installed until a reclaim in a later catalog generation releases it, and the OS
+    /// holds its bytes meanwhile (R-CLN-9, ADR-027 as ruled at the L2 close-out, cycle 3). An excluded-only pack holds
+    /// no adopted content, so only its planned removal or its release makes it count (verifier probes VC3-E,
+    /// PROBE-C5-3 and VP-A3).
     func sourceCopyPacks() -> [PackID] {
-        self.adoptedPacks.union(self.releasedInProcess).sorted()
+        self.adoptedPacks.union(self.releasedInProcess).union(self.settledPacks).union(self.releasing).sorted()
     }
 }

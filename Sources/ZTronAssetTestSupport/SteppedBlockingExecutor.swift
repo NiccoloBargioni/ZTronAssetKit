@@ -6,18 +6,20 @@ import ZTronAssetModel
 /// `publish`, a commit unit, a deletion unit), doing something else on the actor meanwhile, then releasing it:
 /// `R-INT-2: a manifest change during the publish rename…`, `R-CLN-5: two identifiers with identical bytes
 /// published concurrently…` and rows R2–R14. Units are numbered from 1 in submission order; `submittedUnits` and
-/// `completedUnits` record the order, `waitForHeldUnits(atLeast:)` is event-driven, never polled.
+/// `completedUnits` record the order, `waitForHeldUnits(atLeast:)` is event-driven, never polled, and ends when its
+/// caller is cancelled (L2 follow-up): `requireHeldUnits(atLeast:)` is the form that then throws.
 ///
 /// An actor (the protocol is async), so no lock and no availability gate. Units run on the actor once released,
 /// one at a time, like the serial live executor. With `holding == false` units run as soon as they arrive but are
 /// still recorded, so a test lets setup through and holds only from the point it cares about.
-public actor SteppedBlockingExecutor: BlockingExecutor {
+public actor SteppedBlockingExecutor: BlockingExecutor, CensusWaiting {
     private var holding: Bool
     private var nextSequence = 0
     private var gates: [Int: CheckedContinuation<Void, Never>] = [:]
     private var submitted: [Int] = []
     private var completed: [Int] = []
-    private var heldWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    /// Waits for a number of held units (`CensusWaiting`).
+    var censusWaiters = CensusWaiters()
 
     /// Creates an executor that holds every unit (`holding == true`) or lets them through.
     public init(holding: Bool = true) {
@@ -89,30 +91,33 @@ public actor SteppedBlockingExecutor: BlockingExecutor {
         self.completed
     }
 
-    /// Suspends until at least `count` units are held at once.
+    /// Suspends until at least `count` units are held at once, or until the calling task is cancelled (a test past its
+    /// time limit). A cancelled wait returns with fewer units held, so the caller's following expectations on
+    /// `heldUnits` fail instead of the run hanging; a caller that goes on to index `heldUnits` or to await a held
+    /// operation uses `requireHeldUnits(atLeast:)`, which throws instead.
     public func waitForHeldUnits(atLeast count: Int) async {
-        if self.gates.count >= count {
-            return
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        _ = await self.awaitCensus(target: count, met: { self.gates.count >= $0 }, registered: nil)
+    }
+
+    /// Suspends until at least `count` units are held at once; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test past its time limit ends at once instead of running on without the units.
+    public func requireHeldUnits(atLeast count: Int) async throws(CancellationError) {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        guard await self.awaitCensus(target: count, met: { self.gates.count >= $0 }, registered: nil) else {
+            throw CancellationError()
         }
-        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the actor turn
-        // in which `count` units were held; no state is read afterwards (the caller re-reads `heldUnits`).
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            self.heldWaiters.append((count, continuation))
-        }
+    }
+
+    /// Test seam for the wait itself: `true` once at least `count` units are held, `false` when the calling task was
+    /// cancelled first; `registered` runs on the actor once the wait is registered.
+    package func waitForHeldUnits(atLeast count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        await self.awaitCensus(target: count, met: { self.gates.count >= $0 }, registered: registered)
     }
 
     private func notifyHeldWaiters() {
         let held = self.gates.count
-        var ready: [CheckedContinuation<Void, Never>] = []
-        self.heldWaiters.removeAll { waiter in
-            if waiter.count <= held {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume()
-        }
+        self.censusWaiters.resume { $0 <= held }
     }
 }

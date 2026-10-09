@@ -147,16 +147,16 @@ struct StoreRecoveryTests {
         let heal = Task {
             try await harness.store.publish(staged, binding: [a.identifier], expecting: a.contentIdentity, urgency: .bulk)
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         await metadata.releaseNext()  // the claim
-        await metadata.waitForHeldUnits(atLeast: 1)  // the replacement placement
+        try await metadata.requireHeldUnits(atLeast: 1)  // the replacement placement
         #expect(await harness.state.core.publishing.contains(key))
         #expect(await harness.state.core.replacingDooms[key]?.reason == .corrupt)
         // Any commit meanwhile (the engine's runDueWork, a markSynced, a flush) still records the doom.
         let other = Task {
             try await harness.store.markSyncDue()
         }
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         await metadata.release(await metadata.heldUnits[1])
         try await other.value
         let disk = harness.fileSystem.survivingDisk()  // a crash before the replacement rename

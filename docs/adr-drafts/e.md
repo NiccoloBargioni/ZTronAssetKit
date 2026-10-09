@@ -506,8 +506,8 @@ the public signature is unchanged, E-13) — flagged likewise.
   "…of adopted packs, released or not, and of every pack it released in this process (a removed pack reports no
   bytes)". (b) Consequences: "Double residency is bounded by one pack between first adoption and release" no longer
   holds; double residency lasts from first adoption until release, and also from an on-demand re-download after
-  release until the next catalog generation (at most one download and one removal per pack per generation, never a
-  loop). Doc-only; no signature change.
+  release until a reclaim in a later catalog generation releases it (at most one download and one removal per pack
+  per generation, never a loop). Doc-only; no signature change.
 - **ZTronAssetModel `RemoteSource.sourceCopyBytes()` `///` doc, at merge (cycle 5).** "i.e. Apple packs not yet
   released" is stale: the Apple source counts packs holding adopted content, released or not, and every pack it
   released in this process (a released pack that came back counts until a later catalog generation releases it; a

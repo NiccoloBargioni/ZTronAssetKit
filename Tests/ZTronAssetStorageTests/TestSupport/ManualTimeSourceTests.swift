@@ -8,31 +8,41 @@ import ZTronAssetTestSupport
 @Suite("Test support: ManualTimeSource")
 struct TestSupportManualTimeSourceTests {
     /// Registers one sleeper per deadline, in order, waiting for each registration (so sequence numbers are fixed).
+    /// Throws when the test is cancelled before a sleeper registered (its time limit), so the test ends there instead
+    /// of awaiting sleepers that never registered and that nothing would ever wake (L2 follow-up).
     @available(macOS 15.0, *)
-    private static func sleepers(_ time: ManualTimeSource, _ offsets: [TimeInterval]) async -> [Task<Bool, Never>] {
+    private static func sleepers(
+        _ time: ManualTimeSource,
+        _ offsets: [TimeInterval]
+    ) async throws(CancellationError) -> [Task<Bool, Never>] {
         let start = time.monotonicNow()
         var tasks: [Task<Bool, Never>] = []
         for (index, offset) in offsets.enumerated() {
-            let deadline = start.adding(seconds: offset)
-            tasks.append(Task {
-                do {
-                    try await time.sleep(until: deadline)
-                    return true
-                } catch {
-                    return false
-                }
-            })
-            await time.waitForSleepers(atLeast: index + 1)
+            tasks.append(Self.sleeper(time, until: start.adding(seconds: offset)))
+            try await time.requireSleepers(atLeast: index + 1)
         }
         return tasks
     }
 
+    /// One sleeper in a task of its own: `true` when woken, `false` when cancelled.
+    @available(macOS 15.0, *)
+    private static func sleeper(_ time: ManualTimeSource, until deadline: MonotonicInstant) -> Task<Bool, Never> {
+        Task {
+            do {
+                try await time.sleep(until: deadline)
+                return true
+            } catch {
+                return false
+            }
+        }
+    }
+
     @available(macOS 15.0, *)
     @Test("R-ENV-1: one advance wakes exactly the due sleepers in deadline then registration order and keeps the rest", .timeLimit(.minutes(1)))
-    func advanceWakesDueSleepersInOrder() async {
+    func advanceWakesDueSleepersInOrder() async throws {
         let time = ManualTimeSource()
         let start = time.monotonicNow()
-        let tasks = await Self.sleepers(time, [5, 2, 1, 2, 9])
+        let tasks = try await Self.sleepers(time, [5, 2, 1, 2, 9])
         time.advance(by: 2)
         for index in [1, 2, 3] {
             #expect(await tasks[index].value)
@@ -49,11 +59,11 @@ struct TestSupportManualTimeSourceTests {
 
     @available(macOS 15.0, *)
     @Test("R-ENV-1: advancing to an earlier instant moves no clock and wakes nobody", .timeLimit(.minutes(1)))
-    func advanceToThePastIsANoOp() async {
+    func advanceToThePastIsANoOp() async throws {
         let time = ManualTimeSource()
         let start = time.monotonicNow()
         let wall = time.now()
-        let tasks = await Self.sleepers(time, [1])
+        let tasks = try await Self.sleepers(time, [1])
         time.advance(to: .zero)
         #expect(time.monotonicNow() == start)
         #expect(time.now() == wall)
@@ -64,12 +74,12 @@ struct TestSupportManualTimeSourceTests {
 
     @available(macOS 15.0, *)
     @Test("R-ENV-1: a device sleep advances wall and monotonic time, wakes due sleepers, and keeps the awake clock still", .timeLimit(.minutes(1)))
-    func deviceSleepStopsTheAwakeClock() async {
+    func deviceSleepStopsTheAwakeClock() async throws {
         let time = ManualTimeSource()
         let wall = time.now()
         let monotonic = time.monotonicNow()
         let uptime = time.uptimeNow()
-        let tasks = await Self.sleepers(time, [30])
+        let tasks = try await Self.sleepers(time, [30])
         time.sleepDevice(for: 60)
         #expect(await tasks[0].value)
         #expect(time.now() == wall.addingTimeInterval(60))
@@ -126,9 +136,17 @@ struct TestSupportManualTimeSourceTests {
 
     @available(macOS 15.0, *)
     @Test("R-ENV-1: waitForSleepers returns once enough sleepers are registered, at once when they already are", .timeLimit(.minutes(1)))
-    func waitForSleepersIsEventDriven() async {
+    func waitForSleepersIsEventDriven() async throws {
+        // The `Void` form under test registers the sleepers here (the helper uses the throwing form); a wait that the
+        // test's time limit ended early leaves fewer registered, and the `#require` ends the test there.
         let time = ManualTimeSource()
-        let tasks = await Self.sleepers(time, [1, 1])
+        let deadline = time.monotonicNow().adding(seconds: 1)
+        var tasks: [Task<Bool, Never>] = []
+        for index in 0..<2 {
+            tasks.append(Self.sleeper(time, until: deadline))
+            await time.waitForSleepers(atLeast: index + 1)
+        }
+        try #require(time.pendingSleepers == 2)
         await time.waitForSleepers(atLeast: 1)
         #expect(time.pendingSleepers == 2)
         time.advance(by: 1)

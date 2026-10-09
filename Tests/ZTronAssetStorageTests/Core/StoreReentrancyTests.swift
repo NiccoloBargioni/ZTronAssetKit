@@ -23,14 +23,14 @@ struct StoreReentrancyTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .userInitiated)
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         await metadata.releaseNext()  // the claim
-        await metadata.waitForHeldUnits(atLeast: 1)  // the placement (sidecar, barrier, rename) is now held
+        try await metadata.requireHeldUnits(atLeast: 1)  // the placement (sidecar, barrier, rename) is now held
         let changed = CoreFixture.entry("a", CoreFixture.bytes(111))
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest([changed]), etag: nil, eviction: nil)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)  // apply's commit unit queued behind the placement
+        try await metadata.requireHeldUnits(atLeast: 2)  // apply's commit unit queued behind the placement
         await metadata.releaseNext()  // the rename runs; the record changed meanwhile
         await #expect(throws: StoreError.superseded(entry.identifier)) {
             try await publishing.value
@@ -68,13 +68,13 @@ struct StoreReentrancyTests {
         let publishX = Task {
             try await harness.store.publish(stagedX, binding: [x.identifier], expecting: x.contentIdentity, urgency: .bulk)
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         await metadata.releaseNext()  // X's claim; X then holds the key while its placement is held
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let publishY = Task {
             try await harness.store.publish(stagedY, binding: [y.identifier], expecting: y.contentIdentity, urgency: .bulk)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         let held = await metadata.heldUnits
         let key = CoreFixture.key(bytes)
         await metadata.release(held[1])  // Y's claim: Y reaches the key while X's publication is in flight
@@ -118,14 +118,14 @@ struct StoreReentrancyTests {
         let reporting = Task {
             try await harness.store.adoptionReport()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)  // the durable commit holding the captured state
+        try await metadata.requireHeldUnits(atLeast: 1)  // the durable commit holding the captured state
         let publishing = Task {
             try await harness.store.publish(stagedB, binding: [entryB.identifier], expecting: entryB.contentIdentity, urgency: .bulk)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         let commit = await metadata.heldUnits[0]
         await metadata.release(await metadata.heldUnits[1])  // B's claim
-        await metadata.waitForHeldUnits(atLeast: 2)  // B's placement
+        try await metadata.requireHeldUnits(atLeast: 2)  // B's placement
         await metadata.release(await metadata.heldUnits[1])
         #expect(try await publishing.value[entryB.identifier] != nil)
         await metadata.release(commit)

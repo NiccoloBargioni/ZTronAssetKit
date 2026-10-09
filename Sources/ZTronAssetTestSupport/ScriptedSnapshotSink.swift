@@ -20,12 +20,13 @@ package enum SnapshotSinkBehaviour: Sendable, Hashable {
 /// (LRU, R-CLN-4) in the next acknowledgement, records every key offered, and lets a test wait for installs without
 /// polling. Drives `R-CLN-5: a sink that keeps an older or foreign snapshot never counts as acknowledgement` and the
 /// fresh-acknowledgement tests of ADR-017. An actor: no lock, no availability gate.
-package actor ScriptedSnapshotSink: SnapshotSink {
+package actor ScriptedSnapshotSink: SnapshotSink, CensusWaiting {
     private var behaviour: SnapshotSinkBehaviour
     private var current: AssetSnapshot = .empty
     private var pendingAccesses: [AssetID: Date] = [:]
     private var offered: [SnapshotKey] = []
-    private var installWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    /// Waits for a number of offered installs (`CensusWaiting`).
+    var censusWaiters = CensusWaiters()
 
     /// Creates a sink with an initial behaviour.
     package init(behaviour: SnapshotSinkBehaviour = .acknowledge) {
@@ -52,16 +53,29 @@ package actor ScriptedSnapshotSink: SnapshotSink {
         self.current
     }
 
-    /// Suspends until at least `count` installs were offered.
+    /// Suspends until at least `count` installs were offered, or until the calling task is cancelled (a test past its
+    /// time limit), when it returns with fewer offered so the caller's following expectations fail instead of the run
+    /// hanging (L2 follow-up).
     package func waitForInstalls(atLeast count: Int) async {
-        if self.offered.count >= count {
-            return
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards (the caller re-reads
+        // `offeredKeys`).
+        _ = await self.awaitCensus(target: count, met: { self.offered.count >= $0 }, registered: nil)
+    }
+
+    /// Suspends until at least `count` installs were offered; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test past its time limit ends at once.
+    package func requireInstalls(atLeast count: Int) async throws(CancellationError) {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        guard await self.awaitCensus(target: count, met: { self.offered.count >= $0 }, registered: nil) else {
+            throw CancellationError()
         }
-        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the install that
-        // reached `count`; no state is read afterwards (the caller re-reads `offeredKeys`).
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            self.installWaiters.append((count, continuation))
-        }
+    }
+
+    /// Test seam for the wait itself: `true` once at least `count` installs were offered, `false` when the calling
+    /// task was cancelled first; `registered` runs on the actor once the wait is registered.
+    package func waitForInstalls(atLeast count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        await self.awaitCensus(target: count, met: { self.offered.count >= $0 }, registered: registered)
     }
 
     /// Answers according to the behaviour; the replaced snapshot is returned in `retired`, as the mirror does.
@@ -89,16 +103,6 @@ package actor ScriptedSnapshotSink: SnapshotSink {
 
     private func notifyInstallWaiters() {
         let count = self.offered.count
-        var ready: [CheckedContinuation<Void, Never>] = []
-        self.installWaiters.removeAll { waiter in
-            if waiter.count <= count {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume()
-        }
+        self.censusWaiters.resume { $0 <= count }
     }
 }

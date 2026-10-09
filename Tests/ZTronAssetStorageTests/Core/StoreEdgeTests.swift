@@ -24,12 +24,12 @@ struct StoreEdgeTests {
                 try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
             }
             // The claim (metadata) or the first hash unit (bulk) is held; the manifest changes meanwhile.
-            await stepped.waitForHeldUnits(atLeast: 1)
+            try await stepped.requireHeldUnits(atLeast: 1)
             let changing = Task {
                 try await harness.store.admit(CoreFixture.entry("a", CoreFixture.bytes(191)))
             }
             if heldExecutor == "metadata" {
-                await stepped.waitForHeldUnits(atLeast: 2)  // the admission's commit, queued behind the claim
+                try await stepped.requireHeldUnits(atLeast: 2)  // the admission's commit, queued behind the claim
                 await stepped.release(await stepped.heldUnits[1])
             }
             _ = try await changing.value
@@ -58,7 +58,7 @@ struct StoreEdgeTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         try harness.fileSystem.write(Data(repeating: 1, count: 50), to: harness.layout.stagingURL(staged.name.with(kind: .verifying)), mode: .append)
         await bulk.setHolding(false)
         await #expect(throws: StoreError.integrity(.sizeMismatch(expected: 250, actual: 300))) {
@@ -84,13 +84,13 @@ struct StoreEdgeTests {
         let reaping = Task {
             await harness.store.runDueWork()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)  // the deletion unit of the key
+        try await metadata.requireHeldUnits(atLeast: 1)  // the deletion unit of the key
         await harness.store.testInsertRecord(b)
         let staged = try await harness.stage(bytes, for: b, sequence: 2)
         let publishing = Task {
             try await harness.store.publish(staged, binding: [b.identifier], expecting: b.contentIdentity, urgency: .bulk)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)  // the publication's claim
+        try await metadata.requireHeldUnits(atLeast: 2)  // the publication's claim
         let held = await metadata.heldUnits
         await metadata.release(held[1])
         await metadata.release(held[0])
@@ -157,7 +157,7 @@ struct StoreEdgeTests {
         let first = Task {
             try await harness.store.open()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let second = Task {
             try await harness.store.open()
         }
@@ -179,7 +179,7 @@ struct StoreEdgeTests {
         let first = Task {
             try await harness.store.open()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let closing = Task {
             await harness.store.close()
         }
@@ -209,7 +209,7 @@ struct StoreEdgeTests {
         let first = Task {
             try await harness.store.open()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         // Started together: the store resumes both when the open finishes, in no order the test controls. The running
         // open hands the parked call its report, so a close that reaches the store first cannot turn it into `.closed`
         // (ADR draft B-35).
@@ -240,7 +240,7 @@ struct StoreEdgeTests {
         let first = Task {
             try await harness.store.open()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let second = Task {
             try await harness.store.open()
         }
@@ -274,9 +274,9 @@ struct StoreEdgeTests {
         let publishing = Task {
             try await next.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        await draining.waitForHeldUnits(atLeast: 1)
+        try await draining.requireHeldUnits(atLeast: 1)
         await draining.releaseNext()  // the claim
-        await draining.waitForHeldUnits(atLeast: 1)  // the placement
+        try await draining.requireHeldUnits(atLeast: 1)  // the placement
         let closingNext = Task {
             await next.store.close()
         }
@@ -301,7 +301,7 @@ struct StoreEdgeTests {
         let first = Task {
             try await harness.store.markSyncDue()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let second = Task {
             try await harness.store.flush(.ordered)
         }
@@ -319,7 +319,7 @@ struct StoreEdgeTests {
         let waiting = Task {
             try await windowed.store.markSyncDue()
         }
-        await windowed.time.waitForSleepers(atLeast: 1)
+        try await windowed.time.requireSleepers(atLeast: 1)
         waiting.cancel()
         await #expect(throws: StoreError.cancelled) {
             try await waiting.value
