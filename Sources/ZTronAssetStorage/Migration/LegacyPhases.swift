@@ -21,7 +21,8 @@ extension AssetStore {
         let overlaps = await self.legacyRootOverlapsStore(root, layout: layout)
         try self.checkLive()
         guard let overlaps else {
-            // The root could not even be stat-ed: decide nothing in this lifetime.
+            // The root could not even be stat-ed, or an I/O error hid where it lies: decide nothing in this lifetime.
+            self.environment.log.log(.store, .error, "could not tell whether the legacy root overlaps the store's directory; migration waits for a later launch")
             return false
         }
         if overlaps {
@@ -79,6 +80,13 @@ extension AssetStore {
         let checksumsRead = try await self.readLegacyFile(root.appendingPathComponent("local-checksums.json", isDirectory: false), limit: limit)
         // REENTRANCY: R1, R11, c-4 (proposed) — as above.
         let tree = try await self.listLegacyTree(root)
+        if tree.reachesStore {
+            // The store's own directory lies inside the legacy root through a link below the root (review of the L3
+            // close-out): an overlap, found by the listing; nothing was written.
+            self.state.migration.root = nil
+            self.environment.log.log(.store, .error, "the legacy root overlaps the store's directory; legacy migration is skipped")
+            return false
+        }
         guard manifestRead != .failed, checksumsRead != .failed, !tree.failed else {
             // An I/O error while reading the prior art's files decides nothing in this lifetime, as a root that cannot be
             // stat-ed (review round 3, ZProbe-read and ZProbe-list): nothing is written or committed, a relaunch in

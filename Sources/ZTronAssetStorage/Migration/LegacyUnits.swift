@@ -25,6 +25,10 @@ struct LegacyTree: Sendable, Hashable {
     /// A directory could not be listed: the tree is incomplete, so nothing is decided from it (review round 3,
     /// ZProbe-list: its files would count as missing in phase 1, and phase 4 would leave them unattributable).
     var failed = false
+    /// A directory below the root is the store's own directory (`<base>/ZTronAssetKit`, compared by identity): the
+    /// walk did not enter it, and phase 1 takes it for an overlap (review of the L3 close-out: a link below the root
+    /// hides it from the path and identity-chain checks).
+    var reachesStore = false
 }
 
 /// The blocking units of legacy migration (ADR-003): stats, ≤ 1 MiB reads, one listing per directory, bounded
@@ -101,29 +105,41 @@ extension AssetStore {
     /// Every item below `root`, as path components relative to it, from a **non-following** listing (one unit per
     /// directory, S2-10): a symbolic link is neither descended into nor followed, so no planned path passes through one.
     /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited. A listing that fails stops
-    /// the walk and marks the tree `failed`. The phase is re-checked after every unit, and with `cancellable` (phase 4,
-    /// which runs in the caller's task) the caller's cancellation too, so neither a closed store nor a cancelled caller
-    /// submits further listings (review round 3).
+    /// the walk and marks the tree `failed`. The store's own directory is never entered: each directory is stat-ed in its
+    /// listing unit and compared with the store's (`reachesStore`). The phase is re-checked after every unit, and with
+    /// `cancellable` (phase 4, which runs in the caller's task) the caller's cancellation too, so neither a closed store
+    /// nor a cancelled caller submits further listings (review round 3).
     func listLegacyTree(_ root: URL, cancellable: Bool = false, maxDepth: Int = 64) async throws(StoreError) -> LegacyTree {
         let fileSystem = self.environment.fileSystem
         let maxDirectories = max(1, self.configuration.limits.maxEntries)
+        let container = self.state.core.layout?.container
+        var store: FileIdentity?
         var tree = LegacyTree()
         var directories: [[String]] = [[]]
         var next = 0
         while next < directories.count, next < maxDirectories {
             let relative = directories[next]
+            let first = next == 0
+            let known = store
             next += 1
             let url = relative.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
             // REENTRANCY: R1, R11, c-4 (proposed) — the phase, and in phase 4 the caller's cancellation, below; the listing
             // only accumulates, and the plan is computed once it is complete.
-            let listing = await self.runUnit(on: self.environment.metadataExecutor) {
-                CleanupUnits.list(url, fileSystem: fileSystem)
+            let unit = await self.runUnit(on: self.environment.metadataExecutor) { () -> LegacyListingUnit in
+                LegacyListingUnit.run(url, fileSystem: fileSystem, store: first ? container : nil, known: known)
             }
             try self.checkLive()
             if cancellable, Task.isCancelled {
                 throw .cancelled
             }
-            guard case .success(let items) = listing else {
+            if first {
+                store = unit.store
+            }
+            if unit.isStore {
+                tree.reachesStore = true
+                continue
+            }
+            guard case .success(let items) = unit.listing else {
                 tree.failed = true
                 return tree
             }
@@ -259,5 +275,25 @@ extension AssetStore {
             return true
         }
         return items.isEmpty || items.contains { $0.kind != .directory && LegacyRemoval.metadataNames.contains($0.name) }
+    }
+}
+
+/// One unit of the legacy walk: the directory's own identity, compared with the store's, then its listing (C-13,
+/// review of the L3 close-out). The first unit also stats the store's directory, which the walk must never enter.
+struct LegacyListingUnit: Sendable {
+    /// The listing, unless the directory is the store's.
+    var listing: Result<[FileItemInfo], FileSystemError>
+    /// The store's identity (first unit only; `nil` when it cannot be stat-ed).
+    var store: FileIdentity?
+    /// The directory is the store's own: it was not listed.
+    var isStore: Bool
+
+    /// Stats `store` when given, compares `url`'s identity with the store's, and lists `url` unless they are equal.
+    static func run(_ url: URL, fileSystem: any FileSystem, store: URL?, known: FileIdentity?) -> LegacyListingUnit {
+        let storeIdentity = store.flatMap { ((try? fileSystem.itemInfo(at: $0)) ?? nil)?.identity } ?? known
+        if let storeIdentity, ((try? fileSystem.itemInfo(at: url)) ?? nil)?.identity == storeIdentity {
+            return LegacyListingUnit(listing: .success([]), store: storeIdentity, isStore: true)
+        }
+        return LegacyListingUnit(listing: CleanupUnits.list(url, fileSystem: fileSystem), store: storeIdentity, isStore: false)
     }
 }
