@@ -168,6 +168,44 @@ struct PurgeTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Review of the L3 close-out: chunks cut by record count let a blob's records straddle two chunks, so a holder
+    /// pinned between them stayed while the other was purged, an outcome no sequential order of the purge and the pin
+    /// gives. Chunks now end only at blob boundaries, and `.evictable` re-validates every current holder of a blob.
+    @Test("R-CLN-6: a purge of the evictable set keeps a shared blob with all its records when one of them is pinned between chunks", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictablePurgeKeepsSharedBlobWhole() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let alone = CleanupFixture.asset("a", seed: 250)
+        let p0 = CleanupFixture.asset("p0", seed: 251)
+        let p1 = CleanupFixture.Asset(entry: CoreFixture.entry("p1", p0.bytes), bytes: p0.bytes)
+        try await harness.seed([alone, p0, p1])
+        #expect(p0.key == p1.key, "one blob, two records")
+        await harness.store.testSetCleanupChunk(1)
+        await metadata.setHolding(true)
+        let purge = Task {
+            try await harness.store.purge(.evictable)
+        }
+        // The first chunk (a) is purged, then the release between chunks is held.
+        try await CorePoll.until("the first chunk is purged") {
+            await harness.record(alone.id)?.residency == .absent(.purged)
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let held = Set(await metadata.heldUnits)
+        _ = try await CleanupSteps.run(metadata, keeping: held) {
+            try await harness.store.setPinned([p1.id], pinned: true)
+        }
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        try await harness.time.requireSleepers(atLeast: 1)
+        harness.time.advance(by: harness.configuration.policy.deletionGrace)
+        let result = try await purge.value
+        #expect(result.assetsRemoved == 1)
+        let kept = (await harness.isPresent(p0.id, at: p0.key), await harness.isPresent(p1.id, at: p1.key))
+        #expect(kept == (true, true), "the pinned holder keeps its blob, with every record on it")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-6: every purge bumps the purge epoch before it awaits, so a run that began before it cannot write its stamp", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func emptyPurgeBumpsEpoch() async throws {
