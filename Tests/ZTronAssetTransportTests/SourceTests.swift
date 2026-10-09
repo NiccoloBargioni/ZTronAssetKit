@@ -176,6 +176,9 @@ struct SourceTests {
         RouteCase(key: false, exposure: .refuse, expected: 1_000, background: true),
         RouteCase(key: false, exposure: .refuse, expected: 0, background: true),
         // A negative byteSize is no size at all: its tag would not decode, so the OS task could not be tracked.
+        // These two rows are the only guard on routesToBackground's own bound check: without it,
+        // negativeSizeStaysInForeground still passes, because startIfAdmitted refuses the job and the source falls
+        // back to the foreground (the verifiers' mutant M4d is caught here alone).
         RouteCase(key: false, exposure: .refuse, expected: -1, background: false),
         RouteCase(key: false, exposure: .refuse, expected: .min, background: false),
     ]
