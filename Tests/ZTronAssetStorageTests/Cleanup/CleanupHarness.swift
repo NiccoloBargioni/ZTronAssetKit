@@ -181,6 +181,14 @@ extension CoreHarness {
     }
 }
 
+extension AssetStore {
+    /// Test seam for `EvictionState.chunk` (ADR-050 rule 4(f): internal, in the test target only): lets a handful of
+    /// blobs reach quota eviction's yield between chunks (REENTRANCY R8).
+    func testSetEvictionChunk(_ chunk: Int) {
+        self.state.eviction.chunk = chunk
+    }
+}
+
 /// Drives one operation through a `SteppedBlockingExecutor` while other units stay held (REENTRANCY tests: the
 /// operation's units are released one by one as they arrive, the held point under test is not).
 @available(macOS 15.0, iOS 18.0, *)

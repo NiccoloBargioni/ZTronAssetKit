@@ -8,7 +8,8 @@ extension AssetStore {
     /// Candidates are marked in chunks of this many blobs, yielding the actor in between (C2, REENTRANCY R8).
     static let evictionChunk = 1_000
 
-    /// The evictable blobs of the current state, in eviction order.
+    /// The evictable blobs of the current state, in eviction order, computed on the actor: only for the synchronous
+    /// dry run (`evictionPlan`, a contract signature); the async callers use `evictionCandidatesOffActor()`.
     func evictionCandidates(protecting: Set<AssetID>) -> [EvictionCandidate] {
         let rules = EvictionOrder.Rules(
             policy: self.configuration.policy,
@@ -23,6 +24,26 @@ extension AssetStore {
             leases: self.state.cleanup.leases,
             rules: rules
         )
+    }
+
+    /// The evictable blobs, in eviction order, computed in a bulk unit from a value snapshot of the state (C2: at
+    /// `ManifestLimits.maxEntries` the grouping and the sort are far over 10 ms). The result describes the state when
+    /// the unit was submitted; callers re-validate every candidate before acting on it (REENTRANCY R8).
+    func evictionCandidatesOffActor() async -> [EvictionCandidate] {
+        let rules = EvictionOrder.Rules(
+            policy: self.configuration.policy,
+            scope: self.state.eviction.retentionScope,
+            protecting: [],
+            now: self.environment.time.now()
+        )
+        let records = self.state.core.records
+        let blobTable = self.state.core.blobTable
+        let publishing = self.state.core.publishing
+        let leases = self.state.cleanup.leases
+        // REENTRANCY: R8 — nothing here: a pure computation over the snapshot; the callers re-validate each candidate.
+        return await self.runUnit(on: self.environment.bulkExecutor) {
+            EvictionOrder.candidates(records: records, blobTable: blobTable, publishing: publishing, leases: leases, rules: rules)
+        }
     }
 
     /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks, publishes the snapshot without the
@@ -49,15 +70,22 @@ extension AssetStore {
         guard needed > 0 else {
             return result
         }
-        let candidates = self.evictionCandidates(protecting: [])
+        // REENTRANCY: R8 — the phase and writability below, then per candidate (in `evict`): still present at the same
+        // blob, unleased, not accessed since selection, still evictable, against holders read after this await.
+        let candidates = await self.evictionCandidatesOffActor()
+        try self.checkLive()
+        try self.checkWritable()
         var holders = self.referenceIndex()
+        let chunk = max(1, self.state.eviction.chunk)
         var visited = 0
         var evictedAny = false
         for candidate in candidates where result.bytesFreed < needed {
-            if visited > 0, visited % AssetStore.evictionChunk == 0 {
+            if visited > 0, visited % chunk == 0 {
+                // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
+                // meanwhile, and a test can hold eviction at this very point.
                 // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob, unleased,
-                // not accessed since selection, still evictable.
-                await Task.yield()
+                // not accessed since selection, still evictable; the holders are read again.
+                await self.runUnit(on: self.environment.metadataExecutor) {}
                 try self.checkLive()
                 try self.checkWritable()
                 holders = self.referenceIndex()

@@ -47,6 +47,45 @@ struct EvictionTests {
         #expect(!harness.hasBlob(a.key), "the reaper deletes the evicted blob after acknowledgement and grace")
     }
 
+    @Test("R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate: one accessed or leased meanwhile is kept", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func chunkYieldRevalidates() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(100)), metadata: metadata)
+        let assets = (0..<6).map { CleanupFixture.asset("y\($0)", seed: 790 + UInt64($0), count: 100) }
+        // Least recently used first: y0 … y5.
+        try await EvictionTests.seedWithAccesses(harness, assets, recent: assets.map(\.id))
+        await harness.store.testSetEvictionChunk(2)
+        await metadata.setHolding(true)
+        let eviction = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        // The space measurement runs, then the first chunk (y0, y1) is marked and eviction yields in a metadata unit.
+        try await CorePoll.until("eviction yields after its first chunk") {
+            if await harness.record(assets[1].id)?.residency == .absent(.evicted) {
+                return await !metadata.heldUnits.isEmpty
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "nothing after the chunk is marked yet")
+        // Meanwhile the app reads y2 and holds y3 open.
+        #expect(await harness.store.location(for: assets[2].id, extensions: [], recordingAccess: true) != nil)
+        let lease = try await harness.store.acquireLease(assets[3].id)
+        await metadata.setHolding(false)
+        let result = try await eviction.value
+        #expect(result.filesRemoved == 4 && result.bytesFreed == 400, "y0, y1, y4 and y5; the target needed all six")
+        for index in [0, 1, 4, 5] {
+            #expect(await harness.record(assets[index].id)?.residency == .absent(.evicted), "y\(index) is evicted")
+        }
+        #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "accessed since the selection")
+        #expect(await harness.isPresent(assets[3].id, at: assets[3].key), "leased since the selection")
+        _ = await harness.store.releaseLease(lease)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     /// How a test reaches eviction: the maintenance run, or the engine's dry run applied by `apply`.
     enum Route: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case maintenance

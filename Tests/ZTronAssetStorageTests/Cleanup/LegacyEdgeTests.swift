@@ -138,6 +138,41 @@ struct LegacyEdgeTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    @Test("R-STO-11: an adopt-on-demand cancelled while it hashes puts its file back at the head of the queue, and the next batch adopts it", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func cancelledAdoptNowRequeues() async throws {
+        // 1.5 MiB: two hash units, so the cancellation is seen between them.
+        let big = CoreFixture.bytes(780, count: 3 << 19)
+        let small = CoreFixture.bytes(781)
+        let entries = [CoreFixture.entry("big", big), CoreFixture.entry("small", small)]
+        let files: [String: Data] = [
+            "manifest.json": try LegacyFixture.manifestJSON(entries),
+            LegacyFixture.relativePath(entries[0]): big,
+            LegacyFixture.relativePath(entries[1]): small,
+        ]
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
+        let harness = CoreHarness.cleanup(disk: try LegacyFixture.disk(files), legacy: CleanupFixture.legacyPolicy, defaults: defaults, bulk: bulk)
+        _ = try await harness.store.open()
+        #expect(await harness.state.migration.queue.last?.ids == ["big"], "the next file")
+        await bulk.setHolding(true)
+        let onDemand = Task {
+            try await harness.store.adoptLegacyNow("big")
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        #expect(await harness.state.migration.queue.map(\.ids) == [["small"]], "taken from the queue")
+        onDemand.cancel()
+        await bulk.setHolding(false)
+        await #expect(throws: StoreError.cancelled) {
+            try await onDemand.value
+        }
+        #expect(await harness.state.migration.queue.map(\.ids) == [["small"], ["big"]], "back at the head of the queue")
+        #expect(try await harness.store.migrateLegacy(maxFiles: 0) == LegacyMigrationProgress(adopted: 0, remaining: 2, dropped: 0, finished: false))
+        #expect(try await harness.store.migrateLegacy(maxFiles: 1) == LegacyMigrationProgress(adopted: 1, remaining: 1, dropped: 0, finished: false))
+        #expect(await harness.isPresent("big", at: CoreFixture.key(big)))
+        #expect(harness.content(CleanupFixture.legacyRoot.appendingPathComponent(LegacyFixture.relativePath(entries[1]))) == small)
+    }
+
     @Test("R-STO-11: a relaunch in phase inProgress counts files adopted by an earlier lifetime neither adopted nor dropped", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func relaunchCountsEarlierAdoptions() async throws {

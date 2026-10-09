@@ -3,8 +3,8 @@ import ZTronAssetModel
 
 /// `storageReport()` (R-CLN-9).
 extension AssetStore {
-    /// Builds the report: one free-space unit and one staging listing (only once open), then the figures from the
-    /// state as it is after those awaits.
+    /// Builds the report: one free-space unit and one staging listing (only once open) and one bulk unit for the
+    /// evictable bytes, then the other figures from the state as it is after those awaits.
     func performStorageReport() async -> StorageReport {
         var space: FreeSpace?
         var stagingBytes: Int64 = 0
@@ -15,6 +15,9 @@ extension AssetStore {
             // REENTRANCY: c-2 (proposed) — nothing: the staging size is a snapshot; the state is read afterwards.
             stagingBytes = await self.measureStagingBytes()
         }
+        // REENTRANCY: R13 — nothing: the evictable bytes are a snapshot computed off the actor (C2); the other figures
+        // are read from the state after this await.
+        let evictable = await self.evictionCandidatesOffActor().reduce(Int64(0)) { $0.addingSaturating($1.bytes) }
         let core = self.state.core
         var byKind: [String: Int64] = [:]
         var present: Int64 = 0
@@ -50,7 +53,6 @@ extension AssetStore {
                 break
             }
         }
-        let evictable = self.evictionCandidates(protecting: []).reduce(Int64(0)) { $0.addingSaturating($1.bytes) }
         let marks = self.orphanMarks()
         let orphans = (self.state.cleanup.orphans ?? [:]).filter { !marks.contains($0.key) }.values.reduce(Int64(0)) { $0.addingSaturating($1) }
         let unverified = core.records.values.filter { record in
