@@ -192,9 +192,13 @@ struct IntegrityTests {
         #expect(next.bytesVerified == 300 && next.corrupt.isEmpty && !next.completedPass)
     }
 
-    @Test("R-INT-4: deep verification discards a hash whose blob name was replaced meanwhile and never quarantines the new bytes", .timeLimit(.minutes(1)))
+    @Test(
+        "R-INT-4: deep verification discards a hash whose blob was quarantined or replaced meanwhile and never quarantines the new bytes",
+        .timeLimit(.minutes(1)),
+        arguments: [false, true]
+    )
     @available(macOS 15.0, iOS 18.0, *)
-    func verificationDiscardsReplacedIncarnation() async throws {
+    func verificationDiscardsReplacedIncarnation(replaced: Bool) async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.cleanup(bulk: bulk)
         // Three hash units of 1 MiB, so the name can change between the first and the last.
@@ -214,8 +218,19 @@ struct IntegrityTests {
         await bulk.releaseNext()
         try await bulk.requireHeldUnits(atLeast: 1)
         let held = try #require(await bulk.heldUnits.first)
-        // Meanwhile a reader quarantines the blob and the next verified download replaces the name (ADR draft B-24).
+        // Meanwhile a reader quarantines the blob (one integrity attempt) …
         try await harness.store.reportUnreadable(a.id)
+        guard replaced else {
+            // … and verification, finding the blob doomed after its hash, adds no second attempt (R16).
+            await bulk.setHolding(false)
+            let report = try await verification.value
+            #expect(report.corrupt.isEmpty && report.bytesVerified == 0)
+            let record = try #require(await harness.record(a.id))
+            #expect(record.integrity.attempts == 1 && record.referencedBlob == nil)
+            #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[a.key], .corrupt))
+            return
+        }
+        // … and the next verified download replaces the name (ADR draft B-24).
         _ = try await CleanupSteps.run(bulk, keeping: [held]) {
             try await harness.publish(a.bytes, [a.entry], urgency: .userInitiated, sequence: 9)
         }
@@ -227,7 +242,7 @@ struct IntegrityTests {
         #expect(report.corrupt.isEmpty)
         #expect(await harness.isPresent(a.id, at: a.key), "the verified replacement is not quarantined")
         #expect(await harness.record(a.id)?.verifiedAt == seeded, "and not counted verified either")
-        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[a.key], .corrupt) == false)
+        #expect(!StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[a.key], .corrupt))
         // It is checked again in this pass, now as one incarnation.
         let again = try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
         #expect(again.bytesVerified == Int64(a.bytes.count) && again.corrupt.isEmpty)

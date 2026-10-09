@@ -21,12 +21,13 @@ struct LegacyEdgeTests {
         #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot))
     }
 
-    @Test("R-STO-11: a legacy root that cannot be stat-ed is left, with its stamp, for a later launch", .timeLimit(.minutes(1)))
+    /// The first stat of the root is the overlap check's (C-13), the second its kind's.
+    @Test("R-STO-11: a legacy root that cannot be stat-ed is left, with its stamp, for a later launch", .timeLimit(.minutes(1)), arguments: [1, 2])
     @available(macOS 15.0, iOS 18.0, *)
-    func unreadableRootDeferred() async throws {
+    func unreadableRootDeferred(failingStat: Int) async throws {
         let files = try LegacyFixture.fixtureFiles()
         let (harness, defaults) = try LegacyFixture.harness(files: files)
-        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "CDNAssets"), occurrence: .nth(1), error: .io))
+        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "CDNAssets"), occurrence: .nth(failingStat), error: .io))
         let report = try await harness.store.open()
         #expect(!report.legacyMigrationPending)
         #expect(await harness.state.migration.phase == .notStarted)
