@@ -1,9 +1,10 @@
-# Level 2 follow-up, cycle 1 — dispositions (`wp/l2fu`)
+# Level 2 follow-up, cycles 1 and 2 — dispositions (`wp/l2fu`)
 
 Owner: the L2 follow-up work package, on the merged Level 2 head `645caee`. The orchestrator authorised a scope that
 crosses work packages: WP-H's test support (and, to use its new waits, the call sites in WP-B's core tests), one
 test-cost question about an L1 test, one WP-E fix, and wording nits in the drafts. The orchestrator numbers what
-follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
+follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Cycle 2 answers the verifiers' findings on cycle 1 (one
+blocking, in item 3); its additions are marked "cycle 2". Commits, in order:
 
 | Commit | What |
 |---|---|
@@ -13,7 +14,11 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
 | `1180216` | failing test: PROBE-C5-3 (item 3) |
 | `f1881ee` | the fix: packs whose planned removal has not succeeded count in `sourceCopyBytes()` (item 3) |
 | `760430f` | wording nits (item 4) |
-| this file | the dispositions |
+| `eda3c59` | the dispositions (cycle 1) |
+| `ee2640c` | cycle 2 — failing test: VP-A3, a running removal stops counting after a later survey (item 3) |
+| `0cebba5` | cycle 2 — the fix: packs whose removal is running count whatever a later survey finds; doc wording (item 3) |
+| `9a26721` | cycle 2 — WP-H's own TestSupport tests use the throwing or `#require`d census waits (item 1) |
+| this file | the dispositions (cycle 2) |
 
 ## Item 1 — Every TestSupport census wait ends when its caller is cancelled
 
@@ -75,8 +80,32 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
     tests) became `requireHeldUnits` / `requireSleepers`, and `StoreRaceTests.step` became `throws`. After an early
     return, 15 index expressions that follow them (`heldUnits[i]`, `held[i]`) would trap. Others are followed by an await of a
     held publication, which would hang.
+  - **Converted in cycle 2** (`9a26721`, verifier finding on WP-H's own tests in `Tests/ZTronAssetStorageTests/TestSupport`):
+    - `BasicFakesTests.conditionsReachEveryObserver`: both `waitForObservers` became `requireObservers`. After the first
+      one the test awaits observer tasks that iterate `conditions()`; had the observations never registered, those
+      awaits would hang the run although the wait itself ended.
+    - `BasicFakesTests.snapshotSinkInstallCensus`: the `waitForInstalls(atLeast: 2)` that ran in an unstructured task
+      runs in a child task (`async let`), so the test's cancellation reaches it. Awaiting an unstructured task does not
+      forward cancellation.
+    - `ManualTimeSourceTests.sleepers` (the helper behind three tests) uses `requireSleepers` and throws, so a test
+      never awaits sleepers that never registered and that nothing would wake.
+    - `EventProbeTests`: the six discarded `waitForWaiters` results are `try #require`d; the two census waits that ran
+      in unstructured tasks run in child tasks (`async let`).
   - **Not converted.** `StorageContractTests` (3 calls) and `SyncContractTests` (8): contract tests may not be edited,
     and their `Void` waits now end on cancellation. `BenchStorage.swift:466`: a benchmark, skipped in these runs.
+    Cycle 2: two `Void` calls stay because the `Void` form is what the test is about. In
+    `ManualTimeSourceTests.waitForSleepersIsEventDriven` the test registers its sleepers through the `Void` form
+    itself, then `try #require(time.pendingSleepers == 2)` ends it if a wait ended early. In
+    `BasicFakesTests.snapshotSinkInstallCensus` the final `waitForInstalls(atLeast: 1)` is met before the call, so it
+    returns at once.
+  - **Outside the authorised scope (cycle 2, recorded, not changed).** `ConditionsObservation.wait(for:)`
+    (`Sources/ZTronAssetTransport/Conditions/ConditionsObservation.swift`, WP-D), exposed as the package seam
+    `LiveDeviceConditionsSource.waitForObservations(equalTo:)` and called 3 times in `ConditionsTests`, is the same
+    defect class. It suspends on a bare `withCheckedContinuation` that only `wake()` resumes, so a regression that never
+    reaches the count would hang the run past the test's limit. No probe shows it hanging. **Request to the
+    orchestrator:** a WP-D follow-up that gives it the `withTaskCancellationHandler` and actor-hop pattern used here,
+    with a cancelled-waiter behaviour test. The Apple tier's test waits (`PackAvailabilityCoordinator.wait(for:registered:)`,
+    `AppleSourceState.waitForDrain`) already end on cancellation.
   - **For WP-C, WP-F and WP-G:** use the `require…` forms in new tests whenever the code after a wait assumes that
     the census was met.
 - **Proposed REENTRANCY rows (ARCHITECTURE §10.3).**
@@ -107,6 +136,17 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
     - **After** (`62c99d3` + mutant). `Time limit was exceeded: 60.000 seconds`, then `Test run with 1 test in 1 suite
       failed after 63.924 seconds with 1 issue`. The process exited with code 1, 69 s after the test run started. The
       `CancellationError` that `requireHeldUnits` throws adds no second issue.
+  - **Cycle 2 demonstration for the converted call sites** (`.build-l2fu/demo2/{before,after}`, `git archive` of each
+    commit). The mutant stores each observation of `FakeDeviceConditionsSource.conditions()` in a side table, so
+    observations never register and `send` reaches none of them. The test is `Test support: FakeDeviceConditionsSource
+    delivers each sent state to every live observation`.
+    - **Before** (`0cebba5` + mutant, the `Void` wait). The run printed `Time limit was exceeded: 60.000 seconds`. The
+      wait then returned, but the test went on to await its observer tasks, which never end. 201 s after the run
+      started, `swift-test` and `swiftpm-testing-helper` were still running at 0.0 % CPU. The watchdog killed them
+      (exit 143). A first run, with its output buffered to a file, was killed the same way at 200 s.
+    - **After** (`9a26721` + mutant, `requireObservers`). `Time limit was exceeded: 60.000 seconds`, then `Test run
+      with 1 test in 1 suite failed after 63.984 seconds with 1 issue`. The process exited with code 1, 69 s after it
+      started.
 
 ## Item 2 — `startRacingStop` under TSan: measured, left unchanged
 
@@ -123,6 +163,12 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
   - **In the whole package's TSan run** (no other agent running; the run itself took the load from 4.5 to 6.1):
     **23.4 s**, the second slowest test after the R-MAN-3 fuzz (34.9 s). Its target ran 303 tests in 160.6 s. That
     leaves a 2.6× margin to the one-minute limit.
+  - **Cycle 2, a verifier's whole-package TSan run** at load about 10, with another verifier's `swift test` running
+    alongside: **30.06 s**, half the limit. The test passed. Its cost keeps growing with the machine's load; it is not
+    a flake.
+  - **Cycle 2, this agent's whole-package TSan run** (no other `swift-test`, `swiftpm-testing-helper` or `xctest`
+    process at its start, checked with `ps`; load 8.1 at the start, just after this agent's own builds, and 6.7 at the
+    end; 262 s): **24.0 s**. Its target ran 303 tests in 158.8 s.
 - **Cause.** The test's cost is round trips through the cooperative pool. It makes 79,800 yields, plus an actor hop
   per listener state. Each round trip queues behind every other job on the pool. The exhaustive state-space suites
   saturate the pool with CPU-bound rows, so each round trip waits. Other agents' TSan runs on the same machine (load
@@ -138,6 +184,9 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
   57 s took a machine oversubscribed about twofold. This confirms the process lesson already recorded: run TSan only
   on an otherwise idle machine. If a later level's suites saturate the pool for longer, the next lever is option (a)
   with a spread chosen from a measurement on that machine. Raising the limit stays the last resort.
+- **Cycle 2: decision unchanged, with an explicit trigger.** The new figures (24.0 s at load 6–8, 30.06 s at about
+  10) fit the cause above: the cost grows with load and stays under the limit. If a later level's TSan run takes
+  this test **more than about 45 s**, apply option (a), with a yield spread measured on that machine.
 
 ## Item 3 — `sourceCopyBytes()` counts packs whose planned removal has not succeeded (WP-E)
 
@@ -148,17 +197,26 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
   and packs whose planned removal has not yet succeeded.
 - **Decision.**
   - `AppleSourceState` keeps the last survey's settled packs (`settledPacks`, set by `planRelease`).
-    `sourceCopyPacks()` returns `adoptedPacks ∪ releasedInProcess ∪ settledPacks`.
-  - A pack whose planned removal is still running, or failed and is planned again by the next reclaim, therefore
-    counts its `installedBytes`. Once removed, it reports `nil` and adds 0. The sum still saturates.
+  - Cycle 2 (verifier probe VP-A3, blocking): `settledPacks` alone missed a removal still running when a concurrent
+    reclaim surveyed a newer report and reset the set. `sourceCopyPacks()` therefore also counts the packs whose
+    removal is in flight (`releasing`, the set that already keeps a concurrent call from planning a pack twice). It
+    returns `adoptedPacks ∪ releasedInProcess ∪ settledPacks ∪ releasing`.
+  - A pack whose planned removal is still running counts its `installedBytes`, whatever later surveys find. A pack
+    whose removal failed counts while the last survey still finds it settled (the next reclaim plans it again). Once
+    removed, it reports `nil` and adds 0. The sum still saturates.
 - **Consequences.**
-  - The window while a removal call runs is now counted too: the bytes are still on the device until the call
-    returns.
-  - A pack that a later survey no longer finds settled (a new manifest adds an entry nobody adopted) counts only while
-    it is adopted or released in this process. It is no longer planned for removal, and it holds content the store
-    does not have.
+  - The window while a removal call runs is counted: the bytes are still on the device until the call returns. A
+    concurrent reclaim's survey cannot hide it (cycle 2).
+  - After a failed removal, a pack that the last survey no longer finds settled (a new manifest adds an entry nobody
+    adopted) counts only while it is adopted or released in this process. It is no longer planned for removal, and it
+    holds content the store does not have. The cycle-2 test pins this (`sourceCopyBytes() == 0` after the failure),
+    and a later settled survey counts it again.
   - Like the other sets, `settledPacks` lives in memory: a fresh source counts nothing until its first reclaim (E-11
     "Limitation").
+  - Docs (cycle 2): the public `sourceCopyBytes()` doc now reads "still running, or failed while the last reclaim's
+    survey still finds them settled, so a later reclaim plans them again". The `sourceCopyPacks`, `releasing` and
+    `settledPacks` docs say the same. The `reclaimSourceCopies` and `finishRelease` docs use the ruled ADR-027 phrase
+    "stays installed until a reclaim in a later catalog generation releases it".
 - **Evidence.**
   - **Failing test committed first** (`1180216`): `R-CLN-9: a pack whose planned removal is still running or failed
     counts as a source copy until a removal succeeds`. It follows PROBE-C5-3's timeline with `holdRemove` across the
@@ -166,6 +224,14 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
     0.012 seconds with 2 issues` (both `sourceCopyBytes() == 4_096` expectations).
   - **With the fix** (`f1881ee`): `Test run with 103 tests in 14 suites passed after 0.384 seconds` (the whole
     AppleHosted target).
+  - **Cycle 2, failing test committed first** (`ee2640c`): `R-CLN-9: a pack whose planned removal is running counts as
+    a source copy even after a later survey finds it unsettled`. It follows VP-A3's timeline. Reclaim A plans the
+    excluded-only pack with `failRemove(.system)` and `holdRemove`. Reclaim B surveys a report in which the pack gained
+    an unadopted entry. The test expects 4,096 bytes before `releaseRemove`, 0 after the failure (B's survey is the
+    last), 4,096 after a settled survey fails again, and 0 after a successful removal. Against the cycle-1 code: `Test
+    run with 19 tests in 1 suite failed after 0.011 seconds with 1 issue`, at `PackReleaseTests.swift:500` ("A's
+    removal still runs, whatever B's survey found").
+  - **Cycle 2, with the fix** (`0cebba5`): `Test run with 104 tests in 14 suites passed after 0.367 seconds`.
 
 ## Item 4 — Wording nits (`760430f`)
 
@@ -180,30 +246,45 @@ follows into `DECISIONS.md` and ARCHITECTURE §10 at merge. Commits, in order:
 - `b.md`, B-28's cycle-5 amendment: `committedFile` is "the name the store last saw hold the committed generation;
   each decision stats `index.bin` again before acting".
 
+## Process finding (cycle 2) — DerivedData written outside the repository
+
+- **Context.** A requirements verifier of cycle 1 ran `xcodebuild -list` once without `-derivedDataPath`. Xcode then
+  created two folders outside the repository, against the owner directive:
+  `~/Library/Developer/Xcode/DerivedData/l2fu-amdjkcpjknpnpogbbampxkozfvvi` and
+  `~/Library/Developer/Xcode/DerivedData/ZTronAssetKit-amdjkcpjknpnpogbbampxkozfvvi` (8 KB each, created Oct 9 05:43;
+  the hash is this worktree's path). This agent confirmed both exist with a read-only `ls`/`du`.
+- **Decision.** Not deleted here: CLAUDE.md allows `rm -rf` only inside `.build*`, `.verify-logs` and the agent's own
+  worktrees. **Request to the orchestrator or owner:** delete the two folders, and make verifier prompts require
+  `-derivedDataPath` for every `xcodebuild` invocation, `-list` included, not only for builds. Every `xcodebuild` of
+  this work package passed `-derivedDataPath .build-l2fu/xcode`.
+
 ## Verification
 
 All of these ran in this session from the worktree, with scratch path `.build-l2fu` (TMPDIR, the module cache and
-`LLVM_PROFILE_FILE` under `.build-l2fu/tmp`).
+`LLVM_PROFILE_FILE` under `.build-l2fu/tmp`). Cycle 2 ran them again on `9a26721` (the code is unchanged since; this
+file is the only later change).
 
 - **`SWIFTPM_SCRATCH=.build-l2fu bash Scripts/verify.sh --quick`.** `HARNESS: unchanged since harness-frozen`,
-  `toolchain OK: Swift 6.4 >= 6.3`, and the bundles `147 / 10 / 303 / 84 / 12 / 3 / 103` tests passed. The last line
+  `toolchain OK: Swift 6.4 >= 6.3`, and the bundles `147 / 10 / 303 / 84 / 12 / 3 / 104` tests passed. The last line
   was `VERIFY: PASS`.
-- **`swift build -c release --scratch-path .build-l2fu -Xswiftc -warnings-as-errors`:** `Build complete! (20,74 s)`.
+- **`swift build -c release --scratch-path .build-l2fu -Xswiftc -warnings-as-errors`:** `Build complete! (15,86 s)`.
 - **Gates.**
   - `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`.
   - `gates.py docs`: `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. The
     count was 1,277 at the merge; the four new public `require…` methods account for the rest.
 - **`xcodebuild … -destination 'generic/platform=iOS' -derivedDataPath .build-l2fu/xcode build
   OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`:** exit 0. The only output line was xcodebuild's
-  `IDERunDestination: Supported platforms for the buildables in the current scheme is empty.`
+  `IDERunDestination: Supported platforms for the buildables in the current scheme is empty.` No new folder appeared
+  under `~/Library/Developer/Xcode/DerivedData` (checked before and after).
 - **The touched targets, three times** (`--filter 'ZTronAssetStorageTests|ZTronAssetAppleHostedTests|ZTronAssetTransportTests'`).
-  Each run passed: Transport 147 tests, Storage 303 tests (in 49.1, 51.3 and 51.7 s), AppleHosted 103 tests.
+  Each run passed: Transport 147 tests, Storage 303 tests (in 48.0, 50.3 and 51.1 s), AppleHosted 104 tests.
 - **The whole package once under TSan** (`--scratch-path .build-l2fu-tsan --sanitize=thread --skip Benchmarks`). It
-  took 263 s and exited 0. The bundles `147 / 10 / 303 / 84 / 12 / 3 / 103` tests passed, with 0 ThreadSanitizer
+  took 262 s and exited 0. The bundles `147 / 10 / 303 / 84 / 12 / 3 / 104` tests passed, with 0 ThreadSanitizer
   reports.
-- **Coverage** (the export over all 8 bundles of the `--quick` run, then `gates.py coverage`):
-  - `COVERAGE target=ZTronAssetAppleHosted lines= 99.68% (1247/1251) min=70.0 OK`.
-  - Storage 95.06 %, Transport 99.14 %, Model 99.28 %; overall 93.37 %; the device-only share 1.35 %.
+- **Coverage** (`swift test --enable-code-coverage --skip Benchmarks`, then the export over all 8 bundles and
+  `gates.py coverage`):
+  - `COVERAGE target=ZTronAssetAppleHosted lines= 99.76% (1248/1251) min=70.0 OK`.
+  - Storage 95.14 %, Transport 99.14 %, Model 99.28 %; overall 93.41 %; the device-only share 1.35 %.
   - The gate as a whole reports `FAIL`: ZTronAssetKit (37.82 %) and ZTronAssetSync (30.57 %) are still the stubs that
     WP-G and WP-F replace at L4–L5. This work does not touch them.
 - **`docs/TRACEABILITY.md`.** Untouched: neither `--gates-only` nor `--full` ran.
