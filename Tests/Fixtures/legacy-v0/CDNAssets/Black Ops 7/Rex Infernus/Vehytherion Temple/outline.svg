@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>bo7.ri.easter.egg.vehytherion.temple.outline@v1</title>
+  <rect width="64" height="64" fill="#80fed6"/>
+  <circle cx="47" cy="41" r="9" fill="#aae1fc"/>
+  <path d="M21 63 L32 52 L19 51 Z" fill="none" stroke="#a40107" stroke-width="2"/>
+</svg>
