@@ -79,7 +79,7 @@ struct SyncContractTests {
 
     @available(macOS 15.0, *)
     @Test("R-ENV-1: ManualTimeSource wakes sleepers in deadline then registration order", .timeLimit(.minutes(1)))
-    func manualTimeWakeOrder() async {
+    func manualTimeWakeOrder() async throws {
         let time = ManualTimeSource()
         let start = time.monotonicNow()
         var sleepers: [Task<Bool, Never>] = []
@@ -93,7 +93,7 @@ struct SyncContractTests {
                     return false
                 }
             })
-            await time.waitForSleepers(atLeast: index + 1)
+            try await time.requireSleepers(atLeast: index + 1)
         }
         #expect(time.nextDeadline == start.adding(seconds: 1))
         time.advance(by: 1.5)

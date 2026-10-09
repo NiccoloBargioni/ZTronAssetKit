@@ -81,9 +81,27 @@ public final class LiveDeviceConditionsSource: DeviceConditionsSource {
         }
     }
 
-    /// Returns once exactly `count` observations are active (a terminated one stops after a hop); event-driven.
+    /// Returns once exactly `count` observations are active (a terminated one stops after a hop); event-driven. It
+    /// also returns, with the count unmet, when the calling task is cancelled, so a test past its time limit ends
+    /// instead of hanging the run (L2 close); `requireObservations(equalTo:)` throws then.
     package func waitForObservations(equalTo count: Int) async {
         await self.registry.wait(for: count)
+    }
+
+    /// Returns once exactly `count` observations are active; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test whose next step relies on the count stops there instead of awaiting work that
+    /// never started (L2 close). A count already matched is reported matched, cancelled or not.
+    package func requireObservations(equalTo count: Int) async throws(CancellationError) {
+        guard await self.registry.wait(for: count) else {
+            throw CancellationError()
+        }
+    }
+
+    /// The seam that tests the wait itself: `true` once exactly `count` observations are active, `false` when the
+    /// calling task was cancelled first. `registered` runs once the wait is registered (never when the count already
+    /// matched), so a test can cancel a wait it knows is pending.
+    package func waitForObservations(equalTo count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        await self.registry.wait(for: count, registered: registered)
     }
 
     /// A new `NWPathMonitor` behind `PathObserving`: what the public initialiser observes, available to tests that

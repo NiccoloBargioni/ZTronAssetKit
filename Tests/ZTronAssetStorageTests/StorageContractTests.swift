@@ -104,12 +104,12 @@ struct StorageContractTests {
     }
 
     @Test("Test support: SteppedBlockingExecutor holds each unit until released and records submission and completion order", .timeLimit(.minutes(1)))
-    func steppedExecutorOrdersUnits() async {
+    func steppedExecutorOrdersUnits() async throws {
         let executor = SteppedBlockingExecutor()
         let first = Task { await executor.run { 1 } }
-        await executor.waitForHeldUnits(atLeast: 1)
+        try await executor.requireHeldUnits(atLeast: 1)
         let second = Task { await executor.run { 2 } }
-        await executor.waitForHeldUnits(atLeast: 2)
+        try await executor.requireHeldUnits(atLeast: 2)
         #expect(await executor.heldUnits == [1, 2])
         #expect(await executor.completedUnits.isEmpty)
         await executor.release(2)
