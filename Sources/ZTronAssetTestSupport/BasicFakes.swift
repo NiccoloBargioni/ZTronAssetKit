@@ -73,12 +73,14 @@ public struct FakeRemoteSourceFactory: RemoteSourceFactory {
 /// Each `conditions()` call is one observation whose first element is the current state; `send` reaches every
 /// live observation; a terminated observation is removed (one hop), and `activeObservers` is the census P-14
 /// tests assert on. Because removal takes a hop, tests wait for it with `waitForObservers(equalTo:)`, which is
-/// event-driven, never polled.
-public actor FakeDeviceConditionsSource: DeviceConditionsSource {
+/// event-driven, never polled, and ends when its caller is cancelled (L2 follow-up; `requireObservers(equalTo:)`
+/// throws then).
+public actor FakeDeviceConditionsSource: DeviceConditionsSource, CensusWaiting {
     private var current: DeviceConditions
     private var observers: [UInt64: AsyncStream<DeviceConditions>.Continuation] = [:]
     private var nextObserver: UInt64 = 0
-    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    /// Waits for a number of live observations (`CensusWaiting`).
+    var censusWaiters = CensusWaiters()
 
     /// Creates a source with an initial state.
     public init(initial: DeviceConditions = .unrestricted) {
@@ -116,17 +118,29 @@ public actor FakeDeviceConditionsSource: DeviceConditionsSource {
         self.observers.count
     }
 
-    /// Suspends until exactly `count` observations are live (returns at once if they are). Event-driven: resumed
-    /// by the registration or removal that reaches the count.
+    /// Suspends until exactly `count` observations are live (returns at once if they are), or until the calling task
+    /// is cancelled (a test past its time limit), when it returns with the census unchanged so the caller's following
+    /// expectations fail instead of the run hanging. Event-driven: resumed by the registration or removal that reaches
+    /// the count.
     public func waitForObservers(equalTo count: Int) async {
-        if self.observers.count == count {
-            return
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        _ = await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: nil)
+    }
+
+    /// Suspends until exactly `count` observations are live; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test past its time limit ends at once instead of running on with another census.
+    public func requireObservers(equalTo count: Int) async throws(CancellationError) {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        guard await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: nil) else {
+            throw CancellationError()
         }
-        // REENTRANCY: TS2 — nothing: a terminal wait. The waiter is registered synchronously inside the body, and
-        // notifyCountWaiters resumes it only from the actor turn that reached `count`; no state is read afterwards.
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            self.countWaiters.append((count, continuation))
-        }
+    }
+
+    /// Test seam for the wait itself: `true` once exactly `count` observations are live, `false` when the calling task
+    /// was cancelled first; `registered` runs on the actor once the wait is registered.
+    package func waitForObservers(equalTo count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: registered)
     }
 
     private func removeObserver(_ id: UInt64) {
@@ -136,27 +150,18 @@ public actor FakeDeviceConditionsSource: DeviceConditionsSource {
 
     private func notifyCountWaiters() {
         let live = self.observers.count
-        var ready: [CheckedContinuation<Void, Never>] = []
-        self.countWaiters.removeAll { waiter in
-            if waiter.count == live {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume()
-        }
+        self.censusWaiters.resume { $0 == live }
     }
 }
 
 /// Memory-pressure events on demand (R-CLN-11 tests). An actor: no lock, no availability gate. Same observation
 /// semantics and census as `FakeDeviceConditionsSource`, without an initial element (pressure is an event, not a
 /// state).
-public actor FakeMemoryPressureSource: MemoryPressureSource {
+public actor FakeMemoryPressureSource: MemoryPressureSource, CensusWaiting {
     private var observers: [UInt64: AsyncStream<MemoryPressureLevel>.Continuation] = [:]
     private var nextObserver: UInt64 = 0
-    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    /// Waits for a number of live observations (`CensusWaiting`).
+    var censusWaiters = CensusWaiters()
 
     /// Creates a source with no observation.
     public init() {}
@@ -190,16 +195,27 @@ public actor FakeMemoryPressureSource: MemoryPressureSource {
         self.observers.count
     }
 
-    /// Suspends until exactly `count` observations are live; event-driven.
+    /// Suspends until exactly `count` observations are live; event-driven. Returns with the census unchanged when the
+    /// calling task is cancelled first (a test past its time limit), so the caller's following expectations fail.
     public func waitForObservers(equalTo count: Int) async {
-        if self.observers.count == count {
-            return
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        _ = await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: nil)
+    }
+
+    /// Suspends until exactly `count` observations are live; throws `CancellationError` when the calling task is
+    /// cancelled first, so a test past its time limit ends at once.
+    public func requireObservers(equalTo count: Int) async throws(CancellationError) {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        guard await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: nil) else {
+            throw CancellationError()
         }
-        // REENTRANCY: TS2 — nothing: a terminal wait, registered synchronously and resumed only by the actor turn
-        // that reached `count`; no state is read afterwards.
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            self.countWaiters.append((count, continuation))
-        }
+    }
+
+    /// Test seam for the wait itself: `true` once exactly `count` observations are live, `false` when the calling task
+    /// was cancelled first; `registered` runs on the actor once the wait is registered.
+    package func waitForObservers(equalTo count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        // REENTRANCY: TS2 — nothing: a terminal wait (l2fu-1); no state is read afterwards.
+        await self.awaitCensus(target: count, met: { self.observers.count == $0 }, registered: registered)
     }
 
     private func removeObserver(_ id: UInt64) {
@@ -209,16 +225,6 @@ public actor FakeMemoryPressureSource: MemoryPressureSource {
 
     private func notifyCountWaiters() {
         let live = self.observers.count
-        var ready: [CheckedContinuation<Void, Never>] = []
-        self.countWaiters.removeAll { waiter in
-            if waiter.count == live {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume()
-        }
+        self.censusWaiters.resume { $0 == live }
     }
 }

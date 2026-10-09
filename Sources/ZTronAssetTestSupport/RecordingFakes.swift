@@ -973,13 +973,14 @@ public final class FakeStagingSink: StagingSink {
 /// finished (or `stop()` ran) without a match, and when the calling task is cancelled. Each event is returned by at
 /// most one call. `stop()` cancels the consuming task, which terminates the stream's iteration (an engine
 /// subscription is released on that cancellation).
-public actor EventProbe {
+public actor EventProbe: CensusWaiting {
     private var events: [AssetEvent] = []
     private var consumed: Set<Int> = []
     private var waiters: [Waiter] = []
     private var nextWaiter: UInt64 = 0
     private var finished = false
-    private var countWaiters: [(count: Int, continuation: CheckedContinuation<Bool, Never>)] = []
+    /// Waits for a number of suspended `next(where:)` calls (`CensusWaiting`).
+    var censusWaiters = CensusWaiters()
     private let stopSignal: AsyncStream<Void>.Continuation
 
     /// A suspended `next(where:)` call.
@@ -1059,7 +1060,8 @@ public actor EventProbe {
     }
 
     /// Suspends until at least `count` calls of `next(where:)` are waiting (tests of the probe itself); `false`
-    /// when the probe finished first (no call can wait any more).
+    /// when the probe finished first (no call can wait any more) or the calling task was cancelled first (L2
+    /// follow-up).
     @discardableResult
     func waitForWaiters(atLeast count: Int) async -> Bool {
         if self.waiters.count >= count {
@@ -1068,11 +1070,22 @@ public actor EventProbe {
         guard !self.finished else {
             return false
         }
-        // REENTRANCY: h-4 (proposed, as TS2) — nothing: a terminal wait, registered synchronously and resumed only
-        // by the actor turn in which `count` calls were waiting, or by `finish()`; no state is read afterwards.
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            self.countWaiters.append((count, continuation))
+        // REENTRANCY: h-4 (proposed, as TS2) — nothing: a terminal wait (l2fu-1), resumed by the actor turn in which
+        // `count` calls were waiting, by `finish()`, or by the caller's cancellation; no state is read afterwards.
+        return await self.awaitCensus(target: count, met: { self.waiters.count >= $0 }, registered: nil)
+    }
+
+    /// `waitForWaiters(atLeast:)` that calls `registered` on the actor once the wait is registered (tests of the
+    /// cancellation path).
+    func waitForWaiters(atLeast count: Int, registered: @escaping @Sendable () -> Void) async -> Bool {
+        if self.waiters.count >= count {
+            return true
         }
+        guard !self.finished else {
+            return false
+        }
+        // REENTRANCY: h-4 (proposed, as TS2) — as `waitForWaiters(atLeast:)`.
+        return await self.awaitCensus(target: count, met: { self.waiters.count >= $0 }, registered: registered)
     }
 
     /// Stops consuming.
@@ -1099,11 +1112,7 @@ public actor EventProbe {
         for waiter in pending {
             waiter.continuation.resume(returning: nil)
         }
-        let census = self.countWaiters
-        self.countWaiters.removeAll()
-        for waiter in census {
-            waiter.continuation.resume(returning: false)
-        }
+        self.censusWaiters.resumeAll()
     }
 
     private func cancelWaiter(_ id: UInt64) {
@@ -1115,16 +1124,6 @@ public actor EventProbe {
 
     private func notifyCountWaiters() {
         let waiting = self.waiters.count
-        var ready: [CheckedContinuation<Bool, Never>] = []
-        self.countWaiters.removeAll { waiter in
-            if waiter.count <= waiting {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume(returning: true)
-        }
+        self.censusWaiters.resume { $0 <= waiting }
     }
 }
