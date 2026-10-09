@@ -104,21 +104,27 @@ struct IdempotencyTests {
                 return try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
             }
         }
-        // Let the listing through and one deletion unit, then cancel the caller.
-        var released = 0
-        while released < (operation == .stagingGC ? 2 : 3) {
-            try await metadata.requireHeldUnits(atLeast: 1)
-            await metadata.releaseNext()
-            released += 1
+        // Let units through one at a time until one garbage file is gone, then cancel the caller.
+        try await CorePoll.until("one garbage file removed") {
+            if garbage.contains(where: { !harness.exists($0) }) {
+                return true
+            }
+            if await !metadata.heldUnits.isEmpty {
+                await metadata.releaseNext()
+            }
+            return false
         }
         task.cancel()
         await metadata.setHolding(false)
         let outcome = await task.result
         let remaining = garbage.filter { harness.exists($0) }
-        if case .failure(let error) = outcome {
+        switch outcome {
+        case .failure(let error):
             #expect(error as? StoreError == .cancelled)
-            #expect(remaining.count < garbage.count, "the unit that ran stays done")
+        case .success:
+            Issue.record("the cancelled collection ran to the end")
         }
+        #expect(remaining.count < garbage.count && !remaining.isEmpty, "the unit that ran stays done, the rest is left")
         _ = operation == .stagingGC
             ? try await harness.store.collectStaging(keeping: [])
             : try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))

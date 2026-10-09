@@ -82,7 +82,15 @@ struct GarbageCollectionTests {
     static func plantBlob(_ fileSystem: FakeFileSystem, _ bytes: Data, ext: String = "png") throws -> BlobKey {
         let key = CoreFixture.key(bytes, ext: ext)
         let url = CoreFixture.layout.blobURL(key)
-        try fileSystem.createDirectory(at: url.deletingLastPathComponent())
+        var missing: [URL] = []
+        var directory = url.deletingLastPathComponent()
+        while try fileSystem.itemInfo(at: directory) == nil {
+            missing.append(directory)
+            directory = directory.deletingLastPathComponent()
+        }
+        for directory in missing.reversed() {
+            try fileSystem.createDirectory(at: directory)
+        }
         try fileSystem.write(bytes, to: url, mode: .truncate)
         return key
     }
