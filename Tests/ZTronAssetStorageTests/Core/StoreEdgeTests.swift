@@ -161,7 +161,7 @@ struct StoreEdgeTests {
         let second = Task {
             try await harness.store.open()
         }
-        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
+        try await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
         await metadata.setHolding(false)
         let report = try await first.value
         #expect(try await second.value == report)
@@ -183,7 +183,7 @@ struct StoreEdgeTests {
         let closing = Task {
             await harness.store.close()
         }
-        await StoreEdgeTests.waitForOpenWaiters(opens: 0, others: 1, harness)
+        try await StoreEdgeTests.waitForOpenWaiters(opens: 0, others: 1, harness)
         #expect(await harness.state.core.phase == .opening, "close parked without cutting the open short")
         await metadata.setHolding(false)
         await closing.value
@@ -219,7 +219,7 @@ struct StoreEdgeTests {
         let closing = Task {
             await harness.store.close()
         }
-        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 1, harness)
+        try await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 1, harness)
         await metadata.setHolding(false)
         let report = try await first.value
         #expect(try await second.value == report)
@@ -244,7 +244,7 @@ struct StoreEdgeTests {
         let second = Task {
             try await harness.store.open()
         }
-        await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
+        try await StoreEdgeTests.waitForOpenWaiters(opens: 1, others: 0, harness)
         await metadata.setHolding(false)
         await #expect(throws: StoreError.locked) {
             try await first.value
@@ -306,7 +306,7 @@ struct StoreEdgeTests {
             try await harness.store.flush(.ordered)
         }
         // The flush is parked on the running commit before it is released.
-        await StoreRaceTests.waitForCommitWaiter(harness)
+        try await StoreRaceTests.waitForCommitWaiter(harness)
         await metadata.setHolding(false)
         try await first.value
         try await second.value
@@ -390,15 +390,20 @@ extension AssetStore {
 
 extension StoreEdgeTests {
     /// Waits until `opens` further `open()` calls and `others` other callers (a `close()`, an async API) are parked on a
-    /// running `open()` (polled between yields; no sleeping).
+    /// running `open()` (polled between yields; no sleeping; ends with the test), then requires that the `open()` calls
+    /// wait for the running open's report and the others for its phase (ADR draft B-35). Waiting for the total first
+    /// makes a misplaced caller fail at once instead of at the time limit.
     @available(macOS 15.0, *)
-    static func waitForOpenWaiters(opens: Int, others: Int, _ harness: CoreHarness) async {
-        while true {
+    static func waitForOpenWaiters(opens: Int, others: Int, _ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await CorePoll.until("\(opens) open() calls and \(others) other callers parked on the running open()", sourceLocation: sourceLocation) {
             let core = await harness.state.core
-            if core.openReportWaiters.count >= opens, core.openWaiters.count >= others {
-                return
-            }
-            await Task.yield()
+            return core.openReportWaiters.count + core.openWaiters.count >= opens + others
         }
+        let core = await harness.state.core
+        try #require(
+            core.openReportWaiters.count >= opens && core.openWaiters.count >= others,
+            "\(core.openReportWaiters.count) callers wait for the running open's report (\(opens) expected) and \(core.openWaiters.count) for its phase (\(others) expected)",
+            sourceLocation: sourceLocation
+        )
     }
 }

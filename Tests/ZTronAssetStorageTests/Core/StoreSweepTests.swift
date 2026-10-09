@@ -54,7 +54,7 @@ struct StoreSweepTests {
         let applyB = Task {
             try await harness.store.apply(CoreFixture.manifest([b]), etag: nil, eviction: nil)
         }
-        await StoreSweepTests.waitForGateWaiter(harness)
+        try await StoreSweepTests.waitForGateWaiter(harness)
         #expect(await bulk.submittedUnits.count == submitted, "B plans nothing while A holds the gate")
         await bulk.setHolding(false)
         let reportA = try await applyA.value
@@ -72,13 +72,13 @@ struct StoreSweepTests {
         let applyD = Task {
             try await harness.store.apply(CoreFixture.manifest([b]), etag: nil, eviction: nil)
         }
-        await StoreSweepTests.waitForGateWaiter(harness)
+        try await StoreSweepTests.waitForGateWaiter(harness)
         let closing = Task {
             await harness.store.close()
         }
         // C's plan unit is released only once close() is draining: released earlier, C could plan, write and commit
         // while the store is still open and return normally (close-out cycle 3: failed once under load).
-        await StoreSweepTests.waitForPhase(.closing, harness)
+        try await StoreSweepTests.waitForPhase(.closing, harness)
         await bulk.setHolding(false)
         await closing.value
         await #expect(throws: StoreError.closed) {
@@ -176,7 +176,7 @@ struct StoreSweepTests {
         let closing = Task {
             await harness.store.close()
         }
-        await StoreSweepTests.waitForPhase(.closing, harness)
+        try await StoreSweepTests.waitForPhase(.closing, harness)
         await bulk.setHolding(false)
         await closing.value
         await #expect(throws: StoreError.closed) {
@@ -192,19 +192,19 @@ struct StoreSweepTests {
         try harness.fileSystem.contentsOfDirectory(at: harness.layout.stagingDirectory).map(\.name).filter { $0.hasSuffix(".parttmp") }
     }
 
-    /// Waits until a caller is parked on the apply gate (polled between yields; no sleeping).
+    /// Waits until a caller is parked on the apply gate (polled between yields; no sleeping; ends with the test).
     @available(macOS 15.0, *)
-    static func waitForGateWaiter(_ harness: CoreHarness) async {
-        while await harness.state.core.applyGate.waiters.isEmpty {
-            await Task.yield()
+    static func waitForGateWaiter(_ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await CorePoll.until("a caller parked on the apply gate", sourceLocation: sourceLocation) {
+            await !harness.state.core.applyGate.waiters.isEmpty
         }
     }
 
-    /// Waits until the store reaches `phase` (polled between yields; no sleeping).
+    /// Waits until the store reaches `phase` (polled between yields; no sleeping; ends with the test).
     @available(macOS 15.0, *)
-    static func waitForPhase(_ phase: StorePhase, _ harness: CoreHarness) async {
-        while await harness.state.core.phase != phase {
-            await Task.yield()
+    static func waitForPhase(_ phase: StorePhase, _ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await CorePoll.until("the store's phase \(phase)", sourceLocation: sourceLocation) {
+            await harness.state.core.phase == phase
         }
     }
 }

@@ -335,3 +335,28 @@ actor UnitCounter {
         self.value += 1
     }
 }
+
+/// Polling without sleeping (SPEC 7.2) that never outlives its test.
+@available(macOS 15.0, *)
+enum CorePoll {
+    /// Evaluates `condition` until it holds, yielding in between. A test whose time limit ran out is cancelled: the poll
+    /// then records an issue naming what it waited for and throws `CancellationError`, so the test ends within its limit
+    /// and the run goes on (close-out cycle 5: with a fix reverted, a test kept polling at full speed after its limit,
+    /// and the test process never exited). `condition` may do work of its own between checks (a flush, say).
+    static func until(
+        _ waitingFor: @autoclosure () -> String,
+        sourceLocation: SourceLocation = #_sourceLocation,
+        _ condition: () async throws -> Bool
+    ) async throws {
+        while true {
+            if try await condition() {
+                return
+            }
+            if Task.isCancelled {
+                Issue.record("Cancelled while waiting for \(waitingFor())", sourceLocation: sourceLocation)
+                throw CancellationError()
+            }
+            await Task.yield()
+        }
+    }
+}

@@ -79,8 +79,8 @@ struct StoreReentrancyTests {
         let key = CoreFixture.key(bytes)
         await metadata.release(held[1])  // Y's claim: Y reaches the key while X's publication is in flight
         // Y hashes, then parks on the key X holds in `publishing` (REENTRANCY R3), before X's placement is released.
-        while await harness.state.core.keyWaiters[key]?.count != 1 {
-            await Task.yield()
+        try await CorePoll.until("Y parked on the key X publishes") {
+            await harness.state.core.keyWaiters[key]?.count == 1
         }
         #expect(await harness.state.core.publishing.contains(key))
         await metadata.setHolding(false)

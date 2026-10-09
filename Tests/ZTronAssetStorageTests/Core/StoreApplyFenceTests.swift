@@ -52,8 +52,8 @@ struct StoreApplyFenceTests {
         }
         await bulk.waitForHeldUnits(atLeast: 1)
         await bulk.setHolding(false)
-        while await harness.state.core.etag != etagTwo {
-            await Task.yield()
+        try await CorePoll.until("apply's first chunk (ETag two)") {
+            await harness.state.core.etag == etagTwo
         }
         // The window opens while the chunks are written: the woken commit must capture none of them half done.
         harness.time.advance(by: 1)
@@ -95,8 +95,8 @@ struct StoreApplyFenceTests {
         }
         await bulk.waitForHeldUnits(atLeast: 1)
         await bulk.setHolding(false)
-        while await harness.state.core.etag != etagTwo {
-            await Task.yield()
+        try await CorePoll.until("apply's first chunk (ETag two)") {
+            await harness.state.core.etag == etagTwo
         }
         // close() drains the held commit, then must not commit until apply's writes are complete.
         let closing = Task {
@@ -131,11 +131,11 @@ struct StoreApplyFenceTests {
         let synced = Task {
             try await harness.store.markSyncDue()
         }
-        await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 1)
+        try await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 1)
         let adoption = Task {
             try await harness.store.adoptionReport()
         }
-        await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 2)
+        try await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 2)
         // The engine's alarm finds no commit to make while the fence is up, and is given no commit deadline.
         let work = await harness.store.runDueWork()
         #expect(!work.committed)
@@ -156,7 +156,7 @@ struct StoreApplyFenceTests {
         let closing = Task {
             await harness.store.close()
         }
-        await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 1)
+        try await StoreApplyFenceTests.waitForFenceWaiters(harness, atLeast: 1)
         #expect(await harness.state.core.phase == .closing)
         #expect(await harness.state.core.metrics.commits == beforeClose, "no durable commit while the fence is up")
         await harness.store.endApplyWrites()
@@ -167,9 +167,9 @@ struct StoreApplyFenceTests {
 
     /// Waits until `count` callers are parked on the commit fence (no sleeping: the actor is polled between yields).
     @available(macOS 15.0, *)
-    static func waitForFenceWaiters(_ harness: CoreHarness, atLeast count: Int) async {
-        while await harness.state.core.applyGate.writeWaiters.count < count {
-            await Task.yield()
+    static func waitForFenceWaiters(_ harness: CoreHarness, atLeast count: Int, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await CorePoll.until("\(count) callers parked on the commit fence", sourceLocation: sourceLocation) {
+            await harness.state.core.applyGate.writeWaiters.count >= count
         }
     }
 

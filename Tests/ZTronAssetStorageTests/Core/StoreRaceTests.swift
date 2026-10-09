@@ -109,8 +109,12 @@ struct StoreRaceTests {
         #expect(work.reapedKeys == 0 && second.exists(second.layout.blobURL(key)))
         #expect(await second.state.core.snapshots.acknowledgedVersion == 0)
         // Once the replacement store's own snapshot is what readers see, the deletion proceeds.
-        while await second.state.core.snapshots.version <= left.version {
+        try await CorePoll.until("the replacement store's snapshot past version \(left.version)") {
+            if await second.state.core.snapshots.version > left.version {
+                return true
+            }
             try await second.store.flushAndInstall()
+            return false
         }
         #expect(await sink.installed.key.version > left.version)
         #expect(await sink.installed.location(for: entry.identifier, extensions: []) == nil)
@@ -189,7 +193,7 @@ struct StoreRaceTests {
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
         }
-        await StoreRaceTests.waitForCommitWaiter(harness)
+        try await StoreRaceTests.waitForCommitWaiter(harness)
         await metadata.setHolding(false)
         await #expect(throws: StoreError.superseded(x.identifier)) {
             try await publishing.value
@@ -306,9 +310,9 @@ struct StoreRaceTests {
 
     /// Waits until a caller is parked on the running commit (no sleeping: the actor is polled between yields).
     @available(macOS 15.0, *)
-    static func waitForCommitWaiter(_ harness: CoreHarness) async {
-        while await harness.state.core.commits.waiters.isEmpty {
-            await Task.yield()
+    static func waitForCommitWaiter(_ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await CorePoll.until("a caller parked on the running commit", sourceLocation: sourceLocation) {
+            await !harness.state.core.commits.waiters.isEmpty
         }
     }
 }
