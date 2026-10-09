@@ -128,6 +128,54 @@ struct EvictionTests {
         #expect(await harness.isPresent(recent.id, at: recent.key), "accessed within the grace window")
     }
 
+    /// Review round 1 (C-3): a publication of the same bytes under another id takes a provisional reference on the
+    /// live blob before its placement unit; evicting every record meanwhile leaves the blob live, so nothing was removed.
+    @Test("R-CLN-4: eviction reports no removed file when an in-flight publication of the same bytes keeps the blob", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictionDuringReusingPublication() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0), hysteresisTarget: 1), metadata: metadata)
+        let a = CleanupFixture.asset("a", seed: 95)
+        // `c` names the same bytes without a checksum, so no adoption binds it: only its publication does.
+        let c = CoreFixture.entry("c", a.bytes, checksum: false)
+        try await harness.seed([a])
+        _ = try await harness.store.apply(CoreFixture.manifest([a.entry, c]), etag: nil, eviction: nil)
+        harness.time.advance(by: 3_600)
+        let staged = try await harness.stage(a.bytes, for: c, sequence: 9)
+        await metadata.setHolding(true)
+        let publish = Task {
+            try await harness.store.publish(staged, binding: [c.identifier], expecting: c.contentIdentity, urgency: .bulk)
+        }
+        // Run the publication's units until it holds a provisional reference on `a`'s blob; its placement unit then waits.
+        try await CorePoll.until("c's publication reuses a's blob") {
+            if case .live(let references)? = await harness.store.state.core.blobTable[a.key], references == 2 {
+                return true
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let placement = try #require(await metadata.heldUnits.first)
+        let releaser = Task {
+            while !Task.isCancelled {
+                for unit in await metadata.heldUnits where unit != placement {
+                    await metadata.release(unit)
+                }
+                await Task.yield()
+            }
+        }
+        let result = try await harness.store.evictIfNeeded()
+        releaser.cancel()
+        #expect(await harness.record(a.id)?.residency == .absent(.evicted))
+        #expect(result.filesRemoved == 0 && result.bytesFreed == 0, "the blob stays: c's publication holds it")
+        await metadata.setHolding(false)
+        _ = try await publish.value
+        #expect(await harness.isPresent(c.identifier, at: a.key) && harness.hasBlob(a.key))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-4: essential, pinned, leased and recently accessed assets are never evicted", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func protectedAssetsStay() async throws {
