@@ -446,4 +446,87 @@ struct LegacyEdgeTests {
         #expect(listings() == 2, "the root, then the unit that was in flight; no listing after it")
         LegacyEdgeTests.expectTreeUntouched(harness, files.filter { $0.key.hasSuffix(".json") }, "nothing was removed")
     }
+
+    /// A transient fault on one legacy file while phase 2 hashes or moves it (review of the L3 close-out, ZProbe-hash).
+    enum PhaseTwoFault: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// The first read of its bytes fails (EIO; ZProbe-hash).
+        case read
+        /// Its rename into `blobs/` fails (EIO).
+        case rename
+        /// Its rename into `blobs/` finds the volume full (ENOSPC).
+        case renameNoSpace
+
+        var testDescription: String {
+            self.rawValue
+        }
+
+        /// The fault, on the first matching operation on `name` after it is added.
+        func rule(_ name: String) -> FaultRule {
+            switch self {
+            case .read:
+                return FaultRule(operation: .read, matching: URLMatcher(lastComponentSuffix: name), occurrence: .nth(1), error: .io)
+            case .rename:
+                return FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: name), occurrence: .nth(1), error: .io)
+            case .renameNoSpace:
+                return FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: name), occurrence: .nth(1), error: .noSpace)
+            }
+        }
+    }
+
+    /// The fixture's `icon.heic` (the file ZProbe-hash failed): its entry, its path relative to the root, its blob.
+    static func icon(_ files: [String: Data]) throws -> (entry: ManifestEntry, relative: String, key: BlobKey) {
+        let entry = try #require(try LegacyFixture.entries().first { LegacyFixture.relativePath($0).hasSuffix("/icon.heic") })
+        let relative = LegacyFixture.relativePath(entry)
+        let bytes = try #require(files[relative])
+        return (entry, relative, CoreFixture.key(bytes, ext: entry.fileExtension))
+    }
+
+    @Test(
+        "R-STO-11: a transient I/O error while phase 2 hashes or moves a legacy file ends the batch and the file is moved by a later one, never dropped",
+        .timeLimit(.minutes(1)),
+        arguments: PhaseTwoFault.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func phaseTwoTransientFaultDefers(_ fault: PhaseTwoFault) async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (harness, defaults) = try LegacyFixture.harness(files: files)
+        let icon = try LegacyEdgeTests.icon(files)
+        _ = try await harness.store.open()
+        harness.fileSystem.addFault(fault.rule("icon.heic"))
+        let first = try await harness.store.migrateLegacy(maxFiles: 100)
+        #expect(first.dropped == 0 && !first.finished && first.remaining > 0, "the batch ends at the file it could not move")
+        #expect(first.adopted + first.remaining == 13)
+        #expect(harness.content(CleanupFixture.legacyRoot.appendingPathComponent(icon.relative)) == files[icon.relative], "still in the legacy tree")
+        let progress = try await LegacyMigrationTests.migrateAll(harness)
+        #expect(progress == LegacyMigrationProgress(adopted: 13, remaining: 0, dropped: 0, finished: true))
+        #expect(await harness.isPresent(icon.entry.identifier, at: icon.key), "moved, not downloaded again")
+        #expect(try await harness.store.planningView().stamp?.appVersion == "1.4+77")
+        #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot) && defaults.string(forKey: CleanupFixture.legacyKey) == nil)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    @Test(
+        "R-STO-11: a legacy file that fails on every attempt is kept where it is after three: migration finishes without it and phase 4 leaves it",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func phaseTwoPersistentFaultKeepsFile() async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (harness, _) = try LegacyFixture.harness(files: files)
+        let icon = try LegacyEdgeTests.icon(files)
+        _ = try await harness.store.open()
+        harness.fileSystem.addFault(FaultRule(operation: .read, matching: URLMatcher(lastComponentSuffix: "icon.heic"), occurrence: .every, error: .io))
+        let progress = try await LegacyMigrationTests.migrateAll(harness)
+        #expect(progress == LegacyMigrationProgress(adopted: 12, remaining: 0, dropped: 1, finished: true), "counted dropped: it is downloaded again")
+        let reads = harness.fileSystem.operations.filter { $0.kind == .read && $0.url.lastPathComponent == "icon.heic" }
+        #expect(reads.count == 3, "one hash attempt per batch, three in all (`AssetStore.legacyAttempts`)")
+        // The fault fails every read of it, so its bytes are read back from a copy of the volume.
+        let copy = FakeFileSystem(disk: harness.fileSystem.survivingDisk(), time: ManualTimeSource())
+        let kept = try copy.read(from: CleanupFixture.legacyRoot.appendingPathComponent(icon.relative), offset: 0, maxLength: 1 << 20)
+        #expect(kept == files[icon.relative], "a file that could not be read is never removed")
+        #expect(await harness.record(icon.entry.identifier)?.residency == .absent(.neverFetched))
+        let view = try await harness.store.planningView()
+        #expect(view.stamp == nil && view.syncDue, "not every legacy entry was moved")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
 }
