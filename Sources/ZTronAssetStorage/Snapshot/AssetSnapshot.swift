@@ -9,8 +9,8 @@ import ZTronAssetModel
 /// 1 (ADR-013 as amended by ADR-050). A mirror installs a snapshot only if its key is greater, and the store counts an
 /// acknowledgement only when the sink swapped in exactly the snapshot it offered, of its own epoch (`retired != nil`
 /// and `installed == offered`), so a reopened store can never mistake an ignored install, or another store's snapshot
-/// of an equal epoch, for one that happened. After a `rootVanished` reopen the facade resets the mirror before the
-/// replacement store's first install (ADR-016's B-17 amendment); otherwise readers keep the old store's snapshot until
+/// of an equal epoch, for one that happened. After a `rootVanished` reopen the facade is to reset the mirror before the
+/// replacement store's first install (WP-G's obligation, ADR-016's B-17 amendment); otherwise readers keep the old store's snapshot until
 /// the new store's key passes it, which never happens when its epoch is smaller.
 package struct SnapshotKey: Hashable, Comparable, Sendable {
     /// The publishing store instance's launch epoch.

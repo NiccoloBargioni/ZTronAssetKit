@@ -227,9 +227,9 @@ struct ConditionsTests {
             }
             return count
         }
-        await source.waitForObservations(equalTo: 1)
+        try await source.requireObservations(equalTo: 1)
         consumer.cancel()
-        await source.waitForObservations(equalTo: 0)
+        try await source.requireObservations(equalTo: 0)
         #expect(path.isCancelled)
         #expect(await consumer.value <= 1)
         // A second observation is independent and starts from the current state.
