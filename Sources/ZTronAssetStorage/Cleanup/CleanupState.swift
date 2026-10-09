@@ -20,7 +20,7 @@ struct CleanupState: Sendable {
     /// `runDueWork()`) are not a cleanup run and do not stamp it.
     var lastCleanupAt: Date?
     /// The unreferenced blobs the last orphan GC listing found and left (younger than the grace, or adoptable), with
-    /// their sizes: `StorageReport.orphanBytes`. `nil` until the first listing of this lifetime, when the report uses
-    /// the orphans the launch listed.
+    /// their sizes: `StorageReport.orphanBytes`. `nil` until the first orphan GC of this lifetime: the report then counts
+    /// no orphan bytes (ADR draft C-11; the orphans the launch listed are WP-B's bookkeeping, which WP-C does not read).
     var orphans: [BlobKey: Int64]?
 }

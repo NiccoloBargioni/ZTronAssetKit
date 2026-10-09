@@ -54,9 +54,10 @@ enum CleanupUnits {
 
 extension AssetStore {
     /// Removes `items` (URL and size) in metadata units of at most `deletionBatchSize` and `CleanupUnits.removalBudget`,
-    /// checking the caller's cancellation and `deadline` between units. Returns what was removed; throws `.cancelled`
-    /// once cancelled (what was removed stays removed, R-CLN-12) or `.closed` once closing.
-    func removeInUnits(_ items: [(url: URL, bytes: Int64)], until deadline: MonotonicInstant? = nil) async throws(StoreError) -> (removed: [Int], result: CleanupResult) {
+    /// checking the caller's cancellation and `deadline` between units. Returns what was removed and whether the
+    /// caller's cancellation stopped it: what was removed stays removed (R-CLN-12), so the caller accounts for it (the
+    /// cleanup stamp, C-4) before it throws `.cancelled`. Throws `.closed` once closing.
+    func removeInUnits(_ items: [(url: URL, bytes: Int64)], until deadline: MonotonicInstant? = nil) async throws(StoreError) -> (removed: [Int], result: CleanupResult, cancelled: Bool) {
         let fileSystem = self.environment.fileSystem
         let time = self.environment.time
         let batchSize = max(1, self.configuration.deletionBatchSize)
@@ -65,7 +66,7 @@ extension AssetStore {
         var next = 0
         while next < items.count {
             if Task.isCancelled {
-                throw .cancelled
+                return (removed, result, true)
             }
             if let deadline, time.monotonicNow() >= deadline {
                 break
@@ -87,6 +88,14 @@ extension AssetStore {
             }
             next = range.lowerBound + max(1, removal.attempted)
         }
-        return (removed, result)
+        return (removed, result, false)
+    }
+
+    /// `removeInUnits` for a caller with no bookkeeping (legacy phase 4): a cancellation is thrown at once.
+    func removeAllInUnits(_ items: [(url: URL, bytes: Int64)]) async throws(StoreError) {
+        // REENTRANCY: c-1 (proposed) — see `removeInUnits`.
+        if try await self.removeInUnits(items).cancelled {
+            throw .cancelled
+        }
     }
 }

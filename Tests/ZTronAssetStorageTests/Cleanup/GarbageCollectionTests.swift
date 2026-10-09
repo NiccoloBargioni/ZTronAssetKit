@@ -44,6 +44,8 @@ struct GarbageCollectionTests {
         #expect(names.count == 4 && result.filesRemoved == 3)
         #expect(result.bytesFreed == 200 + sidecarSize + 30)
         #expect(await harness.state.cleanup.lastCleanupAt == harness.time.now())
+        let events = harness.tap.lines.compactMap(LogIntervalEvent.init(line:)).filter { $0.name == .gc }
+        #expect(events.map(\.phase) == [.began, .ended], "R-OBS-1: the staging sweep runs inside one gc interval")
         // After a sync the transfer is no longer claimed, and its file is old: collected.
         let after = try await harness.store.collectStaging(keeping: [])
         let left = try GarbageCollectionTests.stagingNames(harness)
@@ -202,5 +204,106 @@ struct GarbageCollectionTests {
         let present = await harness.isPresent(b.identifier, at: key)
         #expect(harness.content(harness.layout.blobURL(key)) == bytes && present)
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// Releases the held metadata units one at a time until `first` is gone, then cancels `task` while the next removal
+    /// unit (the one for `second`) is held, and lets everything run.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func cancelDuringSecondRemoval(_ metadata: SteppedBlockingExecutor, _ harness: CoreHarness, first: URL, second: URL, task: Task<CleanupResult, any Error>) async throws {
+        try await CorePoll.until("the first removal unit ran") {
+            if !harness.exists(first) {
+                return true
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        #expect(harness.exists(second), "the second removal unit is held")
+        task.cancel()
+        await metadata.setHolding(false)
+    }
+
+    @Test("R-CLN-12: a cancelled orphan GC keeps what it removed, counts it and stamps the cleanup", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func cancelledOrphanGCAccounts() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(deletionBatchSize: 1, metadata: metadata)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        let keys = try (0..<3).map { try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(460 + UInt64($0), count: 100)) }.sorted()
+        let urls = keys.map { harness.layout.blobURL($0) }
+        harness.time.advance(by: 3_601)
+        await metadata.setHolding(true)
+        let collect = Task {
+            try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 600))
+        }
+        try await GarbageCollectionTests.cancelDuringSecondRemoval(metadata, harness, first: urls[0], second: urls[1], task: collect)
+        await #expect(throws: StoreError.cancelled) {
+            _ = try await collect.value
+        }
+        #expect(!harness.exists(urls[0]) && !harness.exists(urls[1]) && harness.exists(urls[2]), "the held unit ran; no unit started after the cancellation")
+        #expect(await harness.store.metrics().gcBytes == 200)
+        #expect(await harness.store.storageReport().lastCleanupAt == harness.time.now())
+    }
+
+    @Test("R-CLN-12: a cancelled staging GC keeps what it removed and stamps the cleanup", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func cancelledStagingGCStamps() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(deletionBatchSize: 1, metadata: metadata)
+        _ = try await harness.store.open()
+        let urls = ["a.junk", "b.junk", "c.junk"].map { harness.layout.stagingDirectory.appendingPathComponent($0) }
+        for url in urls {
+            try harness.fileSystem.write(Data(repeating: 1, count: 10), to: url, mode: .truncate)
+        }
+        await metadata.setHolding(true)
+        let collect = Task {
+            try await harness.store.collectStaging(keeping: [])
+        }
+        try await GarbageCollectionTests.cancelDuringSecondRemoval(metadata, harness, first: urls[0], second: urls[1], task: collect)
+        await #expect(throws: StoreError.cancelled) {
+            _ = try await collect.value
+        }
+        #expect(!harness.exists(urls[0]) && !harness.exists(urls[1]) && harness.exists(urls[2]))
+        #expect(await harness.store.storageReport().lastCleanupAt == harness.time.now())
+    }
+
+    /// Review round 1 (ZProbe4): `apply` confirms a launch orphan in one unit and binds it only after its plan unit and
+    /// write chunks; an orphan sweep in between removes the file, and the record is then bound to a missing blob (I-2).
+    /// Closing it needs WP-B's `adoptKnownBlob` to re-read the orphan table (CCR-2 in docs/adr-drafts/c.md): until then
+    /// this is a known issue, and the test fails as soon as the race is closed, so the wrapper is removed with the fix.
+    @Test("R-CLN-2: orphan GC never sweeps a launch orphan that a running apply is about to adopt", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func sweepRacingApplyAdoption() async throws {
+        let x = CleanupFixture.asset("x", seed: 450)
+        let first = CoreHarness.cleanup()
+        _ = try await first.store.open()
+        _ = try await first.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        await first.store.close()
+        // A blob nobody knows lands in blobs/ while the app is not running, older than the orphan grace at the relaunch.
+        let key = try GarbageCollectionTests.plantBlob(first.fileSystem, x.bytes)
+        first.time.advance(by: 3_601)
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(disk: first.fileSystem.survivingDisk(), time: first.time, bulk: bulk)
+        _ = try await harness.store.open()
+        let recorded = await harness.record(x.id)
+        #expect(harness.hasBlob(key) && recorded == nil)
+        // A manifest naming `x` arrives: apply confirms the orphan, then its plan unit is held.
+        await bulk.setHolding(true)
+        let apply = Task {
+            try await harness.store.apply(CoreFixture.manifest([x.entry]), etag: nil, eviction: nil)
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let swept = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        await bulk.setHolding(false)
+        _ = try await apply.value
+        let present = await harness.isPresent(x.id, at: key)
+        let violations = await CoreInvariants.violations(of: harness)
+        withKnownIssue("CCR-2: apply binds a launch orphan the sweep removed meanwhile") {
+            #expect(swept.filesRemoved == 0 || !present, "a swept orphan is never bound")
+            #expect(present == harness.hasBlob(key) && violations.isEmpty, "I-2: \(violations)")
+        }
     }
 }

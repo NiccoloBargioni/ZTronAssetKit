@@ -35,7 +35,8 @@ extension AssetStore {
         var result = CleanupResult()
         let batchSize = max(1, self.configuration.deletionBatchSize)
         var next = 0
-        while next < candidates.count, self.collectsOrphans {
+        var cancelled = false
+        while next < candidates.count, self.collectsOrphans, !cancelled {
             // The sweep set is re-checked against the marks right before each unit is submitted, in the same turn
             // (R10): a key a publication or adoption claimed meanwhile is left alone.
             let marks = self.orphanMarks().union(self.expectedKeys())
@@ -45,20 +46,25 @@ extension AssetStore {
                 continue
             }
             // REENTRANCY: c-1 (proposed) — see `removeInUnits`; the sweep set of the next batch is re-checked above.
-            let (removed, partial) = try await self.removeInUnits(batch.map { (url: layout.blobURL($0), bytes: unknown[$0] ?? 0) }, until: deadline)
-            for index in removed {
+            let removal = try await self.removeInUnits(batch.map { (url: layout.blobURL($0), bytes: unknown[$0] ?? 0) }, until: deadline)
+            for index in removal.removed {
                 unknown[batch[index]] = nil
             }
-            result.bytesFreed = result.bytesFreed.addingSaturating(partial.bytesFreed)
-            result.filesRemoved += partial.filesRemoved
-            if partial.filesRemoved < batch.count {
+            result.bytesFreed = result.bytesFreed.addingSaturating(removal.result.bytesFreed)
+            result.filesRemoved += removal.result.filesRemoved
+            cancelled = removal.cancelled
+            if removal.result.filesRemoved < batch.count {
                 break
             }
         }
+        // A cancelled run still accounts for what it removed (R-CLN-12, C-4) before it reports the cancellation.
         self.state.cleanup.orphans = unknown
         if result.filesRemoved > 0 {
             self.state.core.metrics.gcBytes = self.state.core.metrics.gcBytes.addingSaturating(result.bytesFreed)
             self.stampCleanup()
+        }
+        if cancelled {
+            throw .cancelled
         }
         return result
     }

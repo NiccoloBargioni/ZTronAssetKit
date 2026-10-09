@@ -150,7 +150,7 @@ extension AssetStore {
         }
         guard rootKind == .directory else {
             // REENTRANCY: c-1 (proposed) — see `removeInUnits`; unlinking a link removes the link only.
-            _ = try await self.removeInUnits([(url: root, bytes: 0)])
+            try await self.removeAllInUnits([(url: root, bytes: 0)])
             // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
             return await self.legacyItemKind(root) == .success(nil)
         }
@@ -179,9 +179,9 @@ extension AssetStore {
             }
         }
         // REENTRANCY: c-1 (proposed) — see `removeInUnits`.
-        _ = try await self.removeInUnits(leaves.map { (url: $0, bytes: 0) })
+        try await self.removeAllInUnits(leaves.map { (url: $0, bytes: 0) })
         // REENTRANCY: c-1 (proposed) — as above, deepest directories first.
-        _ = try await self.removeInUnits(directories.reversed().map { (url: $0, bytes: 0) })
+        try await self.removeAllInUnits(directories.reversed().map { (url: $0, bytes: 0) })
         // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
         return await self.legacyItemKind(root) == .success(nil)
     }

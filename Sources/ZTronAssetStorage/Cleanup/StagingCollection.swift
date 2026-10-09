@@ -38,11 +38,15 @@ extension AssetStore {
             policy: self.configuration.policy
         ).map { (url: directory.appendingPathComponent($0.name, isDirectory: $0.kind == .directory), bytes: $0.byteSize) }
         // REENTRANCY: c-1 (proposed) — see `removeInUnits`.
-        let (_, result) = try await self.removeInUnits(garbage)
-        if result.filesRemoved > 0 {
+        let removal = try await self.removeInUnits(garbage)
+        // A cancelled run still stamps what it removed (R-CLN-12, C-4) before it reports the cancellation.
+        if removal.result.filesRemoved > 0 {
             self.stampCleanup()
         }
-        return result
+        if removal.cancelled {
+            throw .cancelled
+        }
+        return removal.result
     }
 }
 
