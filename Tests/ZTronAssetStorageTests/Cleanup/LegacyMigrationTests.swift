@@ -186,6 +186,56 @@ struct LegacyMigrationTests {
         #expect(try await harness.store.planningView().stamp?.appVersion == "1.4+77")
     }
 
+    /// What the engine applied while migration ran.
+    enum AppliedDuringMigration: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// The legacy manifest's own bytes (the server's payload has not changed).
+        case sameManifest
+        /// A newer manifest: every legacy entry and one more (review round 3, ZProbe-stamp).
+        case newerManifest
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// Review round 3 (ZProbe-stamp): phase 3 checked only that every legacy id is present, then stamped the applied
+    /// manifest's digest as synced. A manifest the engine applied during migration whose new entries were never fetched
+    /// was then claimed synced, so `isSyncDue`, `.atMostEvery` or "unchanged since the last sync" could skip them.
+    @Test(
+        "R-STO-11: the legacy stamp migrates only over the legacy manifest itself, never over a newer one applied during migration",
+        .timeLimit(.minutes(1)),
+        arguments: AppliedDuringMigration.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func stampOnlyOverLegacyManifest(_ applied: AppliedDuringMigration) async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let entries = try LegacyFixture.entries()
+        let (harness, _) = try LegacyFixture.harness(files: files)
+        _ = try await harness.store.open()
+        let legacyDigest = try await harness.store.planningView().appliedManifest.digest
+        let extra = CleanupFixture.asset("extra.asset", seed: 740)
+        let manifest: ValidatedManifest
+        switch applied {
+        case .sameManifest:
+            manifest = try ManifestDecoder.decode(try #require(files["manifest.json"]))
+            #expect(manifest.digest == legacyDigest)
+        case .newerManifest:
+            manifest = try ValidatedManifest(entries: entries + [extra.entry], digest: ContentHash.sha256(of: Data("newer".utf8)))
+        }
+        _ = try await harness.store.apply(manifest, etag: nil, eviction: nil)
+        let progress = try await LegacyMigrationTests.migrateAll(harness)
+        #expect(progress == LegacyMigrationProgress(adopted: 13, remaining: 0, dropped: 0, finished: true))
+        let view = try await harness.store.planningView()
+        switch applied {
+        case .sameManifest:
+            #expect(view.stamp?.appVersion == "1.4+77" && view.stamp?.manifestDigest == legacyDigest && !view.syncDue)
+        case .newerManifest:
+            #expect(view.stamp == nil, "the newer manifest was never synced: \(String(describing: view.stamp))")
+            #expect(view.syncDue)
+            #expect(view.records[extra.id]?.residency == .absent(.neverFetched))
+        }
+    }
+
     @Test("R-STO-11: an undecodable legacy manifest degrades the launch, adopts nothing, removes the prior art's metadata and the key, and keeps files it cannot attribute", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func undecodableManifest() async throws {
