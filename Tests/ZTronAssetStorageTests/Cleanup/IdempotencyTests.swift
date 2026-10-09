@@ -16,12 +16,21 @@ struct IdempotencyTests {
         case purgeEvictable
         case purgeAll
         case quarantine
+        /// Deep verification that quarantines a corrupt blob (review round 3, store.md §6.9).
+        case deepVerification
+        /// Legacy migration run to its end, then called again (review round 3, store.md §6.9).
+        case legacyMigration
     }
 
     /// A store with something for every operation to do: an unclaimed old staging file, an old orphan blob, assets
-    /// over a zero budget.
+    /// over a zero budget; for `.legacyMigration` the prior art's tree (`Tests/Fixtures/legacy-v0`) instead.
     @available(macOS 15.0, iOS 18.0, *)
-    static func prepared() async throws -> (CoreHarness, [CleanupFixture.Asset]) {
+    static func prepared(_ operation: Operation) async throws -> (CoreHarness, [CleanupFixture.Asset]) {
+        if operation == .legacyMigration {
+            let (harness, _) = try LegacyFixture.harness(files: try LegacyFixture.fixtureFiles())
+            #expect(try await harness.store.open().legacyMigrationPending)
+            return (harness, [])
+        }
         let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0)))
         let assets = [CleanupFixture.asset("a", seed: 600), CleanupFixture.asset("b", seed: 601)]
         try await harness.seed(assets)
@@ -52,13 +61,23 @@ struct IdempotencyTests {
             _ = try await PurgeTests.purge(harness, request)
         case .quarantine:
             try await harness.store.reportUnreadable(assets[0].id)
+        case .deepVerification:
+            if first {
+                // Bit rot: the same size, other bytes.
+                try harness.fileSystem.write(CoreFixture.bytes(604), to: harness.layout.blobURL(assets[1].key), mode: .truncate)
+            }
+            let report = try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
+            #expect(report.completedPass && report.corrupt == (first ? [assets[1].id] : []), "\(first ? "first" : "second") run")
+        case .legacyMigration:
+            let progress = first ? try await LegacyMigrationTests.migrateAll(harness) : try await harness.store.migrateLegacy(maxFiles: 100)
+            #expect(progress.finished)
         }
     }
 
     @Test("R-CLN-12: every cleanup operation run twice is a no-op the second time", .timeLimit(.minutes(1)), arguments: Operation.allCases)
     @available(macOS 15.0, iOS 18.0, *)
     func secondRunIsNoOp(operation: Operation) async throws {
-        let (harness, assets) = try await IdempotencyTests.prepared()
+        let (harness, assets) = try await IdempotencyTests.prepared(operation)
         let initial = harness.fileSystem.survivingDisk()
         let before = await harness.state
         try await IdempotencyTests.run(operation, harness, assets, first: true)
@@ -73,6 +92,12 @@ struct IdempotencyTests {
         #expect(afterSecond.core.records == afterFirst.core.records, "\(operation): the second run changed a record")
         #expect(afterSecond.core.blobTable == afterFirst.core.blobTable, "\(operation): the second run changed the blob table")
         #expect(afterSecond.cleanup.lastCleanupAt == afterFirst.cleanup.lastCleanupAt, "\(operation): a no-op is not a cleanup")
+        #expect(afterSecond.core.stamp == afterFirst.core.stamp && afterSecond.core.syncDue == afterFirst.core.syncDue, "\(operation): the stamp")
+        #expect(afterSecond.migration.phase == afterFirst.migration.phase && afterSecond.migration.progress == afterFirst.migration.progress)
+        if operation == .deepVerification {
+            // The corrupt bytes stay under their doomed name until the reaper runs (I-1 holds again after it).
+            await harness.settleDeletions()
+        }
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
