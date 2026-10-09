@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 
 @testable import ZTronAssetStorage
 
-/// What one index file holds when a case of the state-space test starts (close-out cycle 3, item 2).
+/// What one index file holds when a case of the state-space test starts (close-out cycle 3, item 2; cycle 5).
 ///
 /// One lineage throughout: `older` is generation 9, `committed` 10, `newer` 11 (an attempt that did not complete: its
 /// data synced, its commit never reported). Every item of the initial disk is synced, except `newerUnsynced`. Pruned,
@@ -17,18 +17,24 @@ import ZTronAssetTestSupport
 ///   promotion's own sync), so their data is never unsynced.
 /// - Names not yet ordered by a root sync (a kill after a rename or a removal and before the next root sync) are not
 ///   seeded here: `IndexCommitUnorderedNamesTests` starts from every such kill survivor of the fault-free lifetimes of
-///   these disks. A power loss can undo what the load read there until a root sync orders it, and the first one is
-///   `open()`'s barrier: the store counts nothing committed before it (ADR draft B-36), and once it succeeded every
+///   the unforged disks. A power loss can undo what the load read there until a root sync orders it, and the first one
+///   is `open()`'s barrier: the store counts nothing committed before it (ADR draft B-36), and once it succeeded every
 ///   index name is ordered (that suite checks it), which leaves a disk of this space up to its generation numbers and
 ///   the unsynced data of an `index.tmp` (read as torn, like an absent one). That suite therefore enumerates the
 ///   barrier's faults, a crash before it, and the lifetime after a failed barrier.
-/// - A rotten file (`badHeader`, `badBody`, `truncated`) is a rotten copy of a generation no other file holds, above
-///   every valid one (20 + the file's position). Every attempt allocates a generation of its own and files are only
-///   renamed afterwards, so two files never share a generation, and a rotten header can never name the committed one.
-///   A rotten header below the valid generations behaves exactly as one above them except for `nextGeneration`: the
-///   load rule and the unit only take maxima of generations and compare a header for equality with the committed one.
-///   The higher one also checks that the next launch epoch clears it (I-5), so it covers both.
-/// Two valid files of one generation are just as impossible, but cost nothing, so they are enumerated anyway.
+///
+/// Rotten files come in two kinds, both enumerated for all three files:
+/// - `badHeader`, `badBody`, `truncated`: a rotten copy of a generation no other file holds, above every valid one
+///   (20 + the file's position), so its header (when it parses) names a generation of its own. A header below the valid
+///   generations that names no valid file behaves as one above them except for `nextGeneration`; the higher one also
+///   checks that the next launch epoch clears it (I-5).
+/// - The `forged…` states (close-out cycle 5, review "a rotten header can name the committed generation"): a copy of a
+///   valid generation (9, 10 or 11) whose header's generation field names another valid generation, the committed one
+///   included, with the right size and a trailer that fails. The header has no checksum of its own (the SHA-256 trailer
+///   covers header and body) and consecutive generations differ in bit 0, so one flipped bit makes a rotten `index.bin`
+///   name `index.prev`'s generation. Every (source, named) pair over 9, 10 and 11: six states per file. The pruning of
+///   cycle 3 ("a rotten header can never name the committed generation, files are only renamed") was false for bit rot.
+/// Two valid files of one generation are impossible, but cost nothing, so they are enumerated anyway.
 enum SeededIndex: String, CaseIterable, Sendable {
     case absent
     case older
@@ -38,9 +44,38 @@ enum SeededIndex: String, CaseIterable, Sendable {
     case badHeader
     case badBody
     case truncated
+    case forged9As10
+    case forged9As11
+    case forged10As9
+    case forged10As11
+    case forged11As9
+    case forged11As10
 
     /// The states `index.bin` and `index.prev` are enumerated over (see the pruning above).
     static let renamedInto: [SeededIndex] = SeededIndex.allCases.filter { $0 != .newerUnsynced }
+    /// The states without a forged header: the space whose fault-free lifetimes `IndexCommitUnorderedNamesTests` starts
+    /// from (its size is pinned; forged headers with unordered names are not enumerated, ADR draft B-33).
+    static let unforged: [SeededIndex] = SeededIndex.allCases.filter { $0.forgery == nil }
+
+    /// For a forged header: the valid generation the file is a copy of, and the generation its header names instead.
+    var forgery: (source: UInt64, named: UInt64)? {
+        switch self {
+        case .forged9As10:
+            return (9, 10)
+        case .forged9As11:
+            return (9, 11)
+        case .forged10As9:
+            return (10, 9)
+        case .forged10As11:
+            return (10, 11)
+        case .forged11As9:
+            return (11, 9)
+        case .forged11As10:
+            return (11, 10)
+        case .absent, .older, .committed, .newer, .newerUnsynced, .badHeader, .badBody, .truncated:
+            return nil
+        }
+    }
 
     /// The generation behind the file (its header's, when rotten), or `nil` when absent.
     func generation(at file: IndexFile) -> UInt64? {
@@ -55,6 +90,8 @@ enum SeededIndex: String, CaseIterable, Sendable {
             return 11
         case .badHeader, .badBody, .truncated:
             return 20 + UInt64(IndexFile.allCases.firstIndex(of: file) ?? 0)
+        case .forged9As10, .forged9As11, .forged10As9, .forged10As11, .forged11As9, .forged11As10:
+            return self.forgery?.named
         }
     }
 }
@@ -106,10 +143,12 @@ struct IndexSpaceSlice: Sendable, CustomTestStringConvertible {
 
 }
 
-/// The states of `index.bin` and `index.prev`: one test case, which enumerates every state of `index.tmp`.
+/// The states of `index.bin` and `index.prev`: one test case, which enumerates every state of `index.tmp` in its space.
 struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
     var bin: SeededIndex
     var previous: SeededIndex
+    /// The states of `index.tmp` the row enumerates.
+    var temporaries: [SeededIndex]
 
     var testDescription: String {
         "bin=\(self.bin) prev=\(self.previous)"
@@ -117,12 +156,21 @@ struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
 
     /// The row's initial disks, one per state of `index.tmp`.
     var slices: [IndexSpaceSlice] {
-        SeededIndex.allCases.map { IndexSpaceSlice(bin: self.bin, previous: self.previous, temporary: $0) }
+        self.temporaries.map { IndexSpaceSlice(bin: self.bin, previous: self.previous, temporary: $0) }
     }
 
-    /// Every row: 7 × 7 (× 8 states of `index.tmp` each).
-    static let all: [IndexSpaceRow] = SeededIndex.renamedInto.flatMap { bin in
-        SeededIndex.renamedInto.map { IndexSpaceRow(bin: bin, previous: $0) }
+    /// Every row of the main enumeration: 13 × 13 (× 14 states of `index.tmp` each), forged headers included.
+    static let all: [IndexSpaceRow] = IndexSpaceRow.rows(SeededIndex.allCases)
+
+    /// The rows without forged headers, whose fault-free lifetimes `IndexCommitUnorderedNamesTests` starts from:
+    /// 7 × 7 (× 8 states of `index.tmp` each).
+    static let unforged: [IndexSpaceRow] = IndexSpaceRow.rows(SeededIndex.unforged)
+
+    private static func rows(_ states: [SeededIndex]) -> [IndexSpaceRow] {
+        let renamedInto = states.filter { $0 != .newerUnsynced }
+        return renamedInto.flatMap { bin in
+            renamedInto.map { IndexSpaceRow(bin: bin, previous: $0, temporaries: states) }
+        }
     }
 }
 
@@ -216,10 +264,17 @@ struct IndexCommitStateSpaceTests {
 }
 
 extension IndexCommitStateSpaceTests {
-    @Test("R-STO-4: the state space holds every initial disk once: 7 states of index.bin and index.prev, 8 of index.tmp, 3 volume scripts")
+    @Test("R-STO-4: the state space holds every initial disk once: 13 states of index.bin and index.prev, 14 of index.tmp, 3 volume scripts")
     func spaceIsComplete() {
-        #expect(SeededIndex.allCases == [.absent, .older, .committed, .newer, .newerUnsynced, .badHeader, .badBody, .truncated])
+        let forged: [SeededIndex] = [.forged9As10, .forged9As11, .forged10As9, .forged10As11, .forged11As9, .forged11As10]
+        #expect(SeededIndex.allCases == [.absent, .older, .committed, .newer, .newerUnsynced, .badHeader, .badBody, .truncated] + forged)
         #expect(SeededIndex.renamedInto == SeededIndex.allCases.filter { $0 != .newerUnsynced })
+        #expect(SeededIndex.unforged == SeededIndex.allCases.filter { !forged.contains($0) })
+        // Every ordered pair of distinct valid generations once: each file of every lineage generation, named as another.
+        let pairs = forged.compactMap(\.forgery).map { "\($0.source)>\($0.named)" }
+        let valid: [UInt64] = [9, 10, 11]
+        let expectedPairs = valid.flatMap { source in valid.filter { $0 != source }.map { "\(source)>\($0)" } }
+        #expect(Set(pairs) == Set(expectedPairs) && pairs.count == 6)
         #expect(VolumeScript.allCases == [.free, .fullAtClose, .fullFromLaunch])
         let slices = IndexSpaceRow.all.flatMap(\.slices)
         let expected = SeededIndex.renamedInto.flatMap { bin in
@@ -227,14 +282,18 @@ extension IndexCommitStateSpaceTests {
                 SeededIndex.allCases.map { "bin=\(bin) prev=\(previous) tmp=\($0)" }
             }
         }
-        #expect(IndexSpaceRow.all.count == 49 && slices.count == 392 && Set(expected).count == 392)
+        #expect(IndexSpaceRow.all.count == 169 && slices.count == 2_366 && Set(expected).count == 2_366)
         #expect(Set(slices.map(\.testDescription)) == Set(expected), "every combination of the three files once")
+        let unforged = IndexSpaceRow.unforged.flatMap(\.slices)
+        #expect(IndexSpaceRow.unforged.count == 49 && unforged.count == 392)
+        #expect(unforged.allSatisfy { $0.bin.forgery == nil && $0.previous.forgery == nil && $0.temporary.forgery == nil })
     }
 }
 
 /// The kill survivors whose index names no root sync has ordered yet (close-out cycle 4, review "state-space enumeration:
 /// pruning justification"; ADR drafts B-33, B-36). The initial disks are every distinct kill survivor of the fault-free
-/// lifetimes of the row's disks (`IndexCommitStateSpaceTests`) on every volume script, whose three crash views differ
+/// lifetimes of the row's disks (`IndexSpaceRow.unforged`: the main enumeration's disks without a forged header; the
+/// suite's size is pinned, close-out cycle 5) on every volume script, whose three crash views differ
 /// (a rename or a removal not yet ordered by a root sync, or data not yet synced). A power loss can undo what the load
 /// read there until a root sync orders it, and the first one is `open()`'s barrier: the store counts nothing committed
 /// before it (B-36), and once it succeeded every index name is ordered, which the fault-free case checks; the rest of
@@ -252,11 +311,11 @@ struct IndexCommitUnorderedNamesTests {
     @Test(
         "R-STO-5: every kill survivor with unordered index names, with a fault at open()'s root barrier or a crash before it, keeps I-a…I-e",
         .timeLimit(.minutes(1)),
-        arguments: IndexSpaceRow.all
+        arguments: IndexSpaceRow.unforged
     )
     @available(macOS 15.0, *)
     func everyUnorderedSurvivor(row: IndexSpaceRow) async throws {
-        let index = try #require(IndexSpaceRow.all.firstIndex { $0.testDescription == row.testDescription })
+        let index = try #require(IndexSpaceRow.unforged.firstIndex { $0.testDescription == row.testDescription })
         let survivors = await UnorderedSurvivors.shared.survivors(at: index)
         let results = await withTaskGroup(of: IndexSpace.SliceResult.self) { group in
             for (index, survivor) in survivors.enumerated() {
@@ -291,7 +350,7 @@ struct IndexCommitUnorderedNamesTests {
         let rows = await UnorderedSurvivors.shared.all()
         let survivors = rows.flatMap { $0 }
         let keys = survivors.map { IndexSpace.ViewsKey(current: $0.start.current, dropped: $0.start.dropped, kept: $0.start.kept) }
-        #expect(rows.count == IndexSpaceRow.all.count)
+        #expect(rows.count == IndexSpaceRow.unforged.count)
         #expect(Set(keys).count == survivors.count, "each survivor once")
         #expect(survivors.allSatisfy { $0.start.current != $0.start.dropped || $0.start.kept != $0.start.current }, "every crash view of a survivor is not the same")
         #expect(survivors.contains { $0.start.dropped != $0.start.kept }, "some survivor has a name a power loss undoes")
@@ -302,22 +361,22 @@ struct IndexCommitUnorderedNamesTests {
 /// The kill survivors of `IndexCommitUnorderedNamesTests`, computed once for the whole suite and row by row: each row
 /// enumerates the survivors first met in its own lifetimes, so a survivor that two rows' lifetimes both leave runs once,
 /// and a row computes only its own lifetimes when the rows run in order (the first one does not pay for all 49). Rows
-/// are appended in the order of `IndexSpaceRow.all`; read-only once appended, and the same on every run (the lifetimes
-/// are deterministic).
+/// are appended in the order of `IndexSpaceRow.unforged`; read-only once appended, and the same on every run (the
+/// lifetimes are deterministic).
 @available(macOS 15.0, *)
 actor UnorderedSurvivors {
     static let shared = UnorderedSurvivors()
     private var rows: [[IndexSpace.Survivor]] = []
     private var seen: Set<IndexSpace.ViewsKey> = []
 
-    /// The survivors first met in the row at `index` of `IndexSpaceRow.all`, computing the rows before it first.
+    /// The survivors first met in the row at `index` of `IndexSpaceRow.unforged`, computing the rows before it first.
     func survivors(at index: Int) async -> [IndexSpace.Survivor] {
         while self.rows.count <= index {
             let next = self.rows.count
             var seen = self.seen
             // REENTRANCY: test support — the row is kept only if no other caller appended it meanwhile (the loop re-reads
             // the count); both computed the same row from the same `seen`.
-            let survivors = await IndexSpace.unorderedSurvivors(of: IndexSpaceRow.all[next], excluding: &seen)
+            let survivors = await IndexSpace.unorderedSurvivors(of: IndexSpaceRow.unforged[next], excluding: &seen)
             if self.rows.count == next {
                 self.rows.append(survivors)
                 self.seen = seen
@@ -326,10 +385,10 @@ actor UnorderedSurvivors {
         return self.rows[index]
     }
 
-    /// The survivors of every row, in the order of `IndexSpaceRow.all`.
+    /// The survivors of every row, in the order of `IndexSpaceRow.unforged`.
     func all() async -> [[IndexSpace.Survivor]] {
         // REENTRANCY: test support — nothing is re-read: every row is appended once the call returns.
-        _ = await self.survivors(at: IndexSpaceRow.all.count - 1)
+        _ = await self.survivors(at: IndexSpaceRow.unforged.count - 1)
         return self.rows
     }
 }
@@ -371,6 +430,9 @@ enum IndexSpace {
 
     /// The bytes `seeded` puts at `file`.
     static func bytes(_ seeded: SeededIndex, at file: IndexFile) -> [UInt8]? {
+        if let forgery = seeded.forgery {
+            return IndexSpace.forged(IndexSpace.encoded(forgery.source), naming: forgery.named)
+        }
         guard let generation = seeded.generation(at: file) else {
             return nil
         }
@@ -382,10 +444,23 @@ enum IndexSpace {
             bytes[IndexHeader.length] ^= 0xFF
         case .truncated:
             bytes.removeLast(bytes.count / 2)
-        case .absent, .older, .committed, .newer, .newerUnsynced:
+        case .absent, .older, .committed, .newer, .newerUnsynced, .forged9As10, .forged9As11, .forged10As9, .forged10As11, .forged11As9, .forged11As10:
             break
         }
         return bytes
+    }
+
+    /// `bytes` (a valid generation) with its header's generation field set to `generation` and everything else, the
+    /// trailer included, unchanged: the size is still right and the header still parses, only the trailer fails (bit rot
+    /// in the generation field; the header has no checksum of its own).
+    static func forged(_ bytes: [UInt8], naming generation: UInt64) -> [UInt8] {
+        guard var header = IndexHeader.parse(bytes) else {
+            return bytes
+        }
+        header.generation = generation
+        var forged = bytes
+        forged.replaceSubrange(0..<IndexHeader.length, with: header.encoded())
+        return forged
     }
 
     /// The initial disk of `slice`: the store's directories and the index files, all synced except an unsynced
@@ -1020,6 +1095,14 @@ enum IndexSpace {
             case .badBody, .truncated:
                 let header = IndexHeader.parse(bytes ?? [])
                 try #require(bytes != nil && valid == nil && header?.generation == seeded.generation(at: file), "\(slice.testDescription): \(file) is rotten behind a valid header")
+            case .forged9As10, .forged9As11, .forged10As9, .forged10As11, .forged11As9, .forged11As10:
+                // A copy of the source generation, the right size, a header that parses and names another generation,
+                // and nothing else changed: only the trailer fails.
+                let source = IndexSpace.encoded(seeded.forgery?.source ?? 0)
+                let header = IndexHeader.parse(bytes ?? [])
+                try #require(bytes != nil && valid == nil && header?.generation == seeded.forgery?.named, "\(slice.testDescription): \(file) names \(String(describing: seeded.forgery?.named))")
+                try #require(bytes?.count == source.count && bytes?[IndexHeader.length...] == source[IndexHeader.length...], "\(slice.testDescription): \(file) is the source generation behind its header")
+                try #require(header?.launchEpoch == seeded.forgery?.source && header?.bodyLength == IndexHeader.parse(source)?.bodyLength, "\(slice.testDescription): only the generation field differs")
             }
         }
         if slice.temporary == .newerUnsynced {
