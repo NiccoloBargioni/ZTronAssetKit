@@ -93,7 +93,8 @@ package struct StoreEnvironment: Sendable {
 package struct OpenReport: Sendable, Hashable {
     /// The launch epoch: the generation allocated at open; prefixes every attempt token (ADR-013).
     package var launchEpoch: UInt64
-    /// The committed generation after launch reconciliation.
+    /// The committed generation after launch reconciliation; 0 when the launch could not order the names it read and
+    /// its launch commit failed.
     package var generation: UInt64
     /// No valid index, or a newer schema: orphan and DOOMED deletion suspended (R-STO-4).
     package var degraded: Bool
