@@ -102,9 +102,13 @@ public struct TransferID: Hashable, Comparable, Sendable, Codable, CustomStringC
 
 /// Which start of a transfer a staging file or OS task belongs to (ADR-013, transport-2 T2-06).
 ///
-/// `epoch` is the store's launch epoch (the index generation allocated at `open()`, persisted and strictly
-/// increasing across launches); `sequence` counts starts within the process. Ordering by `(epoch, sequence)` is
-/// therefore meaningful across relaunches, and two starts can never share a name.
+/// `epoch` is the store's launch epoch: the index generation its launch commit carries, persisted. It is unique only
+/// across launches whose launch commit succeeded over a readable index (ADR-013 as amended by ADR-050): a read-only
+/// launch (an index file could not be read) may take the previous launch's epoch, a later launch may take an epoch
+/// again after a power loss that followed a launch whose root barrier and launch commit both failed, and a wiped root
+/// starts again at 1. `sequence` counts starts within the process. Ordering by `(epoch, sequence)` is therefore
+/// meaningful across those launches only: an equal epoch alone never identifies "this launch", and staging's
+/// exclusive renames report a name collision as `nameInUse`.
 public struct TransferAttempt: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
     /// The launch epoch of the process that started the attempt.
     public let epoch: UInt64

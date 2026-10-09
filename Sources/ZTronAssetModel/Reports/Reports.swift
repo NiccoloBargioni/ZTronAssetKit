@@ -87,7 +87,13 @@ public struct StorageReport: Sendable, Hashable, Codable {
     public var stagingBytes: Int64
     /// Unreferenced blob bytes awaiting orphan GC.
     public var orphanBytes: Int64
-    /// Apple tier: bytes the OS still holds in packs whose content was adopted (H-7, transport-2 T2-13).
+    /// Bytes the OS still holds on the device in the remote source's copies of content (H-7, transport-2 T2-13), from
+    /// `RemoteSource.sourceCopyBytes()`: 0 for HTTP; for the Apple tier, the installed bytes of media packs holding
+    /// adopted content (released or not), of packs released in this process (one that came back stays installed until
+    /// a reclaim in a later catalog generation releases it), and of packs whose planned removal has not yet succeeded;
+    /// a removed pack adds nothing (ADR-027 as amended by ADR-050, E-11). The source learns its adopted packs from
+    /// `reclaimSourceCopies` and keeps them in memory, so a fresh source reports 0 until its first reclaim; the engine
+    /// is to reclaim before its first `storageReport()` (ARCHITECTURE §11, R-CLN-9).
     public var sourceCopyBytes: Int64
     /// The resolved budget in bytes.
     public var budgetBytes: Int64

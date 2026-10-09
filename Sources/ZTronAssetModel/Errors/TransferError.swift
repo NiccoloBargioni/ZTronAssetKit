@@ -58,9 +58,19 @@ public enum TransientCause: Sendable, Hashable {
     case serverError(httpStatus: Int)
     /// 429 (feeds the origin throttle).
     case throttled
-    /// A resume was refused (416, or the validator no longer matches): restart without resume, no backoff.
+    /// A resumed request could not be continued: a 416, a 206 without `Content-Range` or whose range does not start at
+    /// the earlier partial's size, an earlier partial that vanished, or −1002 (ADR-050; D-3, D-4). Only a request
+    /// that resumed gets it (a 206 or 416 to a fresh request is `rejected(.unexpectedStatus)`), so the immediate fresh
+    /// attempt cannot loop. A changed validator is not a refusal: the 200 that answers it restarts the partial from
+    /// zero. In the background only a task created from resume data for checksummed content reads these signals so
+    /// (D-19.1, D-19.2). The engine's action: discard the partial and sidecar, then a fresh attempt without backoff
+    /// (ARCHITECTURE §7.6).
     case resumeRejected
-    /// The background session is unusable (−995/−996/−997): fall back to the foreground session.
+    /// The background session is unusable (−995/−996/−997): the coordinator disables background for the process, and
+    /// the engine's action is a retry in the foreground (ARCHITECTURE §7.6). The HTTP source never surfaces it for a
+    /// transfer the background cannot take (no size, a negative one, or one past the cap): `startIfAdmitted` declines
+    /// it and it runs in the foreground. Only a direct `BackgroundTransferCoordinator.start` of such a job, which no
+    /// production caller makes, answers it, with `NSURLErrorUnknown` (ADR-050, D-15).
     case backgroundSessionUnavailable(urlErrorCode: Int)
     /// A local file error other than ENOSPC while staging.
     case localIO(posixCode: Int32)

@@ -96,7 +96,11 @@ package struct OpenReport: Sendable, Hashable {
     /// The committed generation after launch reconciliation; 0 when the launch could not order the names it read and
     /// its launch commit failed.
     package var generation: UInt64
-    /// No valid index, or a newer schema: orphan and DOOMED deletion suspended (R-STO-4).
+    /// The launch is degraded (R-STO-4; ADR draft B-6, B-34): an index file existed but no generation is valid,
+    /// `index.bin` is invalid, an index file was written by a newer schema, the chosen generation was saved degraded,
+    /// `blobs/` holds blobs although no generation is valid, or an index file's stat or read failed with an error
+    /// (B-34: that lifetime is also read-only, every write throws `storageUnavailable(.ioFailure)`). While degraded
+    /// the reaper deletes nothing at all, orphans and DOOMED keys included: the doom set itself is untrusted.
     package var degraded: Bool
     /// Present records whose blob vanished (R-CLN-7); non-zero resets the stamp.
     package var missingBlobs: Int

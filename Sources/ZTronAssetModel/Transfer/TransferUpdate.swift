@@ -31,7 +31,13 @@ public enum TransferUpdate: Sendable, Hashable {
     case progress(received: Int64, expected: Int64?)
     /// Terminal: complete bytes in the staging file.
     case staged(StagedFile)
-    /// Terminal, after `pause()`: `resumable` when a partial plus a validator were kept.
+    /// Terminal, after `pause()`: `resumable` when the source kept something the next attempt of the same content can
+    /// continue, which only checksummed content ever has (transport-1 TR1-3). Foreground HTTP: the partial holds bytes
+    /// from a 200 or 206 that carried a strong `ETag` or a `Last-Modified`, and a resume sidecar with that validator
+    /// was written (best effort; a missing sidecar only costs the resume; ADR-050, D-5). Background HTTP: the OS
+    /// returned resume data, kept in memory only (never in staging), at most `maxTasks` entries with the oldest
+    /// dropped, and handed once to the next start of that content (ADR-019 as amended by ADR-050, D-14.2); a
+    /// relaunch loses it. The Apple tier never keeps anything (`false`).
     case paused(resumable: Bool)
     /// Terminal: the closed failure taxonomy (R-NET-6).
     case failed(TransferError)
@@ -49,7 +55,9 @@ public enum TransferUpdate: Sendable, Hashable {
 public enum TransferControl: Sendable, Hashable {
     /// Change the lane (R-NET-10): takes effect immediately, the transfer is not restarted.
     case setPriority(AssetPriority)
-    /// Stop, keeping the partial and its sidecar → terminal `.paused(resumable:)`.
+    /// Stop, keeping what a later attempt of the same content can continue, if anything (foreground HTTP: the partial
+    /// and its sidecar; background HTTP: the OS's resume data, in memory; see `TransferUpdate.paused(resumable:)`)
+    /// → terminal `.paused(resumable:)`.
     case pause
     /// Stop, discarding the partial → terminal `.failed(.cancelled(.byClient))`.
     case cancel
@@ -70,7 +78,8 @@ public protocol TransferHandle: Sendable {
     var updates: AsyncStream<TransferUpdate> { get }
     /// Changes the lane in place (R-NET-10).
     func setPriority(_ priority: AssetPriority)
-    /// Stops, keeping a resumable partial (preemption, policy pause).
+    /// Stops, keeping what a later attempt can continue, if anything (`TransferUpdate.paused(resumable:)`; preemption,
+    /// policy pause).
     func pause()
     /// Stops and discards the partial.
     func cancel()

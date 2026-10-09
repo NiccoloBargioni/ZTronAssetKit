@@ -3,10 +3,15 @@ import ZTronAssetModel
 
 /// Orders snapshots across store instances (ADR-016, store-2 S2-02).
 ///
-/// `epoch` is the store's launch epoch (the generation allocated at `open()`, persisted and strictly increasing
-/// across instances), `version` counts publications within an instance. A mirror installs a snapshot only if its
-/// key is greater, and the store counts an acknowledgement only for its own epoch, so a reopened store can never
-/// mistake an ignored install for one that happened.
+/// `epoch` is the store's launch epoch (the generation its launch commit carries, persisted), `version` counts
+/// publications within an instance. The epoch comes from the index files alone and is not strictly increasing across
+/// instances: a read-only launch may repeat the previous one, and a replacement store on a wiped root starts again at
+/// 1 (ADR-013 as amended by ADR-050). A mirror installs a snapshot only if its key is greater, and the store counts an
+/// acknowledgement only when the sink swapped in exactly the snapshot it offered, of its own epoch (`retired != nil`
+/// and `installed == offered`), so a reopened store can never mistake an ignored install, or another store's snapshot
+/// of an equal epoch, for one that happened. After a `rootVanished` reopen the facade resets the mirror before the
+/// replacement store's first install (ADR-016's B-17 amendment); otherwise readers keep the old store's snapshot until
+/// the new store's key passes it, which never happens when its epoch is smaller.
 package struct SnapshotKey: Hashable, Comparable, Sendable {
     /// The publishing store instance's launch epoch.
     package let epoch: UInt64
@@ -86,9 +91,10 @@ package struct AssetSnapshot: Sendable {
 
 /// The store's acknowledgement protocol with the main-actor mirror (H-2, I-3, ADR-016).
 ///
-/// `install` returns only after the mirror swapped its snapshot (or decided to keep a newer one). The store
-/// treats the returned `installed` key as the acknowledgement: a blob becomes deletable only once an acknowledged
-/// snapshot **of its own epoch** without it exists (store-2 S2-02). The returned access stamps feed LRU (R-CLN-4)
+/// `install` returns only after the mirror swapped its snapshot (or decided to keep a newer one). The store counts
+/// the reply as an acknowledgement only when it reports exactly the snapshot offered and `retired` is set (ADR-016's
+/// B-17 amendment): a blob becomes deletable only once an acknowledged snapshot **of its own epoch** without it
+/// exists (store-2 S2-02). The returned access stamps feed LRU (R-CLN-4)
 /// without timers or polling (P-14).
 package protocol SnapshotSink: Sendable {
     /// Installs `snapshot` if its key is newer than the current one and acknowledges what is installed now.
