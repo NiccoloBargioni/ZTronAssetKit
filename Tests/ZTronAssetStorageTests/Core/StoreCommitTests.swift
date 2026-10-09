@@ -158,7 +158,7 @@ struct StoreCommitTests {
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest(entries), etag: nil, eviction: nil)
         }
-        await harness.time.waitForSleepers(atLeast: 1)
+        try await harness.time.requireSleepers(atLeast: 1)
         #expect(await harness.store.metrics().commits == 1)
         harness.time.advance(by: 0.25)
         _ = try await applying.value
@@ -178,7 +178,7 @@ struct StoreCommitTests {
         let flushing = Task {
             try await harness.store.markSyncDue()
         }
-        await harness.time.waitForSleepers(atLeast: 1)
+        try await harness.time.requireSleepers(atLeast: 1)
         #expect(await harness.store.metrics().commits == commitsBefore + 1)
         harness.time.advance(by: 0.25)
         try await flushing.value

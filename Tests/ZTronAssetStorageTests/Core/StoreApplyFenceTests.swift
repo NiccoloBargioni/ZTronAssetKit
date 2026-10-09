@@ -44,13 +44,13 @@ struct StoreApplyFenceTests {
         let synced = Task {
             try await harness.store.markSyncDue()
         }
-        await harness.time.waitForSleepers(atLeast: 1)
+        try await harness.time.requireSleepers(atLeast: 1)
         // apply's plan unit is held, then released; its first chunk is written once `etag` changed.
         await bulk.setHolding(true)
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest(new, etagSeed: "2"), etag: etagTwo, eviction: nil)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         await bulk.setHolding(false)
         try await CorePoll.until("apply's first chunk (ETag two)") {
             await harness.state.core.etag == etagTwo
@@ -88,12 +88,12 @@ struct StoreApplyFenceTests {
         let synced = Task {
             try await harness.store.markSyncDue()
         }
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await metadata.requireHeldUnits(atLeast: 1)
         await bulk.setHolding(true)
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest(new, etagSeed: "2"), etag: etagTwo, eviction: nil)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         await bulk.setHolding(false)
         try await CorePoll.until("apply's first chunk (ETag two)") {
             await harness.state.core.etag == etagTwo
@@ -197,7 +197,7 @@ struct StoreApplyFenceTests {
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest([changedA, b, c, d]), etag: nil, eviction: nil)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)  // the plan unit
+        try await bulk.requireHeldUnits(atLeast: 1)  // the plan unit
         // Meanwhile c's bytes are purged (never re-adopted) and a is evicted (its key doomed `unreferenced`).
         await harness.store.setResidency(.absent(.purged), of: c.identifier, dooming: .purged)
         await harness.store.setResidency(.absent(.evicted), of: a.identifier, dooming: .unreferenced)

@@ -49,7 +49,7 @@ struct StoreSweepTests {
         let applyA = Task {
             try await harness.store.apply(CoreFixture.manifest([a]), etag: nil, eviction: nil)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)  // A's plan unit
+        try await bulk.requireHeldUnits(atLeast: 1)  // A's plan unit
         let submitted = await bulk.submittedUnits.count
         let applyB = Task {
             try await harness.store.apply(CoreFixture.manifest([b]), etag: nil, eviction: nil)
@@ -68,7 +68,7 @@ struct StoreSweepTests {
         let applyC = Task {
             try await harness.store.apply(CoreFixture.manifest([a]), etag: nil, eviction: nil)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         let applyD = Task {
             try await harness.store.apply(CoreFixture.manifest([b]), etag: nil, eviction: nil)
         }
@@ -120,8 +120,8 @@ struct StoreSweepTests {
         let publishing = Task {
             try await changing.store.publish(staged, binding: [png.identifier, jpg.identifier], expecting: png.contentIdentity, urgency: .bulk)
         }
-        await StoreRaceTests.step(bulk)  // the hash
-        await bulk.waitForHeldUnits(atLeast: 1)  // the first copy unit
+        try await StoreRaceTests.step(bulk)  // the hash
+        try await bulk.requireHeldUnits(atLeast: 1)  // the first copy unit
         let source = changing.layout.blobURL(pngKey)
         try changing.fileSystem.write(CoreFixture.bytes(261), to: source, mode: .truncate)
         await bulk.setHolding(false)
@@ -171,8 +171,8 @@ struct StoreSweepTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [png.identifier, jpg.identifier], expecting: png.contentIdentity, urgency: .bulk)
         }
-        await StoreRaceTests.step(bulk)  // the hash
-        await bulk.waitForHeldUnits(atLeast: 1)  // the first copy unit
+        try await StoreRaceTests.step(bulk)  // the hash
+        try await bulk.requireHeldUnits(atLeast: 1)  // the first copy unit
         let closing = Task {
             await harness.store.close()
         }

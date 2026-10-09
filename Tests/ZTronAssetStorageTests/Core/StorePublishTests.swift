@@ -57,7 +57,7 @@ struct StorePublishTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         // A late producer appends to the name it knows: it creates a new partial, never the claimed bytes.
         let sink = try await harness.store.makeStagingSink()
         _ = try sink.appendPartial(Data("late bytes".utf8), to: staged.name)
@@ -106,7 +106,7 @@ struct StorePublishTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         publishing.cancel()
         await bulk.setHolding(false)
         await #expect(throws: StoreError.cancelled) {
@@ -139,7 +139,7 @@ struct StorePublishTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
         }
-        await bulk.waitForHeldUnits(atLeast: 1)
+        try await bulk.requireHeldUnits(atLeast: 1)
         #expect(harness.exists(verifying) && !harness.exists(part), "the claim renamed .part to .verifying")
         let tail = Data([1, 2, 3])
         try harness.fileSystem.write(tail, to: part, mode: .append)

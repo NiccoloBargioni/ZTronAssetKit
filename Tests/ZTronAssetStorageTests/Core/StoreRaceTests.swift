@@ -9,10 +9,10 @@ import ZTronAssetTestSupport
 /// `SteppedBlockingExecutor` or `GatedSnapshotSink` (H-5).
 @Suite("Core: review interleavings (H-2, H-5)")
 struct StoreRaceTests {
-    /// Waits for a held unit and releases the oldest one.
+    /// Waits for a held unit and releases the oldest one; throws once the test is cancelled (its time limit).
     @available(macOS 15.0, *)
-    static func step(_ executor: SteppedBlockingExecutor) async {
-        await executor.waitForHeldUnits(atLeast: 1)
+    static func step(_ executor: SteppedBlockingExecutor) async throws {
+        try await executor.requireHeldUnits(atLeast: 1)
         await executor.releaseNext()
     }
 
@@ -38,23 +38,23 @@ struct StoreRaceTests {
         }
         // The first publication: claim, two hash units, the png placement, the two jpg copy units; its jpg
         // placement is then held.
-        await StoreRaceTests.step(metadata)
-        await StoreRaceTests.step(bulk)
-        await StoreRaceTests.step(bulk)
-        await StoreRaceTests.step(metadata)
-        await StoreRaceTests.step(bulk)
-        await StoreRaceTests.step(bulk)
-        await metadata.waitForHeldUnits(atLeast: 1)
+        try await StoreRaceTests.step(metadata)
+        try await StoreRaceTests.step(bulk)
+        try await StoreRaceTests.step(bulk)
+        try await StoreRaceTests.step(metadata)
+        try await StoreRaceTests.step(bulk)
+        try await StoreRaceTests.step(bulk)
+        try await metadata.requireHeldUnits(atLeast: 1)
         let firstPlacement = await metadata.heldUnits[0]
         let publishSecond = Task {
             try await harness.store.publish(second, binding: [c.identifier, d.identifier], expecting: c.contentIdentity, urgency: .bulk)
         }
         // The second publication: claim, two hash units, the png placement (a dedupe onto the first's blob).
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         await metadata.release(await metadata.heldUnits[1])
-        await StoreRaceTests.step(bulk)
-        await StoreRaceTests.step(bulk)
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await StoreRaceTests.step(bulk)
+        try await StoreRaceTests.step(bulk)
+        try await metadata.requireHeldUnits(atLeast: 2)
         await metadata.release(await metadata.heldUnits[1])
         // The second binder of the jpg key reaches it while the first still places its copy.
         await metadata.release(firstPlacement)
@@ -141,17 +141,17 @@ struct StoreRaceTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [y.identifier], expecting: y.contentIdentity, urgency: .bulk)
         }
-        await StoreRaceTests.step(metadata)  // the claim
-        await metadata.waitForHeldUnits(atLeast: 1)  // the dedupe placement holds a provisional reference
+        try await StoreRaceTests.step(metadata)  // the claim
+        try await metadata.requireHeldUnits(atLeast: 1)  // the dedupe placement holds a provisional reference
         let placement = await metadata.heldUnits[0]
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)  // apply's commit, queued behind the placement
+        try await metadata.requireHeldUnits(atLeast: 2)  // apply's commit, queued behind the placement
         await metadata.release(await metadata.heldUnits[1])
         _ = try await applying.value
         await metadata.release(placement)  // the sidecar removal fails: the provisional reference is dropped
-        await StoreRaceTests.step(metadata)  // the claimed file is discarded before the error is thrown (B-26)
+        try await StoreRaceTests.step(metadata)  // the claimed file is discarded before the error is thrown (B-26)
         await #expect(throws: StoreError.fileSystem(.io)) {
             try await publishing.value
         }
@@ -187,9 +187,9 @@ struct StoreRaceTests {
         let publishing = Task {
             try await harness.store.publish(staged, binding: [x.identifier], expecting: x.contentIdentity, urgency: .bulk)
         }
-        await StoreRaceTests.step(metadata)  // the claim
-        await StoreRaceTests.step(metadata)  // the placement
-        await metadata.waitForHeldUnits(atLeast: 1)  // the commit a checksum-less publication waits for (S1-05)
+        try await StoreRaceTests.step(metadata)  // the claim
+        try await StoreRaceTests.step(metadata)  // the placement
+        try await metadata.requireHeldUnits(atLeast: 1)  // the commit a checksum-less publication waits for (S1-05)
         let applying = Task {
             try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
         }
@@ -266,14 +266,14 @@ struct StoreRaceTests {
         let publication = Task {
             try await harness.store.publish(staged, binding: [a.identifier], expecting: a.contentIdentity, urgency: .bulk)
         }
-        await StoreRaceTests.step(metadata)  // the claim
-        await metadata.waitForHeldUnits(atLeast: 1)  // the placement
+        try await StoreRaceTests.step(metadata)  // the claim
+        try await metadata.requireHeldUnits(atLeast: 1)  // the placement
         #expect(await harness.state.core.blobTable[key] == .live(references: 1))
         // `y` adopts the live key and readers get a snapshot listing it.
         let adopt = Task {
             try await harness.store.apply(CoreFixture.manifest([a, y]), etag: nil, eviction: nil)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         await metadata.release(await metadata.heldUnits[1])
         #expect(try await adopt.value.reused == [y.identifier])
         #expect(await harness.sink.installed.location(for: y.identifier, extensions: []) != nil)
@@ -281,7 +281,7 @@ struct StoreRaceTests {
         let prune = Task {
             try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(901))]), etag: nil, eviction: nil)
         }
-        await metadata.waitForHeldUnits(atLeast: 2)
+        try await metadata.requireHeldUnits(atLeast: 2)
         await metadata.release(await metadata.heldUnits[1])
         _ = try await prune.value
         #expect(await harness.sink.installed.location(for: y.identifier, extensions: []) == nil)

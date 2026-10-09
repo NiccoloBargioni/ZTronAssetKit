@@ -430,7 +430,7 @@ struct StoreCrashTests {
         let applying = Task {
             try await harness.store.apply(FirstSync.manifest, etag: nil, eviction: nil)
         }
-        await harness.time.waitForSleepers(atLeast: 1)
+        try await harness.time.requireSleepers(atLeast: 1)
         harness.time.advance(by: 0.25)
         _ = try await applying.value
         for (index, asset) in assets.enumerated() {
