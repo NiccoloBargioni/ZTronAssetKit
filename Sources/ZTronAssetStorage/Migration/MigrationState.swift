@@ -1,3 +1,4 @@
+import Foundation
 import ZTronAssetModel
 
 /// Where legacy migration stands (ADR-029). Persisted by WP-B's index codec as STAMPS `legacyState`
@@ -24,4 +25,21 @@ struct MigrationState: Sendable {
     var legacyStamp: String?
     /// Phase-2 progress so far.
     var progress = LegacyMigrationProgress(adopted: 0, remaining: 0, dropped: 0, finished: false)
+
+    // MARK: WP-C bookkeeping, in memory (rebuilt by phase 1 at every launch)
+
+    /// The legacy root this lifetime resolved; `nil` until phase 1 ran (migration disabled, or a read-only lifetime).
+    var root: URL?
+    /// Files still to adopt, in path order.
+    var queue: [LegacyFile] = []
+    /// Files a batch or an adopt-on-demand took from `queue` and is processing (REENTRANCY R11, R18).
+    var claimed: [LegacyFile] = []
+    /// Every entry of the legacy manifest, in manifest order: phase 3 migrates the stamp only when each one is present
+    /// at its current content.
+    var legacyIDs: [AssetID] = []
+    /// A legacy manifest was found and decoded; without one nothing counts as fully adopted.
+    var manifestDecoded = false
+    /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
+    /// moved files that no committed record expects).
+    var planCommitted = false
 }
