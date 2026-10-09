@@ -46,7 +46,7 @@ struct TestSupportBasicFakesTests {
     }
 
     @Test("Test support: FakeDeviceConditionsSource delivers each sent state to every live observation", .timeLimit(.minutes(1)))
-    func conditionsReachEveryObserver() async {
+    func conditionsReachEveryObserver() async throws {
         let source = FakeDeviceConditionsSource()
         let offline = DeviceConditions(
             network: NetworkConditions(satisfied: false, expensive: false, constrained: false),
@@ -64,23 +64,25 @@ struct TestSupportBasicFakesTests {
                 return seen
             }
         }
-        await source.waitForObservers(equalTo: 2)
+        // The throwing form: observers that never registered would never end, so a cancelled wait ends the test here.
+        try await source.requireObservers(equalTo: 2)
         await source.send(offline)
         for observer in observers {
             #expect(await observer.value == [.unrestricted, offline])
         }
-        await source.waitForObservers(equalTo: 0)
+        try await source.requireObservers(equalTo: 0)
     }
 
     @Test("Test support: ScriptedSnapshotSink.waitForInstalls resumes once enough installs were offered", .timeLimit(.minutes(1)))
     func snapshotSinkInstallCensus() async {
         let sink = ScriptedSnapshotSink()
-        let waiting = Task { await sink.waitForInstalls(atLeast: 2) }
+        // A child task, not an unstructured one: the test's cancellation (its time limit) reaches the wait.
+        async let waiting: Void = sink.waitForInstalls(atLeast: 2)
         let first = AssetSnapshot(key: SnapshotKey(epoch: 1, version: 1), indexGeneration: 1, entries: [:])
         let second = AssetSnapshot(key: SnapshotKey(epoch: 1, version: 2), indexGeneration: 2, entries: [:])
         _ = await sink.install(first)
         _ = await sink.install(second)
-        await waiting.value
+        await waiting
         #expect(await sink.offeredKeys == [first.key, second.key])
         await sink.waitForInstalls(atLeast: 1)
         #expect(await sink.installed.key == second.key)
