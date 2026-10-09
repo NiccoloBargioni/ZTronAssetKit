@@ -156,8 +156,9 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
 
     func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async {
         let task = self.session.downloadTask(with: request)
-        // Labelled like the live driver: a task continuing resume data says so in its tag (it outlives the process).
-        BackgroundTaskTag(name: name, expectedBytes: expectedBytes, createdFromResumeData: resumeData != nil).label(task, priority: priority)
+        // Labelled by the live driver's own call: a task continuing resume data says so in its tag (it outlives the
+        // process), so the relaunch tests pin the mapping the device runs.
+        BackgroundTaskTag.forStart(name: name, expectedBytes: expectedBytes, resumeData: resumeData).label(task, priority: priority)
         self.tasks[task.taskIdentifier] = task
         self.starts.append(Start(
             url: request.url,

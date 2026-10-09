@@ -95,7 +95,7 @@ public protocol BackgroundSessionDriver: Sendable {
     /// Creates and resumes a download task tagged with `name`: a new download of `request` when `resumeData` is `nil`,
     /// else the continuation of a paused download from that resume data (`downloadTask(withResumeData:)`, which
     /// carries its own archived request). The coordinator decides which; the driver only creates the task and labels
-    /// it with `BackgroundTaskTag(name:expectedBytes:createdFromResumeData: resumeData != nil)`.
+    /// it with `BackgroundTaskTag.forStart(name:expectedBytes:resumeData:)`, the mapping both drivers share.
     func startDownload(_ request: URLRequest, name: StagingFileName, priority: Float, expectedBytes: Int64?, resumeData: ResumeData?) async
     /// Cancels a task; returns the resume data when `producingResumeData` (the coordinator decides what to keep).
     func cancel(taskIdentifier: Int, producingResumeData: Bool) async -> ResumeData?
