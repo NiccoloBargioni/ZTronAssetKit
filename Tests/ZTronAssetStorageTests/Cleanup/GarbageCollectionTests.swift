@@ -561,4 +561,59 @@ struct GarbageCollectionTests {
         #expect(violations.isEmpty, "I-2: \(violations)")
         #expect(await harness.isPresent(gone.id, at: gone.key) == harness.hasBlob(gone.key))
     }
+
+    /// C2 (review of the L3 close-out: one turn dooming 10,000 swept orphans held the actor 9.7 ms, 107 ms at
+    /// `maxEntries`): the sweep dooms in chunks of `CleanupState.chunk` keys and releases the actor in between, and every
+    /// later chunk is decided again, the reap window included (REENTRANCY R10 amendment).
+    @Test(
+        "R-CLN-2: orphan GC dooms in chunks with the actor released in between, and a chunk after the reap window opened dooms nothing",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func sweepChunksReleaseActor() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        let planted = try (0..<3).map { try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(490 + UInt64($0), count: 100)) }.sorted()
+        harness.time.advance(by: 3_601)
+        await harness.store.testSetCleanupChunk(1)
+        let listings = 1 + Set(planted.map(\.hash.fanOut)).count
+        let mark = harness.fileSystem.operations.count
+        await metadata.setHolding(true)
+        let run = Task {
+            try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        }
+        // Every listing unit runs; the first metadata unit after them is the release between the first two chunks.
+        try await CorePoll.until("the listing completed") {
+            if harness.fileSystem.operations.dropFirst(mark).filter({ $0.kind == .contentsOfDirectory }).count == listings {
+                return true
+            }
+            if let next = await metadata.heldUnits.first {
+                await metadata.release(next)
+            }
+            return false
+        }
+        try await CorePoll.until("the sweep released the actor, or dooming every orphan in one turn") {
+            let doomedLast = await harness.state.core.blobTable[planted[2]] != nil
+            return !(await metadata.heldUnits.isEmpty) || doomedLast
+        }
+        let held = Set(await metadata.heldUnits)
+        let table = await harness.state.core.blobTable
+        #expect(!held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil && table[planted[2]] == nil, "one chunk doomed, then the actor is free")
+        // Meanwhile the deletion grace passes and an install is acknowledged: the first chunk's doom is reaped, and a key
+        // the store learnt since the run began could have been too, so no later chunk dooms anything.
+        _ = try await CleanupSteps.run(metadata, keeping: held) {
+            await harness.settleDeletions()
+        }
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        let result = try await run.value
+        #expect(result == CleanupResult(bytesFreed: 100, filesRemoved: 1, bytesDeferred: 0))
+        #expect(!harness.hasBlob(planted[0]) && harness.hasBlob(planted[1]) && harness.hasBlob(planted[2]))
+        #expect(await harness.store.storageReport().orphanBytes == 200, "the rest are still orphans")
+        let again = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        #expect(again == CleanupResult(bytesFreed: 200, filesRemoved: 2, bytesDeferred: 0), "the next run collects them")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
 }
