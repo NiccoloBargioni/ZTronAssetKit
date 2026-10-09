@@ -3,60 +3,75 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Owner decisions in force
-- **Standalone package.** Nothing outside this repository is ever written. `../ZTronCarouselCore` and `../ZTronCarousel` are read-only prior art. PROMPT.md Stage 4 (adoption in ZTronCarouselCore) is cancelled; R-CAR-6 shims live in `Tests/ZTronAssetCompatibilityTests` (ADR-006, ADR-033).
+- **Standalone package.** Nothing outside this repository is ever written, except the device containers of the iOS simulators agents test on (owner-accepted 2026-10-09). `../ZTronCarouselCore` and `../ZTronCarousel` are read-only prior art. PROMPT.md Stage 4 is cancelled; R-CAR-6 shims live in `Tests/ZTronAssetCompatibilityTests` (ADR-006, ADR-033).
 - **iOS 15.0 minimum** (macOS 12 test floor). Never raise it.
-- **Work proceeds level by level; the owner decides each level's scope.** Level 2 ran at full specification. **Level 3's scope is not decided yet** — ask the owner (see "Trim candidates").
+- **Every test target builds and passes on the iOS Simulator** as well as on macOS (owner, 2026-10-09; convention in `docs/adr-drafts/ios.md`). Agents use their own simulators, never the owner's booted iPhone 17.
+- **Level 3 runs at full specification** (WP-C). **Weekly-usage stop:** stop launching agents at the owner's threshold (last set: 55 %), re-estimate, rewrite this file, ask the owner whether to continue now or after the weekly reset.
 - The harness is frozen (`git tag harness-frozen`; `Scripts/` never changes; `quality-gates.json` sha256 `2725907c…026f`).
 
-## Where things stand
+## Where things stand (2026-10-09 evening; weekly usage 55 %, resets Thu 15 Oct 04:00 CEST)
 | Item | State |
 |---|---|
-| Branch | `feature/asset-kit` (never `main`, never push) |
-| Tags | `harness-frozen`, `contracts` (Stage 1), `l1-merged` (WP-H, WP-A), **`l2-merged`** (WP-B storage core, WP-D transport, WP-E Apple tier, follow-ups; ADR-050) |
-| Worktrees | none (all Level 2 worktrees and `wp/*` branches removed) |
-| Live run | **Level 3 (WP-C, full spec)** `wf_7bbebd31-575` launched 2026-10-09 in session `7fbcfa21…` with `usageStop: 55` (owner: stop at 55 % of the weekly limit, re-estimate, rewrite this file, ask whether to continue now or after the reset). Base tag `l3-base` = `l2-merged` + the owner-requested iOS Simulator test build (`docs/adr-drafts/ios.md`; 669/669 tests pass on an iOS 27 simulator). Worktree `.worktrees/c` on `wp/c`. The owner's original uncommitted edits are kept in `git stash` ("owner iOS 26 availability edits…"), identical to commit b9f2752 |
-| Old runs | `wf_262e4b03-7f6` (paused Level 2 run of an earlier session, old prompts): **never resume it** |
-| Gates at `l2-merged` | `--quick` PASS; release + iOS builds green; whole-package TSan 0 reports; unsafe 0; docs 1281/1281; coverage Storage 95.4 %, Transport 99.1 %, AppleHosted 99.8 %, Model 99.3 %, overall 93.5 % (Kit and Sync fail only as WP-F/G stubs); trace: 13 MUSTs without a test (R-CAR-1 → G; R-CLN-2/3/4/12 → C; R-CLN-6/8 → C, F; R-SYN-4/6/7/12/13/14 → F) and 8 budgets (P-1/8/12 → G; P-4/7/14 → F; P-9 → F, G; P-11 → F) |
-| Benchmarks | P-2, P-3, P-5, P-6, P-10 pass with wide margins; **P-13 fails** (unit max 9–12 ms vs 5 ms, one kernel-stalled `unlink` per overrun) — proposal awaiting the owner (ADR-050) |
+| Branch | `feature/asset-kit` (never `main`, never push); clean |
+| Tags | `harness-frozen`, `contracts`, `l1-merged`, `l2-merged`, **`l3-base`** (`l2-merged` + the iOS Simulator test build + doc follow-ups) |
+| Worktrees | **`.worktrees/c` on `wp/c`**: WP-C implemented, 72 commits on `l3-base`, clean |
+| Level 3 progress | Main run `wf_7bbebd31-575` done (author → 3 verification rounds → 2 fix rounds; blocking 8 → 5 → 5). Close-out `wf_23e43bcf-739`: cycle 1 fixed all 5 and applied rulings R1–R5 (its verification: 2 blocking / 11); **cycle 2 fixed both blockers and the clear non-blocking items but is NOT yet independently verified** — the run stopped at the usage gate before `verify:2` (55 %) |
+| Findings files | `.build-orchestrator/l3-remaining-c.json` (round 3), `.build-orchestrator/l3-close1-verify-c.json` (close-out cycle 1 — what cycle 2 fixed) |
+| Rulings | In `.claude/workflows/assetkit-stage2-l3-close.js` (`RULINGS`) and recorded in `docs/adr-drafts/c.md`: R1 CCR-2 (orphan GC vs `apply` adoption; merge-gating), R2 CCR-1 (`doomOrphans` primitive in `StoreInternals.swift`), R3 OI-1 (`apply` never re-adopts `absent(.evicted)`), R4 C2 ≤ 10 ms at 10,000 records, R5 deviations C-6/C-12/C-13/C-14/C-15 accepted, to be tagged NEEDS-HUMAN-REVIEW in ADR-051 |
+| Owner stash | `git stash` "owner iOS 26 availability edits…" = the owner's original edits, identical to commit `b9f2752`; the owner may drop it |
+| Gates at `l3-base` | `--quick` PASS (macOS); 669/669 tests on an iOS 27 simulator; release + iOS builds green; unsafe 0; docs 1281/1281 |
+| Gates on `wp/c` (fixer-reported for cycle 2, not yet independently verified) | `--quick` PASS (Storage 416 tests); release + iOS green; Storage coverage ~97 %; simulator `TEST SUCCEEDED`; C2 longest actor hold ≤ 2.2 ms at 10,000 records; trace: 7 MUSTs left (R-CAR-1 → G; R-SYN-4/6/7/12/13/14 → F) |
 
-## Run the next level
-1. Pre-flight: `git status` clean on `feature/asset-kit`; usage headroom; Mac kept awake (the app's keep-awake setting plus `caffeinate -ims -t 172800` in the background; stop it when the level ends). Create the worktree(s): `git worktree add .worktrees/<wp> -b wp/<wp> l2-merged`.
-2. Launch: `Workflow({scriptPath: ".claude/workflows/assetkit-stage2-level.js", args: {level: "L3", base: "l2-merged", wps: ["c"]}})`. Per WP: author → two independent verifiers (each with its own scratch path) → up to two fix rounds. WP instructions, ADR-050's assignments and the Level 2 lessons are inside the script.
-3. **Close-out (expect it):** every level so far ended its three rounds with blocking findings. Write the remaining findings to `.build-orchestrator/<level>-remaining-<wp>.json`, make the rulings, and run fix → two-lens verification cycles until 0 blocking (Level 2 needed five cycles for WP-B). Templates: this repository's session folder `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/7fbcfa21-90df-4f76-8c7c-0ced89fa87b5/workflows/scripts/assetkit-stage2-l2-close*.js`. When one bug class repeats, demand an exhaustive enumeration (as B-33 did) instead of another probe.
-4. Merge `--no-ff`; `verify.sh --quick`, `--gates-only` (rewrites `docs/TRACEABILITY.md`; commit it), release build, iOS `xcodebuild` with `-derivedDataPath .build/xcode`, then on an idle machine `--perf`, whole-package TSan and the coverage export.
-5. Documentation: rulings file → three-step docs workflow (ledger readers per draft, one writer, independent verifier) → ADR-0nn, ARCHITECTURE amendments, REENTRANCY rows (draft identifiers become final), §11 assignments; then a close pass for the ADR's "Open" items. Tag `l<n>-merged`, remove worktrees, delete `wp/*` branches.
-6. Report to the owner: what was built, gate lines, measured cost, open items; ask for the next level's scope.
+## Resume Level 3 (remaining steps)
+1. Pre-flight: `git status` clean; usage headroom; keep-awake (`caffeinate -ims -t 172800` in the background; stop it at the end).
+2. **Verify cycle 2, then fix/verify until 0 blocking**, from any session: `Workflow({scriptPath: ".claude/workflows/assetkit-stage2-l3-close.js", args: {usageStop: <threshold>, fromCycle: 2, maxCycle: 4, verifyFirst: true, previousIssues: <JSON contents of .build-orchestrator/l3-close1-verify-c.json>}})`. It verifies the committed cycle-2 fixes with both lenses (reproducing the cycle-1 issues), then runs fix → verify cycles 3–4 if needed, with the usage gate before every agent.
+3. Also fix **OI-8** in the next fix cycle: WP-A's `R-MAN-3: the table estimate bounds the storage of a dictionary from AssetID to Int reserved for any count` failed twice on the iOS Simulator in cycle 1 (process-wide heap measurement: measured 544 vs estimated 128 at count 1) and passed in cycle 2's run — make it deterministic on the simulator without weakening it (an orchestrator-authorised edit to WP-A's test).
+4. Merge `wp/c` `--no-ff`; `verify.sh --quick`, `--gates-only` (commit `docs/TRACEABILITY.md`), release + iOS builds, an iOS Simulator run, and on an idle machine `--perf`, whole-package TSan and the coverage export.
+5. Documentation: rulings file → ledger reader for `docs/adr-drafts/c.md` → one writer → independent verifier (ADR-051; ARCHITECTURE amendments incl. OI-6: §1.1, §4.6, §4.7, §10.1 rows c-n, §11 R-CLN-8 naming, §12.2 S2-06, §14 `LiveLegacyDefaults` figure; the new `BenchCleanup.swift` in §1.2; NEEDS-HUMAN-REVIEW for the R-STO-11 deviations) → close pass for ADR-051's open items. Templates: the Level 2 finish scripts in session `7fbcfa21…` (`~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/7fbcfa21-90df-4f76-8c7c-0ced89fa87b5/workflows/scripts/assetkit-stage2-l2-finish-*.js`, `…-l2-close-pass-*.js`).
+6. Tag `l3-merged`, remove the worktree, delete `wp/c`, report.
 
-## Later levels (same script, change `args`)
-L3 `["c"]` on `l2-merged` · L4 `["f"]` · L5 `["g"]` then `["k"]` · then WP-I docs, Stage 3 hardening, Stage 5 final `verify.sh --full` (PROMPT.md §4, ARCHITECTURE §1.2). `docs/VERIFICATION.md` is written at Stage 5 from the drafts' "Not verified" sections (ADR-050 lists them).
+## Usage estimate to finish Level 3 (re-estimated at 55 %)
+Calibration: the plan meter moved ~0.075 points per API-equivalent dollar in Level 2 and in Level 3 (main run $104 ≈ 8 points).
+
+| Remaining step | API-equivalent | Weekly points |
+|---|---|---|
+| Verify cycle 2 (two lenses) | $15–20 | ~1.3 |
+| 1–2 more fix/verify cycles (+ OI-8) | $30–60 | 2.3–4.5 |
+| Merge, gates, idle benchmarks/TSan/simulator (orchestrator) | ~$5 | ~0.4 |
+| Docs: ledger, writer, verifier, close pass (one draft) | $30–45 | 2.3–3.4 |
+| Orchestrator session | ~$10 | ~0.8 |
+| **Total** | **$90–140** | **~7–10 → Level 3 ends at ~62–65 %** |
+
+Spent on Level 3 so far: the iOS Simulator test build $18, the main run $104, close-out cycles 1–2 ~$55 — 15 weekly points with orchestration (40 % → 55 %). Blocking findings went 8 → 5 → 5 → 2 → (unverified); Level 2's WP-B needed five close-out cycles, so one or two more is the likely range, with three as the bad case (~+2 points).
+
+## Later levels (same scripts, change `args`)
+L4 `["f"]` (sync engine, the largest package; expect ~$250–350, ~20–26 points) on `l3-merged` · L5 `["g"]` then `["k"]` · WP-I docs, Stage 3 hardening, Stage 5 final `verify.sh --full`.
 
 ## Cost — measured, Opus 5.5 API-equivalent
-Summed from the agents' transcript usage (`subagents/workflows/<run>/agent-*.jsonl`, max usage per message), priced at $4 / $20 / $0.20 (cache read) / $5 (cache write) per MTok; script: `python3 cost.py <run dirs>` (re-create from this description if needed).
+Summed from the agents' transcript usage (`subagents/workflows/<run>/agent-*.jsonl`, max usage per message) at $4 / $20 / $0.20 (cache read) / $5 (cache write) per MTok.
 
 | Step | Cost |
 |---|---|
-| Stage 1 (designs, reviews, contracts) | ~$180 |
-| Level 1 (H, A, incl. close-out) | ~$190 |
-| **Level 2 (B, D, E, full spec)** | **~$419** — main run $170 (27 agents, ~4 h); close-out cycles 1–5 $157 (31 agents, ~7.6 h); follow-up + documentation $62 (13 agents); close pass $18 (4 agents); orchestrator session $12 |
+| Stage 1 | ~$180 |
+| Level 1 (H, A) | ~$190 |
+| Level 2 (B, D, E) | ~$419 (31 weekly points) |
+| Level 3 so far (iOS tests + C) | ~$177 (15 weekly points incl. orchestration) |
 
-Cache reads are 62–71 % of each run, cache writes 24–30 %, output 4–10 %. Measured on the plan: Level 2 moved the weekly all-models limit from 9 % to 40 % (31 points for ~$419), so a full week holds roughly $1,300 of this workload — the earlier $380–400 estimate was too low. 60 % of the week remained at Level 2's end (reset Thu 15 Oct 2026, 04:00 CEST). Close-out cost nearly as much as the main run: budget ~1× the main run for it.
-
-## Token-saving rules already in the script
-Logs go to files and only summary lines are read; large documents are read by section; nothing is re-read unchanged; independent commands are batched. These lower cost without lowering any check.
+A full week holds roughly $1,300 of this workload.
 
 ## Trim candidates (owner decides per level)
-Background URLSession (R-NET-3) · legacy migration (R-STO-11 — droppable if the CDN build never shipped; it is the largest part of WP-C) · R-INT-4 deep verification · R-CLN-11 cache purging · crash enumeration beyond single-lifetime scenarios · benchmarks P-7 and P-9 · mutation probes (Q-8) · one verifier instead of two. Cutting a MUST or a budget means marking it deferred in `SPEC.md` with a `DECISIONS.md` entry; never edit `Scripts/`.
+Background URLSession (R-NET-3) · R-INT-4 deep verification · R-CLN-11 cache purging · crash enumeration beyond single-lifetime scenarios · benchmarks P-7 and P-9 · mutation probes (Q-8) · one verifier instead of two · the simulator run in every verifier (keep it in the author and one verifier). Cutting a MUST or a budget means marking it deferred in `SPEC.md` with a `DECISIONS.md` entry; never edit `Scripts/`.
 
 ## Open questions for the owner
-1. **P-13** (ADR-050 · NEEDS-HUMAN-REVIEW): a single APFS `unlink` occasionally stalls ~10 ms, so the per-batch maximum cannot fit 5 ms. Option A (recommended): read the bound as p99 (measured ≈ 1 ms), as P-1/P-9 do. Option B: keep the maximum and raise `batch_ms_max` to 15 ms. Either is the owner's edit of SPEC §6 or `quality-gates.json`; until then `--perf` fails on P-13 only.
-2. **NEEDS-HUMAN-REVIEW items of ADR-050:** B-3 the v1 `index.bin` byte layout; D-10 an explicit `shutdown()` cancels in-flight background downloads; the public `BackgroundSessionDriver.startDownload(…resumeData:)` change; D-19.2 the background task tag format the OS persists in `taskDescription`.
-3. Has the CDN version of the app shipped to users? (Decides legacy migration, the bulk of WP-C.)
-4. Are Apple-hosted asset packs planned soon? (WP-E is built; decides how much device verification to plan.)
-5. Outside-repository leftovers from agents (the owner may delete them; agents may not): ~760 `CFNetworkDownload_*.tmp` (~794 MiB), `ResultBundle_*.xcresult` (incl. two `ResultBundle_2026-09-10_*` from Level 2) and Swift macro-expansion dumps in the per-user temp folder; `~/Library/Developer/Xcode/DerivedData/{l2fu-*,ZTronAssetKit-*}`.
+1. **Continue Level 3 now, or after the weekly reset?** (asked 2026-10-09 at 55 %.)
+2. **P-13** (ADR-050 · NEEDS-HUMAN-REVIEW): Option A (recommended) p99 per batch; Option B raise `batch_ms_max` to 15 ms.
+3. **NEEDS-HUMAN-REVIEW items of ADR-050:** B-3 index layout; D-10 `shutdown()` cancels background downloads; public `startDownload(…resumeData:)`; D-19.2 task-tag format. Coming in ADR-051: WP-C's R-STO-11 deviations (C-12 checksum-less legacy files without a local checksum are re-downloaded, C-13 an undecodable legacy manifest adopts nothing, C-14 a legacy root on another volume is dropped, C-15 phase 4 keeps unattributable files and a non-empty root).
+4. Outside-repository leftovers (owner may delete; agents may not): `CFNetworkDownload_*.tmp`, `ResultBundle_*.xcresult` and macro-expansion dumps in the per-user temp folder; `~/Library/Developer/Xcode/DerivedData/{l2fu-*,ZTronAssetKit-*}`.
 
-## Lessons from Levels 0–2
-- Always pass `-derivedDataPath` to `xcodebuild`, and never run `xcodebuild -list` (it writes result bundles to the per-user temp folder even with the flag); never run an unscoped `pkill`; agents stall when the Mac sleeps.
-- One scratch path per agent, verifiers included; never the session scratchpad (Level 2: a deleted coverage profile and a replaced mutant script).
-- Correctness verifiers find new bugs of one class one probe at a time; after the second, demand an exhaustive enumeration of the state space.
-- Benchmarks and TSan only on an otherwise idle machine; three parallel worktrees made storage benchmarks fail by 10–20×.
-- Failing test committed on its own before the fix; test-support waits must end on cancellation (use the `require…` forms), or a regression hangs the run instead of failing it.
+## Lessons from Levels 0–3
+- Always pass `-derivedDataPath` to `xcodebuild`; never `xcodebuild -list`; never an unscoped `pkill`; keep the Mac awake (`caffeinate`; agents' simulator runs use `caffeinate -i`).
+- One scratch path and one simulator per agent; never the session scratchpad.
+- When a bug class repeats, demand an exhaustive enumeration (B-33 for WP-B; WP-C's legacy phase-1 state space).
+- Benchmarks and TSan only on an idle machine.
+- Failing test committed on its own before the fix; TestSupport waits must end on cancellation (`require…` forms).
+- Usage stop: a haiku probe before each agent (`mcp__ccd_session_mgmt__get_usage` is reachable from subagents); in-flight agents finish, so expect up to ~1 point of overshoot.
