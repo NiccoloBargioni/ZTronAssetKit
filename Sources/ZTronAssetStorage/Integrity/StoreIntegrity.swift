@@ -38,6 +38,7 @@ extension AssetStore {
     package func verifyIntegrity(byteBudget: Int64, until deadline: MonotonicInstant) async throws(StoreError)
         -> VerificationReport
     {
+        // REENTRANCY: R1, R16, c-3 (proposed) — `performVerifyIntegrity` re-validates each blob after its hash.
         try await self.performVerifyIntegrity(byteBudget: byteBudget, until: deadline)
     }
 
@@ -75,6 +76,7 @@ extension AssetStore {
                 self.setResidency(.failed(.integrity), of: id, dooming: .unreferenced)
             }
         }
+        // REENTRANCY: R17 — nothing but the phase: the bookkeeping was written synchronously above.
         try await self.persistBookkeeping(changed: changed, droppedBlobs: dropped)
     }
 
@@ -100,6 +102,7 @@ extension AssetStore {
             self.setResidency(.failed(reason), of: id, dooming: .unreferenced)
             changed = true
         }
+        // REENTRANCY: R17 — nothing but the phase: the failures were written synchronously above.
         try await self.persistBookkeeping(changed: changed, droppedBlobs: dropped)
     }
 }

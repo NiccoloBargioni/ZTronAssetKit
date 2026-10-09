@@ -60,6 +60,7 @@ extension AssetStore {
     /// second run within the grace window evicts nothing more, store-2 S2-06); leased blobs are never selected, so
     /// `bytesDeferred` is 0. Throws when the committing generation fails (the evictions stay in memory, dirty, R5).
     package func evictIfNeeded() async throws(StoreError) -> CleanupResult {
+        // REENTRANCY: R1, R13, R8, R17 — `performEvictIfNeeded` re-validates every candidate after each await.
         try await self.performEvictIfNeeded()
     }
 

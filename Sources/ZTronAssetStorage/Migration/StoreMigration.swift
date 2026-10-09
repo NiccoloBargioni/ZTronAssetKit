@@ -35,6 +35,7 @@ extension AssetStore {
     /// bytes do not verify, that vanished or that no record wants any more counts as dropped. Phase 3 never overrides a
     /// newer stamp the engine wrote meanwhile.
     package func migrateLegacy(maxFiles: Int) async throws(StoreError) -> LegacyMigrationProgress {
+        // REENTRANCY: R1, R11, R17, c-4 (proposed) — `performMigrateLegacy` re-validates every file after each await.
         try await self.performMigrateLegacy(maxFiles: maxFiles)
     }
 
@@ -44,6 +45,7 @@ extension AssetStore {
     /// Returns the asset's current location when it is present (adopted or not), `nil` when it is neither present nor a
     /// legacy file still to adopt, or when its file did not verify.
     package func adoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
+        // REENTRANCY: R1, R18 — `performAdoptLegacyNow` re-validates the file and reads the location from the record.
         try await self.performAdoptLegacyNow(id)
     }
 }

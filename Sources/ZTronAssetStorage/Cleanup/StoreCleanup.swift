@@ -13,6 +13,7 @@ extension AssetStore {
     /// claims every transfer it still works on, those with a publication in flight included. Removals run in units of
     /// `deletionBatchSize`; a cancelled caller stops between units with `.cancelled` (removed files stay removed).
     package func collectStaging(keeping claimed: Set<TransferID>) async throws(StoreError) -> CleanupResult {
+        // REENTRANCY: R1, R14, c-1 (proposed) — `performCollectStaging` re-checks the phase after each of its units.
         try await self.performCollectStaging(keeping: claimed)
     }
 
@@ -24,6 +25,8 @@ extension AssetStore {
     /// blobs whose `mtime` is older than `orphanGrace`. A listing the deadline interrupts sweeps nothing; the sweep stops
     /// at the deadline between units. Also suspended while the root is unavailable (B-15).
     package func collectGarbage(until deadline: MonotonicInstant) async throws(StoreError) -> CleanupResult {
+        // REENTRANCY: R1, R10, c-1 (proposed) — `performCollectGarbage` decides only after its full listing and
+        // re-checks the sweep set before each removal unit.
         try await self.performCollectGarbage(until: deadline)
     }
 
@@ -37,6 +40,8 @@ extension AssetStore {
     /// leased; bytes a sink that does not acknowledge holds back are in neither and are reaped later by `runDueWork()`.
     /// A cancelled caller gets `.cancelled` from the grace wait; the purge itself is already committed.
     package func purge(_ request: PurgeRequest) async throws(StoreError) -> PurgeResult {
+        // REENTRANCY: R1, R17, R9 — `performPurge` mutates synchronously, then awaits the install, the commit and the
+        // grace, recomputing the deletable state after each.
         try await self.performPurge(request)
     }
 
@@ -48,6 +53,7 @@ extension AssetStore {
     /// `stagingBytes` and the free space are read in one unit each. `sourceCopyBytes` is 0 here: the engine adds the
     /// remote source's copies (ADR-027). Before `open()` (or after a failed read) the I/O figures are 0.
     package func storageReport() async -> StorageReport {
+        // REENTRANCY: R1, R13, c-2 (proposed) — the report is read from the state after its units.
         await self.performStorageReport()
     }
 }
