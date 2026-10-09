@@ -21,8 +21,14 @@ final class LoopbackRawClient: Sendable {
     private let connection: NWConnection
     private let buffer = LoopbackRawClientBuffer()
 
-    init(port: UInt16) {
-        self.connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
+    /// A client of the server on 127.0.0.1.
+    convenience init(port: UInt16) {
+        self.init(host: "127.0.0.1", port: port)
+    }
+
+    /// A client of `port` on `host`: the server's tests also probe another local address, which must not reach it.
+    init(host: NWEndpoint.Host, port: UInt16) {
+        self.connection = NWConnection(host: host, port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
     }
 
     /// Connects; throws when the connection fails or has to wait for a path.

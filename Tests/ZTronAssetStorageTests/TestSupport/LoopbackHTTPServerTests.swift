@@ -493,6 +493,41 @@ struct TestSupportLoopbackHTTPServerTests {
         await #expect(throws: LoopbackServerError.stopped) { try await never.start() }
     }
 
+    /// The configuration that keeps the server loopback-only, pinned: bound to 127.0.0.1 on the loopback interface,
+    /// and without `acceptLocalOnly`, which the iOS Simulator enforces by resetting 127.0.0.1 connections (ios.md item 3).
+    @Test("Test support: the listener is bound to 127.0.0.1 on the loopback interface and does not set acceptLocalOnly")
+    func listenerIsLoopbackOnly() {
+        let parameters = LoopbackHTTPServer.listenerParameters()
+        #expect(parameters.requiredLocalEndpoint == NWEndpoint.hostPort(host: "127.0.0.1", port: .any))
+        #expect(parameters.requiredInterfaceType == .loopback)
+        #expect(parameters.acceptLocalOnly == false)
+    }
+
+    /// The bound address in behaviour: the same port on another local address (`::1`) has nothing listening, so the
+    /// kernel refuses the connection, while 127.0.0.1 is served. A listener on every address would accept both.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("Test support: a connection to the server's port on ::1 is refused and never reaches the server", .timeLimit(.minutes(1)))
+    func otherLocalAddressIsRefused() async throws {
+        try await Self.withServer({ _ in LoopbackResponse(status: 204) }) { server, port in
+            let stranger = LoopbackRawClient(host: "::1", port: port)
+            let error = await #expect(throws: LoopbackRawClient.ClientError.self) {
+                try await stranger.open()
+            }
+            stranger.close()
+            if case .notReady(let reason) = error {
+                #expect(reason.contains("Connection refused"), "\(reason)")
+            } else {
+                Issue.record("expected a refused connection, got \(String(describing: error))")
+            }
+            #expect(await server.acceptedConnections == 0)
+            let client = try await Self.connect(port)
+            try await client.get("/")
+            #expect(try await client.response().status == 204)
+            client.close()
+            #expect(await server.acceptedConnections == 1, "only the 127.0.0.1 client reached the server")
+        }
+    }
+
     /// Inflates an RFC 1952 member: checks the header, the CRC-32 and the size trailer.
     static func gunzip(_ framed: Data) throws -> Data {
         let bytes = [UInt8](framed)
