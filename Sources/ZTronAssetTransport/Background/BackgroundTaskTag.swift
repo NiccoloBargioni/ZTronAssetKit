@@ -41,7 +41,8 @@ package struct BackgroundTaskTag: Sendable, Hashable {
     /// The tag of a task a driver is about to start: a continuation exactly when the coordinator handed it resume
     /// data (the driver decides nothing, it records what it was given). The only place this mapping is written:
     /// `LiveBackgroundSessionDriver` and the tests' fake driver both call it, so the tests run the line the device
-    /// runs and the coverage-excluded live file keeps no expression of its own (ARCHITECTURE §14).
+    /// runs and the coverage-excluded live file keeps no expression of its own for the tag; only its choice of
+    /// `downloadTask` overload stays device-only (ARCHITECTURE §14).
     package static func forStart(name: StagingFileName, expectedBytes: Int64?, resumeData: ResumeData?) -> BackgroundTaskTag {
         BackgroundTaskTag(name: name, expectedBytes: expectedBytes, createdFromResumeData: resumeData != nil)
     }
