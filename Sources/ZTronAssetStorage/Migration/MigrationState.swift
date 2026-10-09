@@ -30,7 +30,8 @@ struct MigrationState: Sendable {
 
     /// The legacy root this lifetime resolved; `nil` until phase 1 ran (migration disabled, or a read-only lifetime).
     var root: URL?
-    /// Files still to adopt, in path order.
+    /// Files still to adopt, in **reverse** path order: the next one is the last, so a batch takes it and a call that
+    /// did not finish puts it back in O(1) (C2: a migration of `maxEntries` files stays linear).
     var queue: [LegacyFile] = []
     /// Files a batch or an adopt-on-demand took from `queue` and is processing (REENTRANCY R11, R18).
     var claimed: [LegacyFile] = []

@@ -36,6 +36,11 @@ extension AssetStore {
         }
         // REENTRANCY: R17 — as above; the stamp is cleared in this very generation.
         try await self.requireCommitted(.ordered)
+        if !selection.isEmpty {
+            // C-4: the purge is committed, so the reaper frees its bytes even when the caller leaves during the grace
+            // wait (`.cancelled`); it is stamped now, and again when the wait ends.
+            self.stampCleanup()
+        }
         // REENTRANCY: R9 — `awaitReclaim` recomputes the deletable state of the selection from scratch after each await.
         let (freed, deferred) = try await self.awaitReclaim(reclaim)
         if !selection.isEmpty {

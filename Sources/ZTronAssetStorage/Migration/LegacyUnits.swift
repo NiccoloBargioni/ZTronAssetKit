@@ -11,6 +11,16 @@ enum LegacyRead: Sendable, Hashable {
     case unusable
 }
 
+/// What a non-following listing of the legacy tree found, as paths relative to its root (S2-10).
+struct LegacyTree: Sendable, Hashable {
+    /// Regular files.
+    var files: Set<[String]> = []
+    /// Directories below the root (never one reached through a symbolic link).
+    var directories: Set<[String]> = []
+    /// Symbolic links (never followed) and other items that are neither files nor directories.
+    var links: Set<[String]> = []
+}
+
 /// The blocking units of legacy migration (ADR-003): stats, ≤ 1 MiB reads, one listing per directory, bounded
 /// removals, the `UserDefaults` stamp.
 extension AssetStore {
@@ -77,20 +87,21 @@ extension AssetStore {
         return .bytes(data)
     }
 
-    /// Every regular file below `root`, as path components relative to it, from a **non-following** listing (one unit
-    /// per directory, S2-10): a symbolic link is neither descended into nor listed, so no planned path passes through
-    /// one. At most `maxDepth` directory levels and `limits.maxEntries` directories are visited.
-    func listLegacyTree(_ root: URL, maxDepth: Int = 64) async -> Set<[String]> {
+    /// Every item below `root`, as path components relative to it, from a **non-following** listing (one unit per
+    /// directory, S2-10): a symbolic link is neither descended into nor followed, so no planned path passes through one.
+    /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited.
+    func listLegacyTree(_ root: URL, maxDepth: Int = 64) async -> LegacyTree {
         let fileSystem = self.environment.fileSystem
         let maxDirectories = max(1, self.configuration.limits.maxEntries)
-        var files: Set<[String]> = []
+        var tree = LegacyTree()
         var directories: [[String]] = [[]]
         var next = 0
         while next < directories.count, next < maxDirectories {
             let relative = directories[next]
             next += 1
             let url = relative.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
-            // REENTRANCY: R1, R11 — nothing: the listing only accumulates; the plan is computed once it is complete.
+            // REENTRANCY: R1, R11, c-4 (proposed) — nothing: the listing only accumulates; the plan is computed once it
+            // is complete.
             let listing = await self.runUnit(on: self.environment.metadataExecutor) {
                 CleanupUnits.list(url, fileSystem: fileSystem)
             }
@@ -98,17 +109,21 @@ extension AssetStore {
                 continue
             }
             for item in items {
+                let path = relative + [item.name]
                 switch item.kind {
-                case .directory where relative.count < maxDepth:
-                    directories.append(relative + [item.name])
+                case .directory:
+                    tree.directories.insert(path)
+                    if relative.count < maxDepth {
+                        directories.append(path)
+                    }
                 case .file:
-                    files.insert(relative + [item.name])
-                case .directory, .symbolicLink, .other:
-                    break
+                    tree.files.insert(path)
+                case .symbolicLink, .other:
+                    tree.links.insert(path)
                 }
             }
         }
-        return files
+        return tree
     }
 
     /// The prior art's stamp (`UserDefaults`), read in a unit.
@@ -134,10 +149,14 @@ extension AssetStore {
         }
     }
 
-    /// Phase 4's tree removal: lists the tree without following links, removes every file and link (never a link's
-    /// target), then the directories deepest first, then the root. Anything but a directory at the root (a symbolic link
-    /// that replaced it) is removed itself and never listed, since a listing follows a final link (R-SEC-2). A root
-    /// that cannot be stat-ed is left for the next call. Returns whether the root is gone.
+    /// Phase 4's removal (ADR draft C-15, review round 2): only what the prior art wrote, never a recursive removal,
+    /// since its root may be a directory the app shares (its docs suggest a `Documents`-rooted one). Anything but a
+    /// directory at the root (a symbolic link that replaced it) is removed itself and never listed, since a listing
+    /// follows a final link (R-SEC-2); a root that cannot be stat-ed is left for the next call. Otherwise, from a
+    /// non-following listing: each legacy entry's file and `local-checksums.json`, then the directories on the entries'
+    /// paths deepest first (one still holding anything else stays), then `manifest.json` (last, so a call that stopped
+    /// part way can still attribute the files next time), then the root if it is empty. Returns whether everything the
+    /// prior art wrote is gone.
     func removeLegacyTree(_ root: URL) async throws(StoreError) -> Bool {
         // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root's kind, never following a final link.
         let kind = await self.legacyItemKind(root)
@@ -154,35 +173,58 @@ extension AssetStore {
             // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
             return await self.legacyItemKind(root) == .success(nil)
         }
-        let fileSystem = self.environment.fileSystem
-        var directories: [URL] = [root]
-        var leaves: [URL] = []
-        var next = 0
-        while next < directories.count {
-            let directory = directories[next]
-            next += 1
-            // REENTRANCY: c-4 (proposed) — nothing: after the durable "done" commit the tree is the migration's alone.
-            let listing = await self.runUnit(on: self.environment.metadataExecutor) {
-                CleanupUnits.list(directory, fileSystem: fileSystem)
-            }
-            try self.checkLive()
-            guard case .success(let items) = listing else {
-                continue
-            }
-            for item in items.sorted(by: { $0.name < $1.name }) {
-                let url = directory.appendingPathComponent(item.name, isDirectory: item.kind == .directory)
-                if item.kind == .directory {
-                    directories.append(url)
-                } else {
-                    leaves.append(url)
-                }
-            }
+        let manifestURL = root.appendingPathComponent(LegacyRemoval.manifestName, isDirectory: false)
+        // REENTRANCY: c-4 (proposed) — nothing: after the durable "done" commit the tree is the migration's alone.
+        let manifest = await self.readLegacyFile(manifestURL, limit: self.configuration.limits.maxPayloadBytes)
+        // REENTRANCY: c-4 (proposed) — as above.
+        let tree = await self.listLegacyTree(root)
+        try self.checkLive()
+        let limits = self.configuration.limits
+        // REENTRANCY: c-4 (proposed) — the phase; the removal set is computed off the actor (C2).
+        let removal = await self.runUnit(on: self.environment.bulkExecutor) {
+            LegacyRemoval.plan(manifest: manifest, tree: tree, limits: limits)
+        }
+        try self.checkLive()
+        let url = { (path: [String]) in
+            path.dropLast().reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+                .appendingPathComponent(path.last ?? "", isDirectory: false)
         }
         // REENTRANCY: c-1 (proposed) — see `removeInUnits`.
-        try await self.removeAllInUnits(leaves.map { (url: $0, bytes: 0) })
-        // REENTRANCY: c-1 (proposed) — as above, deepest directories first.
-        try await self.removeAllInUnits(directories.reversed().map { (url: $0, bytes: 0) })
-        // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
-        return await self.legacyItemKind(root) == .success(nil)
+        let leaves = try await self.removeInUnits(removal.leaves.map { (url: url($0), bytes: 0) })
+        if leaves.cancelled {
+            throw .cancelled
+        }
+        guard leaves.removed.count == removal.leaves.count else {
+            return false
+        }
+        // REENTRANCY: c-1 (proposed) — as above; a directory that still holds anything fails with ENOTEMPTY and stays.
+        try await self.removeAllInUnits(removal.directories.map { (url: url($0), bytes: 0) })
+        if removal.removesManifest {
+            // REENTRANCY: c-1 (proposed) — as above.
+            let removed = try await self.removeInUnits([(url: manifestURL, bytes: 0)])
+            if removed.cancelled {
+                throw .cancelled
+            }
+            guard removed.removed.count == 1 else {
+                return false
+            }
+        }
+        // REENTRANCY: c-1 (proposed) — as above; a root that still holds anything stays.
+        try await self.removeAllInUnits([(url: root, bytes: 0)])
+        return true
+    }
+
+    /// Whether a relaunch in phase `done` still has phase-4 work: the root holds one of the prior art's metadata files
+    /// (`manifest.json` goes last), or nothing at all (a removal that stopped before the root), or cannot be listed.
+    func legacyRemovalPending(_ root: URL) async -> Bool {
+        let fileSystem = self.environment.fileSystem
+        // REENTRANCY: R1 — nothing: a snapshot of the root's names.
+        let listing = await self.runUnit(on: self.environment.metadataExecutor) {
+            CleanupUnits.list(root, fileSystem: fileSystem)
+        }
+        guard case .success(let items) = listing else {
+            return true
+        }
+        return items.isEmpty || items.contains { $0.kind != .directory && LegacyRemoval.metadataNames.contains($0.name) }
     }
 }

@@ -115,7 +115,7 @@ struct LegacyEdgeTests {
         let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
         let harness = CoreHarness.cleanup(disk: try LegacyFixture.disk(files), legacy: CleanupFixture.legacyPolicy, defaults: defaults, bulk: bulk)
         _ = try await harness.store.open()
-        let first = try #require(await harness.state.migration.queue.first)
+        let first = try #require(await harness.state.migration.queue.last, "the next file is the queue's last")
         let id = try #require(first.ids.first)
         await bulk.setHolding(true)
         let batch = Task {

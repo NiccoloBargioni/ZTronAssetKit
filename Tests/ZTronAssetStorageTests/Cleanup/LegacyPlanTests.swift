@@ -65,9 +65,13 @@ struct LegacyPlanTests {
             LegacyFile(components: ["d", "b.png"], ids: ["localOnly"], digest: c2, byteSize: 10),
             LegacyFile(components: ["s", "g.png"], ids: ["sharedFirst", "sharedSame"], digest: c3, byteSize: 10),
         ])
-        // noChecksum, missingFile, staleLocal (the prior art recorded other bytes than the manifest names), badLocal,
-        // sharedOther (another digest for a path already planned) and traversal.
-        #expect(plan.dropped == 6)
+        // noChecksum, staleLocal (the prior art recorded other bytes than the manifest names), badLocal, sharedOther
+        // (another digest for a path already planned) and traversal.
+        #expect(plan.dropped == 5)
+        // missingFile is not in the tree: dropped unless an earlier lifetime adopted it, which phase 1 decides.
+        #expect(plan.unlisted == [LegacyUnlisted(id: "missingFile", digest: c1)])
         #expect(plan.legacyIDs == entries.map(\.identifier))
+        // Phase 4 may remove these and nothing else but the two metadata files (never a traversal).
+        #expect(plan.paths == files.union([["d", "missing.png"]]))
     }
 }

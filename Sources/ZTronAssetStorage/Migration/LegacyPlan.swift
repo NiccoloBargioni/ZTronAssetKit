@@ -13,14 +13,28 @@ struct LegacyFile: Sendable, Hashable {
     var byteSize: Int64?
 }
 
+/// A legacy entry whose file the listing did not find: dropped, unless an earlier lifetime already adopted it (moved
+/// it into `blobs/`), which phase 1 decides from the records.
+struct LegacyUnlisted: Sendable, Hashable {
+    /// The entry.
+    var id: AssetID
+    /// The digest its bytes had to have; `nil` when the entry could never have been adopted (no usable checksum).
+    var digest: ContentHash?
+}
+
 /// The phase-1 plan (store.md §7).
 struct LegacyPlan: Sendable, Hashable {
     /// The files to adopt, in path order.
     var files: [LegacyFile]
-    /// Entries dropped while planning.
+    /// Entries dropped while planning (an invalid path, a stale or missing checksum, another digest for a shared file).
     var dropped: Int
+    /// Entries with a valid path whose file is not in the tree (moved by an earlier lifetime, or gone).
+    var unlisted: [LegacyUnlisted]
     /// Every entry of the legacy manifest, in manifest order.
     var legacyIDs: [AssetID]
+    /// The path of every legacy entry with a valid one: what phase 4 may remove besides the prior art's two metadata
+    /// files (never anything else in the root, ADR draft C-15).
+    var paths: Set<[String]>
 }
 
 /// The legacy planner (pure; store.md §7, R-SEC-2 / D-14 hardening).
@@ -61,34 +75,42 @@ enum LegacyPlanner {
         return ContentHash(hex: value)
     }
 
+    /// The digest the prior art's file of `entry` must have: the manifest checksum, or for a checksum-less entry the
+    /// local checksum; `nil` when the two disagree (the prior art recorded other bytes than the manifest names: the file
+    /// is stale) or neither exists.
+    static func expectedDigest(of entry: ManifestEntry, checksums: [String: String]) -> ContentHash? {
+        let local = LegacyPlanner.localDigest(checksums[entry.identifier.rawValue])
+        guard let checksum = entry.checksum else {
+            return local
+        }
+        return local == nil || local == checksum ? checksum : nil
+    }
+
     /// The plan from the legacy manifest's `entries` (manifest order, duplicates already dropped), the prior art's
     /// `checksums` and the regular `files` a non-following listing found (paths relative to the root).
     ///
-    /// Each entry's file must be listed (so no component is a symbolic link, S2-10). Its expected digest is the manifest
-    /// checksum, or for a checksum-less entry the local checksum; an entry whose local checksum disagrees with its
-    /// manifest checksum is dropped (the prior art recorded other bytes than the manifest names: the file is stale), and
-    /// so is one with neither. Entries naming the same file share it when they expect the same digest; a later one
-    /// expecting another digest is dropped.
+    /// Each entry's file must be listed (so no component is a symbolic link, S2-10); one that is not is reported in
+    /// `unlisted`, not dropped, since an earlier lifetime may have adopted it. Its expected digest is
+    /// `expectedDigest(of:checksums:)`; an entry without one is dropped. Entries naming the same file share it when they
+    /// expect the same digest; a later one expecting another digest is dropped.
     static func plan(entries: [ManifestEntry], checksums: [String: String], files: Set<[String]>) -> LegacyPlan {
         var planned: [LegacyFile] = []
         var byPath: [[String]: Int] = [:]
         var dropped = 0
+        var unlisted: [LegacyUnlisted] = []
+        var paths: Set<[String]> = []
         for entry in entries {
-            guard let path = LegacyPlanner.relativePath(of: entry), files.contains(path) else {
+            guard let path = LegacyPlanner.relativePath(of: entry) else {
                 dropped += 1
                 continue
             }
-            let local = LegacyPlanner.localDigest(checksums[entry.identifier.rawValue])
-            let digest: ContentHash
-            if let checksum = entry.checksum {
-                guard local == nil || local == checksum else {
-                    dropped += 1
-                    continue
-                }
-                digest = checksum
-            } else if let local {
-                digest = local
-            } else {
+            paths.insert(path)
+            let expected = LegacyPlanner.expectedDigest(of: entry, checksums: checksums)
+            guard files.contains(path) else {
+                unlisted.append(LegacyUnlisted(id: entry.identifier, digest: expected))
+                continue
+            }
+            guard let digest = expected else {
                 dropped += 1
                 continue
             }
@@ -104,6 +126,6 @@ enum LegacyPlanner {
             planned.append(LegacyFile(components: path, ids: [entry.identifier], digest: digest, byteSize: entry.byteSize))
         }
         planned.sort { $0.components.lexicographicallyPrecedes($1.components) }
-        return LegacyPlan(files: planned, dropped: dropped, legacyIDs: entries.map(\.identifier))
+        return LegacyPlan(files: planned, dropped: dropped, unlisted: unlisted, legacyIDs: entries.map(\.identifier), paths: paths)
     }
 }

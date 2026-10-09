@@ -28,16 +28,30 @@ extension AssetStore {
             guard case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key) else {
                 continue
             }
+            let url = layout.blobURL(key)
+            // REENTRANCY: R16 — the phase; the incarnation is compared with the one after the hash, below.
+            let before = await self.blobIncarnation(url)
+            try self.checkLive()
             let outcome: (digest: ContentHash, byteCount: Int64)?
             do throws(StoreError) {
-                // REENTRANCY: R16 — below: the blob is still live and referenced, and the store not degraded; otherwise
-                // the result is discarded and the pass moves on; the deadline and the budget are re-read by the loop.
-                outcome = try await self.hashFile(at: layout.blobURL(key))
+                // REENTRANCY: R16 — below: the same incarnation is under the name and no placement of the key is in
+                // flight, the blob is still live and referenced, and the store not degraded; otherwise the result is
+                // discarded; the deadline and the budget are re-read by the loop.
+                outcome = try await self.hashFile(at: url)
             } catch .fileSystem {
                 // A blob that cannot be read is as unusable as a corrupt one (R-CLN-8).
                 outcome = nil
             }
             try self.checkLive()
+            // REENTRANCY: R16 — as above.
+            let after = await self.blobIncarnation(url)
+            try self.checkLive()
+            guard before == after, !self.state.core.publishing.contains(key) else {
+                // The name was replaced while it was hashed (a quarantine or an eviction, then a re-download or a reap
+                // and a new placement, ADR draft B-24) or is being placed now: the digest mixes two files and proves
+                // nothing about either. Neither quarantined nor verified, and not marked done, so the pass checks it again.
+                continue
+            }
             self.state.integrity.verifiedInPass.insert(key)
             guard case .live? = self.state.core.blobTable[key], !self.state.core.degraded,
                 case let holders = (index[key] ?? []).filter({ self.state.core.records[$0]?.referencedBlob == key }),
@@ -66,6 +80,23 @@ extension AssetStore {
         return report
     }
 
+    /// The file under a blob's name, in one metadata unit: its identity and size, missing, or unknown (the stat
+    /// failed). Two equal values around a hash mean the hash read one file (REENTRANCY R16).
+    func blobIncarnation(_ url: URL) async -> BlobIncarnation {
+        let fileSystem = self.environment.fileSystem
+        // REENTRANCY: R16 — nothing: a snapshot the caller compares with another one.
+        return await self.runUnit(on: self.environment.metadataExecutor) { () -> BlobIncarnation in
+            do throws(FileSystemError) {
+                guard let info = try fileSystem.itemInfo(at: url) else {
+                    return .missing
+                }
+                return .file(identity: info.identity, byteSize: info.byteSize)
+            } catch {
+                return .unknown
+            }
+        }
+    }
+
     /// The blobs of the current pass still to verify, in order: live, referenced, not being placed, not verified in this
     /// pass; oldest `verifiedAt` over their records first (never verified first), then by key; with their sizes.
     func blobsToVerify(_ index: [BlobKey: [AssetID]]) -> [(BlobKey, Int64)] {
@@ -83,4 +114,15 @@ extension AssetStore {
         due.sort { ($0.verifiedAt, $0.key) < ($1.verifiedAt, $1.key) }
         return due.map { ($0.key, $0.size) }
     }
+}
+
+/// What is under a blob's name at one moment (deep verification, REENTRANCY R16). A replacement renames another file
+/// over the name, so its identity changes; a write in place keeps it (and is what verification exists to find).
+enum BlobIncarnation: Sendable, Hashable {
+    /// An item with this `(st_dev, st_ino)` (when the volume reports one) and size.
+    case file(identity: FileIdentity?, byteSize: Int64)
+    /// Nothing has the name.
+    case missing
+    /// The stat failed.
+    case unknown
 }

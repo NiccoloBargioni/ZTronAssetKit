@@ -14,6 +14,22 @@ extension AssetStore {
             return false
         }
         try self.checkLive()
+        guard let layout = self.state.core.layout else {
+            return false
+        }
+        // REENTRANCY: R1, R11 — the phase (`checkLive` below); where the two directories lie is a snapshot.
+        let overlaps = await self.legacyRootOverlapsStore(root, layout: layout)
+        try self.checkLive()
+        guard let overlaps else {
+            // The root could not even be stat-ed: decide nothing in this lifetime.
+            return false
+        }
+        if overlaps {
+            // Migrating would move files inside the store's own tree and phase 4 would remove it (review round 2):
+            // nothing is written, the prior art's stamp stays, and the app's configuration decides a later launch.
+            self.environment.log.log(.store, .error, "the legacy root overlaps the store's directory; legacy migration is skipped")
+            return false
+        }
         self.state.migration.root = root
         // REENTRANCY: R1, R11 — the phase (`opening`); the root's kind is a snapshot.
         let kind = await self.legacyItemKind(root)
@@ -25,11 +41,18 @@ extension AssetStore {
         }
         switch self.state.migration.phase {
         case .done:
-            // A crash during phase 4 left the tree or the key: `migrateLegacy` finishes the removal.
+            // A crash during phase 4 left the prior art's files or the key: `migrateLegacy` finishes the removal. A root
+            // holding only files that are not the prior art's stays, and is not pending (ADR draft C-15).
             // REENTRANCY: R1 — the phase.
             let stamp = await self.readLegacyStamp()
             try self.checkLive()
-            return rootKind != nil || stamp != nil
+            guard rootKind == .directory else {
+                return rootKind != nil || stamp != nil
+            }
+            // REENTRANCY: R1 — the phase; the root's names are a snapshot.
+            let pending = await self.legacyRemovalPending(root)
+            try self.checkLive()
+            return pending || stamp != nil
         case .notStarted, .inProgress:
             break
         }
@@ -55,11 +78,11 @@ extension AssetStore {
         // REENTRANCY: R1, R11 — as above.
         let checksumsRead = await self.readLegacyFile(root.appendingPathComponent("local-checksums.json", isDirectory: false), limit: limit)
         // REENTRANCY: R1, R11 — as above.
-        let files = await self.listLegacyTree(root)
+        let tree = await self.listLegacyTree(root)
         let limits = self.configuration.limits
-        // REENTRANCY: R1, R11 — the phase; decoding is pure and runs off the actor (C2).
-        let decoded = await self.runUnit(on: self.environment.bulkExecutor) { () -> (manifest: ValidatedManifest?, undecodable: Bool, checksums: [String: String]) in
-            LegacyDecoding.decode(manifest: manifestRead, checksums: checksumsRead, limits: limits)
+        // REENTRANCY: R1, R11 — the phase; decoding and planning are pure and run off the actor (C2).
+        let decoded = await self.runUnit(on: self.environment.bulkExecutor) {
+            LegacyDecoding.decode(manifest: manifestRead, checksums: checksumsRead, limits: limits, files: tree.files)
         }
         try self.checkLive()
         if starting {
@@ -82,7 +105,7 @@ extension AssetStore {
             // a commit of this lifetime; the launch commit, which every open() makes, normally covers it already.
             self.markDirty(.soon)
         }
-        let plan = LegacyPlanner.plan(entries: decoded.manifest?.entries ?? [], checksums: decoded.checksums, files: files)
+        let plan = decoded.plan
         var queue: [LegacyFile] = []
         var dropped = plan.dropped
         for file in plan.files {
@@ -92,7 +115,10 @@ extension AssetStore {
                 dropped += 1
             }
         }
-        self.state.migration.queue = queue
+        // An entry whose file is no longer in the tree was adopted by an earlier lifetime when its record holds the
+        // bytes it expected (moved into `blobs/`); otherwise it is dropped.
+        dropped += plan.unlisted.filter { !self.legacyAdopted($0) }.count
+        self.state.migration.queue = queue.reversed()
         self.state.migration.claimed = []
         self.state.migration.legacyIDs = plan.legacyIDs
         self.state.migration.manifestDecoded = decoded.manifest != nil
@@ -146,6 +172,14 @@ extension AssetStore {
     /// Whether some record of `file` already holds its bytes (adopted earlier, by launch reconciliation or on demand).
     func legacyAdopted(_ file: LegacyFile) -> Bool {
         file.ids.contains { self.state.core.records[$0]?.referencedBlob?.hash == file.digest }
+    }
+
+    /// Whether the record of an entry whose file is not in the tree holds the bytes the entry expected.
+    func legacyAdopted(_ entry: LegacyUnlisted) -> Bool {
+        guard let digest = entry.digest else {
+            return false
+        }
+        return self.state.core.records[entry.id]?.referencedBlob?.hash == digest
     }
 
     // MARK: Phase 2 (after open())
@@ -236,8 +270,7 @@ extension AssetStore {
         try await self.commitLegacyPlanIfNeeded()
         var budget = max(0, maxFiles)
         var adoptedAny = false
-        while budget > 0, !self.state.migration.queue.isEmpty {
-            let file = self.state.migration.queue.removeFirst()
+        while budget > 0, let file = self.state.migration.queue.popLast() {
             self.state.migration.claimed.append(file)
             let outcome: LegacyOutcome
             do throws(StoreError) {
@@ -276,13 +309,13 @@ extension AssetStore {
         self.state.migration.planCommitted = true
     }
 
-    /// Removes `file` from the claims, back to the head of the queue when its processing did not complete.
+    /// Removes `file` from the claims, back to the head of the queue (its end) when its processing did not complete.
     func unclaimLegacyFile(_ file: LegacyFile, requeue: Bool) {
         if let index = self.state.migration.claimed.firstIndex(of: file) {
             self.state.migration.claimed.remove(at: index)
         }
         if requeue {
-            self.state.migration.queue.insert(file, at: 0)
+            self.state.migration.queue.append(file)
         }
         self.state.migration.progress.remaining = self.state.migration.queue.count + self.state.migration.claimed.count
     }
@@ -368,7 +401,8 @@ extension AssetStore {
             return try await self.performAdoptLegacyNow(id)
         }
         let migration = self.state.migration
-        let queued = migration.queue.firstIndex { $0.ids.contains(id) }
+        // One linear search per call (adopt-on-demand serves a lookup miss); batches take files from the end in O(1).
+        let queued = migration.queue.lastIndex { $0.ids.contains(id) }
         guard let file = queued.map({ migration.queue[$0] }) ?? migration.claimed.first(where: { $0.ids.contains(id) }) else {
             return nil
         }
@@ -400,11 +434,23 @@ extension AssetStore {
     }
 }
 
-/// Decoding the prior art's metadata files (pure; run in a bulk unit).
+/// Decoding the prior art's metadata files and planning (pure; run in a bulk unit, C2).
 enum LegacyDecoding {
+    /// What phase 1 learns from the prior art's files.
+    struct Decoded: Sendable {
+        /// The legacy manifest, when it decoded.
+        var manifest: ValidatedManifest?
+        /// It was present but could not be read whole or decoded.
+        var undecodable: Bool
+        /// The local checksums (an unusable file reads as none).
+        var checksums: [String: String]
+        /// The plan over `files`.
+        var plan: LegacyPlan
+    }
+
     /// The legacy manifest decoded under `limits` with duplicate identifiers keeping the first (store.md §7, RECON
-    /// D-13), whether it was present but undecodable, and the local checksums (an unusable file reads as none).
-    static func decode(manifest: LegacyRead, checksums: LegacyRead, limits: ManifestLimits) -> (manifest: ValidatedManifest?, undecodable: Bool, checksums: [String: String]) {
+    /// D-13), whether it was present but undecodable, the local checksums, and the plan over the listed `files`.
+    static func decode(manifest: LegacyRead, checksums: LegacyRead, limits: ManifestLimits, files: Set<[String]>) -> Decoded {
         var decoded: ValidatedManifest?
         var undecodable = false
         switch manifest {
@@ -423,6 +469,7 @@ enum LegacyDecoding {
         if case .bytes(let data) = checksums {
             table = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
         }
-        return (decoded, undecodable, table)
+        let plan = LegacyPlanner.plan(entries: decoded?.entries ?? [], checksums: table, files: files)
+        return Decoded(manifest: decoded, undecodable: undecodable, checksums: table, plan: plan)
     }
 }
