@@ -125,6 +125,28 @@ struct GarbageCollectionTests {
         #expect(await reopened.isPresent(expected.id, at: adoptable))
     }
 
+    @Test("R-CLN-2: an orphan whose removal keeps failing does not stop orphan GC from collecting the others", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func failingOrphanDoesNotStopSweep() async throws {
+        let harness = CoreHarness.cleanup(deletionBatchSize: 1)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        let planted = try (0..<3).map { try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(450 + UInt64($0), count: 100)) }.sorted()
+        // The first orphan in sweep order cannot be unlinked, ever (EIO).
+        let stuck = harness.layout.blobURL(planted[0]).lastPathComponent
+        harness.fileSystem.addFault(FaultRule(operation: .removeItem, matching: URLMatcher(lastComponentSuffix: stuck), occurrence: .every, error: .io))
+        harness.time.advance(by: 3_601)
+        let result = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        #expect(result == CleanupResult(bytesFreed: 200, filesRemoved: 2, bytesDeferred: 0))
+        #expect(harness.hasBlob(planted[0]) && !harness.hasBlob(planted[1]) && !harness.hasBlob(planted[2]))
+        // The stuck one is still an orphan: the report counts it and the next run tries it again.
+        #expect(await harness.store.storageReport().orphanBytes == 100)
+        let again = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        #expect(again == CleanupResult() && harness.hasBlob(planted[0]))
+        let attempts = harness.fileSystem.operations.filter { $0.kind == .removeItem && $0.url.lastPathComponent == stuck }
+        #expect(attempts.count == 2 && attempts.allSatisfy { $0.failure == .io })
+    }
+
     @Test("R-CLN-2: orphan GC deletes nothing while the store is degraded or before its listing completed", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func orphanGCSuspended() async throws {
@@ -146,60 +168,78 @@ struct GarbageCollectionTests {
     }
 
     /// store-2 S2-01 timeline B: the first of two publications of one key is superseded while the second waits for it;
-    /// at no point may an orphan sweep see the key as unknown.
+    /// at no point may an orphan sweep see the key as unknown. The entries are checksum-less, so no record expects the
+    /// key and only the blob table and `publishing` protect it (REENTRANCY R10); an orphan older than the grace already
+    /// has the name, so a sweep that misses either mark removes it.
     @Test("R-CLN-2: a superseded publication never leaves its key unprotected while another publication of the same key is in flight", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func supersededPublicationKeepsKeyProtected() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.cleanup(metadata: metadata)
         let bytes = CoreFixture.bytes(440)
-        let a = CoreFixture.entry("a", bytes)
-        let b = CoreFixture.entry("b", bytes)
+        let a = CoreFixture.entry("a", bytes, checksum: false)
+        let b = CoreFixture.entry("b", bytes, checksum: false)
         let key = CoreFixture.key(bytes)
+        let deadline = harness.time.monotonicNow().adding(seconds: 3 * 3_600)
         _ = try await harness.store.open()
         _ = try await harness.store.apply(CoreFixture.manifest([a, b]), etag: nil, eviction: nil)
         let stagedA = try await harness.stage(bytes, for: a, sequence: 1)
         let stagedB = try await harness.stage(bytes, for: b, sequence: 2)
-        // The staged bytes are old, so the orphan grace would not protect the key by itself.
+        #expect(try GarbageCollectionTests.plantBlob(harness.fileSystem, bytes) == key)
         harness.time.advance(by: 2 * 3_600)
+        #expect(await harness.record("b")?.expectedKey == nil, "no record expects the key")
         await metadata.setHolding(true)
         let publishA = Task {
             try await harness.store.publish(stagedA, binding: [a.identifier], expecting: a.contentIdentity, urgency: .bulk)
         }
         try await metadata.requireHeldUnits(atLeast: 1)
         await metadata.releaseNext()
-        // A's placement unit is held: the key is in `publishing`, not in the blob table.
+        // A's placement unit is held: the key is in `publishing` only.
         try await metadata.requireHeldUnits(atLeast: 1)
-        #expect(await harness.state.core.publishing.contains(key))
+        let placementA = try #require(await metadata.heldUnits.first)
+        let placing = await harness.state.core
+        #expect(placing.publishing.contains(key) && placing.blobTable[key] == nil)
+        // (1) A complete sweep (listing and any removal units released, A's placement still held) keeps the name.
+        let first = try await CleanupSteps.run(metadata, keeping: [placementA]) {
+            try await harness.store.collectGarbage(until: deadline)
+        }
+        #expect(first.released.count >= 2, "the sweep listed blobs/ and its fan-out")
+        #expect(first.value.filesRemoved == 0 && harness.content(harness.layout.blobURL(key)) == bytes, "publishing protects the key")
+        // B waits for A's placement.
         let publishB = Task {
             try await harness.store.publish(stagedB, binding: [b.identifier], expecting: b.contentIdentity, urgency: .bulk)
         }
-        try await metadata.requireHeldUnits(atLeast: 2)
-        await metadata.release(try #require(await metadata.heldUnits.last))
         try await CorePoll.until("B waits for A's placement") {
-            await harness.state.core.keyWaiters[key]?.isEmpty == false
+            for unit in await metadata.heldUnits where unit != placementA {
+                await metadata.release(unit)
+            }
+            return await harness.state.core.keyWaiters[key]?.isEmpty == false
         }
         // The manifest changes A's content while A's placement runs.
         let changed = CoreFixture.entry("a", CoreFixture.bytes(441))
-        let apply = Task {
+        _ = try await CleanupSteps.run(metadata, keeping: [placementA]) {
             try await harness.store.apply(CoreFixture.manifest([changed, b]), etag: nil, eviction: nil)
         }
-        try await CorePoll.until("A's entry changed") {
-            await harness.record("a")?.entry.checksum == changed.checksum
-        }
-        let collect = Task {
-            try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 600))
-        }
-        await metadata.setHolding(false)
+        #expect(await harness.record("a")?.entry.checksum == changed.checksum)
+        // A's placement finishes: A is superseded, and B takes the key over and holds its own placement unit.
+        await metadata.release(placementA)
         await #expect(throws: StoreError.superseded("a")) {
             try await publishA.value
         }
+        try await CorePoll.until("B's placement is held") {
+            await !metadata.heldUnits.isEmpty
+        }
+        let placementB = try #require(await metadata.heldUnits.first)
+        let rebinding = await harness.state.core
+        #expect(rebinding.publishing.contains(key) || rebinding.blobTable[key] != nil, "the key is marked while B's placement runs")
+        // (2) A second complete sweep at that point keeps the name too.
+        let second = try await CleanupSteps.run(metadata, keeping: [placementB]) {
+            try await harness.store.collectGarbage(until: deadline)
+        }
+        #expect(second.value.filesRemoved == 0 && harness.content(harness.layout.blobURL(key)) == bytes)
+        await metadata.setHolding(false)
         let locations = try await publishB.value
-        _ = try await apply.value
-        let collected = try await collect.value
         #expect(locations[b.identifier]?.url == harness.layout.blobURL(key))
-        #expect(collected.filesRemoved == 0, "the key was never unknown to the sweep")
-        #expect(harness.content(harness.layout.blobURL(key)) == bytes)
         await harness.settleDeletions()
         let present = await harness.isPresent(b.identifier, at: key)
         #expect(harness.content(harness.layout.blobURL(key)) == bytes && present)

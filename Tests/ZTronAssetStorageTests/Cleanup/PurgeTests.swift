@@ -157,6 +157,9 @@ struct PurgeTests {
         }
         #expect(harness.time.pendingSleepers == 0)
         #expect(await harness.record(a.id)?.residency == .absent(.purged))
+        // C-4: the purge was committed before the caller left, so it is a cleanup run even though the reaper frees the
+        // bytes later.
+        #expect(await harness.state.cleanup.lastCleanupAt == harness.time.now())
         await harness.settleDeletions()
         #expect(!harness.hasBlob(a.key))
         #expect(await CoreInvariants.violations(of: harness).isEmpty)

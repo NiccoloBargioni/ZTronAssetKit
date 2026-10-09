@@ -138,6 +138,24 @@ struct LegacyEdgeTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    @Test("R-STO-11: a relaunch in phase inProgress counts files adopted by an earlier lifetime neither adopted nor dropped", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func relaunchCountsEarlierAdoptions() async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (first, defaults) = try LegacyFixture.harness(files: files)
+        _ = try await first.store.open()
+        #expect(try await first.store.migrateLegacy(maxFiles: 4) == LegacyMigrationProgress(adopted: 4, remaining: 9, dropped: 0, finished: false))
+        try await first.store.flush(.durable)
+        await first.store.close()
+        let second = CoreHarness.cleanup(disk: first.fileSystem.survivingDisk(), legacy: CleanupFixture.legacyPolicy, defaults: defaults, time: first.time)
+        #expect(try await second.store.open().legacyMigrationPending)
+        // The four files moved into blobs/ in the first lifetime are no longer in the tree: their records hold them.
+        #expect(try await second.store.migrateLegacy(maxFiles: 0) == LegacyMigrationProgress(adopted: 0, remaining: 9, dropped: 0, finished: false))
+        let progress = try await LegacyMigrationTests.migrateAll(second)
+        #expect(progress == LegacyMigrationProgress(adopted: 9, remaining: 0, dropped: 0, finished: true))
+        #expect(try await second.store.planningView().stamp?.appVersion == "1.4+77", "every entry was adopted, over two lifetimes")
+    }
+
     /// A legacy `manifest.json` that cannot be read whole.
     enum UnreadableManifest: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case directory
@@ -150,7 +168,7 @@ struct LegacyEdgeTests {
     }
 
     @Test(
-        "R-STO-11: a legacy manifest that cannot be read whole degrades the launch like an undecodable one, adopts nothing and still removes the tree and the key",
+        "R-STO-11: a legacy manifest that cannot be read whole degrades the launch like an undecodable one, adopts nothing and removes the key, keeping files it cannot attribute",
         .timeLimit(.minutes(1)),
         arguments: UnreadableManifest.allCases
     )
@@ -179,6 +197,11 @@ struct LegacyEdgeTests {
         #expect(progress.adopted == 0 && progress.finished)
         let view = try await harness.store.planningView()
         #expect(view.stamp == nil && view.syncDue && view.records.isEmpty)
-        #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot) && defaults.string(forKey: CleanupFixture.legacyKey) == nil)
+        // Phase 4 removes only what the prior art wrote (C-15): a regular `manifest.json`, never a directory of that
+        // name, and no file it cannot attribute to a legacy entry.
+        let root = CleanupFixture.legacyRoot
+        #expect(LegacyMigrationTests.exists(harness, root.appendingPathComponent("manifest.json")) == (manifest == .directory))
+        #expect(harness.content(root.appendingPathComponent("x/y.png")) == files["x/y.png"])
+        #expect(defaults.string(forKey: CleanupFixture.legacyKey) == nil)
     }
 }

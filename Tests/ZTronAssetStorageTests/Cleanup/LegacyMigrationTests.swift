@@ -186,7 +186,7 @@ struct LegacyMigrationTests {
         #expect(try await harness.store.planningView().stamp?.appVersion == "1.4+77")
     }
 
-    @Test("R-STO-11: an undecodable legacy manifest degrades the launch, adopts nothing and still removes the tree and the key", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: an undecodable legacy manifest degrades the launch, adopts nothing, removes the prior art's metadata and the key, and keeps files it cannot attribute", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func undecodableManifest() async throws {
         let files: [String: Data] = ["manifest.json": Data("{ not json".utf8), "x/y.png": CoreFixture.bytes(720)]
@@ -197,7 +197,11 @@ struct LegacyMigrationTests {
         #expect(progress.adopted == 0 && progress.finished)
         let view = try await harness.store.planningView()
         #expect(view.stamp == nil && view.syncDue && view.records.isEmpty)
-        #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot) && defaults.string(forKey: CleanupFixture.legacyKey) == nil)
+        // Without a manifest no file can be attributed to the prior art, so phase 4 removes only its metadata (C-15).
+        let root = CleanupFixture.legacyRoot
+        #expect(!LegacyMigrationTests.exists(harness, root.appendingPathComponent("manifest.json")))
+        #expect(harness.content(root.appendingPathComponent("x/y.png")) == files["x/y.png"])
+        #expect(defaults.string(forKey: CleanupFixture.legacyKey) == nil)
     }
 
     @Test("R-STO-11: phase 1 never overrides newer state: an applied manifest stays and indexed records are kept", .timeLimit(.minutes(1)))

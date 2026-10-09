@@ -192,6 +192,49 @@ struct IntegrityTests {
         #expect(next.bytesVerified == 300 && next.corrupt.isEmpty && !next.completedPass)
     }
 
+    @Test("R-INT-4: deep verification discards a hash whose blob name was replaced meanwhile and never quarantines the new bytes", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func verificationDiscardsReplacedIncarnation() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(bulk: bulk)
+        // Three hash units of 1 MiB, so the name can change between the first and the last.
+        let a = CleanupFixture.asset("a", seed: 380, count: (5 << 20) / 2)
+        try await harness.seed([a])
+        let seeded = await harness.record(a.id)?.verifiedAt
+        var rotten = a.bytes
+        rotten[rotten.startIndex] ^= 0xFF
+        try harness.fileSystem.write(rotten, to: harness.layout.blobURL(a.key), mode: .truncate)
+        await bulk.setHolding(true)
+        let deadline = harness.time.monotonicNow().adding(seconds: 600)
+        let verification = Task {
+            try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
+        }
+        // The first unit hashes the rotten file; the second is held.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        await bulk.releaseNext()
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let held = try #require(await bulk.heldUnits.first)
+        // Meanwhile a reader quarantines the blob and the next verified download replaces the name (ADR draft B-24).
+        try await harness.store.reportUnreadable(a.id)
+        _ = try await CleanupSteps.run(bulk, keeping: [held]) {
+            try await harness.publish(a.bytes, [a.entry], urgency: .userInitiated, sequence: 9)
+        }
+        #expect(await harness.isPresent(a.id, at: a.key))
+        #expect(harness.content(harness.layout.blobURL(a.key)) == a.bytes.prefix(1 << 20))
+        // The rest of the hash reads the new file: a digest of two incarnations proves nothing about either.
+        await bulk.setHolding(false)
+        let report = try await verification.value
+        #expect(report.corrupt.isEmpty)
+        #expect(await harness.isPresent(a.id, at: a.key), "the verified replacement is not quarantined")
+        #expect(await harness.record(a.id)?.verifiedAt == seeded, "and not counted verified either")
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[a.key], .corrupt) == false)
+        // It is checked again in this pass, now as one incarnation.
+        let again = try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
+        #expect(again.bytesVerified == Int64(a.bytes.count) && again.corrupt.isEmpty)
+        #expect(await harness.record(a.id)?.verifiedAt == harness.time.now())
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-INT-4: deep verification stops at its deadline and does nothing while the store is degraded", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func verificationLimits() async throws {

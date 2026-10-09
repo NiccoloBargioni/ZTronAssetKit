@@ -40,6 +40,7 @@ enum CleanupFixture {
 
     /// A store configuration with `policy`, legacy migration off unless `legacy` says otherwise, no coalescing delay.
     static func configuration(
+        location: StorageLocation = .applicationSupport,
         policy: StoragePolicy = CleanupFixture.policy(),
         legacy: LegacyMigrationPolicy = LegacyMigrationPolicy(enabled: false),
         limits: ManifestLimits = ManifestLimits(),
@@ -48,7 +49,7 @@ enum CleanupFixture {
         deletionBatchSize: Int = 64
     ) -> StoreConfiguration {
         StoreConfiguration(
-            location: .applicationSupport,
+            location: location,
             policy: policy,
             legacy: legacy,
             limits: limits,
@@ -90,6 +91,7 @@ extension CoreHarness {
     /// A store over the fake with WP-C's cleanup configuration.
     static func cleanup(
         disk: DiskImage = DiskImage(),
+        location: StorageLocation = .applicationSupport,
         policy: StoragePolicy = CleanupFixture.policy(),
         legacy: LegacyMigrationPolicy = LegacyMigrationPolicy(enabled: false),
         defaults: FakeLegacyDefaults = FakeLegacyDefaults(),
@@ -111,6 +113,7 @@ extension CoreHarness {
             configuration: FakeFileSystemConfiguration(crashBefore: crashBefore, crashMode: mode, importantCapacity: importantCapacity)
         )
         let configuration = CleanupFixture.configuration(
+            location: location,
             policy: policy,
             legacy: legacy,
             commitInterval: commitInterval,
@@ -175,5 +178,48 @@ extension CoreHarness {
     /// Whether `id` is present at `key`.
     func isPresent(_ id: AssetID, at key: BlobKey) async -> Bool {
         await self.record(id)?.referencedBlob == key
+    }
+}
+
+/// Drives one operation through a `SteppedBlockingExecutor` while other units stay held (REENTRANCY tests: the
+/// operation's units are released one by one as they arrive, the held point under test is not).
+@available(macOS 15.0, iOS 18.0, *)
+enum CleanupSteps {
+    /// Set once the driven operation returned or threw.
+    actor Finished {
+        private(set) var value = false
+
+        func set() {
+            self.value = true
+        }
+    }
+
+    /// Runs `operation` to completion, releasing every unit held on `executor` except `kept`; returns its value and the
+    /// units released for it, in order.
+    static func run<T: Sendable>(
+        _ executor: SteppedBlockingExecutor,
+        keeping kept: Set<Int>,
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> (value: T, released: [Int]) {
+        let finished = Finished()
+        let task = Task { () async throws -> T in
+            do {
+                let value = try await operation()
+                await finished.set()
+                return value
+            } catch {
+                await finished.set()
+                throw error
+            }
+        }
+        var released: [Int] = []
+        try await CorePoll.until("the driven operation finished") {
+            for unit in await executor.heldUnits where !kept.contains(unit) {
+                await executor.release(unit)
+                released.append(unit)
+            }
+            return await finished.value
+        }
+        return (try await task.value, released)
     }
 }
