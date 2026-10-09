@@ -50,6 +50,7 @@ extension ZTronAssetKitBenchmarks {
         func stretchesAtMaxEntries() async throws {
             for count in [10_000, 100_000] {
                 let figures = try await CleanupBench.stretches(count: count, seed: UInt64(900_000 + count))
+                    + CleanupBench.purgeStretches(count: count, seed: UInt64(950_000 + count))
                 print("C2 thread CPU of WP-C's stretches at \(count) assets: " + figures.map { "\($0.name) \($0.best) ms (worst \($0.worst) ms)\($0.bounded ? "" : ", recorded")" }.joined(separator: ", "))
                 for figure in figures where figure.bounded {
                     #expect(figure.best <= CleanupBenchmarks.budget, "\(count) assets, \(figure.name): \(figure.best) ms")
@@ -57,7 +58,7 @@ extension ZTronAssetKitBenchmarks {
                 if count == 100_000 {
                     let holds = try await CleanupBench.operationHoldsAtScale(count: count, seed: UInt64(990_000))
                     print("C2 longest actor hold at \(count) assets (WP-C operations, one run, WP-B's stretches inside them included): " + holds.map { "\($0.0) \($0.1) ms" }.joined(separator: ", "))
-                    #expect(holds.count == 6)
+                    #expect(holds.count == 8)
                 }
             }
         }
@@ -79,9 +80,23 @@ extension AssetStore {
 enum CleanupBench {
     /// The measured operations: the first five in this order on one store, each purge on a store of its own.
     static let operations = [
-        "storage report", "deep verification of every blob", "orphan GC of 100 orphans", "quarantine of one blob",
-        "quota eviction of half", "purge(.evictable) of all", "purge(.all) of all",
+        "storage report", "deep verification of every blob", "orphan GC of 100 orphans", "orphan GC of 10,000 orphans",
+        "quarantine of one blob", "quota eviction of half", "purge(.evictable) of all", "purge(.all) of all",
     ]
+
+    /// Writes `count` blobs nobody knows (48 bytes each, from `seed`) into `blobs/` under `base`.
+    static func plantOrphans(_ count: Int, seed: UInt64, fileSystem: FakeFileSystem, base: URL) throws {
+        let layout = StoreLayout(base: base)
+        for index in 0..<count {
+            let bytes = GeneratedPayload.bytes(seed: seed + UInt64(index), offset: 0, length: 48)
+            let key = BlobKey(hash: ContentHash.sha256(of: bytes), ext: try #require(AssetFileExtension("png")))
+            let fanOut = layout.fanOutDirectory(for: key.hash)
+            if try fileSystem.itemInfo(at: fanOut) == nil {
+                try fileSystem.createDirectory(at: fanOut)
+            }
+            try fileSystem.write(bytes, to: layout.blobURL(key), mode: .truncate)
+        }
+    }
 
     /// A store over a fresh fake volume holding `count` present 64-byte assets (adopted by hash at the launch, as in
     /// WP-B's C2 test), with dispatch executors; a byte budget of half the usage, no residency window, no grace.
@@ -147,17 +162,8 @@ enum CleanupBench {
     static func operationHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
         let (store, fileSystem, time, entries) = try await CleanupBench.store(count: count, seed: seed)
         let base = URL(fileURLWithPath: "/bench/cleanup", isDirectory: true)
-        let layout = StoreLayout(base: base)
         // Orphans older than the grace: blobs nobody knows.
-        for index in 0..<100 {
-            let bytes = GeneratedPayload.bytes(seed: seed + 5_000_000 + UInt64(index), offset: 0, length: 48)
-            let key = BlobKey(hash: ContentHash.sha256(of: bytes), ext: try #require(AssetFileExtension("png")))
-            let fanOut = layout.fanOutDirectory(for: key.hash)
-            if try fileSystem.itemInfo(at: fanOut) == nil {
-                try fileSystem.createDirectory(at: fanOut)
-            }
-            try fileSystem.write(bytes, to: layout.blobURL(key), mode: .truncate)
-        }
+        try CleanupBench.plantOrphans(100, seed: seed + 5_000_000, fileSystem: fileSystem, base: base)
         time.advance(by: 120)
         let far = time.monotonicNow().adding(seconds: 3_600)
         var holds: [(String, Double)] = []
@@ -173,15 +179,23 @@ enum CleanupBench {
             let result = try await store.collectGarbage(until: far)
             #expect(result.filesRemoved == 100)
         }))
+        // As many orphans as assets (the review's probe of the sweep's doom turn, L3 close-out).
+        try CleanupBench.plantOrphans(count, seed: seed + 6_000_000, fileSystem: fileSystem, base: base)
+        time.advance(by: 120)
+        let later = time.monotonicNow().adding(seconds: 3_600)
         holds.append((CleanupBench.operations[3], try await ActorHoldProbe.longestHold(of: store) {
-            try await store.reportUnreadable(entries[0].identifier)
+            let result = try await store.collectGarbage(until: later)
+            #expect(result.filesRemoved == count)
         }))
         holds.append((CleanupBench.operations[4], try await ActorHoldProbe.longestHold(of: store) {
+            try await store.reportUnreadable(entries[0].identifier)
+        }))
+        holds.append((CleanupBench.operations[5], try await ActorHoldProbe.longestHold(of: store) {
             let result = try await store.evictIfNeeded()
             #expect(result.filesRemoved >= count / 2 - 1)
         }))
         await store.close()
-        for (index, request) in [(5, PurgeRequest.evictable), (6, .all)] {
+        for (index, request) in [(6, PurgeRequest.evictable), (7, .all)] {
             let full = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 1_000_000).store
             holds.append((CleanupBench.operations[index], try await ActorHoldProbe.longestHold(of: full) {
                 let result = try await full.purge(request)
@@ -305,11 +319,30 @@ enum CleanupBench {
         for sample in 0..<5 {
             let slice = selection.value[(sample * chunk)..<min(selection.value.count, (sample + 1) * chunk)]
             purges.append(await store.benchThreadCPU { store in
-                var reclaim: [BlobKey: Int64] = [:]
+                var reclaim: [PurgeSelection.Reclaim] = []
                 return store.purgeChunk(slice, request: .all, reclaim: &reclaim)
             }.milliseconds)
         }
         record("purge chunk of \(chunk)", bounded: true, purges)
+        // Orphan GC's doom chunk (review of the L3 close-out: one turn over 10,000 swept keys held the actor 9.7 ms).
+        var dooms: [Double] = []
+        for sample in 0..<5 {
+            let orphans = Dictionary(uniqueKeysWithValues: (0..<chunk).map { index in
+                let bytes = Data("c2c-orphan-\(count)-\(sample)-\(index)".utf8)
+                return (BlobKey(hash: ContentHash.sha256(of: bytes), ext: AssetFileExtension("png")!), Int64(48))
+            })
+            dooms.append(await store.benchThreadCPU { store in
+                store.doomOrphans(orphans).count
+            }.milliseconds)
+            // Out of the table again, so the later figures see the store as it was.
+            _ = await store.benchThreadCPU { store in
+                for key in orphans.keys {
+                    store.state.core.blobTable[key] = nil
+                    store.state.core.blobBytes[key] = nil
+                }
+            }
+        }
+        record("orphan GC doom chunk of \(chunk)", bounded: true, dooms)
         // Deep verification's due list (off the actor).
         let due = await store.benchThreadCPU { store in
             DeepVerification.due(records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: store.state.core.publishing, done: [])
@@ -319,21 +352,93 @@ enum CleanupBench {
         return figures
     }
 
+    /// On a fresh store of `count` assets: the holders of a blob read by a full scan (recorded), five `.evictable` purge
+    /// chunks (bounded), then the stretches a full-store purge runs besides its chunks (review of the L3 close-out: its
+    /// longest hold at 100,000 is ~10 ms above eviction's): every other record purged in one bench turn (not measured),
+    /// the install and acknowledgement that start the grace, the reaper's queue (WP-B's, recorded) and one chunk of the
+    /// purge's own reclaim pass (bounded).
+    static func purgeStretches(count: Int, seed: UInt64) async throws -> [Stretch] {
+        let (store, _, _, entries) = try await CleanupBench.store(count: count, seed: seed)
+        var figures: [Stretch] = []
+        func record(_ name: String, bounded: Bool, _ samples: [Double]) {
+            figures.append(Stretch(name: name, best: samples.min() ?? .infinity, worst: samples.max() ?? .infinity, bounded: bounded))
+        }
+        let chunk = AssetStore.cleanupChunk
+        // The holders of a blob when the known ids do not account for its references (a `reportUnreadable` of a blob
+        // several records share, or an eviction candidate bound after the snapshot): one scan of the records.
+        let live = BlobKey(hash: entries[0].checksum!, ext: AssetFileExtension("png")!)
+        var scans: [Double] = []
+        for _ in 0..<5 {
+            let scan = await store.benchThreadCPU { store in
+                store.holders(of: live, known: []).count
+            }
+            #expect(scan.value == 1, "the scan found the blob's holder")
+            scans.append(scan.milliseconds)
+        }
+        record("holders(of:known:) fallback scan", bounded: false, scans)
+        // Purge(.evictable)'s chunk: every holder of each blob re-read (`holders(of:known:)`) and re-validated.
+        let evictable = await store.benchThreadCPU { store in
+            PurgeSelection.select(.evictable, records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: store.state.core.publishing, leases: store.state.cleanup.leases)
+        }.value
+        var evictablePurges: [Double] = []
+        for sample in 0..<5 {
+            let slice = evictable[(sample * chunk)..<min(evictable.count, (sample + 1) * chunk)]
+            let purged = await store.benchThreadCPU { store in
+                var reclaim: [PurgeSelection.Reclaim] = []
+                return store.purgeChunk(slice, request: .evictable, reclaim: &reclaim)
+            }
+            #expect(purged.value == slice.count)
+            evictablePurges.append(purged.milliseconds)
+        }
+        record("purge(.evictable) chunk of \(chunk)", bounded: true, evictablePurges)
+        // The rest of a full-store purge (review of the L3 close-out: its longest hold at 100,000 was ~10 ms above
+        // eviction's): every other record purged in one bench turn (not measured), then the stretches its awaits run.
+        let all = await store.benchThreadCPU { store in
+            PurgeSelection.select(.all, records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: [], leases: [:])
+        }.value
+        let reclaim = await store.benchThreadCPU { store in
+            var reclaim: [PurgeSelection.Reclaim] = []
+            _ = store.purgeChunk(all[...], request: .all, reclaim: &reclaim)
+            return reclaim
+        }.value
+        // WP-B: the acknowledgement of the install after the purge starts the grace of every doomed key in one turn.
+        let graceStart = try await ActorHoldProbe.longestHold(of: store) {
+            await store.publishSnapshot(urgency: .userInitiated)
+        }
+        record("WP-B: grace start over every doomed key (probe, wall clock)", bounded: false, [graceStart])
+        try await store.requireCommitted(.ordered)
+        await store.publishSnapshot(urgency: .userInitiated)
+        var queues: [Double] = []
+        var passes: [Double] = []
+        var deletable = 0
+        for sample in 0..<5 {
+            // WP-B's `reap`: the queue of deletable keys, filtered and sorted in one turn.
+            let queue = await store.benchThreadCPU { store in
+                store.state.core.blobTable.keys.filter { store.deletionBlocker($0) == .none }.sorted().count
+            }
+            queues.append(queue.milliseconds)
+            deletable = queue.value
+            // `awaitReclaim`'s pass over one chunk of the selection.
+            let slice = reclaim[(sample * chunk)..<min(reclaim.count, (sample + 1) * chunk)]
+            passes.append(await store.benchThreadCPU { store in
+                var pass = PurgeSelection.ReclaimPass()
+                store.reclaimPass(slice, into: &pass)
+                return pass.pending.count
+            }.milliseconds)
+        }
+        #expect(deletable == count, "every purged blob is deletable")
+        record("WP-B: the reaper's queue over every deletable key (filter and sort)", bounded: false, queues)
+        record("purge's reclaim pass, chunk of \(chunk)", bounded: true, passes)
+        await store.close()
+        return figures
+    }
+
     /// The longest actor hold of each WP-C operation once on a store of `count` assets (WP-B's stretches inside them
     /// included): a report, one verification slice of 1,000 blobs, orphan GC of 100 orphans, a quarantine, eviction of
-    /// half, then purge(.all) of the rest.
+    /// half, then purge(.all) of the rest; then each purge on a full store of its own.
     static func operationHoldsAtScale(count: Int, seed: UInt64) async throws -> [(String, Double)] {
         let (store, fileSystem, time, entries) = try await CleanupBench.store(count: count, seed: seed)
-        let layout = StoreLayout(base: URL(fileURLWithPath: "/bench/cleanup", isDirectory: true))
-        for index in 0..<100 {
-            let bytes = GeneratedPayload.bytes(seed: seed + 5_000_000 + UInt64(index), offset: 0, length: 48)
-            let key = BlobKey(hash: ContentHash.sha256(of: bytes), ext: try #require(AssetFileExtension("png")))
-            let fanOut = layout.fanOutDirectory(for: key.hash)
-            if try fileSystem.itemInfo(at: fanOut) == nil {
-                try fileSystem.createDirectory(at: fanOut)
-            }
-            try fileSystem.write(bytes, to: layout.blobURL(key), mode: .truncate)
-        }
+        try CleanupBench.plantOrphans(100, seed: seed + 5_000_000, fileSystem: fileSystem, base: URL(fileURLWithPath: "/bench/cleanup", isDirectory: true))
         time.advance(by: 120)
         let far = time.monotonicNow().adding(seconds: 3_600)
         var holds: [(String, Double)] = []
@@ -358,6 +463,15 @@ enum CleanupBench {
             _ = try await store.purge(.all)
         }))
         await store.close()
+        // Each purge on a full store of its own (review of the L3 close-out measured these, not the half left above).
+        for (index, request) in [(1, PurgeRequest.evictable), (2, .all)] {
+            let full = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 1_000_000).store
+            holds.append(("purge(\(request == .all ? ".all" : ".evictable")) of a full store", try await ActorHoldProbe.longestHold(of: full) {
+                let result = try await full.purge(request)
+                #expect(result.assetsRemoved == count)
+            }))
+            await full.close()
+        }
         return holds
     }
 }
