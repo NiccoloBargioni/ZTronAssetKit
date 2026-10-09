@@ -135,13 +135,25 @@ extension AssetStore {
     }
 
     /// Phase 4's tree removal: lists the tree without following links, removes every file and link (never a link's
-    /// target), then the directories deepest first, then the root. Returns whether the root is gone.
+    /// target), then the directories deepest first, then the root. Anything but a directory at the root (a symbolic link
+    /// that replaced it) is removed itself and never listed, since a listing follows a final link (R-SEC-2). A root
+    /// that cannot be stat-ed is left for the next call. Returns whether the root is gone.
     func removeLegacyTree(_ root: URL) async throws(StoreError) -> Bool {
-        // REENTRANCY: c-4 (proposed) — nothing: a tree already gone needs no removal (and no mutation).
-        if await self.legacyItemKind(root) == .success(nil) {
+        // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root's kind, never following a final link.
+        let kind = await self.legacyItemKind(root)
+        try self.checkLive()
+        guard case .success(let rootKind) = kind else {
+            return false
+        }
+        guard let rootKind else {
             return true
         }
-        try self.checkLive()
+        guard rootKind == .directory else {
+            // REENTRANCY: c-1 (proposed) — see `removeInUnits`; unlinking a link removes the link only.
+            _ = try await self.removeInUnits([(url: root, bytes: 0)])
+            // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
+            return await self.legacyItemKind(root) == .success(nil)
+        }
         let fileSystem = self.environment.fileSystem
         var directories: [URL] = [root]
         var leaves: [URL] = []
@@ -170,6 +182,7 @@ extension AssetStore {
         _ = try await self.removeInUnits(leaves.map { (url: $0, bytes: 0) })
         // REENTRANCY: c-1 (proposed) — as above, deepest directories first.
         _ = try await self.removeInUnits(directories.reversed().map { (url: $0, bytes: 0) })
+        // REENTRANCY: c-4 (proposed) — nothing: a snapshot of the root.
         return await self.legacyItemKind(root) == .success(nil)
     }
 }

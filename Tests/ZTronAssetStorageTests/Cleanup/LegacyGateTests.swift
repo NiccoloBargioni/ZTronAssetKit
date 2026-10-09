@@ -51,13 +51,17 @@ struct LegacyGateTests {
         _ = try await first.store.open()
         await first.store.close()
         let second = CoreHarness.cleanup(disk: first.fileSystem.survivingDisk(), legacy: CleanupFixture.legacyPolicy, defaults: defaults, time: first.time)
-        // The relaunch counts nothing committed: its root barrier and its launch commit both fail.
+        // The relaunch counts nothing committed: its root barrier fails, and so does its launch commit (both of its writes:
+        // a commit that runs out of space removes index.tmp and tries once more).
         second.fileSystem.addFault(FaultRule(operation: .synchronizeDirectory, matching: URLMatcher(lastComponentSuffix: "v1"), occurrence: .nth(1), error: .io))
-        second.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .noSpace))
+        for occurrence in 1...2 {
+            second.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(occurrence), error: .noSpace))
+        }
         #expect(try await second.store.open().legacyMigrationPending)
         let atOpen = second.fileSystem.operations
         #expect(atOpen.first { $0.kind == .synchronizeDirectory && $0.url == second.layout.root }?.failure == .io, "the barrier failed")
-        #expect(atOpen.first { $0.kind == .write && $0.url.lastPathComponent == "index.tmp" }?.failure == .noSpace, "the launch commit failed")
+        #expect(atOpen.contains { $0.kind == .write && $0.url.lastPathComponent == "index.tmp" }, "the launch commit was attempted")
+        #expect(LegacyGateTests.landedCommits(atOpen[...]).isEmpty, "and it failed")
         #expect(try await LegacyMigrationTests.migrateAll(second).finished)
         let operations = second.fileSystem.operations
         let firstMove = try #require(LegacyGateTests.firstLegacyMove(operations))
@@ -124,5 +128,22 @@ struct LegacyGateTests {
         #expect(through.isEmpty, "nothing below the link or under its target was mutated: \(through.map(\.url.path))")
         #expect(!LegacyMigrationTests.exists(harness, root), "the link itself is gone")
         #expect(defaults.string(forKey: CleanupFixture.legacyKey) == nil)
+    }
+
+    @Test("R-STO-11: phase 4 leaves a legacy root it cannot stat for the next call, which removes it", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func unstatableRootLeftForNextCall() async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (harness, defaults) = try LegacyFixture.harness(files: files)
+        _ = try await harness.store.open()
+        // Phase 2 never stats the root; phase 4's first stat of it fails, so its kind is unknown and nothing is listed.
+        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "CDNAssets"), occurrence: .nth(1), error: .io))
+        let first = try await harness.store.migrateLegacy(maxFiles: 100)
+        #expect(!first.finished && first.adopted == 13)
+        #expect(LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot.appendingPathComponent("manifest.json")), "nothing was listed or removed")
+        let second = try await harness.store.migrateLegacy(maxFiles: 100)
+        #expect(second.finished)
+        #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot) && defaults.string(forKey: CleanupFixture.legacyKey) == nil)
+        #expect(try await harness.store.planningView().stamp?.appVersion == "1.4+77")
     }
 }

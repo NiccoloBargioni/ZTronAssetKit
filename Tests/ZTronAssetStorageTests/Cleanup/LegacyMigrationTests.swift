@@ -233,8 +233,7 @@ struct LegacyMigrationTests {
             harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(occurrence), error: .noSpace))
         }
         _ = try await harness.store.open()
-        let planCommitted = await harness.state.migration.planCommitted
-        #expect(!planCommitted, "open() could not commit the plan")
+        #expect(LegacyGateTests.landedCommits(harness.fileSystem.operations[...]).isEmpty, "open() could not commit the plan")
         #expect(try await LegacyMigrationTests.migrateAll(harness).finished)
         let operations = harness.fileSystem.operations
         let firstMove = try #require(operations.firstIndex { $0.kind == .rename && $0.url.path.hasPrefix(CleanupFixture.legacyRoot.path) })

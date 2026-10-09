@@ -9,6 +9,7 @@ extension AssetStore {
     /// publishes a snapshot.
     func performLegacyPhaseOne() async throws(StoreError) -> Bool {
         // A lifetime that could not read an index file writes nothing (ADR draft B-34): migration waits for a later one.
+        // REENTRANCY: R1, R11 — nothing: no state was read before it; `checkLive()` below re-checks the phase.
         guard (try? self.checkWritable()) != nil, let root = await self.resolveLegacyRoot() else {
             return false
         }
@@ -34,7 +35,8 @@ extension AssetStore {
         }
         guard rootKind == .directory else {
             // No legacy tree (a symbolic link is never followed, R-SEC-2). Before migration started, the stamp can never
-            // be migrated (D-6): it goes. A tree that vanished during migration still needs phases 3 and 4.
+            // be migrated (D-6): it goes. A tree that vanished during migration still needs phases 3 and 4 (phase 4 removes
+            // a link at the root itself, never what it points to).
             if self.state.migration.phase == .notStarted {
                 self.state.migration.root = nil
                 // REENTRANCY: R1 — the phase.
@@ -42,7 +44,6 @@ extension AssetStore {
                 try self.checkLive()
                 return false
             }
-            self.state.migration.planCommitted = true
             return true
         }
         let starting = self.state.migration.phase == .notStarted
@@ -76,7 +77,10 @@ extension AssetStore {
                 self.environment.log.log(.store, .error, "legacy phase 1 could not commit its plan; it is retried before any file moves")
             }
         } else {
-            self.state.migration.planCommitted = true
+            // A relaunch counts the loaded plan committed only once this lifetime's barrier or a commit succeeded (ADR
+            // draft B-36). Marking the state dirty makes the gate of the first move (`commitLegacyPlanIfNeeded`) wait for
+            // a commit of this lifetime; the launch commit, which every open() makes, normally covers it already.
+            self.markDirty(.soon)
         }
         let plan = LegacyPlanner.plan(entries: decoded.manifest?.entries ?? [], checksums: decoded.checksums, files: files)
         var queue: [LegacyFile] = []
@@ -216,6 +220,10 @@ extension AssetStore {
             return nothing
         case .done:
             if !self.state.migration.progress.finished {
+                // "done" may be in memory only: the call that wrote it throws when its durable commit fails, and a retry
+                // (or a second call while the first one waits) must not remove what that commit protects.
+                // REENTRANCY: R17 — nothing but the phase: `done` is terminal and was written before this call.
+                try await self.requireCommitted(.durable)
                 // REENTRANCY: c-4 (proposed) — see `finishLegacyRemoval`.
                 try await self.finishLegacyRemoval(root)
             }
@@ -223,11 +231,9 @@ extension AssetStore {
         case .inProgress:
             break
         }
-        if !self.state.migration.planCommitted {
-            // REENTRANCY: R17 — nothing but the phase: phase 1's writes reach a committed generation before any file moves.
-            try await self.requireCommitted(.ordered)
-            self.state.migration.planCommitted = true
-        }
+        // REENTRANCY: R17 — nothing but the phase: the queue and the claims are read after it, and a call that finished the
+        // migration meanwhile left them empty.
+        try await self.commitLegacyPlanIfNeeded()
         var budget = max(0, maxFiles)
         var adoptedAny = false
         while budget > 0, !self.state.migration.queue.isEmpty {
@@ -256,6 +262,18 @@ extension AssetStore {
             try await self.finishLegacyMigration(root)
         }
         return self.state.migration.progress
+    }
+
+    /// Commits the phase-1 plan before the first legacy file of this lifetime moves (ADR draft C-13): phase 1's own commit
+    /// may have failed, and a relaunch counts the loaded plan committed only once its barrier or a commit succeeded.
+    func commitLegacyPlanIfNeeded() async throws(StoreError) {
+        guard !self.state.migration.planCommitted else {
+            return
+        }
+        // REENTRANCY: R17 — nothing but the phase: phase 1's writes were made before this call; the callers re-read the
+        // migration state after it.
+        try await self.requireCommitted(.ordered)
+        self.state.migration.planCommitted = true
     }
 
     /// Removes `file` from the claims, back to the head of the queue when its processing did not complete.
@@ -340,6 +358,14 @@ extension AssetStore {
         try self.checkWritable()
         guard self.state.migration.phase == .inProgress else {
             return nil
+        }
+        if !self.state.migration.planCommitted {
+            // No legacy file moves before a generation holding the phase-1 plan is committed, on demand too (C-13).
+            // REENTRANCY: R17, R18 — then the call starts again: the location, the phase, the queue and the claims are
+            // read anew (a batch may have adopted the asset meanwhile).
+            try await self.commitLegacyPlanIfNeeded()
+            // REENTRANCY: R18 — as above.
+            return try await self.performAdoptLegacyNow(id)
         }
         let migration = self.state.migration
         let queued = migration.queue.firstIndex { $0.ids.contains(id) }
