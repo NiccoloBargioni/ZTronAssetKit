@@ -88,7 +88,7 @@ struct PackErrorMappingTests {
         #expect(PackErrorMapping.systemError(domain: NSCocoaErrorDomain, code: Int(ENOSPC)) == .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-2: BackgroundAssets errors become pack errors at the live boundary without touching the manager")
     func liveErrorBoundary() {
         #expect(LiveAssetPackBackend.packError(ManagedBackgroundAssetsError.assetPackNotFound(withID: "ZTronMedia")) == .packNotFound)

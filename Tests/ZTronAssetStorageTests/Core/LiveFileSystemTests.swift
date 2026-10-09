@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
 @Suite("Core: live file system")
 struct LiveFileSystemTests {
     @Test("R-STO-6: the fake and live file systems agree on the shared conformance contract")
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func conformance() throws {
         let directory = try CoreFixture.liveDirectory("conformance")
         defer {
@@ -26,7 +26,7 @@ struct LiveFileSystemTests {
     }
 
     @Test("R-STO-9: the live lock rejects a second opener in the same process and frees on close", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func liveLockIsExclusive() async throws {
         let directory = try CoreFixture.liveDirectory("lock")
         defer {
@@ -46,7 +46,7 @@ struct LiveFileSystemTests {
     }
 
     @Test("R-STO-6: a store over the live file system publishes, survives a reopen and keeps its blob", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func liveStoreRoundTrip() async throws {
         let directory = try CoreFixture.liveDirectory("roundtrip")
         defer {
@@ -77,7 +77,7 @@ struct LiveFileSystemTests {
     }
 
     @Test("R-STO-6: EACCES at open surfaces storageUnavailable without mutating state", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func permissionDeniedAtOpen() async throws {
         let directory = try CoreFixture.liveDirectory("eacces")
         let base = directory.appendingPathComponent("locked", isDirectory: true)
@@ -178,7 +178,7 @@ struct LiveFileSystemTests {
 }
 
 /// Builds stores over `LiveFileSystem` for the live tests.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum LiveStore {
     static func make(_ configuration: StoreConfiguration) -> AssetStore {
         let environment = AssetEnvironment(

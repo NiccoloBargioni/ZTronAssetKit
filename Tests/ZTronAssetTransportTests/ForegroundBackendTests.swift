@@ -8,7 +8,7 @@ import ZTronAssetTransport
 /// cancellation, invalidation and in-place priority changes.
 @Suite("Foreground backend")
 struct ForegroundBackendTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: 500 downloads through one backend use at most maxConnectionsPerHost TCP connections", .timeLimit(.minutes(1)))
     func connectionReuse() async throws {
         // 3 is below URLSession's own default per-host limit (6 on macOS), so only the configured cap explains it.
@@ -45,7 +45,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: every task's bytes reach its own staging file and the transfer interval ends once per transfer", .timeLimit(.minutes(1)))
     func mailboxRoutingAndIntervals() async throws {
         let rig = try await LoopbackRig.make { request in
@@ -72,7 +72,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: cancelling the consumer cancels the URLSession task and reports cancelled by the client", .timeLimit(.minutes(1)))
     func consumerCancellation() async throws {
         let arrivals = Arrivals()
@@ -93,7 +93,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: invalidation fails every live transfer and later starts without touching the network", .timeLimit(.minutes(1)))
     func invalidation() async throws {
         let arrivals = Arrivals()
@@ -115,7 +115,7 @@ struct ForegroundBackendTests {
         await rig.server.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-10: setPriority on a running transfer changes URLSessionTask.priority synchronously", .timeLimit(.minutes(1)))
     func priorityChangesInPlace() async throws {
         let arrivals = Arrivals()
@@ -148,7 +148,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: cancelling by staging name discards the partial unless it keeps it for a pause", .timeLimit(.minutes(1)))
     func cancelByName() async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -180,7 +180,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing", .timeLimit(.minutes(1)))
     func handleCancelDiscards() async throws {
         let rig = try await LoopbackRig.make { request in
@@ -209,7 +209,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a request to an origin outside the policy is refused before any byte is sent", .timeLimit(.minutes(1)))
     func refusedOrigin() async throws {
         let rig = try await LoopbackRig.make(allowedHosts: ["cdn.example.com"]) { _ in LoopbackResponse(body: Data("x".utf8)) }
@@ -224,7 +224,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a remote path that could leave the base path is refused as an invalid URL", .timeLimit(.minutes(1)), arguments: [
         "../secret", "a/../../b", "a/%2e%2e/b", "a/%2E/b", "a//b", "a?b=1", "a#frag", "a\\b", "", "/abs",
     ])
@@ -236,7 +236,7 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a remote path is joined by percent-encoded components under the base path", .timeLimit(.minutes(1)))
     func encodedPath() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data("ok".utf8)) }

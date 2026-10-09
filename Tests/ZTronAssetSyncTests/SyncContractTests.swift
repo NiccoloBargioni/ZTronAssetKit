@@ -77,7 +77,7 @@ struct SyncContractTests {
         #expect(Backoff.delay(attempt: 1, retryAfter: policy.maxRetryAfter + 1, policy: policy, seed: seed, key: 1) == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: ManualTimeSource wakes sleepers in deadline then registration order", .timeLimit(.minutes(1)))
     func manualTimeWakeOrder() async throws {
         let time = ManualTimeSource()
@@ -109,7 +109,7 @@ struct SyncContractTests {
         #expect(time.nextDeadline == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: a cancelled ManualTimeSource sleeper throws promptly and leaves no sleeper behind", .timeLimit(.minutes(1)))
     func manualTimeCancellation() async {
         let time = ManualTimeSource()
@@ -138,7 +138,7 @@ struct SyncContractTests {
         #expect(await past.value)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-1: FakeRemoteSourceFactory hands the store's staging sink to an attachable source before returning it", .timeLimit(.minutes(1)))
     func factoryAttachesStaging() async throws {
         let source = FakeRemoteSource()
@@ -198,7 +198,7 @@ struct SyncContractTests {
         #expect(GeneratedPayload.sha256(seed: 9, byteCount: 0) == ContentHash.sha256(of: Data()))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a fake source and its handles record starts and controls in one global order", .timeLimit(.minutes(1)))
     func transportLogOrdersStartsAndControls() async {
         let source = FakeRemoteSource()

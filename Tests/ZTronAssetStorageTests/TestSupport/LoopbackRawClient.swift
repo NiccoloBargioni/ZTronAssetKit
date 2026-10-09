@@ -4,7 +4,7 @@ import Synchronization
 
 /// A minimal raw HTTP/1.1 client over `NWConnection` (loopback only), so the server's tests see exactly the bytes
 /// and the connection close it sends: no URLSession, no cache, nothing written anywhere. Gated for `Mutex`.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class LoopbackRawClient: Sendable {
     /// One parsed response.
     struct Response: Sendable {
@@ -21,8 +21,14 @@ final class LoopbackRawClient: Sendable {
     private let connection: NWConnection
     private let buffer = LoopbackRawClientBuffer()
 
-    init(port: UInt16) {
-        self.connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
+    /// A client of the server on 127.0.0.1.
+    convenience init(port: UInt16) {
+        self.init(host: "127.0.0.1", port: port)
+    }
+
+    /// A client of `port` on `host`: the server's tests also probe another local address, which must not reach it.
+    init(host: NWEndpoint.Host, port: UInt16) {
+        self.connection = NWConnection(host: host, port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
     }
 
     /// Connects; throws when the connection fails or has to wait for a path.
@@ -172,7 +178,7 @@ final class LoopbackRawClient: Sendable {
 }
 
 /// The client's receive buffer (one connection, one reader at a time).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class LoopbackRawClientBuffer: Sendable {
     private let data = Mutex(Data())
     private let closed = Mutex(false)

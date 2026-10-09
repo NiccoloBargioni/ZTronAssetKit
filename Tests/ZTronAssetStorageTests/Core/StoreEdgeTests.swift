@@ -9,7 +9,7 @@ import ZTronAssetTestSupport
 @Suite("Core: interleavings and failure paths")
 struct StoreEdgeTests {
     @Test("R-INT-2: a manifest change while a publication claims or hashes its file yields superseded and deletes the claim", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func supersededAfterClaimOrHash() async throws {
         for heldExecutor in ["metadata", "bulk"] {
             let stepped = SteppedBlockingExecutor(holding: false)
@@ -45,7 +45,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-INT-2: bytes added to a claimed file while it is hashed are a size mismatch, never published", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func claimedFileGrowsDuringHash() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(hashChunkBytes: 100), bulk: bulk)
@@ -68,7 +68,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-CLN-5: a publication of a key whose deletion unit is in flight waits for it, then places the file afresh", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func publicationWaitsForDeletion() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -102,7 +102,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-CLN-5: a rescued publication is committed before it returns", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func rescueIsCommitted() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(194)
@@ -124,7 +124,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-CLN-5: a key is never unlinked before the generation that dropped it is committed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func uncommittedDropBlocksDeletion() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(195)
@@ -150,7 +150,7 @@ struct StoreEdgeTests {
     // close did (`Caught error: .closed`, under load).
 
     @Test("R-STO-9: open runs once for concurrent callers: a call made while an open runs returns that open's report", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func concurrentOpensShareOneReport() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
         let harness = CoreHarness.make(metadata: metadata)
@@ -172,7 +172,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-9: close() during a running open waits for it, then flushes and releases the lock", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func closeWaitsForARunningOpen() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
         let harness = CoreHarness.make(metadata: metadata)
@@ -202,7 +202,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-9: an open() parked beside a close() on a running open returns that open's report, whichever resumes first", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func parkedOpenAndCloseOnARunningOpen() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
         let harness = CoreHarness.make(metadata: metadata)
@@ -231,7 +231,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-9: an open() parked on an open that fails throws notOpen, and a later call opens", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func parkedOpenOnAFailedOpen() async throws {
         let metadata = SteppedBlockingExecutor(holding: true)
         let harness = CoreHarness.make(metadata: metadata)
@@ -259,7 +259,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-9: close() drains an in-flight publication, which unwinds with closed, and the next launch adopts its blob", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func closeDrainsAnInFlightPublication() async throws {
         // A publication whose placement unit is in flight when close begins: close drains it, the publication
         // unwinds with `.closed`, and the blob it placed is adopted by the next launch.
@@ -291,7 +291,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-4: callers that need a commit while one runs share the next one, and a cancelled wait for the window throws cancelled", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func commitWaitersAndCancellation() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -328,7 +328,7 @@ struct StoreEdgeTests {
     }
 
     @Test("R-STO-1: stagingInventory lists our names with their metadata and everything else as foreign", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func stagingInventory() async throws {
         let harness = CoreHarness.make()
         _ = try await harness.store.open()
@@ -393,7 +393,7 @@ extension StoreEdgeTests {
     /// running `open()` (polled between yields; no sleeping; ends with the test), then requires that the `open()` calls
     /// wait for the running open's report and the others for its phase (ADR draft B-35). Waiting for the total first
     /// makes a misplaced caller fail at once instead of at the time limit.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func waitForOpenWaiters(opens: Int, others: Int, _ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         try await CorePoll.until("\(opens) open() calls and \(others) other callers parked on the running open()", sourceLocation: sourceLocation) {
             let core = await harness.state.core

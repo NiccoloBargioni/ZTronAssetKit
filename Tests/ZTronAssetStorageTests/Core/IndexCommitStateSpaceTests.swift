@@ -216,7 +216,7 @@ struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
 /// once per distinct pair.
 @Suite("Core: index commit state space (R-STO-4, R-STO-5)", .serialized)
 struct IndexCommitStateSpaceTests {
-    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield after every case:
+    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield once per case:
     /// a row then takes about a second under TSan, so its time limit keeps a wide margin, and suites running beside this
     /// one keep the cooperative pool (every case of every suite starts its time limit when the run starts).
     @Test(
@@ -224,10 +224,11 @@ struct IndexCommitStateSpaceTests {
         .timeLimit(.minutes(1)),
         arguments: IndexSpaceRow.all
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func everyStateFaultAndCrash(row: IndexSpaceRow) async throws {
         var starts: [(IndexSpaceSlice, DiskImage, IndexSpace.Views)] = []
         for slice in row.slices {
+            await Task.yield()
             let initial = IndexSpace.disk(slice)
             let start = IndexSpace.views(initial)
             try IndexSpace.checkSeed(slice, start)
@@ -329,7 +330,7 @@ struct IndexCommitUnorderedNamesTests {
         .timeLimit(.minutes(1)),
         arguments: IndexSpaceRow.unforged
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func everyUnorderedSurvivor(row: IndexSpaceRow) async throws {
         let index = try #require(IndexSpaceRow.unforged.firstIndex { $0.testDescription == row.testDescription })
         let survivors = await UnorderedSurvivors.shared.survivors(at: index)
@@ -363,7 +364,7 @@ struct IndexCommitUnorderedNamesTests {
     }
 
     @Test("R-STO-5: the unordered-name survivors are every distinct kill survivor of the fault-free lifetimes whose crash views differ", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func unorderedSurvivorsAreComplete() async {
         let rows = await UnorderedSurvivors.shared.all()
         let survivors = rows.flatMap { $0 }
@@ -386,7 +387,7 @@ struct IndexCommitUnorderedNamesTests {
 /// and a row computes only its own lifetimes when the rows run in order (the first one does not pay for all 49). Rows
 /// are appended in the order of `IndexSpaceRow.unforged`; read-only once appended, and the same on every run (the
 /// lifetimes are deterministic).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 actor UnorderedSurvivors {
     static let shared = UnorderedSurvivors()
     private var rows: [[IndexSpace.Survivor]] = []
@@ -417,7 +418,7 @@ actor UnorderedSurvivors {
 }
 
 /// The machinery of the state-space test.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum IndexSpace {
     /// The fake volume's root and the store's base on it: shallow, so every path the fake resolves is short.
     static let volume = URL(fileURLWithPath: "/v", isDirectory: true)
@@ -956,7 +957,7 @@ enum IndexSpace {
         var counts: Counts
     }
 
-    /// Every volume script and every event for `slice`, yielding after each case.
+    /// Every volume script and every event for `slice`, yielding once per case.
     static func enumerate(_ slice: IndexSpaceSlice, initial: DiskImage, start: Views) async -> SliceResult {
         var memo = Memo()
         var violations: [String] = []
@@ -1011,9 +1012,9 @@ enum IndexSpace {
             return violations + ["\(label): recorded \(snapshots.count) disks for \(mutations.count) mutations"]
         }
         for (point, snapshot) in snapshots.enumerated() {
+            await Task.yield()
             let phase = phases.last { $0.mutations <= point }
             violations += await IndexSpace.checkCrashes(at: point, snapshot, mutation: mutations[point], from: phase, start: start, volume: volume, label: label, memo: &memo)
-            await Task.yield()
         }
         return violations
     }
@@ -1103,6 +1104,7 @@ enum IndexSpace {
             }
         }
         for (mode, files, key, disk) in survivors {
+            await Task.yield()
             let caseLabel = "\(label) \(Event.crash(point, mode))"
             let floor = IndexSpace.floor(start, mode, claimed: claimed, &memo)
             // I-b is a property of a store that reports; a crash inside a unit is checked by I-a against what the store
@@ -1174,7 +1176,7 @@ enum IndexSpace {
 
 // MARK: Kill survivors with unordered names
 
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 extension IndexSpace {
     /// A kill survivor whose crash views differ, and where it came from.
     struct Survivor: Sendable {
@@ -1196,8 +1198,10 @@ extension IndexSpace {
     static func unorderedSurvivors(of row: IndexSpaceRow, excluding seen: inout Set<ViewsKey>) async -> [Survivor] {
         var survivors: [Survivor] = []
         for slice in row.slices {
+            await Task.yield()
             let initial = IndexSpace.disk(slice)
             for volume in VolumeScript.allCases {
+                await Task.yield()
                 var memo = Memo()
                 let clean = IndexSpace.fake(initial)
                 let recorder = MutationRecorder(clean)
@@ -1207,6 +1211,7 @@ extension IndexSpace {
                 }
                 // Point 0 is the initial disk itself, before open()'s barrier.
                 for (point, snapshot) in recorder.snapshots.enumerated() where point > 0 {
+                    await Task.yield()
                     let views = IndexSpace.views(snapshot.disk)
                     let key = ViewsKey(current: views.current, dropped: views.dropped, kept: views.kept)
                     guard views.current != views.dropped || views.kept != views.current, seen.insert(key).inserted else {
@@ -1267,6 +1272,7 @@ extension IndexSpace {
             (.powerLossKeepMetadata, start.kept, ReopenKey(current: start.kept, kept: start.kept), { keptDisk }),
         ]
         for (mode, files, key, disk) in crashes {
+            await Task.yield()
             let caseLabel = "\(label) \(Event.crash(0, mode))"
             let floor = IndexSpace.floor(start, mode, claimed: 0, &memo)
             violations += IndexSpace.checkSurvivor(files, view: "the crash", floor: floor, claimed: 0, checkCommitted: false, label: caseLabel, &memo)
@@ -1282,7 +1288,7 @@ extension IndexSpace {
 /// (`survivingDisk()` of a fake configured for a kill keeps every applied mutation with its synced/unsynced split, so a
 /// crash of any mode before mutation k leaves that disk under the mode's view) and the generation the store counted
 /// committed at that moment.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class MutationRecorder: FileSystem {
     /// The disk before one mutation.
     struct Snapshot: Sendable {
@@ -1384,7 +1390,7 @@ final class MutationRecorder: FileSystem {
 /// A `FileSystem` over a `FakeFileSystem` that misreports: its `failing`-th rename (1-based, any URL) takes effect and
 /// then reports EIO (the "rename failure" of the state-space test: a rename whose result was lost, as in probe
 /// VPC2-K), and every read of a URL `shortReads` matches returns no bytes without an error (a file that ended early).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class MisreportingFileSystem: FileSystem {
     let base: FakeFileSystem
     private let failing: Int

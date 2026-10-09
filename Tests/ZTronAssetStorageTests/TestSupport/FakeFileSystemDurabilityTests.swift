@@ -10,7 +10,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
     private static let work = "/fake-volume/work"
 
     /// A fake with `/fake-volume/work` created and its entry synced into the (durable) volume root.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func prepared() throws -> FakeFileSystem {
         let fileSystem = FakeFSFixture.make()
         try fileSystem.createDirectory(at: FakeFSFixture.url(Self.work))
@@ -18,7 +18,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         return fileSystem
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a process kill keeps every applied mutation and the un-synced split into the next lifetime")
     func processKillKeepsVolatileState() throws {
         let first = try Self.prepared()
@@ -34,7 +34,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(afterPowerLoss.directories.contains(Self.work))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a power loss that drops un-synced state reverts each listing and each file to its last sync")
     func dropUnsyncedRevertsToLastSync() throws {
         let fileSystem = try Self.prepared()
@@ -50,7 +50,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(disk.files[Self.work + "/late.bin"] == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a file whose name was synced but whose data never was is empty after a power loss")
     func syncedNameWithoutDataIsEmpty() throws {
         let fileSystem = try Self.prepared()
@@ -61,7 +61,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(disk.files[Self.work + "/f.bin"] == [])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a power loss that keeps metadata keeps every name but reverts data, so an unsynced renamed file is empty")
     func keepMetadataRevertsDataOnly() throws {
         let fileSystem = try Self.prepared()
@@ -80,7 +80,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(disk.durableFiles == disk.files)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "Test support: directories are durable independently, so a rename between two survives in neither, one or both",
         arguments: [(false, false), (true, false), (false, true), (true, true)]
@@ -108,7 +108,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect((disk.files[Self.work + "/t/f"] == [7]) == syncDestination)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a barrier and a full sync both make the synced item durable at the call", arguments: [SyncLevel.barrier, .full])
     func bothLevelsAreDurable(level: SyncLevel) throws {
         let fileSystem = try Self.prepared()
@@ -121,7 +121,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(disk.files[Self.work + "/f.bin"] == [3, 3])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: data synced in a killed lifetime stays durable when the next lifetime syncs the directory naming it")
     func killThenPowerLossFollowsTheInode() throws {
         // store-1 S1-01 timeline (a): publish without a fan-out sync, kill, adopt and sync in the next lifetime.
@@ -149,7 +149,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
 
     /// Lifetime 1 of the store-1 S1-01 shapes below: `work/blobs` is durable; a fan-out `aa` is created and never
     /// synced into `blobs`, while `aa/h.bin` is written, synced and synced into `aa`'s own listing.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func syncedIntoUnsyncedFanOut() throws -> FakeFileSystem {
         let fileSystem = try Self.prepared()
         let blobs = FakeFSFixture.url(Self.work + "/blobs")
@@ -163,7 +163,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         return fileSystem
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an unlink a process kill kept un-synced is undone by a power loss after the next lifetime syncs the parent")
     func killKeepsSyncedListingOfAnUnsyncedDirectory() throws {
         let blobs = FakeFSFixture.url(Self.work + "/blobs")
@@ -181,7 +181,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(FakeFSFixture.powerLoss(next.survivingDisk()).files[path] == [1, 2, 3])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: editing one path of a killed disk keeps the durable state of every path the edit did not touch")
     func editedKilledDiskKeepsHiddenDurableState() throws {
         let blobs = FakeFSFixture.url(Self.work + "/blobs")
@@ -197,7 +197,7 @@ struct TestSupportFakeFileSystemDurabilityTests {
         #expect(afterPowerLoss.files["/fake-volume/Library/Caches/other.bin"] == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a replacing rename keeps the replaced file durable under its name until the directory is synced")
     func replacedFileStaysDurableUntilDirectorySync() throws {
         let fileSystem = try Self.prepared()

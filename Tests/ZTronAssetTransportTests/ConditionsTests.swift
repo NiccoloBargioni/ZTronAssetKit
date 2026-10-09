@@ -9,7 +9,7 @@ import ZTronAssetTransport
 @Suite("Live device conditions")
 struct ConditionsTests {
     /// A path observer the test drives: `send` delivers on the observation's queue, as `NWPathMonitor` does.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     final class ScriptedPath: PathObserving {
         private struct State {
             var current: NetworkConditions
@@ -72,7 +72,7 @@ struct ConditionsTests {
 
     /// The live `NWPathMonitor` observer, wrapped to count its deliveries: the host's network may report a change
     /// at any time, so a test counts what was delivered instead of assuming nothing was.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     final class CountingPath: PathObserving {
         private let inner: any PathObserving
         private let queue = Mutex<DispatchQueue?>(nil)
@@ -111,7 +111,7 @@ struct ConditionsTests {
     }
 
     /// Counts calls from any thread.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     final class ReadCounter: Sendable {
         private let value = Mutex(0)
 
@@ -124,7 +124,7 @@ struct ConditionsTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-9: the live conditions source yields the current state first, then on change, without polling", .timeLimit(.minutes(1)))
     func liveSourceIsEventDriven() async throws {
         let center = NotificationCenter()
@@ -156,7 +156,7 @@ struct ConditionsTests {
         #expect(settled.value == settled.deliveries + 2)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-9: path changes reach the stream as full snapshots, power notifications carry the current path, and nothing is read between changes", .timeLimit(.minutes(1)))
     func pathSeam() async throws {
         let center = NotificationCenter()
@@ -185,7 +185,7 @@ struct ConditionsTests {
         #expect(path.reads == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-9: the first element is the path observer's first delivery, even when a notification arrives as observation starts", .timeLimit(.minutes(1)))
     func pathStartsBeforeNotifications() async throws {
         let center = NotificationCenter()
@@ -212,7 +212,7 @@ struct ConditionsTests {
         #expect(path.reads == 1 && reads.count == 2)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-9: terminating the conditions stream stops path monitoring and removes the observers", .timeLimit(.minutes(1)))
     func terminationStopsObservation() async throws {
         let center = NotificationCenter()

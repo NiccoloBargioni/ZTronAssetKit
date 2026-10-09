@@ -235,13 +235,23 @@ public actor LoopbackHTTPServer {
         return port
     }
 
-    /// A listener on 127.0.0.1, any port, loopback only, whose connections are accepted on the actor.
-    private func makeListener() throws -> NWListener {
+    /// The listener's parameters: TCP on 127.0.0.1, any port, loopback only.
+    ///
+    /// The bound address and the required interface are what keep it loopback-only: no other host can reach
+    /// 127.0.0.1 on `lo0`. `acceptLocalOnly` is deliberately not set: in the iOS Simulator (iOS 27.0) a listener with it
+    /// resets every inbound connection from 127.0.0.1 (`nw_flow_service_reads … failed socket-flow … No output
+    /// handler`, the client reads ECONNRESET), while the same listener without it serves, on the simulator and on
+    /// macOS alike (docs/adr-drafts/ios.md, item 3). A separate function so the server's tests can pin all three.
+    static func listenerParameters() -> NWParameters {
         let parameters = NWParameters.tcp
         parameters.requiredInterfaceType = .loopback
-        parameters.acceptLocalOnly = true
         parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
-        let listener = try NWListener(using: parameters)
+        return parameters
+    }
+
+    /// A listener with `listenerParameters()`, whose connections are accepted on the actor.
+    private func makeListener() throws -> NWListener {
+        let listener = try NWListener(using: Self.listenerParameters())
         listener.newConnectionHandler = { [weak self] connection in
             Task {
                 // REENTRANCY: h-5 (proposed) — nothing: this task is not the actor; `accept` re-reads `stopped` on

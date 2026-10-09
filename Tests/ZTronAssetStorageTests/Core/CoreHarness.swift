@@ -89,8 +89,8 @@ enum CoreFixture {
 }
 
 /// A store over a `FakeFileSystem`, a manual clock and a scripted sink, plus helpers to stage and publish
-/// (WP-B tests; `@available(macOS 15.0, *)` per test, ADR-014).
-@available(macOS 15.0, *)
+/// (WP-B tests; `@available(macOS 15.0, iOS 18.0, *)` per test, ADR-014).
+@available(macOS 15.0, iOS 18.0, *)
 struct CoreHarness {
     let fileSystem: FakeFileSystem
     let time: ManualTimeSource
@@ -244,7 +244,7 @@ struct CoreHarness {
 
 /// Checks I-1, I-2 and I-4 over a reopened store and its disk (store.md §9.1 `InvariantChecker`); the crash tests add
 /// I-3 (`blobRemovals`) and I-5 (the generations that returned).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum CoreInvariants {
     /// The unlinks of well-named blobs in `operations`, as I-3 violations: in a scenario that prunes nothing and lets
     /// no grace pass, any such unlink removes a blob a reader may hold.
@@ -337,7 +337,7 @@ actor UnitCounter {
 }
 
 /// Polling without sleeping (SPEC 7.2) that never outlives its test.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum CorePoll {
     /// Evaluates `condition` until it holds, yielding in between. A test whose time limit ran out is cancelled: the poll
     /// then records an issue naming what it waited for and throws `CancellationError`, so the test ends within its limit

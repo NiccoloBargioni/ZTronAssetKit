@@ -11,7 +11,7 @@ struct TestSupportFakeStagingSinkTests {
         StagingFileName(transfer: .content(ContentHash.sha256(of: Data([5]))), attempt: TransferAttempt(epoch: 1, sequence: sequence), kind: kind)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: continuePartial moves an earlier partial exclusively and refuses a taken or missing name")
     func continuePartialIsExclusive() throws {
         let sink = FakeStagingSink()
@@ -24,7 +24,7 @@ struct TestSupportFakeStagingSinkTests {
         #expect(throws: StagingError.io(posixCode: ENOENT)) { try sink.continuePartial(from: Self.name(1), as: Self.name(4)) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: readStaged returns the staged bytes and refuses a missing file or more than maxBytes", .timeLimit(.minutes(1)))
     func readStagedHonoursTheCap() async throws {
         let sink = FakeStagingSink()
@@ -35,7 +35,7 @@ struct TestSupportFakeStagingSinkTests {
         await #expect(throws: StagingError.io(posixCode: ENOENT)) { try await sink.readStaged(Self.name(9), maxBytes: 2) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: sidecars are recorded, read back by partial name and discarded with their partial", .timeLimit(.minutes(1)))
     func sidecarsFollowTheirPartial() async throws {
         let sink = FakeStagingSink()
@@ -52,7 +52,7 @@ struct TestSupportFakeStagingSinkTests {
         #expect(sink.sidecars.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: writeStaged drains a chunk source and refuses a taken name, more than maxBytes and a failing source", .timeLimit(.minutes(1)))
     func writeStagedDrainsTheSource() async throws {
         let sink = FakeStagingSink()
@@ -67,7 +67,7 @@ struct TestSupportFakeStagingSinkTests {
         #expect(sink.contents[Self.name(3)] == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: adoptDownload copies a file the test made inside the repository and refuses a taken name")
     func adoptDownloadReadsTheFile() throws {
         let directory = URL(fileURLWithPath: #filePath)
@@ -86,7 +86,7 @@ struct TestSupportFakeStagingSinkTests {
         #expect(throws: StagingError.io(posixCode: ENOENT)) { try sink.adoptDownload(at: directory.appendingPathComponent("absent"), as: Self.name(2)) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: failNext fails exactly the next call of one operation")
     func failNextFiresOnce() throws {
         let sink = FakeStagingSink()
@@ -100,7 +100,7 @@ struct TestSupportFakeStagingSinkTests {
 }
 
 /// A chunk source over fixed chunks, optionally failing after them.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class FakeSinkChunkList: ChunkSource {
     private let remaining: Mutex<[Data]>
     private let failure: StagingError?

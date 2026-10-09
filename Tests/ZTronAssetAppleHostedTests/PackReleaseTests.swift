@@ -15,7 +15,7 @@ private func pack(_ paths: String...) -> [String: Data] {
 /// R-CLN-10 and the source half of R-CLN-9 (H-7, ADR-027).
 @Suite("Apple tier: releases and source copies")
 struct PackReleaseTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: reclaim releases a media pack once every entry in it is adopted or excluded", .timeLimit(.minutes(1)))
     func reclaimReleasesSettledPacks() async throws {
         let fixture = AppleTierFixture(installed: [
@@ -35,7 +35,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a pack that comes back after release is released at most once per catalog generation", .timeLimit(.minutes(1)))
     func releasedOncePerCatalogGeneration() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)])
@@ -55,7 +55,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a report larger than one survey slice releases exactly the packs settled in every slice", .timeLimit(.minutes(1)))
     func reportAcrossSurveySlices() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA), Packs.extras: pack(extraC)])
@@ -72,7 +72,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a release made before the first catalog fetch counts for that catalog's generation", .timeLimit(.minutes(1)))
     func releaseBeforeFirstFetchIsNotRepeated() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)])
@@ -84,7 +84,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-10: a released pack a transfer downloaded again for an adopted asset stays installed until the next catalog generation",
         .timeLimit(.minutes(1))
@@ -117,7 +117,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-10: a pack a transfer downloaded again while its release call was running stays released for that generation",
         .timeLimit(.minutes(1))
@@ -155,7 +155,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-10: requesting an excluded asset after its pack's release removes the pack once per catalog generation, never in a loop",
         .timeLimit(.minutes(1))
@@ -201,7 +201,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a transfer that ends in skew never re-arms its pack's release within a catalog generation", .timeLimit(.minutes(1)))
     func skewedTransferDoesNotRearmTheRelease() async throws {
         // Verifier probe PROBE-R3-1 (ADR-027): the catalog lists `missing`, which the retention scope excludes and the
@@ -230,7 +230,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a failed release is reported and planned again by the next reclaim", .timeLimit(.minutes(1)))
     func failedReleaseIsRetried() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)])
@@ -245,7 +245,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: a pack the system already removed counts as released", .timeLimit(.minutes(1)))
     func absentPackCountsAsReleased() async throws {
         let fixture = AppleTierFixture()
@@ -256,7 +256,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-10: keepPacks and an invalid catalog pack id never release through reclaim", .timeLimit(.minutes(1)))
     func keepPacksNeverReleases() async throws {
         let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
@@ -276,7 +276,7 @@ struct PackReleaseTests {
         await invalid.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-9: sourceCopyBytes sums the installed bytes of adopted media packs, and a pack the OS removed adds nothing",
         .timeLimit(.minutes(1))
@@ -311,7 +311,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-9: a released pack re-downloaded for an adopted asset counts as a source copy again", .timeLimit(.minutes(1)))
     func redownloadedPackCountsAsASourceCopy() async throws {
         let fixture = AppleTierFixture(
@@ -332,7 +332,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-9: a released pack downloaded again on demand counts as a source copy until a later catalog generation releases it",
         .timeLimit(.minutes(1))
@@ -380,7 +380,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-9: a pack whose release straddles a new catalog generation and comes back counts until that generation releases it",
         .timeLimit(.minutes(1))
@@ -421,7 +421,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-9: a pack whose planned removal is still running or failed counts as a source copy until a removal succeeds",
         .timeLimit(.minutes(1))
@@ -461,7 +461,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-9: a pack whose planned removal is running counts as a source copy even after a later survey finds it unsettled",
         .timeLimit(.minutes(1))
@@ -514,7 +514,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-9: sourceCopyBytes saturates instead of trapping when the installed sizes sum past Int64.max", .timeLimit(.minutes(1)))
     func sourceCopyBytesSaturates() async throws {
         // Verifier probe PROBE-R3-2: `PackBackend` is public, so any injected backend can report such sizes.
@@ -535,7 +535,7 @@ struct PackReleaseTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-CLN-9: packs kept by keepPacks keep counting as source copies", .timeLimit(.minutes(1)))
     func keptPacksCount() async throws {
         let fixture = AppleTierFixture(

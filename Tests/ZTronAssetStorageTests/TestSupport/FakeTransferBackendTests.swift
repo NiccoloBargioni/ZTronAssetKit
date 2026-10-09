@@ -18,7 +18,7 @@ struct TestSupportFakeTransferBackendTests {
         )
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: start records the job and returns a handle the test drives", .timeLimit(.minutes(1)))
     func startReturnsDrivableHandle() async {
         let backend = FakeTransferBackend(kind: .background)
@@ -36,7 +36,7 @@ struct TestSupportFakeTransferBackendTests {
         #expect(received == [.failed(.offline(.noConnection))])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: live transfers are scripted, cancellations are recorded and remove the cancelled name", .timeLimit(.minutes(1)))
     func liveTransfersAndCancellations() async {
         let backend = FakeTransferBackend()
@@ -49,7 +49,7 @@ struct TestSupportFakeTransferBackendTests {
         #expect(await backend.cancellations == [FakeBackendCancellation(name: first.name, keepingPartial: true)])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: invalidate fails every handle with a client cancellation and is counted", .timeLimit(.minutes(1)))
     func invalidateCancelsHandles() async {
         let backend = FakeTransferBackend()
@@ -66,7 +66,7 @@ struct TestSupportFakeTransferBackendTests {
 
     /// The Model's `TransferHandle`: terminating the updates stream (its consumer cancelled) cancels the transfer, so
     /// an `HTTPRemoteSource` test sees the cancellation a driver task's cancellation makes.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: cancelling the task that consumes a handle's updates records a cancellation on the handle", .timeLimit(.minutes(1)))
     func cancelledConsumerCancelsHandle() async throws {
         let backend = FakeTransferBackend()
@@ -88,7 +88,7 @@ struct TestSupportFakeTransferBackendTests {
 
     /// `.paused(resumable:)` says whether a partial plus a validator were kept: a stand-alone handle stands for a
     /// transfer that kept both until the test says otherwise.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a stand-alone handle pauses resumably unless the test says no partial was kept", .timeLimit(.minutes(1)))
     func standalonePauseOutcome() async {
         let kept = FakeTransferHandle(id: Self.job(1).id, attempt: Self.job(1).attempt)
@@ -107,7 +107,7 @@ struct TestSupportFakeTransferBackendTests {
         #expect(kept.controls == [.pause] && lost.controls == [.pause])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a handle ends with exactly one terminal update when a scripted delivery races a cancel", .timeLimit(.minutes(1)))
     func racingTerminalsDeliverOne() async {
         let staged = TransferUpdate.staged(StagedFile(name: Self.job(1).partialName, byteCount: 4, resumed: false, httpStatus: 200, etag: nil))

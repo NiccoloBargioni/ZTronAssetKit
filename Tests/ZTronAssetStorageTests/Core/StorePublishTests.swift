@@ -9,7 +9,7 @@ import ZTronAssetTestSupport
 @Suite("Core: publication and integrity")
 struct StorePublishTests {
     @Test("R-STO-3: a blob never appears at its final path before size check, hash verification and barrier", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func publicationOrder() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(hashChunkBytes: 128))
         let bytes = CoreFixture.bytes(5, count: 1_000)
@@ -44,7 +44,7 @@ struct StorePublishTests {
     }
 
     @Test("R-STO-3: bytes appended to a staged file after publication begins are never published", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func appendAfterClaimIsNeverPublished() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(bulk: bulk)
@@ -69,7 +69,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-1: streaming SHA-256 equals CryptoKit one-shot for 0, 1, 1 MiB−1, 1 MiB, 1 MiB+1 and 5 MiB", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func streamingHashMatchesOneShot() async throws {
         let bulk = CountingExecutor()
         let harness = CoreHarness.make(bulk: bulk)
@@ -92,7 +92,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-1: cancelling a hash stops at the next unit boundary and leaves the staged file in place", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func cancelledHashKeepsTheStagedFile() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(hashChunkBytes: 100), bulk: bulk)
@@ -124,7 +124,7 @@ struct StorePublishTests {
     /// exclusively; when a producer recreated `.part` meanwhile (an `O_CREAT` append), the rename fails and the claimed
     /// full-size file must not stay stranded in staging as `.verifying` until staging GC.
     @Test("R-INT-1: a cancelled hash whose claim cannot be handed back discards the claimed file and keeps the producer's new .part", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func cancelledHashHandBackFails() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(hashChunkBytes: 100), bulk: bulk)
@@ -156,7 +156,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-2: a checksum mismatch deletes the staged bytes, throws integrity, counts a metric and publishes nothing", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func checksumMismatch() async throws {
         let harness = CoreHarness.make()
         let claimed = CoreFixture.bytes(30)
@@ -180,7 +180,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-2: a staged file larger than maxAssetBytes is rejected as oversize before hashing", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func oversizeBeforeHashing() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(limits: ManifestLimits(maxAssetBytes: 100)))
         let bytes = CoreFixture.bytes(32, count: 300)
@@ -198,7 +198,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-2: a size mismatch is rejected before hashing and the staged bytes are deleted", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func sizeMismatchBeforeHashing() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(33, count: 300)
@@ -223,7 +223,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-5: unverified entries are rejected when allowUnverifiedAssets is false and flagged unverified otherwise", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func unverifiedEntries() async throws {
         let bytes = CoreFixture.bytes(40)
         let entry = CoreFixture.entry("legacy", bytes, checksum: false)
@@ -252,7 +252,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-6: the recorded blob hash is the digest of the written bytes, not the manifest claim", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func recordedHashIsOurDigest() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(41)
@@ -273,7 +273,7 @@ struct StorePublishTests {
     }
 
     @Test("R-SEC-2: manifest text never becomes a path component of the store", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func manifestTextNeverBecomesAPath() async throws {
         let seed: UInt64 = 0x5EC2
         var generator = SplitMix64(seed: seed)
@@ -350,7 +350,7 @@ struct StorePublishTests {
     }
 
     @Test("R-CLN-1: identical bytes published for two identifiers share one blob, and a second publication is a dedupe", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func dedupeSharesOneBlob() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(50)
@@ -374,7 +374,7 @@ struct StorePublishTests {
     }
 
     @Test("R-INT-2: a publication for a changed, unknown or failed entry is refused before any file operation", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func refusedPublications() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(60)

@@ -30,7 +30,7 @@ struct StoreApplyFenceTests {
     }
 
     @Test("R-NET-5: a commit asked for while apply writes its chunks waits for the whole apply, so a crash never pairs the new ETag with old records", .timeLimit(.minutes(2)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func commitWaitsForTheWholeApply() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: 1), bulk: bulk)
@@ -74,7 +74,7 @@ struct StoreApplyFenceTests {
     }
 
     @Test("R-NET-5: close while apply writes its chunks waits for the whole apply before its durable commit", .timeLimit(.minutes(2)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func closeWaitsForTheWholeApply() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let bulk = SteppedBlockingExecutor(holding: false)
@@ -119,7 +119,7 @@ struct StoreApplyFenceTests {
     }
 
     @Test("R-NET-5: while apply's writes are fenced no commit, adoption report or close captures the state, and each resumes once the fence drops", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func fencedCallersWaitAndResume() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.entry("a", CoreFixture.bytes(310))
@@ -166,7 +166,7 @@ struct StoreApplyFenceTests {
     }
 
     /// Waits until `count` callers are parked on the commit fence (no sleeping: the actor is polled between yields).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func waitForFenceWaiters(_ harness: CoreHarness, atLeast count: Int, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         try await CorePoll.until("\(count) callers parked on the commit fence", sourceLocation: sourceLocation) {
             await harness.state.core.applyGate.writeWaiters.count >= count
@@ -174,7 +174,7 @@ struct StoreApplyFenceTests {
     }
 
     @Test("R-SYN-8: apply's writes re-read records changed during its plan unit, and adoption re-validates every planned candidate", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func writesRevalidateAfterThePlanUnit() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(bulk: bulk)

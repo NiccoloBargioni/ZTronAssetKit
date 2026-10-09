@@ -46,7 +46,7 @@ struct StatusLoopbackTests {
         Route(status: 400, expected: .rejected(.unexpectedStatus(400))),
     ]
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: status mapping through the real delegate matches the pure table", .timeLimit(.minutes(1)), arguments: StatusLoopbackTests.routes)
     func statusThroughDelegate(_ route: Route) async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -59,7 +59,7 @@ struct StatusLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: an error body past the evidence cap stops the transfer and is still classified by its status", .timeLimit(.minutes(1)))
     func longErrorBody() async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -70,7 +70,7 @@ struct StatusLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SEC-1: the canary key appears in no transport update, error or log line", .timeLimit(.minutes(1)))
     func canaryNeverLeaks() async throws {
         let rig = try await LoopbackRig.make(allowedHosts: ["127.0.0.1", "localhost"]) { request in

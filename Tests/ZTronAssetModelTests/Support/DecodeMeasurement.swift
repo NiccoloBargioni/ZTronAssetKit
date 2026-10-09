@@ -73,7 +73,7 @@ enum DecodeMeasurement {
     /// are taken first and held, until a request is served fresh twice in a row; then a block of `2 * request - 64
     /// KiB` is freed, the only one left that fits. Returns the held blocks: keep them alive until the measurement
     /// ends, so they cannot be cached again.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func serveFromBlocksTwiceAsLarge(_ requests: [Int]) -> [[UInt8]] {
         var held: [[UInt8]] = []
         let large = requests.filter { $0 > 2 << 20 }
@@ -101,7 +101,7 @@ enum DecodeMeasurement {
     }
 
     /// Keeps the blocks of `serveFromBlocksTwiceAsLarge(_:)` observable.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static let blockSink = Atomic<Int>(0)
 
     /// The exact in-use heap growth `body` leaves behind with its result alive, with no sampler thread: the lowest of
@@ -120,7 +120,7 @@ enum DecodeMeasurement {
     }
 
     /// Runs `body` on the calling thread while a sampler thread tracks the heap's in-use bytes.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func measure<Result>(_ body: () throws -> Result) rethrows -> (result: Result, cost: DecodeCost) {
         let sampler = HeapSampler()
         let before = DecodeMeasurement.heapInUse()
@@ -146,7 +146,7 @@ enum DecodeMeasurement {
 }
 
 /// A thread that polls the heap's in-use bytes until stopped and keeps the maximum.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class HeapSampler: Sendable {
     private let stopRequested = Atomic<Bool>(false)
     private let started = Atomic<Bool>(false)

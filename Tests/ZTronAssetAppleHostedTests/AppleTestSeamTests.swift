@@ -10,7 +10,7 @@ private let seamAsset = PackAsset("ZTronMedia/seams/a.png", "pixels for the seam
 /// would make a wait endless into a failure instead of a hung run (ADR draft E-13).
 @Suite("Apple tier: test seams")
 struct AppleTestSeamTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("Seams: a cancelled wait for pack waiters returns while the count is still unmet", .timeLimit(.minutes(1)))
     func cancelledWaiterWaitReturns() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
@@ -32,7 +32,7 @@ struct AppleTestSeamTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("Seams: a wait for pack waiters ends when the coordinator closes with the count unmet", .timeLimit(.minutes(1)))
     func waiterWaitEndsOnClose() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
@@ -52,7 +52,7 @@ struct AppleTestSeamTests {
         #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("Seams: a cancelled wait for a drain returns while a staging write is still open", .timeLimit(.minutes(1)))
     func cancelledDrainWaitReturns() async throws {
         let gated = GatedStagingSink()
@@ -76,7 +76,7 @@ struct AppleTestSeamTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("Seams: cancelling a settle cancels the update check, which is recorded as failed", .timeLimit(.minutes(1)))
     func cancelledSettleCancelsTheCheck() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])

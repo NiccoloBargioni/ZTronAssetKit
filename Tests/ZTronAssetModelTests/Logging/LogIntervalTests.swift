@@ -11,7 +11,7 @@ extension ModelSuites {
     /// log: the recording sink hands out `OSSignposter.disabled`.
     @Suite("Log intervals")
     struct LogIntervalTests {
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-OBS-1: an interval begins and ends on the sink's signposter and reaches the tap as began and ended events")
         func intervalReachesSignposterAndTap() {
             let sink = SignpostRecordingSink()
@@ -35,7 +35,7 @@ extension ModelSuites {
             #expect(events.allSatisfy { $0.subsystem == "com.ztron.assetkit" })
         }
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-OBS-1: an environment of fakes emits no signpost and its tap still sees both edges of an interval")
         func testSinkReportsIntervalsOnlyToTheTap() {
             let tap = RecordingLogTap()
@@ -53,7 +53,7 @@ extension ModelSuites {
             silent.end()
         }
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-OBS-1: a tap that implements recordInterval receives structured events and no rendered lines")
         func structuredTapReceivesEvents() {
             let tap = StructuredTap()
@@ -66,7 +66,7 @@ extension ModelSuites {
             #expect(tap.lines.isEmpty)
         }
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-OBS-1: every end of an interval reaches the tap, so an owner's test sees a double end as a second ended edge")
         func doubleEndReachesTheTap() {
             // A copy is the same interval. Under `OSLogSink` a second end asserts in a debug build (the os overlay's
@@ -115,7 +115,7 @@ extension ModelSuites {
 
 /// A sink that records the lines written to it and every signposter request, handing out the disabled signposter
 /// so nothing reaches the unified log. Gated for `Mutex` (ADR-014).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class SignpostRecordingSink: LogSink {
     private let recorded = Mutex<(lines: [LogLine], requests: [LogCategory])>(([], []))
 
@@ -138,7 +138,7 @@ private final class SignpostRecordingSink: LogSink {
 }
 
 /// A tap that takes interval events as values. Gated for `Mutex` (ADR-014).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class StructuredTap: LogTap {
     private let recorded = Mutex<(lines: [LogLine], events: [LogIntervalEvent])>(([], []))
 

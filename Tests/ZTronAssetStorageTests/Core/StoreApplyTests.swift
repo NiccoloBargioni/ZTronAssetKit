@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 @Suite("Core: manifest application and launch reconciliation")
 struct StoreApplyTests {
     @Test("R-CLN-1: a directory change is an index edit with zero file operations on blobs", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func relocationIsAnIndexEdit() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(160)
@@ -29,7 +29,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-CLN-1: prune keeps a blob still referenced by another identifier", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func pruneKeepsSharedBlob() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(161)
@@ -47,7 +47,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-CLN-1: a key moving from a removed identifier to an added one is adopted before the prune, never doomed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func renamedIdentifierAdoptsTheBlob() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(162)
@@ -68,7 +68,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-SYN-8: a content change keeps serving the stale blob, ends failed and quarantined states and resets the integrity history", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func contentChanges() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.bytes(163)
@@ -91,7 +91,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-STO-4: with no valid index the store rebuilds from blob names and the next manifest without re-downloading verified assets", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func rebuildFromBlobNames() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.bytes(170)
@@ -122,7 +122,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-SYN-8: applying the same manifest twice is a no-op the second time", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func applyIsIdempotent() async throws {
         let harness = CoreHarness.make()
         let manifest = CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(172))])
@@ -137,7 +137,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-STO-2: markSynced refuses a stamp from before a purge and markSyncDue clears the stamp", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func stamps() async throws {
         let harness = CoreHarness.make()
         let manifest = CoreFixture.manifest([])
@@ -158,7 +158,7 @@ struct StoreApplyTests {
     }
 
     @Test("R-SEC-2: symbolic links and foreign names under blobs are removed at launch and never followed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func foreignNamesRemoved() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(173)

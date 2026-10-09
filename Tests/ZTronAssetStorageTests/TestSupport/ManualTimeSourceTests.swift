@@ -10,7 +10,7 @@ struct TestSupportManualTimeSourceTests {
     /// Registers one sleeper per deadline, in order, waiting for each registration (so sequence numbers are fixed).
     /// Throws when the test is cancelled before a sleeper registered (its time limit), so the test ends there instead
     /// of awaiting sleepers that never registered and that nothing would ever wake (L2 follow-up).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func sleepers(
         _ time: ManualTimeSource,
         _ offsets: [TimeInterval]
@@ -25,7 +25,7 @@ struct TestSupportManualTimeSourceTests {
     }
 
     /// One sleeper in a task of its own: `true` when woken, `false` when cancelled.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func sleeper(_ time: ManualTimeSource, until deadline: MonotonicInstant) -> Task<Bool, Never> {
         Task {
             do {
@@ -37,7 +37,7 @@ struct TestSupportManualTimeSourceTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: one advance wakes exactly the due sleepers in deadline then registration order and keeps the rest", .timeLimit(.minutes(1)))
     func advanceWakesDueSleepersInOrder() async throws {
         let time = ManualTimeSource()
@@ -57,7 +57,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.monotonicNow() == start.adding(seconds: 9))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: advancing to an earlier instant moves no clock and wakes nobody", .timeLimit(.minutes(1)))
     func advanceToThePastIsANoOp() async throws {
         let time = ManualTimeSource()
@@ -72,7 +72,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(await tasks[0].value == false)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: a device sleep advances wall and monotonic time, wakes due sleepers, and keeps the awake clock still", .timeLimit(.minutes(1)))
     func deviceSleepStopsTheAwakeClock() async throws {
         let time = ManualTimeSource()
@@ -89,7 +89,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.uptimeNow() == uptime.adding(seconds: 1))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: a wall-clock jump moves neither the monotonic nor the awake clock")
     func wallClockJump() {
         let time = ManualTimeSource()
@@ -102,7 +102,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.uptimeNow() == uptime)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: a sleep whose deadline already passed returns at once and never registers", .timeLimit(.minutes(1)))
     func pastDeadlineReturnsAtOnce() async throws {
         let time = ManualTimeSource()
@@ -112,7 +112,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.nextDeadline == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: a sleeper cancelled before it could register throws and leaves nothing registered", .timeLimit(.minutes(1)))
     func cancelledBeforeRegistration() async {
         let time = ManualTimeSource()
@@ -134,7 +134,7 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.nextDeadline == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: waitForSleepers returns once enough sleepers are registered, at once when they already are", .timeLimit(.minutes(1)))
     func waitForSleepersIsEventDriven() async throws {
         // The `Void` form under test registers the sleepers here (the helper uses the throwing form); a wait that the

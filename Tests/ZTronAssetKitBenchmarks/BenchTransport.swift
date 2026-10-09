@@ -10,7 +10,7 @@ extension ZTronAssetKitBenchmarks {
     /// through `QualityBudgets`.
     @Suite("TransportBenchmarks")
     struct TransportBenchmarks {
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("P-10: 500 small assets over a loopback server use at most connections_max TCP connections", .timeLimit(.minutes(1)))
         func connectionReuse() async throws {
             let budgets = try QualityBudgets()

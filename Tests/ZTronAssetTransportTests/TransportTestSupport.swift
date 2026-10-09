@@ -87,7 +87,7 @@ func run(_ handle: any TransferHandle) async -> TransferRun {
 
 /// A loopback server, a `FakeStagingSink` and an `HTTPRemoteSource` over the real foreground backend with the
 /// package-only loopback policy (ADR-011). One rig per test: an ephemeral port, so tests run in parallel.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 struct LoopbackRig {
     let server: LoopbackHTTPServer
     let port: UInt16
@@ -178,7 +178,7 @@ struct LoopbackRig {
 }
 
 /// The `transfer` interval edges a tap recorded (R-OBS-1): every began edge must have exactly one ended edge.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 func transferIntervalEdges(_ tap: RecordingLogTap) -> (began: Int, ended: Int) {
     let events = tap.lines.compactMap(LogIntervalEvent.init(line:)).filter { $0.name == .transfer }
     return (events.filter { $0.phase == .began }.count, events.filter { $0.phase == .ended }.count)
@@ -227,7 +227,7 @@ func awaitProgress(
 /// A staging sink whose `discard` waits for `release()`; everything else goes straight to `base`. It holds a
 /// foreground handle's `cancel()` between its synchronous mark and the task's cancellation, so that window can be
 /// observed deterministically.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class HeldDiscardSink: StagingSink {
     let base: FakeStagingSink
     private let gate = DiscardGate()

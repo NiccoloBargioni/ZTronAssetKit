@@ -7,7 +7,7 @@ import ZTronAssetModel
 /// The reader behind `LiveAssetPackBackend` (R-APL-1, C1, C2), exercised with pipes: no file is created.
 @Suite("Apple tier: file-handle reader")
 struct FileHandleChunkReaderTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: the live reader opens on its first read and streams bounded chunks to the end")
     func opensLazilyAndStreams() throws {
         let pipe = Pipe()
@@ -28,7 +28,7 @@ struct FileHandleChunkReaderTests {
         #expect(opens.withLock { $0 } == 1)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: overlapping first reads continue on the handle stored first and never read from two handles")
     func overlappingFirstReadsShareOneHandle() throws {
         let first = Pipe()
@@ -61,7 +61,7 @@ struct FileHandleChunkReaderTests {
         #expect(opens.withLock { $0 } == 2)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: an absent pack or file asks for the pack and a failed read is readFailed")
     func failuresMapToSourceFailures() {
         for (error, expected) in [

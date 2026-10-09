@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
 /// R-APL-4 / transport-2 T2-12 / ADR-032: a catalog and its media packs can be at different versions.
 @Suite("Apple tier: version skew")
 struct AppleSkewTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a catalog and pack version skew is transient and never quarantines the asset", .timeLimit(.minutes(1)))
     func checksumSkewIsTransient() async throws {
         let catalogVersion = PackAsset("ZTronMedia/images/a.heic", "pixels v2")
@@ -27,7 +27,7 @@ struct AppleSkewTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a pack file of another size than the catalog's is skew, stopped at the catalog size", .timeLimit(.minutes(1)))
     func sizeSkewIsTransient() async throws {
         let asset = PackAsset("ZTronMedia/images/a.heic", "0123456789")
@@ -48,7 +48,7 @@ struct AppleSkewTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a file missing from its pack after the pack was made available is skew", .timeLimit(.minutes(1)))
     func missingFileAfterEnsureIsSkew() async throws {
         let asset = PackAsset("ZTronMedia/images/new.heic", "added in catalog v2")
@@ -64,7 +64,7 @@ struct AppleSkewTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: an asset larger than the transfer cap is oversize, not skew", .timeLimit(.minutes(1)))
     func overCapIsOversize() async throws {
         let asset = PackAsset("ZTronMedia/videos/huge.mp4", String(repeating: "x", count: 64))

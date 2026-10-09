@@ -14,7 +14,7 @@ private let mediaFiles = [assetA.path: assetA.bytes, assetB.path: assetB.bytes]
 /// R-APL-1, R-APL-3: assets are copied out of packs into staging (transport.md §11.3, ADR-027).
 @Suite("Apple tier: transfers")
 struct AppleTransferTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: the Apple source satisfies RemoteSource end to end against a fake PackBackend", .timeLimit(.minutes(1)))
     func endToEnd() async throws {
         let fixture = AppleTierFixture(installed: [
@@ -63,7 +63,7 @@ struct AppleTransferTests {
         await source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: constructing the Apple source and selecting the tier call no pack API", .timeLimit(.minutes(1)))
     func constructionTouchesNoPack() async throws {
         let backend = FakePackBackend(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -81,7 +81,7 @@ struct AppleTransferTests {
         #expect(backend.calls.isEmpty)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: concurrent fetches of assets in one pack trigger one ensureAvailable", .timeLimit(.minutes(1)))
     func concurrentFetchesShareOnePackDownload() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -100,7 +100,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a cancelled waiter leaves the shared pack download running for the others", .timeLimit(.minutes(1)))
     func cancelledWaiterLeavesOthersRunning() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -120,7 +120,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: the pack download is cancelled when its last waiter leaves", .timeLimit(.minutes(1)))
     func lastWaiterLeavingCancelsTheDownload() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -134,7 +134,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: pause ends a pack transfer as not resumable and keeps nothing in staging", .timeLimit(.minutes(1)))
     func pauseEndsNotResumable() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -149,7 +149,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a control after the copy finished discards the staged file and ends the stream once", .timeLimit(.minutes(1)))
     func controlAfterCopyDiscardsTheFile() async throws {
         let gated = GatedStagingSink()
@@ -165,7 +165,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a transfer cancelled before it waits for its pack starts no pack download", .timeLimit(.minutes(1)))
     func cancelBeforePackWaitStartsNothing() async throws {
         let gated = GatedStagingSink()
@@ -180,7 +180,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a stopped transfer whose copy outlives invalidate leaves the copy for staging GC", .timeLimit(.minutes(1)))
     func stoppedCopyOutlivingInvalidate() async throws {
         let gated = GatedStagingSink()
@@ -201,7 +201,7 @@ struct AppleTransferTests {
         #expect(!gated.events.contains("discard"))
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a transfer stopped before its copy reads a chunk opens no pack file", .timeLimit(.minutes(1)))
     func stopBeforeTheFirstChunkReadsNothing() async throws {
         let gated = GatedStagingSink()
@@ -217,7 +217,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: invalidate stops a copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
     func invalidateStopsACopyInFlight() async throws {
         let gated = GatedStagingSink()
@@ -236,7 +236,7 @@ struct AppleTransferTests {
         #expect(gated.base.contents.isEmpty)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a staged copy whose update stream already ended is discarded instead of delivered", .timeLimit(.minutes(1)))
     func stagedCopyForAnEndedStreamIsDiscarded() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
@@ -253,7 +253,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: dropping the update stream cancels the transfer", .timeLimit(.minutes(1)))
     func droppingTheStreamCancels() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -270,7 +270,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: invalidate cancels pack waiters and returns only after in-flight staging writes", .timeLimit(.minutes(1)))
     func invalidateDrainsStagingWrites() async throws {
         let gated = GatedStagingSink()
@@ -301,7 +301,7 @@ struct AppleTransferTests {
         #expect(gated.base.contents[assetB.request().partialName] == nil)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: an invalid remote path is rejected without touching any pack", .timeLimit(.minutes(1)))
     func invalidRemotePathIsRejected() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
@@ -312,7 +312,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a pack the system does not know is permanently missing", .timeLimit(.minutes(1)))
     func unknownPackIsMissing() async throws {
         let fixture = AppleTierFixture()
@@ -322,7 +322,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a staging failure maps into the transfer taxonomy and leaves no partial", .timeLimit(.minutes(1)))
     func stagingFailureIsMapped() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
@@ -333,7 +333,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a staging name already in use is reported and never discarded", .timeLimit(.minutes(1)))
     func nameInUseIsNeverDiscarded() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
@@ -347,7 +347,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a checksum-less entry of unknown size is staged without progress or checksum comparison", .timeLimit(.minutes(1)))
     func legacyEntryIsStagedBySizeOnly() async throws {
         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
@@ -365,7 +365,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-OBS-1: an Apple transfer runs inside the transfer signpost interval", .timeLimit(.minutes(1)))
     func transferIsWrappedInTheInterval() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
@@ -379,7 +379,7 @@ struct AppleTransferTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-OBS-1: a failed, cancelled or paused Apple transfer closes its interval before its terminal update", .timeLimit(.minutes(1)))
     func stoppedTransferClosesTheInterval() async throws {
         // Failed: the file is missing from its pack after the pack was made available (skew).
@@ -410,7 +410,7 @@ struct AppleTransferTests {
         }
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-OBS-1: the transfer interval is already closed when the driver ends its stream", .timeLimit(.minutes(1)))
     func intervalClosesBeforeTheStreamEnds() async throws {
         // Deterministic: `finish()` runs the termination handler synchronously on the driver's own task, so the
@@ -442,7 +442,7 @@ struct AppleTransferTests {
         ]
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-3: an adopted asset is served from blobs and never from a pack location", .timeLimit(.minutes(1)))
     func adoptedAssetIsServedFromBlobs() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: mediaFiles])
@@ -486,7 +486,7 @@ struct AppleTransferTests {
 }
 
 /// The interval edges a stream's termination handler saw, taken once.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class IntervalSnapshot: Sendable {
     private let state = Mutex<[LogIntervalEvent]?>(nil)
 

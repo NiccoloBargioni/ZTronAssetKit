@@ -9,14 +9,14 @@ import ZTronAssetTransport
 /// and the events barrier, never by timing.
 @Suite("Background coordinator interleavings")
 struct BackgroundInterleavingTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     typealias Rig = BackgroundCoordinatorTests.Rig
 
     static func staged(_ job: TransferJob, bytes: Int64 = 4_000) -> TransferUpdate {
         .staged(StagedFile(name: job.partialName, byteCount: bytes, resumed: false, httpStatus: 200, etag: nil))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a start during a cancel or pause of the same content creates its own download and each handle ends as its own control asked", .timeLimit(.minutes(1)), arguments: [false, true])
     func startDuringControl(_ pause: Bool) async throws {
         let rig = try Rig("control-vs-start-\(pause)")
@@ -41,7 +41,7 @@ struct BackgroundInterleavingTests {
         #expect(await run(later).terminal == Self.staged(second))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a replaced handle's controls and its terminated stream never reach the transfer that replaced it", .timeLimit(.minutes(1)))
     func replacedHandleControlsNothing() async throws {
         let rig = try Rig("replaced-handle")
@@ -63,7 +63,7 @@ struct BackgroundInterleavingTests {
         #expect(await run(replacing).terminal == Self.staged(job))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-10: a priority change from a handle replaced while it listed the tasks never reaches the transfer that replaced it", .timeLimit(.minutes(1)))
     func replacedDuringPriorityChange() async throws {
         let rig = try Rig("replaced-during-priority")
@@ -86,7 +86,7 @@ struct BackgroundInterleavingTests {
         #expect(await run(second).terminal == Self.staged(job))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: dropping a handle while a later start lists the tasks never ends the later transfer", .timeLimit(.minutes(1)))
     func dropDuringStart() async throws {
         let rig = try Rig("drop-during-start")
@@ -116,7 +116,7 @@ struct BackgroundInterleavingTests {
         #expect(await rig.driver.cancellations.count == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a second cancel that finds the task already gone keeps a stale listing from joining it while the first is still ending it", .timeLimit(.minutes(1)))
     func secondCancelKeepsTheTaskEnding() async throws {
         let rig = try Rig("second-cancel")
@@ -143,7 +143,7 @@ struct BackgroundInterleavingTests {
         #expect(await run(later).terminal == Self.staged(second))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a start whose listing names a task the pump already ended creates a new download instead of waiting forever", .timeLimit(.minutes(1)))
     func staleListingAfterFailure() async throws {
         let rig = try Rig("stale-listing")
@@ -176,7 +176,7 @@ struct BackgroundInterleavingTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: re-attachment that overlaps a finished download reports it once, as staged, and keeps no phantom live task", .timeLimit(.minutes(1)))
     func reattachOverlappingFinish() async throws {
         let rig = try Rig("reattach-overlap", maxTasks: 1)
@@ -201,7 +201,7 @@ struct BackgroundInterleavingTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: an outcome reported at re-attachment is not handed out again, since launch reconciliation owns its file", .timeLimit(.minutes(1)))
     func reportedOutcomeIsHandedOver() async throws {
         let rig = try Rig("reported-once")
@@ -224,7 +224,7 @@ struct BackgroundInterleavingTests {
         withExtendedLifetime([firstLaunch, handle]) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a download that finishes while nobody waits is handed to the next start for its content, not downloaded again", .timeLimit(.minutes(1)))
     func unreportedOutcomeIsHandedOut() async throws {
         let rig = try Rig("handed-out")
@@ -243,7 +243,7 @@ struct BackgroundInterleavingTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a buffered download is handed only to a start that expects its size, else a new download is created", .timeLimit(.minutes(1)))
     func bufferedOutcomeOfAnotherSize() async throws {
         let rig = try Rig("buffered-other-size")
@@ -279,7 +279,7 @@ struct BackgroundInterleavingTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: the background path takes only transfers whose byteSize is known and within the cap", .timeLimit(.minutes(1)), arguments: [
         Unbounded(expected: nil, maxBytes: 1_000), Unbounded(expected: 4_000, maxBytes: 1_000),
     ])
@@ -299,7 +299,7 @@ struct BackgroundInterleavingTests {
         #expect(await coordinator.admits())
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a start for the very attempt whose task is being cancelled is refused as a name clash", .timeLimit(.minutes(1)))
     func sameAttemptDuringCancel() async throws {
         let rig = try Rig("same-attempt")
@@ -317,7 +317,7 @@ struct BackgroundInterleavingTests {
         #expect(await rig.driver.starts.count == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: resume data kept by background pauses is bounded by the task cap", .timeLimit(.minutes(1)))
     func keptResumeDataIsBounded() async throws {
         let rig = try Rig("resume-bound", maxTasks: 1)

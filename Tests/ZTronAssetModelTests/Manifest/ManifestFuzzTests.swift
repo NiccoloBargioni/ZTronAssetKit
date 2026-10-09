@@ -57,7 +57,7 @@ extension ModelSuites {
             return 0x5EED_0000_0003
         }()
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-MAN-3: seeded fuzz of random, truncated, mutated and deeply nested manifests never traps, and outside Thread Sanitizer stays within 4x the payload in linear time")
         func seededFuzzStaysWithinBounds() throws {
             let seed = Self.baseSeed
@@ -108,7 +108,7 @@ extension ModelSuites {
             }
         }
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test("R-MAN-3: a manifest whose decoded form could exceed four times its payload is rejected before anything is built")
         func overBudgetManifestIsRejectedEarly() throws {
             let payload = ManifestCorpus.shortComponentEntries(length: 16, maxBytes: 2 << 20)

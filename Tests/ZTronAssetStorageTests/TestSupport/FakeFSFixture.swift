@@ -13,7 +13,7 @@ enum FakeFSFixture {
     }
 
     /// A fresh fake on `disk`, with its own manual clock.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func make(
         _ disk: DiskImage = DiskImage(),
         crashBefore: Int? = nil,
@@ -34,13 +34,13 @@ enum FakeFSFixture {
     }
 
     /// The disk a power loss that drops un-synced state would leave now.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func powerLoss(_ disk: DiskImage, _ mode: CrashMode = .powerLossDropUnsynced) -> DiskImage {
         FakeFFSLifetime.next(disk, mode: mode).survivingDisk()
     }
 
     /// A file's whole content, or `nil` when it cannot be read.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func content(_ fileSystem: FakeFileSystem, _ path: String) -> [UInt8]? {
         guard let data = try? fileSystem.read(from: FakeFSFixture.url(path), offset: 0, maxLength: 1 << 20) else {
             return nil
@@ -52,7 +52,7 @@ enum FakeFSFixture {
 /// Starts the next lifetime of a disk.
 enum FakeFFSLifetime {
     /// A fake on `disk` whose `survivingDisk()` applies `mode` now.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func next(_ disk: DiskImage, mode: CrashMode = .processKill) -> FakeFileSystem {
         FakeFSFixture.make(disk, mode: mode)
     }

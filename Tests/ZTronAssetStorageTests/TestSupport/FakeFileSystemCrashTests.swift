@@ -4,14 +4,16 @@ import ZTronAssetModel
 import ZTronAssetTestSupport
 
 /// Deterministic, enumerable crash points (R-STO-5's machinery): mutation k never happens, every later call fails,
-/// and the same k and mode always leave the same disk.
+/// and the same k and mode always leave the same disk. The two enumerations are `async` only to give their cooperative
+/// thread back once per crash point (`await Task.yield()`), so time-limited tests beside them keep the pool (ADR draft
+/// `ios.md`, item 4).
 @Suite("Test support: FakeFileSystem crash points")
 struct TestSupportFakeFileSystemCrashTests {
     private static let root = "/fake-volume/Library/Application Support/ZTronAssetKit"
 
     /// A store-shaped scenario: layout, lock, a published blob, an index commit and a staging cleanup. Every step is
     /// attempted whatever the previous one did, so a crash run issues the same calls as a clean run.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func scenario(_ fileSystem: FakeFileSystem) {
         let root = FakeFSFixture.url(Self.root)
         let blobs = root.appendingPathComponent("blobs")
@@ -47,14 +49,14 @@ struct TestSupportFakeFileSystemCrashTests {
         var destination: String?
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func calls(_ fileSystem: FakeFileSystem) -> [Call] {
         fileSystem.operations.map { Call(kind: $0.kind, path: $0.url.path, destination: $0.destination?.path) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: crash enumeration is deterministic: every crash point and mode repeats the clean run's prefix and its disk")
-    func crashEnumerationIsDeterministic() throws {
+    func crashEnumerationIsDeterministic() async throws {
         let clean = FakeFSFixture.make()
         Self.scenario(clean)
         let cleanCalls = Self.calls(clean)
@@ -64,6 +66,7 @@ struct TestSupportFakeFileSystemCrashTests {
 
         for mode in CrashMode.allCases {
             for k in 0...mutations {
+                await Task.yield()
                 let first = FakeFSFixture.make(crashBefore: k, mode: mode)
                 let second = FakeFSFixture.make(crashBefore: k, mode: mode)
                 Self.scenario(first)
@@ -82,15 +85,16 @@ struct TestSupportFakeFileSystemCrashTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a crash point under a power-loss mode leaves what a kill at that point followed by that power loss leaves")
-    func powerLossCrashPointsEqualKillThenPowerLoss() {
+    func powerLossCrashPointsEqualKillThenPowerLoss() async {
         let clean = FakeFSFixture.make()
         Self.scenario(clean)
         let mutations = clean.mutationCount
         for mode in [CrashMode.powerLossDropUnsynced, .powerLossKeepMetadata] {
             var lostSomething = 0
             for k in 0...mutations {
+                await Task.yield()
                 let crashed = FakeFSFixture.make(crashBefore: k, mode: mode)
                 let killed = FakeFSFixture.make(crashBefore: k, mode: .processKill)
                 Self.scenario(crashed)
@@ -106,7 +110,7 @@ struct TestSupportFakeFileSystemCrashTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: the mutation a crash point names never happens and every later call throws EIO")
     func crashPointStopsTheLifetime() {
         let fileSystem = FakeFSFixture.make(crashBefore: 1)
@@ -123,7 +127,7 @@ struct TestSupportFakeFileSystemCrashTests {
         #expect(!disk.directories.contains("/fake-volume/b"))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: queries are not crash points and failed mutations still consume their crash-point index")
     func mutationsAreNumberedInCallOrder() {
         let fileSystem = FakeFSFixture.make()
@@ -146,7 +150,7 @@ struct TestSupportFakeFileSystemCrashTests {
         #expect(!crashOnFailedRename.survivingDisk().directories.contains("/fake-volume/d"))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a torn write lands half the crashing write's bytes, and a torn crash elsewhere equals a process kill")
     func tornWriteLandsHalf() throws {
         let file = FakeFSFixture.url("/fake-volume/index.tmp")
@@ -166,7 +170,7 @@ struct TestSupportFakeFileSystemCrashTests {
 
     /// R-STO-9 relies on the lock file outliving the process that held it: the next lifetime locks the **same** file
     /// (same identity), never a fresh one made by the acquisition. Lock state itself lives in a lifetime only.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a process kill keeps the lock file with its identity, and the next lifetime locks that same file")
     func crashKeepsTheLockFile() throws {
         let lock = FakeFSFixture.url("/fake-volume/store.lock")

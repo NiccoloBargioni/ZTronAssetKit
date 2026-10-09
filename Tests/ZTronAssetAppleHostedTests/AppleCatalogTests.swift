@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
 /// R-APL-4: catalog-in-pack mode (transport.md §11.2 as amended by transport-2 T2-12, T2-14, T2-20).
 @Suite("Apple tier: catalog")
 struct AppleCatalogTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: the catalog is read from the essential pack and its digest is the ETag", .timeLimit(.minutes(1)))
     func catalogFromEssentialPack() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -25,7 +25,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: an unchanged catalog yields notModified and a changed one is fetched", .timeLimit(.minutes(1)))
     func unchangedCatalogIsNotModified() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -47,7 +47,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a hanging update check never delays reading the installed catalog", .timeLimit(.minutes(1)))
     func hangingUpdateCheckNeverDelaysTheCatalog() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -72,7 +72,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-APL-4: a failing update check still returns the installed catalog, marked not update-checked",
         .timeLimit(.minutes(1))
@@ -101,7 +101,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: packs removed by the update check are reported to the engine once, on notModified too", .timeLimit(.minutes(1)))
     func removedPacksAreReported() async throws {
         let fixture = AppleTierFixture(installed: [
@@ -122,7 +122,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: removals found while a fetch fails are reported by the next successful fetch", .timeLimit(.minutes(1)))
     func removalsSurviveAFailedFetch() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -144,7 +144,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: update checks are skipped when the request or the configuration disallows them", .timeLimit(.minutes(1)))
     func updateChecksFollowRequestAndConfiguration() async throws {
         let disallowed = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -162,7 +162,7 @@ struct AppleCatalogTests {
         await switchedOff.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a missing catalog pack is made available once and read again", .timeLimit(.minutes(1)))
     func missingCatalogPackIsMadeAvailable() async throws {
         let fixture = AppleTierFixture(remote: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -177,7 +177,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a fetch cancelled while the catalog pack downloads ends at once and stops the download", .timeLimit(.minutes(1)))
     func fetchCancelledDuringCatalogDownload() async throws {
         let fixture = AppleTierFixture(remote: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -194,7 +194,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a missing catalog pack while offline reports offline", .timeLimit(.minutes(1)))
     func missingCatalogPackOfflineReportsOffline() async throws {
         let fixture = AppleTierFixture()
@@ -208,7 +208,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a catalog pack without the catalog file is permanently missing", .timeLimit(.minutes(1)))
     func catalogPackWithoutCatalogIsMissing() async throws {
         let other = ["other.json": Data("{}".utf8)]
@@ -219,7 +219,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a catalog over the manifest cap is refused while it streams", .timeLimit(.minutes(1)))
     func oversizedCatalogIsRefused() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -231,7 +231,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a staged catalog that cannot be read back fails and is removed", .timeLimit(.minutes(1)))
     func unreadableStagedCatalogFails() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
@@ -243,7 +243,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a catalog copy that outlives invalidate cancels the fetch and is left for staging GC", .timeLimit(.minutes(1)))
     func catalogCopyOutlivingInvalidate() async throws {
         let gated = GatedStagingSink()
@@ -267,7 +267,7 @@ struct AppleCatalogTests {
         #expect(!gated.events.contains("discard"))
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: invalidate stops a catalog copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
     func invalidateStopsACatalogCopyInFlight() async throws {
         let gated = GatedStagingSink()
@@ -290,7 +290,7 @@ struct AppleCatalogTests {
         #expect(gated.base.contents.isEmpty)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: an invalid catalog location is rejected without touching any pack", .timeLimit(.minutes(1)))
     func invalidCatalogLocationIsRejected() async throws {
         let fixture = AppleTierFixture(configuration: AppleTierConfiguration(catalogPackID: "..", catalogPath: "catalog.json"))
@@ -302,7 +302,7 @@ struct AppleCatalogTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-4: a manifest fetch after invalidate is cancelled and touches no staging", .timeLimit(.minutes(1)))
     func fetchAfterInvalidateIsCancelled() async throws {
         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
