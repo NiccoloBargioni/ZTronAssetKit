@@ -129,7 +129,7 @@ extension AssetStore {
         self.state.migration.queue = queue.reversed()
         self.state.migration.claimed = []
         self.state.migration.legacyIDs = plan.legacyIDs
-        self.state.migration.manifestDecoded = decoded.manifest != nil
+        self.state.migration.manifestDigest = decoded.manifest?.digest
         self.state.migration.progress = LegacyMigrationProgress(adopted: 0, remaining: queue.count, dropped: dropped, finished: false)
         return true
     }
@@ -342,12 +342,16 @@ extension AssetStore {
 
     // MARK: Phases 3 and 4
 
-    /// Phase 3, then phase 4: the stamp migrates only when every legacy entry is present at its current content (and
-    /// never over a newer stamp); otherwise a sync is made due. The "done" generation is committed **durably** before the
-    /// irrevocable removal of the tree and of the `UserDefaults` key.
+    /// Phase 3, then phase 4: the stamp migrates only when the applied manifest is still the legacy one phase 1 decoded
+    /// and every one of its entries is present at its current content (and never over a newer stamp); otherwise a sync
+    /// is made due. The "done" generation is committed **durably** before the irrevocable removal of the tree and of the
+    /// `UserDefaults` key.
     func finishLegacyMigration(_ root: URL) async throws(StoreError) {
         let migration = self.state.migration
-        let allAdopted = migration.manifestDecoded && migration.legacyIDs.allSatisfy { id in
+        // A manifest applied during migration (the engine synced, or an interrupted run resumed after an apply) may list
+        // entries nobody fetched: a stamp over its digest would claim them synced (review round 3, ZProbe-stamp).
+        let current = migration.manifestDigest.map { $0 == self.state.core.appliedManifest.digest } ?? false
+        let allAdopted = current && migration.legacyIDs.allSatisfy { id in
             guard let record = self.state.core.records[id] else {
                 return false
             }

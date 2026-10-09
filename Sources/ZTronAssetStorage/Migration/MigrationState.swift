@@ -38,8 +38,10 @@ struct MigrationState: Sendable {
     /// Every entry of the legacy manifest, in manifest order: phase 3 migrates the stamp only when each one is present
     /// at its current content.
     var legacyIDs: [AssetID] = []
-    /// A legacy manifest was found and decoded; without one nothing counts as fully adopted.
-    var manifestDecoded = false
+    /// The digest of the legacy manifest phase 1 decoded in this lifetime (`nil`: none was found or decoded, and then
+    /// nothing counts as fully adopted). Phase 3 migrates the stamp only while the applied manifest is still this one: a
+    /// newer manifest applied during migration was never synced, whatever is present (review round 3, ZProbe-stamp).
+    var manifestDigest: ContentHash?
     /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
     /// moved files that no committed record expects).
     var planCommitted = false
