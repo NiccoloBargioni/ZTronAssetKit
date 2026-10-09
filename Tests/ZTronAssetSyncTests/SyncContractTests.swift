@@ -4,6 +4,7 @@ import ZTronAssetModel
 import ZTronAssetSync
 import ZTronAssetTestSupport
 
+
 @Suite("Sync contracts")
 struct SyncContractTests {
     @Test("R-SYN-2: the transition table admits exactly the listed transitions")

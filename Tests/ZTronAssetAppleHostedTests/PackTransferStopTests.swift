@@ -11,7 +11,7 @@ private let asset = PackAsset("ZTronMedia/images/a.heic", "pixels of a")
 /// copy and the terminal element is reached deterministically.
 @Suite("Apple tier: terminal claim")
 struct PackTransferStopTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: the first stop requested before the claim is the terminal; a stop after the claim is ignored")
     func claimDecidesOnce() {
         let stopped = PackTransferStop()
@@ -28,7 +28,7 @@ struct PackTransferStopTests {
         #expect(finished.claimTerminal() == nil)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a racing stop is recorded exactly when the claim reports it", .timeLimit(.minutes(1)))
     func claimAndRequestAreOneDecision() async {
         for round in 0..<500 {
@@ -52,7 +52,7 @@ struct PackTransferStopTests {
         }
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a cancel or pause landing after the copy staged and before the claim ends the transfer stopped and discards the copy", .timeLimit(.minutes(1)))
     func stopBeforeClaimReplacesAStagedCopy() async throws {
         for control in [TransferControl.cancel, .pause] {
@@ -68,7 +68,7 @@ struct PackTransferStopTests {
         }
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-1: a control after the claim leaves the staged copy delivered and intact", .timeLimit(.minutes(1)))
     func controlAfterClaimIsANoOp() async throws {
         let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: asset.bytes]])
@@ -84,7 +84,7 @@ struct PackTransferStopTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test(
         "R-CLN-10: a copy staged from a pack downloaded on demand that reaches no consumer leaves the pack released for the generation",
         .timeLimit(.minutes(1))
@@ -114,7 +114,7 @@ struct PackTransferStopTests {
     /// A driver over the fixture's source with its own stop, as `PackTransferHandle.start` builds one, yielding into
     /// `updates`; without one, into a stream nobody holds (a consumer that dropped it after the terminal was claimed,
     /// since no stop is wired to it).
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func driver(
         for request: TransferRequest,
         in fixture: AppleTierFixture,
@@ -132,7 +132,7 @@ struct PackTransferStopTests {
 
     /// Copies the asset into `request`'s staging file as an attempt would, and returns the staged element the
     /// attempt proposes.
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func stagedCopy(of request: TransferRequest, in fixture: AppleTierFixture) async throws -> TransferUpdate {
         let location = try #require(PackLocation(remotePath: request.remotePath))
         let copied = await fixture.source.copier.copy(location, as: request.partialName, maxBytes: request.maxBytes)

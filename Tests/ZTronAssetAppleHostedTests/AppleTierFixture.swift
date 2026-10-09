@@ -41,7 +41,7 @@ struct PackAsset: Sendable {
 
 /// A source over fakes: `FakePackBackend`, `FakeStagingSink` and a recording tap (ADR-047: nothing reaches the
 /// unified log).
-@available(macOS 26.0, *)
+@available(macOS 26.0, iOS 26.0, *)
 struct AppleTierFixture {
     let backend: FakePackBackend
     let staging: FakeStagingSink

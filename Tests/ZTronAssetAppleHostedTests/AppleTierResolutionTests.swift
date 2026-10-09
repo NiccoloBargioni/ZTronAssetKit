@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
 struct AppleTierResolutionTests {
     private static let http = HTTPSourceConfiguration(baseURL: URL(string: "https://cdn.example.com/")!)
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-5: no usable configuration resolves to noSourceConfigured without building any source")
     func noUsableConfiguration() {
         let configurations = [
@@ -37,7 +37,7 @@ struct AppleTierResolutionTests {
         }
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-5: a decision naming a tier the configuration cannot build fails closed with noSourceConfigured")
     func decisionWithoutASourceFailsClosed() {
         let cases: [(RemoteConfiguration, AssetTier, TierInputs)] = [
@@ -85,7 +85,7 @@ struct AppleTierResolutionTests {
         }
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-5: the injected decision is the one resolve follows")
     func resolveFollowsTheDecision() throws {
         let configuration = RemoteConfiguration(http: Self.http, appleHosted: AppleTierConfiguration(), awsOnly: false)

@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
 /// R-APL-2: pack progress as byte values of one asset (D-12).
 @Suite("Apple tier: progress")
 struct PackProgressTests {
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-2: pack download progress reaches the engine as byte values scaled to the asset size", .timeLimit(.minutes(1)))
     func progressIsScaledToTheAsset() async throws {
         let asset = PackAsset("ZTronMedia/videos/intro.mp4", String(repeating: "v", count: 400))
@@ -35,7 +35,7 @@ struct PackProgressTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-2: every waiter on one pack sees the pack's progress in its own asset's bytes", .timeLimit(.minutes(1)))
     func everyWaiterScalesToItsOwnAsset() async throws {
         let small = PackAsset("ZTronMedia/a.png", String(repeating: "s", count: 200))
@@ -53,7 +53,7 @@ struct PackProgressTests {
         await fixture.source.invalidate()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-2: a pack download that outlived its waiters never reports into a newer download's waiters", .timeLimit(.minutes(1)))
     func staleFlightNeverReachesANewerWaiter() async throws {
         let abandoned = PackAsset("ZTronMedia/a.png", String(repeating: "a", count: 400))
@@ -142,7 +142,7 @@ struct PackProgressTests {
         #expect(hugeTotal.received(for: PackProgress(completed: top - 1, total: top)) == top - 1)
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     @Test("R-APL-2: progress reported under another flight's id never reaches the current flight's waiters", .timeLimit(.minutes(1)))
     func progressOfAnotherFlightIsDropped() async throws {
         let backend = FakePackBackend(remote: [Packs.media: ["a.png": Data("a".utf8)]])
