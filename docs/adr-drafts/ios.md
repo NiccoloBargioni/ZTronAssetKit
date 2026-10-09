@@ -52,7 +52,7 @@ on every Apple-tier test and on `AppleTierFixture`, plus a stray blank line in `
      simulator build flags every ungated `.timeLimit`, and those then take `iOS 16.0` beside `macOS 13.0`.
   5. `ZTronAssetTestSupport` is a library target and builds at the package floors (macOS 12.0 / iOS 15.0): every
      declaration there that uses a newer API carries both clauses, and Swift Testing traits stay out of it.
-  6. No `#available` in `Sources/` (R-APL-5: `SingleAvailabilityScanTests` counts exactly one).
+  6. Add no further `#available`/`#unavailable` to `Sources/`: R-APL-5 (`SingleAvailabilityScanTests`) scans only `Sources/` and allows exactly the one in `AppleHostedTier.swift`. Test bodies may use the `guard #available(...)` form of point 1 (tests are not scanned).
   7. The check is the simulator build below; a work package that adds tests runs it (or at least
      `build-for-testing`) before hand-off.
   8. Time limits and the cooperative pool. Swift Testing starts every test and every case at once, and each
@@ -216,6 +216,8 @@ Running tests on a simulator installs the test host and bundles into that device
 `~/Library/Developer/CoreSimulator` and writes there while they run (the host app's data, caches and logs). The owner
 accepted this for this task. Use one named simulator per agent, never the owner's booted one, and
 shut it down afterwards (`xcrun simctl shutdown <UDID>`).
+
+- Agents wrap simulator runs in `caffeinate -i` (orchestrator, Level 2 close): xcodebuild and xctest hold no sleep assertion, and an idle-sleeping host stretched one verifier's run from ~250 s to 1,920 s without failing it (Swift Testing's clock does not advance during sleep).
 
 ## Evidence (this branch, 2026-10-09)
 

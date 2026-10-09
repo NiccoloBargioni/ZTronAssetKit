@@ -1028,7 +1028,7 @@ public struct LiveLoopbackDelay: LoopbackDelay {}          // Task.sleep: ONLY t
 public typealias LoopbackHandler = @Sendable (LoopbackRequest) -> LoopbackResponse
 public actor LoopbackHTTPServer {
     public init(delay: any LoopbackDelay = NoLoopbackDelay(), handler: @escaping LoopbackHandler)
-    public func start() async throws -> UInt16   // NWListener: 127.0.0.1, .any port, acceptLocalOnly, requiredInterfaceType .loopback
+    public func start() async throws -> UInt16   // NWListener: requiredLocalEndpoint 127.0.0.1, .any port, requiredInterfaceType .loopback; no acceptLocalOnly (the iOS Simulator resets 127.0.0.1 connections to such a listener; docs/adr-drafts/ios.md item 3)
     public func stop()                            // cancels the listener and every connection (stalled ones included)
     public var acceptedConnections: Int { get }   // P-10
     public var requests: [LoopbackRequest] { get }// key-stripping and Range assertions
