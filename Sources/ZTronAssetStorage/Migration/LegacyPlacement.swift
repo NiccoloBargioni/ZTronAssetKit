@@ -67,7 +67,50 @@ enum LegacyPlacement {
         if let container = containerChain.first ?? nil, rootChain.contains(container) {
             return true
         }
+        // A symbolic link exactly at a compared level hides what it resolves to: its stat is the link's own (review
+        // round 3, `/A → R` with the store at `/A/app`). One level down the link is intermediate, so it is followed.
+        switch LegacyPlacement.resolves(container, into: root, fileSystem: fileSystem) {
+        case true?:
+            return true
+        case nil:
+            return nil
+        case false?:
+            return LegacyPlacement.resolves(root, into: container, fileSystem: fileSystem)
+        }
+    }
+
+    /// Whether `inner` lies below the directory `outer` once every link on its path is resolved: for each level of
+    /// `inner`'s path, the item one level below it, stat-ed through `inner`'s own spelling (so the level is followed
+    /// when it is a link), is compared with the item of the same name directly under `outer`. Equal identities are one
+    /// item, and a directory has one parent, so that level resolves to `outer`. Two stats per level, in the caller's
+    /// unit; `nil` when a stat failed other than for a missing item (an I/O error decides nothing, as for the root).
+    static func resolves(_ inner: URL, into outer: URL, fileSystem: any FileSystem) -> Bool? {
+        let components = LegacyPlacement.components(inner)
+        for depth in components.indices {
+            let below = URL(fileURLWithPath: "/" + components.prefix(depth + 1).joined(separator: "/"), isDirectory: true)
+            let sibling = outer.appendingPathComponent(components[depth], isDirectory: true)
+            let identities: (FileIdentity?, FileIdentity?)
+            do throws(FileSystemError) {
+                identities = (try LegacyPlacement.identity(below, fileSystem), try LegacyPlacement.identity(sibling, fileSystem))
+            } catch {
+                return nil
+            }
+            if let identity = identities.0, identity == identities.1 {
+                return true
+            }
+        }
         return false
+    }
+
+    /// The identity of the item at `url` (not following a final link); `nil` when it is missing or a component of its
+    /// path is not a directory (a root that is a regular file has no children; `LiveFileSystem` maps ENOTDIR to
+    /// `.notFound`).
+    static func identity(_ url: URL, _ fileSystem: any FileSystem) throws(FileSystemError) -> FileIdentity? {
+        do throws(FileSystemError) {
+            return try fileSystem.itemInfo(at: url)?.identity
+        } catch .notFound, .other(errno: ENOTDIR) {
+            return nil
+        }
     }
 }
 

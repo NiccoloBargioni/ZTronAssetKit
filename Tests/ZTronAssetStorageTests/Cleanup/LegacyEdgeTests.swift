@@ -21,13 +21,15 @@ struct LegacyEdgeTests {
         #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot))
     }
 
-    /// The first stat of the root is the overlap check's (C-13), the second its kind's.
-    @Test("R-STO-11: a legacy root that cannot be stat-ed is left, with its stamp, for a later launch", .timeLimit(.minutes(1)), arguments: [1, 2])
+    /// The overlap check stats the root twice (its identity, then as the last level of its own path when links are
+    /// resolved, C-13 as amended in review round 3); the third stat is its kind's.
+    @Test("R-STO-11: a legacy root that cannot be stat-ed is left, with its stamp, for a later launch", .timeLimit(.minutes(1)), arguments: [1, 2, 3])
     @available(macOS 15.0, iOS 18.0, *)
     func unreadableRootDeferred(failingStat: Int) async throws {
         let files = try LegacyFixture.fixtureFiles()
         let (harness, defaults) = try LegacyFixture.harness(files: files)
-        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "CDNAssets"), occurrence: .nth(failingStat), error: .io))
+        let root = URLMatcher(lastComponentSuffix: "CDNAssets", pathContains: CleanupFixture.legacyRoot.path)
+        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: root, occurrence: .nth(failingStat), error: .io))
         let report = try await harness.store.open()
         #expect(!report.legacyMigrationPending)
         #expect(await harness.state.migration.phase == .notStarted)
@@ -37,6 +39,27 @@ struct LegacyEdgeTests {
         let next = CoreHarness.cleanup(disk: harness.fileSystem.survivingDisk(), legacy: CleanupFixture.legacyPolicy, defaults: defaults, time: harness.time)
         #expect(try await next.store.open().legacyMigrationPending)
         #expect(try await LegacyMigrationTests.migrateAll(next).adopted == 13)
+    }
+
+    /// The overlap check stats items below the root (C-13, review round 3): below a regular file every such stat fails
+    /// with ENOTDIR, which is no I/O error, so the launch still decides that there is no tree.
+    @Test("R-STO-11: a regular file where the legacy root should be is no legacy tree: the stamp goes and the file stays", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func regularFileAtRoot() async throws {
+        let fileSystem = FakeFileSystem(time: ManualTimeSource())
+        try LegacyFixture.makeDirectories(CleanupFixture.legacyRoot.deletingLastPathComponent(), on: fileSystem)
+        let bytes = CoreFixture.bytes(735)
+        try fileSystem.write(bytes, to: CleanupFixture.legacyRoot, mode: .truncate)
+        var disk = fileSystem.survivingDisk()
+        disk.makeDurable()
+        let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
+        let harness = CoreHarness.cleanup(disk: disk, legacy: CleanupFixture.legacyPolicy, defaults: defaults)
+        #expect(try await !harness.store.open().legacyMigrationPending)
+        #expect(await harness.state.migration.phase == .notStarted)
+        #expect(defaults.string(forKey: CleanupFixture.legacyKey) == nil && defaults.removedKeys == [CleanupFixture.legacyKey])
+        #expect(harness.content(CleanupFixture.legacyRoot) == bytes)
+        let enotdir = harness.fileSystem.operations.filter { $0.kind == .itemInfo && $0.failure == .other(errno: ENOTDIR) }
+        #expect(!enotdir.isEmpty, "the overlap check looked below the file")
     }
 
     @Test("R-STO-11: a legacy tree that vanishes during migration still finishes phases 3 and 4 without migrating the stamp", .timeLimit(.minutes(1)))
