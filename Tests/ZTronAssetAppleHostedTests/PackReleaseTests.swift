@@ -277,8 +277,11 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
-    @Test("R-CLN-9: sourceCopyBytes sums the installed bytes of adopted media packs not yet released", .timeLimit(.minutes(1)))
-    func sourceCopyBytesCountsAdoptedUnreleasedPacks() async throws {
+    @Test(
+        "R-CLN-9: sourceCopyBytes sums the installed bytes of adopted media packs, and a pack the OS removed adds nothing",
+        .timeLimit(.minutes(1))
+    )
+    func sourceCopyBytesCountsAdoptedPacks() async throws {
         let fixture = AppleTierFixture(installed: [
             Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA, mediaB), Packs.extras: pack(extraC),
         ])

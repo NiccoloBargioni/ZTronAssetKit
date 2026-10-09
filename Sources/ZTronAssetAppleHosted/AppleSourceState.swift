@@ -2,7 +2,8 @@ import ZTronAssetModel
 
 /// The Apple source's mutable state, owned by one actor so `AppleHostedRemoteSource` stays an immutable `Sendable`
 /// class (C1): staging admission and drain (shutdown, transport-2 T2-04), the source-owned update check and what it
-/// found (T2-14, T2-20), and pack releases per catalog generation plus the adopted packs (H-7, ADR-027).
+/// found (T2-14, T2-20), and pack releases per catalog generation plus the packs whose bytes count as source copies
+/// (H-7, ADR-027).
 @available(iOS 26.0, macOS 26.0, *)
 actor AppleSourceState {
     /// What finished update checks found, as one manifest fetch reports it.
@@ -43,6 +44,10 @@ actor AppleSourceState {
     /// that downloads the pack again on demand (ADR-027 as ruled at the L2 close-out, cycle 3).
     private var released: Set<PackID> = []
     private var releasing: Set<PackID> = []
+    /// Every pack this source released in this process, in any catalog generation: the packs released in this
+    /// generation, and those released in an earlier one until this one releases them again. Their bytes count in
+    /// `sourceCopyBytes()` whenever the OS holds them (R-CLN-9); a removed pack reports none.
+    private var releasedInProcess: Set<PackID> = []
     private var adoptedPacks: Set<PackID> = []
 
     /// Creates an open state.
@@ -232,18 +237,26 @@ actor AppleSourceState {
 
     /// Ends one planned release; a success counts for the generation it was planned in only. It counts even when a
     /// transfer made the pack available again while the call ran: the pack is released at most once per generation,
-    /// so a copy downloaded around the removal stays installed until the next generation (ADR-027).
+    /// so a copy downloaded around the removal stays installed until the next generation (ADR-027). Any success, in
+    /// whichever generation, makes the pack a source copy (`sourceCopyPacks`).
     func finishRelease(_ pack: PackID, succeeded: Bool, generation: UInt64) {
         self.releasing.remove(pack)
-        if succeeded && generation == self.generation {
+        guard succeeded else {
+            return
+        }
+        self.releasedInProcess.insert(pack)
+        if generation == self.generation {
             self.released.insert(pack)
         }
     }
 
-    /// Media packs holding adopted content, sorted. Released packs stay listed: the OS reports no bytes for a removed
-    /// pack, and a pack a transfer downloaded again after its release stays installed until the next catalog
-    /// generation, holding bytes the device really keeps twice (R-CLN-9).
+    /// The packs whose installed bytes `sourceCopyBytes()` sums, sorted: media packs holding adopted content, released
+    /// or not, and every pack released in this process. A removed pack reports no bytes, so it adds nothing; one that
+    /// came back after its release (restored by the OS, or downloaded again on demand by a transfer of this source)
+    /// stays installed until a later catalog generation releases it, and the OS holds its bytes meanwhile (R-CLN-9,
+    /// ADR-027 as ruled at the L2 close-out, cycle 3). An excluded-only pack holds no adopted content, so only the
+    /// release makes it count (verifier probe VC3-E).
     func sourceCopyPacks() -> [PackID] {
-        self.adoptedPacks.sorted()
+        self.adoptedPacks.union(self.releasedInProcess).sorted()
     }
 }

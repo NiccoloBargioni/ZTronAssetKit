@@ -116,7 +116,7 @@ public final class AppleHostedRemoteSource: RemoteSource {
     /// failed removal is reported and planned again by the next call. Each pack is released at most once per catalog
     /// generation (the catalog's pseudo-ETag), so a pack that comes back is never released in a loop: one the OS
     /// restored, or a transfer of this source downloaded again on demand, stays installed until the next generation
-    /// (ADR-027), and its bytes count in `sourceCopyBytes()` meanwhile.
+    /// (ADR-027), and its bytes count in `sourceCopyBytes()` meanwhile, adopted content or not.
     public func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
         guard let catalogPack = PackID(rawValue: self.configuration.catalogPackID) else {
             return ReclaimReport()
@@ -146,9 +146,10 @@ public final class AppleHostedRemoteSource: RemoteSource {
         return reclaim
     }
 
-    /// Bytes the OS still holds in media packs whose entries were adopted, summed from `PackBackend.installedBytes`
-    /// (R-CLN-9, H-7, transport-2 T2-13): a released pack reports nothing, and one a transfer downloaded again after
-    /// its release counts until the next catalog generation releases it.
+    /// Bytes the OS still holds in media packs whose entries were adopted and in packs this source released, summed
+    /// from `PackBackend.installedBytes` (R-CLN-9, H-7, transport-2 T2-13). A removed pack reports nothing; one that
+    /// came back after its release (restored by the OS, or downloaded again on demand) counts until a later catalog
+    /// generation releases it, even when none of its entries is adopted (an entry the retention scope excludes).
     /// The sum saturates at `Int64.max`: the backend is injectable, and a report must never trap the process.
     public func sourceCopyBytes() async -> Int64 {
         var total: Int64 = 0
