@@ -32,18 +32,22 @@ extension AssetStore {
         try await self.performCollectGarbage(until: deadline)
     }
 
-    /// A user purge (R-CLN-6). Clears the stamp in the same commit; bumps `state.core.purgeEpoch` before any await.
-    /// Returns after the selection is reaped (`reapDeletable(maxKeys:)`), rescued or deferred by a lease; the grace
-    /// wait runs in the caller's (engine-owned) task.
+    /// A user purge (R-CLN-6). Bumps `state.core.purgeEpoch`, clears the stamp and sets "sync due" before any await (so
+    /// the purge's commit holds them), and bumps the epoch again once its last record is purged. Returns after the
+    /// selection is reaped (`reapDeletable(maxKeys:)`), rescued or deferred by a lease; the grace wait runs in the
+    /// caller's (engine-owned) task.
     ///
-    /// Every purge that removes something, and every `.all`, also clears the stamp and sets "sync due" (R-CLN-6); a purge
-    /// that selects nothing changes nothing but the epoch. The selection's blobs are doomed `purged` (never re-adopted,
-    /// ADR-018). `bytesFreed` counts the selection's bytes deleted before the call returned, `bytesDeferred` those still
-    /// leased; bytes a sink that does not acknowledge holds back are in neither and are reaped later by `runDueWork()`.
-    /// A cancelled caller gets `.cancelled` from the grace wait; the purge itself is already committed.
+    /// The selection is computed off the actor and applied in chunks, each record re-validated (C2; ADR draft C-5): one
+    /// that changed blob meanwhile, or for `.evictable` became pinned or leased, is kept. A purge on a store with no stamp
+    /// that is already due, and that selects nothing, changes nothing but the epoch. The selection's blobs are doomed
+    /// `purged` (never re-adopted, ADR-018). `assetsRemoved` counts the records purged, `bytesFreed` the selection's bytes
+    /// deleted before the call returned, `bytesDeferred` those still leased; bytes a sink that does not acknowledge holds
+    /// back are in neither and are reaped later by `runDueWork()`. A cancelled caller gets `.cancelled` from the grace
+    /// wait; the purge itself is already committed.
     package func purge(_ request: PurgeRequest) async throws(StoreError) -> PurgeResult {
-        // REENTRANCY: R1, R17, R9 — `performPurge` mutates synchronously, then awaits the install, the commit and the
-        // grace, recomputing the deletable state after each.
+        // REENTRANCY: R1, c-5 (proposed), R17, R9 — `performPurge` re-validates each record after its selection unit
+        // and between chunks, then awaits the install, the commit and the grace, recomputing the deletable state after
+        // each.
         try await self.performPurge(request)
     }
 
@@ -52,8 +56,9 @@ extension AssetStore {
     /// `bytesByKind` and the present/stale split cover live blobs (a blob any current record still wants is present);
     /// `pendingDeletion` is doomed blobs (`FreeSpace.pendingReclaim` plus leased ones); `orphanBytes` are the
     /// unreferenced blobs the last orphan GC listing of this lifetime found and left (0 before the first one);
-    /// `stagingBytes` and the free space are read in one unit each. `sourceCopyBytes` is 0 here: the engine adds the
-    /// remote source's copies (ADR-027). Before `open()` (or after a failed read) the I/O figures are 0.
+    /// `stagingBytes` and the free space are read in one unit each, the sums over the records in one bulk unit.
+    /// `sourceCopyBytes` is 0 here: the engine adds the remote source's copies (ADR-027). Before `open()` (or after a
+    /// failed read) the I/O figures are 0.
     package func storageReport() async -> StorageReport {
         // REENTRANCY: R1, R13, c-2 (proposed) — the report is read from the state after its units.
         await self.performStorageReport()

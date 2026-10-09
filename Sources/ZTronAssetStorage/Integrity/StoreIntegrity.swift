@@ -38,7 +38,8 @@ extension AssetStore {
     package func verifyIntegrity(byteBudget: Int64, until deadline: MonotonicInstant) async throws(StoreError)
         -> VerificationReport
     {
-        // REENTRANCY: R1, R16, c-3 (proposed) — `performVerifyIntegrity` re-validates each blob after its hash.
+        // REENTRANCY: R1, c-6 (proposed), R16, c-3 (proposed) — `performVerifyIntegrity` re-validates each blob before and
+        // after its hash.
         try await self.performVerifyIntegrity(byteBudget: byteBudget, until: deadline)
     }
 
