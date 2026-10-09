@@ -42,6 +42,11 @@ struct MigrationState: Sendable {
     /// nothing counts as fully adopted). Phase 3 migrates the stamp only while the applied manifest is still this one: a
     /// newer manifest applied during migration was never synced, whatever is present (review round 3, ZProbe-stamp).
     var manifestDigest: ContentHash?
+    /// Deferrals of each legacy file in this lifetime, by its path below the root (`AssetStore.deferLegacyFile`).
+    var deferrals: [[String]: Int] = [:]
+    /// Legacy files kept where they are after `AssetStore.legacyAttempts` deferrals in this lifetime: phase 4 of this
+    /// lifetime never removes them, since nothing ever read them (review of the L3 close-out, ZProbe-hash).
+    var kept: Set<[String]> = []
     /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
     /// moved files that no committed record expects).
     var planCommitted = false

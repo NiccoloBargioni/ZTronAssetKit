@@ -205,10 +205,13 @@ extension AssetStore {
             return false
         }
         // REENTRANCY: c-4 (proposed) — the phase and the caller's cancellation (inside, after each unit).
-        let tree = try await self.listLegacyTree(root, cancellable: true)
-        guard !tree.failed else {
+        var listed = try await self.listLegacyTree(root, cancellable: true)
+        guard !listed.failed else {
             return false
         }
+        // A file phase 2 kept after failing to read or move it is never removed: nothing verified it (ZProbe-hash).
+        listed.files.subtract(self.state.migration.kept)
+        let tree = listed
         let limits = self.configuration.limits
         // REENTRANCY: c-4 (proposed) — the phase; the removal set is computed off the actor (C2).
         let removal = await self.runUnit(on: self.environment.bulkExecutor) {

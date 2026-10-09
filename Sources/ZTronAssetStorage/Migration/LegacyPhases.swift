@@ -200,10 +200,33 @@ extension AssetStore {
         case alreadyAdopted
         /// Its bytes did not verify, or it vanished, or no record wants it any more.
         case dropped
+        /// Reading or moving it failed with an error that says nothing about its bytes (I/O, a full volume, a refused
+        /// permission): it goes back to the head of the queue and the batch ends (review of the L3 close-out, ZProbe-hash),
+        /// so phases 3 and 4 never run while it waits (`deferLegacyFile`).
+        case deferred
+    }
+
+    /// Attempts of one legacy file per lifetime before it is kept where it is (`deferLegacyFile`): a file that cannot be
+    /// read or moved three times in a row is left in the legacy tree, never removed by phase 4, and its asset is downloaded
+    /// again, so a permanently unreadable file cannot hold migration back forever.
+    static let legacyAttempts = 3
+
+    /// Whether `error` (not a lifecycle error) says nothing about a legacy file's bytes, so its processing is retried
+    /// rather than the file dropped: any file-system error but a missing file (it vanished) or a cross-device rename (a
+    /// root on another volume is dropped, C-14), and a volume too full to place it.
+    static func isTransientLegacyFailure(_ error: StoreError) -> Bool {
+        switch error {
+        case .fileSystem(.notFound), .fileSystem(.crossDevice):
+            return false
+        case .fileSystem, .insufficientSpace:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Hashes one legacy file and adopts it for the records that still want it (hash, re-validate, `adoptVerifiedFile`).
-    /// Throws only the lifecycle and cancellation errors; every other failure drops the file.
+    /// Throws only the lifecycle and cancellation errors; a transient failure defers the file, every other one drops it.
     func processLegacyFile(_ file: LegacyFile) async throws(StoreError) -> LegacyOutcome {
         guard let root = self.state.migration.root, !self.legacyWanters(file).isEmpty else {
             return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
@@ -217,7 +240,7 @@ extension AssetStore {
             hashed = try await self.hashFile(at: url)
         } catch {
             try AssetStore.rethrowLifecycle(error)
-            return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+            return self.legacyFailureOutcome(file, error)
         }
         try self.checkLive()
         let wanting = self.legacyWanters(file)
@@ -233,8 +256,35 @@ extension AssetStore {
             }
         } catch {
             try AssetStore.rethrowLifecycle(error)
+            return self.legacyFailureOutcome(file, error)
         }
         return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+    }
+
+    /// The outcome of a file whose hash or move failed with `error`: adopted by a racing call, deferred when the error
+    /// says nothing about the file (`isTransientLegacyFailure`), dropped otherwise.
+    func legacyFailureOutcome(_ file: LegacyFile, _ error: StoreError) -> LegacyOutcome {
+        if self.legacyAdopted(file) {
+            return .alreadyAdopted
+        }
+        return AssetStore.isTransientLegacyFailure(error) ? .deferred : .dropped
+    }
+
+    /// Puts a deferred file back at the head of the queue, or, at its `legacyAttempts`-th deferral in this lifetime, keeps
+    /// it where it is: out of the queue, counted dropped (its asset is downloaded again) and out of phase 4's removal set
+    /// (`MigrationState.kept`). Returns whether it was kept.
+    func deferLegacyFile(_ file: LegacyFile) -> Bool {
+        let attempts = (self.state.migration.deferrals[file.components] ?? 0) + 1
+        self.state.migration.deferrals[file.components] = attempts
+        guard attempts >= AssetStore.legacyAttempts else {
+            self.unclaimLegacyFile(file, requeue: true)
+            return false
+        }
+        self.unclaimLegacyFile(file, requeue: false)
+        self.state.migration.kept.insert(file.components)
+        self.count(.dropped)
+        self.environment.log.log(.store, .error, "a legacy file could not be read or moved; it is left where it is and downloaded again")
+        return true
     }
 
     /// Rethrows the errors that end a migration call (the store closing, the caller's cancellation, a lifetime that
@@ -289,10 +339,17 @@ extension AssetStore {
                 self.unclaimLegacyFile(file, requeue: true)
                 throw error
             }
+            budget -= 1
+            if outcome == .deferred {
+                guard self.deferLegacyFile(file) else {
+                    // The file waits at the head of the queue for a later batch; this one ends, so no phase 3 or 4 runs.
+                    break
+                }
+                continue
+            }
             self.unclaimLegacyFile(file, requeue: false)
             self.count(outcome)
             adoptedAny = adoptedAny || outcome == .adopted
-            budget -= 1
         }
         if adoptedAny {
             // REENTRANCY: R17 — nothing but the phase: the adoptions were bound before the await.
@@ -335,7 +392,7 @@ extension AssetStore {
             self.state.migration.progress.adopted += 1
         case .dropped:
             self.state.migration.progress.dropped += 1
-        case .alreadyAdopted:
+        case .alreadyAdopted, .deferred:
             break
         }
     }
@@ -436,7 +493,9 @@ extension AssetStore {
             }
             throw error
         }
-        if queued != nil {
+        if queued != nil, outcome == .deferred {
+            _ = self.deferLegacyFile(file)
+        } else if queued != nil {
             self.unclaimLegacyFile(file, requeue: false)
             self.count(outcome)
         } else if outcome == .adopted {
