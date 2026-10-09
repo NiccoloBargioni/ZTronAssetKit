@@ -117,6 +117,12 @@ enum FirstSync {
     }
 }
 
+/// Every enumeration below gives its cooperative thread back once per case (`await Task.yield()` at the top of each
+/// crash-point, fault-point and second-lifetime iteration). A case runs whole store lifetimes over the fake file system
+/// on the cooperative pool, and its awaits into the store need not suspend (`InlineBlockingExecutor`), so without the
+/// yield a few cases side by side can hold every pool thread for seconds. Time-limited tests elsewhere in the bundle
+/// then wait for a thread to resume their continuations: on the iOS Simulator under host load the live lock test
+/// overran its one-minute limit that way, and `xcodebuild` killed and restarted the runner (ADR draft `ios.md`, item 4).
 @Suite("Core: crash consistency (R-STO-5)")
 struct StoreCrashTests {
     @Test(
@@ -135,6 +141,7 @@ struct StoreCrashTests {
         #expect(total > 40)
         var crashes = 0
         for point in 0..<total {
+            await Task.yield()
             let harness = CoreHarness.make(crashBefore: point, mode: mode)
             let trace = await FirstSync.run(harness)
             guard harness.fileSystem.crashed else {
@@ -169,6 +176,7 @@ struct StoreCrashTests {
         let total = clean.fileSystem.mutationCount
         var pairs = 0
         for point in stride(from: slice, to: total, by: StoreCrashTests.slices) {
+            await Task.yield()
             let first = CoreHarness.make(crashBefore: point, mode: .processKill)
             let trace = await FirstSync.run(first)
             let killed = first.fileSystem.survivingDisk()
@@ -178,6 +186,7 @@ struct StoreCrashTests {
             await StoreCrashTests.secondLifetime(probe)
             let secondTotal = probe.fileSystem.mutationCount
             for secondPoint in 0...secondTotal {
+                await Task.yield()
                 let second = CoreHarness.make(disk: killed, crashBefore: secondPoint < secondTotal ? secondPoint : nil, mode: mode)
                 await StoreCrashTests.secondLifetime(second)
                 let label = "kill at \(point), \(mode) at \(secondPoint)"
@@ -261,6 +270,7 @@ struct StoreCrashTests {
         // finds no index.bin to rename.
         #expect(occurrences >= (fault == .renameCurrent ? 4 : 5), "every commit of the first sync is a fault point")
         for occurrence in 1...occurrences {
+            await Task.yield()
             let harness = CoreHarness.make()
             let rules = fault.rules(occurrence: occurrence)
             for rule in rules {
@@ -295,6 +305,7 @@ struct StoreCrashTests {
         _ = await FirstSync.run(clean)
         let total = clean.fileSystem.mutationCount
         for point in 0..<total {
+            await Task.yield()
             let harness = CoreHarness.make(crashBefore: point, mode: mode)
             let trace = await FirstSync.run(harness)
             let label = "\(mode) at \(point), then a full volume ending in \(end)"

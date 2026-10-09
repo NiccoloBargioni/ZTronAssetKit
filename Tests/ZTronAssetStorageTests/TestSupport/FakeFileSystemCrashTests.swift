@@ -4,7 +4,9 @@ import ZTronAssetModel
 import ZTronAssetTestSupport
 
 /// Deterministic, enumerable crash points (R-STO-5's machinery): mutation k never happens, every later call fails,
-/// and the same k and mode always leave the same disk.
+/// and the same k and mode always leave the same disk. The two enumerations are `async` only to give their cooperative
+/// thread back once per crash point (`await Task.yield()`), so time-limited tests beside them keep the pool (ADR draft
+/// `ios.md`, item 4).
 @Suite("Test support: FakeFileSystem crash points")
 struct TestSupportFakeFileSystemCrashTests {
     private static let root = "/fake-volume/Library/Application Support/ZTronAssetKit"
@@ -54,7 +56,7 @@ struct TestSupportFakeFileSystemCrashTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: crash enumeration is deterministic: every crash point and mode repeats the clean run's prefix and its disk")
-    func crashEnumerationIsDeterministic() throws {
+    func crashEnumerationIsDeterministic() async throws {
         let clean = FakeFSFixture.make()
         Self.scenario(clean)
         let cleanCalls = Self.calls(clean)
@@ -64,6 +66,7 @@ struct TestSupportFakeFileSystemCrashTests {
 
         for mode in CrashMode.allCases {
             for k in 0...mutations {
+                await Task.yield()
                 let first = FakeFSFixture.make(crashBefore: k, mode: mode)
                 let second = FakeFSFixture.make(crashBefore: k, mode: mode)
                 Self.scenario(first)
@@ -84,13 +87,14 @@ struct TestSupportFakeFileSystemCrashTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a crash point under a power-loss mode leaves what a kill at that point followed by that power loss leaves")
-    func powerLossCrashPointsEqualKillThenPowerLoss() {
+    func powerLossCrashPointsEqualKillThenPowerLoss() async {
         let clean = FakeFSFixture.make()
         Self.scenario(clean)
         let mutations = clean.mutationCount
         for mode in [CrashMode.powerLossDropUnsynced, .powerLossKeepMetadata] {
             var lostSomething = 0
             for k in 0...mutations {
+                await Task.yield()
                 let crashed = FakeFSFixture.make(crashBefore: k, mode: mode)
                 let killed = FakeFSFixture.make(crashBefore: k, mode: .processKill)
                 Self.scenario(crashed)

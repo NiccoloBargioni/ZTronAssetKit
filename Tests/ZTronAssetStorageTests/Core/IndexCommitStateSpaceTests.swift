@@ -216,7 +216,7 @@ struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
 /// once per distinct pair.
 @Suite("Core: index commit state space (R-STO-4, R-STO-5)", .serialized)
 struct IndexCommitStateSpaceTests {
-    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield after every case:
+    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield once per case:
     /// a row then takes about a second under TSan, so its time limit keeps a wide margin, and suites running beside this
     /// one keep the cooperative pool (every case of every suite starts its time limit when the run starts).
     @Test(
@@ -228,6 +228,7 @@ struct IndexCommitStateSpaceTests {
     func everyStateFaultAndCrash(row: IndexSpaceRow) async throws {
         var starts: [(IndexSpaceSlice, DiskImage, IndexSpace.Views)] = []
         for slice in row.slices {
+            await Task.yield()
             let initial = IndexSpace.disk(slice)
             let start = IndexSpace.views(initial)
             try IndexSpace.checkSeed(slice, start)
@@ -956,7 +957,7 @@ enum IndexSpace {
         var counts: Counts
     }
 
-    /// Every volume script and every event for `slice`, yielding after each case.
+    /// Every volume script and every event for `slice`, yielding once per case.
     static func enumerate(_ slice: IndexSpaceSlice, initial: DiskImage, start: Views) async -> SliceResult {
         var memo = Memo()
         var violations: [String] = []
@@ -1011,9 +1012,9 @@ enum IndexSpace {
             return violations + ["\(label): recorded \(snapshots.count) disks for \(mutations.count) mutations"]
         }
         for (point, snapshot) in snapshots.enumerated() {
+            await Task.yield()
             let phase = phases.last { $0.mutations <= point }
             violations += await IndexSpace.checkCrashes(at: point, snapshot, mutation: mutations[point], from: phase, start: start, volume: volume, label: label, memo: &memo)
-            await Task.yield()
         }
         return violations
     }
@@ -1103,6 +1104,7 @@ enum IndexSpace {
             }
         }
         for (mode, files, key, disk) in survivors {
+            await Task.yield()
             let caseLabel = "\(label) \(Event.crash(point, mode))"
             let floor = IndexSpace.floor(start, mode, claimed: claimed, &memo)
             // I-b is a property of a store that reports; a crash inside a unit is checked by I-a against what the store
@@ -1196,8 +1198,10 @@ extension IndexSpace {
     static func unorderedSurvivors(of row: IndexSpaceRow, excluding seen: inout Set<ViewsKey>) async -> [Survivor] {
         var survivors: [Survivor] = []
         for slice in row.slices {
+            await Task.yield()
             let initial = IndexSpace.disk(slice)
             for volume in VolumeScript.allCases {
+                await Task.yield()
                 var memo = Memo()
                 let clean = IndexSpace.fake(initial)
                 let recorder = MutationRecorder(clean)
@@ -1207,6 +1211,7 @@ extension IndexSpace {
                 }
                 // Point 0 is the initial disk itself, before open()'s barrier.
                 for (point, snapshot) in recorder.snapshots.enumerated() where point > 0 {
+                    await Task.yield()
                     let views = IndexSpace.views(snapshot.disk)
                     let key = ViewsKey(current: views.current, dropped: views.dropped, kept: views.kept)
                     guard views.current != views.dropped || views.kept != views.current, seen.insert(key).inserted else {
@@ -1267,6 +1272,7 @@ extension IndexSpace {
             (.powerLossKeepMetadata, start.kept, ReopenKey(current: start.kept, kept: start.kept), { keptDisk }),
         ]
         for (mode, files, key, disk) in crashes {
+            await Task.yield()
             let caseLabel = "\(label) \(Event.crash(0, mode))"
             let floor = IndexSpace.floor(start, mode, claimed: 0, &memo)
             violations += IndexSpace.checkSurvivor(files, view: "the crash", floor: floor, claimed: 0, checkCommitted: false, label: caseLabel, &memo)
