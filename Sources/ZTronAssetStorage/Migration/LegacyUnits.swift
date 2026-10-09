@@ -7,8 +7,11 @@ enum LegacyRead: Sendable, Hashable {
     case absent
     /// Its bytes, read whole.
     case bytes(Data)
-    /// Not a regular file, larger than the limit, or a read failed: treated as undecodable.
+    /// Not a regular file, or larger than the limit: treated as undecodable.
     case unusable
+    /// Its stat or one of its reads failed, or it changed size while it was read: an I/O error says nothing about the
+    /// file, so nothing is decided from it (review round 3, ZProbe-read; as for a root that cannot be stat-ed, C-13).
+    case failed
 }
 
 /// What a non-following listing of the legacy tree found, as paths relative to its root (S2-10).
@@ -19,6 +22,9 @@ struct LegacyTree: Sendable, Hashable {
     var directories: Set<[String]> = []
     /// Symbolic links (never followed) and other items that are neither files nor directories.
     var links: Set<[String]> = []
+    /// A directory could not be listed: the tree is incomplete, so nothing is decided from it (review round 3,
+    /// ZProbe-list: its files would count as missing in phase 1, and phase 4 would leave them unattributable).
+    var failed = false
 }
 
 /// The blocking units of legacy migration (ADR-003): stats, ≤ 1 MiB reads, one listing per directory, bounded
@@ -51,10 +57,12 @@ extension AssetStore {
         }
     }
 
-    /// Reads a legacy metadata file whole, in ≤ 1 MiB units on the bulk executor, refusing more than `limit` bytes.
-    func readLegacyFile(_ url: URL, limit: Int64) async -> LegacyRead {
+    /// Reads a legacy metadata file whole, in ≤ 1 MiB units on the bulk executor, refusing more than `limit` bytes. The
+    /// phase is re-checked after every unit, so a store that closes meanwhile submits no further read (review round 3).
+    func readLegacyFile(_ url: URL, limit: Int64) async throws(StoreError) -> LegacyRead {
         let fileSystem = self.environment.fileSystem
-        // REENTRANCY: R1, R11 — nothing: the file belongs to the prior art, which no longer runs.
+        // REENTRANCY: R1, R11, c-4 (proposed) — the phase (`checkLive` below); the file belongs to the prior art, which no
+        // longer runs.
         let info = await self.runUnit(on: self.environment.metadataExecutor) { () -> Result<FileItemInfo?, FileSystemError> in
             do throws(FileSystemError) {
                 return .success(try fileSystem.itemInfo(at: url))
@@ -62,8 +70,9 @@ extension AssetStore {
                 return .failure(error)
             }
         }
+        try self.checkLive()
         guard case .success(let item) = info else {
-            return .unusable
+            return .failed
         }
         guard let item else {
             return .absent
@@ -75,12 +84,14 @@ extension AssetStore {
         while data.count < item.byteSize {
             let offset = Int64(data.count)
             let length = Int(min(Int64(1 << 20), item.byteSize - offset))
-            // REENTRANCY: R1, R11 — nothing: the bytes accumulate in a local; the file is the prior art's.
+            // REENTRANCY: R1, R11, c-4 (proposed) — the phase (`checkLive` below); the bytes accumulate in a local.
             let chunk = await self.runUnit(on: self.environment.bulkExecutor) { () -> Data? in
                 try? fileSystem.read(from: url, offset: offset, maxLength: length)
             }
+            try self.checkLive()
             guard let chunk, !chunk.isEmpty else {
-                return .unusable
+                // A failed read, or a file that shrank while it was read.
+                return .failed
             }
             data.append(chunk)
         }
@@ -89,8 +100,11 @@ extension AssetStore {
 
     /// Every item below `root`, as path components relative to it, from a **non-following** listing (one unit per
     /// directory, S2-10): a symbolic link is neither descended into nor followed, so no planned path passes through one.
-    /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited.
-    func listLegacyTree(_ root: URL, maxDepth: Int = 64) async -> LegacyTree {
+    /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited. A listing that fails stops
+    /// the walk and marks the tree `failed`. The phase is re-checked after every unit, and with `cancellable` (phase 4,
+    /// which runs in the caller's task) the caller's cancellation too, so neither a closed store nor a cancelled caller
+    /// submits further listings (review round 3).
+    func listLegacyTree(_ root: URL, cancellable: Bool = false, maxDepth: Int = 64) async throws(StoreError) -> LegacyTree {
         let fileSystem = self.environment.fileSystem
         let maxDirectories = max(1, self.configuration.limits.maxEntries)
         var tree = LegacyTree()
@@ -100,13 +114,18 @@ extension AssetStore {
             let relative = directories[next]
             next += 1
             let url = relative.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
-            // REENTRANCY: R1, R11, c-4 (proposed) — nothing: the listing only accumulates; the plan is computed once it
-            // is complete.
+            // REENTRANCY: R1, R11, c-4 (proposed) — the phase, and in phase 4 the caller's cancellation, below; the listing
+            // only accumulates, and the plan is computed once it is complete.
             let listing = await self.runUnit(on: self.environment.metadataExecutor) {
                 CleanupUnits.list(url, fileSystem: fileSystem)
             }
+            try self.checkLive()
+            if cancellable, Task.isCancelled {
+                throw .cancelled
+            }
             guard case .success(let items) = listing else {
-                continue
+                tree.failed = true
+                return tree
             }
             for item in items {
                 let path = relative + [item.name]
@@ -174,11 +193,22 @@ extension AssetStore {
             return await self.legacyItemKind(root) == .success(nil)
         }
         let manifestURL = root.appendingPathComponent(LegacyRemoval.manifestName, isDirectory: false)
-        // REENTRANCY: c-4 (proposed) — nothing: after the durable "done" commit the tree is the migration's alone.
-        let manifest = await self.readLegacyFile(manifestURL, limit: self.configuration.limits.maxPayloadBytes)
-        // REENTRANCY: c-4 (proposed) — as above.
-        let tree = await self.listLegacyTree(root)
-        try self.checkLive()
+        // REENTRANCY: c-4 (proposed) — the phase (inside); after the durable "done" commit the tree is the migration's
+        // alone.
+        let manifest = try await self.readLegacyFile(manifestURL, limit: self.configuration.limits.maxPayloadBytes)
+        if Task.isCancelled {
+            throw .cancelled
+        }
+        // Nothing is removed on a view the earlier phases never saw: a manifest that could not be read attributes no
+        // file, and a listing that failed hides some (review round 3); the next call tries again.
+        guard manifest != .failed else {
+            return false
+        }
+        // REENTRANCY: c-4 (proposed) — the phase and the caller's cancellation (inside, after each unit).
+        let tree = try await self.listLegacyTree(root, cancellable: true)
+        guard !tree.failed else {
+            return false
+        }
         let limits = self.configuration.limits
         // REENTRANCY: c-4 (proposed) — the phase; the removal set is computed off the actor (C2).
         let removal = await self.runUnit(on: self.environment.bulkExecutor) {

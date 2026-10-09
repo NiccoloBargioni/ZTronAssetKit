@@ -73,12 +73,20 @@ extension AssetStore {
         // REENTRANCY: R1, R11 — the phase; the reads below are snapshots of the prior art's files, which no one writes.
         let stamp = starting ? await self.readLegacyStamp() : self.state.migration.legacyStamp
         let limit = self.configuration.limits.maxPayloadBytes
+        // REENTRANCY: R1, R11 — as above; the phase is re-checked inside after every unit.
+        let manifestRead = try await self.readLegacyFile(root.appendingPathComponent("manifest.json", isDirectory: false), limit: limit)
         // REENTRANCY: R1, R11 — as above.
-        let manifestRead = await self.readLegacyFile(root.appendingPathComponent("manifest.json", isDirectory: false), limit: limit)
-        // REENTRANCY: R1, R11 — as above.
-        let checksumsRead = await self.readLegacyFile(root.appendingPathComponent("local-checksums.json", isDirectory: false), limit: limit)
-        // REENTRANCY: R1, R11 — as above.
-        let tree = await self.listLegacyTree(root)
+        let checksumsRead = try await self.readLegacyFile(root.appendingPathComponent("local-checksums.json", isDirectory: false), limit: limit)
+        // REENTRANCY: R1, R11, c-4 (proposed) — as above.
+        let tree = try await self.listLegacyTree(root)
+        guard manifestRead != .failed, checksumsRead != .failed, !tree.failed else {
+            // An I/O error while reading the prior art's files decides nothing in this lifetime, as a root that cannot be
+            // stat-ed (review round 3, ZProbe-read and ZProbe-list): nothing is written or committed, a relaunch in
+            // phase `inProgress` keeps its persisted plan, and no later phase runs on a view this one could not read.
+            self.state.migration.root = nil
+            self.environment.log.log(.store, .error, "legacy phase 1 could not read the prior art's files; migration waits for a later launch")
+            return false
+        }
         let limits = self.configuration.limits
         // REENTRANCY: R1, R11 — the phase; decoding and planning are pure and run off the actor (C2).
         let decoded = await self.runUnit(on: self.environment.bulkExecutor) {
@@ -365,13 +373,16 @@ extension AssetStore {
         try await self.finishLegacyRemoval(root)
     }
 
-    /// Phase 4: the tree, then the key. Idempotent: a crash or an error part way is finished by the next call.
+    /// Phase 4: the tree, then the key (only once the tree is done, so the order holds when a call stops part way).
+    /// Idempotent: a crash or an error part way is finished by the next call.
     func finishLegacyRemoval(_ root: URL) async throws(StoreError) {
-        // REENTRANCY: c-4 (proposed) — nothing: after the durable "done" commit the tree and the key are the migration's
-        // alone, and every step of the removal is idempotent.
+        // REENTRANCY: c-4 (proposed) — the phase and the caller's cancellation (inside); after the durable "done" commit
+        // the tree and the key are the migration's alone, and every step of the removal is idempotent.
         let removed = try await self.removeLegacyTree(root)
-        // REENTRANCY: c-4 (proposed) — as above.
-        await self.removeLegacyStamp()
+        if removed {
+            // REENTRANCY: c-4 (proposed) — as above.
+            await self.removeLegacyStamp()
+        }
         try self.checkLive()
         self.state.migration.progress.remaining = 0
         self.state.migration.progress.finished = removed
@@ -456,7 +467,8 @@ enum LegacyDecoding {
         switch manifest {
         case .absent:
             break
-        case .unusable:
+        case .unusable, .failed:
+            // Phase 1 and phase 4 never decode a failed read (they decide nothing from it); treated as undecodable here.
             undecodable = true
         case .bytes(let data):
             do throws(ManifestError) {
