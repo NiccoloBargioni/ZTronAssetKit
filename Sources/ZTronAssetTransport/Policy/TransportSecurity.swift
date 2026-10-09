@@ -123,6 +123,17 @@ public enum RedirectPolicy {
         keyStillPresent: Bool,
         policy: TransportSecurityPolicy
     ) -> Decision {
-        fatalError("WP-D: RedirectPolicy.decide not implemented")
+        guard hop <= policy.maxRedirects else {
+            return .refuse(.tooManyRedirects)
+        }
+        guard let proposed else {
+            return .refuse(.invalidLocation)
+        }
+        if let violation = policy.check(proposed) {
+            // `check` of a non-nil origin reports only these two.
+            return .refuse(violation == .insecureScheme ? .insecureScheme : .hostNotAllowed)
+        }
+        // Monotone: once a hop left the original origin the key is gone for good, even back at the origin.
+        return .follow(keepKey: keyStillPresent && previous == original && proposed == original)
     }
 }

@@ -76,8 +76,16 @@ public final class ForegroundTransferBackend: TransferBackend {
     public let delegate: SessionDelegate
     /// The one foreground session.
     public let session: URLSession
+    /// Builds every request; the only holder of the key on this path (R-NET-4).
+    let requests: RequestFactory
+    /// Where the `transfer` signpost intervals go (R-OBS-1).
+    let log: LogRoute
+    /// Orders task creation against invalidation: a task created on an invalidated session raises an Objective-C
+    /// exception, so `start` and `invalidate` meet on one actor.
+    let gate = SessionGate()
 
-    /// Creates the backend and its session (about 0.05 ms, transport.md E-12).
+    /// Creates the backend and its session (about 0.05 ms, transport.md E-12). Requests carry no key and intervals
+    /// go nowhere; `HTTPRemoteSource` uses `init(delegate:maxConnectionsPerHost:requestTimeout:appKey:log:)`.
     public init(delegate: SessionDelegate, maxConnectionsPerHost: Int, requestTimeout: TimeInterval) {
         self.delegate = delegate
         self.session = URLSession(
@@ -88,6 +96,24 @@ public final class ForegroundTransferBackend: TransferBackend {
             delegate: delegate,
             delegateQueue: nil
         )
+        self.requests = RequestFactory(policy: delegate.policy, appKey: nil, timeout: requestTimeout)
+        self.log = .tapOnly(nil)
+    }
+
+    /// Creates the backend with the key its request factory attaches (to origins the delegate's policy allows) and
+    /// the route its `transfer` intervals go to (ADR-047).
+    package init(delegate: SessionDelegate, maxConnectionsPerHost: Int, requestTimeout: TimeInterval, appKey: AppKey?, log: LogRoute) {
+        self.delegate = delegate
+        self.session = URLSession(
+            configuration: ForegroundTransferBackend.makeConfiguration(
+                maxConnectionsPerHost: maxConnectionsPerHost,
+                requestTimeout: requestTimeout
+            ),
+            delegate: delegate,
+            delegateQueue: nil
+        )
+        self.requests = RequestFactory(policy: delegate.policy, appKey: appKey, timeout: requestTimeout)
+        self.log = log
     }
 
     deinit {
@@ -113,24 +139,154 @@ public final class ForegroundTransferBackend: TransferBackend {
         return configuration
     }
 
-    /// Starts one data task for `job`.
+    /// Starts one data task for `job`: the request from the factory (the key only for allowed origins), the lane's
+    /// priority, the job's mailbox, and a `transfer` interval that ends with the stream. Terminating the stream
+    /// before its terminal element cancels the task (`TransferHandle`). A refused origin or an invalidated session
+    /// yields a handle that is already terminal.
     public func start(_ job: TransferJob) async -> any TransferHandle {
-        fatalError("WP-D: ForegroundTransferBackend.start not implemented")
+        let request: URLRequest
+        switch self.requests.makeRequest(for: job) {
+        case .request(let built):
+            request = built
+        case .refused(let violation):
+            return ImmediateTransferHandle(id: job.id, attempt: job.attempt, terminal: .failed(.rejected(violation)))
+        }
+        let session = self.session
+        let log = self.log
+        let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(4))
+        // The task gets its mailbox, priority and interval inside the gate, so no task ever exists without its
+        // mailbox: an invalidation right after the gate still finds the mailbox and ends the stream.
+        let made = await self.gate.makeTask {
+            let task = session.dataTask(with: request)
+            task.priority = job.priority.urlSessionTaskPriority
+            if let expected = job.expectedBytes {
+                // The offset comes from a sidecar on disk: clamped into 0…expected first, so the remainder never
+                // overflows whatever the sidecar says (review round 3).
+                task.countOfBytesClientExpectsToReceive = expected - min(max(job.resume?.offset ?? 0, 0), expected)
+            }
+            let purpose = job.purpose == .manifest ? "manifest" : "asset"
+            let interval = log.interval(.transfer, category: .transport, "attempt \(job.attempt) \(purpose)")
+            continuation.onTermination = { termination in
+                if case .cancelled = termination {
+                    // Nobody will read this transfer's outcome: append nothing more (a pause in progress keeps its mark).
+                    TaskMarker.requestIfUnmarked(.discard, on: task)
+                    task.cancel()
+                }
+                interval.end()
+            }
+            task.delegate = TaskMailbox(continuation: continuation, job: job)
+            return task
+        }
+        guard let task = made else {
+            continuation.finish()
+            return ImmediateTransferHandle(id: job.id, attempt: job.attempt, terminal: .failed(.cancelled(.byClient)))
+        }
+        task.resume()
+        return DataTransferHandle(job: job, updates: updates, task: task, staging: self.delegate.staging)
     }
 
-    /// Live data tasks.
+    /// The session's running and suspended data tasks, read from the tasks themselves (their mailboxes). A task the
+    /// client discarded is not live although its cancellation may not have reached the task yet: a handle's
+    /// `cancel()` marks it synchronously and cancels it only after its partial was discarded. `bytesReceived` is what
+    /// the partial holds: the resume offset counts only once a 206 continued it.
     public func liveTransfers() async -> [LiveTransfer] {
-        fatalError("WP-D: ForegroundTransferBackend.liveTransfers not implemented")
+        let tasks = await self.session.allTasks
+        return tasks.compactMap { task in
+            guard let job = (task.delegate as? TaskMailbox)?.job, task.state == .running || task.state == .suspended,
+                TaskMarker(decoding: task.taskDescription) != .discard
+            else {
+                return nil
+            }
+            // The resume offset is part of the partial only when the origin continued it (206); a 200 answering a
+            // resumed request restarted the partial from zero (the validator changed).
+            let continued = (task.response as? HTTPURLResponse)?.statusCode == 206
+            let offset = continued ? job.resume?.offset ?? 0 : 0
+            return LiveTransfer(
+                name: job.partialName,
+                backend: .foreground,
+                isRunning: task.state == .running,
+                bytesReceived: Saturating.add(offset, task.countOfBytesReceived),
+                priority: task.priority
+            )
+        }
     }
 
-    /// Cancels by staging name.
+    /// Cancels the task writing `name`. Keeping the partial is a pause (the sidecar is written by the delegate);
+    /// otherwise the task is marked so the delegate appends nothing more, and the partial and its sidecar are
+    /// discarded here (staging GC collects anything a callback still in flight leaves behind, R-CLN-3).
     public func cancel(_ name: StagingFileName, keepingPartial: Bool) async {
-        fatalError("WP-D: ForegroundTransferBackend.cancel not implemented")
+        let tasks = await self.session.allTasks
+        var found = false
+        for task in tasks where (task.delegate as? TaskMailbox)?.job.partialName == name {
+            found = true
+            if keepingPartial {
+                TaskMarker.requestIfUnmarked(.pause, on: task)
+            } else {
+                TaskMarker.requestDiscard(on: task)
+            }
+            task.cancel()
+        }
+        if found && !keepingPartial {
+            await self.delegate.staging.discard(name)
+        }
     }
 
     /// `invalidateAndCancel()` and waits for `didBecomeInvalidWithError`, i.e. for `.invalidated` on
     /// `delegate.sessionEvents` (transport-2 T2-04).
     public func invalidate() async {
-        fatalError("WP-D: ForegroundTransferBackend.invalidate not implemented")
+        await self.gate.invalidate(self.session, events: self.delegate.sessionEvents)
+    }
+}
+
+/// Serialises task creation and invalidation of one foreground session, and lets any number of callers wait for
+/// the session's last callback (`.invalidated`).
+///
+/// The session stream is single-consumer, so one unstructured task reads it; callers wait on continuations. That
+/// task is not a caller's child, so a cancelled shutdown cannot end the read early (cancelling a reader terminates
+/// an `AsyncStream` for good).
+actor SessionGate {
+    private var invalidating = false
+    private var invalidated = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Runs `make` unless invalidation began; `nil` afterwards.
+    func makeTask(_ make: @Sendable () -> URLSessionDataTask) -> URLSessionDataTask? {
+        guard !self.invalidating else {
+            return nil
+        }
+        return make()
+    }
+
+    /// Invalidates `session` once and returns after its delegate reported `.invalidated` on `events`.
+    func invalidate(_ session: URLSession, events: AsyncStream<SessionEvent>) async {
+        if self.invalidated {
+            return
+        }
+        if !self.invalidating {
+            self.invalidating = true
+            session.invalidateAndCancel()
+            Task {
+                // REENTRANCY: D-1 (proposed) — the read of the session stream; afterwards `finish()` re-reads only
+                // `waiters`, draining exactly the callers registered by then.
+                for await event in events where event == .invalidated {
+                    break
+                }
+                self.finish()
+            }
+        }
+        // REENTRANCY: D-1 (proposed) — a terminal wait resumed by `finish()`, registered in the same actor turn as
+        // the `invalidated` check above, so `finish()` cannot run in between.
+        await withCheckedContinuation { continuation in
+            self.waiters.append(continuation)
+        }
+    }
+
+    private func finish() {
+        self.invalidated = true
+        let waiters = self.waiters
+        self.waiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
     }
 }
