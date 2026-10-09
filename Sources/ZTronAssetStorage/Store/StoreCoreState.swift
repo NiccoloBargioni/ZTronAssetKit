@@ -203,6 +203,10 @@ struct CommitBookkeeping: Sendable {
     /// The generation of the `index.tmp` the launch loaded, until a commit unit renamed it to `index.bin` (ADR draft
     /// B-28): every commit attempt promotes it before it writes `index.tmp` again.
     var pendingPromotion: UInt64?
+    /// The index name that holds `StoreCoreState.committedGeneration` (ADR draft B-28, close-out cycle 5): set from the
+    /// load, which validated that file in full, and moved by every commit unit's renames (`IndexCommitLedger`); `nil`
+    /// while nothing is committed. Step 4 and the ENOSPC fallback trust it, never a header that may have rotted.
+    var committedFile: IndexFile?
 
     /// Whether a `.soon` mutation is not yet committed.
     var soonPending: Bool {

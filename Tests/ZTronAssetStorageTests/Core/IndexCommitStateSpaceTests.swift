@@ -195,7 +195,9 @@ struct IndexSpaceRow: Sendable, CustomTestStringConvertible {
 ///   next attempt writes.
 /// - **I-b** the generation the store counts committed is a valid file on disk: after every commit attempt (as a kill
 ///   leaves it), and at the end of every run and of every reopen under each crash view. A crash inside a unit is held to
-///   I-a against what the store counted committed before that unit: a promotion inside the unit may replace it.
+///   I-a against what the store counted committed before that unit: a promotion inside the unit may replace it. After
+///   every commit attempt the store also knows which index name holds it (`IndexCommitLedger.committedFile`, which step 4
+///   and the ENOSPC fallback trust instead of a header), and that file holds it, validated in full (close-out cycle 5).
 /// - **I-c** a failed commit leaves `index.bin` present and valid whenever it was valid before.
 /// - **I-e** (liveness) on a free volume, a fault before close()'s durable flush does not outlive its commit: the flush,
 ///   meeting no fault of its own, succeeds (probe VPC2-K: a promotion left pending by a lost rename blocked every commit).
@@ -582,6 +584,7 @@ enum IndexSpace {
     /// Everything a lifetime keeps in memory that a check or a later commit reads.
     struct Bookkeeping: Hashable {
         var committed: UInt64
+        var committedFile: IndexFile?
         var pending: UInt64?
         var claimed: UInt64
         var epoch: UInt64
@@ -684,6 +687,7 @@ enum IndexSpace {
         var bookkeeping: Bookkeeping {
             Bookkeeping(
                 committed: self.ledger.committedGeneration,
+                committedFile: self.ledger.committedFile,
                 pending: self.ledger.pendingPromotion,
                 claimed: self.claimed,
                 epoch: self.epoch,
@@ -716,10 +720,10 @@ enum IndexSpace {
         let outcome = await IndexLoader.load(layout: layout, fileSystem: fileSystem, metadata: inline, bulk: inline)
         let launch = LaunchState.build(outcome: outcome, onDisk: [:], blobsRecreated: false, seed: IndexSpace.seed, now: IndexSpace.now, layout: layout)
         let rootOrdered = (try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)) != nil
-        let committed = launch.committedGeneration(rootOrdered: rootOrdered)
+        let ledger = launch.ledger(rootOrdered: rootOrdered)
         let progress = Progress(
-            ledger: IndexCommitLedger(committedGeneration: committed, pendingPromotion: launch.promotion),
-            claimed: committed,
+            ledger: ledger,
+            claimed: ledger.committedGeneration,
             epoch: launch.nextGeneration,
             loaded: outcome.content?.generation ?? 0,
             storeID: launch.storeID,
@@ -747,6 +751,7 @@ enum IndexSpace {
             durability: index == 0 ? .ordered : .durable,
             lock: nil,
             committedGeneration: progress.ledger.committedGeneration,
+            committedFile: progress.ledger.committedFile,
             promotion: progress.ledger.pendingPromotion
         )
         progress.generation += 1
@@ -810,6 +815,16 @@ enum IndexSpace {
                 let committed = run.progress.ledger.committedGeneration
                 if committed > 0, !after.generations.contains(committed) {
                     found.append("\(attempt): I-b, the committed generation \(committed) is not on disk (\(IndexSpace.describe(files)))")
+                }
+                // The store knows which file holds what it counts committed (step 4 and the ENOSPC fallback trust that
+                // knowledge instead of a header, close-out cycle 5), and that file does hold it, validated in full.
+                if let file = run.progress.ledger.committedFile {
+                    let held = files[IndexSpace.path(file)].flatMap { try? IndexCodec.decode($0).get() }?.generation
+                    if held != committed {
+                        found.append("\(attempt): I-b, the store counts generation \(committed) committed in \(file.rawValue), which holds \(held.map { String($0) } ?? "no valid generation") (\(IndexSpace.describe(files)))")
+                    }
+                } else if committed > 0 {
+                    found.append("\(attempt): I-b, the store counts generation \(committed) committed but no longer knows which file holds it (\(IndexSpace.describe(files)))")
                 }
                 if !succeeded, run.currentIsValid, !after.currentIsValid {
                     found.append("\(attempt): I-c, index.bin was valid before the failed commit and is \(files[IndexSpace.path(.current)] == nil ? "missing" : "invalid") after it")

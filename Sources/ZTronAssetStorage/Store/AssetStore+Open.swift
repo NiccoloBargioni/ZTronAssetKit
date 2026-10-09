@@ -101,9 +101,15 @@ extension AssetStore {
             (try? fileSystem.synchronizeDirectory(at: layout.root, level: .barrier)) != nil
         }
         try self.checkLive()
-        // ADR draft B-36: the loaded generation counts as committed only once the root's names are ordered (never lowered:
-        // a commit made before the barrier, by legacy phase 1, was ordered by its own root sync).
-        self.state.core.committedGeneration = max(self.state.core.committedGeneration, loaded.committedGeneration(rootOrdered: rootOrdered))
+        // ADR draft B-36: the loaded generation counts as committed only once the root's names are ordered; the file that
+        // holds it is the one the load validated in full (close-out cycle 5). A commit attempted before the barrier (legacy
+        // phase 1, WP-C) keeps the ledger it folded instead: its renames may have moved the files the load read, and what
+        // it counts its own root sync ordered (review "B-36 committed count vs a commit made before open()'s barrier").
+        if self.state.core.commits.lastAttemptAt == nil {
+            let launch = loaded.ledger(rootOrdered: rootOrdered)
+            self.state.core.committedGeneration = launch.committedGeneration
+            self.state.core.commits.committedFile = launch.committedFile
+        }
         if let reason = self.state.core.unavailable {
             // ADR draft B-34: the load could not read an index file, so no commit may write over it in this lifetime.
             self.environment.log.log(.store, .error, "an index file could not be read (\(String(describing: reason))); serving the loaded state read-only")
@@ -145,6 +151,7 @@ extension AssetStore {
         self.state.core.nextGeneration = loaded.nextGeneration
         // Nothing counts as committed before `open()`'s root barrier ordered the names the load read (ADR draft B-36).
         self.state.core.committedGeneration = 0
+        self.state.core.commits.committedFile = nil
         self.state.core.commits.pendingPromotion = loaded.promotion
         // The launch epoch is the generation the launch commit carries: persisted and strictly increasing (ADR-013).
         self.state.core.launchEpoch = loaded.nextGeneration

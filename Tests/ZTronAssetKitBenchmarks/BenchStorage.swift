@@ -81,11 +81,14 @@ extension ZTronAssetKitBenchmarks {
             var content = StorageBench.content(records: 10_000)
             let metadata = DispatchBlockingExecutor(label: "bench.p5.metadata")
             var report: [String] = []
+            // The store's own bookkeeping, as `commitNow` folds it: after the first success the previous generation is
+            // committed in index.bin, so every later commit moves it to index.prev (step 4), as in production.
+            var ledger = IndexCommitLedger(committedGeneration: 0, committedFile: nil, pendingPromotion: nil)
             for (durability, runs) in [(CommitDurability.ordered, 35), (.durable, 20)] {
                 var timings: [Double] = []
                 for run in 0..<runs {
                     content.generation += 1
-                    let input = IndexCommitInput(
+                    var input = IndexCommitInput(
                         layout: layout,
                         content: content,
                         dirtyFanOuts: fanOuts,
@@ -93,11 +96,15 @@ extension ZTronAssetKitBenchmarks {
                         durability: durability,
                         lock: lock
                     )
+                    input.committedGeneration = ledger.committedGeneration
+                    input.committedFile = ledger.committedFile
+                    let unitInput = input
                     let started = ContinuousClock.now
                     let result = await metadata.run {
-                        IndexCommitUnit.run(input, fileSystem: fileSystem)
+                        IndexCommitUnit.run(unitInput, fileSystem: fileSystem)
                     }
                     let elapsed = StorageBench.milliseconds(ContinuousClock.now - started)
+                    ledger = ledger.recording(result, of: unitInput)
                     #expect((try? result.result.get()) != nil)
                     if run >= 3 {
                         timings.append(elapsed)

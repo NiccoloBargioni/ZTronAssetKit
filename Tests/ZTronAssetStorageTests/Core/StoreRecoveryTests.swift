@@ -299,10 +299,12 @@ struct StoreRecoveryTests {
     }
 
     /// The ENOSPC fallback of the commit unit (ADR-015 as amended by ADR draft B-28) on a disk holding `index.prev` of
-    /// generation 4: it may drop `index.prev` only while `index.bin` is the committed generation's file.
+    /// generation 4: it may drop `index.prev` only while `index.bin` is the file the store knows to hold its committed
+    /// generation, never because of what `index.bin`'s header says (close-out cycle 5). The store's knowledge is what a
+    /// launch builds from the loaded disk (`LaunchState.ledger(rootOrdered:)`); then the disk changes as the case says.
     @Test(
         "R-STO-4: the ENOSPC fallback removes index.prev only while index.bin holds the committed generation",
-        arguments: ["committed", "missing", "rotten", "other generation"]
+        arguments: ["committed", "missing", "rotten", "other generation", "forged header"]
     )
     @available(macOS 15.0, *)
     func noSpaceFallbackKeepsTheNewestGeneration(bin: String) throws {
@@ -320,14 +322,35 @@ struct StoreRecoveryTests {
         }
         try fileSystem.write(try encoded(4), to: layout.indexURL(.previous), mode: .truncate)
         switch bin {
-        case "committed":
+        case "committed", "missing":
             try fileSystem.write(try encoded(5), to: layout.indexURL(.current), mode: .truncate)
-        case "rotten":
+        case "rotten", "other generation":
             var rotten = try encoded(5)
             rotten[rotten.count - 1] ^= 0xFF
             rotten.removeLast()
             try fileSystem.write(rotten, to: layout.indexURL(.current), mode: .truncate)
+        case "forged header":
+            // A copy of generation 5 whose header's generation field lost bit 0: it names 4, the committed generation,
+            // with the right size; only the trailer fails.
+            let valid = [UInt8](try encoded(5))
+            var header = try #require(IndexHeader.parse(valid))
+            header.generation = 4
+            try fileSystem.write(Data(header.encoded() + valid[IndexHeader.length...]), to: layout.indexURL(.current), mode: .truncate)
+        default:
+            break
+        }
+        let loaded = StoreRecoveryTests.loadRule(fileSystem.survivingDisk())
+        let launch = LaunchState.build(outcome: loaded, onDisk: [:], blobsRecreated: false, seed: 7, now: Date(timeIntervalSince1970: 0), layout: layout)
+        let ledger = launch.ledger(rootOrdered: true)
+        #expect(ledger.committedGeneration == (bin == "committed" || bin == "missing" ? 5 : 4))
+        #expect(ledger.committedFile == (bin == "committed" || bin == "missing" ? .current : .previous))
+        switch bin {
+        case "missing":
+            // index.bin vanished after the load (an outside deletion inside the private root).
+            try fileSystem.removeItem(at: layout.indexURL(.current))
         case "other generation":
+            // An attempt whose root sync failed renamed its synced index.tmp over the rotten index.bin: valid, but the
+            // store never counted it.
             try fileSystem.write(try encoded(6), to: layout.indexURL(.current), mode: .truncate)
         default:
             break
@@ -335,7 +358,8 @@ struct StoreRecoveryTests {
         fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .every, error: .noSpace))
         var input = IndexCommitInput(layout: layout, content: content, dirtyFanOuts: [], blobsDirectoryDirty: false, durability: .ordered, lock: nil)
         input.content.generation = 7
-        input.committedGeneration = 5
+        input.committedGeneration = ledger.committedGeneration
+        input.committedFile = ledger.committedFile
         let outcome = IndexCommitUnit.run(input, fileSystem: fileSystem)
         #expect(throws: StoreError.fileSystem(.noSpace)) {
             try outcome.result.get()
@@ -344,6 +368,7 @@ struct StoreRecoveryTests {
         let previousKept = ((try? fileSystem.itemInfo(at: layout.indexURL(.previous))) ?? nil) != nil
         #expect(previousKept == (bin != "committed"), "index.bin \(bin): index.prev kept \(previousKept)")
         #expect(((try? fileSystem.itemInfo(at: layout.indexURL(.temporary))) ?? nil) == nil, "the failed index.tmp is removed")
+        #expect(outcome.committedFile == ledger.committedFile, "nothing was renamed, so the committed file is where it was")
     }
 
     /// How the commit before the kill was stopped between its two renames (review round 3, probe 1).

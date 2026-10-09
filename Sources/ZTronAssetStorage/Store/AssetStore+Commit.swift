@@ -104,6 +104,7 @@ extension AssetStore {
             deletingDooms: self.state.core.deletingDooms,
             replacingDooms: self.state.core.replacingDooms,
             committedGeneration: self.state.core.committedGeneration,
+            committedFile: self.state.core.commits.committedFile,
             promotion: self.state.core.commits.pendingPromotion
         )
         self.state.core.commits.inFlight = true
@@ -117,7 +118,8 @@ extension AssetStore {
             defer {
                 interval.end()
             }
-            // REENTRANCY: R5 — `committedGeneration = max(…)` with the generation allocated at capture; mutations made
+            // REENTRANCY: R5 — `committedGeneration = max(…)` with the generation allocated at capture, and its file as the
+            // unit's renames left it (nothing else renames an index file while the unit runs); mutations made
             // meanwhile stay dirty (their serial is above `serial`); on failure the dirty directories are restored;
             // waiters are resumed either way; callers re-check the phase, so no new commit starts once closing.
             outcome = await self.runUnit(on: self.environment.metadataExecutor) {
@@ -126,12 +128,14 @@ extension AssetStore {
         }
         self.state.core.commits.inFlight = false
         // The loaded index.tmp is index.bin now (or gone), whether or not the rest of the unit succeeded; a durable
-        // promotion and a success raise the committed generation (ADR draft B-28).
+        // promotion and a success raise the committed generation, and the unit's renames move its file (ADR draft B-28).
         let ledger = IndexCommitLedger(
             committedGeneration: self.state.core.committedGeneration,
+            committedFile: self.state.core.commits.committedFile,
             pendingPromotion: self.state.core.commits.pendingPromotion
         ).recording(outcome, of: input)
         self.state.core.committedGeneration = ledger.committedGeneration
+        self.state.core.commits.committedFile = ledger.committedFile
         self.state.core.commits.pendingPromotion = ledger.pendingPromotion
         switch outcome.result {
         case .success:

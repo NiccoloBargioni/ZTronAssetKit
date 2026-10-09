@@ -15,6 +15,9 @@ struct LaunchState: Sendable {
     /// committed only once the launch commit promoted it to `index.bin` (`promotion`); until then it is
     /// `IndexLoadOutcome.survivingGeneration`, the newest valid generation outside `index.tmp` (ADR draft B-28).
     var committedGeneration: UInt64
+    /// The index name that holds `committedGeneration`: the chosen file, or the surviving one when the load chose
+    /// `index.tmp`; the load validated it in full, trailer included (close-out cycle 5). `nil` when nothing was loaded.
+    var committedFile: IndexFile?
     /// The generation of the loaded `index.tmp`, which the next commit renames to `index.bin` before it writes
     /// `index.tmp` again (ADR draft B-28); `nil` when the load rule chose another file.
     var promotion: UInt64?
@@ -29,14 +32,19 @@ struct LaunchState: Sendable {
     /// read (ADR draft B-34); a later launch reads again.
     var unavailable: StorageUnavailableReason?
 
-    /// What the launch counts committed once `open()`'s root barrier ran (ADR draft B-36): `committedGeneration` when the
-    /// barrier ordered the names the load read, and nothing (0) when it failed. A killed process may have renamed an
-    /// index file and died before its root sync; until a root sync orders that name, a power loss can bring the older
-    /// names back, so the loaded generation is not yet durable. Counting it committed let the reaper unlink a blob that
-    /// the generation a power loss brings back still binds or expects, and let the ENOSPC fallback and step 4 treat
-    /// `index.bin` as the committed file. The next successful commit (its own root sync) raises the committed generation.
-    func committedGeneration(rootOrdered: Bool) -> UInt64 {
-        rootOrdered ? self.committedGeneration : 0
+    /// What the launch counts committed, and where, once `open()`'s root barrier ran (ADR draft B-36): `committedGeneration`
+    /// in `committedFile` when the barrier ordered the names the load read, and nothing (0) when it failed. A killed
+    /// process may have renamed an index file and died before its root sync; until a root sync orders that name, a power
+    /// loss can bring the older names back, so the loaded generation is not yet durable. Counting it committed let the
+    /// reaper unlink a blob that the generation a power loss brings back still binds or expects, and let the ENOSPC
+    /// fallback and step 4 treat `index.bin` as the committed file. The next successful commit (its own root sync) raises
+    /// the committed generation. `pendingPromotion` is `promotion` either way.
+    func ledger(rootOrdered: Bool) -> IndexCommitLedger {
+        IndexCommitLedger(
+            committedGeneration: rootOrdered ? self.committedGeneration : 0,
+            committedFile: rootOrdered && self.committedGeneration > 0 ? self.committedFile : nil,
+            pendingPromotion: self.promotion
+        )
     }
 
     /// Builds the launch state; pure.
@@ -63,6 +71,7 @@ struct LaunchState: Sendable {
             storeID: content.storeID == .zero ? derived : content.storeID,
             nextGeneration: nextGeneration,
             committedGeneration: outcome.chosen == .temporary ? outcome.survivingGeneration : content.generation,
+            committedFile: outcome.chosen == .temporary ? outcome.survivingFile : outcome.chosen,
             promotion: outcome.chosen == .temporary ? content.generation : nil,
             reconciled: reconciled,
             presentTable: SnapshotTable.build(records: reconciled.records, layout: layout),

@@ -23,6 +23,9 @@ struct IndexLoadOutcome: Sendable, Equatable {
     /// step, ADR draft B-28, which can fail). Keys the chosen generation dooms wait for that promotion or a later
     /// commit (review: load rule vs commit protocol).
     var survivingGeneration: UInt64
+    /// The file the surviving generation was read from, validated in full (`nil` when there is none): the index name
+    /// the store counts as holding its committed generation until the promotion (ADR draft B-28, close-out cycle 5).
+    var survivingFile: IndexFile?
     /// No valid generation although an index file existed, an invalid `index.bin`, a newer schema, or a chosen
     /// generation that was itself degraded.
     var degraded: Bool
@@ -84,14 +87,15 @@ enum IndexLoadRule {
         let newest = valid.max { $0.content.generation < $1.content.generation }
         let agreeing = valid.filter { $0.content.storeID == newest?.content.storeID }
         let chosen = agreeing.max { $0.content.generation < $1.content.generation }
-        let surviving = agreeing.filter { $0.file != .temporary }.map(\.content.generation).max() ?? 0
+        let surviving = agreeing.filter { $0.file != .temporary }.max { $0.content.generation < $1.content.generation }
         let anyFile = !files.isEmpty
         let degraded = (anyFile && chosen == nil) || binInvalid || newerSchema || (chosen?.content.degraded ?? false)
         return IndexLoadOutcome(
             content: chosen?.content,
             chosen: chosen?.file,
             nextGeneration: next,
-            survivingGeneration: surviving,
+            survivingGeneration: surviving?.content.generation ?? 0,
+            survivingFile: surviving?.file,
             degraded: degraded,
             newerSchema: newerSchema,
             anyFileExisted: anyFile
