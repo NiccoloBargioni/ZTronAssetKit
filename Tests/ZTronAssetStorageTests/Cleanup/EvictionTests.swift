@@ -308,6 +308,64 @@ struct EvictionTests {
         #expect(evicted.map(\.id) == [assets[0].id, assets[1].id])
     }
 
+    /// What reaches the evicted asset's record while its doomed blob is still on disk.
+    enum AfterEviction: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// `apply` of the same manifest (a sync that changed nothing).
+        case apply
+        /// `admit` of the entry, relocated.
+        case admit
+        /// A relaunch: launch adoption binds it again (crash recovery, ADR-018).
+        case relaunch
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// Review round 3 (OI-1, orchestrator ruling R3): `apply` adopted `absent(.evicted)` records and rescued their
+    /// doomed blobs, so any sync within the deletion grace undid the eviction and maintenance could thrash. Evicted
+    /// records are adopted only by the launch adoption now.
+    @Test(
+        "R-CLN-4: an apply or admit within the deletion grace never adopts an evicted asset again; only a relaunch does",
+        .timeLimit(.minutes(1)),
+        arguments: AfterEviction.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictionNotUndoneByApply(_ after: AfterEviction) async throws {
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0)))
+        let a = CleanupFixture.asset("a", seed: 96)
+        try await harness.seed([a])
+        harness.time.advance(by: 3_600)
+        #expect(try await harness.store.evictIfNeeded().filesRemoved == 1)
+        #expect(await harness.record(a.id)?.residency == .absent(.evicted) && harness.hasBlob(a.key))
+        switch after {
+        case .apply:
+            let report = try await harness.store.apply(CoreFixture.manifest([a.entry]), etag: nil, eviction: nil)
+            #expect(report.reused.isEmpty)
+        case .admit:
+            var moved = a.entry
+            moved.localPathComponents = ["moved"]
+            try await harness.store.admit(moved)
+        case .relaunch:
+            await harness.store.close()
+            let reopened = CoreHarness.cleanup(disk: harness.fileSystem.survivingDisk(), policy: CleanupFixture.policy(budget: .bytes(0)), time: harness.time)
+            _ = try await reopened.store.open()
+            #expect(await reopened.isPresent(a.id, at: a.key), "launch adoption binds the evicted record to its blob (ADR-018)")
+            #expect(await CoreInvariants.violations(of: reopened).isEmpty)
+            return
+        }
+        #expect(await harness.record(a.id)?.residency == .absent(.evicted), "the eviction stands")
+        guard case .doomed(let doom)? = await harness.state.core.blobTable[a.key] else {
+            Issue.record("the evicted blob was rescued")
+            return
+        }
+        #expect(doom.reason == .unreferenced)
+        await harness.settleDeletions()
+        let used = try await harness.store.freeSpace().usedBytes
+        #expect(!harness.hasBlob(a.key) && used == 0)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-4: entries outside the retention scope are evicted first, whatever their last access", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func outsideScopeFirst() async throws {
