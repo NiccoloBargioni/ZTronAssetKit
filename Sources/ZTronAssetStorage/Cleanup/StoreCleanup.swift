@@ -6,25 +6,47 @@ import ZTronAssetModel
 extension AssetStore {
     /// Removes every staging file whose transfer is not in `claimed`, older than `stagingClaimGrace`
     /// (ADR-028, R-CLN-3).
+    ///
+    /// A file is collected when its name does not parse (foreign), when it is older than `stagingMaxAge` (claimed or
+    /// not), or when no claim names its transfer and it is older than `stagingClaimGrace`; a file whose age is unknown is
+    /// kept. Epochs are never compared (ARCHITECTURE §4.5): the caller's claims and the file's age decide. The caller
+    /// claims every transfer it still works on, those with a publication in flight included. Removals run in units of
+    /// `deletionBatchSize`; a cancelled caller stops between units with `.cancelled` (removed files stay removed).
     package func collectStaging(keeping claimed: Set<TransferID>) async throws(StoreError) -> CleanupResult {
-        fatalError("WP-C: AssetStore.collectStaging not implemented")
+        try await self.performCollectStaging(keeping: claimed)
     }
 
     /// Orphan mark and sweep in bounded units until `deadline` (R-CLN-2, P-13); suspended while
     /// `state.core.degraded` (S1-11).
+    ///
+    /// Mark: every key of the blob table, every key being placed, and the adoption key of every record (a later `apply`
+    /// or launch adopts such a blob instead of downloading it). Sweep, only after the full listing: unmarked well-named
+    /// blobs whose `mtime` is older than `orphanGrace`. A listing the deadline interrupts sweeps nothing; the sweep stops
+    /// at the deadline between units. Also suspended while the root is unavailable (B-15).
     package func collectGarbage(until deadline: MonotonicInstant) async throws(StoreError) -> CleanupResult {
-        fatalError("WP-C: AssetStore.collectGarbage not implemented")
+        try await self.performCollectGarbage(until: deadline)
     }
 
     /// A user purge (R-CLN-6). Clears the stamp in the same commit; bumps `state.core.purgeEpoch` before any await.
     /// Returns after the selection is reaped (`reapDeletable(maxKeys:)`), rescued or deferred by a lease; the grace
     /// wait runs in the caller's (engine-owned) task.
+    ///
+    /// Every purge that removes something, and every `.all`, also clears the stamp and sets "sync due" (R-CLN-6); a purge
+    /// that selects nothing changes nothing but the epoch. The selection's blobs are doomed `purged` (never re-adopted,
+    /// ADR-018). `bytesFreed` counts the selection's bytes deleted before the call returned, `bytesDeferred` those still
+    /// leased; bytes a sink that does not acknowledge holds back are in neither and are reaped later by `runDueWork()`.
+    /// A cancelled caller gets `.cancelled` from the grace wait; the purge itself is already committed.
     package func purge(_ request: PurgeRequest) async throws(StoreError) -> PurgeResult {
-        fatalError("WP-C: AssetStore.purge not implemented")
+        try await self.performPurge(request)
     }
 
     /// `storageReport()` (R-CLN-9).
+    ///
+    /// Blob bytes come from the blob table: `bytesByKind` and the present/stale split cover live blobs, `pendingDeletion`
+    /// doomed ones; `orphanBytes` are unreferenced blobs found by the last orphan GC listing (or at launch, before the
+    /// first one); `stagingBytes` and the free space are read in one unit each. `sourceCopyBytes` is 0 here: the engine
+    /// adds the remote source's copies (ADR-027). Before `open()` (or after a failed read) the I/O figures are 0.
     package func storageReport() async -> StorageReport {
-        fatalError("WP-C: AssetStore.storageReport not implemented")
+        await self.performStorageReport()
     }
 }

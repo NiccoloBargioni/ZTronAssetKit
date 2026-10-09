@@ -1,0 +1,92 @@
+import Foundation
+import ZTronAssetModel
+
+/// The blocking units of WP-C's collections (ADR-003): one listing, or a bounded batch of removals.
+enum CleanupUnits {
+    /// The time a removal batch may take before it yields, on the injected monotonic clock: the reaper's bound
+    /// (P-13, ADR draft B-10), so a collection never holds a metadata unit longer than a deletion unit does.
+    static let removalBudget: TimeInterval = 0.001
+
+    /// What a removal batch did: the leading items it attempted and the ones that failed.
+    struct Removal: Sendable {
+        /// The number of leading items attempted.
+        var attempted: Int
+        /// Indices (into the batch) whose removal failed.
+        var failed: Set<Int>
+    }
+
+    /// Lists one directory without following links; `[]` for a missing directory.
+    static func list(_ url: URL, fileSystem: any FileSystem) -> Result<[FileItemInfo], FileSystemError> {
+        do throws(FileSystemError) {
+            return .success(try fileSystem.contentsOfDirectory(at: url))
+        } catch .notFound {
+            return .success([])
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Removes `urls` in order: at least one, then each next one only while the time spent plus the slowest removal
+    /// seen would stay within `budget` (the last one predicted, as the reaper's unit does). Absent items count as
+    /// removed (`removeItem` treats absence as success).
+    static func remove(_ urls: [URL], fileSystem: any FileSystem, time: any TimeSource, budget: TimeInterval) -> Removal {
+        let start = time.monotonicNow()
+        var last = start
+        var slowest: TimeInterval = 0
+        var removal = Removal(attempted: 0, failed: [])
+        for (index, url) in urls.enumerated() {
+            if removal.attempted > 0, last.seconds(since: start) + slowest > budget {
+                break
+            }
+            removal.attempted += 1
+            do throws(FileSystemError) {
+                try fileSystem.removeItem(at: url)
+            } catch {
+                removal.failed.insert(index)
+            }
+            let now = time.monotonicNow()
+            slowest = max(slowest, now.seconds(since: last))
+            last = now
+        }
+        return removal
+    }
+}
+
+extension AssetStore {
+    /// Removes `items` (URL and size) in metadata units of at most `deletionBatchSize` and `CleanupUnits.removalBudget`,
+    /// checking the caller's cancellation and `deadline` between units. Returns what was removed; throws `.cancelled`
+    /// once cancelled (what was removed stays removed, R-CLN-12) or `.closed` once closing.
+    func removeInUnits(_ items: [(url: URL, bytes: Int64)], until deadline: MonotonicInstant? = nil) async throws(StoreError) -> (removed: [Int], result: CleanupResult) {
+        let fileSystem = self.environment.fileSystem
+        let time = self.environment.time
+        let batchSize = max(1, self.configuration.deletionBatchSize)
+        var result = CleanupResult()
+        var removed: [Int] = []
+        var next = 0
+        while next < items.count {
+            if Task.isCancelled {
+                throw .cancelled
+            }
+            if let deadline, time.monotonicNow() >= deadline {
+                break
+            }
+            let range = next..<min(next + batchSize, items.count)
+            let urls = items[range].map(\.url)
+            // REENTRANCY: c-1 (proposed) — the phase: the files are the collection's own decision (garbage nobody else
+            // writes under these names, or orphans re-checked by the caller just before); the next batch starts after
+            // the cancellation and deadline checks.
+            let removal = await self.runUnit(on: self.environment.metadataExecutor) {
+                CleanupUnits.remove(urls, fileSystem: fileSystem, time: time, budget: CleanupUnits.removalBudget)
+            }
+            try self.checkLive()
+            for offset in 0..<removal.attempted where !removal.failed.contains(offset) {
+                let index = range.lowerBound + offset
+                removed.append(index)
+                result.bytesFreed = result.bytesFreed.addingSaturating(items[index].bytes)
+                result.filesRemoved += 1
+            }
+            next = range.lowerBound + max(1, removal.attempted)
+        }
+        return (removed, result)
+    }
+}
