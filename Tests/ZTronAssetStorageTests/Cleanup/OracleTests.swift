@@ -201,8 +201,8 @@ struct OracleTests {
             let plan = try #require(await harness.store.evictionPlan(toFree: 1, protecting: others))
             #expect(plan.victims.map(\.id) == [AssetID(id)])
             _ = try await harness.store.apply(OracleTests.manifest(target), etag: nil, eviction: plan)
-            // Reaped at once, so no later `apply` rescues the doomed blob (see ADR draft C, open issue on apply's adoption).
-            await harness.settleDeletions()
+            // Not reaped: the later steps run `apply` within the deletion grace, which must not adopt the evicted record
+            // again (OI-1, ruling R3 at the L3 close-out); the doomed blob waits for a relaunch or the reaper.
             try await harness.store.flush(.ordered)
         case .reopen:
             break
@@ -244,6 +244,18 @@ struct OracleTests {
                 let report = try await harness.store.open()
                 let headers = IndexFile.allCases.compactMap { disk.files[harness.layout.indexURL($0).path].flatMap(IndexHeader.parse) }
                 #expect(headers.allSatisfy { report.launchEpoch > $0.generation }, "\(label): I-5 epoch, after \(history)")
+                // Launch adoption binds an evicted record whose doomed blob is still on disk (ADR-018): an evicted asset
+                // may be present again after any relaunch, never after an `apply` (OI-1). A fake that crashed inside
+                // open() (a tolerated launch-commit failure) is reconciled by the first step, which then fails.
+                if !harness.fileSystem.crashed {
+                    let observed = await OracleTests.observe(harness, versions: versions)
+                    if let match = model.matching(observed) {
+                        model = match
+                    } else {
+                        Issue.record("\(label): after the relaunch in \(history): store \(observed) ≠ oracle \(model)")
+                        return
+                    }
+                }
             } catch {
                 // Crashed inside open(): nothing changed for the oracle.
                 disk = harness.fileSystem.survivingDisk()
