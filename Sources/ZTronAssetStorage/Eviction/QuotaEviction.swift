@@ -19,7 +19,6 @@ extension AssetStore {
         return EvictionOrder.candidates(
             records: self.state.core.records,
             blobTable: self.state.core.blobTable,
-            blobBytes: self.state.core.blobBytes,
             publishing: self.state.core.publishing,
             leases: self.state.cleanup.leases,
             rules: rules
@@ -146,7 +145,7 @@ extension AssetStore {
         else {
             return nil
         }
-        let bytes = self.state.core.blobBytes[key] ?? 0
+        let bytes = holders.first.flatMap { self.state.core.records[$0] }.map(EvictionOrder.recordedSize) ?? 0
         for victim in victims {
             self.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
         }

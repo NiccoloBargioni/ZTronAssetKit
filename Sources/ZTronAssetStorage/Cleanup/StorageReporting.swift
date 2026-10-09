@@ -19,19 +19,16 @@ extension AssetStore {
         var byKind: [String: Int64] = [:]
         var present: Int64 = 0
         var stale: Int64 = 0
-        var pending: Int64 = 0
         var pinned: Int64 = 0
         var essential: Int64 = 0
-        let holders = self.referenceIndex()
-        for (key, blobState) in core.blobTable {
-            let bytes = core.blobBytes[key] ?? 0
-            guard case .live = blobState else {
-                pending = pending.addingSaturating(bytes)
+        for (key, ids) in self.referenceIndex() {
+            guard case .live? = core.blobTable[key] else {
                 continue
             }
-            let records = (holders[key] ?? []).compactMap { core.records[$0] }
+            let records = ids.compactMap { core.records[$0] }
+            let bytes = records.first.map(EvictionOrder.recordedSize) ?? 0
             byKind[key.ext.rawValue, default: 0] = byKind[key.ext.rawValue, default: 0].addingSaturating(bytes)
-            if records.isEmpty || records.contains(where: { !$0.isStale }) {
+            if records.contains(where: { !$0.isStale }) {
                 present = present.addingSaturating(bytes)
             } else {
                 stale = stale.addingSaturating(bytes)
@@ -43,9 +40,19 @@ extension AssetStore {
                 essential = essential.addingSaturating(bytes)
             }
         }
+        // Doomed bytes: the unleased ones from `freeSpace()`, the leased ones from the sizes recorded with the leases.
+        var pending = space?.pendingReclaim ?? 0
+        for (key, bytes) in self.state.cleanup.leasedBytes where !(self.state.cleanup.leases[key]?.isEmpty ?? true) {
+            switch core.blobTable[key] {
+            case .doomed?, .deleting?:
+                pending = pending.addingSaturating(bytes)
+            case .live?, nil:
+                break
+            }
+        }
         let evictable = self.evictionCandidates(protecting: []).reduce(Int64(0)) { $0.addingSaturating($1.bytes) }
         let marks = self.orphanMarks()
-        let orphans = (self.state.cleanup.orphans ?? core.orphans).filter { !marks.contains($0.key) }.values.reduce(Int64(0)) { $0.addingSaturating($1) }
+        let orphans = (self.state.cleanup.orphans ?? [:]).filter { !marks.contains($0.key) }.values.reduce(Int64(0)) { $0.addingSaturating($1) }
         let unverified = core.records.values.filter { record in
             if case .present(_, _, .unverified) = record.residency {
                 return true

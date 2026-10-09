@@ -56,7 +56,6 @@ enum EvictionOrder {
     static func candidates(
         records: [AssetID: AssetRecord],
         blobTable: [BlobKey: BlobState],
-        blobBytes: [BlobKey: Int64],
         publishing: Set<BlobKey>,
         leases: [BlobKey: [UInt64: AssetID]],
         rules: Rules
@@ -76,7 +75,7 @@ enum EvictionOrder {
                 continue
             }
             let sorted = holders.sorted { $0.entry.identifier.rawValue < $1.entry.identifier.rawValue }
-            let bytes = blobBytes[key] ?? EvictionOrder.recordedSize(sorted[0])
+            let bytes = EvictionOrder.recordedSize(sorted[0])
             let victims = sorted.map { EvictionVictim(id: $0.entry.identifier, blob: key, byteSize: bytes, lastAccess: $0.lastAccess) }
             candidates.append(
                 EvictionCandidate(
@@ -140,7 +139,8 @@ enum EvictionOrder {
         return used - target
     }
 
-    /// A present record's recorded size (used only when the blob table lacks the size).
+    /// A present record's recorded size: the size of the blob it references (every record of one blob records the
+    /// blob's size, I-2); 0 for a record without a blob.
     static func recordedSize(_ record: AssetRecord) -> Int64 {
         if case .present(_, let byteSize, _) = record.residency {
             return byteSize

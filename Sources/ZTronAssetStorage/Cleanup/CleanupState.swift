@@ -12,6 +12,9 @@ struct CleanupState: Sendable {
     var leases: [BlobKey: [UInt64: AssetID]] = [:]
     /// The last lease token handed out; tokens are never reused, so a second release is a no-op.
     var lastLeaseToken: UInt64 = 0
+    /// The size of each leased blob, recorded at acquisition (the record's size then), so a leased blob that is doomed
+    /// meanwhile still counts in `StorageReport.bytesByState.pendingDeletion`; dropped with the blob's last lease.
+    var leasedBytes: [BlobKey: Int64] = [:]
     /// When the last orphan GC, staging GC, quota eviction or purge finished (`StorageReport.lastCleanupAt`,
     /// R-CLN-9); persisted. Written only by WP-C's own operations: the reaper's deletions of pruned blobs (WP-B's
     /// `runDueWork()`) are not a cleanup run and do not stamp it.

@@ -77,7 +77,7 @@ extension AssetStore {
             }
             let records = ids.compactMap { self.state.core.records[$0] }
             let oldest = records.map { $0.verifiedAt ?? .distantPast }.min() ?? .distantPast
-            let size = self.state.core.blobBytes[key] ?? records.first.map(EvictionOrder.recordedSize) ?? 0
+            let size = records.first.map(EvictionOrder.recordedSize) ?? 0
             due.append((key, oldest, size))
         }
         due.sort { ($0.verifiedAt, $0.key) < ($1.verifiedAt, $1.key) }

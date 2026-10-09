@@ -14,10 +14,10 @@ extension AssetStore {
         let selection = self.purgeSelection(request)
         var reclaim: [BlobKey: Int64] = [:]
         for id in selection {
-            guard let key = self.state.core.records[id]?.referencedBlob else {
+            guard let record = self.state.core.records[id], let key = record.referencedBlob else {
                 continue
             }
-            reclaim[key] = self.state.core.blobBytes[key] ?? 0
+            reclaim[key] = EvictionOrder.recordedSize(record)
             self.setResidency(.absent(.purged), of: id, dooming: .purged)
         }
         var changed = !selection.isEmpty
@@ -69,14 +69,18 @@ extension AssetStore {
     }
 
     /// Waits until every blob of `reclaim` is reaped, rescued, or blocked by something waiting cannot clear (a lease, a
-    /// sink that does not acknowledge, an uncommitted generation, a degraded or unavailable store), reaping whatever is
-    /// deletable and installing the fresh snapshot ADR-017 needs after the grace. Returns the bytes of the selection that
-    /// were deleted and of those still leased.
+    /// sink that does not acknowledge, an uncommitted generation, a degraded or unavailable store, a failed unlink's
+    /// backoff), reaping whatever is deletable and installing once the fresh snapshot ADR-017 needs after the grace.
+    /// Reads only the blob table's doom bookkeeping (`DoomInfo.eligibleAt`) and the leases. Returns the bytes of the
+    /// selection that were deleted and of those still leased.
     func awaitReclaim(_ reclaim: [BlobKey: Int64]) async throws(StoreError) -> (freed: Int64, deferred: Int64) {
         var pending = reclaim
         var freed: Int64 = 0
-        var installedFresh = false
+        var freshInstalled = false
         while true {
+            try self.checkLive()
+            // REENTRANCY: R7, R9 — every key is recomputed from the blob table below.
+            _ = await self.reapDeletable(maxKeys: Int.max)
             try self.checkLive()
             for (key, bytes) in pending {
                 switch self.state.core.blobTable[key] {
@@ -89,48 +93,41 @@ extension AssetStore {
                     break
                 }
             }
-            var reapable = false
-            var fresh = false
+            guard !pending.isEmpty else {
+                break
+            }
+            let uptime = self.environment.time.uptimeNow()
             var wake: MonotonicInstant?
+            var graceOver = false
             for key in pending.keys {
-                switch self.deletionBlocker(key) {
-                case .none:
-                    reapable = true
-                case .freshAcknowledgement(unanswered: false):
-                    fresh = true
-                case .grace(let eligibleAt):
-                    // A failed unlink's backoff is also a grace; waiting for it could last minutes, so a key that failed
-                    // to unlink is left to the reaper.
-                    if case .doomed(let info)? = self.state.core.blobTable[key], info.failedUnlinks > 0 {
-                        continue
-                    }
-                    let instant = self.environment.time.monotonicNow().adding(seconds: eligibleAt.seconds(since: self.environment.time.uptimeNow()))
+                guard case .doomed(let info)? = self.state.core.blobTable[key], let eligibleAt = info.eligibleAt, info.failedUnlinks == 0 else {
+                    continue
+                }
+                if eligibleAt > uptime {
+                    let instant = self.environment.time.monotonicNow().adding(seconds: eligibleAt.seconds(since: uptime))
                     wake = wake.map { min($0, instant) } ?? instant
-                case .notDoomed, .degraded, .unavailable, .acknowledgement, .commit, .lease, .freshAcknowledgement(unanswered: true):
-                    break
+                } else {
+                    graceOver = true
                 }
             }
-            if reapable {
-                // REENTRANCY: R7, R9 — the loop recomputes every key's state from scratch.
-                _ = await self.reapDeletable(maxKeys: Int.max)
-            } else if fresh, !installedFresh {
-                installedFresh = true
-                // REENTRANCY: R12, R9 — the grace ended before this install; the loop recomputes the blockers after it.
-                await self.publishSnapshot(urgency: .userInitiated)
-            } else if let wake {
-                installedFresh = false
+            if let wake {
+                freshInstalled = false
                 do throws(CancellationError) {
                     // REENTRANCY: R9 — the timer only pokes: the loop recomputes the deletable state and the phase.
                     try await self.environment.time.sleep(until: wake)
                 } catch {
                     throw .cancelled
                 }
+            } else if graceOver, !freshInstalled {
+                freshInstalled = true
+                // REENTRANCY: R12, R9 — the grace ended before this install started; the loop reaps and recomputes.
+                await self.publishSnapshot(urgency: .userInitiated)
             } else {
                 break
             }
         }
         var deferred: Int64 = 0
-        for (key, bytes) in pending where self.deletionBlocker(key) == .lease {
+        for (key, bytes) in pending where !(self.state.cleanup.leases[key]?.isEmpty ?? true) {
             deferred = deferred.addingSaturating(bytes)
         }
         return (freed, deferred)

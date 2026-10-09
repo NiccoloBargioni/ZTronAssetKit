@@ -66,7 +66,7 @@ extension AssetStore {
     /// Orphans are collected only while the store is neither degraded (the doom set and the records are untrusted
     /// until the next `apply`, store-1 S1-11) nor unavailable (the path may belong to another store, B-15).
     var collectsOrphans: Bool {
-        !self.state.core.degraded && self.state.core.unavailable == nil
+        !self.state.core.degraded && (try? self.checkWritable()) != nil
     }
 
     /// The keys the store knows: every key of the blob table and every key being placed (REENTRANCY R10).

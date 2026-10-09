@@ -20,6 +20,7 @@ extension AssetStore {
         self.state.cleanup.lastLeaseToken += 1
         let token = self.state.cleanup.lastLeaseToken
         self.state.cleanup.leases[blob, default: [:]][token] = id
+        self.state.cleanup.leasedBytes[blob] = EvictionOrder.recordedSize(record)
         self.recordAccesses([id: self.environment.time.now()])
         return AssetLease(id: id, blob: blob, token: token, url: layout.blobURL(blob))
     }
@@ -30,6 +31,9 @@ extension AssetStore {
     package func releaseLease(_ lease: AssetLease) -> MonotonicInstant? {
         if var holders = self.state.cleanup.leases[lease.blob], holders.removeValue(forKey: lease.token) != nil {
             self.state.cleanup.leases[lease.blob] = holders.isEmpty ? nil : holders
+            if holders.isEmpty {
+                self.state.cleanup.leasedBytes[lease.blob] = nil
+            }
         }
         return self.nextDeadline()
     }

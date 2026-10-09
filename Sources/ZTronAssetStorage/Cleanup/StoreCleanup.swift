@@ -42,10 +42,11 @@ extension AssetStore {
 
     /// `storageReport()` (R-CLN-9).
     ///
-    /// Blob bytes come from the blob table: `bytesByKind` and the present/stale split cover live blobs, `pendingDeletion`
-    /// doomed ones; `orphanBytes` are unreferenced blobs found by the last orphan GC listing (or at launch, before the
-    /// first one); `stagingBytes` and the free space are read in one unit each. `sourceCopyBytes` is 0 here: the engine
-    /// adds the remote source's copies (ADR-027). Before `open()` (or after a failed read) the I/O figures are 0.
+    /// `bytesByKind` and the present/stale split cover live blobs (a blob any current record still wants is present);
+    /// `pendingDeletion` is doomed blobs (`FreeSpace.pendingReclaim` plus leased ones); `orphanBytes` are the
+    /// unreferenced blobs the last orphan GC listing of this lifetime found and left (0 before the first one);
+    /// `stagingBytes` and the free space are read in one unit each. `sourceCopyBytes` is 0 here: the engine adds the
+    /// remote source's copies (ADR-027). Before `open()` (or after a failed read) the I/O figures are 0.
     package func storageReport() async -> StorageReport {
         await self.performStorageReport()
     }
