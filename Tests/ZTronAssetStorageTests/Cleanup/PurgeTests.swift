@@ -160,6 +160,8 @@ struct PurgeTests {
         harness.time.advance(by: harness.configuration.policy.deletionGrace)
         let result = try await purge.value
         #expect(result.assetsRemoved == 3)
+        // The reclaim pass runs in chunks of the same size (two here): every chunk's freed bytes count.
+        #expect(result.bytesFreed == assets.prefix(3).reduce(0) { $0 + Int64($1.bytes.count) } && result.bytesDeferred == 0)
         for asset in assets.prefix(3) {
             #expect(await harness.record(asset.id)?.residency == .absent(.purged), "\(asset.id.rawValue) is purged")
         }

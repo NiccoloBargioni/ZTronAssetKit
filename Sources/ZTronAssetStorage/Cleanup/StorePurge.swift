@@ -32,7 +32,7 @@ extension AssetStore {
         }
         try self.checkLive()
         try self.checkWritable()
-        var reclaim: [BlobKey: Int64] = [:]
+        var reclaim: [PurgeSelection.Reclaim] = []
         var purged = 0
         var start = 0
         while start < selection.count {
@@ -97,9 +97,10 @@ extension AssetStore {
     /// references its blob. `.evictable`: a blob still live, unleased and not being placed, whose every current holder
     /// (`holders(of:known:)`, O(holders) unless a record was bound to it since the selection) is still neither essential
     /// nor pinned, loses all of them; one that is not stays with all of them, as the selection's rule says.
-    func purgeChunk(_ groups: ArraySlice<PurgeSelection.Group>, request: PurgeRequest, reclaim: inout [BlobKey: Int64]) -> Int {
+    func purgeChunk(_ groups: ArraySlice<PurgeSelection.Group>, request: PurgeRequest, reclaim: inout [PurgeSelection.Reclaim]) -> Int {
         var purged = 0
         for group in groups {
+            var bytes: Int64?
             let ids: [AssetID]
             switch request {
             case .evictable:
@@ -120,9 +121,13 @@ extension AssetStore {
                 guard let record = self.state.core.records[id], record.referencedBlob == group.blob else {
                     continue
                 }
-                reclaim[group.blob] = EvictionOrder.recordedSize(record)
+                bytes = EvictionOrder.recordedSize(record)
                 self.setResidency(.absent(.purged), of: id, dooming: .purged)
                 purged += 1
+            }
+            // A blob is in one group only, so it is waited for once.
+            if let bytes {
+                reclaim.append(PurgeSelection.Reclaim(key: group.blob, bytes: bytes))
             }
         }
         return purged
@@ -131,47 +136,41 @@ extension AssetStore {
     /// Waits until every blob of `reclaim` is reaped, rescued, or blocked by something waiting cannot clear (a lease, a
     /// sink that does not acknowledge, an uncommitted generation, a degraded or unavailable store, a failed unlink's
     /// backoff), reaping whatever is deletable and installing once the fresh snapshot ADR-017 needs after the grace.
-    /// Reads only the blob table's doom bookkeeping (`DoomInfo.eligibleAt`) and the leases. Returns the bytes of the
-    /// selection that were deleted and of those still leased.
-    func awaitReclaim(_ reclaim: [BlobKey: Int64]) async throws(StoreError) -> (freed: Int64, deferred: Int64) {
+    /// Reads only the blob table's doom bookkeeping (`DoomInfo.eligibleAt`) and the leases. Each round makes one pass over
+    /// the blobs still pending, in chunks of `CleanupState.chunk` with the actor released in between (C2: one turn over
+    /// the selection of a full-store purge took 27.6 ms at `maxEntries`, review of the L3 close-out). Returns the bytes of
+    /// the selection that were deleted and of those still leased.
+    func awaitReclaim(_ reclaim: [PurgeSelection.Reclaim]) async throws(StoreError) -> (freed: Int64, deferred: Int64) {
         var pending = reclaim
         var freed: Int64 = 0
+        var deferred: Int64 = 0
         var freshInstalled = false
         while true {
             try self.checkLive()
             // REENTRANCY: R7, R9 — every key is recomputed from the blob table below.
             _ = await self.reapDeletable(maxKeys: Int.max)
             try self.checkLive()
-            // One pass over the selection per round (C2: O(1) per key).
-            let uptime = self.environment.time.uptimeNow()
-            let monotonic = self.environment.time.monotonicNow()
-            var wake: MonotonicInstant?
-            var graceOver = false
-            for (key, bytes) in pending {
-                switch self.state.core.blobTable[key] {
-                case nil:
-                    freed = freed.addingSaturating(bytes)
-                    pending[key] = nil
-                case .live?:
-                    pending[key] = nil
-                case .doomed(let info)?:
-                    guard let eligibleAt = info.eligibleAt, info.failedUnlinks == 0 else {
-                        continue
-                    }
-                    if eligibleAt > uptime {
-                        let instant = monotonic.adding(seconds: eligibleAt.seconds(since: uptime))
-                        wake = wake.map { min($0, instant) } ?? instant
-                    } else {
-                        graceOver = true
-                    }
-                case .deleting?:
-                    break
+            var pass = PurgeSelection.ReclaimPass()
+            var start = 0
+            while start < pending.count {
+                if start > 0 {
+                    // REENTRANCY: R9 — the phase below; every later key is classified from the blob table as it is then (one
+                    // reaped or rescued meanwhile counts as such), and the round's figures only decide whether to wait,
+                    // install or stop: the next round, or the reaper, sees what changed.
+                    await self.runUnit(on: self.environment.metadataExecutor) {}
+                    try self.checkLive()
                 }
+                let end = min(start + max(1, self.state.cleanup.chunk), pending.count)
+                self.reclaimPass(pending[start..<end], into: &pass)
+                start = end
             }
+            freed = freed.addingSaturating(pass.freed)
+            pending = pass.pending
+            deferred = pass.deferred
             guard !pending.isEmpty else {
                 break
             }
-            if let wake {
+            if let wake = pass.wake {
                 freshInstalled = false
                 do throws(CancellationError) {
                     // REENTRANCY: R9 — the timer only pokes: the loop recomputes the deletable state and the phase.
@@ -179,7 +178,7 @@ extension AssetStore {
                 } catch {
                     throw .cancelled
                 }
-            } else if graceOver, !freshInstalled {
+            } else if pass.graceOver, !freshInstalled {
                 freshInstalled = true
                 // REENTRANCY: R12, R9 — the grace ended before this install started; the loop reaps and recomputes.
                 await self.publishSnapshot(urgency: .userInitiated)
@@ -187,16 +186,70 @@ extension AssetStore {
                 break
             }
         }
-        var deferred: Int64 = 0
-        for (key, bytes) in pending where !(self.state.cleanup.leases[key]?.isEmpty ?? true) {
-            deferred = deferred.addingSaturating(bytes)
-        }
         return (freed, deferred)
+    }
+
+    /// Classifies `items` against the blob table now, O(1) each: a key gone from it was freed, a live one was rescued;
+    /// a doomed or deleting one stays pending (its bytes deferred while a lease holds it), and a doomed one whose grace
+    /// runs sets the wake-up, or asks for the fresh install once its grace ended (one with a failed unlink waits for the
+    /// reaper's backoff, one not yet acknowledged for an install).
+    func reclaimPass(_ items: ArraySlice<PurgeSelection.Reclaim>, into pass: inout PurgeSelection.ReclaimPass) {
+        let uptime = self.environment.time.uptimeNow()
+        let monotonic = self.environment.time.monotonicNow()
+        for item in items {
+            let doom: DoomInfo?
+            switch self.state.core.blobTable[item.key] {
+            case nil:
+                pass.freed = pass.freed.addingSaturating(item.bytes)
+                continue
+            case .live?:
+                continue
+            case .doomed(let info)?:
+                doom = info
+            case .deleting?:
+                doom = nil
+            }
+            pass.pending.append(item)
+            if !(self.state.cleanup.leases[item.key]?.isEmpty ?? true) {
+                pass.deferred = pass.deferred.addingSaturating(item.bytes)
+            }
+            guard let doom, let eligibleAt = doom.eligibleAt, doom.failedUnlinks == 0 else {
+                continue
+            }
+            if eligibleAt > uptime {
+                let instant = monotonic.adding(seconds: eligibleAt.seconds(since: uptime))
+                pass.wake = pass.wake.map { min($0, instant) } ?? instant
+            } else {
+                pass.graceOver = true
+            }
+        }
     }
 }
 
 /// The pure part of purge (run on the bulk executor, C2).
 enum PurgeSelection {
+    /// One purged blob the purge waits for, and the bytes it frees.
+    struct Reclaim: Sendable, Hashable {
+        /// The blob.
+        let key: BlobKey
+        /// Its recorded size.
+        let bytes: Int64
+    }
+
+    /// What one round of `awaitReclaim` found over the blobs still pending.
+    struct ReclaimPass: Sendable {
+        /// The blobs still doomed or being deleted.
+        var pending: [Reclaim] = []
+        /// The bytes of those gone from the blob table.
+        var freed: Int64 = 0
+        /// The bytes of the pending ones a lease holds.
+        var deferred: Int64 = 0
+        /// The earliest end of a running grace, on the monotonic clock.
+        var wake: MonotonicInstant?
+        /// A pending blob's grace ended: the fresh install ADR-017 needs may unblock it.
+        var graceOver = false
+    }
+
     /// The selected records of one blob, as they were when the selection was made.
     struct Group: Sendable, Hashable {
         /// The blob.
