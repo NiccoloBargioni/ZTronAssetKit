@@ -5,13 +5,32 @@ import ZTronAssetModel
 extension AssetStore {
     /// Pins an asset's blob for the lease's lifetime (R-CAR-8); no await, so no window. Recorded in
     /// `state.cleanup.leases`, which WP-B's reaper reads.
+    ///
+    /// Throws `.notOpen`/`.closed` outside the open phase, `.unknownAsset` for an id without a record and `.notPresent`
+    /// for a record that holds no blob. Acquiring counts as an access (the LRU input, R-CLN-4), through WP-B's
+    /// `recordAccesses(_:)`. A stale record's blob is leased like any other: lookups still serve it (store.md §6.1).
     package func acquireLease(_ id: AssetID) throws(StoreError) -> AssetLease {
-        fatalError("WP-C: AssetStore.acquireLease not implemented")
+        try self.ensureOpen()
+        guard let record = self.state.core.records[id] else {
+            throw .unknownAsset(id)
+        }
+        guard let blob = record.referencedBlob, let layout = self.state.core.layout else {
+            throw .notPresent(id)
+        }
+        self.state.cleanup.lastLeaseToken += 1
+        let token = self.state.cleanup.lastLeaseToken
+        self.state.cleanup.leases[blob, default: [:]][token] = id
+        self.recordAccesses([id: self.environment.time.now()])
+        return AssetLease(id: id, blob: blob, token: token, url: layout.blobURL(blob))
     }
 
     /// Releases a lease; idempotent per token. Returns the store's new deadline (`nextDeadline()`) so the engine can
     /// re-arm (a lease was the reaper's only blocker, store-2 S2-03).
+    /// Valid in every phase: a lease released after `close()` changes nothing that matters (leases end with the store).
     package func releaseLease(_ lease: AssetLease) -> MonotonicInstant? {
-        fatalError("WP-C: AssetStore.releaseLease not implemented")
+        if var holders = self.state.cleanup.leases[lease.blob], holders.removeValue(forKey: lease.token) != nil {
+            self.state.cleanup.leases[lease.blob] = holders.isEmpty ? nil : holders
+        }
+        return self.nextDeadline()
     }
 }
