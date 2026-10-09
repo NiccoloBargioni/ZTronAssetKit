@@ -153,7 +153,8 @@ extension AssetStore {
         self.state.core.committedGeneration = 0
         self.state.core.commits.committedFile = nil
         self.state.core.commits.pendingPromotion = loaded.promotion
-        // The launch epoch is the generation the launch commit carries: persisted and strictly increasing (ADR-013).
+        // The launch epoch is the generation the launch commit carries, persisted; unique only across launches whose
+        // launch commit succeeded over a readable index, so not strictly increasing (ADR-013 as amended by ADR-050).
         self.state.core.launchEpoch = loaded.nextGeneration
         self.state.core.records = reconciled.records
         self.state.core.blobTable = reconciled.blobTable

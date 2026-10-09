@@ -22,6 +22,11 @@ public enum TransferRoute: Sendable, Hashable {
 ///
 /// The engine's admission decides first; these flags make the OS fail fast (−1009 with a reason) when the path
 /// changes under a running request, so the engine never pays for a request its policy refuses.
+///
+/// The HTTP tier sets them on every request it builds. The Apple tier cannot honour them: BackgroundAssets has no
+/// per-call network constraint for making a pack available or for an update check, so it ignores
+/// `TransferRequest.access` and `ManifestRequest.access` by necessity, and the engine must gate Apple-tier transfers
+/// and update-checking manifest fetches on its own `DeviceConditions` (ADR-050, E-17; ARCHITECTURE §11, R-SYN-7).
 public struct NetworkAccess: Sendable, Hashable {
     /// `URLRequest.allowsCellularAccess`.
     public var allowsCellular: Bool

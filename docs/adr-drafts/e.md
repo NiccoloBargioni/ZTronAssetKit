@@ -172,8 +172,8 @@ the public signature is unchanged, E-13) — flagged likewise.
   again next time. An invalid `catalogPackID` releases nothing. **A pack is released at most once per pack per
   catalog generation and is never re-armed within one** (ADR-027 literally; orchestrator ruling, L2 close-out
   cycle 3, below): a pack that comes back after its release — restored by the OS, or downloaded again on demand by a
-  transfer of this source, whatever that transfer ended with — stays installed until the next catalog generation,
-  and its `installedBytes` keep counting in `sourceCopyBytes()` meanwhile (E-11).
+  transfer of this source, whatever that transfer ended with — stays installed until a reclaim in a later catalog
+  generation releases it, and its `installedBytes` keep counting in `sourceCopyBytes()` meanwhile (E-11).
 - **Fix round 1.** (a) The first digest of a process does **not** start a new generation: releases made before the
   first successful fetch (an offline launch's maintenance) belong to the generation it opens, so they are neither
   repeated nor reported twice (tested). Generations are a counter bumped when the released set is cleared, and a
@@ -192,9 +192,9 @@ the public signature is unchanged, E-13) — flagged likewise.
   release re-armed although the staged copy was discarded: `copyDelivered=false released=2 removes=2`).
 - **Orchestrator ruling (L2 close-out cycle 3).** ADR-027's decision stands literally: a pack is released at most
   once per pack per catalog generation and is never re-armed within a generation; E-10(b)'s re-arm is withdrawn. A
-  pack downloaded again on demand after its release stays installed until the next catalog generation, and its
-  `installedBytes` keep counting in `sourceCopyBytes`. This removes PROBE-C1-1g's whole-pack re-download loop and
-  PROBE-C1-6's re-arm-before-yield defect together.
+  pack downloaded again on demand after its release stays installed until a reclaim in a later catalog generation
+  releases it, and its `installedBytes` keep counting in `sourceCopyBytes`. This removes PROBE-C1-1g's whole-pack
+  re-download loop and PROBE-C1-6's re-arm-before-yield defect together.
 - **Implementation (cycle 3).** The re-arm path is deleted: `AppleSourceState.forgetRelease`, its
   `forgottenWhileReleasing` set and the check in `finishRelease` (a release call's success now always counts for the
   generation it was planned in, even when a transfer downloaded the pack around the removal), and the driver's
@@ -238,9 +238,9 @@ the public signature is unchanged, E-13) — flagged likewise.
   packs are **no longer subtracted** — `installedBytes` is `nil` for a removed pack (fake and live: no `.downloaded`
   status), and a released pack a transfer downloaded again really holds bytes twice on the device, which
   `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the verifier's PROBE-1). Since cycle 3
-  (E-10) such a pack stays installed, and counted, until the next catalog generation releases it. Adopted entries are
-  found among the manifest entries (`AdoptionReport` documents adopted paths as entries of the applied manifest), see
-  E-16.
+  (E-10) such a pack stays installed until a reclaim in a later catalog generation releases it, and counts meanwhile.
+  Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths as entries of the
+  applied manifest), see E-16.
 - **L2 close-out cycle 5 (verifier probe VC3-E, non-blocking).** Under the cycle 3 ruling a released pack that
   comes back stays installed for the rest of the generation, but the sum covered only packs holding adopted content.
   A pack whose only entry the retention scope excludes is released, then downloaded again on demand when that entry
@@ -466,8 +466,9 @@ the public signature is unchanged, E-13) — flagged likewise.
 
 - **ADR-027 / E-10(b).** ADR-027's decision stands literally: a pack is released at most once per pack per catalog
   generation and is never re-armed within a generation; E-10(b)'s re-arm is withdrawn. A pack downloaded again on
-  demand after its release stays installed until the next catalog generation, and its `installedBytes` keep counting
-  in `sourceCopyBytes`. Implemented in E-10 (failing tests first; the re-arm path deleted).
+  demand after its release stays installed until a reclaim in a later catalog generation releases it, and its
+  `installedBytes` keep counting in `sourceCopyBytes`. Implemented in E-10 (failing tests first; the re-arm path
+  deleted).
 - **E-13.** The internal `resolve(…, select:)` overload in `AppleHostedTier.swift` is acknowledged under the E-13
   ratification (no change).
 

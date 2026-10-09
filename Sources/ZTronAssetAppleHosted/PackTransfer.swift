@@ -166,9 +166,9 @@ struct PackTransferDriver: Sendable {
     /// a pause or cancel recorded before the claim replaces the proposed element, discarding a staged copy, and one
     /// arriving later is a no-op, as a control after the terminal element is (ADR-021); nothing between the claim and
     /// the yield is visible to the consumer. Nothing here touches pack releases: a pack this attempt downloaded on
-    /// demand after its release stays released for the catalog generation and installed until the next one, whatever
-    /// the attempt ended with, so no request can make maintenance remove and download a whole pack in a loop
-    /// (ADR-027, R-CLN-10).
+    /// demand after its release stays released for the catalog generation and stays installed until a reclaim in a
+    /// later catalog generation releases it, whatever the attempt ended with, so no request can make maintenance
+    /// remove and download a whole pack in a loop (ADR-027, R-CLN-10).
     func conclude(_ proposed: TransferUpdate) async -> TransferUpdate {
         guard let stop = self.stop.claimTerminal() else {
             return proposed
