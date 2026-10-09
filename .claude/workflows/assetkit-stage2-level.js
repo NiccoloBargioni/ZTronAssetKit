@@ -11,6 +11,22 @@ export const meta = {
 const ROOT = '/Users/admin/Documents/ZTronAssetKit'
 const LEVEL = args.level
 const BASE = args.base
+// Weekly-usage stop (owner, 2026-10-09): before every agent a cheap probe reads the plan meter; at >= usageStop
+// no new agent starts (in-flight ones finish) and the run returns what it has. Resume with a higher usageStop.
+const STOP = args.usageStop === undefined ? 101 : args.usageStop
+let stopped = null
+const gate = async (tag) => {
+  if (stopped) return false
+  if (STOP > 100) return true
+  const r = await agent('Do exactly this and nothing else: use ToolSearch with query "select:mcp__ccd_session_mgmt__get_usage", call mcp__ccd_session_mgmt__get_usage with no arguments, and return the "Weekly · all models" percentUsed as percent (use -1 if the tool is unavailable). Do not read or modify any file.', { label: 'usage:' + tag, model: 'haiku', effort: 'low', schema: { type: 'object', properties: { percent: { type: 'number' } }, required: ['percent'] } })
+  const p = r ? r.percent : -1
+  log('weekly usage before ' + tag + ': ' + p + '%')
+  if (p >= STOP) { stopped = { before: tag, percent: p }; return false }
+  return true
+}
+// iOS 27.0 simulators per agent role (never the owner's booted iPhone 17); see docs/adr-drafts/ios.md.
+const SIMS = ['897F9D8D-B10D-4D91-8E22-417A2B9D70AA', '6BE15CAF-7E02-4060-9338-9DAC025EDF0B', '5B940E6E-490F-4E9E-A917-A6456A18225E', '02CE21B4-F307-4CB7-B80A-1F2EF72F115C', '7E25727F-BD73-47F4-B6C8-BB38A9F5D822', '0E21D9E5-AD38-4065-A393-E8E5A6865FC9']
+const simFor = (k, role) => SIMS[(3 * args.wps.indexOf(k) + ({ author: 0, reqs: 1, correct: 2 })[role]) % SIMS.length]
 
 const WPS = {
   h: { name: 'WP-H', title: 'test support (all fakes)', target: 'ZTronAssetTestSupport (excluded from coverage)', testTarget: 'ZTronAssetStorageTests',
@@ -58,7 +74,7 @@ const VERIFY_SCHEMA = { type: 'object', properties: {
   evidence: { type: 'string' },
 }, required: ['issues', 'evidence'] }
 
-const COMMON = (w, k, S = '.build-' + k) => `Repository: ${ROOT} (git; integration branch feature/asset-kit; harness frozen at tag harness-frozen; contracts at tag contracts). Your worktree: ${ROOT}/.worktrees/${k} on branch wp/${k}, based on ${BASE}. cd into the worktree for EVERY command and never edit outside it.
+const COMMON = (w, k, S = '.build-' + k, SIM = simFor(k, 'author')) => `Repository: ${ROOT} (git; integration branch feature/asset-kit; harness frozen at tag harness-frozen; contracts at tag contracts). Your worktree: ${ROOT}/.worktrees/${k} on branch wp/${k}, based on ${BASE}. cd into the worktree for EVERY command and never edit outside it.
 Owner directives: standalone package - never write outside the repository (set TMPDIR and the Swift module cache inside your scratch path for xcrun/xcodebuild, and ALWAYS pass -derivedDataPath inside your scratch path to every xcodebuild invocation, -list included; never real download tasks, real UserDefaults or the unified log); never run 'xcodebuild -list' (it writes result bundles outside the repository); never put scratch files in the session scratchpad directory or /tmp - only under your own scratch path; never run an unscoped pkill/killall - other worktrees run concurrently, so kill only processes whose command line contains your own worktree path; ../ZTronCarouselCore and ../ZTronCarousel are read-only; iOS 15.0 / macOS 12.0 floors (never raise). Never edit Scripts/, SPEC.md, PROMPT.md, CLAUDE.md, KICKOFF-README.md, docs/ARCHITECTURE.md, docs/DECISIONS.md, docs/TRACEABILITY.md, Package.swift, or any *ContractTests.swift.
 TOKEN DISCIPLINE (this run is metered; every token you put in context is re-read on every later turn): never let long command output into the conversation - redirect builds and test runs to a log under your scratch path and read only summary lines (e.g. grep -E 'error:|warning:|Test run|passed|failed|VERIFY|COVERAGE' log | tail -40); read large documents by section (grep -n '^#' first, then Read with offset/limit) rather than whole, and never re-read a file you already read unless it changed; batch independent commands into one Bash call; keep notes and reports compact. None of this lowers the bar: run every check the task requires.
 YOUR SwiftPM scratch path is ${S} (plus ${S}-perf, ${S}-tsan and ${S}/xcode); other agents work in this worktree concurrently with their own paths, so never use, delete or reuse another agent's .build-* directory (CLAUDE.md P2).
@@ -69,6 +85,7 @@ Run swift / xcodebuild with the Bash tool's dangerouslyDisableSandbox: true. Com
   coverage: swift test --scratch-path ${S} --enable-code-coverage --skip Benchmarks; then P=${S}/out/Products/Debug; xcrun llvm-cov export -summary-only -instr-profile $P/codecov/default.profdata <first .xctest binary> -object <each other .xctest binary> (binaries are $P/<Name>.xctest/Contents/MacOS/<Name>) > ${S}/cov.json; python3 Scripts/gates.py coverage --json ${S}/cov.json (other WPs' stubbed targets will fail - read the line for ${w.target})
   benchmarks: swift test -c release --scratch-path .build-${S}-perf -Xswiftc -enable-testing --filter Benchmarks
   iOS: xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath ${S}/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet
+  iOS Simulator tests (owner requirement since 2026-10-09: every test target builds and passes on the simulator at the iOS 15 floor; follow the gating convention of docs/adr-drafts/ios.md): xcodebuild test -scheme ZTronAssetKit -destination 'platform=iOS Simulator,id=${SIM}' -derivedDataPath ${S}/xcode-sim -skip-testing:ZTronAssetKitBenchmarks OTHER_SWIFT_FLAGS='-warnings-as-errors' > ${S}/sim.log 2>&1, then xcrun xcresulttool get test-results summary --path <bundle under ${S}/xcode-sim/Logs/Test>. Use ONLY that simulator (never the owner's booted iPhone 17; never create, erase or delete simulators) and shut it down when you finish (xcrun simctl shutdown ${SIM}); its device container under ~/Library/Developer/CoreSimulator is the one owner-accepted write outside the repository.
   If you ran --gates-only or --full, restore docs/TRACEABILITY.md (git checkout -- docs/TRACEABILITY.md).`
 
 const AUTHOR = (w, k) => `TASK: You are the author of ${w.name} - ${w.title} - in Stage 2, level ${LEVEL}.
@@ -79,16 +96,16 @@ Contract files: implement bodies, never change a public or package signature. If
 Method: test-first - for each requirement write the failing test and commit it on its own, then the code (CLAUDE.md P3: the history must show the failing test first). In tests, use the throwing require... forms of the TestSupport waits (requireHeldUnits, requireSleepers, requireObservers, requireInstalls) whenever the code after a wait assumes the census was met (docs/adr-drafts/l2fu.md), so a regression fails within its time limit instead of hanging the run. Test rules (SPEC 7.2, CLAUDE.md G3/G4): Swift Testing; .timeLimit(.minutes(1)) on everything that awaits; one behaviour per test with a name that states it; no assertion-free tests, no #expect(true), no tests of private details; ManualTimeSource only - never sleep, never wait on the wall clock; seeded generators that print the failing seed; order-independent and parallel-safe; no network except the ephemeral-port loopback server; file I/O only in per-test directories inside the repository; TapOnlyLogSink in tests; per-@Test @available(macOS 15.0, *) where Mutex-backed fakes are used.
 Code rules: CLAUDE.md C1-C6 and the style section; every await inside an actor carries a // REENTRANCY: comment citing its ledger row (or a proposed row) and the re-validation it names actually happens; blocking file-system work only inside BlockingExecutor units; every public declaration documented with ///; 0 unsafe escapes (if you believe you need one, stop and report); Date()/Task.sleep/DispatchTime.now()/SystemRandomNumberGenerator/UUID() only in live conformers.
 Coverage: aim for >= 95% of the lines you own with behaviour-asserting tests (gate: Storage and Sync >= 90%, others >= 70%); a hard-to-cover line means a missing seam.
-Before handoff: --quick green, release build green, iOS build green, unsafe 0, docs 100%, benchmarks you own within budget; commit everything on wp/${k} in small imperative commits, each message ending with the line "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"; leave the worktree clean. Never push, never touch other branches.
+Before handoff: --quick green, release build green, iOS build green, iOS Simulator tests green, unsafe 0, docs 100%, benchmarks you own within budget; commit everything on wp/${k} in small imperative commits, each message ending with the line "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"; leave the worktree clean. Never push, never touch other branches.
 Return the structured report with pasted evidence lines.`
 
 const LENSES = [
-  { key: 'reqs', text: `LENS: requirements, tests and gates. Check with evidence: (1) ownership - git diff --name-only ${BASE}...HEAD touches only files ARCHITECTURE 1.2 gives this WP, and contract files changed only in bodies (compare declarations; any signature change is blocking); (2) --quick green, the release build and the iOS xcodebuild green with -warnings-as-errors; the WP's tests pass 3 times in a row (swift test --scratch-path .build-verify-KEY --skip Benchmarks --filter TESTTARGET, three runs) and once under TSan (--sanitize=thread, scratch .build-verify-KEY-tsan) - any flake or TSan report is blocking; (3) every test section 11, section 9 and section 13.5 assign to this WP exists with that exact display-name prefix - read each and judge whether it genuinely verifies the requirement (would fail if the requirement were broken); assertion-free, trivially-true, coverage-only or private-detail tests and missing requirement tests are blocking (G4); (4) unsafe escapes 0, docs 100%; (5) coverage of the WP's own production lines via the coverage export (Storage/Sync files of this WP < 90% or other targets < 70% is blocking - list the uncovered regions); (6) benchmarks this WP owns, in release - a budget miss is blocking; (7) no test sleeps, uses the wall clock, touches the network beyond loopback, writes outside the repository, or uses real UserDefaults/unified log.` },
+  { key: 'reqs', text: `LENS: requirements, tests and gates. Check with evidence: (1) ownership - git diff --name-only ${BASE}...HEAD touches only files ARCHITECTURE 1.2 gives this WP, and contract files changed only in bodies (compare declarations; any signature change is blocking); (2) --quick green, the release build and the iOS xcodebuild green with -warnings-as-errors, and every test target builds and passes on your iOS Simulator (new tests follow docs/adr-drafts/ios.md; a test excluded on iOS without a genuine, recorded reason is blocking); the WP's tests pass 3 times in a row (swift test --scratch-path .build-verify-KEY --skip Benchmarks --filter TESTTARGET, three runs) and once under TSan (--sanitize=thread, scratch .build-verify-KEY-tsan) - any flake or TSan report is blocking; (3) every test section 11, section 9 and section 13.5 assign to this WP exists with that exact display-name prefix - read each and judge whether it genuinely verifies the requirement (would fail if the requirement were broken); assertion-free, trivially-true, coverage-only or private-detail tests and missing requirement tests are blocking (G4); (4) unsafe escapes 0, docs 100%; (5) coverage of the WP's own production lines via the coverage export (Storage/Sync files of this WP < 90% or other targets < 70% is blocking - list the uncovered regions); (6) benchmarks this WP owns, in release - a budget miss is blocking; (7) no test sleeps, uses the wall clock, touches the network beyond loopback, writes outside the repository, or uses real UserDefaults/unified log.` },
   { key: 'correct', text: `LENS: correctness and concurrency of the production code against ARCHITECTURE and SPEC. Look for logic bugs, crash-consistency gaps (what a crash or power loss at each file-system step leaves), races and actor reentrancy (every await in an actor must carry a // REENTRANCY: comment and the named re-validation must actually happen), cancellation leaks or double resumes, unbounded growth, C2 violations (blocking work on the cooperative pool), C4 (time/randomness), forbidden APIs, iOS 15 availability, error mapping mistakes, security issues (path traversal, key leakage). For each suspected bug PROVE it: write a failing probe test under .build-verify-KEY/probes (a scratch SwiftPM test you run, or a temporary test file you delete afterwards - leave the worktree exactly as you found it) or give the exact failing timeline. Proven bugs are blocking; unproven suspicions are non-blocking.` },
 ]
 
 const VERIFY = (w, k, lens, round) => `TASK: Independent verification (round ${round}, ${lens.key}) of ${w.name} - ${w.title} - on branch wp/${k}. You did NOT write this code (CLAUDE.md P4). Do NOT modify or commit production code or tests; scratch files only under your own scratch path in the worktree, and leave the worktree clean (git status must be unchanged when you finish).
-${COMMON(w, k, '.build-verify-' + k + '-' + lens.key + '-r' + round)}
+${COMMON(w, k, '.build-verify-' + k + '-' + lens.key + '-r' + round, simFor(k, lens.key))}
 Read CLAUDE.md, docs/ARCHITECTURE.md section 1.2, ${w.sections}, section 11 rows for ${w.name.slice(3)}, section 13.5, docs/adr-drafts/${k}.md, the SPEC requirements in scope, and the diff git diff ${BASE}...HEAD.
 ${lens.text.split('.build-verify-KEY').join('.build-verify-' + k + '-' + lens.key + '-r' + round).split('TESTTARGET').join(w.testTarget)}
 Return structured issues (blocking vs non-blocking) with file:line and a concrete fix, plus the evidence lines you observed.`
@@ -100,12 +117,14 @@ Read CLAUDE.md, docs/ARCHITECTURE.md section 1.2 and ${w.sections}, docs/adr-dra
 
 const runWP = async (k) => {
   const w = WPS[k]
+  if (!(await gate('author:' + k))) return { wp: k, stopped }
   const author = await agent(AUTHOR(w, k), { label: 'author:' + k, phase: 'Implement', schema: AUTHOR_SCHEMA })
   if (!author) return { wp: k, failed: 'author produced no result' }
   log(w.name + ' author: ' + author.quick_line + ' | contract requests: ' + author.contract_change_requests.length)
   const history = []
   let last = null
   for (let round = 1; round <= 3; round++) {
+    if (!(await gate('verify:' + k + ':' + round))) break
     const results = await parallel(LENSES.map(lens => () =>
       agent(VERIFY(w, k, lens, round), { label: 'verify:' + k + ':' + lens.key + ':' + round, phase: 'Verify', schema: VERIFY_SCHEMA })))
     const issues = results.filter(Boolean).flatMap((r, i) => r.issues.map(x => ({ lens: LENSES[i] ? LENSES[i].key : '?', ...x })))
@@ -114,6 +133,7 @@ const runWP = async (k) => {
     log(w.name + ' verify round ' + round + ': ' + blocking.length + ' blocking / ' + issues.length + ' total')
     last = { issues }
     if (blocking.length === 0 || round === 3) break
+    if (!(await gate('fix:' + k + ':' + round))) break
     const fx = await agent(FIX(w, k, issues, round), { label: 'fix:' + k + ':' + round, phase: 'Fix', schema: AUTHOR_SCHEMA })
     if (fx) history[history.length - 1].fix = { quick: fx.quick_line, open: fx.open_issues, contract: fx.contract_change_requests }
   }
@@ -122,9 +142,10 @@ const runWP = async (k) => {
     author: { summary: author.summary, quick: author.quick_line, gates: author.gates_lines, coverage: author.coverage_lines, bench: author.bench_lines, ios: author.ios_build_ok, contract: author.contract_change_requests, open: author.open_issues, tests: author.requirement_tests.length },
     history,
     remaining: last ? last.issues : [],
+    stopped,
   }
 }
 
 phase('Implement')
 const results = await pipeline(args.wps, k => runWP(k))
-return { level: LEVEL, base: BASE, results }
+return { level: LEVEL, base: BASE, stopped, results }
