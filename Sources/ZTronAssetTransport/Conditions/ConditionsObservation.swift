@@ -91,9 +91,24 @@ actor ConditionsObservation {
 }
 
 /// Counts live observations and lets a caller wait for a count without polling.
+///
+/// A wait also ends when its caller is cancelled (L2 close, `docs/adr-drafts/l2close.md` item 1). A test past its
+/// `.timeLimit` is cancelled and Swift Testing then waits for its body to return, so a wait that only the count could
+/// end kept a regression that never reaches the count suspended for good, and the whole run hung instead of failing
+/// one test. Each waiter is resumed exactly once, by whichever comes first: with `true` by the turn whose count
+/// matched, or with `false` by its caller's cancellation. Every mutation runs on the actor, and a waiter is always
+/// removed from the table before it is resumed.
 actor ObservationRegistry {
+    /// One suspended wait.
+    private struct Waiter {
+        let id: UInt64
+        let count: Int
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
     private(set) var active = 0
-    private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var waiters: [Waiter] = []
+    private var lastWaiter: UInt64 = 0
 
     func add() {
         self.active += 1
@@ -105,22 +120,67 @@ actor ObservationRegistry {
         self.wake()
     }
 
-    func wait(for count: Int) async {
+    /// Suspends until exactly `count` observations are active, or until the calling task is cancelled: `true` when
+    /// the count matched, `false` when the caller was cancelled first (a count already matched is reported matched,
+    /// cancelled or not). `registered` runs on the actor once the wait is registered, so a test of the wait itself can
+    /// cancel one it knows is pending.
+    ///
+    /// The count is checked, and the wait registered, synchronously in the continuation body, so no `add` or `remove`
+    /// can fall between the check and the registration. A caller cancelled before the body ran is never registered
+    /// (`Task.isCancelled`); one cancelled afterwards is resumed by the hop of the cancellation handler, which cannot
+    /// touch actor state synchronously and finds nothing to do for a wait that `wake()` already resumed.
+    @discardableResult
+    func wait(for count: Int, registered: (@Sendable () -> Void)? = nil) async -> Bool {
         if self.active == count {
-            return
+            return true
         }
-        // REENTRANCY: D-11 (proposed) — a terminal wait, registered synchronously and resumed by `wake()` once the
-        // count matches; nothing is read afterwards.
-        await withCheckedContinuation { continuation in
-            self.waiters.append((count, continuation))
+        self.lastWaiter += 1
+        let id = self.lastWaiter
+        // REENTRANCY: D-11 (amended, l2close-1 proposed) — nothing: a terminal wait, registered synchronously in the
+        // continuation body and resumed exactly once, by the `wake()` whose count matched or by `cancel(id)`; no state
+        // is read afterwards (a caller re-reads `active`).
+        return await withTaskCancellationHandler {
+            // REENTRANCY: D-11 (amended, l2close-1 proposed) — as above.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                if self.active == count {
+                    continuation.resume(returning: true)
+                } else if Task.isCancelled {
+                    continuation.resume(returning: false)
+                } else {
+                    self.waiters.append(Waiter(id: id, count: count, continuation: continuation))
+                    registered?()
+                }
+            }
+        } onCancel: {
+            Task {
+                // REENTRANCY: l2close-2 (proposed) — nothing: this task is not the actor's turn; `cancel(id)` re-reads
+                // the table and is a no-op for a wait that `wake()` already resumed.
+                await self.cancel(id)
+            }
         }
     }
 
+    /// Resumes with `true`, and removes, every wait whose count is now active.
     private func wake() {
-        let ready = self.waiters.filter { $0.count == self.active }
-        self.waiters.removeAll { $0.count == self.active }
-        for waiter in ready {
-            waiter.continuation.resume()
+        var ready: [CheckedContinuation<Bool, Never>] = []
+        let active = self.active
+        self.waiters.removeAll { waiter in
+            guard waiter.count == active else {
+                return false
+            }
+            ready.append(waiter.continuation)
+            return true
         }
+        for continuation in ready {
+            continuation.resume(returning: true)
+        }
+    }
+
+    /// Resumes wait `id` with `false` (its caller was cancelled); a no-op for a wait already resumed and removed.
+    private func cancel(_ id: UInt64) {
+        guard let index = self.waiters.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        self.waiters.remove(at: index).continuation.resume(returning: false)
     }
 }
