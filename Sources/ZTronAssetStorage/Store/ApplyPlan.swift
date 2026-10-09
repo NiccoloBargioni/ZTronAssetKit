@@ -12,9 +12,10 @@ struct ApplyPlan: Sendable {
     /// The record of each added id: absent, never fetched, expecting the entry's checksum (`insertRecord`).
     var newRecords: [AssetID: AssetRecord]
     /// The ids, in target order, whose record may adopt a blob the store knows (live, doomed `unreferenced`, or a
-    /// confirmed orphan): added and content-changed ids, and existing records that accept adoption. `adoptKnownBlob`
-    /// decides each on the actor. A blob placed during the unit is bound by its own publication; a record that starts
-    /// accepting adoption during the unit adopts at the next `apply` or launch.
+    /// confirmed orphan): added and content-changed ids, and existing records that accept adoption, except evicted ones
+    /// (only the launch adoption takes those, OI-1; ruling R3 at the L3 close-out). `adoptKnownBlob` decides each on the
+    /// actor. A blob placed during the unit is bound by its own publication; a record that starts accepting adoption
+    /// during the unit adopts at the next `apply` or launch.
     var adoptionCandidates: [AssetID]
 
     /// Builds the plan; pure.
@@ -64,7 +65,7 @@ struct ApplyPlan: Sendable {
                 }
                 // A record that exists and keeps its content adopts only if it accepts adoption already; one that
                 // starts accepting it during the unit adopts at the next `apply` or launch.
-                if !changing.contains(id), let record = records[id], !record.acceptsAdoption {
+                if let record = records[id], record.residency == .absent(.evicted) || (!changing.contains(id) && !record.acceptsAdoption) {
                     continue
                 }
                 if adoptable(fromEntry) || adoptable(records[id]?.expectedKey) {

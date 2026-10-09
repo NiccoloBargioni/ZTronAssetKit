@@ -250,10 +250,13 @@ extension AssetStore {
     }
 
     /// Binds `id` to a blob the store already knows (live, rescuable, or an orphan confirmed on disk) when its
-    /// record accepts adoption and expects that key and size; no I/O (store.md §2.6 7c).
+    /// record accepts adoption and expects that key and size; no I/O (store.md §2.6 7c). A record quota eviction made
+    /// `absent(.evicted)` is adopted only by the launch adoption (crash recovery, ADR-018), never here: an `apply` or
+    /// `admit` within the deletion grace would rescue the very blob the eviction doomed and undo it (OI-1; orchestrator
+    /// ruling R3 at the L3 close-out). It is fetched again on demand, and a publication dedupes onto a live key.
     func adoptKnownBlob(for id: AssetID, orphans confirmed: [BlobKey: Int64], now: Date) -> Bool {
-        guard var record = self.state.core.records[id], record.acceptsAdoption, let key = record.expectedKey,
-            !self.state.core.publishing.contains(key)
+        guard var record = self.state.core.records[id], record.acceptsAdoption, record.residency != .absent(.evicted),
+            let key = record.expectedKey, !self.state.core.publishing.contains(key)
         else {
             return false
         }
