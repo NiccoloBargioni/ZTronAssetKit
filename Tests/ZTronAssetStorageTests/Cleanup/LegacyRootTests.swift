@@ -24,28 +24,49 @@ struct LegacyRootTests {
         /// base `/A/app`): the link sits exactly at a level the identity chain compares, where a stat that does not follow
         /// a final link sees the link's own inode (review round 3).
         case linkToRoot
+        /// The store's base lies inside the legacy root, reached through a symbolic link to a directory below the root
+        /// (`/A → R/x`, base `/A/app`): no level of either path resolves to the other's directory itself (review of the L3
+        /// close-out).
+        case linkIntoRoot
+        /// The legacy root lies inside the store's own directory, named through a symbolic link to a directory of the
+        /// store (`/A → <container>/sub`, root `/A/CDNAssets`; review of the L3 close-out).
+        case rootThroughLinkIntoStore
 
         var testDescription: String {
             self.rawValue
         }
 
-        /// The store's base, the legacy root, and the link to create first (path, destination), if any.
-        var placement: (base: URL, root: URL, link: (String, String)?) {
+        /// The store's base, the legacy root as configured, where the root's files physically are, and the link to create
+        /// first (path, destination; the destination directory is created first), if any.
+        var placement: (base: URL, root: URL, physicalRoot: URL, link: (String, String)?) {
             let legacy = CleanupFixture.legacyRoot
             switch self {
             case .sameDirectory:
-                return (legacy, legacy, nil)
+                return (legacy, legacy, legacy, nil)
             case .ancestor:
-                return (legacy.appendingPathComponent("app", isDirectory: true), legacy, nil)
+                return (legacy.appendingPathComponent("app", isDirectory: true), legacy, legacy, nil)
             case .insideStore:
-                return (CoreFixture.base, CoreFixture.layout.container.appendingPathComponent("CDNAssets", isDirectory: true), nil)
+                let root = CoreFixture.layout.container.appendingPathComponent("CDNAssets", isDirectory: true)
+                return (CoreFixture.base, root, root, nil)
             case .throughLink:
                 let alias = URL(fileURLWithPath: "/fake-volume/alias", isDirectory: true)
-                return (alias.appendingPathComponent("CDNAssets", isDirectory: true), legacy, (alias.path, legacy.deletingLastPathComponent().path))
+                return (alias.appendingPathComponent("CDNAssets", isDirectory: true), legacy, legacy, (alias.path, legacy.deletingLastPathComponent().path))
             case .linkToRoot:
                 let alias = URL(fileURLWithPath: "/fake-volume/alias-root", isDirectory: true)
-                return (alias.appendingPathComponent("app", isDirectory: true), legacy, (alias.path, legacy.path))
+                return (alias.appendingPathComponent("app", isDirectory: true), legacy, legacy, (alias.path, legacy.path))
+            case .linkIntoRoot:
+                let alias = URL(fileURLWithPath: "/fake-volume/alias-child", isDirectory: true)
+                return (alias.appendingPathComponent("app", isDirectory: true), legacy, legacy, (alias.path, legacy.appendingPathComponent("x").path))
+            case .rootThroughLinkIntoStore:
+                let alias = URL(fileURLWithPath: "/fake-volume/alias-in-store", isDirectory: true)
+                let physical = CoreFixture.layout.container.appendingPathComponent("sub/CDNAssets", isDirectory: true)
+                return (CoreFixture.base, alias.appendingPathComponent("CDNAssets", isDirectory: true), physical, (alias.path, physical.deletingLastPathComponent().path))
             }
+        }
+
+        /// The store sits at the default location (`.applicationSupport`), not at a custom base.
+        var defaultLocation: Bool {
+            self == .insideStore || self == .rootThroughLinkIntoStore
         }
     }
 
@@ -58,8 +79,9 @@ struct LegacyRootTests {
     func overlappingRootSkipped(_ overlap: Overlap) async throws {
         let files = try LegacyFixture.fixtureFiles()
         let placement = overlap.placement
-        let fileSystem = FakeFileSystem(disk: try LegacyFixture.disk(files, root: placement.root), time: ManualTimeSource())
+        let fileSystem = FakeFileSystem(disk: try LegacyFixture.disk(files, root: placement.physicalRoot), time: ManualTimeSource())
         if let (path, destination) = placement.link {
+            try LegacyFixture.makeDirectories(URL(fileURLWithPath: destination, isDirectory: true), on: fileSystem)
             try fileSystem.createSymbolicLink(at: URL(fileURLWithPath: path), destination: destination)
         }
         // Through the link where there is one (its target's directories are created).
@@ -67,7 +89,7 @@ struct LegacyRootTests {
         var disk = fileSystem.survivingDisk()
         disk.makeDurable()
         let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
-        let location: StorageLocation = overlap == .insideStore ? .applicationSupport : .custom(placement.base)
+        let location: StorageLocation = overlap.defaultLocation ? .applicationSupport : .custom(placement.base)
         let legacy = LegacyMigrationPolicy(enabled: true, root: placement.root)
         let harness = CoreHarness.cleanup(disk: disk, location: location, legacy: legacy, defaults: defaults)
         let layout = StoreLayout(base: placement.base)
@@ -93,6 +115,45 @@ struct LegacyRootTests {
         #expect(try await !next.store.open().legacyMigrationPending)
         #expect(await next.isPresent(asset.id, at: asset.key))
         #expect(next.content(layout.blobURL(asset.key)) == asset.bytes)
+    }
+
+    /// What a stat of a directory above the legacy root fails with (review of the L3 close-out, ZProbe-perm).
+    enum AncestorFault: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// EPERM: a sandbox refusing metadata of a directory it does not grant says nothing about an overlap.
+        case permissionDenied
+        /// EIO: nothing can be decided from the stat.
+        case io
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @Test(
+        "R-STO-11: a refused stat of a directory above the legacy root is no overlap and migration runs; an I/O error decides nothing and says so",
+        .timeLimit(.minutes(1)),
+        arguments: AncestorFault.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func ancestorStatFault(_ fault: AncestorFault) async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (harness, defaults) = try LegacyFixture.harness(files: files)
+        let error: FileSystemError = fault == .io ? .io : .permissionDenied
+        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "Caches"), occurrence: .every, error: error))
+        let report = try await harness.store.open()
+        let undecided = harness.tap.lines.contains { $0.level == .error && $0.message.contains("could not tell whether the legacy root overlaps") }
+        switch fault {
+        case .permissionDenied:
+            #expect(report.legacyMigrationPending && !undecided)
+            #expect(await harness.state.migration.phase == .inProgress)
+            #expect(try await LegacyMigrationTests.migrateAll(harness) == LegacyMigrationProgress(adopted: 13, remaining: 0, dropped: 0, finished: true))
+            #expect(await CoreInvariants.violations(of: harness).isEmpty)
+        case .io:
+            #expect(!report.legacyMigrationPending && undecided, "decided nothing, and logged it")
+            #expect(await harness.state.migration.phase == .notStarted)
+            LegacyEdgeTests.expectTreeUntouched(harness, files, "nothing moves")
+            #expect(defaults.string(forKey: CleanupFixture.legacyKey) == "1.4+77")
+        }
     }
 
     @Test(
