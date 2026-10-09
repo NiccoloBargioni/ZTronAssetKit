@@ -52,6 +52,7 @@ extension AssetStore {
         let candidates = self.evictionCandidates(protecting: [])
         var holders = self.referenceIndex()
         var visited = 0
+        var evictedAny = false
         for candidate in candidates where result.bytesFreed < needed {
             if visited > 0, visited % AssetStore.evictionChunk == 0 {
                 // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob, unleased,
@@ -62,12 +63,19 @@ extension AssetStore {
                 holders = self.referenceIndex()
             }
             visited += 1
-            if let freed = self.evict(candidate.victims, holders: holders[candidate.key] ?? []) {
-                result.bytesFreed = result.bytesFreed.addingSaturating(freed)
+            switch self.evict(candidate.victims, holders: holders[candidate.key] ?? []) {
+            case .doomed(let bytes)?:
+                result.bytesFreed = result.bytesFreed.addingSaturating(bytes)
                 result.filesRemoved += 1
+                evictedAny = true
+            case .stillReferenced?:
+                // The records changed, but nothing was released to the reaper (C-3).
+                evictedAny = true
+            case nil:
+                break
             }
         }
-        guard result.filesRemoved > 0 else {
+        guard evictedAny else {
             self.environment.log.log(.store, .info, "quota eviction found nothing evictable: \(needed) bytes over target remain")
             return result
         }
@@ -118,11 +126,20 @@ extension AssetStore {
         return index
     }
 
+    /// What evicting one blob's records did.
+    enum BlobEviction: Sendable, Hashable {
+        /// The records were evicted and the blob is doomed: `bytes` go to the reaper.
+        case doomed(bytes: Int64)
+        /// The records were evicted, but another reference keeps the blob live (an in-flight publication of the same
+        /// bytes under another id holds a provisional one, `acquireReference`'s `.reused`): nothing was freed.
+        case stillReferenced
+    }
+
     /// Evicts one blob's records when the blob is still live, unleased and not being placed, its present records
     /// (`holders`, from a `referenceIndex()` of the current state) are exactly `victims`, and each of them is still
-    /// evictable and was not accessed since the selection. Returns the bytes released to the reaper (0 when the blob
-    /// stays referenced), or `nil` when nothing was evicted.
-    func evict(_ victims: [EvictionVictim], holders: [AssetID]) -> Int64? {
+    /// evictable and was not accessed since the selection. Returns what happened to the blob, or `nil` when nothing
+    /// was evicted.
+    func evict(_ victims: [EvictionVictim], holders: [AssetID]) -> BlobEviction? {
         guard let key = victims.first?.blob, case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key),
             self.state.cleanup.leases[key]?.isEmpty ?? true
         else {
@@ -151,10 +168,10 @@ extension AssetStore {
         }
         self.state.core.metrics.evictions += victims.count
         guard case .doomed? = self.state.core.blobTable[key] else {
-            return 0
+            return .stillReferenced
         }
         self.state.core.metrics.evictedBytes = self.state.core.metrics.evictedBytes.addingSaturating(bytes)
-        return bytes
+        return .doomed(bytes: bytes)
     }
 
     /// Stamps `lastCleanupAt` for a GC, eviction or purge that changed something (persisted with the next commit).
