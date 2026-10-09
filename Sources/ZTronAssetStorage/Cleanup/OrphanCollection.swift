@@ -32,31 +32,22 @@ extension AssetStore {
             }
             candidates.append(key)
         }
-        var result = CleanupResult()
-        let batchSize = max(1, self.configuration.deletionBatchSize)
-        var next = 0
-        var cancelled = false
-        while next < candidates.count, self.collectsOrphans, !cancelled {
-            // The sweep set is re-checked against the marks right before each unit is submitted, in the same turn
-            // (R10): a key a publication or adoption claimed meanwhile is left alone.
+        // The sweep set is re-checked against the marks right before each removal unit is submitted, in the same turn
+        // (R10): a key a publication or adoption claimed meanwhile is left alone. A file whose removal fails stays an
+        // orphan for the next run and does not stop the others; only the deadline and the caller's cancellation do.
+        // REENTRANCY: c-1 (proposed) — see `removeInUnits`; the re-check above runs in the turn of each submission.
+        let removal = try await self.removeInUnits(candidates.map { (url: layout.blobURL($0), bytes: unknown[$0] ?? 0) }, until: deadline) { [candidates] indices in
+            guard self.collectsOrphans else {
+                return []
+            }
             let marks = self.orphanMarks().union(self.expectedKeys())
-            let batch = candidates[next..<min(next + batchSize, candidates.count)].filter { !marks.contains($0) }
-            next += batchSize
-            guard !batch.isEmpty else {
-                continue
-            }
-            // REENTRANCY: c-1 (proposed) — see `removeInUnits`; the sweep set of the next batch is re-checked above.
-            let removal = try await self.removeInUnits(batch.map { (url: layout.blobURL($0), bytes: unknown[$0] ?? 0) }, until: deadline)
-            for index in removal.removed {
-                unknown[batch[index]] = nil
-            }
-            result.bytesFreed = result.bytesFreed.addingSaturating(removal.result.bytesFreed)
-            result.filesRemoved += removal.result.filesRemoved
-            cancelled = removal.cancelled
-            if removal.result.filesRemoved < batch.count {
-                break
-            }
+            return indices.filter { !marks.contains(candidates[$0]) }
         }
+        for index in removal.removed {
+            unknown[candidates[index]] = nil
+        }
+        let result = removal.result
+        let cancelled = removal.cancelled
         // A cancelled run still accounts for what it removed (R-CLN-12, C-4) before it reports the cancellation.
         self.state.cleanup.orphans = unknown
         if result.filesRemoved > 0 {
