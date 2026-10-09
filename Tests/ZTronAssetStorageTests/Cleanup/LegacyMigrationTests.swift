@@ -222,4 +222,25 @@ struct LegacyMigrationTests {
         #expect(progress.adopted == 0 && progress.finished, "the legacy file of that id has other bytes than the applied entry expects")
         #expect(try await harness.store.planningView().syncDue)
     }
+
+    @Test("R-STO-11: no legacy file moves before a generation holding the phase-1 plan is committed", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func planCommittedBeforeMoves() async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let (harness, _) = try LegacyFixture.harness(files: files)
+        // Every index write of open() runs out of space: phase 1's commit and the launch commit both fail.
+        for occurrence in 1...4 {
+            harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(occurrence), error: .noSpace))
+        }
+        _ = try await harness.store.open()
+        let planCommitted = await harness.state.migration.planCommitted
+        #expect(!planCommitted, "open() could not commit the plan")
+        #expect(try await LegacyMigrationTests.migrateAll(harness).finished)
+        let operations = harness.fileSystem.operations
+        let firstMove = try #require(operations.firstIndex { $0.kind == .rename && $0.url.path.hasPrefix(CleanupFixture.legacyRoot.path) })
+        let commitsBefore = operations[..<firstMove].filter {
+            $0.kind == .rename && $0.url.lastPathComponent == "index.tmp" && $0.destination?.lastPathComponent == "index.bin" && $0.failure == nil
+        }
+        #expect(!commitsBefore.isEmpty, "a commit holding the plan landed before the first legacy file moved")
+    }
 }
