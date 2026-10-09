@@ -214,6 +214,7 @@ struct OracleTests {
 
     @Test(
         "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step",
+        .serialized,
         .timeLimit(.minutes(1)),
         arguments: Array(UInt64(1)...UInt64(16))
     )

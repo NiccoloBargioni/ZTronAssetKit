@@ -256,8 +256,10 @@ struct LegacyPhaseOneStateSpaceTests {
         return result
     }
 
-    /// How many initial disks of a row run at once.
-    static let width = 2
+    /// How many initial disks of a row run at once: one (review round 2: under TSan on a loaded host the suites beside
+    /// this one, WP-B's kill-then-power-loss cases and WP-H's start/stop race, need the cooperative pool more than this
+    /// suite needs wall time).
+    static let width = 1
 
     /// The rows run one at a time (`.serialized`), each enumerating its eight disks `width` at a time as low-priority
     /// child tasks that yield once per case (ios.md item 4): a row's time limit then measures only its own work (under a

@@ -49,7 +49,7 @@ struct CleanupCrashTests {
         #expect(headers.allSatisfy { report.launchEpoch > $0.generation }, "\(label): I-5, the epoch reuses a generation")
     }
 
-    @Test("R-STO-5: crash at every boundary during eviction preserves I-1…I-5", .timeLimit(.minutes(1)), arguments: CrashMode.allCases)
+    @Test("R-STO-5: crash at every boundary during eviction preserves I-1…I-5", .serialized, .timeLimit(.minutes(1)), arguments: CrashMode.allCases)
     @available(macOS 15.0, iOS 18.0, *)
     func crashDuringEviction(mode: CrashMode) async throws {
         let clean = CoreHarness.cleanup(policy: EvictionRun.policy)
@@ -90,6 +90,7 @@ struct CleanupCrashTests {
 
     @Test(
         "R-STO-5: crash at every boundary during legacy migration preserves I-1…I-5 and adopts every verified file",
+        .serialized,
         .timeLimit(.minutes(1)),
         arguments: CrashMode.allCases
     )
@@ -145,6 +146,7 @@ struct CleanupCrashTests {
     /// commit that drops it: the next launch must bind the new bytes, never delete them.
     @Test(
         "R-STO-5: a blob reaped and then republished before the lazy commit survives a crash and the next launch",
+        .serialized,
         .timeLimit(.minutes(1)),
         arguments: CrashMode.allCases
     )
