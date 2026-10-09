@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 /// The commit unit carries which index name holds the committed generation (`IndexCommitInput.committedFile`, ADR draft
 /// B-28 as amended in close-out cycle 5) instead of reading it from a header, and follows it through every rename it
 /// makes, including the ones whose result is lost. The state-space enumeration checks the single-event cases after every
-/// commit attempt; these two need two events in one unit, or an outside deletion, which it does not enumerate. Each
+/// commit attempt; these need two events in one unit, or an outside deletion, which it does not enumerate. Each
 /// asserts the invariant the unit's decisions rely on: the file it reports holds the committed generation, or it
 /// reports none.
 @Suite("Core: the committed index file through a commit unit's renames (R-STO-4)")
@@ -104,5 +104,25 @@ struct IndexCommitFileTrackingTests {
         #expect(fake.operations.filter { $0.kind == .rename }.map { $0.url.lastPathComponent } == ["index.bin", "index.tmp", "index.prev"])
         #expect(outcome.committedFile == nil, "no file holds generation 4 any more")
         #expect(IndexCommitFileTrackingTests.generation(in: .current, fake) == nil && IndexCommitFileTrackingTests.generation(in: .previous, fake) == nil)
+    }
+
+    /// The load validated `index.bin` (generation 5), then it vanished (an outside deletion inside the private root).
+    /// Step 4 does not run (nothing is at `index.bin`), step 5 fails before it acts: the unit no longer claims
+    /// `index.bin` for generation 5, which no file holds now, so a later ENOSPC fallback cannot take `index.bin` for it.
+    @Test("R-STO-4: a committed index.bin that vanished is no longer taken for the committed generation")
+    @available(macOS 15.0, *)
+    func vanishedCommittedFile() throws {
+        let fake = try IndexCommitFileTrackingTests.volume([.current: 5, .previous: 4])
+        let loaded = StoreRecoveryTests.loadRule(fake.survivingDisk())
+        #expect(loaded.chosen == .current && loaded.content?.generation == 5)
+        try fake.removeItem(at: IndexCommitFileTrackingTests.layout.indexURL(.current))
+        fake.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        let outcome = IndexCommitUnit.run(try IndexCommitFileTrackingTests.input(committed: 5, in: .current), fileSystem: fake)
+        #expect(throws: StoreError.fileSystem(.io)) {
+            try outcome.result.get()
+        }
+        #expect(fake.operations.filter { $0.kind == .rename }.map { $0.url.lastPathComponent } == ["index.tmp"], "no step 4: nothing was at index.bin")
+        #expect(outcome.committedFile == nil, "no file holds generation 5 any more")
+        #expect(IndexCommitFileTrackingTests.generation(in: .previous, fake) == 4, "index.prev is kept")
     }
 }
