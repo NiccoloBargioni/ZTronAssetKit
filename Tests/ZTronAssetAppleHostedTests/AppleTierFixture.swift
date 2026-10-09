@@ -101,7 +101,7 @@ func collect(_ handle: any TransferHandle) async -> [TransferUpdate] {
 /// Drains a handle's stream like `collect`, and records the interval edges `tap` held when the terminal element
 /// arrived (R-OBS-1): read at that moment, not after the stream finished, so a transfer that closes its interval
 /// only after delivering its terminal update is caught.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 func collectNotingIntervals(
     _ handle: any TransferHandle,
     tap: RecordingLogTap
@@ -119,7 +119,7 @@ func collectNotingIntervals(
 
 /// A staging sink whose `writeStaged` can be held before it pulls any chunk or after it wrote the whole file, so a
 /// test can act while a copy is in flight; everything else goes to a `FakeStagingSink`.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class GatedStagingSink: StagingSink {
     /// Where an armed gate holds a write.
     enum Gate: Sendable, Hashable {

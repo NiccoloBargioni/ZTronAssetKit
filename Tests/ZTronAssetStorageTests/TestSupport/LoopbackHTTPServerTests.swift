@@ -9,7 +9,7 @@ import Testing
 @Suite("Test support: LoopbackHTTPServer")
 struct TestSupportLoopbackHTTPServerTests {
     /// Runs `body` against a started server and always stops it afterwards.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func withServer(
         delay: any LoopbackDelay = NoLoopbackDelay(),
         _ handler: @escaping LoopbackHandler,
@@ -26,14 +26,14 @@ struct TestSupportLoopbackHTTPServerTests {
         await server.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func connect(_ port: UInt16) async throws -> LoopbackRawClient {
         let client = LoopbackRawClient(port: port)
         try await client.open()
         return client
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a scripted response is served verbatim and the request is recorded with lowercased headers", .timeLimit(.minutes(1)))
     func servesScriptedResponse() async throws {
         try await Self.withServer({ request in
@@ -56,7 +56,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: keep-alive requests share one counted connection and a second client is a second connection", .timeLimit(.minutes(1)))
     func countsConnections() async throws {
         try await Self.withServer({ request in
@@ -80,7 +80,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: closeAfter sends the head and the first body bytes, then a FIN", .timeLimit(.minutes(1)))
     func closeAfterIsAFin() async throws {
         let body = Data((0..<100).map { UInt8($0) })
@@ -98,7 +98,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: stallAfter holds the connection mid-body until stop closes it", .timeLimit(.minutes(1)))
     func stallUntilStop() async throws {
         let body = Data(repeating: 7, count: 50)
@@ -118,7 +118,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a matching If-Range yields 206 with the tail, a stale one the whole body, an unsatisfiable range 416", .timeLimit(.minutes(1)))
     func rangesAndIfRange() async throws {
         let body = Data((0..<10).map { UInt8($0) })
@@ -157,7 +157,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a gzip response carries Content-Encoding and a body that inflates to the decoded bytes", .timeLimit(.minutes(1)))
     func gzipEncoding() async throws {
         let decoded = Data(String(repeating: "ZTronAssetKit ", count: 400).utf8)
@@ -194,7 +194,7 @@ struct TestSupportLoopbackHTTPServerTests {
         #expect(try Self.gunzip(Gzip.frame(stored, original: original)) == original)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a close-delimited body has no Content-Length and ends with the connection", .timeLimit(.minutes(1)))
     func closeDelimitedBody() async throws {
         try await Self.withServer({ _ in
@@ -209,7 +209,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: Connection close is honoured and a request body is consumed before the next request", .timeLimit(.minutes(1)))
     func connectionCloseAndRequestBodies() async throws {
         try await Self.withServer({ request in
@@ -230,7 +230,7 @@ struct TestSupportLoopbackHTTPServerTests {
 
     /// A `Data` slice keeps its parent's indices: a range indexes the body relative to its start (a zero-based index
     /// into a slice whose `startIndex` is not 0 traps inside the server actor and ends the test process).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a range request against a body that is a Data slice gets the slice's bytes", .timeLimit(.minutes(1)))
     func rangeOverSlicedBody() async throws {
         let parent = Data((0..<20).map { UInt8($0) })
@@ -259,7 +259,7 @@ struct TestSupportLoopbackHTTPServerTests {
 
     /// The default delay is `NoLoopbackDelay`: a server built without one answers at once whatever latency is
     /// scripted, so a correctness test can never sleep by accident (a sleeping default would hit the time limit).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a server with the default delay answers a response scripted with an hour of latency at once", .timeLimit(.minutes(1)))
     func defaultDelayNeverSleeps() async throws {
         let hour: UInt64 = 3_600 * 1_000_000_000
@@ -275,7 +275,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: scripted latency is awaited through the injected delay, and a response without latency awaits nothing", .timeLimit(.minutes(1)))
     func latencyGoesThroughTheDelay() async throws {
         let delay = LoopbackRecordingDelay()
@@ -292,7 +292,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a request body split across segments is awaited and a header line without a colon is skipped", .timeLimit(.minutes(1)))
     func splitRequestBody() async throws {
         try await Self.withServer({ request in
@@ -307,7 +307,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a request followed by the client's FIN is answered before the server closes", .timeLimit(.minutes(1)))
     func clientFinishedIsAnswered() async throws {
         try await Self.withServer({ _ in
@@ -323,7 +323,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: malformed or reversed byte ranges are ignored and the whole body is sent", .timeLimit(.minutes(1)))
     func malformedRangesAreIgnored() async throws {
         let body = Data((0..<10).map { UInt8($0) })
@@ -353,7 +353,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "Test support: a request whose Content-Length is not a bounded digit string gets 400 and the connection is closed",
         .timeLimit(.minutes(1)),
@@ -374,7 +374,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a scripted Content-Length wins whatever its case, and the server's Connection header replaces a scripted one", .timeLimit(.minutes(1)))
     func scriptedHeadersMergeCaseInsensitively() async throws {
         try await Self.withServer({ _ in
@@ -421,7 +421,7 @@ struct TestSupportLoopbackHTTPServerTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a request head that grows past its cap without a blank line gets 431 and the connection is closed", .timeLimit(.minutes(1)))
     func oversizedHeadIsRejected() async throws {
         try await Self.withServer({ _ in
@@ -444,7 +444,7 @@ struct TestSupportLoopbackHTTPServerTests {
     /// A caller cancelled while the listener comes up (a `.timeLimit`, a cancelled test task) must not stay suspended
     /// until Network reports a state. The listener's states are held, so only the cancellation can end that start;
     /// once they are released, the same listener serves a later start.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a start cancelled while the listener comes up throws CancellationError, and a later start gets the port", .timeLimit(.minutes(1)))
     func cancelledStartEnds() async throws {
         let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
@@ -464,7 +464,7 @@ struct TestSupportLoopbackHTTPServerTests {
 
     /// Network can report `.failed` for a listener that was ready. `start()` must then not keep returning the dead
     /// port: the failed listener is dropped, and the next start makes a new one whose port serves.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a listener that fails after it was ready is replaced at the next start, whose port serves", .timeLimit(.minutes(1)))
     func failedAfterReadyIsReplaced() async throws {
         let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
@@ -512,7 +512,7 @@ struct TestSupportLoopbackHTTPServerTests {
 }
 
 /// A delay that records what it was asked to wait and returns at once.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class LoopbackRecordingDelay: LoopbackDelay {
     private let recorded = Mutex<[UInt64]>([])
 

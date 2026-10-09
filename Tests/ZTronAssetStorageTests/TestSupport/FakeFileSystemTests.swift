@@ -6,7 +6,7 @@ import ZTronAssetTestSupport
 /// Recording (R-STO-7 calling thread, R-STO-8 attributes), locks (R-STO-9), the namespace and disk images.
 @Suite("Test support: FakeFileSystem recording and namespace")
 struct TestSupportFakeFileSystemTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: every call records whether it ran on the main thread", .timeLimit(.minutes(1)))
     func recordsCallingThread() async throws {
         let fileSystem = FakeFSFixture.make()
@@ -18,7 +18,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(fileSystem.operations.map(\.isMainThread) == [false, true])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: applied attributes are recorded by path and read back in the next lifetime")
     func attributesAreRecorded() throws {
         let fileSystem = FakeFSFixture.make()
@@ -34,7 +34,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: FileSystemError.notFound) { try next.storeAttributes(at: root.appendingPathComponent("absent")) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a held lock blocks every other holder until released and its token names the lock file")
     func lockBlocksOtherHolders() throws {
         let fileSystem = FakeFSFixture.make()
@@ -52,7 +52,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(releases.allSatisfy { $0.url.path == "/fake-volume/store.lock" })
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a replaced lock file has a new identity, which is how a replaced root is detected")
     func replacedLockFileChangesIdentity() throws {
         let fileSystem = FakeFSFixture.make()
@@ -65,7 +65,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: Never.self) { _ = try fileSystem.acquireExclusiveLock(at: lock) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: standard directories resolve to existing directories under the configured volume root")
     func standardDirectoriesExist() throws {
         let volume = URL(fileURLWithPath: "/other-volume", isDirectory: true)
@@ -79,7 +79,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(FakeFSFixture.powerLoss(fileSystem.survivingDisk()).directories.contains("/other-volume/Library/Caches"))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: listings come in descending name order, never the ascending order code might rely on, with sizes, kinds and modification times")
     func listingsAreInDescendingOrder() throws {
         let time = ManualTimeSource()
@@ -99,7 +99,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: FileSystemError.other(errno: ENOTDIR)) { try fileSystem.contentsOfDirectory(at: directory.appendingPathComponent("a.bin")) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an intermediate symbolic link is followed, a final one only by reads and writes")
     func symbolicLinks() throws {
         let fileSystem = FakeFSFixture.make()
@@ -123,7 +123,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(FakeFFSLifetime.next(disk).survivingDisk() == disk)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a relative link target resolves against the link's directory, with . and .. applied")
     func relativeLinkTargets() throws {
         let fileSystem = FakeFSFixture.make()
@@ -138,7 +138,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: FileSystemError.other(errno: EINVAL)) { try fileSystem.createSymbolicLink(at: FakeFSFixture.url("/"), destination: "x") }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a file a power loss left under two names is one file: unlinking one name keeps the other")
     func powerLossHardLinks() throws {
         let fileSystem = FakeFSFixture.make(important: 1_000)
@@ -168,7 +168,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(try next.availableCapacity(at: FakeFSFixture.volume, for: .important) == 1_100)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a hand-edited disk keeps its symbolic links and attributes")
     func editedDiskKeepsLinksAndAttributes() throws {
         let fileSystem = FakeFSFixture.make()
@@ -195,7 +195,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(try FakeFFSLifetime.next(afterPowerLoss).itemInfo(at: FakeFSFixture.url("/fake-volume/ghost-link"))?.kind == .symbolicLink)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a cycle of symbolic links fails with ELOOP instead of looping")
     func linkLoopsFail() throws {
         let fileSystem = FakeFSFixture.make()
@@ -204,7 +204,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: FileSystemError.other(errno: ELOOP)) { try fileSystem.read(from: FakeFSFixture.url("/fake-volume/a"), offset: 0, maxLength: 1) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: renames refuse to move a directory into itself or onto a non-empty directory")
     func directoryRenames() throws {
         let fileSystem = FakeFSFixture.make()
@@ -227,7 +227,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(try fileSystem.itemInfo(at: a)?.kind == .directory)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: misuse of the seam is reported as an error: oversized reads, relative URLs, directories as files")
     func misuseIsReported() throws {
         let fileSystem = FakeFSFixture.make()
@@ -244,7 +244,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(throws: FileSystemError.other(errno: EISDIR)) { try fileSystem.acquireExclusiveLock(at: FakeFSFixture.volume) }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: disk digests are equal for equal trees and change with any path or byte")
     func digestsFollowContent() throws {
         let first = FakeFSFixture.make()
@@ -267,7 +267,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(Set([renamed, renamed]).count == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: makeDurable lets a seeded disk survive a power loss in its first lifetime")
     func makeDurableSeedsSurvive() throws {
         var seeded = DiskImage()
@@ -290,7 +290,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(FakeFSFixture.powerLoss(image).files["/fake-volume/s/f"] == [7])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a hand-edited disk loads with the edit and keeps the durability of every untouched file")
     func editedDiskKeepsUntouchedDurability() throws {
         let fileSystem = FakeFSFixture.make()
@@ -312,7 +312,7 @@ struct TestSupportFakeFileSystemTests {
         #expect(afterPowerLoss.files["/fake-volume/blobs/a"] == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a seeded file whose parent directories are not listed gets them, and a seeded durable-only file returns on power loss")
     func seededImagesAreLenient() throws {
         var seeded = DiskImage()

@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 @Suite("Core: commit protocol and scheduling")
 struct StoreCommitTests {
     @Test("R-STO-4: a commit writes tmp, syncs it, renames bin to prev, renames tmp to bin, then syncs the root, in that order", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func commitOrderAndLevels() async throws {
         let time = ManualTimeSource()
         let fake = FakeFileSystem(time: time)
@@ -52,7 +52,7 @@ struct StoreCommitTests {
     }
 
     @Test("R-STO-4: a torn index.tmp is ignored and the newest valid generation wins", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func tornTemporaryIsIgnored() async throws {
         let harness = CoreHarness.make()
         let entry = CoreFixture.entry("a", CoreFixture.bytes(81))
@@ -87,7 +87,7 @@ struct StoreCommitTests {
     }
 
     @Test("R-STO-6: ENOSPC during an index commit keeps the previous generation and retries", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func noSpaceDuringCommit() async throws {
         let harness = CoreHarness.make()
         let tmp = URLMatcher(lastComponentSuffix: "index.tmp")
@@ -125,7 +125,7 @@ struct StoreCommitTests {
     }
 
     @Test("R-STO-9: a replaced root is detected before the next commit", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func replacedRootDetected() async throws {
         let harness = CoreHarness.make()
         let entry = CoreFixture.entry("a", CoreFixture.bytes(83))
@@ -148,7 +148,7 @@ struct StoreCommitTests {
     }
 
     @Test("P-5: bulk publications coalesce into one commit per commitMinimumInterval, and a required commit waits for the window", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func commitsAreCoalesced() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: 0.25))
         let payloads = (0..<10).map { CoreFixture.bytes(200 + UInt64($0), count: 16) }
@@ -188,7 +188,7 @@ struct StoreCommitTests {
     /// Review round 3, probe 6: a commit that keeps failing (a full volume, EIO) re-encoded the index and logged an
     /// error every 250 ms forever, so the engine's alarm never went quiet. The scheduled retry now backs off.
     @Test("P-5: failed commits back off exponentially, explicit flushes still try at once, success resets, one error per streak", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedCommitsBackOff() async throws {
         let interval: TimeInterval = 0.25
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: interval))
@@ -243,7 +243,7 @@ struct StoreCommitTests {
     }
 
     @Test("R-STO-6: a launch commit that fails leaves the store open on the loaded state and retries later", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func launchCommitFailureServesReadOnly() async throws {
         let harness = CoreHarness.make()
         let tmp = URLMatcher(lastComponentSuffix: "index.tmp")

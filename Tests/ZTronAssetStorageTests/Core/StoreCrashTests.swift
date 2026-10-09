@@ -8,7 +8,7 @@ import ZTronAssetTestSupport
 /// The scripted first sync of R-STO-5: open → apply → four publications (a resumable pair with its sidecar, two
 /// identifiers sharing one transfer, a checksum-less entry committed before it returns, a dedupe onto a live blob)
 /// → the coalesced commit → a durable flush → close.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum FirstSync {
     struct Asset {
         let entries: [ManifestEntry]
@@ -124,7 +124,7 @@ struct StoreCrashTests {
         .timeLimit(.minutes(1)),
         arguments: CrashMode.allCases
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func crashAtEveryBoundary(mode: CrashMode) async throws {
         let clean = CoreHarness.make()
         let cleanTrace = await FirstSync.run(clean)
@@ -162,7 +162,7 @@ struct StoreCrashTests {
         .timeLimit(.minutes(1)),
         arguments: [CrashMode.powerLossDropUnsynced, .powerLossKeepMetadata], 0..<StoreCrashTests.slices
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func killThenPowerLoss(mode: CrashMode, slice: Int) async throws {
         let clean = CoreHarness.make()
         _ = await FirstSync.run(clean)
@@ -252,7 +252,7 @@ struct StoreCrashTests {
         .serialized,
         arguments: CommitFault.allCases, StoreCrashTests.fullVolumeEnds
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func faultAtEveryCommitThenFullVolume(fault: CommitFault, end: CrashMode) async throws {
         let clean = CoreHarness.make()
         _ = await FirstSync.run(clean)
@@ -289,7 +289,7 @@ struct StoreCrashTests {
         .serialized,
         arguments: CrashMode.allCases, StoreCrashTests.fullVolumeEnds
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func crashThenFullVolume(mode: CrashMode, end: CrashMode) async throws {
         let clean = CoreHarness.make()
         _ = await FirstSync.run(clean)
@@ -312,7 +312,7 @@ struct StoreCrashTests {
     /// valid generations than the same `end` would have left had it struck before the lifetime did anything: whatever
     /// the launch loaded and promoted, it must not make the last durable generation depend on unsynced data (review
     /// close-out, probe VP7).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func fullVolumeLifetime(_ disk: DiskImage, endingIn end: CrashMode = .processKill, label: String) async -> DiskImage {
         let before = StoreRecoveryTests.loadRule(CoreHarness.make(disk: disk, mode: end).fileSystem.survivingDisk())
         let harness = CoreHarness.make(disk: disk, mode: end)
@@ -347,7 +347,7 @@ struct StoreCrashTests {
         .timeLimit(.minutes(1)),
         arguments: [CrashMode.powerLossKeepMetadata, .powerLossDropUnsynced]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func promotedUnsyncedTemporarySurvivesPowerLoss(mode: CrashMode) async throws {
         // Lifetime 1: a durable commit dooms the rotten blob `corrupt`; the next commit is killed right before it syncs
         // index.tmp.
@@ -385,7 +385,7 @@ struct StoreCrashTests {
     }
 
     /// The second lifetime of the pair test: open (adoption, launch commit), re-apply, flush durably.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func secondLifetime(_ harness: CoreHarness) async {
         do {
             _ = try await harness.store.open()
@@ -398,7 +398,7 @@ struct StoreCrashTests {
     }
 
     @Test("R-STO-5: power loss after a durable commit keeps the store root reachable", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func powerLossAfterDurableCommit() async throws {
         for mode in [CrashMode.powerLossDropUnsynced, .powerLossKeepMetadata] {
             let harness = CoreHarness.make(mode: mode)
@@ -421,7 +421,7 @@ struct StoreCrashTests {
     }
 
     @Test("R-STO-5: blobs published before a rate-limited commit are adopted after a crash, never re-downloaded", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func windowBlobsAreAdopted() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(commitInterval: 0.25))
         let assets = FirstSync.assets.filter { $0.entries[0].checksum != nil }

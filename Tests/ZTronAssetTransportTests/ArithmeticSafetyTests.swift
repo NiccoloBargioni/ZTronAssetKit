@@ -23,7 +23,7 @@ struct ArithmeticSafetyTests {
         ))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a resumed 206 announcing Content-Length Int64.max aborts as oversize and leaves the earlier partial untouched", .timeLimit(.minutes(1)))
     func hugeContentLengthOnResumed206() async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -54,7 +54,7 @@ struct ArithmeticSafetyTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a chunk of a resumed 206 announcing Int64.max is judged oversize, not added up", .timeLimit(.minutes(1)))
     func hugeContentLengthPerChunk() async throws {
         let staging = FakeStagingSink()
@@ -113,7 +113,7 @@ struct ArithmeticSafetyTests {
         #expect(SizeGuard.verdict(written: row.written, announced: row.announced, expected: row.expected, limit: row.limit) == row.verdict)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a size cap of Int64.max means unlimited and a negative one nothing, both through a whole transfer", .timeLimit(.minutes(1)))
     func extremeConfiguredCaps() async throws {
         let body = TransportFixtures.payload(1_000)
@@ -132,7 +132,7 @@ struct ArithmeticSafetyTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a resume offset of Int64.min from a corrupt sidecar never traps, and the origin's 200 is staged from zero", .timeLimit(.minutes(1)))
     func corruptResumeOffset() async throws {
         let body = TransportFixtures.payload(1_000)
@@ -151,7 +151,7 @@ struct ArithmeticSafetyTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a live resumed transfer counts the resume offset only when the origin continued it with a 206", .timeLimit(.minutes(1)), arguments: [true, false])
     func liveBytesCountTheOffsetOnlyFor206(_ continued: Bool) async throws {
         // 600,000 bytes give a progress quantum of 256 KiB, so the chunk that reaches 262,144 staged bytes is reported
@@ -180,7 +180,7 @@ struct ArithmeticSafetyTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a background task cap of Int.max sizes the coordinator's tables without trapping", .timeLimit(.minutes(1)))
     func unboundedTaskCap() async throws {
         let rig = try BackgroundCoordinatorTests.Rig("cap-int-max", maxTasks: .max)

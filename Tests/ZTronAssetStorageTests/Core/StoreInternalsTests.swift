@@ -9,7 +9,7 @@ import ZTronAssetTestSupport
 @Suite("Core: primitives for WP-C")
 struct StoreInternalsTests {
     @Test("R-STO-3: adoptVerifiedFile moves a verified file into blobs for every record expecting it and installs no snapshot", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func adoptVerifiedFile() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(180, count: 2_500)
@@ -39,7 +39,7 @@ struct StoreInternalsTests {
     }
 
     @Test("R-STO-4: ensureOpen, requireCommitted and publishSnapshot follow the phase, the durability and the install rate", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func phaseCommitAndSnapshotPrimitives() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(installInterval: 0.1))
         await #expect(throws: StoreError.notOpen) {
@@ -71,7 +71,7 @@ struct StoreInternalsTests {
     }
 
     @Test("R-CLN-1: setResidency dooms the last reference with the given reason, persists it, and refuses an unreferencable present key", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func setResidency() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.bytes(182)

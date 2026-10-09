@@ -44,7 +44,7 @@ enum MemoryProbe {
     }
 
     /// Tracks the largest resident size seen between `start()` and the last `sample()`, from any thread.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     final class PeakSampler: Sendable {
         private let state = Mutex<(baseline: UInt64, peak: UInt64, samples: Int)>((0, 0, 0))
 

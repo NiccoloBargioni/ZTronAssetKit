@@ -9,11 +9,11 @@ import ZTronAssetTransport
 /// fresh download through `resumeRejected`.
 @Suite("Background resume")
 struct BackgroundResumeTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     typealias Rig = BackgroundCoordinatorTests.Rig
 
     /// Pauses a fresh background transfer of `job` whose cancellation returns `data`.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func pause(_ job: TransferJob, returning data: ResumeData?, rig: Rig, coordinator: BackgroundTransferCoordinator) async -> TransferUpdate? {
         await rig.driver.setResumeData(data, holdingCancellationEvents: false)
         let handle = await coordinator.start(job)
@@ -21,7 +21,7 @@ struct BackgroundResumeTests {
         return await run(handle).terminal
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a paused background transfer restarted by the engine continues from the kept resume data, once", .timeLimit(.minutes(1)))
     func restartContinuesFromKeptData() async throws {
         let rig = try Rig("bg-resume-continue")
@@ -53,7 +53,7 @@ struct BackgroundResumeTests {
         case partialWithoutRange
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: stale background resume data falls back to a fresh download through resumeRejected", .timeLimit(.minutes(1)), arguments: StaleSignal.allCases)
     func staleDataFallsBackToFresh(_ signal: StaleSignal) async throws {
         let rig = try Rig("bg-resume-stale-\(signal)")
@@ -94,7 +94,7 @@ struct BackgroundResumeTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: any other failure of a continued background download keeps its meaning, and the data is not used again", .timeLimit(.minutes(1)))
     func otherFailuresOfAContinuation() async throws {
         let rig = try Rig("bg-resume-timeout")
@@ -112,7 +112,7 @@ struct BackgroundResumeTests {
         withExtendedLifetime(next) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a checksum-less background transfer is never resumed: its pause keeps no resume data", .timeLimit(.minutes(1)))
     func checksumLessPauseKeepsNothing() async throws {
         let rig = try Rig("bg-resume-legacy")
@@ -137,7 +137,7 @@ struct BackgroundResumeTests {
         case checksumLess
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a background download not created from resume data refuses a 206, even one with a Content-Range", .timeLimit(.minutes(1)), arguments: Identity.allCases)
     func freshDownloadRefusesPartialContent(_ identity: Identity) async throws {
         let rig = try Rig("bg-resume-fresh-206-\(identity)")
@@ -166,7 +166,7 @@ struct BackgroundResumeTests {
         case rangedContinuation
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a continuation re-attached after a relaunch keeps its meaning: a refusal reads resumeRejected, a ranged answer is staged as resumed", .timeLimit(.minutes(1)), arguments: ReattachedAnswer.allCases)
     func continuationSurvivesRelaunch(_ answer: ReattachedAnswer) async throws {
         let rig = try Rig("bg-resume-relaunch-\(answer)")
@@ -212,7 +212,7 @@ struct BackgroundResumeTests {
         case whole
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a task tagged without the continuation flag is re-attached as a fresh download", .timeLimit(.minutes(1)), arguments: UnflaggedAnswer.allCases)
     func unflaggedTagIsFresh(_ answer: UnflaggedAnswer) async throws {
         let rig = try Rig("bg-resume-unflagged-\(answer)")
@@ -240,7 +240,7 @@ struct BackgroundResumeTests {
         #expect(await run(joined).terminal == expected)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a continued background download answered 200 (validator changed) stages the whole body as a fresh, non-resumed file", .timeLimit(.minutes(1)), arguments: [false, true])
     func continuationAnsweredWhole(_ relaunched: Bool) async throws {
         let rig = try Rig("bg-resume-whole-\(relaunched)")
@@ -271,7 +271,7 @@ struct BackgroundResumeTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: resume data the task cap evicted is not used: that restart downloads afresh", .timeLimit(.minutes(1)))
     func evictedDataIsNotUsed() async throws {
         let rig = try Rig("bg-resume-evicted", maxTasks: 1)

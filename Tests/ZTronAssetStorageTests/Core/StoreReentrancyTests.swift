@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
 @Suite("Core: reentrancy (H-5)")
 struct StoreReentrancyTests {
     @Test("R-INT-2: a manifest change during the publish rename yields superseded and never returns the URL", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func manifestChangeDuringRename() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -53,7 +53,7 @@ struct StoreReentrancyTests {
     }
 
     @Test("R-CLN-5: two identifiers with identical bytes published concurrently keep the blob until both are removed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func concurrentIdenticalPublications() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -102,7 +102,7 @@ struct StoreReentrancyTests {
     }
 
     @Test("R-CLN-10: a publish that lands during the adoption report's durable commit is not reported adopted", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func publishDuringAdoptionReport() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -138,7 +138,7 @@ struct StoreReentrancyTests {
     }
 
     @Test("R-CLN-10: a pack is released only after the adopting generation is durably committed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func adoptionReportIsDurable() async throws {
         let time = ManualTimeSource()
         let fake = FakeFileSystem(time: time)
@@ -181,7 +181,7 @@ struct StoreReentrancyTests {
     }
 
     @Test("R-SYN-8: point admission adds or updates one entry, commits it and keeps the fetched manifest's ETag out", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func pointAdmission() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.bytes(150)
@@ -213,7 +213,7 @@ struct StoreReentrancyTests {
     /// applied entries without a server payload, so the applied digest must stop matching the fetched one; otherwise
     /// a planner that skips `apply` on equal digests would never prune an admitted entry the server dropped again.
     @Test("R-SYN-8: after a point admission the applied digest matches no fetched manifest, so the server's manifest is applied again and prunes it", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func admissionInvalidatesTheAppliedDigest() async throws {
         let harness = CoreHarness.make()
         let server = CoreFixture.manifest([CoreFixture.entry("a", CoreFixture.bytes(152))])

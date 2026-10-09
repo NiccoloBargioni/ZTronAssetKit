@@ -88,7 +88,7 @@ struct TestSupportCancelledWaitTests {
         #expect(await executor.heldUnits.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a waitForSleepers whose task is cancelled returns while no sleeper is registered", .timeLimit(.minutes(1)))
     func sleepersWaitEndsOnCancellation() async {
         let time = ManualTimeSource()
@@ -149,7 +149,7 @@ struct TestSupportCancelledWaitTests {
         #expect(await Self.outcome(of: unit) == 7)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a waitForSleepers cancelled while registered reports no sleepers, and a later sleeper resumes only a new wait", .timeLimit(.minutes(1)))
     func sleepersWaitCancelledWhileRegistered() async {
         let time = ManualTimeSource()
@@ -243,7 +243,7 @@ struct TestSupportCancelledWaitTests {
         #expect(await Self.outcome(of: unit) == 7)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: requireSleepers throws CancellationError when cancelled first and returns once the sleepers are registered", .timeLimit(.minutes(1)))
     func requireSleepers() async {
         let time = ManualTimeSource()

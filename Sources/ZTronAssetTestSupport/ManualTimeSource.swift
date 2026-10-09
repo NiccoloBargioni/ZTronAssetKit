@@ -5,7 +5,7 @@ import ZTronAssetModel
 /// The test clock (H-8, Q-4): time moves only when a test calls `advance`; nothing ever sleeps for real.
 ///
 /// `TimeSource` has synchronous clock reads, so the state needs a lock: `Synchronization.Mutex`, hence the
-/// availability gate (ADR-014). Tests that use it carry `@available(macOS 15.0, *)` **on each `@Test` function,
+/// availability gate (ADR-014). Tests that use it carry `@available(macOS 15.0, iOS 18.0, *)` **on each `@Test` function,
 /// never on a `@Suite`** (Swift Testing rejects the latter). Zero unsafe escapes.
 ///
 /// Semantics: `sleep(until:)` registers a sleeper; `advance` resumes every sleeper whose deadline passed, in

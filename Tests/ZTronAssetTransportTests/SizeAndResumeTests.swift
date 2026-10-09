@@ -8,7 +8,7 @@ import ZTronAssetTransport
 /// size over the cap, a truncated body, a connection dropped mid-download then resumed).
 @Suite("Sizes and resume")
 struct SizeAndResumeTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a gzip response is accepted when the decoded size equals byteSize though Content-Length differs", .timeLimit(.minutes(1)))
     func gzipDecodedSize() async throws {
         let body = Data(String(repeating: "ztron asset kit ", count: 19_688).utf8).prefix(315_000)
@@ -25,7 +25,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: an announced size over maxAssetBytes aborts before any progress is reported", .timeLimit(.minutes(1)))
     func announcedOverCap() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data(repeating: 1, count: 10 << 20)) }
@@ -44,7 +44,7 @@ struct SizeAndResumeTests {
         LoopbackResponse(headers: ["Content-Type": "application/octet-stream"], body: body, ending: .stallAfter(bodyBytes: sent), omitContentLength: true)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a body written past the cap without an announced length is aborted while streaming", .timeLimit(.minutes(1)))
     func writtenOverCap() async throws {
         let cap: Int64 = 1 << 20
@@ -58,7 +58,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: writing more than byteSize aborts early as a size mismatch", .timeLimit(.minutes(1)))
     func exceedsByteSize() async throws {
         let body = TransportFixtures.payload(2 << 20)
@@ -73,7 +73,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a close-delimited body shorter than byteSize is reported as truncated", .timeLimit(.minutes(1)))
     func closeDelimitedTruncated() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: TransportFixtures.payload(40_000), omitContentLength: true) }
@@ -82,7 +82,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: an empty body for an asset without byteSize is reported as truncated", .timeLimit(.minutes(1)))
     func emptyAsset() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data()) }
@@ -91,7 +91,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a body shorter than its Content-Length is reported as a lost connection", .timeLimit(.minutes(1)))
     func shorterThanContentLength() async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -107,7 +107,7 @@ struct SizeAndResumeTests {
     /// Attempt 1 of `video.bin` against a server that stalls after `stall` bytes and is then stopped, so the
     /// connection drops mid-body after the client provably staged those bytes (ARCHITECTURE §6.7: `stallAfter` +
     /// `stop()`; a FIN right behind the bytes races URLSession, which may report the loss first).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func dropMidway(
         body: Data,
         stall: Int,
@@ -128,7 +128,7 @@ struct SizeAndResumeTests {
         return (first, terminal)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a connection dropped mid-download resumes with Range and If-Range and the staged file is complete", .timeLimit(.minutes(1)))
     func droppedConnectionResumes() async throws {
         let body = TransportFixtures.payload(2 << 20)
@@ -159,7 +159,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar", .timeLimit(.minutes(1)))
     func pauseKeepsThePartial() async throws {
         let rig = try await LoopbackRig.make { _ in
@@ -183,7 +183,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: checksum-less transfers are never resumed", .timeLimit(.minutes(1)))
     func checksumLessNeverResumed() async throws {
         // The connection drops after the client staged bytes under a validator: only the identity forbids a sidecar.
@@ -195,7 +195,7 @@ struct SizeAndResumeTests {
         #expect(staging.sidecars.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a refused or invalid resume yields resumeRejected and a fresh attempt stages the whole body", .timeLimit(.minutes(1)))
     func refusedResume() async throws {
         let body = TransportFixtures.payload(2_000)
@@ -241,7 +241,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a changed validator makes the origin send the whole body, which is staged from zero", .timeLimit(.minutes(1)))
     func changedValidatorRestartsFromZero() async throws {
         let body = TransportFixtures.payload(5_000, seed: 3)
@@ -264,7 +264,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: ENOSPC while staging maps to insufficientSpace and other staging failures to local I/O", .timeLimit(.minutes(1)))
     func stagingFailures() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: TransportFixtures.payload(1_000)) }
@@ -280,7 +280,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a resumed partial already longer than byteSize is a size mismatch before any byte is appended", .timeLimit(.minutes(1)))
     func resumedPartialPastByteSize() async throws {
         let body = TransportFixtures.payload(5_000)
@@ -296,7 +296,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a 206 whose Content-Range does not start at the resume offset is never appended", .timeLimit(.minutes(1)), arguments: [
         "bytes 0-9/10", "items 5-9/10", "bytes x-9/10", "bytes 5",
     ])
@@ -315,7 +315,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a Last-Modified validator is sent as If-Range and a full answer is staged from zero", .timeLimit(.minutes(1)))
     func lastModifiedValidator() async throws {
         let body = TransportFixtures.payload(3_000)
@@ -337,7 +337,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: every staging failure kind maps into the taxonomy, a cap as oversize and a source failure as local I/O", .timeLimit(.minutes(1)))
     func stagingFailureKinds() async throws {
         let rig = try await LoopbackRig.make { request in
@@ -356,7 +356,7 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a resumed request carries the current key, never a stale one", .timeLimit(.minutes(1)))
     func resumedRequestCarriesTheCurrentKey() async throws {
         let body = TransportFixtures.payload(1 << 20)

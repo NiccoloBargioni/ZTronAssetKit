@@ -5,7 +5,7 @@ import ZTronAssetTestSupport
 
 /// A `FileSystem` that forwards to a `FakeFileSystem` and records the level of every sync, which the fake's op log
 /// does not carry (ADR-049: ordered and durable commits are told apart through the store's own commit API).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class SyncLevelSpy: FileSystem {
     /// One recorded sync.
     struct Sync: Sendable, Hashable {

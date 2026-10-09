@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
 @Suite("Core: recovery from failed renames and commits")
 struct StoreRecoveryTests {
     @Test("R-STO-5: EIO on the blob placement rename fails the publication with nothing bound and nothing held", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func placementRenameFails() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(220)
@@ -42,7 +42,7 @@ struct StoreRecoveryTests {
     /// next placement into that fan-out finds it already there, so nothing would make the fan-out's own entry in
     /// `blobs/` durable before the commit that references a blob in it (ARCHITECTURE §3, §4.1 step 1).
     @Test("R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedPlacementFanOutIsSynced() async throws {
         let firstSeed: UInt64 = 600
         let first = CoreFixture.bytes(firstSeed)
@@ -75,7 +75,7 @@ struct StoreRecoveryTests {
     }
 
     @Test("R-INT-2: EIO while hashing the claimed file fails the publication and discards the claim and its sidecar", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func hashReadFails() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(221)
@@ -101,7 +101,7 @@ struct StoreRecoveryTests {
     }
 
     @Test("R-INT-1: EIO on placing a copy under a second extension binds nothing under it and leaves no copy in staging", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func copyPlacementFails() async throws {
         let bytes = CoreFixture.bytes(262)
         let png = CoreFixture.entry("a", bytes, ext: "png")
@@ -125,7 +125,7 @@ struct StoreRecoveryTests {
     /// commit captured then must still record its doom; otherwise a crash before the replacement rename leaves an
     /// unreferenced, undoomed name that launch adopts with the rotten bytes still under it.
     @Test("R-STO-5: a commit during a corrupt key's replacement keeps the key doomed, so a crash never adopts the rotten bytes", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func replacementKeepsCorruptDoom() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -188,7 +188,7 @@ struct StoreRecoveryTests {
     }
 
     @Test("R-STO-4: EIO on either commit rename keeps the previous generation on disk and the state dirty until a later commit", .timeLimit(.minutes(1)), arguments: ["index.bin", "index.tmp"])
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func commitRenameFails(source: String) async throws {
         let harness = CoreHarness.make()
         let entry = CoreFixture.entry("a", CoreFixture.bytes(230))
@@ -242,7 +242,7 @@ struct StoreRecoveryTests {
         .timeLimit(.minutes(1)),
         arguments: PromotionFault.allCases
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func temporaryGenerationDoomsWaitForACommit(fault: PromotionFault) async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(240)
@@ -306,7 +306,7 @@ struct StoreRecoveryTests {
         "R-STO-4: the ENOSPC fallback removes index.prev only while index.bin holds the committed generation",
         arguments: ["committed", "missing", "rotten", "other generation", "forged header"]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func noSpaceFallbackKeepsTheNewestGeneration(bin: String) throws {
         let layout = CoreFixture.layout
         let fileSystem = FakeFileSystem(time: ManualTimeSource())
@@ -387,7 +387,7 @@ struct StoreRecoveryTests {
         .timeLimit(.minutes(1)),
         arguments: StepFiveInterruption.allCases
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func fullVolumeLaunchAfterStepFive(interruption: StepFiveInterruption) async throws {
         let (disk, entry, key) = try await StoreRecoveryTests.interruptedBetweenRenames(interruption)
         let newest = try #require(StoreRecoveryTests.loadRule(disk).content?.generation)
@@ -428,7 +428,7 @@ struct StoreRecoveryTests {
         .timeLimit(.minutes(1)),
         arguments: [CrashMode.processKill, .powerLossKeepMetadata]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func rottenCurrentNeverReplacesPrevious(end: CrashMode) async throws {
         try await StoreRecoveryTests.rottenCurrentLifetimes(end: end, rot: .body)
     }
@@ -444,7 +444,7 @@ struct StoreRecoveryTests {
         .timeLimit(.minutes(1)),
         arguments: [CrashMode.processKill, .powerLossKeepMetadata]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func forgedHeaderNeverReplacesPrevious(end: CrashMode) async throws {
         try await StoreRecoveryTests.rottenCurrentLifetimes(end: end, rot: .generationField)
     }
@@ -461,7 +461,7 @@ struct StoreRecoveryTests {
     /// Lifetime 1 dooms a rotten blob `corrupt` and closes durably; `index.bin` then rots as `rot` says. Lifetime 2's
     /// launch commit fails at step 5 (EIO), then the volume is full for its close; lifetime 3 has space again. A valid
     /// generation, the record and the `corrupt` doom survive all three.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func rottenCurrentLifetimes(end: CrashMode, rot: IndexRot) async throws {
         // Lifetime 1: the corrupt doom is committed durably, then two more commits (the last one close()'s durable flush).
         let first = CoreHarness.make()
@@ -521,7 +521,7 @@ struct StoreRecoveryTests {
     /// `close()`'s durable flush included. A vanished `index.tmp` now completes the promotion without a commit: it is no
     /// longer pending, its generation never counts as committed, and the commit goes on with steps 1–6.
     @Test("R-STO-4: a pending promotion whose index.tmp vanished stops blocking commits and never counts as committed", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func vanishedPromotionStopsBlockingCommits() async throws {
         // Lifetime 1 is killed right before its last commit's step 4: its synced index.tmp is the newest generation.
         let (killed, entry, key) = try await StoreRecoveryTests.killedInLastCommit { $0.kind == .rename && $0.url.lastPathComponent == "index.bin" }
@@ -567,7 +567,7 @@ struct StoreRecoveryTests {
     /// launch commit then truncated and rewrote the loaded `index.tmp` in place, so a failed or torn write there would
     /// have dropped the newest generation.
     @Test("R-STO-4: a notFound from the promotion's sync of an index.tmp that exists keeps the promotion pending and the file unchanged", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func promotionSyncNotFoundStaysPending() async throws {
         // Lifetime 1 is killed right before its last commit's step 4: its synced index.tmp is the newest generation.
         let (killed, entry, _) = try await StoreRecoveryTests.killedInLastCommit { $0.kind == .rename && $0.url.lastPathComponent == "index.bin" }
@@ -605,7 +605,7 @@ struct StoreRecoveryTests {
     /// brings back still lists its entry: the bytes it would have adopted again were gone (a needless download). A
     /// launch now counts nothing committed until a root sync ordered the names it read (ADR draft B-36).
     @Test("R-CLN-5: a launch whose root barrier fails unlinks nothing a power loss could still need, until a commit succeeds", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedLaunchBarrierBlocksTheReaper() async throws {
         // Lifetime 1 prunes `a` and is killed right before that commit's root sync: index.bin names the generation that
         // dropped `a`'s blob, and only a kill keeps that name.
@@ -662,7 +662,7 @@ struct StoreRecoveryTests {
         .timeLimit(.minutes(1)),
         arguments: [FSOpKind.itemInfo, .read]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func unreadableIndexOpensReadOnly(failing operation: FSOpKind) async throws {
         let first = CoreHarness.make()
         try await StoreRecoveryTests.quarantine(first)
@@ -697,7 +697,7 @@ struct StoreRecoveryTests {
     /// ADR draft B-34 tells an index file that cannot be read (an error: the launch writes nothing) from one that ends
     /// early (no error, fewer bytes than its size: torn, as a torn write leaves it, and the launch commits as usual).
     @Test("R-STO-4: an index file whose read ends early is torn, not unreadable, and the launch still commits", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func shortIndexReadIsTorn() async throws {
         let slice = IndexSpaceSlice(bin: .newer, previous: .committed, temporary: .absent)
         let fake = IndexSpace.fake(IndexSpace.disk(slice))
@@ -711,7 +711,7 @@ struct StoreRecoveryTests {
 
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush → one more commit,
     /// stopped between its renames; returns the disk the killed process leaves.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func interruptedBetweenRenames(_ interruption: StepFiveInterruption) async throws -> (DiskImage, ManifestEntry, BlobKey) {
         switch interruption {
         case .eio:
@@ -735,7 +735,7 @@ struct StoreRecoveryTests {
     }
 
     /// Open → apply → publish → the blob rots and is quarantined (`corrupt` doom) → durable flush.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func quarantine(_ harness: CoreHarness) async throws {
         let entry = QuarantineFixture.entry
         _ = try await harness.store.open()
@@ -751,7 +751,7 @@ struct StoreRecoveryTests {
     /// `quarantine(_:)`, then one more commit (`markSyncDue`) in a process killed (`.processKill`) right before the
     /// first mutation of that commit that `isCrashPoint` matches in a clean run; returns the disk the killed process
     /// leaves.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func killedInLastCommit(before isCrashPoint: (FSOpRecord) -> Bool) async throws -> (DiskImage, ManifestEntry, BlobKey) {
         let clean = CoreHarness.make()
         try await StoreRecoveryTests.quarantine(clean)
@@ -788,7 +788,7 @@ struct StoreRecoveryTests {
     }
 
     @Test("R-STO-9: after the root was replaced nothing under it is deleted any more", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func replacedRootStopsTheReaper() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
         _ = try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
@@ -806,7 +806,7 @@ struct StoreRecoveryTests {
     }
 
     /// The names under `staging/`.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func stagingNames(_ harness: CoreHarness) -> [String] {
         ((try? harness.fileSystem.contentsOfDirectory(at: harness.layout.stagingDirectory)) ?? []).map(\.name).sorted()
     }

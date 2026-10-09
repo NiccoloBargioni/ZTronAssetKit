@@ -13,7 +13,7 @@ struct SessionDelegateDirectTests {
     static let url = URL(string: "https://cdn.example.com/a.bin")!
     static let name = StagingFileName(transfer: TransportFixtures.contentID(1), attempt: TransportFixtures.attempt(1), kind: .partial)
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a background download is reported under its tag, a foreign one is ignored, and didFinishEvents follows", .timeLimit(.minutes(1)))
     func backgroundDownloadRouting() async throws {
         let staging = FakeStagingSink()
@@ -41,7 +41,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.contents.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: the background delegate reads a task's answers as a continuation's only when its tag says so and it is checksummed content", .timeLimit(.minutes(1)))
     func continuationNeedsFlagAndChecksummedContent() async throws {
         let staging = FakeStagingSink()
@@ -77,7 +77,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.contents.keys.sorted() == [Self.name])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: background cancel reasons map to cancelled by the system and file errors keep their POSIX code", .timeLimit(.minutes(1)))
     func backgroundFailures() async throws {
         let delegate = SessionDelegate(mode: .background, staging: FakeStagingSink(), policy: Self.policy)
@@ -104,7 +104,7 @@ struct SessionDelegateDirectTests {
         #expect(await events.next() == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: a foreground delegate ignores download callbacks and tasks without a mailbox", .timeLimit(.minutes(1)))
     func foregroundIgnoresForeignCallbacks() async throws {
         let delegate = SessionDelegate(mode: .foreground, staging: FakeStagingSink(), policy: Self.policy)
@@ -127,7 +127,7 @@ struct SessionDelegateDirectTests {
         #expect(await events.next() == .invalidated)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: a response that is not HTTP stops the task and is reported as a bad server response", .timeLimit(.minutes(1)))
     func nonHTTPResponse() async throws {
         let staging = FakeStagingSink()
@@ -157,7 +157,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.contents.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: a timed-out foreground task without a response is reported as timed out and keeps nothing", .timeLimit(.minutes(1)))
     func timeoutWithoutResponse() async throws {
         let staging = FakeStagingSink()
@@ -174,7 +174,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.sidecars.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: a client's discard is never turned into a staging failure by a later write into the discarded partial", .timeLimit(.minutes(1)))
     func discardIsSticky() async throws {
         let staging = FakeStagingSink()
@@ -277,7 +277,7 @@ struct SessionDelegateDirectTests {
                errorCode: NSURLErrorNetworkConnectionLost, status: 404, validated: true, outcome: .failed(.permanentMissing(httpStatus: 404))),
     ]
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a completion that races a verdict, or stages more than byteSize or the cap, is never reported staged", .timeLimit(.minutes(1)), arguments: SessionDelegateDirectTests.endings)
     func completionHonoursVerdicts(_ ending: Ending) async throws {
         let staging = FakeStagingSink()
@@ -299,7 +299,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.sidecars.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a background download tagged without byteSize is staged only when it holds bytes", .timeLimit(.minutes(1)))
     func untaggedSizeBackgroundDownload() async throws {
         let staging = FakeStagingSink()
@@ -320,7 +320,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.contents[full] == TransportFixtures.payload(700))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a response that arrives after the client's discard opens no partial, moves no earlier partial, and stops the task", .timeLimit(.minutes(1)))
     func responseAfterDiscard() async throws {
         let staging = FakeStagingSink()
@@ -350,7 +350,7 @@ struct SessionDelegateDirectTests {
         #expect(staging.contents[earlier] == TransportFixtures.payload(300))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a chunk that arrives after a verdict or the client's discard is not written, while a pausing task keeps writing", .timeLimit(.minutes(1)))
     func chunkAfterMarker() async throws {
         let response = try #require(HTTPURLResponse(url: Self.url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]))

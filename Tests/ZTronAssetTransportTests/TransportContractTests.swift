@@ -56,7 +56,7 @@ struct TransportContractTests {
         #expect(!BackgroundSessionIdentifier.isOurs("com.other.app.bg.default.v1"))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: the production source builds a background coordinator only when background transfers are enabled with a valid namespace")
     func productionBackgroundBackend() throws {
         let staging = FakeStagingSink()

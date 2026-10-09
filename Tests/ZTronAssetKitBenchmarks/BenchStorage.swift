@@ -25,7 +25,7 @@ extension ZTronAssetKitBenchmarks {
     @Suite("StorageBenchmarks")
     struct StorageBenchmarks {
         @Test("P-2: cold index load of 10,000 records off the main thread is under budget", .timeLimit(.minutes(1)))
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         func indexLoad() async throws {
             let budget = try #require(try QualityBudgets().value("P-2", "index_load_ms"))
             let directory = try StorageBench.directory("p2")
@@ -58,7 +58,7 @@ extension ZTronAssetKitBenchmarks {
         }
 
         @Test("P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second", .timeLimit(.minutes(1)))
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         func indexCommit() async throws {
             let budgets = try QualityBudgets()
             let commitBudget = try #require(budgets.value("P-5", "index_commit_ms"))
@@ -128,7 +128,7 @@ extension ZTronAssetKitBenchmarks {
         }
 
         @Test("P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap", .timeLimit(.minutes(1)))
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         func streamingHash() async throws {
             let budgets = try QualityBudgets()
             let floor = try #require(budgets.value("P-6", "hash_mb_per_s_min"))
@@ -191,7 +191,7 @@ extension ZTronAssetKitBenchmarks {
         }
 
         @Test("P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration", .timeLimit(.minutes(1)))
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         func reclaim() async throws {
             let budgets = try QualityBudgets()
             let count = Int(try #require(budgets.value("P-13", "blobs")))
@@ -251,7 +251,7 @@ extension ZTronAssetKitBenchmarks {
         }
 
         @Test("C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch", .timeLimit(.minutes(1)))
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         func actorStretches() async throws {
             // CLAUDE.md C2: nothing blocks a cooperative-pool thread for more than ~10 ms at a stretch. No quality-gates
             // key exists for it, so the rule's own figure is the budget.
@@ -339,7 +339,7 @@ extension ZTronAssetKitBenchmarks {
 }
 
 /// Helpers of the storage benchmarks.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum StorageBench {
     /// A directory inside this repository (`.build-tests/`, git-ignored); the caller removes it.
     static func directory(_ name: String, filePath: String = #filePath) throws -> URL {
@@ -508,7 +508,7 @@ enum StorageBench {
 /// Records the execution time of every unit run on the wrapped executor (P-13: batches between suspension points):
 /// the wall time, which is what the budget bounds, and the time the unit's thread spent on a CPU meanwhile, which tells
 /// the unit's own work from preemption by other processes (the profile behind ADR draft B-9's P-13 ruling).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class TimingExecutor: BlockingExecutor {
     private let base: any BlockingExecutor
     private let recorded = Mutex<[(wall: Double, onCPU: Double)]>([])
@@ -545,7 +545,7 @@ final class TimingExecutor: BlockingExecutor {
 }
 
 /// Durations in milliseconds, recorded from any thread.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class DurationRecorder: Sendable {
     private let recorded = Mutex<[Double]>([])
 
@@ -563,7 +563,7 @@ final class DurationRecorder: Sendable {
 /// bytes read are still alive (the peak while hashing, transient chunk buffers included); P-13 records the duration of
 /// every unlink under `blobs/`, so a deletion unit that overran its batch budget can be told apart: a stall inside the
 /// kernel's unlink (the volume) or outside it (the scheduler).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 struct InstrumentedFileSystem: FileSystem {
     let base = LiveFileSystem()
     var sampler: MemoryProbe.PeakSampler?
@@ -643,7 +643,7 @@ struct InstrumentedFileSystem: FileSystem {
 /// Measures how long the store's actor is held at a stretch while a call runs (C2): a probe task calls a cheap
 /// synchronous API of the store in a loop and records the longest wait. Units run on their executors, off the actor,
 /// so the probe is served while one runs; it waits only while the actor executes a synchronous stretch.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 enum ActorHoldProbe {
     /// Runs `call` and returns the longest probe wait, in milliseconds.
     static func longestHold(of store: AssetStore, _ call: () async throws -> Void) async throws -> Double {

@@ -17,7 +17,7 @@ struct RedirectLoopbackTests {
         return "127.0.0.1:" + host.dropFirst("localhost:".count)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a cross-host redirect to an allow-listed host is followed without the app key", .timeLimit(.minutes(1)))
     func crossHostRedirectStripsTheKey() async throws {
         let body = TransportFixtures.payload(5_000)
@@ -42,7 +42,7 @@ struct RedirectLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a redirect to a host outside the allow-list is refused and that host receives no request", .timeLimit(.minutes(1)))
     func foreignRedirectIsRefused() async throws {
         let foreign = LoopbackHTTPServer { _ in LoopbackResponse(body: Data("stolen".utf8)) }
@@ -58,7 +58,7 @@ struct RedirectLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: same-origin redirects keep the key and the sixth hop is refused", .timeLimit(.minutes(1)))
     func hopLimit() async throws {
         let rig = try await LoopbackRig.make { request in
@@ -74,7 +74,7 @@ struct RedirectLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: once stripped, the key never returns on a redirect back to the original origin", .timeLimit(.minutes(1)))
     func keyNeverReturns() async throws {
         let rig = try await LoopbackRig.make(allowedHosts: ["127.0.0.1", "localhost"]) { request in
@@ -98,7 +98,7 @@ struct RedirectLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: a 403 after the key was withheld on a cross-origin redirect is reported as keyWithheldOnRedirect", .timeLimit(.minutes(1)))
     func forbiddenAfterWithholding() async throws {
         let rig = try await LoopbackRig.make(allowedHosts: ["127.0.0.1", "localhost"]) { request in
@@ -112,7 +112,7 @@ struct RedirectLoopbackTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a redirect without a usable Location is delivered as a refused redirect", .timeLimit(.minutes(1)))
     func missingLocation() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(status: 302) }

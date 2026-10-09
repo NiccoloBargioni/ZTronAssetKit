@@ -17,7 +17,7 @@ struct IndexCommitFileTrackingTests {
 
     /// A fake volume with the store's directories and `files` (index name → generation, or `nil` for a rotten copy of
     /// generation 5 whose trailer fails).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func volume(_ files: [IndexFile: UInt64?]) throws -> FakeFileSystem {
         let fileSystem = FakeFileSystem(time: ManualTimeSource())
         var path = URL(fileURLWithPath: "/", isDirectory: true)
@@ -42,7 +42,7 @@ struct IndexCommitFileTrackingTests {
     }
 
     /// The generation `file` holds, validated in full.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func generation(in file: IndexFile, _ fileSystem: FakeFileSystem) -> UInt64? {
         fileSystem.survivingDisk().files[IndexCommitFileTrackingTests.layout.indexURL(file).path].flatMap { try? IndexCodec.decode($0).get() }?.generation
     }
@@ -68,7 +68,7 @@ struct IndexCommitFileTrackingTests {
     /// and reports `index.bin`, which holds generation 5 again. Without that, it reported `index.prev`, which no longer
     /// exists, and the next commit's step 4 would have renamed its `index.tmp` straight over the committed file.
     @Test("R-STO-4: an undo of step 4 whose result was lost still moves the committed file back to index.bin")
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func lostUndoResult() throws {
         let fake = try IndexCommitFileTrackingTests.volume([.current: 5, .previous: 4])
         fake.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
@@ -90,7 +90,7 @@ struct IndexCommitFileTrackingTests {
     /// fails and the undo moves it back. The unit no longer claims a file for generation 4: whatever is at either name
     /// is the rotten file, and naming it would let a later ENOSPC fallback treat it as the committed generation.
     @Test("R-STO-4: a file renamed over the committed file's name is not taken for the committed generation")
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func renamedOverTheCommittedName() throws {
         let fake = try IndexCommitFileTrackingTests.volume([.current: nil, .previous: 4])
         let loaded = StoreRecoveryTests.loadRule(fake.survivingDisk())
@@ -110,7 +110,7 @@ struct IndexCommitFileTrackingTests {
     /// Step 4 does not run (nothing is at `index.bin`), step 5 fails before it acts: the unit no longer claims
     /// `index.bin` for generation 5, which no file holds now, so a later ENOSPC fallback cannot take `index.bin` for it.
     @Test("R-STO-4: a committed index.bin that vanished is no longer taken for the committed generation")
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func vanishedCommittedFile() throws {
         let fake = try IndexCommitFileTrackingTests.volume([.current: 5, .previous: 4])
         let loaded = StoreRecoveryTests.loadRule(fake.survivingDisk())

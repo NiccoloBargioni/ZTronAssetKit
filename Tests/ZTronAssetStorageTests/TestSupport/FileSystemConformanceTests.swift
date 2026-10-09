@@ -8,7 +8,7 @@ import ZTronAssetModel
 /// any one of its clauses (so passing it means something).
 @Suite("Test support: FileSystem conformance")
 struct TestSupportFileSystemConformanceTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-STO-6: FakeFileSystem satisfies the shared FileSystem conformance contract")
     func fakeConforms() throws {
         let fileSystem = FakeFSFixture.make()
@@ -19,7 +19,7 @@ struct TestSupportFileSystemConformanceTests {
         #expect(fileSystem.operations.count > 60)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-STO-6: the conformance contract reports a conformer that breaks one of its clauses", arguments: BrokenFileSystemConformer.Defect.allCases)
     func brokenConformerIsReported(defect: BrokenFileSystemConformer.Defect) throws {
         let base = FakeFSFixture.make()
@@ -32,7 +32,7 @@ struct TestSupportFileSystemConformanceTests {
 }
 
 /// A `FakeFileSystem` with exactly one deliberate defect.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
     enum Defect: String, CaseIterable, Sendable {
         case createFailsWhenPresent
@@ -343,7 +343,7 @@ struct BrokenFileSystemConformer: FileSystem, FileSystemFixtureSeeding {
 
 /// The latest real lock token per lock file, so `staleReleaseUnlocks` releases whatever lock a reused descriptor
 /// number names now.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class BrokenConformerTokens: Sendable {
     private let tokens = Mutex<[FileIdentity: FileLockToken]>([:])
 

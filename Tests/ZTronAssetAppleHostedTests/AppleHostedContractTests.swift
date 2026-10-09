@@ -26,7 +26,7 @@ struct AppleHostedContractTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-APL-5: the awsOnly kill switch selects AWS on an OS that supports the Apple tier", .timeLimit(.minutes(1)))
     func killSwitchSelectsAWS() async throws {
         let aws = FakeRemoteSource(originID: "https://cdn.example.com:443")

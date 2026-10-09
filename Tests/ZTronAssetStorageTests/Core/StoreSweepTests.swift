@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
 @Suite("Core: chunked apply and extension copies")
 struct StoreSweepTests {
     @Test("R-SYN-8: an apply larger than one sweep chunk adds, re-adopts and prunes every entry", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func applyLargerThanAChunk() async throws {
         let harness = CoreHarness.make()
         let count = AssetStore.sweepChunk * 2 + 100
@@ -38,7 +38,7 @@ struct StoreSweepTests {
     }
 
     @Test("R-SYN-8: concurrent applies run one at a time, and close unwinds an apply waiting for its turn", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func appliesAreSerialised() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(bulk: bulk)
@@ -90,7 +90,7 @@ struct StoreSweepTests {
     }
 
     @Test("R-INT-1: a copy under a second extension is verified, and a failed or mismatched copy binds nothing and leaves nothing behind", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func copyFailures() async throws {
         let bytes = CoreFixture.bytes(260)
         let png = CoreFixture.entry("a", bytes, ext: "png")
@@ -134,7 +134,7 @@ struct StoreSweepTests {
     }
 
     @Test("R-INT-1: a copy replaces a corrupt name under the second extension", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func copyReplacesACorruptName() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(270)
@@ -157,7 +157,7 @@ struct StoreSweepTests {
     }
 
     @Test("R-STO-9: close during a copy unit drains it, and the publication fails with closed leaving no copy", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func closeDuringACopy() async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(bulk: bulk)
@@ -187,13 +187,13 @@ struct StoreSweepTests {
     }
 
     /// The extension copies left in staging.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func copies(in harness: CoreHarness) throws -> [String] {
         try harness.fileSystem.contentsOfDirectory(at: harness.layout.stagingDirectory).map(\.name).filter { $0.hasSuffix(".parttmp") }
     }
 
     /// Waits until a caller is parked on the apply gate (polled between yields; no sleeping; ends with the test).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func waitForGateWaiter(_ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         try await CorePoll.until("a caller parked on the apply gate", sourceLocation: sourceLocation) {
             await !harness.state.core.applyGate.waiters.isEmpty
@@ -201,7 +201,7 @@ struct StoreSweepTests {
     }
 
     /// Waits until the store reaches `phase` (polled between yields; no sleeping; ends with the test).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func waitForPhase(_ phase: StorePhase, _ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         try await CorePoll.until("the store's phase \(phase)", sourceLocation: sourceLocation) {
             await harness.state.core.phase == phase

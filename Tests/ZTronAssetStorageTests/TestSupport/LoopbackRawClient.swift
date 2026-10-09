@@ -4,7 +4,7 @@ import Synchronization
 
 /// A minimal raw HTTP/1.1 client over `NWConnection` (loopback only), so the server's tests see exactly the bytes
 /// and the connection close it sends: no URLSession, no cache, nothing written anywhere. Gated for `Mutex`.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class LoopbackRawClient: Sendable {
     /// One parsed response.
     struct Response: Sendable {
@@ -172,7 +172,7 @@ final class LoopbackRawClient: Sendable {
 }
 
 /// The client's receive buffer (one connection, one reader at a time).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class LoopbackRawClientBuffer: Sendable {
     private let data = Mutex(Data())
     private let closed = Mutex(false)

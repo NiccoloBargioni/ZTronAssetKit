@@ -13,7 +13,7 @@ struct BackgroundCoordinatorTests {
     static let url = URL(string: "https://cdn.example.com/media/video.bin")!
 
     /// A staging sink, a driver whose "OS" outlives coordinators, and the first launch's coordinator.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     struct Rig {
         let staging = FakeStagingSink()
         let driver: FakeBackgroundSessionDriver
@@ -67,7 +67,7 @@ struct BackgroundCoordinatorTests {
         }
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: the coordinator reports a download finished while the app was dead as a reattached staged transfer", .timeLimit(.minutes(1)))
     func finishedWhileDead() async throws {
         let rig = try Rig("finished-while-dead")
@@ -93,7 +93,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a start for content an OS task is still fetching attaches to that task instead of creating another", .timeLimit(.minutes(1)))
     func attachesToLiveTask() async throws {
         let rig = try Rig("attach-live")
@@ -116,7 +116,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime(firstLaunch) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a start that joins a live OS task is never handed a staged file of another byteSize", .timeLimit(.minutes(1)), arguments: [
         Int64(4_000), Int64(6_000),
     ])
@@ -145,7 +145,7 @@ struct BackgroundCoordinatorTests {
         await coordinator.invalidate()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: foreign or undecodable background tasks are cancelled at launch and never reported", .timeLimit(.minutes(1)))
     func foreignTasksAreCancelled() async throws {
         let rig = try Rig("foreign-tasks")
@@ -161,7 +161,7 @@ struct BackgroundCoordinatorTests {
         #expect(await rig.driver.liveNames == [rig.job().partialName])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a background pause is reported paused and keeps its resume data", .timeLimit(.minutes(1)), arguments: [false, true])
     func pauseKeepsResumeData(_ dataFirst: Bool) async throws {
         let rig = try Rig("pause-\(dataFirst)")
@@ -180,7 +180,7 @@ struct BackgroundCoordinatorTests {
         #expect(await rig.driver.cancellations.map(\.producingResumeData) == [true])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: cancelling a background transfer ends it as cancelled by the client and keeps no resume data", .timeLimit(.minutes(1)))
     func cancelEndsTheTransfer() async throws {
         let rig = try Rig("cancel")
@@ -197,7 +197,7 @@ struct BackgroundCoordinatorTests {
         #expect(await rig.driver.cancellations.count == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: the coordinator owns a pump task only while a background transfer is outstanding", .timeLimit(.minutes(1)))
     func pumpOnlyWhileOutstanding() async throws {
         let rig = try Rig("pump")
@@ -221,7 +221,7 @@ struct BackgroundCoordinatorTests {
         #expect(await !coordinator.isPumping)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: handling background events returns after every event that preceded didFinishEvents was staged", .timeLimit(.minutes(1)))
     func eventsBeforeFinishAreStaged() async throws {
         let rig = try Rig("events")
@@ -254,7 +254,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime(handles) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a didFinishEvents that arrives before anybody waits releases the next wait at once", .timeLimit(.minutes(1)))
     func earlyFinishIsKept() async throws {
         let rig = try Rig("early-finish")
@@ -272,7 +272,7 @@ struct BackgroundCoordinatorTests {
         #expect(await coordinator.reattached().isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: an unusable background session fails the transfer for a foreground retry and disables background for the process", .timeLimit(.minutes(1)))
     func unusableSessionDisablesBackground() async throws {
         let rig = try Rig("unusable")
@@ -286,7 +286,7 @@ struct BackgroundCoordinatorTests {
         #expect(await !coordinator.admits())
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: the background task cap counts re-attached tasks", .timeLimit(.minutes(1)))
     func taskCap() async throws {
         let rig = try Rig("cap", maxTasks: 2)
@@ -302,7 +302,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime([first, second]) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a background-mode delegate refuses bytes that arrived through a cross-origin redirect", .timeLimit(.minutes(1)))
     func crossOriginBackgroundBytesRefused() async throws {
         let rig = try Rig("cross-origin")
@@ -336,7 +336,7 @@ struct BackgroundCoordinatorTests {
         Completion(status: 200, bodyBytes: 4_000, expected: 4_000, verdict: nil),
     ]
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a background download is staged only when its status and size are right", .timeLimit(.minutes(1)), arguments: BackgroundCoordinatorTests.completions)
     func backgroundCompletionChecks(_ completion: Completion) async throws {
         let rig = try Rig("completion-\(completion.status)-\(completion.bodyBytes)")
@@ -350,7 +350,7 @@ struct BackgroundCoordinatorTests {
         #expect(terminal == (completion.verdict ?? staged))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: a staging failure while adopting a background download maps to insufficientSpace", .timeLimit(.minutes(1)))
     func adoptionFailure() async throws {
         let rig = try Rig("adopt-enospc")
@@ -363,7 +363,7 @@ struct BackgroundCoordinatorTests {
         #expect(await run(handle).terminal == .failed(.insufficientSpace(requiredBytes: 4_000)))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: invalidation releases the session, ends waiting transfers and refuses later starts", .timeLimit(.minutes(1)))
     func invalidation() async throws {
         let rig = try Rig("invalidate")
@@ -381,7 +381,7 @@ struct BackgroundCoordinatorTests {
         await coordinator.awaitBackgroundEvents()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-10: a background transfer's priority change reaches its OS task", .timeLimit(.minutes(1)))
     func priorityChange() async throws {
         let rig = try Rig("priority")
@@ -397,7 +397,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime(handle) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a background request carries the key only when the coordinator was given one, and only to allowed origins", .timeLimit(.minutes(1)))
     func backgroundRequestKey() async throws {
         let rig = try Rig("key")
@@ -417,7 +417,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime([first, second]) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a start that overlaps invalidation re-checks it after listing the tasks and starts nothing", .timeLimit(.minutes(1)))
     func startRacingInvalidation() async throws {
         let rig = try Rig("start-race")
@@ -433,7 +433,7 @@ struct BackgroundCoordinatorTests {
         #expect(await rig.driver.starts.isEmpty)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a pause whose cancellation is reported before the resume data returns still ends paused with that data", .timeLimit(.minutes(1)))
     func pauseWithCancellationFirst() async throws {
         let rig = try Rig("pause-event-first")
@@ -456,7 +456,7 @@ struct BackgroundCoordinatorTests {
         #expect(await !coordinator.isPumping)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: the pump ends once it absorbed a pause's cancellation, also when the paused handle's consumer then goes away", .timeLimit(.minutes(1)))
     func pumpEndsAfterAbsorbedPause() async throws {
         let rig = try Rig("pause-absorbed")
@@ -478,7 +478,7 @@ struct BackgroundCoordinatorTests {
         await rig.driver.releaseCancel()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a background download that finishes while its pause is being requested ends staged", .timeLimit(.minutes(1)))
     func finishDuringPause() async throws {
         let rig = try Rig("finish-during-pause")
@@ -496,7 +496,7 @@ struct BackgroundCoordinatorTests {
         #expect(await coordinator.keptResumeData(for: job.partialName) == nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: an invalidated session ends every waiting background transfer", .timeLimit(.minutes(1)))
     func sessionInvalidated() async throws {
         let rig = try Rig("session-invalid")
@@ -507,7 +507,7 @@ struct BackgroundCoordinatorTests {
         #expect(await run(handle).terminal == .failed(.cancelled(.byClient)))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a second start for content already attached replaces the first handle, which ends cancelled", .timeLimit(.minutes(1)))
     func secondAttachReplacesTheFirst() async throws {
         let rig = try Rig("double-attach")
@@ -526,7 +526,7 @@ struct BackgroundCoordinatorTests {
         #expect(await rig.driver.starts.count == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: unclaimed outcomes beyond the task cap drop the oldest, whose file stays in staging", .timeLimit(.minutes(1)))
     func outcomeBufferIsBounded() async throws {
         let rig = try Rig("outcome-cap", maxTasks: 1)
@@ -546,7 +546,7 @@ struct BackgroundCoordinatorTests {
         withExtendedLifetime(handles) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-10: a priority change through the background handle reaches its OS task, an unknown name changes nothing", .timeLimit(.minutes(1)))
     func priorityThroughHandle() async throws {
         let rig = try Rig("priority-handle")
@@ -563,7 +563,7 @@ struct BackgroundCoordinatorTests {
         #expect(await coordinator.liveTransfers().map(\.priority) == [0.75])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: dropping a background handle before its outcome cancels the OS task", .timeLimit(.minutes(1)))
     func droppedHandleCancels() async throws {
         let rig = try Rig("dropped")

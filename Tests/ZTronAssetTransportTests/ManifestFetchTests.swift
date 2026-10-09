@@ -11,7 +11,7 @@ struct ManifestFetchTests {
         ManifestRequest(ifNoneMatch: tag, maxBytes: maxBytes, attempt: TransportFixtures.attempt(sequence))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: a manifest fetch sends If-None-Match with the stored ETag and maps 304 to notModified", .timeLimit(.minutes(1)))
     func conditionalFetch() async throws {
         let manifest = Data(#"{"schemaVersion":1,"assets":[]}"#.utf8)
@@ -34,7 +34,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: URLSession never answers a manifest fetch from its own cache, even within max-age", .timeLimit(.minutes(1)))
     func neverFromCache() async throws {
         let rig = try await LoopbackRig.make { request in
@@ -51,7 +51,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: a 304 without a conditional request is rejected", .timeLimit(.minutes(1)))
     func unconditionalNotModified() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(status: 304) }
@@ -61,7 +61,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: a manifest over 32 MiB is aborted while streaming", .timeLimit(.minutes(1)))
     func streamingCap() async throws {
         let limit = ManifestLimits().maxPayloadBytes
@@ -82,7 +82,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: an announced manifest length over the cap is aborted before any byte is staged", .timeLimit(.minutes(1)))
     func announcedCap() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data(repeating: 0x20, count: 2 << 20)) }
@@ -93,7 +93,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-6: an XML 403 on the manifest is reported with its evidence through the delegate", .timeLimit(.minutes(1)))
     func xmlForbiddenManifest() async throws {
         let xml = Data("<Error><Code>AccessDenied</Code></Error>".utf8)
@@ -108,7 +108,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: a manifest path that is not a plain relative path is refused before any request", .timeLimit(.minutes(1)))
     func invalidManifestPath() async throws {
         let rig = try await LoopbackRig.make(manifestPath: "../manifest.json") { _ in LoopbackResponse(body: Data("{}".utf8)) }
@@ -119,7 +119,7 @@ struct ManifestFetchTests {
         await rig.stop()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-5: a staged manifest that cannot be read back fails as a local error and is discarded", .timeLimit(.minutes(1)))
     func unreadableStagedManifest() async throws {
         let rig = try await LoopbackRig.make { _ in LoopbackResponse(body: Data("{}".utf8)) }

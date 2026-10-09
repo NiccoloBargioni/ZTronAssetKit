@@ -486,7 +486,7 @@ struct AppleTransferTests {
 }
 
 /// The interval edges a stream's termination handler saw, taken once.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class IntervalSnapshot: Sendable {
     private let state = Mutex<[LogIntervalEvent]?>(nil)
 

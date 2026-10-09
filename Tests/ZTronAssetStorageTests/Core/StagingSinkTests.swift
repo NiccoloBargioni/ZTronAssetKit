@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
 @testable import ZTronAssetStorage
 
 /// A chunk source over fixed chunks, failing where told (Apple-tier copies).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 struct ScriptedChunks: ChunkSource {
     let chunks: [Data]
     let failAt: Int?
@@ -29,7 +29,7 @@ struct ScriptedChunks: ChunkSource {
 }
 
 /// A counter for a synchronous chunk source.
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class PullCounter: Sendable {
     private let state = Mutex(0)
 
@@ -45,7 +45,7 @@ final class PullCounter: Sendable {
 
 @Suite("Core: staging sink")
 struct StagingSinkTests {
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func sink() async throws -> (CoreHarness, StoreStagingSink) {
         let harness = CoreHarness.make()
         _ = try await harness.store.open()
@@ -57,7 +57,7 @@ struct StagingSinkTests {
     }
 
     @Test("R-STO-1: partial files, continuations and adopted downloads land in staging under their exclusive names", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func partialsAndContinuations() async throws {
         let (harness, sink) = try await StagingSinkTests.sink()
         let first = StagingSinkTests.name(1)
@@ -86,7 +86,7 @@ struct StagingSinkTests {
     }
 
     @Test("R-STO-1: a sidecar is written atomically, read back, and ignored when absent, undecodable or describing another file", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func sidecars() async throws {
         let (harness, sink) = try await StagingSinkTests.sink()
         let name = StagingSinkTests.name(1)
@@ -113,7 +113,7 @@ struct StagingSinkTests {
     }
 
     @Test("R-STO-1: a staged manifest is read within its cap and a larger one is refused", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func readStaged() async throws {
         let (_, sink) = try await StagingSinkTests.sink()
         let name = StagingSinkTests.name(1)
@@ -135,7 +135,7 @@ struct StagingSinkTests {
     }
 
     @Test("R-STO-1: a chunk source is staged through a temporary and renamed into place, within its cap", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func writeStaged() async throws {
         let (harness, sink) = try await StagingSinkTests.sink()
         let chunks = [Data([1, 2]), Data([3]), Data([4, 5, 6])]
@@ -168,7 +168,7 @@ struct StagingSinkTests {
     }
 
     /// A sink on `kind` over an open store's fake volume, and the stepped executor when `kind` holds units.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func sink(on kind: CleanupExecutor) async throws -> (CoreHarness, StoreStagingSink, SteppedBlockingExecutor?) {
         let harness = CoreHarness.make()
         _ = try await harness.store.open()
@@ -188,7 +188,7 @@ struct StagingSinkTests {
 
     /// Runs `work` in a task that is already cancelled when `work` starts, releasing a held unit of `stepped` meanwhile;
     /// returns whether the task was still cancelled when `work` returned.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func inCancelledTask(_ stepped: SteppedBlockingExecutor?, _ work: @escaping @Sendable () async -> Void) async throws -> Bool {
         let returned = Mutex(false)
         let task = Task {
@@ -224,7 +224,7 @@ struct StagingSinkTests {
         .timeLimit(.minutes(1)),
         arguments: CleanupExecutor.allCases
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func discardFromACancelledTask(executor: CleanupExecutor) async throws {
         let (harness, sink, stepped) = try await StagingSinkTests.sink(on: executor)
         let name = StagingSinkTests.name(1)
@@ -248,7 +248,7 @@ struct StagingSinkTests {
         .timeLimit(.minutes(1)),
         arguments: [CleanupExecutor.inline, .dispatch]
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedCopyInACancelledTaskCleansUp(executor: CleanupExecutor) async throws {
         let (harness, sink, _) = try await StagingSinkTests.sink(on: executor)
         let name = StagingSinkTests.name(2)

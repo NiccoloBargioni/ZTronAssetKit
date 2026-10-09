@@ -10,7 +10,7 @@ import ZTronAssetTransport
 struct SourceTests {
     static let base = URL(string: "https://cdn.example.com/assets/")!
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: the production source allows only HTTPS to its base host and the configured additional hosts", .timeLimit(.minutes(1)))
     func productionSource() async throws {
         let configuration = HTTPSourceConfiguration(
@@ -41,7 +41,7 @@ struct SourceTests {
         await source.invalidate()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: the production source refuses a plain-HTTP base URL before any request", .timeLimit(.minutes(1)))
     func productionRefusesPlainHTTP() async throws {
         let configuration = HTTPSourceConfiguration(baseURL: URL(string: "http://127.0.0.1:9/")!, appKey: TransportFixtures.canaryKey)
@@ -54,7 +54,7 @@ struct SourceTests {
         await source.invalidate()
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: an enabled background policy builds a coordinator and reports background support without creating a session", .timeLimit(.minutes(1)))
     func productionBackground() async throws {
         let options = BackgroundTransferOptions(namespace: "media", keyRedirectExposure: .acceptedByOwner)
@@ -76,7 +76,7 @@ struct SourceTests {
         #expect(made.httpMaximumConnectionsPerHost == 4)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: the production background backend carries the key only when the owner accepted redirect exposure, with the configured timeout and log route", .timeLimit(.minutes(1)), arguments: [
         KeyRedirectExposure.refuse, .acceptedByOwner,
     ])
@@ -113,14 +113,14 @@ struct SourceTests {
         #expect(!tap.lines.contains { $0.message.contains(TransportFixtures.canaryValue) })
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a base URL without a host falls back to its text as the origin identifier the circuit breaker is keyed by")
     func originFallback() {
         let source = HTTPRemoteSource(configuration: HTTPSourceConfiguration(baseURL: URL(string: "file:///srv/assets/")!), staging: FakeStagingSink(), log: .tapOnly(nil))
         #expect(source.originID == "file:///srv/assets/")
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a backend built without a key sends none and still stages", .timeLimit(.minutes(1)))
     func keylessBackend() async throws {
         let server = LoopbackHTTPServer { _ in LoopbackResponse(body: Data("ok".utf8)) }
@@ -183,7 +183,7 @@ struct SourceTests {
         RouteCase(key: false, exposure: .refuse, expected: .min, background: false),
     ]
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: a key-bearing transfer never uses the background session unless the owner accepted redirect exposure", .timeLimit(.minutes(1)), arguments: SourceTests.routeCases)
     func routing(_ route: RouteCase) async throws {
         let options = BackgroundTransferOptions(namespace: "media", keyRedirectExposure: route.exposure)
@@ -212,7 +212,7 @@ struct SourceTests {
         #expect(jobs.first?.resume == resume && jobs.first?.priority == route.priority)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: when the coordinator refuses new work the transfer runs in the foreground", .timeLimit(.minutes(1)))
     func refusedCoordinatorFallsBack() async throws {
         let fixtures = try TransportFixtures.directory("fallback")
@@ -247,7 +247,7 @@ struct SourceTests {
         withExtendedLifetime(background) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-7: a negative byteSize never creates a background task: the source runs it in the foreground and the coordinator refuses it", .timeLimit(.minutes(1)), arguments: [Int64(-1), .min])
     func negativeSizeStaysInForeground(_ expected: Int64) async throws {
         let fixtures = try TransportFixtures.directory("negative-size-\(expected)")
@@ -285,7 +285,7 @@ struct SourceTests {
         withExtendedLifetime(handle) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: concurrent transfers never take more background tasks than the cap", .timeLimit(.minutes(1)))
     func concurrentStartsRespectTheCap() async throws {
         let fixtures = try TransportFixtures.directory("concurrent-cap")
@@ -333,7 +333,7 @@ struct SourceTests {
         withExtendedLifetime(others) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: re-attachment through a plain background backend reports its live transfers as running", .timeLimit(.minutes(1)))
     func reattachedThroughPlainBackend() async {
         let background = FakeTransferBackend(kind: .background)

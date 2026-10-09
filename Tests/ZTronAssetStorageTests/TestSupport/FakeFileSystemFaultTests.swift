@@ -9,7 +9,7 @@ struct TestSupportFakeFileSystemFaultTests {
     private static let tmp = FakeFSFixture.url("/fake-volume/index.tmp")
     private static let bin = FakeFSFixture.url("/fake-volume/index.bin")
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an nth rule fails only the n-th call that matches its operation and URL")
     func nthRuleFiresOnce() throws {
         let fileSystem = FakeFSFixture.make()
@@ -22,7 +22,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(fileSystem.operations.compactMap(\.failure) == [.noSpace])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a partial write lands its first bytes, then throws, and later writes succeed")
     func partialWriteLandsPrefix() throws {
         let fileSystem = FakeFSFixture.make()
@@ -33,7 +33,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(FakeFSFixture.content(fileSystem, "/fake-volume/index.tmp") == [1, 2, 3, 6])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a write fault fails after the open: a truncating write keeps only what landed, an appending one creates the file")
     func faultedWriteHasOpenedTheFile() throws {
         let fileSystem = FakeFSFixture.make()
@@ -49,7 +49,7 @@ struct TestSupportFakeFileSystemFaultTests {
 
     /// store.md §3.4 / F19: before the first unlock `open(2)` fails with EACCES and nothing is mutated, so an
     /// open-time error must not create, truncate or partly write the file, whatever `partialBytes` says.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "Test support: a write fault with an open-time error (EACCES, ENOENT, EISDIR, ENOTDIR) fails before the open and changes nothing",
         arguments: [FileSystemError.permissionDenied, .notFound, .other(errno: EACCES), .other(errno: EISDIR), .other(errno: ENOTDIR)]
@@ -69,7 +69,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(try fileSystem.availableCapacity(at: FakeFSFixture.volume, for: .important) == 996)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an afterBytes rule truncates the write that crosses the threshold and fails every later write")
     func afterBytesIsAShortWrite() throws {
         let fileSystem = FakeFSFixture.make()
@@ -83,7 +83,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(FakeFSFixture.content(fileSystem, "/fake-volume/index.tmp")?.count == 6)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "Test support: an every rule throws its error on each matching call and leaves the item untouched",
         arguments: [FileSystemError.io, .crossDevice, .permissionDenied]
@@ -100,7 +100,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(fileSystem.operations.filter { $0.kind == .rename }.map(\.failure) == [error, error])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: EACCES on createDirectory models protected data before the first unlock")
     func permissionDeniedOnCreate() {
         let fileSystem = FakeFSFixture.make()
@@ -110,7 +110,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect((try? fileSystem.itemInfo(at: root)) == .some(nil))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: faults apply to queries too, and a rule for another operation never fires")
     func faultsOnQueries() throws {
         let fileSystem = FakeFSFixture.make()
@@ -123,7 +123,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(try fileSystem.itemInfo(at: Self.tmp)?.byteSize == 1)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: free space falls with the bytes a lifetime writes and rises with the bytes it removes")
     func capacityFollowsUsage() throws {
         let fileSystem = FakeFSFixture.make(important: 1_000, opportunistic: 600)
@@ -140,7 +140,7 @@ struct TestSupportFakeFileSystemFaultTests {
         #expect(try next.availableCapacity(at: FakeFSFixture.volume, for: .important) == 50)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a write that does not fit lands what fits and throws noSpace")
     func fullVolumeIsAShortWrite() throws {
         let fileSystem = FakeFSFixture.make(important: 10, opportunistic: 10)

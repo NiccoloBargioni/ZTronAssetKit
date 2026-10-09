@@ -188,7 +188,7 @@ struct ModelContractTests {
         #expect(MonotonicInstant(nanoseconds: UInt64.max - 10).adding(seconds: 1.7e10).nanoseconds == UInt64.max)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-OBS-1: log lines carry the module subsystem and their category and render identifiers as stable hashes")
     func logLinesAreTaggedAndHashed() {
         let id = AssetID("bo7.ri.secret-page")
@@ -205,7 +205,7 @@ struct ModelContractTests {
         #expect(LogLevel.allCases.map(\.osLogType) == [.debug, .info, .error, .fault])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-OBS-1: every line reaches the environment's sink and tap once, and an environment of fakes keeps the unified log untouched")
     func logRouteReachesSinkAndTap() {
         let sink = RecordingLogSink()
@@ -254,7 +254,7 @@ struct ModelContractTests {
 }
 
 /// A `LogSink` that records what it is asked to write (the R-OBS-1 route test); gated for `Mutex` (ADR-014).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 private final class RecordingLogSink: LogSink {
     private let recorded = Mutex<[LogLine]>([])
 

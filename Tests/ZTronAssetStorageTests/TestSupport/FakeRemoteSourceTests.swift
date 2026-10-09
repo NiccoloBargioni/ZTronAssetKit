@@ -36,7 +36,7 @@ struct TestSupportFakeRemoteSourceTests {
         return all
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a staged step writes through the attached sink and reports the staged file", .timeLimit(.minutes(1)))
     func stageWritesThroughSink() async {
         let source = FakeRemoteSource()
@@ -51,7 +51,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.starts == [request])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: without an attached sink a staged step fails with localIO instead of hanging", .timeLimit(.minutes(1)))
     func stageWithoutSinkFails() async {
         let source = FakeRemoteSource()
@@ -60,7 +60,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: handle) == [.failed(.transient(.localIO(posixCode: ENXIO), retryAfter: nil))])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a sink ENOSPC fails the transfer with insufficientSpace and another sink error with localIO", .timeLimit(.minutes(1)))
     func sinkErrorsMapLikeTheTransport() async {
         let source = FakeRemoteSource()
@@ -75,7 +75,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: second) == [.failed(.transient(.localIO(posixCode: EIO), retryAfter: nil))])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a generated step streams the payload in bounded chunks that hash like GeneratedPayload.sha256", .timeLimit(.minutes(1)))
     func generatedPayloadStreamsInChunks() async {
         let source = FakeRemoteSource()
@@ -90,7 +90,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(sink.digest == GeneratedPayload.sha256(seed: 77, byteCount: size))
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: scripted steps are consumed across attempts, each attempt up to its terminal step", .timeLimit(.minutes(1)))
     func stepsSpanAttempts() async {
         let source = FakeRemoteSource()
@@ -104,7 +104,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: second) == [Self.staged(retry, 4)])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a hold keeps the transfer active until release ends it", .timeLimit(.minutes(1)))
     func holdUntilRelease() async {
         let source = FakeRemoteSource()
@@ -117,7 +117,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.activeTransfers == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a release that arrives before the hold ends that hold at once", .timeLimit(.minutes(1)))
     func earlyReleaseIsKept() async {
         let source = FakeRemoteSource()
@@ -128,7 +128,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.activeTransfers == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: early releases are delivered in order: progress continues the attempt, a terminal one ends it", .timeLimit(.minutes(1)))
     func earlyReleasesInOrder() async {
         let source = FakeRemoteSource()
@@ -150,7 +150,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.activeTransfers == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "Test support: every staging failure maps the way the transport maps it",
         .timeLimit(.minutes(1)),
@@ -170,7 +170,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: handle) == [.failed(expected)])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an Apple-tier source reports pack manifests and staged files without an HTTP status", .timeLimit(.minutes(1)))
     func appleTierShapes() async throws {
         let capabilities = RemoteSourceCapabilities(tier: .appleHosted, supportsPriority: false, supportsResume: false, supportsBackground: false, keepsSourceCopies: true)
@@ -187,7 +187,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await (source.attachedStaging as? FakeStagingSink) != nil)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a non-terminal release continues the held attempt with its remaining steps", .timeLimit(.minutes(1)))
     func progressReleaseContinues() async {
         let source = FakeRemoteSource()
@@ -199,7 +199,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await Self.updates(of: handle) == [.progress(received: 1, expected: 4), Self.staged(request, 4)])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an unscripted transfer stays active until a script for it arrives", .timeLimit(.minutes(1)))
     func unscriptedWaitsForScript() async {
         let source = FakeRemoteSource()
@@ -212,7 +212,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.activeTransfers == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a paused transfer is no longer active and a later release goes to the next attempt", .timeLimit(.minutes(1)))
     func pausedAttemptIsSkipped() async {
         let source = FakeRemoteSource()
@@ -230,7 +230,7 @@ struct TestSupportFakeRemoteSourceTests {
     /// The Model: `.paused(resumable:)` is `true` only when a partial plus a validator were kept. A parked attempt of
     /// this fake has written nothing under its own name; one that continues an earlier partial left that partial and
     /// the request's validator untouched.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: pausing a parked attempt is resumable only when it continues an earlier partial with a validator", .timeLimit(.minutes(1)))
     func pauseIsResumableOnlyWithAKeptPartial() async throws {
         let source = FakeRemoteSource()
@@ -250,7 +250,7 @@ struct TestSupportFakeRemoteSourceTests {
     /// The Model's `TransferHandle`: terminating the updates stream (its consumer cancelled) cancels the transfer. An
     /// engine that ends a held attempt by cancelling the task that drives it must see the census reach 0, and the
     /// attempt's remaining steps go to the next attempt as after `cancel()`.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: cancelling the task that consumes a held attempt cancels the attempt and drops it from the census", .timeLimit(.minutes(1)))
     func cancelledConsumerCancelsAttempt() async {
         let source = FakeRemoteSource()
@@ -270,14 +270,14 @@ struct TestSupportFakeRemoteSourceTests {
     }
 
     /// Starts `request` and releases its handle, never iterated or stopped, before returning.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func startAndDrop(_ source: FakeRemoteSource, _ request: TransferRequest) async {
         let handle = await source.transfer(request)
         #expect(handle.id == request.id)
     }
 
     /// Starts `request` and returns only its updates stream: the handle itself is released.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func streamOnly(_ source: FakeRemoteSource, _ request: TransferRequest) async -> AsyncStream<TransferUpdate> {
         await source.transfer(request).updates
     }
@@ -285,7 +285,7 @@ struct TestSupportFakeRemoteSourceTests {
     /// The Model's `TransferHandle`: terminating the updates stream cancels the transfer, also when the consumer drops
     /// it. The source keeps only the handle's channel, so an engine that releases a held attempt's handle sees the
     /// census reach 0, and the attempt's remaining steps go to the next attempt.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: dropping the handle of a held attempt cancels the attempt and drops it from the census", .timeLimit(.minutes(1)))
     func droppedHandleCancelsAttempt() async {
         let source = FakeRemoteSource()
@@ -302,7 +302,7 @@ struct TestSupportFakeRemoteSourceTests {
 
     /// Dropping the handle is not dropping the stream: a consumer that keeps only `updates` still receives what the
     /// source delivers, and the attempt stays active until then (the source never kept the stream itself).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: an attempt whose updates stream outlives its handle stays active and still ends by release", .timeLimit(.minutes(1)))
     func streamOutlivesHandle() async {
         let source = FakeRemoteSource()
@@ -322,7 +322,7 @@ struct TestSupportFakeRemoteSourceTests {
 
     /// The end of a finished stream is not a cancellation: a consumer cancelled after the terminal element records no
     /// control.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a consumer cancelled after its attempt ended records no cancellation", .timeLimit(.minutes(1)))
     func finishedStreamIsNotCancelled() async {
         let source = FakeRemoteSource()
@@ -340,7 +340,7 @@ struct TestSupportFakeRemoteSourceTests {
 
     /// A `Data` slice keeps its parent's indices: the step must stage the slice's own bytes, from its start and from a
     /// resume offset (a zero-based offset into a slice whose `startIndex` is not 0 traps and ends the test process).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a stage step scripted with a Data slice stages the slice's bytes, fresh and resumed", .timeLimit(.minutes(1)))
     func stageScriptedWithSlice() async throws {
         let source = FakeRemoteSource()
@@ -369,7 +369,7 @@ struct TestSupportFakeRemoteSourceTests {
     /// `StagingAttachable`: "a later call (a restarted client) replaces it". The engine's shutdown invalidates the
     /// source (RE-S22); a client restarted on the same factory and source must transfer again, as the R-NET-6 and
     /// R-NET-3 relaunch scenarios that reuse the source (and its `scriptReattached`) need.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a source re-attached by a restarted client after shutdown transfers again through the new sink", .timeLimit(.minutes(1)))
     func restartedClientRevivesSource() async throws {
         let source = FakeRemoteSource()
@@ -396,7 +396,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.starts.map(\.attempt.sequence) == [1, 2, 3])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: starts and controls share one ordered log, so a priority change before a later start is provable", .timeLimit(.minutes(1)))
     func oneOrderedTransportLog() async {
         let source = FakeRemoteSource()
@@ -414,7 +414,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(parked.id == Self.other)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: manifest responses are served in script order and an unscripted fetch answers notModified", .timeLimit(.minutes(1)))
     func manifestScript() async throws {
         let source = FakeRemoteSource()
@@ -429,7 +429,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.manifestRequests == [request, request, request, request])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: scripted re-attached transfers are returned by exactly one launch", .timeLimit(.minutes(1)))
     func reattachedOnce() async {
         let source = FakeRemoteSource()
@@ -440,7 +440,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.reattachedTransfers() == [])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: invalidate ends every active transfer with a client cancellation and later transfers fail at once", .timeLimit(.minutes(1)))
     func invalidateEndsEverything() async {
         let source = FakeRemoteSource()
@@ -462,7 +462,7 @@ struct TestSupportFakeRemoteSourceTests {
 
     /// An engine that pauses or cancels many parked attempts (window moves, R-CAR-3, R-SYN-4) without ever calling
     /// `script` or `release` must not leave them in the source: the next interaction drops them.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: attempts the engine paused or cancelled are dropped at the next census read or transfer", .timeLimit(.minutes(1)))
     func stoppedAttemptsAreDropped() async {
         let source = FakeRemoteSource()
@@ -488,7 +488,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.parkedAttempts == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: cancellations of re-attached transfers, reclaim reports and background events are recorded", .timeLimit(.minutes(1)))
     func recordsSideCalls() async {
         let source = FakeRemoteSource()
@@ -504,7 +504,7 @@ struct TestSupportFakeRemoteSourceTests {
         #expect(await source.sourceCopyBytes() == 42)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a resumed request continues the earlier partial and appends only the bytes it lacks", .timeLimit(.minutes(1)))
     func resumeContinuesPartial() async throws {
         let source = FakeRemoteSource()
@@ -527,7 +527,7 @@ struct TestSupportFakeRemoteSourceTests {
 }
 
 /// A staging sink that records the size of every append and hashes what it receives (never storing it).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class FakeSourceChunkRecordingSink: StagingSink {
     private let state = Mutex<(sizes: [Int], hasher: SHA256, total: Int64)>(([], SHA256(), 0))
 

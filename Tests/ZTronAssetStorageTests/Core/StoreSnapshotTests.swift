@@ -11,7 +11,7 @@ struct StoreSnapshotTests {
         "R-STO-13: bulk publishes install at most one snapshot per snapshotInstallInterval and a user-initiated publish installs at once",
         .timeLimit(.minutes(1))
     )
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func installRate() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(installInterval: 0.1))
         let payloads = (0..<52).map { CoreFixture.bytes(400 + UInt64($0), count: 24) }
@@ -64,7 +64,7 @@ struct StoreSnapshotTests {
     }
 
     @Test("R-STO-13: the store resolves from current state, matches extensions case-insensitively and records accesses lazily", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func locationsFromCurrentState() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(90)
@@ -86,7 +86,7 @@ struct StoreSnapshotTests {
     }
 
     @Test("R-STO-13: accesses reach the records through acknowledgements, clamped to now and never moved backwards", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func accessesThroughAcknowledgements() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(91)
@@ -105,7 +105,7 @@ struct StoreSnapshotTests {
     }
 
     @Test("R-STO-7: the store's availability counts present, missing, stale, failed and unverified entries of a scope without I/O", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func availabilityCounts() async throws {
         let harness = CoreHarness.make()
         let a = CoreFixture.bytes(92)
@@ -140,7 +140,7 @@ struct StoreSnapshotTests {
     }
 
     @Test("R-OBS-1: every index commit and every hash runs inside exactly one commit or verify interval", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func signpostIntervals() async throws {
         let harness = CoreHarness.make()
         let bytes = CoreFixture.bytes(97)
@@ -160,7 +160,7 @@ struct StoreSnapshotTests {
     }
 
     @Test("R-CLN-1: freeSpace reads both capacities once and reports usage, the pending reclaim of doomed blobs and the resolved budget", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func freeSpaceFigures() async throws {
         let harness = CoreHarness.make(importantCapacity: 10_000)
         let a = CoreFixture.bytes(98)

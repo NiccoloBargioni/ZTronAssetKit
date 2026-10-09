@@ -348,7 +348,7 @@ public struct FakeFileSystemConfiguration: Sendable, Hashable {
 /// Every call runs under one `Mutex` in program order, so with `InlineBlockingExecutor` a scenario's op sequence is
 /// identical on every run, and "crash before mutation k" is reproducible from k (store-2 S2-08). Directories are
 /// modelled independently (pessimistic). After a crash every call throws `.io` and `survivingDisk()` yields the
-/// post-crash disk. Gated for `Mutex` (ADR-014): tests annotate each `@Test` with `@available(macOS 15.0, *)`.
+/// post-crash disk. Gated for `Mutex` (ADR-014): tests annotate each `@Test` with `@available(macOS 15.0, iOS 18.0, *)`.
 ///
 /// Model, precisely (store.md §3.4 as amended by store-1 S1-01): an inode table where each file has current and
 /// synced bytes and each directory a current and a synced listing. `synchronizeFile` makes a file's bytes durable

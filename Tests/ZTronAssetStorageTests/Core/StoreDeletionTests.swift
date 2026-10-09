@@ -9,7 +9,7 @@ import ZTronAssetTestSupport
 @Suite("Core: deletion protocol (I-3) and deadlines")
 struct StoreDeletionTests {
     /// Opens a store with `a` and `b` published, then prunes `a`: its blob is doomed.
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func prunedStore(sink: ScriptedSnapshotSink = ScriptedSnapshotSink()) async throws -> (CoreHarness, BlobKey, BlobKey) {
         let harness = CoreHarness.make(sink: sink)
         let a = CoreFixture.bytes(70)
@@ -24,7 +24,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-CLN-1: prune removes blobs of removed entries only after acknowledgement and grace", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func pruneWaitsForAcknowledgementAndGrace() async throws {
         let (harness, keyA, keyB) = try await StoreDeletionTests.prunedStore()
         let report = try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
@@ -53,7 +53,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-CLN-5: a sink that keeps an older or foreign snapshot never counts as acknowledgement", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func olderOrForeignSnapshotsNeverCount() async throws {
         let sink = ScriptedSnapshotSink()
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore(sink: sink)
@@ -81,7 +81,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-CLN-5: deletion grace uses the awake clock and a fresh acknowledgement after a device sleep", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func awakeClockAndFreshAcknowledgement() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
         _ = try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
@@ -102,7 +102,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-STO-4: a degraded fallback deletes no blob listed in the older generation's doomed set", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func degradedFallbackProtectsDoomedKeys() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
         let entryB = CoreFixture.entry("b", CoreFixture.bytes(71))
@@ -133,7 +133,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-CLN-5: a doomed key blocked only by a lease keeps no deadline, and releasing the lease makes it deletable at once", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func leaseBlockedKeys() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
         await harness.store.testSetLease(keyA, token: 1, id: "a")
@@ -150,7 +150,7 @@ struct StoreDeletionTests {
     }
 
     @Test("R-CLN-5: a failed unlink keeps the key doomed with backoff and retries it", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedUnlinkBacksOff() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
         harness.fileSystem.addFault(FaultRule(operation: .removeItem, matching: URLMatcher(pathContains: keyA.hash.hex), occurrence: .nth(1), error: .io))
@@ -171,7 +171,7 @@ struct StoreDeletionTests {
     }
 
     @Test("P-13: reaping runs in sorted units of deletionBatchSize and honours maxKeys", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func reapBatches() async throws {
         let harness = CoreHarness.make(configuration: CoreFixture.configuration(deletionBatchSize: 16))
         _ = try await harness.store.open()
@@ -199,7 +199,7 @@ struct StoreDeletionTests {
 @Suite("Core: time-bounded deletion units")
 struct DeletionUnitTests {
     @Test("P-13: a deletion unit stops when its time budget is spent and the reaper carries the rest to the next unit", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func timeBoundedUnits() async throws {
         let clock = SteppingClock()
         let metadata = CountingExecutor()
@@ -240,7 +240,7 @@ struct DeletionUnitTests {
 }
 
 /// A clock whose monotonic reads advance 1 ms each while stepping (a slow volume, seen from inside a unit).
-@available(macOS 15.0, *)
+@available(macOS 15.0, iOS 18.0, *)
 final class SteppingClock: TimeSource {
     let base = ManualTimeSource()
     private let stepping = Mutex(false)

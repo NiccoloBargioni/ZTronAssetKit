@@ -41,7 +41,7 @@ extension ModelSuites {
             #expect(ManifestFootprint.allocated(14_400_032) == 2 * 14_417_920)
         }
 
-        @available(macOS 15.0, *)
+        @available(macOS 15.0, iOS 18.0, *)
         @Test(
             "R-MAN-3: a request above 2 MiB is counted at least as large as the freed block the allocator reuses for it",
             .enabled(if: !DecodeMeasurement.underThreadSanitizer)

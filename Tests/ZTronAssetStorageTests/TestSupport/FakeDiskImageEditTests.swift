@@ -85,7 +85,7 @@ struct TestSupportDiskImageEditTests {
 
     /// A fully durable disk with a file, an empty directory, a link, attributes and one file under two names (a
     /// power loss after a rename between two independently synced directories).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     private static func base() throws -> DiskImage {
         let fileSystem = FakeFSFixture.make()
         let source = FakeFSFixture.url("/fake-volume/s")
@@ -105,7 +105,7 @@ struct TestSupportDiskImageEditTests {
         return FakeFSFixture.powerLoss(renaming.survivingDisk())
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a fake started on an edited disk shows exactly the edited disk", arguments: Edit.allCases)
     func editedDiskLoadsAsEdited(edit: Edit) throws {
         let base = try Self.base()
@@ -130,7 +130,7 @@ struct TestSupportDiskImageEditTests {
         return implied
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: rewriting a file's content in a disk image keeps the file's identity and its synced bytes")
     func rewriteKeepsIdentity() throws {
         let fileSystem = FakeFSFixture.make()
@@ -153,7 +153,7 @@ struct TestSupportDiskImageEditTests {
         #expect(FakeFSFixture.powerLoss(next.survivingDisk()).files[Self.work + "/f.bin"] == [1])
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Test support: a purge removes a path from both namespaces, while an edit of files alone is undone by a power loss")
     func purgeIsDurable() throws {
         let fileSystem = FakeFSFixture.make()

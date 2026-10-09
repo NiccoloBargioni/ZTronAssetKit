@@ -10,14 +10,14 @@ import ZTronAssetTestSupport
 @Suite("Core: review interleavings (H-2, H-5)")
 struct StoreRaceTests {
     /// Waits for a held unit and releases the oldest one; throws once the test is cancelled (its time limit).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func step(_ executor: SteppedBlockingExecutor) async throws {
         try await executor.requireHeldUnits(atLeast: 1)
         await executor.releaseNext()
     }
 
     @Test("R-INT-1: two publications binding one digest under a second extension copy it once and never place a torn copy", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func concurrentBindsOfOneExtraExtension() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let bulk = SteppedBlockingExecutor(holding: false)
@@ -78,7 +78,7 @@ struct StoreRaceTests {
     }
 
     @Test("R-CLN-5: a replacement store whose epoch repeats never counts the previous store's snapshot as acknowledged", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func repeatedEpochNeverAcknowledges() async throws {
         let sink = ScriptedSnapshotSink()
         let bytes = CoreFixture.bytes(180)
@@ -124,7 +124,7 @@ struct StoreRaceTests {
     }
 
     @Test("R-CLN-1: a reused placement that fails after a prune dooms the key with a deadline and is reaped", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func failedReusedPlacementIsReaped() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -172,7 +172,7 @@ struct StoreRaceTests {
     }
 
     @Test("R-INT-2: a prune during a checksum-less publication's commit yields superseded and never returns the URL", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func pruneDuringPublicationCommit() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         var policy = StoragePolicy()
@@ -204,7 +204,7 @@ struct StoreRaceTests {
     }
 
     @Test("R-INT-2: a prune during a publication's snapshot install yields superseded and never returns the URL", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func pruneDuringPublicationInstall() async throws {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(time: time)
@@ -240,7 +240,7 @@ struct StoreRaceTests {
     /// appear in an acknowledged snapshot and lose it again (a decrement, no fresh doom). The dropped rescue must not
     /// restore the old doom, whose grace ended long before that snapshot was replaced.
     @Test("R-CLN-5: a rescue that binds nothing after another record gained and lost the key is doomed afresh and waits a new grace", .timeLimit(.minutes(1)))
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     func droppedRescueIsDoomedAfresh() async throws {
         let metadata = SteppedBlockingExecutor(holding: false)
         let harness = CoreHarness.make(metadata: metadata)
@@ -309,7 +309,7 @@ struct StoreRaceTests {
     }
 
     /// Waits until a caller is parked on the running commit (no sleeping: the actor is polled between yields).
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     static func waitForCommitWaiter(_ harness: CoreHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         try await CorePoll.until("a caller parked on the running commit", sourceLocation: sourceLocation) {
             await !harness.state.core.commits.waiters.isEmpty

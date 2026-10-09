@@ -88,7 +88,7 @@ struct ConditionsCensusWaitTests {
         #expect(await source.activeObservations == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Seams: a waitForObservations cancelled while registered reports no match, and a later observation resumes only a new wait", .timeLimit(.minutes(1)))
     func observationWaitCancelledWhileRegistered() async {
         let path = ConditionsTests.ScriptedPath(NetworkConditions(satisfied: true, expensive: false, constrained: false))
@@ -106,7 +106,7 @@ struct ConditionsCensusWaitTests {
         withExtendedLifetime(stream) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Seams: a waitForObservations for fewer observations, cancelled while registered, reports no match and leaves the observation running", .timeLimit(.minutes(1)))
     func shrinkingWaitCancelledWhileRegistered() async {
         let path = ConditionsTests.ScriptedPath(NetworkConditions(satisfied: true, expensive: false, constrained: false))
@@ -121,7 +121,7 @@ struct ConditionsCensusWaitTests {
         withExtendedLifetime(stream) {}
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("Seams: requireObservations throws CancellationError when cancelled first and returns once the count matches, cancelled or not", .timeLimit(.minutes(1)))
     func requireObservations() async {
         let path = ConditionsTests.ScriptedPath(NetworkConditions(satisfied: true, expensive: false, constrained: false))

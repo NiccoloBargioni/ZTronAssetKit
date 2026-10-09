@@ -293,7 +293,7 @@ struct KitContractTests {
         #expect(relay.liveCount == 0)
     }
 
-    @available(macOS 15.0, *)
+    @available(macOS 15.0, iOS 18.0, *)
     @MainActor
     @Test("R-STO-13: the mirror ignores an out-of-order snapshot and acknowledges what readers see")
     func mirrorAcknowledgesInstalledKey() throws {
