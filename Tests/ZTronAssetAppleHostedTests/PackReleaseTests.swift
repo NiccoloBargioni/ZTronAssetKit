@@ -462,6 +462,59 @@ struct PackReleaseTests {
     }
 
     @available(macOS 26.0, *)
+    @Test(
+        "R-CLN-9: a pack whose planned removal is running counts as a source copy even after a later survey finds it unsettled",
+        .timeLimit(.minutes(1))
+    )
+    func removalInFlightCountsAcrossSurveys() async throws {
+        // Verifier probe VP-A3 (R-CLN-9 as ruled at the L2 merge): reclaim A plans the excluded-only extras pack and its
+        // removal is held, to fail with a system error. Meanwhile reclaim B surveys a newer report in which the pack
+        // gained an entry nobody adopted yet, so B's survey no longer finds it settled. A's removal still runs and the
+        // OS still holds the pack, so its bytes count whatever B's survey found. Once A's removal failed, the pack
+        // counts only while the last survey finds it settled: B's does not, so it counts again once a survey does.
+        let excluded = PackAsset(extraC, "excluded by the retention scope")
+        let fixture = AppleTierFixture(installed: [
+            Packs.catalog: AppleTierFixture.catalogPack(), Packs.extras: [excluded.path: excluded.bytes],
+        ])
+        fixture.backend.setInstalledBytes(Packs.extras, 4_096)
+        let settledReport = AdoptionReport(
+            manifestRemotePaths: [excluded.remotePath],
+            adoptedRemotePaths: [],
+            excludedRemotePaths: [excluded.remotePath]
+        )
+        let unsettledReport = AdoptionReport(
+            manifestRemotePaths: [excluded.remotePath, "ZTronExtras/d.wav"],
+            adoptedRemotePaths: [],
+            excludedRemotePaths: [excluded.remotePath]
+        )
+        fixture.backend.failRemove(Packs.extras, with: .system(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+        fixture.backend.holdRemove(Packs.extras)
+        let reclaimA = Task {
+            await fixture.source.reclaimSourceCopies(settledReport)
+        }
+        await fixture.backend.waitFor(.remove(Packs.extras))
+        #expect(await fixture.source.sourceCopyBytes() == 4_096, "A's planned removal has not returned yet")
+
+        #expect(await fixture.source.reclaimSourceCopies(unsettledReport) == ReclaimReport(), "B plans nothing")
+        #expect(fixture.backend.installedPacks.contains(Packs.extras))
+        #expect(await fixture.source.sourceCopyBytes() == 4_096, "A's removal still runs, whatever B's survey found")
+
+        fixture.backend.releaseRemove(Packs.extras)
+        #expect(await reclaimA.value.failed.keys.sorted() == ["ZTronExtras"])
+        #expect(fixture.backend.installedPacks.contains(Packs.extras))
+        #expect(await fixture.source.sourceCopyBytes() == 0, "failed, and the last survey no longer plans its removal")
+
+        #expect(await fixture.source.reclaimSourceCopies(settledReport).failed.keys.sorted() == ["ZTronExtras"])
+        #expect(await fixture.source.sourceCopyBytes() == 4_096, "failed again, and the last survey finds it settled")
+
+        fixture.backend.failRemove(Packs.extras, with: nil)
+        #expect(await fixture.source.reclaimSourceCopies(settledReport) == ReclaimReport(released: ["ZTronExtras"]))
+        #expect(await fixture.source.sourceCopyBytes() == 0, "a removed pack reports no bytes")
+        #expect(fixture.backend.calls.filter { $0 == .remove(Packs.extras) }.count == 3)
+        await fixture.source.invalidate()
+    }
+
+    @available(macOS 26.0, *)
     @Test("R-CLN-9: sourceCopyBytes saturates instead of trapping when the installed sizes sum past Int64.max", .timeLimit(.minutes(1)))
     func sourceCopyBytesSaturates() async throws {
         // Verifier probe PROBE-R3-2: `PackBackend` is public, so any injected backend can report such sizes.
