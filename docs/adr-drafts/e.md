@@ -218,9 +218,10 @@ the public signature is unchanged, E-13) — flagged likewise.
   is unchanged and still passes. None of the replaced tests is a pre-existing CDN test (G3); each assertion they lose
   is the withdrawn behaviour, and each replacement asserts the ruled one on the same timeline.
 - **Consequence.** An asset viewed on demand after its pack's release keeps the whole pack installed for the rest of
-  the catalog generation (bounded: one download and one removal per pack per generation, never a loop). For WP-F: a
-  pack id can appear in `ReclaimReport.released` again in a later generation; the engine must treat `released` as
-  "removed now", not as a set it accumulates without duplicates.
+  the catalog generation (bounded: one download and one removal per pack per generation, never a loop), and its bytes
+  count in `sourceCopyBytes()` until a later generation releases it, whether or not the pack holds adopted content
+  (E-11, cycle 5). For WP-F: a pack id can appear in `ReclaimReport.released` again in a later generation; the
+  engine must treat `released` as "removed now", not as a set it accumulates without duplicates.
 - **(c) Declined.** Keying generations on the digest the **engine applied** (a fetched catalog the engine rejects
   also starts a generation here) needs that digest in `AdoptionReport` — a contract change.
 - **Residual.** transport-2 T2-13 fix 5 asked to persist `alreadyReleased` in `index.bin`; no contract field exists, so
@@ -232,13 +233,34 @@ the public signature is unchanged, E-13) — flagged likewise.
 ## E-11 — `sourceCopyBytes()`
 
 - **Decision.** Media packs (never the catalog pack) with at least one adopted entry in the **last**
-  `AdoptionReport` the source received, summed from `PackBackend.installedBytes` (`nil` → 0, negative clamped). 0
-  before the first report. Fix round 1: released packs are **no longer subtracted** — `installedBytes` is `nil` for a
-  removed pack (fake and live: no `.downloaded` status), and a released pack a transfer downloaded again really holds
-  bytes twice on the device, which `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the
-  verifier's PROBE-1). Since cycle 3 (E-10) such a pack stays installed, and counted, until the next catalog
-  generation releases it. Adopted entries are found among the manifest entries (`AdoptionReport` documents adopted paths
-  as entries of the applied manifest), see E-16.
+  `AdoptionReport` the source received, and (cycle 5, below) every pack the source released in this process, summed
+  from `PackBackend.installedBytes` (`nil` → 0, negative clamped). 0 before the first report. Fix round 1: released
+  packs are **no longer subtracted** — `installedBytes` is `nil` for a removed pack (fake and live: no `.downloaded`
+  status), and a released pack a transfer downloaded again really holds bytes twice on the device, which
+  `StorageReport.sourceCopyBytes` must show (R-CLN-9; regression test from the verifier's PROBE-1). Since cycle 3
+  (E-10) such a pack stays installed, and counted, until the next catalog generation releases it. Adopted entries are
+  found among the manifest entries (`AdoptionReport` documents adopted paths as entries of the applied manifest), see
+  E-16.
+- **L2 close-out cycle 5 (verifier probe VC3-E, non-blocking).** Under the cycle 3 ruling a released pack that
+  comes back stays installed for the rest of the generation, but the sum covered only packs holding adopted content.
+  A pack whose only entry the retention scope excludes is released, then downloaded again on demand when that entry
+  is viewed; the store evicts the out-of-scope blob first, so no later report names the entry adopted, and the pack's
+  bytes never reached the sum (probe: `extrasInstalled=true extrasBytes=Optional(4096) sourceCopyBytes=0`). This
+  conflicted with ADR-027 ("bytes the OS still holds") and with the ruling ("its `installedBytes` keep counting").
+  **Fix:** `AppleSourceState` keeps `releasedInProcess`, every pack whose removal succeeded in this process, in any
+  generation (a success planned in an earlier generation counts too), and `sourceCopyPacks()` returns
+  `adoptedPacks ∪ releasedInProcess`. A released pack that is really gone reports `installedBytes` `nil` and adds 0;
+  one that came back is counted until a later generation releases it, including the window between a new catalog
+  digest and that generation's first reclaim (a set cleared per generation would drop it there). It stays in memory
+  like the released set (E-10 residual): after a relaunch such a pack counts again only once a reclaim released it.
+  The sum still saturates. Tests, both run red against the old code first (`Test run with 17 tests in 1 suite failed
+  after 0.012 seconds with 3 issues`, the three `sourceCopyBytes` expectations) and committed on their own, then green:
+  `R-CLN-9: a released pack downloaded again on demand counts as a source copy until a later catalog generation
+  releases it` (VC3-E's timeline, then a new catalog digest, then that generation's reclaim) and `R-CLN-9: a pack
+  whose release straddles a new catalog generation and comes back counts until that generation releases it` (a
+  `holdRemove` across the new digest). `R-CLN-9: sourceCopyBytes sums the installed bytes of adopted media packs not
+  yet released` is renamed `…of adopted media packs, and a pack the OS removed adds nothing` (WP-E's own test, same
+  assertions; the old name described the withdrawn rule).
 - **L2 close-out (verifier round 3, non-blocking, PROBE-R3-2).** The sum saturates at `Int64.max`
   (`addingReportingOverflow`): `PackBackend` is public and injectable, and two packs reporting `Int64.max / 2 + 1`
   bytes trapped the process (SIGTRAP; the test `R-CLN-9: sourceCopyBytes saturates instead of trapping when the
@@ -324,7 +346,16 @@ the public signature is unchanged, E-13) — flagged likewise.
   which no test constructs).
   Cycle 3 (the re-arm path deleted, E-10): `COVERAGE target=ZTronAssetAppleHosted lines= 99.76% (1242/1245)
   min=70.0 OK` and `COVERAGE device-only-excluded lines=110 share=1.69% max=3.0% OK`; the same three lines are not
-  reached (the seam branch is now `AppleSourceState.swift:119`).
+  reached (the seam branch is now `AppleSourceState.swift:119`). The figure is not exact: `AppleSourceState.swift:66`
+  (`endStaging`'s early return while another staging call still runs, fix round 2) is reached only when two copies
+  overlap by scheduling, so a run reaches 1241 or 1242 of 1245 (the cycle 3 verifier's gate run gave `99.68%
+  (1241/1245)`). The gate passes either way.
+  Cycle 5 (`releasedInProcess`, E-11; gate export over all 8 test bundles): `COVERAGE target=ZTronAssetAppleHosted
+  lines= 99.76% (1246/1249) min=70.0 OK` and `COVERAGE device-only-excluded lines=110 share=1.69% max=3.0% OK`. The
+  three lines not reached are the two pre-cancelled seam branches (`AppleSourceState.swift:124`, shifted from :119 by
+  the new property, and `PackAvailabilityCoordinator.swift:131`) and the implicit `LiveAssetPackBackend()` closure
+  in `AppleHostedTier.swift:46`. `endStaging`'s early return, now `AppleSourceState.swift:71`, was reached (2 hits);
+  it stays scheduling-dependent, so a run may give 1245 of 1249.
 - `R-APL-3: an adopted asset is served from blobs and never from a pack location` is written at the source level: at
   L2 the store is WP-B's stub, so the test asserts that what reaches the engine is a staging copy of this transfer
   (no pack location exists in any output), that the pack's release leaves the copy intact, and that the release opens
@@ -440,6 +471,16 @@ the public signature is unchanged, E-13) — flagged likewise.
 - **E-13.** The internal `resolve(…, select:)` overload in `AppleHostedTier.swift` is acknowledged under the E-13
   ratification (no change).
 
+## L2 close-out cycle 5: dispositions (`l2-close3-remaining-e.json`, no blocking findings)
+
+- **VC3-E, `sourceCopyPacks` omits released packs (correct lens):** fixed, E-11 cycle 5 (failing tests committed
+  first, then the fix).
+- **Stale orchestrator-owned texts, two findings (reqs and correct lenses):** requested below — ADR-027's amendment
+  bullet and Consequences, the `RemoteSource.sourceCopyBytes()` doc, and §6.6 (extended).
+- **E-13 coverage figure (correct lens):** noted in E-13's cycle 3 paragraph (1241 or 1242 of 1245, scheduling).
+- **`StagingSink.discard` from a cancelled task (correct lens, unproven):** no WP-E change; WP-B makes
+  `StoreStagingSink.discard` cancellation-proof this cycle (request below).
+
 ## Requests for the orchestrator (L2 close-out)
 
 - **ARCHITECTURE §11, WP-F rows (E-17):** WP-F gates Apple-tier dispatch and manifest fetches that allow an update
@@ -455,10 +496,27 @@ the public signature is unchanged, E-13) — flagged likewise.
   violations. The exception: `Synchronization.Mutex` is allowed only inside code gated
   `@available(iOS 26.0, macOS 26.0, *)`, never `@unchecked`, with no await and no I/O in a critical section; it is
   used by exactly three types, `PackTransferStop`, `HashingChunkSource` and `FileHandleChunkReader`.
-- **ARCHITECTURE §6.6 (cycle 3, E-10/E-11):** "`sourceCopyBytes()` sums `PackBackend.installedBytes` of adopted,
-  unreleased packs" predates fix round 1; the sum covers every media pack holding adopted content, released or not,
-  because a released pack reports no bytes and one downloaded again after its release stays installed until the next
-  catalog generation.
+- **ARCHITECTURE §6.6 (cycle 3, E-10/E-11; extended in cycle 5):** "`sourceCopyBytes()` sums
+  `PackBackend.installedBytes` of adopted, unreleased packs" predates fix round 1; the sum covers every media pack
+  holding adopted content, released or not, and (cycle 5) every pack the source released in this process, because a
+  released pack reports no bytes and one that came back after its release stays installed until a later catalog
+  generation releases it.
+- **DECISIONS ADR-027, at merge (cycle 5, E-10/E-11).** (a) The amendment bullet "*Source-held bytes reach the report
+  through the Model*": replace "the Apple source sums `PackBackend.installedBytes` of adopted, unreleased packs" with
+  "…of adopted packs, released or not, and of every pack it released in this process (a removed pack reports no
+  bytes)". (b) Consequences: "Double residency is bounded by one pack between first adoption and release" no longer
+  holds; double residency lasts from first adoption until release, and also from an on-demand re-download after
+  release until the next catalog generation (at most one download and one removal per pack per generation, never a
+  loop). Doc-only; no signature change.
+- **ZTronAssetModel `RemoteSource.sourceCopyBytes()` `///` doc, at merge (cycle 5).** "i.e. Apple packs not yet
+  released" is stale: the Apple source counts packs holding adopted content, released or not, and every pack it
+  released in this process (a released pack that came back counts until a later catalog generation releases it; a
+  removed one reports no bytes). Doc-only; WP-E does not own the Model file.
+- **StagingSink.discard under cancellation (cycle 5, verifier finding on `PackTransfer.swift:112-120,176-178,190-192`
+  and `PackCopier.swift:58-60,83-89`).** `pause()`/`cancel()` cancel the driver task, so WP-E's discards of a staged
+  or partial copy run from a cancelled task. WP-B's `StoreStagingSink.discard` is being made cancellation-proof in
+  this cycle (WP-B task), so WP-E keeps discarding from the cancelled driver task; no WP-E change. Re-check when WP-B
+  merges (the source-level tests use `FakeStagingSink`, which ignores cancellation).
 
 ## Requests for the orchestrator (fix round 1)
 
@@ -498,6 +556,10 @@ out-of-space row (3 expectations, run before the fix). L2 close-out, each new te
 before its fix: the interval ended after `deliver` (both R-OBS-1 tests failed at repetition 76 of
 `--repeat-until fail`); the release forgotten on every `.available` pack wait (the PROBE-R3-1 test, 5 issues, 4
 removals); the unsaturated `+=` (the saturation test crashed the test helper with signal 5).
+L2 close-out cycle 5, each run against the fixed code with the two new R-CLN-9 tests, all killed: the per-generation
+union `adoptedPacks ∪ released` (both new tests, 1 issue each: the pack uncounted after a new digest); counting a
+release only when it finished in the generation it was planned in (the straddling test, 1 issue); dropping the
+generation check on `released` (the straddling test, 3 issues; no earlier test killed it).
 L2 close-out cycle 3: the R-OBS-1 ordering mutant (`interval.end()` after `deliver`) against the deterministic
 interval test (3/3 single runs and 200/200 repetitions failed, scratch copy); the re-arm code itself, as the old
 behaviour, against the four E-10 tests (23 issues).
