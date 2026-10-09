@@ -270,7 +270,11 @@ extension AssetStore {
             }
             size = known
         case nil:
-            guard let orphan = confirmed[key] else {
+            // A launch orphan binds only while it still is one, at the size `apply` confirmed: orphan GC dooms the orphans
+            // it sweeps and forgets them in that same turn (`doomOrphans`), so a key swept after the confirmation is
+            // rescued from its doom above while it is on disk, and never bound once the reaper unlinked it (CCR-2;
+            // orchestrator ruling R1 at the L3 close-out).
+            guard let orphan = confirmed[key], self.state.core.orphans[key] == orphan else {
                 return false
             }
             size = orphan

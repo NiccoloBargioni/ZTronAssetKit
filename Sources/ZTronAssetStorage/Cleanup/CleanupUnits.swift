@@ -54,16 +54,11 @@ enum CleanupUnits {
 
 extension AssetStore {
     /// Removes `items` (URL and size) in metadata units of at most `deletionBatchSize` and `CleanupUnits.removalBudget`,
-    /// checking the caller's cancellation and `deadline` between units. `recheck`, when given, filters the indices of
-    /// each unit in the very turn that submits it (orphan GC's marks, REENTRANCY R10); an item it drops is skipped, not
-    /// removed. A failed removal is reported (not in `removed`) and the next unit goes on. Returns what was removed and
-    /// whether the caller's cancellation stopped it: what was removed stays removed (R-CLN-12), so the caller accounts
-    /// for it (the cleanup stamp, C-4) before it throws `.cancelled`. Throws `.closed` once closing.
-    func removeInUnits(
-        _ items: [(url: URL, bytes: Int64)],
-        until deadline: MonotonicInstant? = nil,
-        recheck: (([Int]) -> [Int])? = nil
-    ) async throws(StoreError) -> (removed: [Int], result: CleanupResult, cancelled: Bool) {
+    /// checking the caller's cancellation between units. A failed removal is reported (not in `removed`) and the next
+    /// unit goes on. Returns what was removed and whether the caller's cancellation stopped it: what was removed stays
+    /// removed (R-CLN-12), so the caller accounts for it (the cleanup stamp, C-4) before it throws `.cancelled`. Throws
+    /// `.closed` once closing. (Orphan GC no longer removes files itself: it dooms them, `doomOrphans`.)
+    func removeInUnits(_ items: [(url: URL, bytes: Int64)]) async throws(StoreError) -> (removed: [Int], result: CleanupResult, cancelled: Bool) {
         let fileSystem = self.environment.fileSystem
         let time = self.environment.time
         let batchSize = max(1, self.configuration.deletionBatchSize)
@@ -74,19 +69,11 @@ extension AssetStore {
             if Task.isCancelled {
                 return (removed, result, true)
             }
-            if let deadline, time.monotonicNow() >= deadline {
-                break
-            }
-            let range = Array(next..<min(next + batchSize, items.count))
-            let indices = recheck.map { $0(range) } ?? range
-            guard !indices.isEmpty else {
-                next = range[range.count - 1] + 1
-                continue
-            }
+            let indices = Array(next..<min(next + batchSize, items.count))
             let urls = indices.map { items[$0].url }
-            // REENTRANCY: c-1 (proposed) — the phase: the files are the collection's own decision (garbage nobody else
-            // writes under these names, or orphans the caller's `recheck` kept in this very turn); the next unit starts
-            // after the cancellation and deadline checks, and is re-checked again.
+            // REENTRANCY: c-1 (proposed) — the phase: the files are the collection's own decision (staging garbage or the
+            // prior art's files, which nobody else writes under these names); the next unit starts after the
+            // cancellation check.
             let removal = await self.runUnit(on: self.environment.metadataExecutor) {
                 CleanupUnits.remove(urls, fileSystem: fileSystem, time: time, budget: CleanupUnits.removalBudget)
             }
@@ -97,7 +84,7 @@ extension AssetStore {
                 result.bytesFreed = result.bytesFreed.addingSaturating(items[index].bytes)
                 result.filesRemoved += 1
             }
-            // Items the time budget left unattempted come first in the next unit (and are re-checked with it).
+            // Items the time budget left unattempted come first in the next unit.
             next = indices[max(1, removal.attempted) - 1] + 1
         }
         return (removed, result, false)

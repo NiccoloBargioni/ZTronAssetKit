@@ -30,10 +30,11 @@ struct StorageReportTests {
         harness.time.advance(by: 3_601)
         let orphan = try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(509, count: 77))
         let swept = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
-        #expect(swept.filesRemoved == 1 && !harness.hasBlob(gone) && harness.hasBlob(orphan))
+        // `gone` is doomed (CCR-1): it waits for the reaper beside the pruned blob.
+        #expect(swept.filesRemoved == 1 && harness.hasBlob(gone) && harness.hasBlob(orphan))
         let report = await harness.store.storageReport()
         #expect(report.bytesByKind == ["png": 300 + 150 + 80, "wav": 200, "heic": 100])
-        #expect(report.bytesByState == ResidencyBytes(present: 300 + 200 + 100 + 80, stale: 150, pendingDeletion: 120))
+        #expect(report.bytesByState == ResidencyBytes(present: 300 + 200 + 100 + 80, stale: 150, pendingDeletion: 120 + 40))
         #expect(report.pinnedBytes == 200 && report.essentialBytes == 100)
         #expect(report.evictableBytes == 300 + 150 + 80)
         #expect(report.stagingBytes == 123)

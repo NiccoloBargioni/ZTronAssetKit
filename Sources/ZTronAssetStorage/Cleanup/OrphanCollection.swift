@@ -3,7 +3,9 @@ import ZTronAssetModel
 
 /// Orphan mark and sweep over `blobs/` (R-CLN-2, store.md §6.2, REENTRANCY R10).
 extension AssetStore {
-    /// `collectGarbage(until:)`.
+    /// `collectGarbage(until:)`: one listing, one decision off the actor, then the sweep dooms the orphans in one turn
+    /// (`doomOrphans`, CCR-1; orchestrator ruling R2 at the L3 close-out), so the reaper unlinks them under the I-3
+    /// protocol and a publication or adoption of the same key meanwhile rescues them instead of losing the file.
     func performCollectGarbage(until deadline: MonotonicInstant) async throws(StoreError) -> CleanupResult {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -21,41 +23,39 @@ extension AssetStore {
         }
         let now = self.environment.time.now()
         let grace = self.configuration.policy.orphanGrace
+        let records = self.state.core.records
+        let blobTable = self.state.core.blobTable
+        let publishing = self.state.core.publishing
+        // C2: the adoption keys of every record and the comparison with the listing run off the actor.
+        // REENTRANCY: R10 — the phase, the caller's cancellation and the suspension rules (degraded, unavailable) below;
+        // the decision describes the state when the unit was submitted, so every key is checked again against the blob
+        // table and `publishing` in the turn that dooms it (`doomOrphans`); a key a record started expecting meanwhile is
+        // doomed, but stays rescuable by that record's adoption or publication until the reaper's grace ends.
+        let decision = await self.runUnit(on: self.environment.bulkExecutor) {
+            OrphanCollection.decide(listed: listed, records: records, blobTable: blobTable, publishing: publishing, now: now, grace: grace)
+        }
+        try self.checkLive()
+        if Task.isCancelled {
+            throw .cancelled
+        }
+        guard self.collectsOrphans else {
+            return CleanupResult()
+        }
+        // One turn from here: each key is O(1) against the live tables.
         var unknown: [BlobKey: Int64] = [:]
-        var candidates: [BlobKey] = []
-        let marked = self.orphanMarks()
-        let expected = self.expectedKeys()
-        for (key, item) in listed.sorted(by: { $0.key < $1.key }) where !marked.contains(key) {
-            unknown[key] = item.byteSize
-            guard !expected.contains(key), let modified = item.modifiedAt, now.timeIntervalSince(modified) > grace else {
-                continue
-            }
-            candidates.append(key)
+        for (key, size) in decision.unknown where self.state.core.blobTable[key] == nil && !self.state.core.publishing.contains(key) {
+            unknown[key] = size
         }
-        // The sweep set is re-checked against the marks right before each removal unit is submitted, in the same turn
-        // (R10): a key a publication or adoption claimed meanwhile is left alone. A file whose removal fails stays an
-        // orphan for the next run and does not stop the others; only the deadline and the caller's cancellation do.
-        // REENTRANCY: c-1 (proposed) — see `removeInUnits`; the re-check above runs in the turn of each submission.
-        let removal = try await self.removeInUnits(candidates.map { (url: layout.blobURL($0), bytes: unknown[$0] ?? 0) }, until: deadline) { [candidates] indices in
-            guard self.collectsOrphans else {
-                return []
-            }
-            let marks = self.orphanMarks().union(self.expectedKeys())
-            return indices.filter { !marks.contains(candidates[$0]) }
+        let doomed = self.doomOrphans(decision.sweep.filter { unknown[$0.key] != nil })
+        var result = CleanupResult()
+        for key in doomed {
+            result.bytesFreed = result.bytesFreed.addingSaturating(unknown.removeValue(forKey: key) ?? 0)
+            result.filesRemoved += 1
         }
-        for index in removal.removed {
-            unknown[candidates[index]] = nil
-        }
-        let result = removal.result
-        let cancelled = removal.cancelled
-        // A cancelled run still accounts for what it removed (R-CLN-12, C-4) before it reports the cancellation.
         self.state.cleanup.orphans = unknown
         if result.filesRemoved > 0 {
             self.state.core.metrics.gcBytes = self.state.core.metrics.gcBytes.addingSaturating(result.bytesFreed)
             self.stampCleanup()
-        }
-        if cancelled {
-            throw .cancelled
         }
         return result
     }
@@ -64,16 +64,6 @@ extension AssetStore {
     /// until the next `apply`, store-1 S1-11) nor unavailable (the path may belong to another store, B-15).
     var collectsOrphans: Bool {
         !self.state.core.degraded && (try? self.checkWritable()) != nil
-    }
-
-    /// The keys the store knows: every key of the blob table and every key being placed (REENTRANCY R10).
-    func orphanMarks() -> Set<BlobKey> {
-        Set(self.state.core.blobTable.keys).union(self.state.core.publishing)
-    }
-
-    /// The adoption key of every record: such a blob is adopted by the next `apply` or launch, never collected.
-    func expectedKeys() -> Set<BlobKey> {
-        Set(self.state.core.records.values.compactMap(\.expectedKey))
     }
 
     /// Lists every well-named blob in its fan-out, one unit per directory; `nil` when `deadline` passes first (a partial
@@ -128,6 +118,37 @@ extension AssetStore {
 
 /// Pure helpers of orphan GC.
 enum OrphanCollection {
+    /// What one listing decides, from a snapshot of the state (C2: computed on the bulk executor).
+    struct Decision: Sendable {
+        /// Every listed blob the snapshot's blob table and `publishing` do not know, with its size: those left after the
+        /// sweep are the report's orphans (`StorageReport.orphanBytes`).
+        var unknown: [BlobKey: Int64]
+        /// The unknown blobs to sweep: no record expects them (a later `apply` or launch adopts such a blob instead of
+        /// downloading it), and they are older than the orphan grace (one without a modification time is kept).
+        var sweep: [BlobKey: Int64]
+    }
+
+    /// The decision over `listed` (REENTRANCY R10: only after the full listing).
+    static func decide(
+        listed: [BlobKey: FileItemInfo],
+        records: [AssetID: AssetRecord],
+        blobTable: [BlobKey: BlobState],
+        publishing: Set<BlobKey>,
+        now: Date,
+        grace: TimeInterval
+    ) -> Decision {
+        let expected = Set(records.values.compactMap(\.expectedKey))
+        var decision = Decision(unknown: [:], sweep: [:])
+        for (key, item) in listed where blobTable[key] == nil && !publishing.contains(key) {
+            decision.unknown[key] = item.byteSize
+            guard !expected.contains(key), let modified = item.modifiedAt, now.timeIntervalSince(modified) > grace else {
+                continue
+            }
+            decision.sweep[key] = item.byteSize
+        }
+        return decision
+    }
+
     /// Whether `name` is a fan-out directory name: two lowercase hex digits.
     static func isFanOut(_ name: String) -> Bool {
         let bytes = Array(name.utf8)

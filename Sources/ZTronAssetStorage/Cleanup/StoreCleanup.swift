@@ -17,16 +17,18 @@ extension AssetStore {
         try await self.performCollectStaging(keeping: claimed)
     }
 
-    /// Orphan mark and sweep in bounded units until `deadline` (R-CLN-2, P-13); suspended while
-    /// `state.core.degraded` (S1-11).
+    /// Orphan mark and sweep (R-CLN-2, P-13); suspended while `state.core.degraded` (S1-11).
     ///
     /// Mark: every key of the blob table, every key being placed, and the adoption key of every record (a later `apply`
-    /// or launch adopts such a blob instead of downloading it). Sweep, only after the full listing: unmarked well-named
-    /// blobs whose `mtime` is older than `orphanGrace`. A listing the deadline interrupts sweeps nothing; the sweep stops
-    /// at the deadline between units. Also suspended while the root is unavailable (B-15).
+    /// or launch adopts such a blob instead of downloading it). Sweep, only after the full listing (in bounded units until
+    /// `deadline`; a listing the deadline interrupts sweeps nothing): unmarked well-named blobs whose `mtime` is older
+    /// than `orphanGrace` are **doomed**, not unlinked (CCR-1, L3 close-out): the reaper deletes them after the deletion
+    /// grace under the I-3 protocol (`runDueWork()`), and a publication or adoption of the same key meanwhile rescues
+    /// them. The result counts what this run released to the reaper (as quota eviction's, C-3). Also suspended while the
+    /// root is unavailable (B-15). A caller cancelled before the sweep gets `.cancelled` and nothing is doomed.
     package func collectGarbage(until deadline: MonotonicInstant) async throws(StoreError) -> CleanupResult {
-        // REENTRANCY: R1, R10, c-1 (proposed) — `performCollectGarbage` decides only after its full listing and
-        // re-checks the sweep set before each removal unit.
+        // REENTRANCY: R1, R10 — `performCollectGarbage` decides only after its full listing and re-checks every key
+        // against the blob table and `publishing` in the turn that dooms it.
         try await self.performCollectGarbage(until: deadline)
     }
 

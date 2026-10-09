@@ -188,6 +188,8 @@ struct CleanupCrashTests {
         #expect(violations.isEmpty, "\(mode): \(violations)")
         await reopened.settleDeletions()
         _ = try await reopened.store.collectGarbage(until: reopened.time.monotonicNow().adding(seconds: 60))
+        // Orphan GC dooms (CCR-1): the reaper's unlink after the grace is what could lose the bytes.
+        await reopened.settleDeletions()
         switch mode {
         case .processKill, .processKillTornWrite:
             #expect(await reopened.isPresent(a.id, at: a.key), "\(mode): the next launch binds the republished bytes")

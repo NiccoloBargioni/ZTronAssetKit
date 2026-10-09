@@ -60,10 +60,12 @@ struct IdempotencyTests {
     func secondRunIsNoOp(operation: Operation) async throws {
         let (harness, assets) = try await IdempotencyTests.prepared()
         let initial = harness.fileSystem.survivingDisk()
+        let before = await harness.state
         try await IdempotencyTests.run(operation, harness, assets, first: true)
         let afterFirst = await harness.state
         let disk = harness.fileSystem.survivingDisk()
-        #expect(disk != initial, "\(operation): the first run did something")
+        // Orphan GC dooms (CCR-1): its first run changes the blob table, and the reaper changes the disk later.
+        #expect(disk != initial || afterFirst.core.blobTable != before.core.blobTable, "\(operation): the first run did something")
         let mutations = harness.fileSystem.mutationCount
         try await IdempotencyTests.run(operation, harness, assets, first: false)
         let afterSecond = await harness.state
@@ -104,9 +106,14 @@ struct IdempotencyTests {
                 return try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
             }
         }
-        // Let units through one at a time until one garbage file is gone, then cancel the caller.
-        try await CorePoll.until("one garbage file removed") {
-            if garbage.contains(where: { !harness.exists($0) }) {
+        // Let units through one at a time until one garbage file is gone (staging GC removes in units) or the listing of
+        // `blobs/` ran (orphan GC lists in units and dooms in one turn after its last one), then cancel the caller.
+        let blobsListed = {
+            harness.fileSystem.operations.filter { $0.kind == .contentsOfDirectory && $0.url.standardizedFileURL.path == harness.layout.blobsDirectory.standardizedFileURL.path }.count
+        }
+        let launchListings = blobsListed()
+        try await CorePoll.until("one unit of the collection ran") {
+            if operation == .stagingGC ? garbage.contains(where: { !harness.exists($0) }) : blobsListed() > launchListings {
                 return true
             }
             if await !metadata.heldUnits.isEmpty {
@@ -124,10 +131,20 @@ struct IdempotencyTests {
         case .success:
             Issue.record("the cancelled collection ran to the end")
         }
-        #expect(remaining.count < garbage.count && !remaining.isEmpty, "the unit that ran stays done, the rest is left")
+        if operation == .stagingGC {
+            #expect(remaining.count < garbage.count && !remaining.isEmpty, "the unit that ran stays done, the rest is left")
+        } else {
+            let doomed = await harness.state.core.blobTable.count { if case .doomed = $0.value { return true } else { return false } }
+            #expect(remaining.count == garbage.count && doomed == 0, "a cancelled listing decides nothing: every orphan is left for the next run")
+        }
         _ = operation == .stagingGC
             ? try await harness.store.collectStaging(keeping: [])
             : try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        if operation == .orphanGC {
+            // The sweep doomed them; the reaper unlinks them after the grace (I-3).
+            #expect(garbage.allSatisfy { harness.exists($0) })
+            await harness.settleDeletions()
+        }
         #expect(garbage.allSatisfy { !harness.exists($0) }, "the next run finishes the collection")
     }
 }

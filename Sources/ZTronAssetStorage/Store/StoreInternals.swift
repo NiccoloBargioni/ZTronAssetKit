@@ -12,7 +12,8 @@ enum DirtyUrgency: Sendable, Hashable {
 
 /// The primitives WP-B provides for WP-C's extension files (ADR-046). Contract signatures, implemented by WP-B in
 /// Stage 2 level L2 and used by WP-C in level L3, so WP-C never re-implements reference counting, commit
-/// scheduling, snapshot publication, hashing or blob placement, and never edits a WP-B file.
+/// scheduling, snapshot publication, hashing or blob placement, and never edits a WP-B file. `doomOrphans(_:)` was
+/// added at the L3 close-out (CCR-1, orchestrator ruling R2).
 extension AssetStore {
     /// Throws unless the store is open: `.notOpen` while `created` or `opening`, `.closed` once `close()` began
     /// (store-1 S1-09, store-2 S2-07). Every mutating entry point of both packages calls it first and again after
@@ -80,5 +81,32 @@ extension AssetStore {
     ) async throws(StoreError) -> [AssetID: AssetLocation] {
         // REENTRANCY: R3, R4, R11, R18 — every record is re-validated after the placement unit.
         try await self.adoptVerifiedFileInternal(at: url, digest: digest, byteCount: byteCount, for: ids)
+    }
+
+    /// Dooms blobs found on disk that the store does not know, instead of unlinking them (orphan GC; CCR-1, added by
+    /// orchestrator ruling R2 at the L3 close-out). Each key of `orphans` (with its listed size) that is neither in the
+    /// blob table nor being placed becomes `doomed(unreferenced)` with that size, eligible once `deletionGrace` has
+    /// passed on the awake clock from now, and stops being a launch orphan, so `apply` no longer binds it as one
+    /// (ruling R1). The reaper then unlinks it under the I-3 protocol (a fresh acknowledgement after the grace, no
+    /// lease, a store neither degraded nor unavailable), and a publication or an adoption of the key before that rescues
+    /// it (ADR-018): no binder can lose the file to the sweep any more. Synchronous, so no window; the doom rides along
+    /// with the next commit (`.lazy`). Returns the keys it doomed, sorted.
+    func doomOrphans(_ orphans: [BlobKey: Int64]) -> [BlobKey] {
+        let eligibleAt = self.environment.time.uptimeNow().adding(seconds: self.configuration.policy.deletionGrace)
+        var doomed: [BlobKey] = []
+        for (key, size) in orphans.sorted(by: { $0.key < $1.key })
+        where self.state.core.blobTable[key] == nil && !self.state.core.publishing.contains(key) {
+            // Never in any snapshot, so the grace starts now rather than at an acknowledgement.
+            self.state.core.blobTable[key] = .doomed(
+                DoomInfo(reason: .unreferenced, sinceSnapshotVersion: self.state.core.snapshots.version, droppedInGeneration: 0, eligibleAt: eligibleAt)
+            )
+            self.state.core.blobBytes[key] = max(0, size)
+            self.state.core.orphans[key] = nil
+            doomed.append(key)
+        }
+        if !doomed.isEmpty {
+            self.markDirtyInternal(.lazy)
+        }
+        return doomed
     }
 }

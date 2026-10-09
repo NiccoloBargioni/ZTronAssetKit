@@ -53,8 +53,9 @@ extension AssetStore {
                 break
             }
         }
-        let marks = self.orphanMarks()
-        let orphans = (self.state.cleanup.orphans ?? [:]).filter { !marks.contains($0.key) }.values.reduce(Int64(0)) { $0.addingSaturating($1) }
+        // O(1) per orphan: one doomed or claimed since the last GC is no longer an orphan.
+        let orphans = (self.state.cleanup.orphans ?? [:]).filter { core.blobTable[$0.key] == nil && !core.publishing.contains($0.key) }
+            .values.reduce(Int64(0)) { $0.addingSaturating($1) }
         let unverified = core.records.values.filter { record in
             if case .present(_, _, .unverified) = record.residency {
                 return true

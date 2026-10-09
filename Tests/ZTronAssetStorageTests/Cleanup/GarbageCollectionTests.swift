@@ -113,9 +113,16 @@ struct GarbageCollectionTests {
         let young = try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(423, count: 50))
         let result = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
         #expect(result == CleanupResult(bytesFreed: 250, filesRemoved: 1, bytesDeferred: 0))
+        let sweptAt = harness.time.now()
+        // Doomed, not unlinked (CCR-1): the reaper removes it after the deletion grace, under the I-3 protocol.
+        let doom = await harness.state.core.blobTable[old]
+        #expect(harness.hasBlob(old) && doom.map { if case .doomed(let info) = $0 { info.reason == .unreferenced } else { false } } == true)
+        #expect(try await harness.store.freeSpace().pendingReclaim == 250, "the doomed orphan counts as pending reclaim")
+        let reaped = await harness.settleDeletions()
+        #expect(reaped.reapedKeys == 1 && reaped.reapedBytes == 250)
         #expect(!harness.hasBlob(old) && harness.hasBlob(young) && harness.hasBlob(adoptable) && harness.hasBlob(live.key))
         #expect(await harness.store.metrics().gcBytes == 250)
-        #expect(await harness.state.cleanup.lastCleanupAt == harness.time.now())
+        #expect(await harness.state.cleanup.lastCleanupAt == sweptAt, "the sweep stamps; the reaper's unlink does not")
         let events = harness.tap.lines.compactMap(LogIntervalEvent.init(line:)).filter { $0.name == .gc }
         #expect(events.map(\.phase) == [.began, .ended], "R-OBS-1: the sweep runs inside one gc interval")
         // The protected orphan is adopted by the next manifest application.
@@ -125,7 +132,9 @@ struct GarbageCollectionTests {
         #expect(await reopened.isPresent(expected.id, at: adoptable))
     }
 
-    @Test("R-CLN-2: an orphan whose removal keeps failing does not stop orphan GC from collecting the others", .timeLimit(.minutes(1)))
+    /// Since the L3 close-out orphan GC dooms (CCR-1), so an unlink that fails is the reaper's: the key stays doomed with
+    /// backoff (ARCHITECTURE §4.4) and the others are reaped; a later GC run sees it doomed, not as an orphan.
+    @Test("R-CLN-2: an orphan whose unlink keeps failing stays doomed with backoff and does not stop the others from being collected", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func failingOrphanDoesNotStopSweep() async throws {
         let harness = CoreHarness.cleanup(deletionBatchSize: 1)
@@ -137,14 +146,24 @@ struct GarbageCollectionTests {
         harness.fileSystem.addFault(FaultRule(operation: .removeItem, matching: URLMatcher(lastComponentSuffix: stuck), occurrence: .every, error: .io))
         harness.time.advance(by: 3_601)
         let result = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
-        #expect(result == CleanupResult(bytesFreed: 200, filesRemoved: 2, bytesDeferred: 0))
+        #expect(result == CleanupResult(bytesFreed: 300, filesRemoved: 3, bytesDeferred: 0))
+        let reaped = await harness.settleDeletions()
+        #expect(reaped.reapedKeys == 2 && reaped.reapedBytes == 200)
         #expect(harness.hasBlob(planted[0]) && !harness.hasBlob(planted[1]) && !harness.hasBlob(planted[2]))
-        // The stuck one is still an orphan: the report counts it and the next run tries it again.
-        #expect(await harness.store.storageReport().orphanBytes == 100)
+        guard case .doomed(let doom)? = await harness.state.core.blobTable[planted[0]] else {
+            Issue.record("the stuck orphan left the blob table")
+            return
+        }
+        #expect(doom.failedUnlinks == 1 && doom.reason == .unreferenced)
+        // Doomed, so neither an orphan in the report nor swept again; the reaper retries it after its backoff.
+        #expect(await harness.store.storageReport().orphanBytes == 0)
         let again = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
         #expect(again == CleanupResult() && harness.hasBlob(planted[0]))
+        harness.time.advance(by: AssetStore.unlinkBackoff(afterFailures: 1))
+        _ = await harness.store.runDueWork()
         let attempts = harness.fileSystem.operations.filter { $0.kind == .removeItem && $0.url.lastPathComponent == stuck }
         #expect(attempts.count == 2 && attempts.allSatisfy { $0.failure == .io })
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
     @Test("R-CLN-2: orphan GC deletes nothing while the store is degraded or before its listing completed", .timeLimit(.minutes(1)))
@@ -164,7 +183,9 @@ struct GarbageCollectionTests {
         #expect(try await degraded.store.collectGarbage(until: time.monotonicNow()) == CleanupResult())
         #expect(degraded.hasBlob(planted))
         let swept = try await degraded.store.collectGarbage(until: time.monotonicNow().adding(seconds: 60))
-        #expect(swept.filesRemoved == 1 && !degraded.hasBlob(planted))
+        #expect(swept.filesRemoved == 1 && degraded.hasBlob(planted))
+        await degraded.settleDeletions()
+        #expect(!degraded.hasBlob(planted))
     }
 
     /// store-2 S2-01 timeline B: the first of two publications of one key is superseded while the second waits for it;
@@ -275,7 +296,9 @@ struct GarbageCollectionTests {
         }
         #expect(harness.hasBlob(key))
         let collected = try await harness.store.collectGarbage(until: deadline)
-        #expect(collected.filesRemoved == 1 && !harness.hasBlob(key))
+        #expect(collected.filesRemoved == 1)
+        await harness.settleDeletions()
+        #expect(!harness.hasBlob(key))
     }
 
     /// Releases the held metadata units one at a time until `first` is gone, then cancels `task` while the next removal
@@ -297,27 +320,39 @@ struct GarbageCollectionTests {
         await metadata.setHolding(false)
     }
 
-    @Test("R-CLN-12: a cancelled orphan GC keeps what it removed, counts it and stamps the cleanup", .timeLimit(.minutes(1)))
+    /// Since the L3 close-out orphan GC dooms in the one turn after its decision unit (CCR-1), so a caller cancelled at
+    /// any of its suspension points, the decision included, gets `.cancelled` with nothing doomed, counted or stamped.
+    @Test("R-CLN-12: a cancelled orphan GC dooms, counts and stamps nothing, and the next run collects every orphan", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func cancelledOrphanGCAccounts() async throws {
-        let metadata = SteppedBlockingExecutor(holding: false)
-        let harness = CoreHarness.cleanup(deletionBatchSize: 1, metadata: metadata)
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(bulk: bulk)
         _ = try await harness.store.open()
         _ = try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
         let keys = try (0..<3).map { try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(460 + UInt64($0), count: 100)) }.sorted()
-        let urls = keys.map { harness.layout.blobURL($0) }
         harness.time.advance(by: 3_601)
-        await metadata.setHolding(true)
+        let stamped = await harness.state.cleanup.lastCleanupAt
+        await bulk.setHolding(true)
         let collect = Task {
             try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 600))
         }
-        try await GarbageCollectionTests.cancelDuringSecondRemoval(metadata, harness, first: urls[0], second: urls[1], task: collect)
+        // The listing is complete and the decision unit is held: cancel the caller there.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        collect.cancel()
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
         await #expect(throws: StoreError.cancelled) {
             _ = try await collect.value
         }
-        #expect(!harness.exists(urls[0]) && !harness.exists(urls[1]) && harness.exists(urls[2]), "the held unit ran; no unit started after the cancellation")
-        #expect(await harness.store.metrics().gcBytes == 200)
+        let state = await harness.state
+        #expect(keys.allSatisfy { state.core.blobTable[$0] == nil && harness.hasBlob($0) }, "nothing was doomed")
+        #expect(state.core.metrics.gcBytes == 0 && state.cleanup.lastCleanupAt == stamped)
+        let collected = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 600))
+        #expect(collected == CleanupResult(bytesFreed: 300, filesRemoved: 3, bytesDeferred: 0))
+        #expect(await harness.store.metrics().gcBytes == 300)
         #expect(await harness.store.storageReport().lastCleanupAt == harness.time.now())
+        await harness.settleDeletions()
+        #expect(keys.allSatisfy { !harness.hasBlob($0) })
     }
 
     @Test("R-CLN-12: a cancelled staging GC keeps what it removed and stamps the cleanup", .timeLimit(.minutes(1)))
