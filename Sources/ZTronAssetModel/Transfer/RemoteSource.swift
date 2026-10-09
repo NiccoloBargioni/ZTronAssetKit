@@ -102,9 +102,12 @@ public protocol RemoteSource: Sendable {
     func cancelTransfer(_ name: StagingFileName) async
     /// R-CLN-10: releases source-held duplicates of adopted content when policy allows. No-op for HTTP.
     func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport
-    /// R-CLN-9, H-7 (transport-2 T2-13): bytes the source still holds on the device for content the store adopted,
-    /// i.e. Apple packs not yet released (from `PackBackend.installedBytes`); 0 for HTTP. No network. The engine
-    /// adds it to `StorageReport.sourceCopyBytes`, because Sync reaches the Apple tier only through this protocol.
+    /// R-CLN-9, H-7 (transport-2 T2-13): bytes the OS still holds on the device in this source's copies of content
+    /// (from `PackBackend.installedBytes`): for the Apple source, packs holding adopted content (released or not),
+    /// packs released in this process that came back (restored by the OS or downloaded again on demand; they count
+    /// until a later catalog generation releases them), and packs whose planned removal has not yet succeeded
+    /// (ADR-027 as amended by ADR-050); 0 for HTTP. No network. The engine adds it to `StorageReport.sourceCopyBytes`,
+    /// because Sync reaches the Apple tier only through this protocol.
     func sourceCopyBytes() async -> Int64
     /// The app forwarded background-session events for `identifier` (R-NET-3): ensures that session exists so the
     /// OS delivers them, and returns once every event delivered before `urlSessionDidFinishEvents` is staged. A
