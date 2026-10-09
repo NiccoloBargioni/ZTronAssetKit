@@ -146,9 +146,10 @@ public final class AppleHostedRemoteSource: RemoteSource {
         return reclaim
     }
 
-    /// Bytes the OS still holds in media packs whose entries were adopted and in packs this source released, summed
-    /// from `PackBackend.installedBytes` (R-CLN-9, H-7, transport-2 T2-13). A removed pack reports nothing; one that
-    /// came back after its release (restored by the OS, or downloaded again on demand) counts until a later catalog
+    /// Bytes the OS still holds in media packs whose entries were adopted, in packs this source released, and in packs
+    /// whose planned removal has not succeeded yet (running, or failed until a later reclaim removes them), summed from
+    /// `PackBackend.installedBytes` (R-CLN-9, H-7, transport-2 T2-13). A removed pack reports nothing; one that came
+    /// back after its release (restored by the OS, or downloaded again on demand) counts until a later catalog
     /// generation releases it, even when none of its entries is adopted (an entry the retention scope excludes).
     /// The sum saturates at `Int64.max`: the backend is injectable, and a report must never trap the process.
     public func sourceCopyBytes() async -> Int64 {
