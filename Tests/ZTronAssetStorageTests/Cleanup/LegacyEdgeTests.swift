@@ -100,8 +100,9 @@ struct LegacyEdgeTests {
         #expect(throws: StoreError.cancelled) {
             try outcome.get()
         }
-        let state = await harness.state.migration
-        #expect(state.progress.adopted == 1 && state.queue.count == 12 && state.claimed.isEmpty, "the unit that ran completed; the rest stays queued")
+        // A batch of no files reports the progress without moving anything.
+        let after = try await harness.store.migrateLegacy(maxFiles: 0)
+        #expect(after.adopted == 1 && after.remaining == 12 && !after.finished, "the unit that ran completed; the rest stays queued")
         let progress = try await LegacyMigrationTests.migrateAll(harness)
         #expect(progress == LegacyMigrationProgress(adopted: 13, remaining: 0, dropped: 0, finished: true))
     }
@@ -135,5 +136,49 @@ struct LegacyEdgeTests {
         #expect(harness.content(location.url) == files[first.components.joined(separator: "/")])
         #expect(progress.adopted == 1 && progress.dropped == 0, "counted once, by the call that adopted it")
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// A legacy `manifest.json` that cannot be read whole.
+    enum UnreadableManifest: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case directory
+        case statFails
+        case readFails
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @Test(
+        "R-STO-11: a legacy manifest that cannot be read whole degrades the launch like an undecodable one, adopts nothing and still removes the tree and the key",
+        .timeLimit(.minutes(1)),
+        arguments: UnreadableManifest.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func unreadableManifest(_ manifest: UnreadableManifest) async throws {
+        var files: [String: Data] = ["x/y.png": CoreFixture.bytes(730)]
+        switch manifest {
+        case .directory:
+            files["manifest.json/inner.json"] = Data("[]".utf8)
+        case .statFails, .readFails:
+            files["manifest.json"] = Data("[]".utf8)
+        }
+        let (harness, defaults) = try LegacyFixture.harness(files: files)
+        let matcher = URLMatcher(lastComponentSuffix: "manifest.json")
+        switch manifest {
+        case .directory:
+            break
+        case .statFails:
+            harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: matcher, occurrence: .nth(1), error: .io))
+        case .readFails:
+            harness.fileSystem.addFault(FaultRule(operation: .read, matching: matcher, occurrence: .nth(1), error: .io))
+        }
+        let report = try await harness.store.open()
+        #expect(report.degraded && report.legacyMigrationPending)
+        let progress = try await LegacyMigrationTests.migrateAll(harness)
+        #expect(progress.adopted == 0 && progress.finished)
+        let view = try await harness.store.planningView()
+        #expect(view.stamp == nil && view.syncDue && view.records.isEmpty)
+        #expect(!LegacyMigrationTests.exists(harness, CleanupFixture.legacyRoot) && defaults.string(forKey: CleanupFixture.legacyKey) == nil)
     }
 }

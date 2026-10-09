@@ -120,6 +120,8 @@ struct CleanupEdgeTests {
         let report = await harness.store.storageReport()
         #expect(report.bytesByState.pendingDeletion == 200, "an unleased and a leased doomed blob")
         _ = await harness.store.releaseLease(lease)
+        #expect(await harness.store.storageReport().bytesByState.pendingDeletion == 200, "the released blob counts once")
+        // Bookkeeping: the size recorded with the lease goes with the blob's last lease.
         #expect(await harness.state.cleanup.leasedBytes.isEmpty)
     }
 }

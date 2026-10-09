@@ -206,6 +206,38 @@ struct GarbageCollectionTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    @Test("R-CLN-2: orphan GC whose listing fails or is cancelled part way removes nothing, and the next run collects", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func partialListingRemovesNothing() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([]), etag: nil, eviction: nil)
+        let key = try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(470, count: 90))
+        harness.time.advance(by: 3_601)
+        let deadline = harness.time.monotonicNow().adding(seconds: 600)
+        // A fan-out directory that cannot be listed: the run reports the error and decides nothing.
+        harness.fileSystem.addFault(FaultRule(operation: .contentsOfDirectory, matching: URLMatcher(lastComponentSuffix: key.hash.fanOut), occurrence: .nth(1), error: .io))
+        await #expect(throws: StoreError.fileSystem(.io)) {
+            _ = try await harness.store.collectGarbage(until: deadline)
+        }
+        #expect(harness.hasBlob(key))
+        // Cancelled after the top-level listing: no fan-out is listed and nothing is removed.
+        await metadata.setHolding(true)
+        let cancelled = Task {
+            try await harness.store.collectGarbage(until: deadline)
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        cancelled.cancel()
+        await metadata.setHolding(false)
+        await #expect(throws: StoreError.cancelled) {
+            _ = try await cancelled.value
+        }
+        #expect(harness.hasBlob(key))
+        let collected = try await harness.store.collectGarbage(until: deadline)
+        #expect(collected.filesRemoved == 1 && !harness.hasBlob(key))
+    }
+
     /// Releases the held metadata units one at a time until `first` is gone, then cancels `task` while the next removal
     /// unit (the one for `second`) is held, and lets everything run.
     @available(macOS 15.0, iOS 18.0, *)
