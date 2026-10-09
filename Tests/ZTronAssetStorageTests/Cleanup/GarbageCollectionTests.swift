@@ -342,13 +342,29 @@ struct GarbageCollectionTests {
         #expect(await harness.store.storageReport().lastCleanupAt == harness.time.now())
     }
 
-    /// Review round 1 (ZProbe4): `apply` confirms a launch orphan in one unit and binds it only after its plan unit and
-    /// write chunks; an orphan sweep in between removes the file, and the record is then bound to a missing blob (I-2).
-    /// Closing it needs WP-B's `adoptKnownBlob` to re-read the orphan table (CCR-2 in docs/adr-drafts/c.md): until then
-    /// this is a known issue, and the test fails as soon as the race is closed, so the wrapper is removed with the fix.
-    @Test("R-CLN-2: orphan GC never sweeps a launch orphan that a running apply is about to adopt", .timeLimit(.minutes(1)))
+    /// Where the orphan a sweep took is when the running `apply` reaches its adoption.
+    enum SweptOrphan: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// Still on disk: `apply` may bind it only if the sweep left it rescuable.
+        case stillOnDisk
+        /// Unlinked by the reaper once the grace passed: `apply` must not bind it.
+        case reaped
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// Review round 1 (ZProbe4, CCR-2): `apply` confirms a launch orphan in one unit and binds it only after its plan
+    /// unit and write chunks; an orphan sweep in between removed the file, and the record was then bound to a missing
+    /// blob (I-2). Closed at the L3 close-out (orchestrator rulings R1 and R2): the sweep dooms the orphan and forgets it
+    /// as a launch orphan in the same turn, so `apply` rescues it while it is on disk and never binds it once reaped.
+    @Test(
+        "R-CLN-2: orphan GC never sweeps a launch orphan that a running apply is about to adopt",
+        .timeLimit(.minutes(1)),
+        arguments: SweptOrphan.allCases
+    )
     @available(macOS 15.0, iOS 18.0, *)
-    func sweepRacingApplyAdoption() async throws {
+    func sweepRacingApplyAdoption(_ swept: SweptOrphan) async throws {
         let x = CleanupFixture.asset("x", seed: 450)
         let first = CoreHarness.cleanup()
         _ = try await first.store.open()
@@ -368,14 +384,32 @@ struct GarbageCollectionTests {
             try await harness.store.apply(CoreFixture.manifest([x.entry]), etag: nil, eviction: nil)
         }
         try await bulk.requireHeldUnits(atLeast: 1)
-        let swept = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        let plan = try #require(await bulk.heldUnits.first)
+        // A complete sweep runs meanwhile (any unit of its own is released; the plan unit stays held).
+        let sweep = try await CleanupSteps.run(bulk, keeping: [plan]) {
+            try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        }
+        if swept == .reaped {
+            _ = try await CleanupSteps.run(bulk, keeping: [plan]) {
+                await harness.settleDeletions()
+            }
+            #expect(!harness.hasBlob(key), "the reaper unlinked the swept orphan before apply's adoption")
+        }
         await bulk.setHolding(false)
+        await bulk.releaseAll()
         _ = try await apply.value
         let present = await harness.isPresent(x.id, at: key)
         let violations = await CoreInvariants.violations(of: harness)
-        withKnownIssue("CCR-2: apply binds a launch orphan the sweep removed meanwhile") {
-            #expect(swept.filesRemoved == 0 || !present, "a swept orphan is never bound")
-            #expect(present == harness.hasBlob(key) && violations.isEmpty, "I-2: \(violations)")
+        #expect(present == harness.hasBlob(key) && violations.isEmpty, "I-2: \(violations)")
+        switch swept {
+        case .stillOnDisk:
+            #expect(sweep.value.filesRemoved == 0 || present, "a swept orphan still on disk is rescued, never lost")
+            await harness.settleDeletions()
+            #expect(await harness.isPresent(x.id, at: key) && harness.content(harness.layout.blobURL(key)) == x.bytes)
+        case .reaped:
+            let residency = await harness.record(x.id)?.residency
+            #expect(!present && residency == .absent(.neverFetched), "a reaped orphan is never bound")
         }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 }
