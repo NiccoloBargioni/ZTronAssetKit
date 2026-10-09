@@ -250,6 +250,64 @@ struct EvictionTests {
         #expect(evicted.map(\.id) == [assets[0].id, assets[1].id])
     }
 
+    /// The two budget shapes in which the doomed bytes, not the usage, decide a second run (store-2 S2-06).
+    enum ReclaimBudget: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// No byte budget: free space plus pending reclaim falls 15,000 bytes short of the reserve.
+        case reserve
+        /// Half of usage plus free space plus pending reclaim: 25,000 bytes over 40,000 used.
+        case fractionOfFreeSpace
+
+        var testDescription: String {
+            self.rawValue
+        }
+
+        /// The policy for a volume with `free` bytes free when the first run measures.
+        func policy(free: Int64) -> StoragePolicy {
+            switch self {
+            case .reserve:
+                return CleanupFixture.policy(reserveFreeBytes: free + 15_000, hysteresisTarget: 1)
+            case .fractionOfFreeSpace:
+                return CleanupFixture.policy(budget: .fractionOfFreeSpace(0.5), hysteresisTarget: 1)
+            }
+        }
+    }
+
+    /// Review round 3 (the S2-06 regression): with a byte budget, usage alone decides the second run, so only a budget
+    /// that reads free space can tell whether the doomed bytes are counted. Four 10,000-byte assets; the first run must free
+    /// 15,000 bytes and evicts the two least recently used (20,000). The doomed bytes stay on disk until the reaper runs,
+    /// so free space has not grown: counted as pending reclaim they cover the reserve (`.reserve`) and keep the resolved
+    /// budget at 25,000 (`.fractionOfFreeSpace`), so the second run evicts nothing. Without them it would evict again
+    /// (mutant `effective = max(0, available)` in `EvictionOrder.bytesToFree`: two more, and one more).
+    @Test(
+        "R-CLN-4: pending reclaim decides a second eviction within the grace window, against a reserve and a fractional budget (store-2 S2-06)",
+        .timeLimit(.minutes(1)),
+        arguments: ReclaimBudget.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func pendingReclaimDecidesSecondRun(budget: ReclaimBudget) async throws {
+        let assets = (0..<4).map { CleanupFixture.asset("r\($0)", seed: 90 + UInt64($0), count: 10_000) }
+        // The same deterministic sequence on a large volume measures what this lifetime writes before the first run.
+        let probe = CoreHarness.cleanup()
+        try await EvictionTests.seedWithAccesses(probe, assets, recent: assets.map(\.id))
+        let written = probe.fileSystem.configuration.importantCapacity - (try await probe.store.freeSpace().volumeImportant)
+        // `.fractionOfFreeSpace` needs 10,000 bytes free at the first run (0.5 × (40,000 + 10,000) = 25,000).
+        let capacity = budget == .fractionOfFreeSpace ? 10_000 + written : probe.fileSystem.configuration.importantCapacity
+        let free = capacity - written
+        let harness = CoreHarness.cleanup(policy: budget.policy(free: free), importantCapacity: capacity)
+        try await EvictionTests.seedWithAccesses(harness, assets, recent: assets.map(\.id))
+        let before = try await harness.store.freeSpace()
+        #expect(before.volumeImportant == free && before.usedBytes == 40_000 && before.pendingReclaim == 0)
+        let first = try await harness.store.evictIfNeeded()
+        #expect(first.bytesFreed == 20_000 && first.filesRemoved == 2)
+        let between = try await harness.store.freeSpace()
+        #expect(between.usedBytes == 20_000 && between.pendingReclaim == 20_000, "the doomed bytes wait for the grace")
+        #expect(between.volumeImportant <= free, "nothing was unlinked yet")
+        let second = try await harness.store.evictIfNeeded()
+        #expect(second == CleanupResult(), "the pending reclaim covers what the first run freed")
+        let evicted = await assets.asyncFilter { await harness.record($0.id)?.residency == .absent(.evicted) }
+        #expect(evicted.map(\.id) == [assets[0].id, assets[1].id])
+    }
+
     @Test("R-CLN-4: entries outside the retention scope are evicted first, whatever their last access", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func outsideScopeFirst() async throws {
