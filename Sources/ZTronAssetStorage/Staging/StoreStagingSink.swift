@@ -134,7 +134,9 @@ package struct StoreStagingSink: StagingSink {
         return data
     }
 
-    /// Removes a staging file, its sidecar and the sidecar's temporary; idempotent.
+    /// Removes a staging file, its sidecar and the sidecar's temporary; idempotent. It completes regardless of the
+    /// caller's task cancellation (WP-E discards staged copies from cancelled driver tasks): it checks no cancellation,
+    /// and its one unit, once submitted, runs to completion on every `BlockingExecutor`.
     package func discard(_ name: StagingFileName) async {
         let urls = [name, name.with(kind: .sidecar), name.with(kind: .sidecarTemporary)].map(self.layout.stagingURL)
         let fileSystem = self.fileSystem

@@ -62,7 +62,8 @@ public protocol StagingSink: Sendable {
     func readSidecar(for name: StagingFileName) async -> ResumeSidecar?
     /// Manifest path: reads a staged file (≤ `maxBytes`) off the pool.
     func readStaged(_ name: StagingFileName, maxBytes: Int64) async throws(StagingError) -> Data
-    /// Removes a staging file and its sidecar; idempotent.
+    /// Removes a staging file and its sidecar; idempotent. It completes regardless of the caller's task cancellation:
+    /// staged copies are discarded from driver tasks that were cancelled.
     func discard(_ name: StagingFileName) async
     /// Apple tier: pulls `source` in ≤ 1 MiB units on the bulk executor into `staging/<name>`; returns the size.
     func writeStaged(_ name: StagingFileName, from source: any ChunkSource, maxBytes: Int64) async throws(StagingError) -> Int64
