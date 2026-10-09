@@ -447,4 +447,118 @@ struct GarbageCollectionTests {
         }
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
+
+    /// How a key can be on an orphan listing yet gone from the disk and from the blob table by the turn that dooms the
+    /// sweep (review of the L3 close-out, ZProbe-phantom): a doom made then has no file, and a later adoption or
+    /// publication rescues it without I/O (I-2 takes a rescuable doom's file as complete).
+    enum PhantomRace: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// Doomed by `apply` before the run; the reaper unlinks it after the listing saw its file.
+        case reapedDoom
+        /// An unknown orphan an overlapping run dooms; the reaper unlinks it after this run's listing saw its file.
+        case overlappingRun
+        /// A launch orphan `apply` adopts and then drops, and the reaper unlinks, all after this run's listing saw it.
+        case adoptedAndReaped
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// The first asset, from `seed` on, whose blob lies in a fan-out directory `accepts` takes (the listing visits the
+    /// fan-outs in name order, so a test can hold the unit after a given one).
+    static func asset(_ id: String, from seed: UInt64, fanOut accepts: (String) -> Bool) -> CleanupFixture.Asset {
+        var seed = seed
+        while !accepts(CleanupFixture.asset(id, seed: seed).key.hash.fanOut) {
+            seed += 1
+        }
+        return CleanupFixture.asset(id, seed: seed)
+    }
+
+    @Test(
+        "R-CLN-2: orphan GC never dooms a key whose file the reaper removed after the listing saw it",
+        .timeLimit(.minutes(1)),
+        arguments: PhantomRace.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func noPhantomDoom(_ race: PhantomRace) async throws {
+        let gone = GarbageCollectionTests.asset("gone", from: 470) { $0 < "f0" }
+        let keep = GarbageCollectionTests.asset("keep", from: 480) { $0 > gone.key.hash.fanOut }
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness: CoreHarness
+        switch race {
+        case .reapedDoom:
+            harness = CoreHarness.cleanup(metadata: metadata)
+            try await harness.seed([gone, keep])
+            // Doomed; the install of this apply starts its grace, and only a fresh acknowledgement is missing.
+            _ = try await harness.store.apply(CoreFixture.manifest([keep.entry]), etag: nil, eviction: nil)
+        case .overlappingRun:
+            harness = CoreHarness.cleanup(metadata: metadata)
+            try await harness.seed([keep])
+            _ = try GarbageCollectionTests.plantBlob(harness.fileSystem, gone.bytes)
+        case .adoptedAndReaped:
+            let first = CoreHarness.cleanup()
+            try await first.seed([keep])
+            await first.store.close()
+            _ = try GarbageCollectionTests.plantBlob(first.fileSystem, gone.bytes)
+            harness = CoreHarness.cleanup(disk: first.fileSystem.survivingDisk(), time: first.time, metadata: metadata)
+            _ = try await harness.store.open()
+        }
+        harness.time.advance(by: 3_601)
+        let deadline = harness.time.monotonicNow().adding(seconds: 60)
+        // The run lists gone's fan-out (the launch's own listing is before `mark`); its next listing unit (keep's fan-out)
+        // is held.
+        let mark = harness.fileSystem.operations.count
+        await metadata.setHolding(true)
+        let run = Task {
+            try await harness.store.collectGarbage(until: deadline)
+        }
+        let fanOut = gone.key.hash.fanOut
+        try await CorePoll.until("the run listed gone's fan-out") {
+            if harness.fileSystem.operations.dropFirst(mark).contains(where: { $0.kind == .contentsOfDirectory && $0.url.lastPathComponent == fanOut }) {
+                return true
+            }
+            if let next = await metadata.heldUnits.first {
+                await metadata.release(next)
+            }
+            return false
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let held = Set(await metadata.heldUnits)
+        switch race {
+        case .reapedDoom:
+            break
+        case .overlappingRun:
+            let second = try await CleanupSteps.run(metadata, keeping: held) {
+                try await harness.store.collectGarbage(until: deadline)
+            }
+            #expect(second.value == CleanupResult(), "a run while another one is in flight returns at once")
+        case .adoptedAndReaped:
+            _ = try await CleanupSteps.run(metadata, keeping: held) {
+                try await harness.store.apply(CoreFixture.manifest([keep.entry, gone.entry]), etag: nil, eviction: nil)
+            }
+            #expect(await harness.isPresent(gone.id, at: gone.key), "apply adopted the launch orphan")
+            _ = try await CleanupSteps.run(metadata, keeping: held) {
+                try await harness.store.apply(CoreFixture.manifest([keep.entry]), etag: nil, eviction: nil)
+            }
+        }
+        _ = try await CleanupSteps.run(metadata, keeping: held) {
+            // gone's grace already ended before the run: the fresh acknowledgement alone lets the reaper unlink it, with
+            // no time passing during the run.
+            race == .reapedDoom ? await harness.store.runDueWork() : await harness.settleDeletions()
+        }
+        if race != .overlappingRun {
+            #expect(!harness.hasBlob(gone.key), "the reaper unlinked gone's file after the listing saw it")
+        }
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        let result = try await run.value
+        let doomed = await harness.state.core.blobTable[gone.key] != nil
+        #expect(!doomed || harness.hasBlob(gone.key), "no doom without its file")
+        #expect(result.filesRemoved == (race == .overlappingRun ? 1 : 0))
+        // A manifest naming gone again: a doom without its file would be rescued onto a missing blob.
+        _ = try await harness.store.apply(CoreFixture.manifest([keep.entry, gone.entry]), etag: nil, eviction: nil)
+        let violations = await CoreInvariants.violations(of: harness)
+        #expect(violations.isEmpty, "I-2: \(violations)")
+        #expect(await harness.isPresent(gone.id, at: gone.key) == harness.hasBlob(gone.key))
+    }
 }
