@@ -124,7 +124,9 @@ public struct StoreAttributes: Sendable, Hashable {
 public struct FileLockToken: Sendable, Hashable {
     /// The lock file's identity at acquisition.
     public let identity: FileIdentity
-    /// The descriptor (live) or a fake handle (tests). Package-only: nobody outside can forge a token.
+    /// The conformer's handle. Live: `nonce << 32 | descriptor`, where the nonce (`1...Int32.max`) is parked in the
+    /// descriptor's file offset at acquisition, so a token whose descriptor number was closed and reused no longer
+    /// matches it (ADR draft B-1). Fake: a handle of the test double. Package-only: nobody outside can forge a token.
     package let handle: Int64
 
     /// Creates a token (conformers only).
@@ -200,6 +202,8 @@ public protocol FileSystem: Sendable {
     func applyStoreAttributes(_ attributes: StoreAttributes, at url: URL) throws(FileSystemError)
     /// Takes the advisory lock, creating the lock file when absent (mutation).
     func acquireExclusiveLock(at url: URL) throws(FileSystemError) -> FileLockToken
-    /// Releases a lock; idempotent (not a crash boundary: process death releases locks anyway).
+    /// Releases a lock; idempotent (not a crash boundary: process death releases locks anyway). Releasing a stale
+    /// token (released already, or one whose live descriptor number now belongs to another open file or lock)
+    /// releases nothing.
     func releaseLock(_ token: FileLockToken)
 }

@@ -18,7 +18,7 @@ extension AssetStore {
     /// (store-1 S1-09, store-2 S2-07). Every mutating entry point of both packages calls it first and again after
     /// each await (ARCHITECTURE §10).
     func ensureOpen() throws(StoreError) {
-        fatalError("WP-B: AssetStore.ensureOpen not implemented")
+        try self.ensureOpenInternal()
     }
 
     /// Moves a record to a residency **without** a blob (`absent`, `needsHeal`, `quarantined`, `failed`), releasing
@@ -27,38 +27,42 @@ extension AssetStore {
     /// the state dirty (`.soon`). A transition **to** `present` goes through
     /// `adoptVerifiedFile(at:digest:byteCount:for:)`.
     func setResidency(_ residency: Residency, of id: AssetID, dooming reason: DoomReason) {
-        fatalError("WP-B: AssetStore.setResidency not implemented")
+        self.setResidencyInternal(residency, of: id, dooming: reason)
     }
 
     /// Records that the in-memory state changed: `.soon` schedules one coalesced commit (P-5), `.lazy` rides along.
     func markDirty(_ urgency: DirtyUrgency) {
-        fatalError("WP-B: AssetStore.markDirty not implemented")
+        self.markDirtyInternal(urgency)
     }
 
     /// Returns once a generation holding every mutation made before the call is committed at `durability`
     /// (store.md §4.6 `requireCommitted`; REENTRANCY R5). Used by purge, pins, migration phases and deletion paths.
     func requireCommitted(_ durability: CommitDurability) async throws(StoreError) {
-        fatalError("WP-B: AssetStore.requireCommitted not implemented")
+        // REENTRANCY: R5, R17 — the loop inside re-reads coverage, the window and the phase after each await.
+        try await self.requireCommittedInternal(durability)
     }
 
     /// Builds the snapshot of current state (version allocated synchronously, store-2 S2-13) and installs it now
     /// (`.userInitiated`) or within `snapshotInstallInterval` (`.prefetch`, `.bulk`; the trailing install is a
     /// `nextDeadline()`), merging the acknowledgement as REENTRANCY R6 says (ADR-016).
     func publishSnapshot(urgency: AssetPriority) async {
-        fatalError("WP-B: AssetStore.publishSnapshot not implemented")
+        // REENTRANCY: R6, R17 — the acknowledgement is validated and merged inside.
+        await self.publishSnapshotInternal(urgency: urgency)
     }
 
     /// Deletes up to `maxKeys` blobs that are deletable **now** (ARCHITECTURE §4.4, leases read from
     /// `state.cleanup`), in sorted order and units of `deletionBatchSize` (P-13); used by `runDueWork()` and by
     /// WP-C's `purge` after its grace wait. Failed unlinks stay doomed with backoff.
     func reapDeletable(maxKeys: Int) async -> CleanupResult {
-        fatalError("WP-B: AssetStore.reapDeletable not implemented")
+        // REENTRANCY: R7, R9 — every key is re-checked before its unit and the phase after it.
+        await self.reap(maxKeys: maxKeys)
     }
 
     /// Streaming SHA-256 of a file in `hashChunkBytes` units on the bulk executor, cancellation-aware between units
     /// (R-INT-1, P-6, store.md §5.1). Used by `publish`, deep verification (R-INT-4) and legacy migration.
     func hashFile(at url: URL) async throws(StoreError) -> (digest: ContentHash, byteCount: Int64) {
-        fatalError("WP-B: AssetStore.hashFile not implemented")
+        // REENTRANCY: R2, R16 — the caller re-validates its records after the hash.
+        try await self.hashFileInternal(at: url)
     }
 
     /// The tail of publication (ARCHITECTURE §4.3 steps 7–10) for a file the caller already hashed: gains the
@@ -74,6 +78,7 @@ extension AssetStore {
         byteCount: Int64,
         for ids: [AssetID]
     ) async throws(StoreError) -> [AssetID: AssetLocation] {
-        fatalError("WP-B: AssetStore.adoptVerifiedFile not implemented")
+        // REENTRANCY: R3, R4, R11, R18 — every record is re-validated after the placement unit.
+        try await self.adoptVerifiedFileInternal(at: url, digest: digest, byteCount: byteCount, for: ids)
     }
 }
