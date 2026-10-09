@@ -49,7 +49,9 @@ orchestrator numbers them.
   something. A cancelled orphan or staging GC accounts for what its earlier units removed (stamp, `gcBytes`, the
   report's orphan table) before it throws `.cancelled` (review round 1; tests `R-CLN-12: a cancelled orphan GC keeps
   what it removed, counts it and stamps the cleanup` and `R-CLN-12: a cancelled staging GC keeps what it removed and
-  stamps the cleanup`).
+  stamps the cleanup`). A purge stamps once its commit succeeded, before the grace wait, and again when the wait ends:
+  a caller cancelled during the wait gets `.cancelled`, but the purge is committed and the reaper frees its bytes, so
+  it is a cleanup run (review round 2; `R-CLN-6: a purge cancelled during its grace wait…` asserts the stamp).
 - **Consequences.** R-CLN-12's second run is a strict no-op: no file-system mutation, no record, blob-table or stamp
   change (test `R-CLN-12: every cleanup operation run twice is a no-op the second time`, six operations).
   `StorageReport.lastCleanupAt` therefore means "the last cleanup that did something".
@@ -70,6 +72,12 @@ orchestrator numbers them.
   them later). A cancelled caller gets `.cancelled` from the wait; the purge is already committed.
 - **Consequences.** Purge waits on contract fields (`blobTable`'s `DoomInfo`, the leases) and primitives only, not on
   the reaper's internal blocker (C-16).
+- **Purge during legacy migration (review round 2, a spec question; for store.md §6.5).** `purge(.all)` selects records
+  holding a blob; records still waiting for a legacy file stay `absent(.neverFetched)` and later batches may adopt
+  their files. Kept, and documented here rather than changed: a purge makes a sync due (R-CLN-6) and that sync fetches
+  the same entries again, so adopting a legacy file whose digest verifies is the same bytes without the download; the
+  legacy tree is not the store's to purge, and phase 4 removes what is left of it when migration ends. Abandoning the
+  queue instead would turn a purge into a forced re-download of every not-yet-migrated file.
 
 ## C-6 — Apple-adopted assets are not ranked after ordinary ones
 - **Context.** `EvictionPlan`'s doc and ADR-027 rank Apple-adopted assets after ordinary ones of the same class.
@@ -99,6 +107,14 @@ orchestrator numbers them.
   its deadline, and before a blob that would take it past `byteBudget` (the first blob of a slice always runs, so a
   blob larger than the budget is still verified). A digest or size mismatch, or a blob whose read fails, quarantines.
   Nothing runs while degraded (R16). Quarantines are installed at once; their commit follows in the coalescing window.
+- **One incarnation per hash (review round 2, ZProbeC).** A blob's name can be replaced while it is hashed (quarantine
+  or eviction, then a re-download over the doomed name, ADR draft B-24, or a reap and a new placement): the hash then
+  mixes chunks of two files and quarantined the fresh, verified one. Verification stats the name (identity
+  `(st_dev, st_ino)`, size) in one metadata unit before the hash and again after it; a change, or a placement of the
+  key in flight (`publishing`), discards the result: no quarantine, no `verifiedAt`, and the key is not marked done,
+  so the pass checks it again (`R-INT-4: deep verification discards a hash whose blob name was replaced meanwhile…`,
+  failing first in `28076fa`). A write in place keeps the identity and is what verification exists to find. A
+  per-key placement serial from WP-B would be an alternative; the identity needs no contract change.
 
 ## C-9 — Staging GC
 - **Decision.** One listing (R14), then removals in units of `deletionBatchSize` and at most 1 ms of the injected clock
@@ -115,7 +131,10 @@ orchestrator numbers them.
   fan-out, non-following) must complete before any decision; a deadline that passes first sweeps nothing. Sweep:
   unmarked well-named blobs in their own fan-out older than `orphanGrace` (no modification time: kept), re-checked
   against the marks right before each removal unit is submitted (same actor turn), removed in units as C-9, stopping
-  at the deadline. Suspended while degraded (S1-11) or unwritable (B-15/B-34, through `checkWritable()`). The
+  at the deadline. The re-check runs in the turn that submits **each** removal unit, including the units a removal
+  batch's time budget splits off (`removeInUnits(recheck:)`); a file whose unlink fails stays an orphan for the next
+  run and never stops the sweep, which ends only at the deadline or the caller's cancellation (review round 2; test
+  `R-CLN-2: an orphan whose removal keeps failing does not stop orphan GC…`). Suspended while degraded (S1-11) or unwritable (B-15/B-34, through `checkWritable()`). The
   unreferenced blobs it leaves (young or adoptable) are remembered for the report (`CleanupState.orphans`).
 - **Residual risk, reported as CCR-1.** The unlink unit runs off the actor: between the sweep decision and the unit, a
   publication of the very same bytes for a record that did not expect them at decision time (a checksum-less
@@ -148,15 +167,27 @@ orchestrator numbers them.
   checksum (64 lowercase hex digits; anything else came from a custom `computeChecksum`). An entry whose local
   checksum disagrees with its manifest checksum is dropped (the prior art stored other bytes, the file is stale); one
   with neither is dropped. Entries naming one file share it when they expect one digest; a later one expecting another
-  is dropped. The legacy manifest is decoded under `configuration.limits` with duplicates keeping the first.
+  is dropped. The legacy manifest is decoded under `configuration.limits` with duplicates keeping the first. An entry
+  whose file the listing does not find is reported apart (`LegacyPlan.unlisted`, with the digest it expected), not
+  dropped: an earlier lifetime may have moved it into `blobs/` (review round 2). The plan also lists every valid
+  entry path (`paths`), the only files phase 4 may remove besides the two metadata files. Decoding and planning run in
+  one bulk unit (C2: at `maxEntries` the plan alone took about 94 ms on the actor).
 - **Deviation from store.md §7 (for the orchestrator).** store.md hashed checksum-less files without a local checksum
   in phase 1; ADR-029 moved all hashing out of `open()`, and SPEC R-STO-11 adopts files "whose checksum verifies", so
   such files are dropped and downloaded again instead (the prior art always recorded a local checksum when it stored a
   file, so this case needs a failed hash in the prior art).
 
 ## C-13 — Legacy phase 1 inside `open()`
-- **Decision.** Skipped in a lifetime that cannot write (B-34) and when the root cannot be stat-ed (no decision on an
-  I/O error). Before migration started, a missing root (a symbolic link counts as missing, never followed) removes the
+- **Decision.** Skipped in a lifetime that cannot write (B-34), when the root cannot be stat-ed (no decision on an
+  I/O error), and when the legacy root **overlaps the store** (review round 2, ZProbeA/A2): it is the store's own
+  directory `<base>/ZTronAssetKit`, one of its ancestors (the prior art's `baseDirectory:` was the root itself, so
+  `StorageLocation.custom(X)` with `LegacyMigrationPolicy(root: X)` is natural), or lies inside it. Compared by path
+  (dot segments applied, canonical composition, case folded) and then by `(st_dev, st_ino)` of the root, the store's
+  directory and their ancestors in one metadata unit, so a symbolic link in either path cannot hide the overlap. Such
+  a lifetime logs, writes nothing and leaves the stamp; migrating would rename files inside the store's tree and phase
+  4 would remove it. The store's directory, not its base, is the boundary: the default root `<Caches>/CDNAssets` lies
+  inside the base of a `.caches` store without touching it (test `R-STO-11: a legacy root that is, contains or lies
+  inside the store's directory is never migrated, and the store survives`, four placements, one through a link). Before migration started, a missing root (a symbolic link counts as missing, never followed) removes the
   prior art's `UserDefaults` key and migrates nothing (D-6). Otherwise phase 1 reads the stamp (only when starting),
   `manifest.json` and `local-checksums.json` (whole, ≤ `maxPayloadBytes`, 1 MiB units), lists the tree, decodes off
   the actor, and — when starting — writes exactly ARCHITECTURE §1.1 rule 1's set: the legacy manifest becomes the
@@ -174,15 +205,20 @@ orchestrator numbers them.
   files on a plan that only an unsynced `index.tmp` may hold. The launch commit normally covers the mark already
   (`requireCommitted` then returns at once). Test `R-STO-11: a relaunch in phase inProgress whose barrier and launch
   commit failed commits before moving a legacy file`. Files nothing wants any more are counted dropped unless a record
-  already holds their bytes. Phase 1 publishes no snapshot.
+  already holds their bytes, and so are unlisted entries (review round 2, ZProbeB: a relaunch counted the files an
+  earlier lifetime adopted as dropped; test `R-STO-11: a relaunch in phase inProgress counts files adopted by an earlier
+  lifetime neither adopted nor dropped`). Phase 1 publishes no snapshot.
 - **Deviation from store.md §7 (for the orchestrator).** An undecodable legacy manifest does not hash and move the
   legacy files as protected orphans: placing a blob with no record that expects it needs a store primitive that does
   not exist (the same gap as CCR-1). The launch is degraded as the contract says, nothing is adopted, and phases 3–4
-  remove the tree and the key with a sync due, so those files are downloaded again. A legacy root without
+  remove the prior art's metadata and the key with a sync due, so those entries are downloaded again; their files stay
+  where they are (C-15: without a manifest nothing attributes them). A legacy root without
   `manifest.json` (the prior art creates the directory at init) migrates nothing and never the stamp.
 
 ## C-14 — Phase 2 and adopt-on-demand
-- **Decision.** Files are processed in path order from a queue; a file being processed is claimed. Each file is hashed
+- **Decision.** Files are processed in path order from a queue (stored reversed: a batch takes the last and a call
+  that did not finish puts it back in O(1), so a migration of `maxEntries` files stays linear, C2; adopt-on-demand
+  searches it once per call); a file being processed is claimed. Each file is hashed
   (`hashFile`, R11), re-validated (records still expect the digest and accept adoption; digest and stated size match)
   and adopted through `adoptVerifiedFile` (rename from the legacy tree, dedupe onto a live key); lifecycle and
   cancellation errors end the call (the file goes back to the head of the queue), every other failure drops the file
@@ -210,6 +246,21 @@ orchestrator numbers them.
   every file and link (never a target), then the directories deepest first, then the root, then the `UserDefaults`
   key. Phase 4 is idempotent: a relaunch in phase `done` with the tree or the key left returns
   `legacyMigrationPending`, and the next `migrateLegacy` finishes it.
+- **Amended in review round 2: phase 4 removes only what the prior art wrote.** The prior art's docs suggest a
+  `Documents`-rooted `baseDirectory:`, so the legacy root may hold the user's own files; a recursive removal would
+  delete them (and, with an overlapping root, the store: C-13). Phase 4 now reads `manifest.json` and lists the tree
+  without following links, then removes each legacy entry's file (`LegacyPlan.paths`) and `local-checksums.json`
+  (and a symbolic link where the prior art had a file or a directory: the link only), then the directories on the
+  entries' paths deepest first (one still holding anything fails with ENOTEMPTY and stays), then `manifest.json`
+  **last** (so a call that stopped part way still attributes the files next time), then the root only if empty. It is
+  finished when everything the prior art wrote is gone; a root holding other files stays and is not pending at the
+  next launch (pending in phase `done` = the stamp, a non-directory at the root, a metadata file, or an empty root).
+  Test `R-STO-11: phase 4 removes only what the prior art wrote, never recursively…` (a file at the root, one beside
+  a legacy file, one in its own directory). Consequence, accepted: an undecodable or unreadable manifest attributes
+  nothing, so its files stay in the root (the two tests of that case now assert they are kept, the metadata file and
+  the key removed; one-to-one with their previous "removes the tree" assertion); a file the prior art left from an
+  older manifest (it pruned on every reconcile) stays too. In `Caches` the OS may purge them; elsewhere they are the
+  app's to delete, which is the safe direction for data that might not be ours.
 
 ## C-16 — How WP-C reaches WP-B
 - **Decision.** WP-C writes `StoreCoreState` only where its doc allows (records' `pinned`/`integrity`/`verifiedAt`,
@@ -274,8 +325,24 @@ orchestrator numbers them.
   durable files, checked once per disk against the fake's own view). Two disks at a time, not eight: with eight, WP-H's
   start/stop race (400 rounds, about 80,000 `Task.yield()`s) took 55.6–58.1 s of its 60 under TSan beside this suite
   (30.7 s without it); with two, 37.1 s. Cost: about 25 s of CPU in debug on this Mac (was 112 s), about 0.5 s per row,
-  12 s of wall time alone, 120 s under TSan. The space is asserted, not printed: every disk ran, and each disk's fault
+  12 s of wall time alone, 120 s under TSan. Review round 2: one disk at a time (`width = 1`), and the oracle's seeds and
+  the three crash suites' modes are `.serialized`, so WP-C's suites hold at most one cooperative thread each beside
+  WP-B's kill-then-power-loss cases and WP-H's start/stop race under TSan. The space is asserted, not printed: every disk ran, and each disk's fault
   and crash-view counts equal the counts its window implies. The B-36 mutation check still fails 27 of 49 rows.
+
+## C-21 — Eviction candidates off the actor; the chunk yield (review round 2, C2)
+- **Context.** `EvictionOrder.candidates` groups every record by blob and sorts: about 228 ms on the actor at
+  `maxEntries` (ZProbeF, loaded host). The R8 yield between chunks of 1,000 was never reached by a test.
+- **Decision.** `evictIfNeeded()` and `storageReport()` compute the candidates in a bulk unit from a value snapshot
+  (records, blob table, `publishing`, leases, rules); eviction re-validates each candidate against the state when it
+  marks it, with holders read after the await, as before (R8). The dry run `evictionPlan(toFree:protecting:)` keeps
+  computing on the actor: it is synchronous by contract (OI-4). The yield between chunks is a no-op metadata unit
+  instead of `Task.yield()`: the actor is free for the whole hop, and a test holds eviction at that point
+  (`R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate…`: with
+  `EvictionState.chunk` lowered to 2 through a test-target seam, a candidate accessed and one leased during the
+  yield are kept). For the orchestrator: R8's ledger text names `Task.yield()`; it now reads "a no-op metadata unit".
+- **Consequences.** A snapshot captured by the unit makes the actor's next mutation of that dictionary copy it once
+  (copy-on-write) while the unit runs; that copy is linear and far cheaper than the grouping and sort.
 
 ## Contract change requests
 
@@ -315,14 +382,23 @@ orchestrator numbers them.
   13.37 ms and 10.44 ms against 5 ms; p95 0.99 ms) at load averages of 65–75; WP-C changed no reaper code and owns no
   benchmark (ARCHITECTURE §1.2). The orchestrator re-runs `--perf` on an idle machine at merge (ORCHESTRATION.md).
 
+- **OI-4 — `evictionPlan(toFree:protecting:)` computes its candidates on the actor (C2, review round 2).** It is a
+  synchronous package API by contract, so its grouping and sort (about 228 ms at `maxEntries` under load, a few ms at
+  realistic catalog sizes) stay one actor stretch. Moving it off the actor needs an `async` signature (a contract
+  change, for the orchestrator with WP-F, its caller).
+- **OI-5 — ARCHITECTURE §14 (orchestrator).** It describes `LiveLegacyDefaults.swift`'s untested part as 3 lines; the
+  coverage export counts 3 of 14 lines covered (11 uncovered). The file is unchanged since the contract.
+
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.1)
 
 | Row | Await | Re-validated afterwards |
 |---|---|---|
-| c-1 (proposed) | the removal units of `collectStaging`, `collectGarbage` and legacy phase 4 (`removeInUnits`, `removeAllInUnits`) | the phase; the next unit starts only after the caller's cancellation and the deadline are checked (a cancellation ends the loop with the partial result, which the caller accounts for before it throws `.cancelled`, C-4); for orphans the sweep set of each unit is re-checked against the blob table, `publishing` and the records' adoption keys in the turn that submits it (C-10) |
+| c-1 (proposed) | the removal units of `collectStaging`, `collectGarbage` and legacy phase 4 (`removeInUnits`, `removeAllInUnits`) | the phase; the next unit starts only after the caller's cancellation and the deadline are checked (a cancellation ends the loop with the partial result, which the caller accounts for before it throws `.cancelled`, C-4); a failed removal does not stop the loop; for orphans the items of each unit are re-checked (`recheck`) against the blob table, `publishing` and the records' adoption keys in the turn that submits it, the units a time budget splits off included (C-10) |
 | c-2 (proposed) | `storageReport()`'s staging listing unit | nothing: the sum is a snapshot; the report's other figures are read from the state after the await |
 | c-3 (proposed) | `verifyIntegrity`'s trailing snapshot install | nothing but the phase (as R17): the quarantines were made synchronously before it and the report describes them |
-| c-4 (proposed) | legacy phase 4's stats, listing and removal units and the `UserDefaults` key removal; the key removal of phase 1 when no tree exists | nothing: after the durable "done" commit (or with no tree before migration) the tree and the key are the migration's alone, and every step is idempotent; the root's kind is a snapshot taken without following it, and anything but a directory is unlinked, never listed |
+| c-4 (proposed) | legacy phase 4's stats, manifest read, listing, removal-set unit (bulk) and removal units and the `UserDefaults` key removal; the key removal of phase 1 when no tree exists | nothing: after the durable "done" commit (or with no tree before migration) the prior art's files and the key are the migration's alone, and every step is idempotent; the root's kind is a snapshot taken without following it, and anything but a directory is unlinked, never listed; only items of the non-following listing that the prior art could have written are removed (C-15) |
+| R16 amendment (proposed) | `verifyIntegrity`'s stat units around each hash (`blobIncarnation`) | as R16, plus: the identity and size under the name are the same before and after the hash and the key is not in `publishing`; otherwise the result is discarded and the key stays due in this pass (C-8) |
+| R8 amendment (proposed) | quota eviction's candidate unit (bulk) and its no-op metadata unit between chunks | as R8: the phase and writability, then per candidate against holders read after the await (C-21) |
 
 Existing rows WP-C's awaits cite: R1 (async APIs await `open()`; phase-1 units), R3/R4 (through `adoptVerifiedFile`),
 R7 and R9 (purge's reap and grace wait), R8 (eviction chunks), R10 (orphan listing), R11 (migration units), R12
@@ -359,6 +435,30 @@ declined except where noted.
 | 20 | correct: `CleanupState.orphans` doc said the report uses the launch's orphans | doc corrected to what the code and C-11 say (0 before the first orphan GC) |
 | 21 | correct: same as 9 | as 9 |
 
+## Review round 2 — dispositions
+
+Two lenses reported 16 issues, 5 of them blocking. Every blocking one is fixed with a test that failed first
+(`28076fa`); none is declined. Routed items are unchanged where WP-C's write set cannot close them.
+
+| # | Lens, issue | Disposition |
+|---|---|---|
+| 1 | reqs, blocking: the superseded-publication R-CLN-2 test passed for any implementation | rewritten: checksum-less entries (no record expects the key), an orphan older than the grace already under the name, A's placement held while one complete sweep runs (its listing units released one by one), then a second sweep while B's placement is held; mutant M-B (`orphanMarks()` without `publishing`) now fails it (`first.value.filesRemoved == 0`), it passed before |
+| 2 | reqs: CCR-2 merge-gating | routed, unchanged (CCR-2; `withKnownIssue` stays until both halves land) |
+| 3 | reqs: WP-C's suites halve the TSan headroom of WP-B's and WP-H's races | the oracle's seeds and the three crash suites are `.serialized`, the state space runs one disk at a time (C-20) |
+| 4 | reqs: the R8 yield and `adoptLegacyNow`'s requeue path uncovered | C-21: chunk size in `EvictionState` (test-target seam), the yield a no-op metadata unit, test of a candidate accessed and one leased during the yield; `R-STO-11: an adopt-on-demand cancelled while it hashes puts its file back…` (mutant: no requeue → fails) |
+| 5 | reqs: OI-1 | routed, unchanged |
+| 6 | reqs: P-13 at load | OI-3, unchanged (WP-B's benchmark) |
+| 7 | reqs: C-17 ownership | none needed (orchestrator) |
+| 8 | reqs: §14's LiveLegacyDefaults figure | OI-5 (orchestrator; WP-C cannot edit ARCHITECTURE.md) |
+| 9 | correct, blocking: phase 4 removed a store inside the legacy root | C-13 (overlap check, four placements tested) and C-15 (phase 4 removes only the prior art's files, never recursively) |
+| 10 | correct, blocking: verification quarantined a replacement hashed across two incarnations | C-8 incarnation check; ZProbeC is the regression test |
+| 11 | correct, blocking: a relaunch counted earlier adoptions as dropped | C-12/C-13: `LegacyPlan.unlisted`, dropped only without a record at the expected digest |
+| 12 | correct, blocking: a cancelled purge was never stamped | C-4: stamped after the commit and again after the wait |
+| 13 | correct: C2 stretches at the manifest limit | planning in the bulk decode unit, legacy queue O(1) per file (C-12, C-14), eviction candidates in a bulk unit for `evictIfNeeded` and the report (C-21); the synchronous dry run stays (OI-4, contract) |
+| 14 | correct: one failing unlink stopped orphan GC | C-10: the sweep stops only at the deadline or cancellation; the marks are re-checked per unit, including units a time budget splits off (found while fixing: the old loop re-checked per batch only) |
+| 15 | correct: CCR-2 and OI-1 still open | routed, unchanged |
+| 16 | correct: purge during legacy migration | decided and documented (C-5): kept, no code change |
+
 ## Not verified here
 
 - Device behaviour of the legacy rename (`Caches` → `Application Support` on one APFS volume) and of a legacy root on
@@ -366,8 +466,47 @@ declined except where noted.
   §14); Unicode normalisation or case differences between a legacy manifest's path components and the names on disk
   (a mismatch drops the file, which is then downloaded again).
 - The ordered/durable distinction of phase 3 on a device (OI-2).
+- The overlap check's identity comparison on a device (C-13): `(st_dev, st_ino)` through `/var` → `/private/var` and
+  through an App Group container were exercised on the fake volume only (a link in the store's base, test case
+  `throughLink`); the live conformer reports `systemNumber`/`systemFileNumber`, and the path comparison does not depend
+  on them.
+- Deep verification's incarnation check against a real rename-over on APFS (C-8): the fake gives every new file a new
+  inode, as APFS does; a volume that reuses inode numbers at once could hide a replacement of the same size.
 
-## Evidence (this worktree, `wp/c`, 2026-10-09, fix round 1; this Mac, 8 cores)
+## Evidence (this worktree, `wp/c`, 2026-10-09, fix round 2; this Mac, 8 cores)
+
+- Failing first (`28076fa`, the tests alone on the round-1 sources): `swift test` of the Storage bundle recorded 113
+  issues in 8 tests, among them `R-STO-11: a legacy root that is, contains or lies inside the store's directory…` (all
+  4 placements), `R-STO-11: phase 4 removes only what the prior art wrote…` (8 issues), `R-INT-4: deep verification
+  discards a hash…` (`report.corrupt.isEmpty` failed: ZProbeC reproduced), `R-STO-11: a relaunch in phase inProgress
+  counts…` (`dropped` 4), `R-CLN-6: a purge cancelled during its grace wait…` (no stamp), `R-CLN-2: an orphan whose
+  removal keeps failing…` (3 issues). The rewritten superseded-publication test passed on the round-1 sources and
+  failed with mutant M-B (`orphanMarks()` without `publishing`): `first.value.filesRemoved == 0` at
+  `GarbageCollectionTests.swift:207`. Mutant "no requeue" in `adoptLegacyNow`'s error path fails
+  `R-STO-11: an adopt-on-demand cancelled while it hashes…`. Every mutant was reverted (`git diff` empty).
+- `SWIFTPM_SCRATCH=.build-c bash Scripts/verify.sh --quick` at `c19bef5`: `VERIFY: PASS` (Storage bundle `Test run
+  with 399 tests in 55 suites passed after 65.170 seconds with 2 known issues`, CCR-2's test).
+- `swift build -c release --scratch-path .build-c -Xswiftc -warnings-as-errors`: `Build complete!`, exit 0.
+- `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-c/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no error or warning.
+- `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`; `gates.py selftest`: `SELFTEST: PASS`. Every `await` in
+  WP-C's four directories has a `// REENTRANCY:` line (scripted check, no exception).
+- Coverage (`swift test --enable-code-coverage --skip Benchmarks` at `6536e5d`, `llvm-cov export` over all bundles):
+  `COVERAGE target=ZTronAssetStorage lines= 97.18% (6967/7169) min=90.0 OK`; WP-C's files 1978/2054 = 96.30% (96.81%
+  without `LiveLegacyDefaults.swift`), lowest `CleanupUnits.swift` 92.6%. The R8 yield and `adoptLegacyNow`'s requeue
+  path are covered now. Kit and Sync fail on WP-F/WP-G stubs, as expected at L3.
+- TSan (`swift test --scratch-path .build-c-tsan --sanitize=thread --filter ZTronAssetStorageTests`, load 45 → 12):
+  `Test run with 399 tests in 55 suites passed after 237.444 seconds with 2 known issues`, 0 ThreadSanitizer reports,
+  0 `Time limit was exceeded`; WP-B's `R-STO-5: a process kill followed by a power loss…` 31.6 s, WP-H's start/stop
+  race 48.1 s, the oracle (seeds serialized) 26.0 s, the state space (one disk at a time) 237.4 s for 49 rows.
+- iOS Simulator (`897F9D8D…`, `caffeinate -i xcodebuild test … -skip-testing:ZTronAssetKitBenchmarks
+  -collect-test-diagnostics never OTHER_SWIFT_FLAGS='-warnings-as-errors'`): see the final line of this section.
+- Benchmarks (informational; WP-C owns none): `swift test -c release --scratch-path .build-c-perf -Xswiftc
+  -enable-testing --filter Benchmarks` at load 7–10: 8 of 9 passed; WP-B's P-13 failed again (`unit max 7.1545 ms
+  (p50 0.961375 ms, p95 0.994083 ms); budgets 2.0 s, 5.0 ms per batch`), as OI-3; WP-C changed no reaper code.
+
+## Evidence of fix round 1 (this worktree, `wp/c`, 2026-10-09; this Mac, 8 cores)
 
 - `SWIFTPM_SCRATCH=.build-c bash Scripts/verify.sh --quick` at `4255271`: `VERIFY: PASS` (Storage bundle `Test run with
   392 tests in 54 suites passed after 57.114 seconds with 2 known issues`, the 2 known issues being CCR-2's test).
