@@ -99,17 +99,45 @@ struct LegacyPhaseOneStateSpaceTests {
         Dictionary(uniqueKeysWithValues: CrashMode.allCases.map { ($0, LegacyPhaseOneStateSpaceTests.newestValid(IndexSpace.surviving(initial, $0))) })
     }
 
+    /// The load rule's choice, by the index files of a view: survivors share their index files far more often than
+    /// anything else, so each distinct set is decided once per initial disk.
+    typealias LoadMemo = [[IndexFile: [UInt8]]: UInt64]
+
+    /// The index files of one view's file table.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func indexFiles(_ table: [String: [UInt8]]) -> [IndexFile: [UInt8]] {
+        Dictionary(uniqueKeysWithValues: IndexFile.allCases.compactMap { file in table[IndexSpace.path(file)].map { (file, $0) } })
+    }
+
+    /// The index files `survivor` (a disk taken from a fake configured for a kill) leaves under the view of `mode`, as
+    /// B-33's `IndexSpace.views` reads them: the namespace for a kill or a torn write, the durable names with their
+    /// synced data for a power loss dropping unsynced state, the fake's own view for one keeping metadata.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func view(_ survivor: DiskImage, _ mode: CrashMode) -> [IndexFile: [UInt8]] {
+        switch mode {
+        case .processKill, .processKillTornWrite:
+            return LegacyPhaseOneStateSpaceTests.indexFiles(survivor.files)
+        case .powerLossDropUnsynced:
+            return LegacyPhaseOneStateSpaceTests.indexFiles(survivor.durableFiles)
+        case .powerLossKeepMetadata:
+            return LegacyPhaseOneStateSpaceTests.indexFiles(IndexSpace.surviving(survivor, mode).files)
+        }
+    }
+
     /// I-a for the survivor of a case: under `views` (the survivor's own view for a crash, every view for a kill), the
     /// load rule finds a generation at least as new as the initial disk's under that view (`floors`) and as `counted`.
     @available(macOS 15.0, iOS 18.0, *)
-    static func checkSurvivor(_ survivor: DiskImage, floors: [CrashMode: UInt64], counted: UInt64, views: [CrashMode], label: String) -> [String] {
+    static func checkSurvivor(_ survivor: DiskImage, floors: [CrashMode: UInt64], counted: UInt64, views: [CrashMode], label: String, memo: inout LoadMemo) -> [String] {
         var found: [String] = []
         for mode in views {
-            let view = mode == .processKill || mode == .processKillTornWrite ? survivor : IndexSpace.surviving(survivor, mode)
-            let files = Dictionary(uniqueKeysWithValues: IndexFile.allCases.compactMap { file in
-                view.files[IndexSpace.path(file)].map { (file, IndexFileRead(size: Int64($0.count), bytes: $0)) }
-            })
-            let loaded = IndexLoadRule.choose(files).content?.generation ?? 0
+            let files = LegacyPhaseOneStateSpaceTests.view(survivor, mode)
+            let loaded: UInt64
+            if let known = memo[files] {
+                loaded = known
+            } else {
+                loaded = IndexLoadRule.choose(files.mapValues { IndexFileRead(size: Int64($0.count), bytes: $0) }).content?.generation ?? 0
+                memo[files] = loaded
+            }
             let floor = max(floors[mode] ?? 0, counted)
             if loaded < floor {
                 found.append("\(label), \(mode) view: I-a, the next launch loads generation \(loaded) < \(floor)")
@@ -164,8 +192,14 @@ struct LegacyPhaseOneStateSpaceTests {
         var result = SliceResult(slice: slice.testDescription)
         let initial = try LegacyPhaseOneStateSpaceTests.disk(slice)
         let floors = LegacyPhaseOneStateSpaceTests.floors(initial)
+        var memo: LoadMemo = [:]
         let root = IndexSpace.layout.root
         let clean = await LegacyPhaseOneStateSpaceTests.lifetime(initial)
+        // The shortcut of `view` for a power loss dropping unsynced state agrees with the fake's own view.
+        let dropped = LegacyPhaseOneStateSpaceTests.indexFiles(IndexSpace.surviving(clean.survivor, .powerLossDropUnsynced).files)
+        if dropped != LegacyPhaseOneStateSpaceTests.view(clean.survivor, .powerLossDropUnsynced) {
+            result.violations.append("\(slice.testDescription): the durable index files differ from the fake's power-loss view")
+        }
         let (mutations, faults) = LegacyPhaseOneStateSpaceTests.window(clean.operations, root: root)
         guard !mutations.isEmpty, !faults.isEmpty else {
             result.violations.append("\(slice.testDescription): the window holds no phase-1 commit or barrier")
@@ -195,7 +229,7 @@ struct LegacyPhaseOneStateSpaceTests {
                 let event = fault.map { "\($0.error) at \($0.operation) \($0.matching.lastComponentSuffix ?? "") #\($0.occurrence)" } ?? "no fault"
                 let label = "\(slice.testDescription), \(event)\(full ? ", full after phase 1" : "")"
                 result.violations += run.violations.map { "\(label): \($0)" }
-                result.violations += LegacyPhaseOneStateSpaceTests.checkSurvivor(run.survivor, floors: floors, counted: run.counted, views: CrashMode.allCases, label: label)
+                result.violations += LegacyPhaseOneStateSpaceTests.checkSurvivor(run.survivor, floors: floors, counted: run.counted, views: CrashMode.allCases, label: label, memo: &memo)
             }
         }
         for (point, mutation) in mutations.enumerated() {
@@ -216,16 +250,20 @@ struct LegacyPhaseOneStateSpaceTests {
                 }
                 result.crashViews += 1
                 result.violations += run.violations.map { "\(label): \($0)" }
-                result.violations += LegacyPhaseOneStateSpaceTests.checkSurvivor(run.survivor, floors: floors, counted: run.counted, views: [mode], label: label)
+                result.violations += LegacyPhaseOneStateSpaceTests.checkSurvivor(run.survivor, floors: floors, counted: run.counted, views: [mode], label: label, memo: &memo)
             }
         }
         return result
     }
 
-    /// The rows run one at a time (`.serialized`), each as eight child tasks at low priority that yield once per case
-    /// (ios.md item 4): a row's time limit then measures only its own work (about a second of CPU), and the suites
-    /// running beside this one keep the cooperative pool (round-1 review: with every row started at once, a loaded host
-    /// ran 48 of 49 rows past their limit).
+    /// How many initial disks of a row run at once.
+    static let width = 2
+
+    /// The rows run one at a time (`.serialized`), each enumerating its eight disks `width` at a time as low-priority
+    /// child tasks that yield once per case (ios.md item 4): a row's time limit then measures only its own work (under a
+    /// second of CPU), and the suites running beside this one keep the cooperative pool. Round-1 review: with every row
+    /// started at once, a loaded host ran 48 of 49 rows past their limit; with eight disks at once, a test that yields
+    /// 80,000 times (WP-H's loopback start/stop race) took 56 s of its 60 under TSan instead of 31.
     @Test(
         "R-STO-5: legacy phase 1's commit before open()'s barrier keeps the newest durable generation and counts only what a file holds, for every initial index disk, fault and crash",
         .serialized,
@@ -235,14 +273,23 @@ struct LegacyPhaseOneStateSpaceTests {
     @available(macOS 15.0, iOS 18.0, *)
     func everyStateFaultAndCrash(row: IndexSpaceRow) async throws {
         let results = try await withThrowingTaskGroup(of: SliceResult.self) { group in
-            for slice in row.slices {
+            var pending = row.slices[...]
+            for _ in 0..<LegacyPhaseOneStateSpaceTests.width {
+                guard let slice = pending.popFirst() else {
+                    break
+                }
                 group.addTask(priority: .low) {
                     try await LegacyPhaseOneStateSpaceTests.enumerate(slice)
                 }
             }
             var results: [SliceResult] = []
-            for try await result in group {
+            while let result = try await group.next() {
                 results.append(result)
+                if let slice = pending.popFirst() {
+                    group.addTask(priority: .low) {
+                        try await LegacyPhaseOneStateSpaceTests.enumerate(slice)
+                    }
+                }
             }
             return results.sorted { $0.slice < $1.slice }
         }
