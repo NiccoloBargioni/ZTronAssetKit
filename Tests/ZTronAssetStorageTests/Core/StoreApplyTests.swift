@@ -78,7 +78,9 @@ struct StoreApplyTests {
         try await harness.publish(a, [entries[0]])
         await harness.store.setResidency(.failed(.integrity), of: "b", dooming: .unreferenced)
         await harness.store.setResidency(.quarantined(until: harness.time.now().addingTimeInterval(60)), of: "c", dooming: .unreferenced)
-        await harness.store.testSetIntegrity("c", IntegrityHistory(attempts: 2, failedIdentity: entries[2].contentIdentity, nextEligibleAt: harness.time.now()))
+        try await harness.store.recordIntegrityFailure(["c"], identity: entries[2].contentIdentity)
+        try await harness.store.recordIntegrityFailure(["c"], identity: entries[2].contentIdentity)
+        #expect(try await harness.store.planningView().records["c"]?.integrity.attempts == 2)
         let changed = [CoreFixture.entry("a", CoreFixture.bytes(166)), CoreFixture.entry("b", CoreFixture.bytes(167)), CoreFixture.entry("c", CoreFixture.bytes(168))]
         let report = try await harness.store.apply(CoreFixture.manifest(changed), etag: ETag(rawValue: "\"2\""), eviction: nil)
         #expect(report.contentChanged == ["a", "b", "c"])
@@ -143,7 +145,8 @@ struct StoreApplyTests {
         let manifest = CoreFixture.manifest([])
         _ = try await harness.store.open()
         let stamp = SyncStamp(appVersion: "1", completedAt: harness.time.now(), manifestETag: nil, manifestDigest: manifest.digest)
-        await harness.store.testBumpPurgeEpoch()
+        // A purge that selects nothing still bumps the purge epoch (WP-C's `purge`).
+        _ = try await harness.store.purge(.scope(.identifiers([])))
         await #expect(throws: StoreError.purgeRaced) {
             try await harness.store.markSynced(stamp, ifPurgeEpoch: 0)
         }
@@ -193,18 +196,5 @@ struct StoreApplyTests {
         #expect(next.content(outside) == Data([9, 9]), "the link's target is untouched")
         #expect(next.content(next.layout.blobURL(key)) == bytes)
         #expect(await CoreInvariants.violations(of: next).isEmpty)
-    }
-}
-
-extension AssetStore {
-    /// Writes a record's integrity history the way WP-C's `recordIntegrityFailure` will (test seam).
-    func testSetIntegrity(_ id: AssetID, _ history: IntegrityHistory) {
-        self.state.core.records[id]?.integrity = history
-        self.markDirty(.soon)
-    }
-
-    /// Bumps the purge epoch the way WP-C's `purge` will (test seam).
-    func testBumpPurgeEpoch() {
-        self.state.core.purgeEpoch += 1
     }
 }
