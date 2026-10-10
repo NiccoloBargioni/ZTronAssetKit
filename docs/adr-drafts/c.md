@@ -16,7 +16,9 @@ paths: WP-A's table-estimate test and its helper (`Tests/ZTronAssetModelTests/Ma
 outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised edit of the same WP-A test file and helper
 (OI-8's sibling); cycle 5 changed nothing outside WP-C's paths (its new source file is `Eviction/HolderScan.swift`). Cycle 6
 changed nothing outside WP-C's paths either (its new test files are `Cleanup/EvictionOverlapTests.swift` and
-`Cleanup/EvictionOrderTests.swift`).
+`Cleanup/EvictionOrderTests.swift`). Cycle 7 edited WP-B's `Store/ApplyPlan.swift` and `Store/AssetStore+Apply.swift`
+under ruling R6 (C-22 cycle 7 (1)); cycle 8 changed nothing outside WP-C's paths (`Cleanup/StorePurge.swift` and
+`Cleanup/PurgeTests.swift`).
 
 ## C-1 — Eviction candidates are blobs, evicted with all their records
 - **Context.** R-CLN-4 orders *assets*; bytes are freed per *blob*, and identical bytes dedupe (SPEC §4.3), so evicting
@@ -167,6 +169,29 @@ changed nothing outside WP-C's paths either (its new test files are `Cleanup/Evi
   pass in one turn held the actor 27.6 ms for a full-store purge at `maxEntries` (2.9 ms at 10,000), measured in this
   cycle; one chunk is 0.13 ms (C-22). REENTRANCY: R9 amendment. The chunk-yield purge test now also checks the freed
   bytes summed over the pass's chunks (`28c6312`).
+- **Amended at the L3 close-out, cycle 8 (review of cycle 7, blocking; probes ZP7-purge-deleting and ZP7-purge).** (5)
+  An in-flight unlink is waited for. The reaper that runs after a grace takes every deletable key, so the engine's
+  `runDueWork()` (whose alarm fires at the grace end the purge sleeps until), another purge's wait, or a reaper started
+  between the chunks of the purge's pass can hold the purge's blobs `deleting`; the pass found them neither waking nor
+  past a grace and the wait stopped, so the caller was told nothing was freed or deferred while the bytes were being
+  reclaimed (no data was lost: only the report was wrong). Now `reclaimPass` notes each `deleting` key
+  (`ReclaimPass.inFlight`), and when no wake and no fresh install applies, `awaitReclaim` waits on the store's key
+  waiters (`waitForKey`, as `acquireReference` waits for an in-flight deletion) for the first of them that is still
+  `deleting` in that turn, then runs another round (reap, classify from the blob table). The reaper resumes a key's
+  waiters after every deletion unit (removed, back to doomed with backoff, or not attempted), and `close()` resumes all
+  of them, so the wait ends; a key whose deletion ended since the pass saw it is not waited for (its waiters were already
+  resumed) and the next round classifies it. Each wait follows one deletion unit, which attempts at least one key, so
+  the rounds are bounded by the reapers' units over the selection; an unlink that fails falls back to the backoff stop
+  above. A caller cancelled during this wait gets `.cancelled` once the unit ended, as from the grace wait (6). The
+  decision reads only the keys the pass saw in flight (at most the reapers' batches), O(1) each. Tests: `R-CLN-6: a
+  purge waits for a blob of its selection that another reaper run is deleting, and counts its bytes` (two purges; failed
+  first in `3209808`: one result `PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2)`, A or B by
+  schedule), `R-CLN-6: a purge waits for its blobs while runDueWork's reaper deletes them, and counts their bytes` (failed
+  first: `bytesFreed: 0`), `R-CLN-6: a purge does not wait for a deletion that ended while its pass was released between
+  chunks` and `R-CLN-6: a purge cancelled while it waits for an in-flight deletion leaves with cancelled, its selection
+  purged` (failed first in `3be1409`: `bytesFreed: 100` of 200, and a result instead of `.cancelled`); fix `d192edc`.
+  Mutants: waiting for the first in-flight key without the in-turn check hangs the third test to its time limit (a lost
+  wake-up); no cancellation check fails the fourth (1 issue). REENTRANCY: R9 amendment, cycle 8.
 - **Purge during legacy migration (review round 2, a spec question; for store.md §6.5).** `purge(.all)` selects records
   holding a blob; records still waiting for a legacy file stay `absent(.neverFetched)` and later batches may adopt
   their files. Kept, and documented here rather than changed: a purge makes a sync due (R-CLN-6) and that sync fetches
@@ -948,7 +973,9 @@ changed nothing outside WP-C's paths either (its new test files are `Cleanup/Evi
   `report.reused` non-empty and the record present again, for `apply` and `admit`; the relaunch case passed, as launch
   adoption intends); the oracle no longer reaps right after an eviction and reconciles after every open (with R3 reverted
   15 of 16 seeds fail). An evicted record whose content changes stays evicted until it is fetched (a publication dedupes
-  onto a live key), the literal reading of the ruling.
+  onto a live key), the literal reading of the ruling. The review of cycle 7 (probe ZP7-OI1b) asks the orchestrator to
+  confirm that reading or narrow it to the `.doomed` and orphan branches (binding to a live key cannot undo an eviction);
+  kept literal until it rules (OI-15).
 - **Orchestrator ruling (L3 close-out) R4 — C2 at 10,000 records mandatory.** Done: C-22, C-5, C-8, C-11, C-21, C-23.
 - **Orchestrator ruling (L3 close-out) R5 — deviations accepted.** C-12 (checksum-less legacy files without a local
   checksum are downloaded again), C-13 (an undecodable legacy manifest keeps its files where they are), C-14 (a legacy
@@ -1241,6 +1268,20 @@ changed nothing outside WP-C's paths either (its new test files are `Cleanup/Evi
   no longer one turn at this scale (C-22 cycle 7 (1)).
 - **OI-14, cycle 7.** Quarantines, recorded failures and a record's last integrity failure now count (ruling R7, C-2
   cycle 7); what stays is WP-B's own release path (`apply`'s prune), unchanged.
+- **OI-15 — ruling R3's reading for an evicted record whose content changes to live bytes (cycle 8, for the
+  orchestrator).** Probe ZP7-OI1b of the review of cycle 7: evict `zv0`, settle the deletions, then `apply` a manifest
+  whose `zv0` entry names `zv3`'s bytes, which are live: `reused=[]`, `zv0` stays `absent(.evicted)`, and the engine
+  downloads bytes the store holds (SPEC §Storage dedupes identical bytes). `adoptKnownBlob` refuses `absent(.evicted)`
+  for every blob state, as R3 reads literally ("adopted only by the launch adoption, never by a later apply"). Binding to
+  a `.live` key cannot undo an eviction (the evicted blob stays doomed); only the `.doomed` rescue and the launch-orphan
+  branches can. Not changed in cycle 8: the ruling's text is literal and the review asks the orchestrator. Options: (a)
+  confirm, and the record is fetched (the transfer dedupes onto the live key at publication, so no second copy is kept);
+  (b) narrow the refusal to `adoptKnownBlob`'s `.doomed` and `nil` (orphan) branches, add ZP7-OI1b as a test, and keep
+  `R-CLN-4: an apply or admit within the deletion grace never adopts an evicted asset again…`, which must still pass.
+  WP-C recommends (b); the edit is one condition in `adoptKnownBlob` (WP-B's file, needs the ruling's authorisation).
+- **OI-6, cycle 8 additions.** §4.6 (purge, R-CLN-6): a purge's wait also waits for a blob of its selection that
+  another reaper run is deleting, through the key waiters (C-5, cycle 8). §10.1: the R9 amendment of cycle 8 below.
+  §11, R-CLN-6: the four `R-CLN-6` tests named in C-5's cycle-8 amendment.
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.1)
 
@@ -1254,6 +1295,7 @@ changed nothing outside WP-C's paths either (its new test files are `Cleanup/Evi
 | c-6 (proposed, review round 3) | `verifyIntegrity`'s due-list unit (bulk) | the phase and writability; per blob before its hash: live, not being placed, not verified in this pass meanwhile; after it R16; the holders read again with `holders(of:known:scan:)`, the blob's check and its quarantine sharing at most one scan of the records (C-8; C-21, cycle 5) |
 | R10 amendment (proposed, review round 3; amended in cycle 2) | `collectGarbage`'s decision unit (bulk), after the full listing, and its no-op metadata unit between doom chunks | the phase, the caller's cancellation (before the first chunk only: nothing doomed then), degraded or unavailable (nothing doomed); a key counts as unknown only if the snapshot taken before the first listing unit lacks it too; each chunk's turn checks the reap window (`reapWindowClosed`: no key learnt since the start can have been reaped) and every key again in O(1) against the blob table and `publishing` (`doomOrphans`); runs are serialized; a key a record started expecting meanwhile is doomed but stays rescuable until the grace ends (C-23) |
 | R9 amendment (proposed, cycle 2) | `awaitReclaim`'s no-op metadata unit between chunks of its pass | the phase; each later key is classified from the blob table as it is then; the round's figures only decide whether to wait, install or stop, and the next round (or the reaper) sees what changed (C-5) |
+| R9 amendment, cycle 8 (proposed) | `awaitReclaim`'s wait for a key another reaper run is deleting (`waitForKey`, as R3) | nothing is carried across it: the key was read `deleting` in the turn the wait registered, so the end of its deletion unit (or `close()`) resumes it; then the caller's cancellation (`.cancelled`, as the grace wait), and the loop re-checks the phase, reaps, and classifies every pending key from the blob table again (C-5, cycle 8) |
 | c-7 (proposed, cycle 3; amended in cycle 4) | phase 3's no-op metadata unit between chunks of its check (`legacyEntriesPresent`), and the return to `finishLegacyMigration` | the phase after each release; the pass answers "present" only if `commits.mutationSerial` is unchanged since it began (else it starts again; after three interrupted passes the call decides nothing and the next call checks again, C-24 cycle 4); a missing entry is missing in the turn it is found; then writability, and the migration's phase, queue and claims (a call that finished migration meanwhile, or a file back in the queue, leaves it) (C-24) |
 | c-4 amendment (proposed, cycle 3) | the listing units of phases 1 and 4 (`LegacyListingUnit`) and phase 1's bulk unit | an I/O error on either stat of a listing unit fails the walk as a failed listing (C-13, cycle 3); phase 1's bulk unit builds the records and the queue from snapshots that nothing else writes while the store is `opening` (R1), and they replace the store's whole (C-24) |
 | R16 amendment (proposed) | `verifyIntegrity`'s stat units around each hash (`blobIncarnation`) | as R16, plus: the identity and size under the name are the same before and after the hash and the key is not in `publishing`; otherwise the result is discarded and the key stays due in this pass (C-8) |
@@ -1474,6 +1516,26 @@ One optional suggestion is not taken (row 6).
 | 9 | correct: phase 3 liveness | as 4 |
 | 10 | correct: carried orchestrator items | as 5. OI-4 stays fixed at 10,000 (dry run 2.65 / 2.42 ms); 39.77 / 32.61 ms at 100,000, recorded |
 
+## Review of cycle 7 — dispositions (L3 close-out, cycle 8)
+
+The close-out verification of cycle 7 reported 11 issues, 1 of them blocking. The blocking one is fixed, its tests
+committed failing first. One non-blocking issue asks the orchestrator to confirm or narrow ruling R3 (OI-15); the rest are
+environment items or the orchestrator's merge-time document edits, with this cycle's figures. None is declined.
+
+| # | Lens, issue | Disposition |
+|---|---|---|
+| 1 | reqs: one blob that 10,000 ids share leaves in one turn (ruling R8) | ruling R8's recorded exception, Stage 3; no change. This cycle: `eviction of one blob 10,000 ids share (thread CPU) 16.209542 ms (max of runs 18.30775 ms)` (Evidence) |
+| 2 | reqs: phase-3 liveness under access stamps (ruling R9) | the orchestrator amends RE-S29 and §4.7 at merge; no WP-C change. This cycle: 3 last calls end `finished: false` at 10,000 files (16,263–16,876 stamps) and at 100,000 (16,494); holds 3.44 and 8.66 ms |
+| 3 | reqs: coverage plan figure (OI-5) | for the orchestrator (§14: "11 of 14 lines deliberately uncovered"); measured again: `LiveLegacyDefaults.swift` 3/14 |
+| 4 | reqs: benchmark figures under host load | for the orchestrator (the CleanupBenchmarks gate alone on an idle host); no assertion loosened. This cycle (load 9.65 → 4.58): `purge(.evictable) chunk of 1,000 blobs after an alias was bound to each (thread CPU) 5.990542 ms (max of runs 6.398333 ms)` |
+| 5 | reqs: TSan headroom of WP-H's `start racing stop` | environment item (orchestrator note); this cycle's TSan run passed, the race after 42.519 s |
+| 6 | reqs: residual stretches at `maxEntries` (OI-9) | Stage 3 with WP-B, as ruled; this cycle's 100,000 figures are in the Evidence |
+| 7 | reqs: carried document items (§1.2, §4.5, §11, §12.2, NEEDS-HUMAN-REVIEW tags) | for the orchestrator at merge, unchanged (OI-6, OI-7, OI-11); §12.2's S2-06 row names `R-CLN-4: pending reclaim decides a second eviction … (store-2 S2-06)` |
+| 8 | correct, blocking: purge's wait gives up on a blob another reaper run is deleting (ZP7-purge-deleting, ZP7-purge) | fixed (C-5, cycle 8; R9 amendment, cycle 8): failing tests `3209808` (two purges; a purge over `runDueWork()`'s reaper) and `3be1409` (a deletion that ends mid-pass; a cancelled wait), fix `d192edc`; two mutants caught |
+| 9 | correct: ruling R3 read literally downloads bytes already live (ZP7-OI1b) | for the orchestrator (OI-15): kept literal, as the review asks; WP-C recommends narrowing to the `.doomed` and orphan branches, with ZP7-OI1b as a test |
+| 10 | correct: carried items re-measured | as 1, 2, 3, 6 and 7 |
+| 11 | correct: TSan headroom under host load | environment item: this cycle's TSan run passed with nothing else of WP-C's running (load 7.84 → 7.80); WP-B's `R-STO-5: a process kill followed by a power loss…` passed after 25.898 s, WP-H's race after 42.519 s, 0 `ThreadSanitizer` lines |
+
 ## Not verified here
 
 - Device behaviour of the legacy rename (`Caches` → `Application Support` on one APFS volume) and of a legacy root on
@@ -1510,8 +1572,79 @@ One optional suggestion is not taken (row 6).
   closure, which only the probe sees.
 - `apply`'s chunked eviction (row c-8) on a device: the per-chunk figures and the probe's holds were measured on this Mac,
   in release, on the fake file system; a device's slower CPU scales each chunk's turn (about 1.8 ms here).
+- A purge's wait for another reaper's deletion (C-5, cycle 8) on a device: it lasts one deletion unit, whose CPU budget
+  is about 1 ms; an `unlink(2)` that blocks in the kernel (the case no budget bounds, `BlobDeletionUnit`) delays the
+  purge's return as it delays `acquireReference`. Exercised on the fake file system only.
 - The holders scan's prefilter (C-21, cycle 5) assumes the first word of a blob's SHA-256 spreads evenly over its slots,
   as a digest does; a skew would cost time only (a set bit is checked against the set), never a holder.
+
+## Evidence of the L3 close-out, cycle 8 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
+
+Commits, in order: `3209808` (failing tests: two purges, and a purge over `runDueWork()`'s reaper), `3be1409` (the
+overlap as a shared setup; failing tests: a deletion that ends mid-pass, a cancelled wait), `d192edc` (the purge waits for
+an in-flight deletion), then this record. Every run below is at `d192edc`, whose sources are the final ones.
+
+- Failing first (debug, `swift test --scratch-path .build-c --skip-build --skip Benchmarks --filter purgeWaitsFor`, the
+  tests of `3209808`, three runs): `Test run with 2 tests in 1 suite failed … with 2 issues` each: the two purges
+  `resultA → PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2)` in runs 1 and 2 and `resultB` the same in
+  run 3 (which purge reaps first depends on the schedule; three earlier runs of that test alone: B, A, A), and the
+  engine's reaper `result → PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2)` in every run. With
+  the fix stashed after `3be1409` (`--filter PurgeTests`): `Test run with 14 tests in 1 suite failed after 0.011 seconds
+  with 4 issues`: the two above, `result → PurgeResult(bytesFreed: 100, bytesDeferred: 0, assetsRemoved: 2)` (a deletion
+  that ended mid-pass), and `an error was expected but none was thrown and "PurgeResult(bytesFreed: 0, bytesDeferred: 0,
+  assetsRemoved: 2)" was returned` (the cancelled wait). With the fix: `Test run with 12 tests in 1 suite passed after
+  0.009–0.010 seconds` in five runs before `3be1409`'s tests existed, then `Test run with 14 tests in 1 suite passed after
+  0.010–0.017 seconds` in eight runs.
+- Mutants (each reverted; the file compared equal to the fix afterwards): the wait on `pass.inFlight.first` without the
+  in-turn `deleting` check → `R-CLN-6: a purge does not wait for a deletion that ended…` `failed after 64.000 seconds with
+  2 issues` (`Time limit was exceeded: 60.000 seconds`, `Cancelled while waiting for the purge returned`); no cancellation
+  check after the wait → `R-CLN-6: a purge cancelled while it waits…` fails (1 issue: `PurgeResult(bytesFreed: 200, …)`
+  returned instead of `.cancelled`).
+- `TMPDIR=… SWIFTPM_SCRATCH=.build-c bash Scripts/verify.sh --quick` (16:01:31–16:04:29, load 4.84 → 7.72): `VERIFY:
+  PASS` (`::: SUMMARY mode=--quick steps-failed=0`; Storage bundle `Test run with 440 tests in 58 suites passed after
+  79.738 seconds`; the other bundles 151, 10, 84, 12, 3 and 104 tests passed).
+- `swift build -c release --scratch-path .build-c -Xswiftc -warnings-as-errors`: `Build complete! (22,13 s)`, exit 0, no
+  warning.
+- `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Every `await` in WP-C's four directories,
+  `StoreInternals.swift` and `AssetStore+Apply.swift` has a `// REENTRANCY:` line (scripted check: `awaits 150 missing 0`).
+- Storage tests three times (`swift test --scratch-path .build-c --skip Benchmarks --filter ZTronAssetStorageTests`,
+  16:05:28–16:09:32, load 4.48 → 8.43): `Test run with 440 tests in 58 suites passed after 68.661 / 70.791 / 71.258
+  seconds`.
+- TSan once (`swift test --scratch-path .build-c-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetStorageTests`, 16:09:36–16:14:22, load 7.84 → 7.80): `Test run with 440 tests in 58 suites passed after
+  239.138 seconds`, 0 `ThreadSanitizer` lines; WP-H's `start racing stop …` passed after 42.519 seconds, WP-B's `R-STO-5: a
+  process kill followed by a power loss…` after 25.898 seconds.
+- Coverage (the `--quick` run, `default.profdata` written 16:04; `llvm-cov export -summary-only` over the 8 test bundles;
+  `gates.py coverage`): `COVERAGE target=ZTronAssetStorage lines= 97.36% (7942/8157) min=90.0 OK`. WP-C's files with
+  `StoreInternals.swift`: 2877/2964 = 97.06%; `StorePurge.swift` 98.90% (269/272); the lowest are
+  `LiveLegacyDefaults.swift` 21.43% (11 of 14 lines uncovered, OI-5), then `IntegrityBookkeeping.swift` 94.92%,
+  `LegacyPlacement.swift` 95.24%, `DeepVerification.swift` 95.42%. The WP-B files edited under rulings: `ApplyPlan.swift`
+  96.85%, `AssetStore+Apply.swift` 96.16%. `ZTronAssetKit` 37.82% and `ZTronAssetSync` 30.57% fail on the WP-F/WP-G stubs,
+  as in cycles 1 to 7 (`COVERAGE: FAIL` for those two only).
+- `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-c/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` (16:14:26–16:14:46): exit 0, no error or warning.
+- iOS Simulator, full (`897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0; `caffeinate -i xcodebuild test -scheme
+  ZTronAssetKit -destination 'platform=iOS Simulator,id=897F9D8D-B10D-4D91-8E22-417A2B9D70AA' -derivedDataPath
+  .build-c/xcode-sim -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never
+  OTHER_SWIFT_FLAGS='-warnings-as-errors'`, 16:14:52–16:18:55, load 5.71 at the start, 36.95 at the end): `** TEST
+  SUCCEEDED **`; `xcresulttool get test-results summary` of `Test-ZTronAssetKit-2026.10.10_16-15-09-+0200.xcresult`:
+  `{'result': 'Passed', 'totalTestCount': 804, 'passedTests': 804, 'failedTests': 0, 'skippedTests': 0,
+  'expectedFailures': 0}`; 0 "Restarting after" or "exceeded execution time". The simulator is shut down (`simctl`
+  reports it `Shutdown`).
+- C2 benchmarks (release; `swift test -c release --skip-build --scratch-path .build-c-perf -Xswiftc -enable-testing
+  --filter CleanupBenchmarks`, 16:20:38–16:22:36, load 9.65 → 4.58): `Test run with 6 tests in 2 suites passed after
+  116.257 seconds`. At 10,000 (best of 3): `purge(.evictable) of all 1.898666 ms`, `purge(.all) of all 1.941375 ms`;
+  thread CPU `purge chunk of 1000 1.052833 ms`, `purge's reclaim pass, chunk of 1000 0.053916 ms (worst 0.113958 ms)`,
+  `purge(.evictable) chunk of 1000 1.541792 ms`; after aliases `purge(.evictable) chunk of 1,000 blobs after an alias was
+  bound to each (thread CPU) 5.990542 ms (max of runs 6.398333 ms)`; `apply`'s hook per chunk 1.43 ms (worst 1.99 ms).
+  Ruling R8: `eviction of one blob 10,000 ids share (thread CPU) 16.209542 ms (max of runs 18.30775 ms)`. At 100,000
+  (recorded, OI-9): WP-B's grace start 42.34 ms and reaper queue 23.12 ms, the records copy 9.64 ms (worst 10.31),
+  quota eviction of half 23.63, `purge(.all)` of the rest 23.23, full-store purges 40.01 / 39.19 ms, orphan GC of 100,000
+  orphans 19.08, `purge's reclaim pass, chunk of 1000 0.150292 ms`, the legacy batch of 500 17.50. Legacy migration: the
+  last calls while access stamps arrive 3.44 / 8.66 ms, `finished: false` after 3 last calls in every run (16,263–16,876
+  and 16,494 stamps).
+- `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 7 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
 
