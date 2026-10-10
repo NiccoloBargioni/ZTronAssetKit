@@ -17,10 +17,11 @@ struct EvictionState: Sendable {
     /// did not account for a blob's references (diagnostics, in memory only): a test reads it to show how many scans one
     /// actor turn makes (C2, review of the L3 close-out cycle 4).
     var holderScans = 0
-    /// The bytes quota eviction (maintenance and `apply`'s plan) and purge released to the reaper in this lifetime, each
-    /// counted in the turn its blob was doomed; never decreases. A maintenance run reads it in the turn its space figures
-    /// were measured and counts every byte released since toward its need, its own and those of an eviction, an `apply`
-    /// or a purge that ran while it awaited (store.md §6.4; review of the L3 close-out cycle 5: two overlapping runs
-    /// each chased the need they measured alone and evicted the whole store).
+    /// The bytes quota eviction (maintenance and `apply`'s plan), purge, quarantine and recorded failures released to the
+    /// reaper in this lifetime, each counted in the turn its blob was doomed; never decreases. A maintenance run reads it
+    /// in the turn its space figures were measured and counts every byte released since toward its need, its own and
+    /// those of an eviction, an `apply`, a purge or a quarantine that ran while it awaited (store.md §6.4; review of the
+    /// L3 close-out cycle 5: two overlapping runs each chased the need they measured alone and evicted the whole store;
+    /// cycle 6: a quarantine meanwhile made a run evict one asset too many, ruling R7 at cycle 7).
     var releasedBytes: Int64 = 0
 }

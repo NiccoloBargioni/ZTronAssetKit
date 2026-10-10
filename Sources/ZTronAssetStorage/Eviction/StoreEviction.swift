@@ -58,8 +58,8 @@ extension AssetStore {
     /// The result counts what this run evicted: `bytesFreed` and `filesRemoved` are the bytes and blobs it released to
     /// the reaper (they leave `FreeSpace.usedBytes` at once and are unlinked after acknowledgement and grace, so a
     /// second run within the grace window evicts nothing more, store-2 S2-06); leased blobs are never selected, so
-    /// `bytesDeferred` is 0. Bytes another eviction, an `apply`'s eviction plan or a purge released after this run
-    /// measured count toward its need too, so overlapping runs free what one run would. Throws when the committing
+    /// `bytesDeferred` is 0. Bytes another eviction, an `apply`'s eviction plan, a purge, a quarantine or a recorded
+    /// failure released after this run measured count toward its need too, so overlapping runs free what one run would. Throws when the committing
     /// generation fails (the evictions stay in memory, dirty, R5).
     package func evictIfNeeded() async throws(StoreError) -> CleanupResult {
         // REENTRANCY: R1, R13, R8, R17 — `performEvictIfNeeded` re-validates every candidate after each await.

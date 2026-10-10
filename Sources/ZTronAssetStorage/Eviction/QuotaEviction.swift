@@ -51,7 +51,8 @@ extension AssetStore {
 
     /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks, publishes the snapshot without the
     /// victims and commits. It stops once the bytes released since the measurement, by itself or by any eviction,
-    /// `apply`'s plan or purge that ran while it awaited (`EvictionState.releasedBytes`), cover what it measured.
+    /// `apply`'s plan, purge, quarantine or recorded failure that ran while it awaited (`EvictionState.releasedBytes`),
+    /// cover what it measured.
     func performEvictIfNeeded() async throws(StoreError) -> CleanupResult {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -61,9 +62,10 @@ extension AssetStore {
             interval.end()
         }
         // REENTRANCY: R13 — the figures are a snapshot taken at the unit, and `releasedBytes` is read in the turn they
-        // were summed: every byte an eviction, an `apply`'s plan or a purge releases from then on (this run's included)
-        // counts toward the need, which is re-checked before each candidate; the candidates are computed afterwards
-        // from the state as it is then, and every one is re-validated before it is marked.
+        // were summed: every byte an eviction, an `apply`'s plan, a purge, a quarantine or a recorded failure releases
+        // from then on (this run's included) counts toward the need, which is re-checked before each candidate; the
+        // candidates are computed afterwards from the state as it is then, and every one is re-validated before it is
+        // marked.
         let space = try await self.freeSpace()
         let releasedAtMeasure = self.state.eviction.releasedBytes
         try self.checkWritable()
