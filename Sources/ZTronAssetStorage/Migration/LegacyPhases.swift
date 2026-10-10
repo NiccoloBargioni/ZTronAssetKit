@@ -79,15 +79,15 @@ extension AssetStore {
         // REENTRANCY: R1, R11 — as above.
         let checksumsRead = try await self.readLegacyFile(root.appendingPathComponent("local-checksums.json", isDirectory: false), limit: limit)
         // REENTRANCY: R1, R11, c-4 (proposed) — as above.
-        let tree = try await self.listLegacyTree(root)
-        if tree.reachesStore {
+        let walk = try await self.listLegacyTree(root)
+        if walk.reachesStore {
             // The store's own directory lies inside the legacy root through a link below the root (review of the L3
             // close-out): an overlap, found by the listing; nothing was written.
             self.state.migration.root = nil
             self.environment.log.log(.store, .error, "the legacy root overlaps the store's directory; legacy migration is skipped")
             return false
         }
-        guard manifestRead != .failed, checksumsRead != .failed, !tree.failed else {
+        guard manifestRead != .failed, checksumsRead != .failed, !walk.failed else {
             // An I/O error while reading the prior art's files decides nothing in this lifetime, as a root that cannot be
             // stat-ed (review round 3, ZProbe-read and ZProbe-list): nothing is written or committed, a relaunch in
             // phase `inProgress` keeps its persisted plan, and no later phase runs on a view this one could not read.
@@ -96,13 +96,27 @@ extension AssetStore {
             return false
         }
         let limits = self.configuration.limits
-        // REENTRANCY: R1, R11 — the phase; decoding and planning are pure and run off the actor (C2).
-        let decoded = await self.runUnit(on: self.environment.bulkExecutor) {
-            LegacyDecoding.decode(manifest: manifestRead, checksums: checksumsRead, limits: limits, files: tree.files)
+        let records = self.state.core.records
+        let applied = self.state.core.appliedManifest
+        let now = self.environment.time.now()
+        // REENTRANCY: R1, R11 — the phase; decoding, planning, phase 1's record writes and the queue are computed off the
+        // actor from snapshots (C2 at `maxEntries`, review of the L3 close-out cycle 2). While the store is `opening`
+        // nothing else writes the records or the applied manifest (R1), so what the unit built from them is current.
+        let phaseOne = await self.runUnit(on: self.environment.bulkExecutor) {
+            LegacyDecoding.phaseOne(
+                manifest: manifestRead,
+                checksums: checksumsRead,
+                limits: limits,
+                tree: LegacyTree(walk),
+                starting: starting,
+                records: records,
+                applied: applied,
+                now: now
+            )
         }
         try self.checkLive()
         if starting {
-            self.applyLegacyPlanWrites(decoded.manifest, undecodable: decoded.undecodable, checksums: decoded.checksums, stamp: stamp)
+            self.applyLegacyPlanWrites(phaseOne, stamp: stamp)
             do throws(StoreError) {
                 // REENTRANCY: R17, R1 — nothing but the phase: phase 1's writes were made synchronously above; a failed
                 // commit leaves them dirty (R5) for the launch commit, and phase 2 commits before moving any file.
@@ -121,54 +135,29 @@ extension AssetStore {
             // a commit of this lifetime; the launch commit, which every open() makes, normally covers it already.
             self.markDirty(.soon)
         }
-        let plan = decoded.plan
-        var queue: [LegacyFile] = []
-        var dropped = plan.dropped
-        for file in plan.files {
-            if !self.legacyWanters(file).isEmpty {
-                queue.append(file)
-            } else if !self.legacyAdopted(file) {
-                dropped += 1
-            }
-        }
-        // An entry whose file is no longer in the tree was adopted by an earlier lifetime when its record holds the
-        // bytes it expected (moved into `blobs/`); otherwise it is dropped.
-        dropped += plan.unlisted.filter { !self.legacyAdopted($0) }.count
-        self.state.migration.queue = queue.reversed()
+        // The queue was built from the records as phase 1 left them (`LegacyDecoding.phaseOne`), in reverse path order.
+        self.state.migration.queue = phaseOne.queue
         self.state.migration.claimed = []
-        self.state.migration.legacyIDs = plan.legacyIDs
-        self.state.migration.manifestDigest = decoded.manifest?.digest
-        self.state.migration.progress = LegacyMigrationProgress(adopted: 0, remaining: queue.count, dropped: dropped, finished: false)
+        self.state.migration.legacyIDs = phaseOne.decoded.plan.legacyIDs
+        self.state.migration.manifestDigest = phaseOne.decoded.manifest?.digest
+        self.state.migration.progress = LegacyMigrationProgress(adopted: 0, remaining: phaseOne.queue.count, dropped: phaseOne.dropped, finished: false)
         return true
     }
 
-    /// Phase 1's writes (ARCHITECTURE §1.1 rule 1): the legacy manifest becomes the applied one (no ETag) only while
-    /// none is applied; records are inserted only for ids the applied manifest lists and the index lacks, as
-    /// `absent(.neverFetched)` expecting the planned digest; an undecodable manifest degrades the launch.
-    func applyLegacyPlanWrites(_ manifest: ValidatedManifest?, undecodable: Bool, checksums: [String: String], stamp: String?) {
-        if undecodable {
+    /// Phase 1's writes (ARCHITECTURE §1.1 rule 1), computed by `LegacyDecoding.phaseOne` off the actor: the legacy
+    /// manifest becomes the applied one (no ETag) only while none is applied; records are inserted only for ids the
+    /// applied manifest lists and the index lacks, as `absent(.neverFetched)` expecting the planned digest; an
+    /// undecodable manifest degrades the launch. The records the unit built (the store's own plus those inserts) replace
+    /// the store's in O(1): only `open()` runs while it is `opening` (R1), so nothing changed them since the snapshot.
+    func applyLegacyPlanWrites(_ phaseOne: LegacyDecoding.PhaseOne, stamp: String?) {
+        if phaseOne.decoded.undecodable {
             self.state.core.degraded = true
         }
-        if let manifest {
-            if self.state.core.appliedManifest.entries.isEmpty {
-                self.state.core.appliedManifest = manifest
-                self.state.core.etag = nil
-            }
-            let now = self.environment.time.now()
-            for legacy in manifest.entries where self.state.core.records[legacy.identifier] == nil {
-                guard let applied = self.state.core.appliedManifest.entry(for: legacy.identifier) else {
-                    continue
-                }
-                let planned = legacy.checksum ?? LegacyPlanner.localDigest(checksums[legacy.identifier.rawValue])
-                let expected = applied.checksum ?? (applied.contentIdentity == legacy.contentIdentity ? planned : nil)
-                self.state.core.records[legacy.identifier] = AssetRecord(
-                    entry: applied,
-                    residency: .absent(.neverFetched),
-                    expectedBlob: expected,
-                    lastAccess: now
-                )
-            }
+        if phaseOne.adoptsManifest, let manifest = phaseOne.decoded.manifest {
+            self.state.core.appliedManifest = manifest
+            self.state.core.etag = nil
         }
+        self.state.core.records = phaseOne.records
         self.state.migration.legacyStamp = stamp
         self.state.migration.phase = .inProgress
         self.markDirty(.soon)
@@ -177,25 +166,12 @@ extension AssetStore {
     /// The ids of `file` whose records still want its bytes (REENTRANCY R11): they expect its digest, accept adoption
     /// and name a valid extension.
     func legacyWanters(_ file: LegacyFile) -> [AssetID] {
-        file.ids.filter { id in
-            guard let record = self.state.core.records[id] else {
-                return false
-            }
-            return record.expectedBlob == file.digest && record.acceptsAdoption && AssetFileExtension(record.entry.fileExtension) != nil
-        }
+        LegacyDecoding.wanters(of: file, in: self.state.core.records)
     }
 
     /// Whether some record of `file` already holds its bytes (adopted earlier, by launch reconciliation or on demand).
     func legacyAdopted(_ file: LegacyFile) -> Bool {
-        file.ids.contains { self.state.core.records[$0]?.referencedBlob?.hash == file.digest }
-    }
-
-    /// Whether the record of an entry whose file is not in the tree holds the bytes the entry expected.
-    func legacyAdopted(_ entry: LegacyUnlisted) -> Bool {
-        guard let digest = entry.digest else {
-            return false
-        }
-        return self.state.core.records[entry.id]?.referencedBlob?.hash == digest
+        LegacyDecoding.adopted(file, in: self.state.core.records)
     }
 
     // MARK: Phase 2 (after open())
@@ -554,5 +530,90 @@ enum LegacyDecoding {
         }
         let plan = LegacyPlanner.plan(entries: decoded?.entries ?? [], checksums: table, files: files)
         return Decoded(manifest: decoded, undecodable: undecodable, checksums: table, plan: plan)
+    }
+
+    /// What phase 1 decides, computed in its bulk unit (C2 at `maxEntries`: the record writes and the queue were two
+    /// actor turns of about 100 and 60 ms over 100,000 legacy files, review of the L3 close-out cycle 2).
+    struct PhaseOne: Sendable {
+        /// What the prior art's files decoded to.
+        var decoded: Decoded
+        /// The store's records with phase 1's inserts (the snapshot unchanged unless `starting`).
+        var records: [AssetID: AssetRecord]
+        /// Whether the legacy manifest becomes the applied one (only while none is applied).
+        var adoptsManifest: Bool
+        /// The files some record still wants, in **reverse** path order (`MigrationState.queue`).
+        var queue: [LegacyFile]
+        /// Entries dropped while planning, files no record wants or holds, and unlisted entries no record holds.
+        var dropped: Int
+    }
+
+    /// Phase 1 over snapshots of the store's `records` and `applied` manifest: decodes the prior art's files, makes phase
+    /// 1's record writes when `starting` (as `AssetStore.applyLegacyPlanWrites(_:stamp:)` documents), then queues the
+    /// planned files that a record still wants. An entry whose file is no longer in the tree was adopted by an earlier
+    /// lifetime when its record holds the bytes it expected (moved into `blobs/`); otherwise it is dropped.
+    static func phaseOne(
+        manifest: LegacyRead,
+        checksums: LegacyRead,
+        limits: ManifestLimits,
+        tree: LegacyTree,
+        starting: Bool,
+        records: [AssetID: AssetRecord],
+        applied: ValidatedManifest,
+        now: Date
+    ) -> PhaseOne {
+        let decoded = LegacyDecoding.decode(manifest: manifest, checksums: checksums, limits: limits, files: tree.files)
+        var records = records
+        var adoptsManifest = false
+        if starting, let legacy = decoded.manifest {
+            var current = applied
+            if current.entries.isEmpty {
+                current = legacy
+                adoptsManifest = true
+            }
+            for entry in legacy.entries where records[entry.identifier] == nil {
+                guard let listed = current.entry(for: entry.identifier) else {
+                    continue
+                }
+                let planned = entry.checksum ?? LegacyPlanner.localDigest(decoded.checksums[entry.identifier.rawValue])
+                let expected = listed.checksum ?? (listed.contentIdentity == entry.contentIdentity ? planned : nil)
+                records[entry.identifier] = AssetRecord(entry: listed, residency: .absent(.neverFetched), expectedBlob: expected, lastAccess: now)
+            }
+        }
+        var queue: [LegacyFile] = []
+        var dropped = decoded.plan.dropped
+        for file in decoded.plan.files {
+            if !LegacyDecoding.wanters(of: file, in: records).isEmpty {
+                queue.append(file)
+            } else if !LegacyDecoding.adopted(file, in: records) {
+                dropped += 1
+            }
+        }
+        dropped += decoded.plan.unlisted.filter { !LegacyDecoding.adopted($0, in: records) }.count
+        queue.reverse()
+        return PhaseOne(decoded: decoded, records: records, adoptsManifest: adoptsManifest, queue: queue, dropped: dropped)
+    }
+
+    /// The ids of `file` whose records in `records` still want its bytes: they expect its digest, accept adoption and
+    /// name a valid extension.
+    static func wanters(of file: LegacyFile, in records: [AssetID: AssetRecord]) -> [AssetID] {
+        file.ids.filter { id in
+            guard let record = records[id] else {
+                return false
+            }
+            return record.expectedBlob == file.digest && record.acceptsAdoption && AssetFileExtension(record.entry.fileExtension) != nil
+        }
+    }
+
+    /// Whether some record of `file` in `records` already holds its bytes.
+    static func adopted(_ file: LegacyFile, in records: [AssetID: AssetRecord]) -> Bool {
+        file.ids.contains { records[$0]?.referencedBlob?.hash == file.digest }
+    }
+
+    /// Whether the record of an entry whose file is not in the tree holds the bytes the entry expected.
+    static func adopted(_ entry: LegacyUnlisted, in records: [AssetID: AssetRecord]) -> Bool {
+        guard let digest = entry.digest else {
+            return false
+        }
+        return records[entry.id]?.referencedBlob?.hash == digest
     }
 }

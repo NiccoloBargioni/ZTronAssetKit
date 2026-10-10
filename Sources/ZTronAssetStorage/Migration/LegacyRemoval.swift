@@ -19,6 +19,29 @@ struct LegacyRemoval: Sendable, Hashable {
     /// Whether a regular `manifest.json` (or a link of that name) is to be removed, after everything else.
     var removesManifest: Bool
 
+    /// A removal set as the items `removeInUnits` takes, below the legacy root.
+    struct Items: Sendable {
+        /// `leaves`, as URLs.
+        var leaves: [(url: URL, bytes: Int64)]
+        /// `directories`, as URLs.
+        var directories: [(url: URL, bytes: Int64)]
+        /// As `removesManifest`.
+        var removesManifest: Bool
+    }
+
+    /// The URLs of the removal set below `root` (built in the bulk unit that plans it: C2 at `maxEntries`).
+    func items(below root: URL) -> Items {
+        let url = { (path: [String]) in
+            path.dropLast().reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+                .appendingPathComponent(path.last ?? "", isDirectory: false)
+        }
+        return Items(
+            leaves: self.leaves.map { (url: url($0), bytes: 0) },
+            directories: self.directories.map { (url: url($0), bytes: 0) },
+            removesManifest: self.removesManifest
+        )
+    }
+
     /// The removal set for `tree` given the legacy manifest as read now: an unreadable or undecodable one attributes no
     /// entry, so only the metadata files go and every other file stays (it cannot be told from the user's own).
     static func plan(manifest: LegacyRead, tree: LegacyTree, limits: ManifestLimits) -> LegacyRemoval {

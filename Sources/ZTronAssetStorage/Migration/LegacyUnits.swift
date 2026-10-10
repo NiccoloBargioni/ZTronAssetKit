@@ -14,7 +14,8 @@ enum LegacyRead: Sendable, Hashable {
     case failed
 }
 
-/// What a non-following listing of the legacy tree found, as paths relative to its root (S2-10).
+/// What a non-following listing of the legacy tree found, as paths relative to its root (S2-10). Built from a
+/// `LegacyWalk` inside a bulk unit, never on the actor (C2: the sets hash every path).
 struct LegacyTree: Sendable, Hashable {
     /// Regular files.
     var files: Set<[String]> = []
@@ -22,6 +23,34 @@ struct LegacyTree: Sendable, Hashable {
     var directories: Set<[String]> = []
     /// Symbolic links (never followed) and other items that are neither files nor directories.
     var links: Set<[String]> = []
+}
+
+extension LegacyTree {
+    /// Every item of `walk`'s listings.
+    init(_ walk: LegacyWalk) {
+        for listing in walk.listings {
+            self.files.formUnion(listing.files)
+            self.directories.formUnion(listing.directories)
+            self.links.formUnion(listing.links)
+        }
+    }
+}
+
+/// One directory's items, as paths relative to the legacy root, classified inside its listing unit.
+struct LegacyListing: Sendable, Hashable {
+    /// Regular files.
+    var files: [[String]] = []
+    /// Directories (never one reached through a symbolic link).
+    var directories: [[String]] = []
+    /// Symbolic links (never followed) and other items that are neither files nor directories.
+    var links: [[String]] = []
+}
+
+/// What the walk of the legacy tree collected: one listing per directory, appended in O(1) on the actor, merged into a
+/// `LegacyTree` off it (review of the L3 close-out cycle 2, C2 at `maxEntries`).
+struct LegacyWalk: Sendable, Hashable {
+    /// The listings, in walk order.
+    var listings: [LegacyListing] = []
     /// A directory could not be listed: the tree is incomplete, so nothing is decided from it (review round 3,
     /// ZProbe-list: its files would count as missing in phase 1, and phase 4 would leave them unattributable).
     var failed = false
@@ -105,16 +134,17 @@ extension AssetStore {
     /// Every item below `root`, as path components relative to it, from a **non-following** listing (one unit per
     /// directory, S2-10): a symbolic link is neither descended into nor followed, so no planned path passes through one.
     /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited. A listing that fails, or an
-    /// I/O error on a unit's stat (`LegacyListingUnit`), stops the walk and marks the tree `failed`. The store's own directory is never entered: each directory is stat-ed in its
-    /// listing unit and compared with the store's (`reachesStore`). The phase is re-checked after every unit, and with
-    /// `cancellable` (phase 4, which runs in the caller's task) the caller's cancellation too, so neither a closed store
-    /// nor a cancelled caller submits further listings (review round 3).
-    func listLegacyTree(_ root: URL, cancellable: Bool = false, maxDepth: Int = 64) async throws(StoreError) -> LegacyTree {
+    /// I/O error on a unit's stat (`LegacyListingUnit`), stops the walk and marks it `failed`. The store's own directory
+    /// is never entered: each directory is stat-ed in its listing unit and compared with the store's (`reachesStore`).
+    /// The phase is re-checked after every unit, and with `cancellable` (phase 4, which runs in the caller's task) the
+    /// caller's cancellation too, so neither a closed store nor a cancelled caller submits further listings (review round
+    /// 3). Each unit classifies its items itself; the actor only appends the unit's listing and queues its directories.
+    func listLegacyTree(_ root: URL, cancellable: Bool = false, maxDepth: Int = 64) async throws(StoreError) -> LegacyWalk {
         let fileSystem = self.environment.fileSystem
         let maxDirectories = max(1, self.configuration.limits.maxEntries)
         let container = self.state.core.layout?.container
         var store: FileIdentity?
-        var tree = LegacyTree()
+        var walk = LegacyWalk()
         var directories: [[String]] = [[]]
         var next = 0
         while next < directories.count, next < maxDirectories {
@@ -126,7 +156,7 @@ extension AssetStore {
             // REENTRANCY: R1, R11, c-4 (proposed) — the phase, and in phase 4 the caller's cancellation, below; the listing
             // only accumulates, and the plan is computed once it is complete.
             let unit = await self.runUnit(on: self.environment.metadataExecutor) { () -> LegacyListingUnit in
-                LegacyListingUnit.run(url, fileSystem: fileSystem, store: first ? container : nil, known: known)
+                LegacyListingUnit.run(url, relative: relative, fileSystem: fileSystem, store: first ? container : nil, known: known)
             }
             try self.checkLive()
             if cancellable, Task.isCancelled {
@@ -136,29 +166,19 @@ extension AssetStore {
                 store = unit.store
             }
             if unit.isStore {
-                tree.reachesStore = true
+                walk.reachesStore = true
                 continue
             }
-            guard case .success(let items) = unit.listing else {
-                tree.failed = true
-                return tree
+            guard case .success(let listing) = unit.listing else {
+                walk.failed = true
+                return walk
             }
-            for item in items {
-                let path = relative + [item.name]
-                switch item.kind {
-                case .directory:
-                    tree.directories.insert(path)
-                    if relative.count < maxDepth {
-                        directories.append(path)
-                    }
-                case .file:
-                    tree.files.insert(path)
-                case .symbolicLink, .other:
-                    tree.links.insert(path)
-                }
+            if relative.count < maxDepth {
+                directories.append(contentsOf: listing.directories)
             }
+            walk.listings.append(listing)
         }
-        return tree
+        return walk
     }
 
     /// The prior art's stamp (`UserDefaults`), read in a unit.
@@ -221,25 +241,23 @@ extension AssetStore {
             return false
         }
         // REENTRANCY: c-4 (proposed) — the phase and the caller's cancellation (inside, after each unit).
-        var listed = try await self.listLegacyTree(root, cancellable: true)
-        guard !listed.failed else {
+        let walk = try await self.listLegacyTree(root, cancellable: true)
+        guard !walk.failed else {
             return false
         }
         // A file phase 2 kept after failing to read or move it is never removed: nothing verified it (ZProbe-hash).
-        listed.files.subtract(self.state.migration.kept)
-        let tree = listed
+        let kept = self.state.migration.kept
         let limits = self.configuration.limits
-        // REENTRANCY: c-4 (proposed) — the phase; the removal set is computed off the actor (C2).
-        let removal = await self.runUnit(on: self.environment.bulkExecutor) {
-            LegacyRemoval.plan(manifest: manifest, tree: tree, limits: limits)
+        // REENTRANCY: c-4 (proposed) — the phase; the tree, the removal set and its URLs are computed off the actor (C2:
+        // the URLs of `maxEntries` leaves alone held the actor for tens of milliseconds).
+        let removal = await self.runUnit(on: self.environment.bulkExecutor) { () -> LegacyRemoval.Items in
+            var tree = LegacyTree(walk)
+            tree.files.subtract(kept)
+            return LegacyRemoval.plan(manifest: manifest, tree: tree, limits: limits).items(below: root)
         }
         try self.checkLive()
-        let url = { (path: [String]) in
-            path.dropLast().reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
-                .appendingPathComponent(path.last ?? "", isDirectory: false)
-        }
         // REENTRANCY: c-1 (proposed) — see `removeInUnits`.
-        let leaves = try await self.removeInUnits(removal.leaves.map { (url: url($0), bytes: 0) })
+        let leaves = try await self.removeInUnits(removal.leaves)
         if leaves.cancelled {
             throw .cancelled
         }
@@ -247,7 +265,7 @@ extension AssetStore {
             return false
         }
         // REENTRANCY: c-1 (proposed) — as above; a directory that still holds anything fails with ENOTEMPTY and stays.
-        try await self.removeAllInUnits(removal.directories.map { (url: url($0), bytes: 0) })
+        try await self.removeAllInUnits(removal.directories)
         if removal.removesManifest {
             // REENTRANCY: c-1 (proposed) — as above.
             let removed = try await self.removeInUnits([(url: manifestURL, bytes: 0)])
@@ -281,8 +299,8 @@ extension AssetStore {
 /// One unit of the legacy walk: the directory's own identity, compared with the store's, then its listing (C-13,
 /// review of the L3 close-out). The first unit also stats the store's directory, which the walk must never enter.
 struct LegacyListingUnit: Sendable {
-    /// The listing, unless the directory is the store's.
-    var listing: Result<[FileItemInfo], FileSystemError>
+    /// The directory's items, unless the directory is the store's.
+    var listing: Result<LegacyListing, FileSystemError>
     /// The store's identity (first unit only; `nil` when it cannot be stat-ed).
     var store: FileIdentity?
     /// The directory is the store's own: it was not listed.
@@ -292,7 +310,7 @@ struct LegacyListingUnit: Sendable {
     /// error on either stat fails the unit as a failed listing would, since the walk could then enter the store's own
     /// directory unseen (review of the L3 close-out cycle 2, ZProbe-overlap-io); any other error is no match, as in
     /// `LegacyPlacement.identity(_:_:)`.
-    static func run(_ url: URL, fileSystem: any FileSystem, store: URL?, known: FileIdentity?) -> LegacyListingUnit {
+    static func run(_ url: URL, relative: [String], fileSystem: any FileSystem, store: URL?, known: FileIdentity?) -> LegacyListingUnit {
         let storeIdentity: FileIdentity?
         let identity: FileIdentity?
         do throws(FileSystemError) {
@@ -306,8 +324,23 @@ struct LegacyListingUnit: Sendable {
             return LegacyListingUnit(listing: .failure(error), store: known, isStore: false)
         }
         if let storeIdentity, identity == storeIdentity {
-            return LegacyListingUnit(listing: .success([]), store: storeIdentity, isStore: true)
+            return LegacyListingUnit(listing: .success(LegacyListing()), store: storeIdentity, isStore: true)
         }
-        return LegacyListingUnit(listing: CleanupUnits.list(url, fileSystem: fileSystem), store: storeIdentity, isStore: false)
+        let listing = CleanupUnits.list(url, fileSystem: fileSystem).map { items in
+            var listing = LegacyListing()
+            for item in items {
+                let path = relative + [item.name]
+                switch item.kind {
+                case .directory:
+                    listing.directories.append(path)
+                case .file:
+                    listing.files.append(path)
+                case .symbolicLink, .other:
+                    listing.links.append(path)
+                }
+            }
+            return listing
+        }
+        return LegacyListingUnit(listing: listing, store: storeIdentity, isStore: false)
     }
 }
