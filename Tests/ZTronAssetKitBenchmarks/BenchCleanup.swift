@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetTestSupport
@@ -65,16 +66,22 @@ extension ZTronAssetKitBenchmarks {
 
         /// Legacy migration's actor holds (review of the L3 close-out cycle 2): `open()` with phase 1, the longest batch
         /// of phase 2 and the last call (its batch, phases 3 and 4) over a legacy tree of 10,000 and of `maxEntries`
-        /// files. At 10,000 each is asserted against the 10 ms (best of three runs); at 100,000 they are recorded, with
-        /// WP-B's stretches inside them (the launch commit and snapshot, the adoptions' bindings) included.
+        /// files; and, on a second store, the last calls while a task merges access stamps (`recordAccesses`, a counted
+        /// mutation in every call) during phase 3's check (review of close-out cycle 3: its one-turn fallback then held
+        /// the actor 35–40 ms at `maxEntries`). At 10,000 each is asserted against the 10 ms (best of three runs); at
+        /// 100,000 they are recorded, with WP-B's stretches inside them (the launch commit and snapshot, the adoptions'
+        /// bindings) included.
         @Test("C2: legacy migration's actor holds at 10,000 and at 100,000 legacy files", .timeLimit(.minutes(10)))
         @available(macOS 15.0, iOS 18.0, *)
         func legacyMigrationHolds() async throws {
             for (count, runs) in [(10_000, 3), (100_000, 1)] {
                 var holds: [String: [Double]] = [:]
                 for run in 0..<runs {
-                    for (name, hold) in try await CleanupBench.legacyHolds(count: count, seed: UInt64(1_200_000 + run * 200_000)) {
-                        holds[name, default: []].append(hold)
+                    for stamping in [false, true] {
+                        let seed = UInt64(1_200_000 + run * 200_000)
+                        for (name, hold) in try await CleanupBench.legacyHolds(count: count, seed: seed, stamping: stamping) {
+                            holds[name, default: []].append(hold)
+                        }
                     }
                 }
                 let figures = CleanupBench.legacyOperations.map { ($0, holds[$0] ?? []) }
@@ -459,11 +466,15 @@ enum CleanupBench {
     }
 
     /// Legacy migration's measured calls, in order.
-    static let legacyOperations = ["open() with phase 1", "longest batch of 500", "last call with phases 3 and 4"]
+    static let legacyOperations = [
+        "open() with phase 1", "longest batch of 500", "last call with phases 3 and 4", "last calls while access stamps arrive",
+    ]
 
     /// Migrates a legacy tree of `count` files (40 bytes each, 500 per directory, with the prior art's `manifest.json`)
-    /// on a fresh fake volume with dispatch executors and returns the longest actor hold of each legacy operation.
-    static func legacyHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
+    /// on a fresh fake volume with dispatch executors and returns the longest actor hold of each legacy operation; with
+    /// `stamping`, only the last calls', made while a task merges an access stamp into one record after another (each a
+    /// counted mutation, so phase 3's passes are interrupted), at most three of them, then one without it.
+    static func legacyHolds(count: Int, seed: UInt64, stamping: Bool = false) async throws -> [(String, Double)] {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(time: time)
         let volume = URL(fileURLWithPath: "/bench/legacy", isDirectory: true)
@@ -527,10 +538,10 @@ enum CleanupBench {
         )
         let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
         var holds: [(String, Double)] = []
-        holds.append((CleanupBench.legacyOperations[0], try await ActorHoldProbe.longestHold(of: store) {
+        let opened = try await ActorHoldProbe.longestHold(of: store) {
             let report = try await store.open()
             #expect(report.legacyMigrationPending)
-        }))
+        }
         var longestBatch = 0.0
         var progress = LegacyMigrationProgress(adopted: 0, remaining: count, dropped: 0, finished: false)
         while progress.remaining > 500 {
@@ -538,10 +549,39 @@ enum CleanupBench {
                 progress = try await store.migrateLegacy(maxFiles: 500)
             })
         }
-        holds.append((CleanupBench.legacyOperations[1], longestBatch))
-        holds.append((CleanupBench.legacyOperations[2], try await ActorHoldProbe.longestHold(of: store) {
-            progress = try await store.migrateLegacy(maxFiles: 500)
-        }))
+        if stamping {
+            let stop = Mutex(false)
+            let stamper = Task {
+                var calls = 0
+                while !stop.withLock({ $0 }) {
+                    time.advance(by: 0.001)
+                    await store.recordAccesses([AssetID(rawValue: "legacy.bench.asset\(calls % count)"): time.now()])
+                    calls += 1
+                }
+                return calls
+            }
+            var longest = 0.0
+            var calls = 0
+            while calls < 3, !progress.finished {
+                longest = max(longest, try await ActorHoldProbe.longestHold(of: store) {
+                    progress = try await store.migrateLegacy(maxFiles: 500)
+                })
+                calls += 1
+            }
+            stop.withLock { $0 = true }
+            let stamps = await stamper.value
+            print("C2 legacy migration over \(count) files with access stamps: \(calls) last calls, finished: \(progress.finished), \(stamps) stamps")
+            holds.append((CleanupBench.legacyOperations[3], longest))
+            if !progress.finished {
+                progress = try await store.migrateLegacy(maxFiles: 500)
+            }
+        } else {
+            holds.append((CleanupBench.legacyOperations[0], opened))
+            holds.append((CleanupBench.legacyOperations[1], longestBatch))
+            holds.append((CleanupBench.legacyOperations[2], try await ActorHoldProbe.longestHold(of: store) {
+                progress = try await store.migrateLegacy(maxFiles: 500)
+            }))
+        }
         #expect(progress == LegacyMigrationProgress(adopted: count, remaining: 0, dropped: 0, finished: true))
         #expect(defaults.string(forKey: legacy.defaultsKey) == nil, "phase 4 removed the prior art's stamp")
         await store.close()
