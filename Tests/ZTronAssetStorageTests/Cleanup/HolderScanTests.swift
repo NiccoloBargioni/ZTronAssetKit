@@ -181,6 +181,56 @@ struct HolderScanTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// What happens to one of a planned shared blob's two records between the plan and the `apply` that carries it.
+    enum SharedChange: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// The second record is renamed by the manifest (it no longer holds the blob: fails before any scan).
+        case renamed
+        /// The second record is read (its access is newer than the plan's).
+        case read
+        /// An alias of the blob is bound (a holder the plan never saw).
+        case aliasBound
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @Test(
+        "R-SYN-11: apply keeps a shared blob of its plan, with every record on it, when one of them was renamed, read or joined by an alias since the plan",
+        .timeLimit(.minutes(1)),
+        arguments: SharedChange.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func sharedBlobRevalidated(change: SharedChange) async throws {
+        let harness = CoreHarness.cleanup()
+        let bytes = CoreFixture.bytes(1_640, count: 200)
+        let first = CleanupFixture.Asset(entry: CoreFixture.entry("s1", bytes), bytes: bytes)
+        let second = CleanupFixture.Asset(entry: CoreFixture.entry("s2", bytes), bytes: bytes)
+        let lone = CleanupFixture.asset("lone", seed: 1_641, count: 100)
+        try await EvictionTests.seedWithAccesses(harness, [first, second, lone], recent: [])
+        let plan = try #require(await harness.store.evictionPlan(toFree: 300, protecting: []))
+        #expect(Set(plan.victims.map(\.id)) == [first.id, second.id, lone.id])
+        var entries = [first.entry, second.entry, lone.entry]
+        switch change {
+        case .renamed:
+            entries[1] = CoreFixture.entry("s2-renamed", bytes)
+        case .read:
+            harness.time.advance(by: 1)
+            _ = await harness.store.location(for: second.id, extensions: [], recordingAccess: true)
+        case .aliasBound:
+            entries.append(CoreFixture.entry("s-alias", bytes))
+        }
+        let scansBefore = await harness.state.eviction.holderScans
+        let report = try await harness.store.apply(CoreFixture.manifest(entries), etag: nil, eviction: plan)
+        #expect(report.evicted == [lone.id], "the lone blob goes as planned; the shared one stays")
+        #expect(await harness.isPresent(first.id, at: first.key), "the shared blob keeps its first record")
+        let holders = await harness.state.core.records.filter { $0.value.referencedBlob == first.key }.count
+        #expect(holders == (change == .aliasBound ? 3 : 2), "and every other record on it (the renamed id, the alias)")
+        let scans = await harness.state.eviction.holderScans - scansBefore
+        #expect(scans == (change == .aliasBound ? 1 : 0), "only a holder the plan never saw needs the records scanned")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     /// `count` blob keys from `seed` (SHA-256 of distinct strings, as a store's keys are digests).
     static func keys(_ count: Int, seed: String) -> [BlobKey] {
         (0..<count).map { BlobKey(hash: ContentHash.sha256(of: Data("\(seed)-\($0)".utf8)), ext: AssetFileExtension("png")!) }
