@@ -101,7 +101,7 @@ for (let cycle = FROM; cycle <= MAXC; cycle++) {
   }
   if (!(await gate('fix:' + cycle))) break
   const extra = prevIssues ? 'The previous close-out verification reports these issues (JSON) - fix every blocking one first (failing test committed first), then the clearly-right non-blocking ones:\n' + JSON.stringify(prevIssues, null, 1) : ''
-  const fx = await agent(fixPrompt(cycle, extra), { label: 'fix:c:c' + cycle, phase: 'Fix', schema: FIX_SCHEMA })
+  const fx = await agent(fixPrompt(cycle, extra + (args.extraFixNote ? '\n' + args.extraFixNote : '')), { label: 'fix:c:c' + cycle, phase: 'Fix', schema: FIX_SCHEMA })
   log('WP-C close-out fix ' + cycle + ': ' + (fx ? fx.quick_line : 'NO RESULT'))
   const v = await verifyBoth(cycle, prevIssues)
   const entry = { cycle, fix: fx && { summary: fx.summary, quick: fx.quick_line, sim: fx.sim_line, c2: fx.c2_figures, declined: fx.declined, contract: fx.contract_changes_made }, verify: v }
