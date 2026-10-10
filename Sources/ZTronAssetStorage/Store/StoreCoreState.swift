@@ -73,8 +73,9 @@ struct StoreCoreState: Sendable {
     /// The newest committed generation.
     var committedGeneration: UInt64 = 0
     /// No valid index or a newer schema at load: orphan GC and DOOMED deletion are suspended (R-STO-4, S1-11).
-    /// WP-C's garbage collection reads it; legacy phase 1 (WP-C) sets it when the prior art's `manifest.json` cannot
-    /// be decoded, so the legacy files it moves stay protected orphans (store.md §7).
+    /// WP-C's garbage collection reads it; legacy phase 1 (WP-C) sets it when the prior art's `manifest.json` cannot be
+    /// decoded or is unusable (not a regular file, or too large): that launch adopts nothing and the legacy files stay
+    /// where they are, in the legacy root (ADR draft C-13, a deviation from store.md §7; ADR-052).
     var degraded = false
     /// The applied manifest (planner order; purge scopes and migration plans read it). Legacy phase 1 (WP-C)
     /// installs the decoded legacy manifest here, with `etag` left `nil`, only when it is still empty (a first launch
@@ -87,18 +88,23 @@ struct StoreCoreState: Sendable {
     /// (`verifyIntegrity`) directly, then calls `markDirty(_:)`; residency changes go through
     /// `setResidency(_:of:dooming:)` or `adoptVerifiedFile(at:digest:byteCount:for:)`. One insertion is WP-C's:
     /// legacy phase 1 inserts a record for each legacy entry the applied manifest lists and the index has no record
-    /// for, always as `absent(.neverFetched)` with `expectedBlob` set (the adoption key), never replacing a record.
+    /// for, always as `absent(.neverFetched)` with `expectedBlob` set (the adoption key), never replacing a record;
+    /// it builds them off the actor beside the store's own and assigns the whole dictionary while `opening` (ADR draft
+    /// C-24).
     var records: [AssetID: AssetRecord] = [:]
-    /// The sync stamp (R-STO-2); `purge` (WP-C) clears it in the purge's commit; legacy phase 3 (WP-C) sets it
-    /// from the legacy stamp only when every legacy entry was adopted (ADR-029).
+    /// The sync stamp (R-STO-2); every purge (WP-C) clears it before its first own await, and again in the turn of its
+    /// last chunk when it purged something, so the purge's commits hold it (ADR draft C-5); legacy phase 3 (WP-C) sets
+    /// it from the legacy stamp only while none is set, the applied manifest is still the one phase 1 decoded and every
+    /// one of its entries is present (ADR-029, ADR draft C-15).
     var stamp: SyncStamp?
     /// The persisted "sync due" flag. Legacy phase 3 (WP-C) sets it, directly or through `markSyncDue()`, when not
-    /// every legacy entry was adopted.
+    /// every legacy entry was adopted; every purge (WP-C) sets it with the stamp cleared (R-CLN-6, ADR draft C-5).
     var syncDue = false
-    /// Bumped by every purge (WP-C) before any await; `markSynced` compares it (R-CLN-6, RE-S11).
+    /// Bumped by every purge (WP-C) before any await, and again in the turn of its last chunk when it purged
+    /// something; `markSynced` compares it (R-CLN-6, RE-S11).
     var purgeEpoch: UInt64 = 0
     /// Every blob the store knows: live, doomed or being deleted. WP-C reads it (GC mark set, storage report) and
-    /// dooms through `setResidency(_:of:dooming:)`.
+    /// dooms through `setResidency(_:of:dooming:)`, orphan GC through `doomOrphans(_:)` (ADR-052).
     var blobTable: [BlobKey: BlobState] = [:]
     /// Keys whose placement is in flight: a new key (not yet in `blobTable`), or a doomed `purged`/`corrupt` name
     /// being replaced (already `live`). Never collected, never deleted; every other binder of the key waits until it
@@ -107,7 +113,7 @@ struct StoreCoreState: Sendable {
     /// Counters (R-OBS-2). WP-C increments `evictions`, `evictedBytes` and `gcBytes`.
     var metrics = StoreMetrics()
 
-    // MARK: WP-B bookkeeping (not read or written by WP-C)
+    // MARK: WP-B bookkeeping (WP-C reads only `blobBytes`, `commits.mutationSerial`; writes via `doomOrphans(_:)`)
 
     /// The index lineage (store.md §2.3).
     var storeID = StoreIdentifier.zero
@@ -121,13 +127,16 @@ struct StoreCoreState: Sendable {
     /// `nil` when it failed) instead of letting them re-read the phase: a `close()` that began between that open's end
     /// and their resumption would otherwise decide what they return (close-out cycle 4, ADR draft B-35).
     var openReportWaiters: [CheckedContinuation<OpenReport?, Never>] = []
-    /// Commit scheduling (P-5, ARCHITECTURE §4.1).
+    /// Commit scheduling (P-5, ARCHITECTURE §4.1). WP-C's legacy phase 3 reads `mutationSerial`, which every persisted
+    /// change bumps through `markDirty(_:)`, to tell whether its chunked check saw a quiet store (ADR draft C-24).
     var commits = CommitBookkeeping()
     /// Snapshot versions, installs and acknowledgements (ADR-016, ADR-017).
     var snapshots = SnapshotBookkeeping()
     /// The snapshot entry of every present record, maintained per changed record (O(1) publication).
     var presentTable: [AssetID: SnapshotEntry] = [:]
     /// The size of every blob the table knows (live, doomed or being deleted): usage, pending reclaim, reaped bytes.
+    /// WP-C reads a blob's size when a quarantine or a recorded failure dooms it (ruling R7) and writes it only through
+    /// `doomOrphans(_:)`.
     var blobBytes: [BlobKey: Int64] = [:]
     /// The doom bookkeeping of each key whose deletion unit is in flight (`BlobState.deleting` carries none): a
     /// commit captured meanwhile still persists the reason in DOOMED, and a failed unlink restores it with backoff.
@@ -139,7 +148,8 @@ struct StoreCoreState: Sendable {
     /// Publishers waiting for an in-flight publication or deletion of the same key (REENTRANCY R3, R7).
     var keyWaiters: [BlobKey: [CheckedContinuation<Void, Never>]] = [:]
     /// Unreferenced, undoomed blobs listed at launch: adoptable by a later `apply` (degraded rebuild, store.md
-    /// §2.6); each is stat-ed again before it is bound.
+    /// §2.6); each is stat-ed again before it is bound, and bound only while its entry here still equals the size that
+    /// stat confirmed. `doomOrphans(_:)` removes each key it dooms (orchestrator rulings R1, R2; ADR-052).
     var orphans: [BlobKey: Int64] = [:]
     /// Units and installs whose continuation has not resumed yet; `close()` drains them (store-1 S1-09).
     var unitsInFlight = 0

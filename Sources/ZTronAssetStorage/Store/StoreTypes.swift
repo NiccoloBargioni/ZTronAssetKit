@@ -225,10 +225,12 @@ package struct EvictionVictim: Sendable, Hashable {
 /// The dry run of an eviction (R-CLN-4, R-SYN-11, X-2): computed without mutating anything, re-validated per
 /// victim when applied.
 package struct EvictionPlan: Sendable, Hashable {
-    /// Victims in eviction order: outside the retention scope first (ADR-027), then LRU, larger first on ties,
-    /// then hash; Apple-adopted assets after ordinary ones of the same class (ADR-027).
+    /// Victims in eviction order, one per record: a candidate is a blob, planned with all its records (ADR draft C-1);
+    /// outside the retention scope first (ADR-027), then LRU, larger first on ties, then the blob key (hash, then
+    /// extension; R-SYN-1). Apple-adopted assets are not ranked after ordinary ones: records carry no tier (ADR draft
+    /// C-6; ADR-027 as amended by ADR-052).
     package var victims: [EvictionVictim]
-    /// Bytes the plan frees.
+    /// Bytes the plan frees, each blob counted once (ADR draft C-1).
     package var bytes: Int64
 
     /// Creates a plan.
@@ -291,9 +293,12 @@ package struct StagingInventory: Sendable, Hashable {
 
 /// The outcome of a cleanup step (R-CLN-*).
 package struct CleanupResult: Sendable, Hashable {
-    /// Bytes deleted.
+    /// Bytes deleted; for quota eviction and orphan GC, the bytes the run released to the reaper (quota eviction's leave
+    /// `FreeSpace.usedBytes` at once; orphan GC's files, which the blob table did not know, join
+    /// `FreeSpace.pendingReclaim`; both are unlinked after acknowledgement and grace, which `runDueWork()` reports in
+    /// `reapedBytes`; ADR drafts C-3, C-11, C-23).
     package var bytesFreed: Int64
-    /// Files deleted.
+    /// Files deleted; for quota eviction and orphan GC, the blobs the run released to the reaper.
     package var filesRemoved: Int
     /// Bytes selected but still leased.
     package var bytesDeferred: Int64
@@ -359,7 +364,10 @@ package struct LegacyMigrationProgress: Sendable, Hashable {
     package var adopted: Int
     /// Files left.
     package var remaining: Int
-    /// Files dropped (checksum mismatch, traversal, symlink).
+    /// Files dropped, whose assets are downloaded again: an invalid path or one through a symbolic link, a stale or
+    /// missing checksum, bytes that do not verify, a file no record wants or no listing found (unless an earlier
+    /// lifetime adopted it), one that vanished, a root on another volume, or a file kept in place after three failed
+    /// attempts (ADR drafts C-12, C-14).
     package var dropped: Int
     /// Phases 3 and 4 completed: the legacy tree and key are gone.
     package var finished: Bool
