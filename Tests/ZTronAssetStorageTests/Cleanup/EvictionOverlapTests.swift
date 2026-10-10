@@ -158,4 +158,56 @@ struct EvictionOverlapTests {
         #expect(try await purge.value.assetsRemoved == 2)
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
+
+    /// How a blob is doomed outside eviction and purge while quota eviction computes its candidates.
+    enum Release: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// `reportUnreadable(_:)`: the blob is quarantined, doomed `corrupt` (deep verification shares the path).
+        case quarantine
+        /// `recordFailure(_:identity:reason:)` with `.notFound`: the record becomes `failed`, its blob doomed
+        /// `unreferenced`.
+        case failure
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// Review of the L3 close-out cycle 6 (probe ZP6-overlap-quarantine; orchestrator ruling R7 at cycle 7): a quarantine
+    /// dooms the most recently used asset's blob while the run computes its candidates. Those bytes left `usedBytes` as
+    /// surely as an eviction's, so they count toward the need: counted, the run evicts what a measurement after the
+    /// quarantine asks for; not counted, it evicts one asset too many, to be downloaded again.
+    @Test(
+        "R-CLN-4: bytes a quarantine or a recorded failure dooms while quota eviction computes its candidates count toward its need",
+        .timeLimit(.minutes(1)),
+        arguments: Release.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func releaseWhileCandidatesRun(release: Release) async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        await bulk.setHolding(true)
+        let maintenance = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        // The run measured 550 bytes to free and waits in its candidates unit.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        // Meanwhile the most recently used asset, o9, is found unreadable, or gone from the server: its blob is doomed.
+        let last = EvictionOverlapTests.assets[9]
+        _ = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            switch release {
+            case .quarantine:
+                try await harness.store.reportUnreadable(last.id)
+            case .failure:
+                try await harness.store.recordFailure([last.id], identity: last.entry.contentIdentity, reason: .notFound)
+            }
+        }
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[last.key], release == .quarantine ? .corrupt : .unreferenced))
+        await bulk.setHolding(false)
+        let result = try await maintenance.value
+        #expect(result == CleanupResult(bytesFreed: 500, filesRemoved: 5), "450 of the 550 bytes it measured were still needed")
+        let evicted = await EvictionOverlapTests.evicted(harness)
+        #expect(evicted == Array(0..<5), "what a run measured after the release evicts")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
 }
