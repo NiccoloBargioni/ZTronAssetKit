@@ -43,8 +43,9 @@ extension ZTronAssetKitBenchmarks {
 
         /// Ruling R4's second half: the thread CPU of each of WP-C's actor stretches, measured directly on the actor (as
         /// the round-3 review measured them), at 10,000 and at `ManifestLimits.maxEntries` assets. The stretches WP-C made
-        /// O(1) per item and chunked are asserted against the 10 ms at both scales (best of five chunks), the synchronous
-        /// eviction dry run at 10,000 only; the ones that stay linear on the actor (the first copy of `records` while a
+        /// O(1) per item and chunked are asserted against the 10 ms at both scales (best of five chunks; `apply`'s eviction
+        /// hook, every chunk of one plan, also its worst chunk at 10,000), the synchronous eviction dry run at 10,000 only;
+        /// the ones that stay linear on the actor (the first copy of `records` while a
         /// snapshot is alive, the dry run at `maxEntries`, and WP-B's own stretches inside the operations, seen by the probe
         /// at 100,000) are recorded (ADR draft C-22).
         @Test("C2: WP-C's actor stretches at 10,000 and at 100,000 assets (maxEntries), thread CPU per stretch", .timeLimit(.minutes(10)))
@@ -57,6 +58,9 @@ extension ZTronAssetKitBenchmarks {
                 print("C2 thread CPU of WP-C's stretches at \(count) assets: " + figures.map { "\($0.name) \($0.best) ms (worst \($0.worst) ms)\($0.bounded ? "" : ", recorded")" }.joined(separator: ", "))
                 for figure in figures where figure.bounded {
                     #expect(figure.best <= CleanupBenchmarks.budget, "\(count) assets, \(figure.name): \(figure.best) ms")
+                    if figure.worstBounded {
+                        #expect(figure.worst <= CleanupBenchmarks.budget, "\(count) assets, \(figure.name), worst: \(figure.worst) ms")
+                    }
                 }
                 if count == 100_000 {
                     let holds = try await CleanupBench.operationHoldsAtScale(count: count, seed: UInt64(990_000))
@@ -124,7 +128,8 @@ extension ZTronAssetKitBenchmarks {
         /// an eviction chunk of 1,000 held the actor about 1.7 s at 10,000 assets, and `apply`'s eviction of a plan of
         /// half about 4.3 s. Each operation's longest hold after the outdating `apply` (WP-B's probe, best of three runs),
         /// asserted against the 10 ms; and the thread CPU of `apply`'s eviction hook over a plan of half, with and
-        /// without the rename (recorded: one synchronous turn inside `apply`'s fence, ADR draft C-22).
+        /// without the rename and after an alias was bound to half the plan's blobs, each the run's longest chunk since
+        /// `apply` passes its plan in chunks (ruling R6 at the L3 close-out cycle 7), asserted too (best of three runs).
         @Test(
             "C2: quota eviction, apply's eviction plan and an evictable purge hold the actor at most 10 ms at 10,000 assets when ids were bound to their blobs after the selection",
             .timeLimit(.minutes(10))
@@ -327,13 +332,15 @@ enum CleanupBench {
         return holds
     }
 
-    /// One stretch's thread CPU over five samples.
+    /// One stretch's thread CPU over five samples (or over every chunk of one operation).
     struct Stretch: Sendable {
         let name: String
         let best: Double
         let worst: Double
         /// Asserted against the C2 budget (WP-C made it O(1) per item, in chunks); otherwise recorded only.
         let bounded: Bool
+        /// The worst sample is asserted too: every chunk of one operation is a turn that operation holds the actor for.
+        var worstBounded = false
     }
 
     /// The thread CPU of WP-C's actor stretches on a store of `count` assets: five samples each.
@@ -588,32 +595,65 @@ enum CleanupBench {
         return figures
     }
 
-    /// `apply`'s eviction hook over a plan of half the store and over a plan of the whole store, each in the one
-    /// synchronous turn `apply` runs it in (review of the L3 close-out cycles 4 and 5; WP-C cannot split it without a
-    /// change to `apply`, CCR-3): recorded at both scales, with WP-B's `setResidency` of the same victims alone in one turn
-    /// on a store of its own, the part of the hook that is not WP-C's.
+    /// The thread CPU of each turn `apply` gives its eviction hook for `plan` (`ApplyEvictionChunks`, chunks of
+    /// `AssetStore.evictionChunk` records at blob boundaries; ruling R6 at the L3 close-out cycle 7, CCR-3), in
+    /// milliseconds, and how many ids the hook evicted.
+    static func hookChunks(of plan: EvictionPlan, on store: AssetStore) async -> (evicted: Int, milliseconds: [Double]) {
+        var evicted = 0
+        var milliseconds: [Double] = []
+        for chunk in ApplyEvictionChunks(cutting: plan, records: AssetStore.evictionChunk).chunks {
+            let turn = await store.benchThreadCPU { store in
+                store.applyEviction(chunk).count
+            }
+            evicted += turn.value
+            milliseconds.append(turn.milliseconds)
+        }
+        return (evicted, milliseconds)
+    }
+
+    /// `apply`'s eviction hook over a plan of half the store and over a plan of the whole store, one chunk per turn as
+    /// `apply` passes it (review of the L3 close-out cycles 4 to 6; ruling R6 at cycle 7): every chunk's turn, the best
+    /// asserted at both scales and the worst at 10,000 (at `maxEntries` the first chunk can pay WP-B's copy of the present
+    /// table after a publication, C-22 (b)); with WP-B's `setResidency` of each chunk's victims alone on a store of its
+    /// own, the part of a chunk's turn that is not WP-C's.
     static func applyEvictionStretch(count: Int, seed: UInt64) async throws -> [Stretch] {
         var figures: [Stretch] = []
         for (index, share) in [(0, 2), (1, 1)] {
             let (store, _, _, _) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 10_000)
             let plan = try #require(await store.evictionPlan(toFree: Int64(count) * 64 / Int64(share), protecting: []))
-            let evicted = await store.benchThreadCPU { store in
-                store.performApplyEviction(plan).count
-            }
-            #expect(evicted.value == plan.victims.count && evicted.value == count / share)
+            let turns = await CleanupBench.hookChunks(of: plan, on: store)
+            #expect(turns.evicted == plan.victims.count && turns.evicted == count / share)
             await store.close()
-            figures.append(Stretch(name: "apply's eviction hook over a plan of \(evicted.value) blobs (one turn)", best: evicted.milliseconds, worst: evicted.milliseconds, bounded: false))
+            figures.append(
+                Stretch(
+                    name: "apply's eviction hook over a plan of \(turns.evicted) blobs, each of its \(turns.milliseconds.count) chunks of \(AssetStore.evictionChunk) records",
+                    best: turns.milliseconds.min() ?? .infinity,
+                    worst: turns.milliseconds.max() ?? .infinity,
+                    bounded: true,
+                    worstBounded: count == 10_000
+                )
+            )
         }
         let (other, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 20_000)
         let plan = try #require(await other.evictionPlan(toFree: Int64(count) * 64, protecting: []))
-        let alone = await other.benchThreadCPU { store in
-            for victim in plan.victims {
-                store.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
-            }
-            return plan.victims.count
+        var alone: [Double] = []
+        for chunk in ApplyEvictionChunks(cutting: plan, records: AssetStore.evictionChunk).chunks {
+            alone.append(await other.benchThreadCPU { store in
+                for victim in chunk.victims {
+                    store.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
+                }
+                return chunk.victims.count
+            }.milliseconds)
         }
         await other.close()
-        figures.append(Stretch(name: "WP-B: setResidency of \(alone.value) victims alone (one turn)", best: alone.milliseconds, worst: alone.milliseconds, bounded: false))
+        figures.append(
+            Stretch(
+                name: "WP-B: setResidency of each chunk's \(AssetStore.evictionChunk) victims alone (\(alone.count) chunks)",
+                best: alone.min() ?? .infinity,
+                worst: alone.max() ?? .infinity,
+                bounded: false
+            )
+        )
         return figures
     }
 
@@ -871,16 +911,15 @@ enum CleanupBench {
         "quota eviction after an alias was bound to every candidate",
         "apply renaming every id with an eviction plan of half",
         "purge(.evictable) after an alias was bound to every selected blob",
-        "apply's eviction hook over a plan of half (thread CPU)",
-        "apply's eviction hook over a plan of half after a rename (thread CPU)",
+        "apply's eviction hook over a plan of half, longest chunk (thread CPU)",
+        "apply's eviction hook over a plan of half after a rename, longest chunk (thread CPU)",
         "purge(.evictable) chunk of 1,000 blobs after an alias was bound to each (thread CPU)",
-        "apply's eviction hook over a plan of half after an alias was bound to half its blobs (thread CPU)",
+        "apply's eviction hook over a plan of half after an alias was bound to half its blobs, longest chunk (thread CPU)",
     ]
 
-    /// The figures of `bindingOperations` asserted against the C2 budget; the others are recorded.
-    static let boundedBindingOperations: Set<String> = [
-        bindingOperations[0], bindingOperations[1], bindingOperations[2], bindingOperations[4], bindingOperations[5],
-    ]
+    /// The figures of `bindingOperations` asserted against the C2 budget: every one since `apply` passes its plan in
+    /// chunks (ruling R6 at the L3 close-out cycle 7).
+    static let boundedBindingOperations = Set(bindingOperations)
 
     /// `entries` renamed with `prefix`, same bytes.
     static func renamed(_ entries: [ManifestEntry], _ prefix: String) -> [ManifestEntry] {
@@ -910,7 +949,8 @@ enum CleanupBench {
     /// On fresh stores of `count` assets: the longest hold of quota eviction, and of `purge(.evictable)`, after an
     /// `apply` bound an alias to every blob while the operation's selection unit was held; of an `apply` that renames
     /// every id and carries an eviction plan of half made before it; and the thread CPU of `apply`'s eviction hook over
-    /// such a plan, without and with the rename.
+    /// such a plan, without and with the rename and after an alias was bound to half its blobs (the longest of the
+    /// chunks `apply` passes it, one turn each).
     static func bindingHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
         var holds: [(String, Double)] = []
         let digest = { (tag: String) in ContentHash.sha256(of: Data("c2c-binding-\(seed)-\(tag)".utf8)) }
@@ -945,23 +985,20 @@ enum CleanupBench {
             #expect(report.evicted.isEmpty, "every planned id was renamed")
         }))
         await store.close()
-        // The hook alone, in one turn: over the plan as made, then after a rename (applied without the plan first).
+        // The hook alone, one chunk per turn as `apply` passes it: over the plan as made, then after a rename (applied
+        // without the plan first); each figure is the run's longest chunk.
         let (plain, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 30_000)
         let half = try #require(await plain.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
-        let evicted = await plain.benchThreadCPU { store in
-            store.performApplyEviction(half).count
-        }
-        #expect(evicted.value == half.victims.count)
-        holds.append((CleanupBench.bindingOperations[3], evicted.milliseconds))
+        let evicted = await CleanupBench.hookChunks(of: half, on: plain)
+        #expect(evicted.evicted == half.victims.count)
+        holds.append((CleanupBench.bindingOperations[3], evicted.milliseconds.max() ?? .infinity))
         await plain.close()
         let (moved, _, _, movedEntries) = try await CleanupBench.store(count: count, seed: seed + 40_000)
         let stale = try #require(await moved.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
         _ = try await moved.apply(try ValidatedManifest(entries: CleanupBench.renamed(movedEntries, "renamed"), digest: digest("moved")), etag: nil, eviction: nil)
-        let none = await moved.benchThreadCPU { store in
-            store.performApplyEviction(stale).count
-        }
-        #expect(none.value == 0)
-        holds.append((CleanupBench.bindingOperations[4], none.milliseconds))
+        let none = await CleanupBench.hookChunks(of: stale, on: moved)
+        #expect(none.evicted == 0)
+        holds.append((CleanupBench.bindingOperations[4], none.milliseconds.max() ?? .infinity))
         // One chunk of an evictable purge whose selection predates the aliases: twice the records, and the chunk's scan.
         let selection = await moved.benchThreadCPU { store in
             PurgeSelection.select(.evictable, records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: [], leases: [:])
@@ -992,11 +1029,9 @@ enum CleanupBench {
             etag: nil,
             eviction: nil
         )
-        let partly = await aliased.benchThreadCPU { store in
-            store.performApplyEviction(planned).count
-        }
-        #expect(partly.value == planned.victims.count - halfOfPlan.count, "the aliased blobs stay")
-        holds.append((CleanupBench.bindingOperations[6], partly.milliseconds))
+        let partly = await CleanupBench.hookChunks(of: planned, on: aliased)
+        #expect(partly.evicted == planned.victims.count - halfOfPlan.count, "the aliased blobs stay")
+        holds.append((CleanupBench.bindingOperations[6], partly.milliseconds.max() ?? .infinity))
         await aliased.close()
         return holds
     }
