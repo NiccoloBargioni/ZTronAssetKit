@@ -69,22 +69,25 @@ extension ModelSuites {
             .enabled(if: !DecodeMeasurement.underThreadSanitizer)
         )
         func tableEstimateBoundsDictionaries() {
-            // Warm the dictionary type's runtime metadata, which is allocated once per process.
-            var warm: [AssetID: Int] = [:]
-            warm.reserveCapacity(1)
-            withExtendedLifetime(warm) {}
+            // The table's own block, as the allocator sized it: the process-wide in-use growth around the reservation
+            // also counted whatever the tests running beside this one allocated meanwhile (OI-8).
+            let stride = MemoryLayout<AssetID>.stride + MemoryLayout<Int>.stride
             var under: [(count: Int, measured: Int, estimated: Int)] = []
+            var notTheTable: [(count: Int, measured: Int, capacity: Int)] = []
             for count in Array(1...200) + [1_000, 10_000, 49_152, 49_153, 100_000] {
-                let measured = DecodeMeasurement.retainedGrowth {
-                    var table: [AssetID: Int] = [:]
-                    table.reserveCapacity(count)
-                    return table
+                var table: [AssetID: Int] = [:]
+                table.reserveCapacity(count)
+                let measured = DecodeMeasurement.storageBlockSize(of: table)
+                // The block read is the table's: it holds at least the buckets its capacity needs.
+                if measured < table.capacity * stride {
+                    notTheTable.append((count, measured, table.capacity))
                 }
-                let estimated = ManifestFootprint.table(count: count, stride: MemoryLayout<AssetID>.stride + MemoryLayout<Int>.stride)
+                let estimated = ManifestFootprint.table(count: count, stride: stride)
                 if measured > estimated {
                     under.append((count, measured, estimated))
                 }
             }
+            #expect(notTheTable.isEmpty, "\(notTheTable.count) tables whose storage block was not found, first: \(notTheTable.prefix(8))")
             #expect(under.isEmpty, "\(under.count) counts estimated below their storage, first: \(under.prefix(8))")
             // The index is only built past the linear-lookup limit.
             #expect(ManifestFootprint.index(count: 8) == 0 && ManifestFootprint.index(count: 9) > 0)

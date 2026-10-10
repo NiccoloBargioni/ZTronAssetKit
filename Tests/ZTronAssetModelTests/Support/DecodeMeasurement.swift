@@ -119,6 +119,21 @@ enum DecodeMeasurement {
         return lowest
     }
 
+    /// The size of the malloc block holding `dictionary`'s native storage, or 0 when its one word does not point at the
+    /// start of a malloc block. A native dictionary is one reference to a storage object that tail-allocates its
+    /// occupancy bitmap, keys and values in a single allocation, and `Dictionary`'s layout is ABI-stable on Apple
+    /// platforms, so this is exactly what the table costs the heap, read from the allocator itself rather than from the
+    /// process-wide in-use figure, which every thread's allocations move (OI-8: tests running beside the measurement
+    /// made the in-use growth around one 128-byte table read 544 to 19,680 bytes on the iOS Simulator).
+    static func storageBlockSize<Key: Hashable, Value>(of dictionary: [Key: Value]) -> Int {
+        withUnsafeBytes(of: dictionary) { bytes in
+            guard bytes.count == MemoryLayout<UInt>.size, let storage = UnsafeRawPointer(bitPattern: bytes.load(as: UInt.self)) else {
+                return 0
+            }
+            return malloc_size(storage)
+        }
+    }
+
     /// Runs `body` on the calling thread while a sampler thread tracks the heap's in-use bytes.
     @available(macOS 15.0, iOS 18.0, *)
     static func measure<Result>(_ body: () throws -> Result) rethrows -> (result: Result, cost: DecodeCost) {
