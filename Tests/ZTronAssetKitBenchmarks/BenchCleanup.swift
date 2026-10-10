@@ -814,6 +814,7 @@ enum CleanupBench {
         "apply's eviction hook over a plan of half (thread CPU)",
         "apply's eviction hook over a plan of half after a rename (thread CPU)",
         "purge(.evictable) chunk of 1,000 blobs after an alias was bound to each (thread CPU)",
+        "apply's eviction hook over a plan of half after an alias was bound to half its blobs (thread CPU)",
     ]
 
     /// The figures of `bindingOperations` asserted against the C2 budget; the others are recorded.
@@ -920,6 +921,23 @@ enum CleanupBench {
         #expect(chunk.value == 2 * AssetStore.cleanupChunk, "each selected blob lost its record and the alias bound since")
         holds.append((CleanupBench.bindingOperations[5], chunk.milliseconds))
         await moved.close()
+        // The hook over a plan of half after an `apply` bound an alias to half of the planned blobs (review of close-out
+        // cycle 5: the turn's one scan of the records is part of it): those blobs stay, the other half is evicted.
+        let (aliased, _, _, aliasedEntries) = try await CleanupBench.store(count: count, seed: seed + 60_000)
+        let planned = try #require(await aliased.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
+        let plannedIDs = Set(planned.victims.map(\.id))
+        let halfOfPlan = Array(aliasedEntries.filter { plannedIDs.contains($0.identifier) }.prefix(count / 4))
+        _ = try await aliased.apply(
+            try ValidatedManifest(entries: aliasedEntries + CleanupBench.renamed(halfOfPlan, "alias"), digest: digest("half-aliased")),
+            etag: nil,
+            eviction: nil
+        )
+        let partly = await aliased.benchThreadCPU { store in
+            store.performApplyEviction(planned).count
+        }
+        #expect(partly.value == planned.victims.count - halfOfPlan.count, "the aliased blobs stay")
+        holds.append((CleanupBench.bindingOperations[6], partly.milliseconds))
+        await aliased.close()
         return holds
     }
 }
