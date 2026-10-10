@@ -75,7 +75,7 @@ extension AssetStore {
                 }
             } else {
                 dropped = dropped || record.referencedBlob != nil
-                self.setResidency(.failed(.integrity), of: id, dooming: .unreferenced)
+                self.setResidencyCountingRelease(.failed(.integrity), of: id, dooming: .unreferenced)
             }
         }
         // REENTRANCY: R17 — nothing but the phase: the bookkeeping was written synchronously above.
@@ -101,7 +101,7 @@ extension AssetStore {
                 continue
             }
             dropped = dropped || record.referencedBlob != nil
-            self.setResidency(.failed(reason), of: id, dooming: .unreferenced)
+            self.setResidencyCountingRelease(.failed(reason), of: id, dooming: .unreferenced)
             changed = true
         }
         // REENTRANCY: R17 — nothing but the phase: the failures were written synchronously above.

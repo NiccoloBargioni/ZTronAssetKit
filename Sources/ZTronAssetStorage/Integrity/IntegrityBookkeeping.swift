@@ -52,9 +52,28 @@ extension AssetStore {
             record.integrity = step.history
             self.state.core.records[id] = record
             let residency: Residency = step.quarantinedUntil.map { .quarantined(until: $0) } ?? .failed(.unreadable)
-            self.setResidency(residency, of: id, dooming: .corrupt)
+            self.setResidencyCountingRelease(residency, of: id, dooming: .corrupt)
         }
         return ids
+    }
+
+    /// `setResidency(_:of:dooming:)` for a release outside eviction and purge (a quarantine, a recorded failure): when
+    /// the change dooms the record's live blob, its bytes left `FreeSpace.usedBytes` in this turn, so they count toward
+    /// the need of a quota eviction that measured before (`EvictionState.releasedBytes`, as eviction and purge count
+    /// theirs). Otherwise a quarantine landing while a maintenance run awaited made it evict one asset too many, to be
+    /// downloaded again (review of the L3 close-out cycle 6, probe ZP6-overlap-quarantine; orchestrator ruling R7 at
+    /// cycle 7).
+    func setResidencyCountingRelease(_ residency: Residency, of id: AssetID, dooming reason: DoomReason) {
+        guard let record = self.state.core.records[id], let blob = record.referencedBlob, case .live? = self.state.core.blobTable[blob] else {
+            self.setResidency(residency, of: id, dooming: reason)
+            return
+        }
+        // The bytes `usedBytes` counts for the blob, read before the change.
+        let bytes = self.state.core.blobBytes[blob] ?? EvictionOrder.recordedSize(record)
+        self.setResidency(residency, of: id, dooming: reason)
+        if case .doomed? = self.state.core.blobTable[blob] {
+            self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+        }
     }
 
     /// Persists bookkeeping written synchronously by the caller: one ordered commit, after a snapshot install when a
