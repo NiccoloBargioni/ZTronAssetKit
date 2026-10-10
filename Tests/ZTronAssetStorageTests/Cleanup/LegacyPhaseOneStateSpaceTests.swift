@@ -256,53 +256,45 @@ struct LegacyPhaseOneStateSpaceTests {
         return result
     }
 
-    /// How many initial disks of a row run at once: one (review round 2: under TSan on a loaded host the suites beside
-    /// this one, WP-B's kill-then-power-loss cases and WP-H's start/stop race, need the cooperative pool more than this
-    /// suite needs wall time).
-    static let width = 1
+    /// Every unforged initial disk (7 × 7 × 8), one test case each (close-out cycle 4): under TSan on a host loaded by
+    /// other agents one row of eight disks ran past its one-minute limit, so each case now carries one disk's work, an
+    /// eighth of a row's, and keeps that headroom.
+    static let slices: [IndexSpaceSlice] = IndexSpaceRow.unforged.flatMap(\.slices)
 
-    /// The rows run one at a time (`.serialized`), each enumerating its eight disks `width` at a time as low-priority
-    /// child tasks that yield once per case (ios.md item 4): a row's time limit then measures only its own work (under a
-    /// second of CPU), and the suites running beside this one keep the cooperative pool. Round-1 review: with every row
-    /// started at once, a loaded host ran 48 of 49 rows past their limit; with eight disks at once, a test that yields
-    /// 80,000 times (WP-H's loopback start/stop race) took 56 s of its 60 under TSan instead of 31.
+    /// The cases run one at a time (`.serialized`), each enumerating its disk as a low-priority child task that yields once
+    /// per case (ios.md item 4): a case's time limit then measures only its own work, and the suites running beside this
+    /// one keep the cooperative pool. Round-1 review: with every row started at once, a loaded host ran 48 of 49 rows past
+    /// their limit; with eight disks at once, a test that yields 80,000 times (WP-H's loopback start/stop race) took 56 s of
+    /// its 60 under TSan instead of 31; review round 2: one disk at a time leaves WP-B's kill-then-power-loss cases and
+    /// WP-H's race the pool they need.
     @Test(
         "R-STO-5: legacy phase 1's commit before open()'s barrier keeps the newest durable generation and counts only what a file holds, for every initial index disk, fault and crash",
         .serialized,
         .timeLimit(.minutes(1)),
-        arguments: IndexSpaceRow.unforged
+        arguments: LegacyPhaseOneStateSpaceTests.slices
     )
     @available(macOS 15.0, iOS 18.0, *)
-    func everyStateFaultAndCrash(row: IndexSpaceRow) async throws {
-        let results = try await withThrowingTaskGroup(of: SliceResult.self) { group in
-            var pending = row.slices[...]
-            for _ in 0..<LegacyPhaseOneStateSpaceTests.width {
-                guard let slice = pending.popFirst() else {
-                    break
-                }
-                group.addTask(priority: .low) {
-                    try await LegacyPhaseOneStateSpaceTests.enumerate(slice)
-                }
+    func everyStateFaultAndCrash(slice: IndexSpaceSlice) async throws {
+        let result = try await withThrowingTaskGroup(of: SliceResult.self) { group in
+            group.addTask(priority: .low) {
+                try await LegacyPhaseOneStateSpaceTests.enumerate(slice)
             }
-            var results: [SliceResult] = []
-            while let result = try await group.next() {
-                results.append(result)
-                if let slice = pending.popFirst() {
-                    group.addTask(priority: .low) {
-                        try await LegacyPhaseOneStateSpaceTests.enumerate(slice)
-                    }
-                }
-            }
-            return results.sorted { $0.slice < $1.slice }
+            return try await group.next()
         }
-        let violations = results.flatMap(\.violations)
-        #expect(violations.isEmpty, "\(violations.count) violations in \(row.testDescription), first: \(violations.prefix(5))")
-        // The size of the space is asserted, not only printed: a refactor that dropped a disk, an event or a crash mode
-        // would otherwise still pass.
-        #expect(Set(results.map(\.slice)) == Set(row.slices.map(\.testDescription)) && results.count == row.slices.count, "every initial disk of \(row.testDescription) ran")
-        for result in results {
-            #expect(result.faultRuns == result.expectedFaultRuns && result.expectedFaultRuns > 2, "\(result.slice): \(result.faultRuns) of \(result.expectedFaultRuns) fault cases")
-            #expect(result.crashViews == result.expectedCrashViews && result.expectedCrashViews > 3, "\(result.slice): \(result.crashViews) of \(result.expectedCrashViews) crash views")
-        }
+        let ran = try #require(result, "\(slice.testDescription) ran")
+        #expect(ran.violations.isEmpty, "\(ran.violations.count) violations in \(slice.testDescription), first: \(ran.violations.prefix(5))")
+        // The size of the space is asserted, not only printed: a refactor that dropped an event or a crash mode would
+        // otherwise still pass.
+        #expect(ran.slice == slice.testDescription)
+        #expect(ran.faultRuns == ran.expectedFaultRuns && ran.expectedFaultRuns > 2, "\(ran.slice): \(ran.faultRuns) of \(ran.expectedFaultRuns) fault cases")
+        #expect(ran.crashViews == ran.expectedCrashViews && ran.expectedCrashViews > 3, "\(ran.slice): \(ran.crashViews) of \(ran.expectedCrashViews) crash views")
+    }
+
+    /// The cases cover every unforged initial disk, each once: a refactor that dropped a disk would otherwise still pass.
+    @Test("R-STO-5: legacy phase 1's state space enumerates every unforged initial index disk once")
+    func everyInitialDisk() {
+        let disks = LegacyPhaseOneStateSpaceTests.slices.map(\.testDescription)
+        #expect(disks.count == 7 * 7 * 8 && Set(disks).count == disks.count)
+        #expect(IndexSpaceRow.unforged.count == 7 * 7 && IndexSpaceRow.unforged.allSatisfy { $0.slices.count == 8 })
     }
 }
