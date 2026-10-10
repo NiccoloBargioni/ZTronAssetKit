@@ -52,6 +52,7 @@ extension ZTronAssetKitBenchmarks {
             for count in [10_000, 100_000] {
                 let figures = try await CleanupBench.stretches(count: count, seed: UInt64(900_000 + count))
                     + CleanupBench.purgeStretches(count: count, seed: UInt64(950_000 + count))
+                    + CleanupBench.applyEvictionStretch(count: count, seed: UInt64(970_000 + count))
                 print("C2 thread CPU of WP-C's stretches at \(count) assets: " + figures.map { "\($0.name) \($0.best) ms (worst \($0.worst) ms)\($0.bounded ? "" : ", recorded")" }.joined(separator: ", "))
                 for figure in figures where figure.bounded {
                     #expect(figure.best <= CleanupBenchmarks.budget, "\(count) assets, \(figure.name): \(figure.best) ms")
@@ -59,7 +60,7 @@ extension ZTronAssetKitBenchmarks {
                 if count == 100_000 {
                     let holds = try await CleanupBench.operationHoldsAtScale(count: count, seed: UInt64(990_000))
                     print("C2 longest actor hold at \(count) assets (WP-C operations, one run, WP-B's stretches inside them included): " + holds.map { "\($0.0) \($0.1) ms" }.joined(separator: ", "))
-                    #expect(holds.count == 8)
+                    #expect(holds.count == 9)
                 }
             }
         }
@@ -511,6 +512,19 @@ enum CleanupBench {
         return figures
     }
 
+    /// `apply`'s eviction hook over a plan of half the store, in the one synchronous turn `apply` runs it in (review of
+    /// the L3 close-out cycle 4; WP-C cannot split it without a change to `apply`, CCR-3): recorded at both scales.
+    static func applyEvictionStretch(count: Int, seed: UInt64) async throws -> [Stretch] {
+        let (store, _, _, _) = try await CleanupBench.store(count: count, seed: seed)
+        let plan = try #require(await store.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
+        let evicted = await store.benchThreadCPU { store in
+            store.performApplyEviction(plan).count
+        }
+        #expect(evicted.value == plan.victims.count && evicted.value == count / 2)
+        await store.close()
+        return [Stretch(name: "apply's eviction hook over a plan of \(evicted.value) blobs (one turn)", best: evicted.milliseconds, worst: evicted.milliseconds, bounded: false)]
+    }
+
     /// Legacy migration's measured calls, in order.
     static let legacyOperations = [
         "open() with phase 1", "longest batch of 500", "last call with phases 3 and 4", "last calls while access stamps arrive",
@@ -636,7 +650,8 @@ enum CleanupBench {
 
     /// The longest actor hold of each WP-C operation once on a store of `count` assets (WP-B's stretches inside them
     /// included): a report, one verification slice of 1,000 blobs, orphan GC of 100 orphans, a quarantine, eviction of
-    /// half, then purge(.all) of the rest; then each purge on a full store of its own.
+    /// half, then purge(.all) of the rest; then each purge on a full store of its own; then orphan GC of `count` orphans
+    /// on a full store.
     static func operationHoldsAtScale(count: Int, seed: UInt64) async throws -> [(String, Double)] {
         let (store, fileSystem, time, entries) = try await CleanupBench.store(count: count, seed: seed)
         try CleanupBench.plantOrphans(100, seed: seed + 5_000_000, fileSystem: fileSystem, base: URL(fileURLWithPath: "/bench/cleanup", isDirectory: true))
@@ -673,6 +688,17 @@ enum CleanupBench {
             }))
             await full.close()
         }
+        // Orphan GC of as many orphans as assets (an index lost on a full store; review of close-out cycle 4: the blob
+        // table's growth rehash falls inside one doom chunk).
+        let (orphaned, volume, clock, _) = try await CleanupBench.store(count: count, seed: seed + 3_000_000)
+        try CleanupBench.plantOrphans(count, seed: seed + 7_000_000, fileSystem: volume, base: URL(fileURLWithPath: "/bench/cleanup", isDirectory: true))
+        clock.advance(by: 120)
+        let later = clock.monotonicNow().adding(seconds: 3_600)
+        holds.append(("orphan GC of \(count) orphans", try await ActorHoldProbe.longestHold(of: orphaned) {
+            let result = try await orphaned.collectGarbage(until: later)
+            #expect(result.filesRemoved == count)
+        }))
+        await orphaned.close()
         return holds
     }
 
