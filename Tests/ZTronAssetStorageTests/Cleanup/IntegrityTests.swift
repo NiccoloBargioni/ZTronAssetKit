@@ -283,6 +283,65 @@ struct IntegrityTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// R-CLN-12's cancellation half for deep verification (store.md §6.9; close-out cycle 4): a slice cancelled while
+    /// its due list is built or while a blob is hashed throws `.cancelled` and leaves no trace (no integrity attempt,
+    /// no doom, no `verifiedAt`, nothing counted verified in the pass, no file-system mutation), so the next slice
+    /// verifies every blob and quarantines the corrupt one exactly once.
+    @Test(
+        "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass",
+        .timeLimit(.minutes(1)),
+        arguments: [0, 1, 2]
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func cancelledVerification(releasedUnits: Int) async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(bulk: bulk)
+        // Three hash units of 1 MiB each: whichever blob the pass takes first, the cancellation lands inside its hash.
+        let assets = (0..<2).map { CleanupFixture.asset("c\($0)", seed: 390 + UInt64($0), count: (5 << 20) / 2) }
+        try await harness.seed(assets)
+        let victim = assets[1]
+        var rotten = victim.bytes
+        rotten[rotten.startIndex] ^= 0xFF
+        try harness.fileSystem.write(rotten, to: harness.layout.blobURL(victim.key), mode: .truncate)
+        let before = await harness.state
+        let mutations = harness.fileSystem.mutationCount
+        let deadline = harness.time.monotonicNow().adding(seconds: 600)
+        let seedingUnits = await bulk.submittedUnits.count
+        await bulk.setHolding(true)
+        let verification = Task {
+            try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
+        }
+        // Unit 1 is the due list, units 2 to 4 the first blob's hash: release `releasedUnits` of them, then cancel the
+        // caller while the next one is held.
+        for _ in 0..<releasedUnits {
+            try await bulk.requireHeldUnits(atLeast: 1)
+            await bulk.releaseNext()
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        #expect(await bulk.submittedUnits.count == seedingUnits + releasedUnits + 1)
+        verification.cancel()
+        await bulk.setHolding(false)
+        switch await verification.result {
+        case .failure(let error):
+            #expect(error as? StoreError == .cancelled)
+        case .success(let report):
+            Issue.record("the cancelled verification ran to the end: \(report)")
+        }
+        let after = await harness.state
+        #expect(after.core.records == before.core.records, "no integrity attempt and no verifiedAt")
+        #expect(after.core.blobTable == before.core.blobTable, "nothing doomed")
+        #expect(after.integrity.verifiedInPass.isEmpty, "nothing counted verified in the pass")
+        #expect(harness.fileSystem.mutationCount == mutations)
+        // The next slice starts the pass again and finishes it.
+        let report = try await harness.store.verifyIntegrity(byteBudget: .max, until: deadline)
+        #expect(report.completedPass && report.corrupt == [victim.id])
+        #expect(await harness.record(victim.id)?.integrity.attempts == 1)
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[victim.key], .corrupt))
+        #expect(await harness.record(assets[0].id)?.verifiedAt == harness.time.now())
+        await harness.settleDeletions()
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-INT-4: deep verification stops at its deadline and does nothing while the store is degraded", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func verificationLimits() async throws {
