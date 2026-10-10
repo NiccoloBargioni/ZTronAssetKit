@@ -492,11 +492,18 @@ struct EvictionTests {
 
     /// `apply`'s hook reads a plan as runs of victims naming one blob (the dry run lists a blob's records together, ADR
     /// draft C-22 cycle 6); a plan that names a blob in two places is grouped by key, so the shared blob still leaves
-    /// with both its records, and the report keeps the plan's order.
-    @Test("R-SYN-11: apply evicts a shared blob whose records its plan lists apart, and reports the evicted ids in plan order", .timeLimit(.minutes(1)))
+    /// with both its records, and the report keeps the plan's order. With a chunk of one record `apply` passes the plan in
+    /// chunks (ruling R6 at the L3 close-out cycle 7): grouped by key before it is cut, the shared blob's two records still
+    /// reach the hook in one chunk, and `apply` restores the plan's order in the report.
+    @Test(
+        "R-SYN-11: apply evicts a shared blob whose records its plan lists apart, and reports the evicted ids in plan order",
+        .timeLimit(.minutes(1)),
+        arguments: [AssetStore.evictionChunk, 1]
+    )
     @available(macOS 15.0, iOS 18.0, *)
-    func applyPlanNamingBlobApart() async throws {
+    func applyPlanNamingBlobApart(chunk: Int) async throws {
         let harness = CoreHarness.cleanup()
+        await harness.store.testSetEvictionChunk(chunk)
         let bytes = CoreFixture.bytes(73, count: 200)
         let first = CleanupFixture.Asset(entry: CoreFixture.entry("first", bytes), bytes: bytes)
         let second = CleanupFixture.Asset(entry: CoreFixture.entry("second", bytes), bytes: bytes)

@@ -69,7 +69,9 @@ extension AssetStore {
     /// **Hook called by WP-B's `apply`** when it receives a plan: re-validates each victim (still present, unleased,
     /// not accessed since the plan, still evictable; REENTRANCY R8), evicts the valid ones through
     /// `setResidency(.absent(.evicted), of:dooming: .unreferenced)` and returns them in plan order. Synchronous: it
-    /// runs inside `apply`'s mutation, before its commit.
+    /// runs inside `apply`'s mutation, before its commit; `apply` calls it once per chunk of whole blobs of a plan larger
+    /// than a chunk, releasing the actor in between behind its write fence (C2; ruling R6 at the L3 close-out cycle 7),
+    /// so each call re-validates its victims against the state as it is in that turn.
     func applyEviction(_ plan: EvictionPlan) -> [AssetID] {
         self.performApplyEviction(plan)
     }

@@ -76,3 +76,68 @@ struct ApplyPlan: Sendable {
         return ApplyPlan(diff: diff, identical: applied == manifest, newRecords: newRecords, adoptionCandidates: candidates)
     }
 }
+
+/// `apply`'s eviction plan cut into the chunks it passes to WP-C's hook `applyEviction(_:)`, one actor turn each (C2;
+/// orchestrator ruling R6 at the L3 close-out cycle 7, CCR-3): in one turn the hook held the actor about 1.4 µs per
+/// victim, 14 ms for a plan of 10,000 blobs and 20 ms for one of 10,000 records over 5,000 blobs. Pure: computed on the
+/// bulk executor from the plan, a value.
+struct ApplyEvictionChunks: Sendable, Hashable {
+    /// The plan's victims in chunks of whole blobs: each chunk ends at the first blob boundary at or past the record
+    /// limit, as quota eviction's chunks do (a blob's records leave together, and the hook re-validates them together).
+    var chunks: [EvictionPlan]
+    /// Whether the chunks list the victims in plan order. A plan lists each blob's victims together (the dry run's
+    /// `EvictionOrder.plan`); one that names a blob in several places is grouped by key, its blobs in the order the plan
+    /// first names them, so `apply` restores the plan's order in its report itself.
+    var inPlanOrder: Bool
+
+    /// Cuts `plan` into chunks of whole blobs holding at least `records` victims each (the last may hold fewer).
+    init(cutting plan: EvictionPlan, records: Int) {
+        let victims = plan.victims
+        var runs: [ArraySlice<EvictionVictim>] = []
+        var seen: Set<BlobKey> = []
+        var grouped = false
+        var start = 0
+        while start < victims.count {
+            var end = start + 1
+            while end < victims.count, victims[end].blob == victims[start].blob {
+                end += 1
+            }
+            guard seen.insert(victims[start].blob).inserted else {
+                grouped = true
+                break
+            }
+            runs.append(victims[start..<end])
+            start = end
+        }
+        if grouped {
+            var order: [BlobKey] = []
+            var groups: [BlobKey: [EvictionVictim]] = [:]
+            for victim in victims {
+                if groups[victim.blob] == nil {
+                    order.append(victim.blob)
+                }
+                groups[victim.blob, default: []].append(victim)
+            }
+            runs = order.map { (groups[$0] ?? [])[...] }
+        }
+        let limit = max(1, records)
+        var chunks: [EvictionPlan] = []
+        var current: [EvictionVictim] = []
+        var bytes: Int64 = 0
+        for run in runs {
+            current.append(contentsOf: run)
+            // A blob is counted once, as the dry run's `EvictionPlan.bytes` counts it.
+            bytes = bytes.addingSaturating(run.first?.byteSize ?? 0)
+            if current.count >= limit {
+                chunks.append(EvictionPlan(victims: current, bytes: bytes))
+                current = []
+                bytes = 0
+            }
+        }
+        if !current.isEmpty {
+            chunks.append(EvictionPlan(victims: current, bytes: bytes))
+        }
+        self.chunks = chunks
+        self.inPlanOrder = !grouped
+    }
+}

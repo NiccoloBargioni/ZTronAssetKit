@@ -54,7 +54,9 @@ extension AssetStore {
         }
         if !unchanged || !report.reused.isEmpty {
             if let eviction {
-                report.evicted = self.applyEviction(eviction)
+                // REENTRANCY: c-8 (proposed) — behind the fence (see `pace`); the hook re-validates each chunk's victims
+                // against the state as it is in that chunk's own turn.
+                report.evicted = await self.applyEvictionInChunks(eviction)
             }
             self.state.core.degraded = false
             self.markDirtyInternal(.soon)
@@ -89,6 +91,47 @@ extension AssetStore {
         // plan and the applied manifest unchanged; every caller re-reads the record it touches next; the phase and
         // writability are re-checked by `apply`'s commit after the last write.
         await Task.yield()
+    }
+
+    /// Evicts `apply`'s plan through WP-C's hook `applyEviction(_:)`, one chunk of whole blobs per actor turn behind the
+    /// commit fence (C2; orchestrator ruling R6 at the L3 close-out cycle 7, CCR-3): the hook re-validates every victim
+    /// in its chunk's turn, so a plan of any size holds the actor for at most a chunk's worth of records (about 1.4 µs
+    /// each; `EvictionState.chunk`, `AssetStore.evictionChunk` unless a test lowers it). A plan within one chunk is
+    /// evicted in this turn, as before. The evicted ids are returned in plan order.
+    private func applyEvictionInChunks(_ plan: EvictionPlan) async -> [AssetID] {
+        let limit = max(1, self.state.eviction.chunk)
+        guard plan.victims.count > limit else {
+            return self.applyEviction(plan)
+        }
+        // REENTRANCY: c-8 (proposed) — nothing stops the writes (as b-7): the cut is a pure computation over the plan, a
+        // value; each chunk's victims are re-validated by the hook in that chunk's turn.
+        let cut = await self.runUnit(on: self.environment.bulkExecutor) {
+            ApplyEvictionChunks(cutting: plan, records: limit)
+        }
+        var evicted: [AssetID] = []
+        for (index, chunk) in cut.chunks.enumerated() {
+            if index > 0 {
+                // The actor is released between chunks by a no-op metadata unit, as quota eviction does (a test can hold
+                // `apply` at this very point).
+                // REENTRANCY: c-8 (proposed) — behind the fence (see `pace`): nothing persists or reports the half-done
+                // eviction meanwhile and `close()` waits for the fence; the hook re-validates every victim of the next
+                // chunk against the state as it is then (still present at the planned blob, unleased, not being placed,
+                // not accessed since the plan, still evictable under rules whose clock is read in that turn, against its
+                // holders as they are then), so one accessed, leased, pinned, purged or re-bound meanwhile is kept.
+                await self.runUnit(on: self.environment.metadataExecutor) {}
+            }
+            evicted.append(contentsOf: self.applyEviction(chunk))
+        }
+        guard !cut.inPlanOrder else {
+            return evicted
+        }
+        // A plan that names a blob in several places was grouped by key: its report keeps the plan's order.
+        let done = evicted
+        // REENTRANCY: c-8 (proposed) — nothing: a pure computation over the plan and the ids evicted above.
+        return await self.runUnit(on: self.environment.bulkExecutor) {
+            let ids = Set(done)
+            return plan.victims.map(\.id).filter { ids.contains($0) }
+        }
     }
 
     /// Lowers the commit fence after `apply`'s last write and resumes everything that waited for it (ADR draft

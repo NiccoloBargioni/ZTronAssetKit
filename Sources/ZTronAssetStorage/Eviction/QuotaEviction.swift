@@ -150,10 +150,11 @@ extension AssetStore {
     /// `applyEviction(_:)`, run synchronously inside `apply`'s write fence: evicts each blob of the plan whose records are
     /// all still evictable exactly as planned (REENTRANCY R8's re-validation), and returns the evicted ids in plan order.
     ///
-    /// One turn (ARCHITECTURE §1.1 rule 4(c)), so its per-blob cost bounds the plans `apply` can carry within C2: a plan
-    /// lists each blob's victims together (`EvictionOrder.plan`), so the blobs are read as runs of the plan, without a
-    /// dictionary of arrays or a set of every evicted id (ADR draft C-22, cycle 6); a plan that names a blob in two
-    /// places is grouped by key instead.
+    /// One turn (ARCHITECTURE §1.1 rule 4(c)); `apply` passes a plan larger than `EvictionState.chunk` records one chunk
+    /// of whole blobs per turn (`ApplyEvictionChunks`; ruling R6 at the L3 close-out cycle 7, CCR-3), so the per-victim
+    /// cost here bounds a chunk's turn. A plan lists each blob's victims together (`EvictionOrder.plan`), so the blobs are
+    /// read as runs of the plan, without a dictionary of arrays or a set of every evicted id (ADR draft C-22, cycle 6); a
+    /// plan that names a blob in two places is grouped by key instead.
     func performApplyEviction(_ plan: EvictionPlan) -> [AssetID] {
         let victims = plan.victims
         var runs: [Range<Int>] = []

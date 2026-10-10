@@ -17,8 +17,8 @@ struct HolderScanTests {
         /// `evictIfNeeded()` with its candidates unit held while `apply` binds an alias to every candidate's blob; two
         /// chunks of four.
         case evictionChunks
-        /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest adding an alias of every id with that plan:
-        /// one turn.
+        /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest adding an alias of every id with that plan: two
+        /// chunks of four, one turn each (ruling R6 at the L3 close-out cycle 7).
         case applyEvictionAfterAliases
         /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest renaming every id with that plan: one turn, in
         /// which no planned record holds its blob any more, so nothing needs a scan.
@@ -83,7 +83,7 @@ struct HolderScanTests {
             let report = try await harness.store.apply(aliased, etag: nil, eviction: plan)
             #expect(report.evicted.isEmpty, "every planned blob has an alias the plan never saw")
             let scans = await harness.state.eviction.holderScans - scansBefore
-            #expect(scans == 1, "one scan for the whole plan, not one per planned blob")
+            #expect(scans == 2, "one scan for each of the plan's two chunks of four, not one per planned blob")
             for asset in assets {
                 #expect(await harness.isPresent(asset.id, at: asset.key), "\(asset.id.rawValue) is kept")
                 #expect(await harness.isPresent(AssetID("alias-" + asset.id.rawValue), at: asset.key), "its alias is kept")
