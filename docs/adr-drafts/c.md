@@ -476,6 +476,13 @@ outside WP-C's directories changed in cycle 3.
   the three crash suites' modes are `.serialized`, so WP-C's suites hold at most one cooperative thread each beside
   WP-B's kill-then-power-loss cases and WP-H's start/stop race under TSan. The space is asserted, not printed: every disk ran, and each disk's fault
   and crash-view counts equal the counts its window implies. The B-36 mutation check still fails 27 of 49 rows.
+- **Amended at the L3 close-out, cycle 4 (review of cycle 3).** Under TSan at a host load of about 140 (other agents) one
+  row (`bin=absent prev=absent`) ran past its one-minute limit. The serialized test now takes one of the 392 disks per
+  test case (`LegacyPhaseOneStateSpaceTests.slices`), each enumerated as one low-priority child task, so a case carries
+  an eighth of a row's work under the same limit; the per-disk assertions are unchanged (no violation, the fault-run and
+  crash-view counts its window implies), and `R-STO-5: legacy phase 1's state space enumerates every unforged initial
+  index disk once` replaces the per-row "every disk ran" check (392 distinct disks, 49 rows of 8). Debug, alone: 392
+  cases in 25.2 s.
 
 ## C-21 — Eviction candidates off the actor; the chunk yield (review round 2, C2)
 - **Context.** `EvictionOrder.candidates` groups every record by blob and sorts: about 228 ms on the actor at
@@ -569,6 +576,19 @@ outside WP-C's directories changed in cycle 3.
   (or of the present table) inside an adoption's binding (C-22 (a), (b); OI-9). The rest of the benchmark at this
   commit, same run: every 10,000-asset hold ≤ 2.32 ms and every asserted chunk ≤ 2.47 ms at both scales, as in cycle 2.
   Under host load the 100,000 figures run about 25–30 % higher (OI-9, cycle 3 note).
+
+- **Amended at the L3 close-out, cycle 4 (review of cycle 3).** (1) Phase 3's one-turn fallback, reached whenever counted
+  mutations interrupt every pass, is gone (C-24, cycle 4); the legacy benchmark gains the last calls while a task merges
+  access stamps: at 100,000 files 44.76 ms with the fallback restored (scratch, reverted), 7.65 and **7.32 ms** without
+  it; at 10,000 files 4.63, then 3.09 and **3.06 ms** (asserted ≤ 10). (2) The quarantine of one blob at 100,000 assets:
+  this cycle's run measured 4.95 ms, cycle 3's 15.12 ms and the review's 14.88 ms; C-22's "5.0–5.4 ms" holds only for
+  some runs. The spread is the copy-on-write of (a) (`records` copied when the actor mutates it before the executor has
+  released the unit's closure that captured it, 9.1–9.7 ms) and WP-B's present-table copy of (b) (3.6–6.2 ms), both
+  timing-dependent; so about 15 ms at 100,000 when both are paid, recorded with (a) and (b) (OI-9, cycle 4 note). Full
+  run at `f567631` (release, load 8.1 → 4.4; Evidence of cycle 4): every 10,000-asset hold ≤ 2.23 ms, every asserted chunk
+  ≤ 2.38 ms at 10,000 and ≤ 7.11 ms at 100,000 (the `purge(.evictable)` chunk's worst of five, 1.91 best), holds at
+  100,000: report 7.94, verification slice 2.32, orphan GC of 100 3.13, quarantine 4.95, eviction of half 21.63,
+  `purge(.all)` of the rest 22.31, full-store purges 33.40 / 33.39 ms.
 
 ## C-23 — Orphan GC dooms; a launch orphan binds only while it is one (CCR-1, CCR-2; rulings R1, R2)
 - **Decision.** `StoreInternals.swift` gains `doomOrphans(_ orphans: [BlobKey: Int64]) -> [BlobKey]` (ruling R2,
@@ -671,6 +691,27 @@ outside WP-C's directories changed in cycle 3.
   legacy holds; and, when migration starts on a store that already indexes many assets, the old records dictionary may
   be freed on the actor at the O(1) assignment (if the unit's closure was released first). Not measured: a first
   migration normally starts on an empty index.
+- **Amended at the L3 close-out, cycle 4 (review of cycle 3).** The one-turn fallback is gone. Any counted mutation
+  between two chunks interrupts a pass (an access stamp merged from an install acknowledgement, a pin, a publication, a
+  doom), so with readers or downloads active during the last call all three passes were interrupted and the check ran
+  over every legacy entry in one turn: the review measured 34.76 ms (pins) and 39.37 ms (access stamps) of longest hold
+  at 100,000, 2.8–4.1 ms at 10,000. Now `legacyEntriesPresent()` answers `nil` after `MigrationState.checkPasses`
+  interrupted passes, and `finishLegacyMigration` decides, commits and removes nothing in that call (logged at `.info`):
+  the stamp stays unmigrated, `syncDue` unchanged, phase `inProgress`, `progress.finished` false with `remaining` 0, and
+  the next call checks again. A store with at most one chunk (5,000) of legacy entries is checked in one turn with no
+  release, so it always decides. Options not taken: recording the stretch (ruling R4 asks for O(1) per item where cheap,
+  and leaving the decision to the next call is); a WP-B serial bumped only by presence-reducing mutations (a CCR: access
+  stamps and pins would never interrupt a pass), which the orchestrator may still prefer for liveness; re-running
+  chunked passes inside the call (same liveness cost, and the call would not return). Liveness: while counted mutations
+  arrive between every two chunks of every pass, phase 3 waits for a call that sees one quiet pass (at 100,000 entries a
+  pass spans 20 chunks and 19 metadata round trips); the files are adopted already, so what waits is phase 3's outcome
+  (the stamp's migration, or the sync it would make due) and phase 4's removal of the tree and of the key. Test:
+  `R-STO-11: phase 3 checks the legacy entries … only over a pass no mutation interrupted`, one-pass cases: the call
+  decides nothing (not finished, still `inProgress`, no stamp, key and tree kept) and the next call decides (failing
+  first in `353c87f`, 7 issues, fix `3ea300b`). Measured by the legacy benchmark's new case, the last calls while a
+  task merges access stamps (`75a2683`; release, load about 3.5–4): 100,000 files 44.76 ms with the fallback restored,
+  **7.65 ms** without it (three calls, none deciding, then one without stamps that finishes); 10,000 files 4.63 and
+  **3.09 ms** (asserted ≤ 10).
 
 ## Orchestrator rulings (L3 close-out)
 
@@ -781,6 +822,45 @@ outside WP-C's directories changed in cycle 3.
   bits (fix round 3's bug), passes: `ManifestFootprint.allocated` now rounds to the coarser magazine size classes, which
   absorb the missing word at every count measured.
   Evidence: 20 consecutive passes on macOS and 20 iterations on the simulator (cycle-3 Evidence).
+- **OI-8, cycle 4 — its sibling, `R-MAN-3: a request above 2 MiB is counted at least as large as the freed block the
+  allocator reuses for it`, was flaky on the simulator for the same cause; fixed by the same orchestrator-authorised edit
+  of that WP-A test and its helper (`3ab4022`).** The review of cycle 3 saw it pass 18 and 17 of 20 iterations on a
+  simulator: every failure was the 3 MiB block case (a 1,572,865-byte request), whose process-wide in-use growth read
+  1,609,488 to 1,798,704 bytes against `ManifestFootprint.allocated(request)` = 1,605,632, i.e. 4 KB to 193 KB of other
+  tests' allocations. Fix: the test reads the array's own block, `DecodeMeasurement.storageBlockSize(of:)` generalised
+  from dictionaries to any collection whose one word references its native storage (an `Array`'s header and elements
+  are one allocation), worst of three as before, the bound unchanged, and checks that the block holds the whole request
+  (`notTheArray` empty), so a wrong pointer fails loudly. `malloc_size` reports a reused cached block whole, the case the
+  test exists for: on this Mac a 2,097,153-byte request was served a 4,145,152-byte block (1.98x), 4,194,305 →
+  8,339,456, 8,388,609 → 16,728,064, 15,204,353 → 30,359,552 (2x − 64 KiB each), the 1,572,865-byte one 1,589,248.
+  `serveFromBlocksTwiceAsLarge(_:)` now detects a fresh block by its own size too (it compared the in-use growth with
+  `malloc_good_size`, the same exposure, which only made it hold more blocks). On the iOS 27.0 simulator no request was
+  served a reused block: in all 20 iterations each one got a fresh block, the request rounded up to 16 KiB (2,097,153 →
+  2,113,536, …, 15,204,353 → 15,220,736), and the same with the old fresh-block detection restored in a scratch run
+  (reverted), so there the test checks the fresh-block bound and the reuse case is exercised on macOS only. Mutants (each reverted): `allocated`
+  without its doubling above 2 MiB → the four reuse cases fail (`2097153: 4145152 > 2129920`, …); without its 32 KiB
+  rounding → the 3 MiB case fails (`1572865: 1589248 > 1572865`). Audit of the other heap measurements in
+  `ZTronAssetModelTests`: `ManifestAllocationTests` (lowest of three retained growths around a decode of microseconds;
+  interference must hit all three runs) and the fuzz test's sampled peaks (bounds of 4x payloads of 1 MiB and more, and
+  the over-budget case's lowest of three peaks below the payload) still read process-wide figures, since a decode's
+  result is many allocations; none of their heap assertions failed in the 40 simulator iterations of the review or in
+  this cycle's runs (Evidence; run 8's failure is the fuzz test's CPU ratio, OI-13), so they stay as they are, recorded
+  here.
+- **OI-13 — WP-A's linear-time check in the manifest fuzz test is sensitive to core scheduling (cycle 4; for WP-A and
+  the orchestrator; outside the authorised edit, not changed).** `R-MAN-3: seeded fuzz … in linear time` asserts that
+  the dense manifest at the limit costs at most 64x the thread CPU of a 1 MiB one (`ManifestFuzzTests.swift:107`). In
+  this cycle's macOS loop (debug, 28 runs) the limit case took 2.87–3.47 s of thread CPU in 25 runs, but 4.33 s (run 15,
+  beside the simulator's build at load 31–80), 5.42 s (run 3, beside a release build of this worktree) and 6.08 s (run
+  8, beside the release benchmark), and run 8 failed:
+  `dense 1 MiB 0.091568333 s vs limit 6.079241875 s` (64x = 5.86 s). This Mac has 4 performance and 4 efficiency cores;
+  a thread moved to an efficiency core spends about twice the CPU time on the same work, which the ratio's 2x headroom
+  (about 32x measured) cannot absorb when only one of the two decodes runs there. A heap measurement is not involved.
+  Suggested for WP-A: compare the lowest of a few measurements of each decode, or measure both at a QoS that keeps them
+  on performance cores, without loosening the 64x.
+- **OI-10, cycle 4 note (for the orchestrator).** The review of cycle 3 found no orchestrator authorisation in the
+  repository for cycle 3's WP-D test edit (`36dd17c`: `LoopbackRig.make(requestTimeout:)`, default 10 s, 50 s in
+  `connectionReuse`), made on the previous verification's "with an authorised test edit"; test-only, every assertion
+  kept. Record its authorisation here at merge.
 - **OI-10 — transport loopback tests under host load (WP-D/WP-E and the orchestrator; cycle 3).** `R-NET-2: 500
   downloads through one backend use at most maxConnectionsPerHost TCP connections` failed on the simulator at load
   110–327 (191 transfers `.transient(.timedOut)`): its 500 tasks queue behind 3 connections and a queued task's
@@ -820,6 +900,14 @@ outside WP-C's directories changed in cycle 3.
   §10.1: new row c-7; the c-4 amendment below.
 - **OI-5, cycle 3.** Unchanged: `LiveLegacyDefaults.swift` has 11 of 14 lines uncovered (cycle-3 coverage export);
   §14's "3 lines" should read "11 of 14 lines uncovered".
+- **OI-6, cycle 4 additions.** §4.7: phase 3's check, when every pass is interrupted, leaves the decision to the next
+  call (C-24, cycle 4). §10.1: row c-7 as amended. §11, R-CLN-12: the new test `R-CLN-12: deep verification cancelled
+  while it builds its due list or hashes a blob records nothing, and the next run completes the pass`. §12.2: no change.
+- **OI-9, cycle 4 note.** The quarantine of one blob at 100,000 assets holds 4.95 to about 15 ms (this cycle 4.95 ms,
+  cycle 3 15.12 ms, the review of cycle 3 14.88 ms; C-22, cycle 4), not only the 5.0–5.4 ms of C-22's cycle-2 text: the
+  copy of `records` under a live snapshot and WP-B's present-table copy (C-22 (a), (b)), whose cost depends on when the
+  executor releases a unit's closure. Unchanged otherwise: WP-B's grace start 33.47 ms and reaper queue 22.84 ms at
+  100,000 in this cycle's run.
 
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.1)
 
@@ -833,7 +921,7 @@ outside WP-C's directories changed in cycle 3.
 | c-6 (proposed, review round 3) | `verifyIntegrity`'s due-list unit (bulk) | the phase and writability; per blob before its hash: live, not being placed, not verified in this pass meanwhile; after it R16; the holders read again with `holders(of:known:)` (C-8) |
 | R10 amendment (proposed, review round 3; amended in cycle 2) | `collectGarbage`'s decision unit (bulk), after the full listing, and its no-op metadata unit between doom chunks | the phase, the caller's cancellation (before the first chunk only: nothing doomed then), degraded or unavailable (nothing doomed); a key counts as unknown only if the snapshot taken before the first listing unit lacks it too; each chunk's turn checks the reap window (`reapWindowClosed`: no key learnt since the start can have been reaped) and every key again in O(1) against the blob table and `publishing` (`doomOrphans`); runs are serialized; a key a record started expecting meanwhile is doomed but stays rescuable until the grace ends (C-23) |
 | R9 amendment (proposed, cycle 2) | `awaitReclaim`'s no-op metadata unit between chunks of its pass | the phase; each later key is classified from the blob table as it is then; the round's figures only decide whether to wait, install or stop, and the next round (or the reaper) sees what changed (C-5) |
-| c-7 (proposed, cycle 3) | phase 3's no-op metadata unit between chunks of its check (`legacyEntriesPresent`), and the return to `finishLegacyMigration` | the phase after each release; the pass answers "present" only if `commits.mutationSerial` is unchanged since it began (else it starts again; after three interrupted passes one turn decides); a missing entry is missing in the turn it is found; then writability, and the migration's phase, queue and claims (a call that finished migration meanwhile, or a file back in the queue, leaves it) (C-24) |
+| c-7 (proposed, cycle 3; amended in cycle 4) | phase 3's no-op metadata unit between chunks of its check (`legacyEntriesPresent`), and the return to `finishLegacyMigration` | the phase after each release; the pass answers "present" only if `commits.mutationSerial` is unchanged since it began (else it starts again; after three interrupted passes the call decides nothing and the next call checks again, C-24 cycle 4); a missing entry is missing in the turn it is found; then writability, and the migration's phase, queue and claims (a call that finished migration meanwhile, or a file back in the queue, leaves it) (C-24) |
 | c-4 amendment (proposed, cycle 3) | the listing units of phases 1 and 4 (`LegacyListingUnit`) and phase 1's bulk unit | an I/O error on either stat of a listing unit fails the walk as a failed listing (C-13, cycle 3); phase 1's bulk unit builds the records and the queue from snapshots that nothing else writes while the store is `opening` (R1), and they replace the store's whole (C-24) |
 | R16 amendment (proposed) | `verifyIntegrity`'s stat units around each hash (`blobIncarnation`) | as R16, plus: the identity and size under the name are the same before and after the hash and the key is not in `publishing`; otherwise the result is discarded and the key stays due in this pass (C-8) |
 | R8 amendment (proposed) | quota eviction's candidate unit (bulk) and its no-op metadata unit between chunks | as R8: the phase and writability, then per candidate against its holders as they are then (`holders(of:known:)`, review round 3; C-21) |
@@ -968,6 +1056,25 @@ first, or measured first; the rest are for the orchestrator. None is declined.
 | 13 | correct: orphan GC liveness (the reap window per run) | recorded for WP-B and the orchestrator (OI-12); each occurrence is already logged |
 | 14 | correct: carried orchestrator items (§14, §1.2, OI-9, OI-4) | unchanged, for the orchestrator (OI-5, OI-7, OI-9, OI-4) |
 
+## Review of cycle 3 — dispositions (L3 close-out, cycle 4)
+
+The close-out verification of cycle 3 reported 8 issues, 1 of them blocking (WP-A's reused-block test, a sibling of
+OI-8, flaky on the simulator); the orchestrator's note repeats OI-8, closed in cycle 3. The blocking one is fixed by the
+orchestrator-authorised test edit, shown passing 20 times on macOS and 20 iterations on the simulator and failing
+against two mutants. Every clearly-right non-blocking one is fixed with a test committed failing first, or with a
+regression test that fails against mutants; the rest are for the orchestrator. None is declined.
+
+| # | Lens, issue | Disposition |
+|---|---|---|
+| 1 | reqs, blocking: `R-MAN-3: a request above 2 MiB is counted at least as large as the freed block…` flaky on the simulator (OI-8's sibling) | fixed (authorised edit, `3ab4022`): the array's own malloc block instead of the process-wide heap delta, the block checked to hold the request, worst of three and the bound kept; mutants (no doubling above 2 MiB, no 32 KiB rounding) caught; the other heap measurements audited (OI-8, cycle 4) |
+| 2 | reqs: deep verification's cancellation untested (R-CLN-12) | `R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass` (`16d975f`; cancelled with the due list, the first or the second hash unit held): `.cancelled`, records, blob table and file system unchanged, nothing counted verified; the next run quarantines the corrupt blob once. The behaviour was right, so no failing commit; mutants caught: `catch .fileSystem` widened to every error (a cancelled hash counted unreadable), and the hash loop without its cancellation check |
+| 3 | reqs: phase 3's one-turn fallback unrecorded (ruling R4) | bounded instead (C-24, cycle 4): after three interrupted passes the call decides nothing and the next one checks again; failing `353c87f`, fix `3ea300b`; row c-7 amended |
+| 4 | reqs: test edits outside §1.2's L3 row | for the orchestrator: the WP-D edit's authorisation (OI-10, cycle 4 note) and `BenchCleanup.swift` in §1.2 (OI-7) |
+| 5 | reqs: carried orchestrator items; C-22's quarantine figure | the figure is corrected in place (C-22 cycle-4 amendment, OI-9 cycle-4 note: 4.95 to about 15 ms at 100,000 depending on whether (a) and (b) are paid); OI-5, OI-6, OI-10, OI-11, OI-12, OI-4 and OI-9 for the orchestrator, unchanged |
+| 6 | correct: phase 3's one-turn fallback reached under normal activity (34.76 / 39.37 ms at 100,000) | as 3, with the benchmark case asked for: the last calls while a task merges access stamps (`75a2683`), 44.76 ms with the fallback restored, 7.65 ms without it at 100,000; 3.09 ms at 10,000, asserted |
+| 7 | correct: TSan headroom of the shared Storage bundle on a loaded host | WP-C's part: the legacy state space runs one initial disk per test case (`7616b8e`, C-20 cycle 4); WP-B's `StoreCrashTests` and WP-H's loopback race for their owners; sanitizer verification on an idle host, one agent at a time, for the orchestrator |
+| 8 | correct: carried orchestrator items | for the orchestrator, unchanged (OI-5, OI-7, OI-9, OI-11, OI-12, OI-10, OI-4) |
+
 ## Not verified here
 
 - Device behaviour of the legacy rename (`Caches` → `Application Support` on one APFS volume) and of a legacy root on
@@ -992,12 +1099,92 @@ first, or measured first; the rest are for the orchestrator. None is declined.
 - Phase 3's mutation-serial guard (C-24) relies on WP-B bumping `commits.mutationSerial` in the turn of every
   persisted change (`markDirty`): read in `AssetStore+Commit.swift` and implied by `requireCommitted`'s coverage, not
   audited across every WP-B write; the test exercises it with WP-C's quarantine and pin only.
+- The reused-block measurement of OI-8's sibling (cycle 4) relies on `Array`'s ABI-stable layout (one word referencing
+  the storage object that holds the header and the elements) and on `malloc_size` reporting a reused cached block whole
+  (2x − 64 KiB, measured on this Mac, macOS 27). The iOS 27.0 simulator served every request a fresh block, so a reused
+  block was never measured there, nor on a device.
 - OI-8's measurement relies on `Dictionary`'s ABI-stable layout (one word referencing the native storage); a layout
   change makes `storageBlockSize(of:)` return 0 or a smaller block, which the test's capacity check reports. Checked on
   this Mac (macOS 27) and the iOS 27.0 simulator only.
 - The actor-hold figures of C-22 on a device: measured on this Mac in release with the fake file system; a device's
   slower CPU scales every stretch, and the copy-on-write copies of C-22 (a) depend on when the executor releases a unit's
   closure, which only the probe sees.
+
+## Evidence of the L3 close-out, cycle 4 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
+
+Commits, in order: `16d975f` (deep verification's cancellation test), `353c87f` → `3ea300b` (phase 3 bounded, failing
+test first), `75a2683` (legacy benchmark case with access stamps), `7616b8e` (state space one disk per case), `3ab4022`
+(OI-8's sibling, authorised WP-A test edit), `f567631` (`migrateLegacy`'s doc), then this record. The final runs below
+are at `f567631` (the record changes no code) unless stated.
+
+- Failing first: `353c87f` on the sources before its fix (`swift test --filter phaseThreeCheckRevalidates`): 7 issues,
+  both one-pass cases (`!progress.finished && progress.remaining == 0`, the phase `.inProgress`, the key and the tree
+  kept; for `pin` also `stamp == nil`); the two three-pass cases pass, as before.
+- Mutants (each reverted, `git diff -- Sources` empty afterwards): OI-8's sibling: `ManifestFootprint.allocated` without
+  its doubling above 2 MiB → 4 issues (`2097153: 4145152 > 2129920`, `4194305: 8339456 > 4227072`, `8388609: 16728064 >
+  8421376`, `15204353: 30359552 > 15237120`); without its 32 KiB rounding → 1 issue (`1572865: 1589248 > 1572865`).
+  Deep verification's cancellation test: `catch .fileSystem` widened to `catch` → 15 issues, 5 in each case (the
+  cancelled run ran to the end, the records and the blob table changed, the next pass's report, the healthy asset's
+  `verifiedAt`); `hashFileInternal` without its `Task.isCancelled` check → 12 issues, 4 in each case (the same but the
+  last). Phase 3's one-turn fallback restored → the new
+  benchmark case holds 44.76 ms at 100,000 files (4.63 ms at 10,000).
+- OI-8's sibling on macOS: `swift test --scratch-path .build-c --skip-build --filter ZTronAssetModelTests`, 28 runs at
+  load 2.29–80.68 (the simulator's build and run beside runs 14–20): run 8 failed on OI-13 (the fuzz test's CPU ratio,
+  beside the release benchmark), every other run passed; **runs 9–28: 20 consecutive passes** (`Test run with 84 tests in
+  18 suites passed` each). The reused-block test passed 28 of 28, each run printing the same five blocks (`a 2097153-byte
+  request was served a 4145152-byte block (1.976561557502004x)`, …).
+- OI-8's sibling on the iOS Simulator (`897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0) at `3ab4022`, 06:58:09–07:18:37,
+  load 2.81 at the start (up to about 80 meanwhile), 2.24 at the end: `caffeinate -i xcodebuild test -scheme
+  ZTronAssetKit -destination 'platform=iOS Simulator,id=897F9D8D-…' -derivedDataPath .build-c/xcode-sim
+  -only-testing:ZTronAssetModelTests -test-iterations 20 -collect-test-diagnostics never
+  OTHER_SWIFT_FLAGS='-warnings-as-errors'`: `** TEST SUCCEEDED **`; `xcresulttool get test-results summary` of
+  `Test-ZTronAssetKit-2026.10.10_06-58-20-+0200.xcresult`: `{'result': 'Passed', 'totalTestCount': 84, 'passedTests':
+  84, 'failedTests': 0, 'skippedTests': 0, 'expectedFailures': 0}`; `Test run with 84 tests in 18 suites passed after
+  1182.892 seconds`, 0 failed issues, every test started 20 times (1,596 "repetition" starts, 84 × 19, plus the first);
+  the reused-block test 20 of 20, served a fresh block each time (OI-8, cycle 4).
+- `TMPDIR=… SWIFTPM_SCRATCH=.build-c bash Scripts/verify.sh --quick` (07:23:52–07:26:21): `VERIFY: PASS` (`::: SUMMARY
+  mode=--quick steps-failed=0`; Storage bundle `Test run with 421 tests in 55 suites passed after 60.981 seconds`; the
+  other bundles 151, 10, 84, 12, 3 and 104 tests passed).
+- `swift build -c release --scratch-path .build-c -Xswiftc -warnings-as-errors`: `Build complete! (19,81 s)`, exit 0.
+- `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Every `await` in WP-C's four directories,
+  `StoreInternals.swift` and `AssetStore+Apply.swift` has a `// REENTRANCY:` line (scripted check: `awaits 145 missing
+  0`).
+- Storage tests three times (`swift test --scratch-path .build-c --skip Benchmarks --filter ZTronAssetStorageTests`, load
+  7.9–9.7): `Test run with 421 tests in 55 suites passed after 59.458 / 61.096 / 61.928 seconds`.
+- TSan once (`swift test --scratch-path .build-c-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetStorageTests`, 07:30:22–07:34:29, load 9.20 → 5.62): `Test run with 421 tests in 55 suites passed after
+  199.649 seconds`, 0 `ThreadSanitizer` lines, 0 failures.
+- Coverage (`swift test --scratch-path .build-c --enable-code-coverage --skip Benchmarks`, all 7 test runs passed;
+  `llvm-cov export -summary-only` over the 7 test bundles; `gates.py coverage`): `COVERAGE target=ZTronAssetStorage
+  lines= 97.34% (7501/7706) min=90.0 OK`; WP-C's files with `StoreInternals.swift` 2534/2614 = 96.94%, lowest
+  `LiveLegacyDefaults.swift` 21.43% (11 of 14 lines uncovered, OI-5), then `LegacyPlacement.swift` 95.24% and
+  `DeepVerification.swift` 95.36%. `ZTronAssetKit` 37.82% and `ZTronAssetSync` 30.57% fail on the WP-F/WP-G stubs, as in
+  cycles 1 to 3 (`COVERAGE: FAIL` for those two only).
+- `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-c/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no error or warning.
+- iOS Simulator, full (`897F9D8D-…`, iOS 27.0; `caffeinate -i xcodebuild test -scheme ZTronAssetKit -destination
+  'platform=iOS Simulator,id=897F9D8D-B10D-4D91-8E22-417A2B9D70AA' -derivedDataPath .build-c/xcode-sim
+  -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never OTHER_SWIFT_FLAGS='-warnings-as-errors'`,
+  07:37:35–07:40:34, load 3.23 at the start, 27.79 at the end): `** TEST SUCCEEDED **`; `xcresulttool get test-results
+  summary` of `Test-ZTronAssetKit-2026.10.10_07-37-45-+0200.xcresult`: `{'result': 'Passed', 'totalTestCount': 785,
+  'passedTests': 785, 'failedTests': 0, 'skippedTests': 0, 'expectedFailures': 0}`; 0 "Restarting after" or "exceeded
+  execution time". The simulator is shut down.
+- C2 benchmarks at `f567631` (release; `swift test -c release --skip-build --scratch-path .build-c-perf -Xswiftc
+  -enable-testing --filter CleanupBenchmarks`, load 8.10 → 4.40): `Test run with 3 tests in 2 suites passed after 70.201
+  seconds`. `C2 longest actor hold of legacy migration over 10000 files (best of 3): open() with phase 1 0.254084 ms,
+  longest batch of 500 0.662625 ms, last call with phases 3 and 4 1.850292 ms, last calls while access stamps arrive
+  3.056458 ms (max of runs 3.109916 ms)`; `… over 100000 files (best of 1): open() with phase 1 2.403375 ms, longest
+  batch of 500 14.837167 ms, last call with phases 3 and 4 7.254416 ms, last calls while access stamps arrive 7.324208
+  ms`; with stamps every run made 3 last calls, none deciding (15,818–16,784 stamps), then one without stamps that
+  finished. Before and after the phase-3 change on its own (`3ea300b` with and without the fallback, load 3.5–4.1): 4.63 /
+  44.76 ms and 3.09 / 7.65 ms at 10,000 / 100,000. The rest of the run: holds at 10,000 ≤ 2.22 ms (`quota eviction of half
+  2.223584 ms`); asserted chunks at 10,000 / 100,000: orphan GC doom 0.24 / 0.29, purge 0.95 / 1.45, `purge(.evictable)`
+  1.51 / 1.91 (worst 7.11 at 100,000), eviction 1.94 / 2.38, reclaim pass 0.06 / 0.12, holders of 1000 blobs 0.50 /
+  0.72 ms; recorded at 100,000: first records copy 9.10, holders fallback scan 7.78, WP-B grace start 33.47, WP-B reaper
+  queue 22.84; holds at 100,000: storage report 7.94, verification slice 2.32, orphan GC of 100 3.13, quarantine 4.95,
+  eviction of half 21.63, `purge(.all)` of the rest 22.31, full-store purges 33.40 / 33.39 ms.
+- `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 3 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores)
 
