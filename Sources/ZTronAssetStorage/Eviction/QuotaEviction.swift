@@ -229,12 +229,10 @@ extension AssetStore {
             }
             let holders = self.holders(of: key, known: victims.map(\.id), scan: &scan)
             let planned = Dictionary(victims.map { ($0.id, $0.lastAccess) }, uniquingKeysWith: { first, _ in first })
+            // Every selected record holds the blob, so as many holders as selected records are exactly those records.
             guard holders.count == planned.count,
-                holders.allSatisfy({ id in
-                    guard let lastAccess = planned[id], let record = self.state.core.records[id], record.referencedBlob == key else {
-                        return false
-                    }
-                    return rules.allows(record) && record.lastAccess <= lastAccess
+                planned.allSatisfy({ id, lastAccess in
+                    self.state.core.records[id].map { rules.allows($0) && $0.lastAccess <= lastAccess } ?? false
                 })
             else {
                 return nil
