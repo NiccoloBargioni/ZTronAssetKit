@@ -335,9 +335,10 @@ struct LegacyMigrationTests {
     )
     @available(macOS 15.0, iOS 18.0, *)
     func phaseThreeCheckRevalidates(_ interruption: CheckInterruption, passes: Int) async throws {
-        // With one pass allowed, the interrupted pass is not repeated: the check is made in one turn.
+        // With one pass allowed, the interrupted pass is not repeated: the call leaves phase 3 to the next call, rather
+        // than checking every entry in one turn (C2 at `maxEntries`, close-out cycle 4).
         let metadata = SteppedBlockingExecutor(holding: false)
-        let (harness, _, entries) = try await LegacyMigrationTests.adoptedOnDemand(metadata, passes: passes)
+        let (harness, defaults, entries) = try await LegacyMigrationTests.adoptedOnDemand(metadata, passes: passes)
         await metadata.setHolding(true)
         let finishing = Task {
             try await harness.store.migrateLegacy(maxFiles: 10)
@@ -358,7 +359,18 @@ struct LegacyMigrationTests {
         }
         await metadata.setHolding(false)
         await metadata.releaseAll()
-        #expect(try await finishing.value.finished)
+        let progress = try await finishing.value
+        if passes == 1 {
+            // Every pass allowed was interrupted: nothing is decided, committed or removed in this call …
+            #expect(!progress.finished && progress.remaining == 0, "\(progress)")
+            #expect(await harness.state.migration.phase == .inProgress)
+            #expect(try await harness.store.planningView().stamp == nil)
+            #expect(defaults.removedKeys.isEmpty && harness.exists(CleanupFixture.legacyRoot))
+            // … and the next call, whose pass nothing interrupts, decides.
+            #expect(try await harness.store.migrateLegacy(maxFiles: 10).finished)
+        } else {
+            #expect(progress.finished)
+        }
         let view = try await harness.store.planningView()
         #expect(await harness.state.migration.phase == .done)
         switch interruption {
