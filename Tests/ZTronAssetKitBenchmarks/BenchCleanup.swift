@@ -62,6 +62,31 @@ extension ZTronAssetKitBenchmarks {
                 }
             }
         }
+
+        /// Legacy migration's actor holds (review of the L3 close-out cycle 2): `open()` with phase 1, the longest batch
+        /// of phase 2 and the last call (its batch, phases 3 and 4) over a legacy tree of 10,000 and of `maxEntries`
+        /// files. At 10,000 each is asserted against the 10 ms (best of three runs); at 100,000 they are recorded, with
+        /// WP-B's stretches inside them (the launch commit and snapshot, the adoptions' bindings) included.
+        @Test("C2: legacy migration's actor holds at 10,000 and at 100,000 legacy files", .timeLimit(.minutes(10)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func legacyMigrationHolds() async throws {
+            for (count, runs) in [(10_000, 3), (100_000, 1)] {
+                var holds: [String: [Double]] = [:]
+                for run in 0..<runs {
+                    for (name, hold) in try await CleanupBench.legacyHolds(count: count, seed: UInt64(1_200_000 + run * 200_000)) {
+                        holds[name, default: []].append(hold)
+                    }
+                }
+                let figures = CleanupBench.legacyOperations.map { ($0, holds[$0] ?? []) }
+                print("C2 longest actor hold of legacy migration over \(count) files (best of \(runs)): " + figures.map { "\($0.0) \($0.1.min() ?? 0) ms (max of runs \($0.1.max() ?? 0) ms)" }.joined(separator: ", "))
+                for (name, samples) in figures {
+                    #expect(samples.count == runs, "\(name) ran in every run")
+                    if count == 10_000 {
+                        #expect((samples.min() ?? .infinity) <= CleanupBenchmarks.budget, "\(name): \(samples)")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -431,6 +456,96 @@ enum CleanupBench {
         record("purge's reclaim pass, chunk of \(chunk)", bounded: true, passes)
         await store.close()
         return figures
+    }
+
+    /// Legacy migration's measured calls, in order.
+    static let legacyOperations = ["open() with phase 1", "longest batch of 500", "last call with phases 3 and 4"]
+
+    /// Migrates a legacy tree of `count` files (40 bytes each, 500 per directory, with the prior art's `manifest.json`)
+    /// on a fresh fake volume with dispatch executors and returns the longest actor hold of each legacy operation.
+    static func legacyHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(time: time)
+        let volume = URL(fileURLWithPath: "/bench/legacy", isDirectory: true)
+        let base = volume.appendingPathComponent("app", isDirectory: true)
+        let root = volume.appendingPathComponent("CDNAssets", isDirectory: true)
+        try fileSystem.createDirectory(at: volume.deletingLastPathComponent())
+        for directory in [volume, base, root] {
+            try fileSystem.createDirectory(at: directory)
+        }
+        struct LegacyEntry: Encodable {
+            let identifier: String
+            let fileExtension: String
+            let remotePath: String
+            let localPathComponents: [String]
+            let localFileName: String?
+            let byteSize: Int64?
+            let checksum: String?
+        }
+        var legacyEntries: [LegacyEntry] = []
+        for index in 0..<count {
+            let bytes = GeneratedPayload.bytes(seed: seed + UInt64(index), offset: 0, length: 40)
+            let directory = "Dir\(index / 500)"
+            let directoryURL = root.appendingPathComponent(directory, isDirectory: true)
+            if index % 500 == 0 {
+                try fileSystem.createDirectory(at: directoryURL)
+            }
+            try fileSystem.write(bytes, to: directoryURL.appendingPathComponent("f\(index).png", isDirectory: false), mode: .truncate)
+            legacyEntries.append(LegacyEntry(
+                identifier: "legacy.bench.asset\(index)",
+                fileExtension: "png",
+                remotePath: "media/\(index).png",
+                localPathComponents: [directory],
+                localFileName: "f\(index)",
+                byteSize: 40,
+                checksum: ContentHash.sha256(of: bytes).hex
+            ))
+        }
+        try fileSystem.write(try JSONEncoder().encode(legacyEntries), to: root.appendingPathComponent("manifest.json", isDirectory: false), mode: .truncate)
+        let legacy = LegacyMigrationPolicy(enabled: true, root: root)
+        var policy = StoragePolicy()
+        policy.budget = .unlimited
+        policy.deletionGrace = 0
+        let configuration = StoreConfiguration(
+            location: .custom(base),
+            policy: policy,
+            legacy: legacy,
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let defaults = FakeLegacyDefaults(values: [legacy.defaultsKey: "1.0"])
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: DispatchBlockingExecutor(label: "bench.legacy.metadata"),
+            bulkExecutor: DispatchBlockingExecutor(label: "bench.legacy.bulk"),
+            time: time,
+            random: SeededRandom(seed: 19),
+            conditions: FakeDeviceConditionsSource(),
+            remoteSources: FakeRemoteSourceFactory(source: FakeRemoteSource()),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: defaults
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        var holds: [(String, Double)] = []
+        holds.append((CleanupBench.legacyOperations[0], try await ActorHoldProbe.longestHold(of: store) {
+            let report = try await store.open()
+            #expect(report.legacyMigrationPending)
+        }))
+        var longestBatch = 0.0
+        var progress = LegacyMigrationProgress(adopted: 0, remaining: count, dropped: 0, finished: false)
+        while progress.remaining > 500 {
+            longestBatch = max(longestBatch, try await ActorHoldProbe.longestHold(of: store) {
+                progress = try await store.migrateLegacy(maxFiles: 500)
+            })
+        }
+        holds.append((CleanupBench.legacyOperations[1], longestBatch))
+        holds.append((CleanupBench.legacyOperations[2], try await ActorHoldProbe.longestHold(of: store) {
+            progress = try await store.migrateLegacy(maxFiles: 500)
+        }))
+        #expect(progress == LegacyMigrationProgress(adopted: count, remaining: 0, dropped: 0, finished: true))
+        #expect(defaults.string(forKey: legacy.defaultsKey) == nil, "phase 4 removed the prior art's stamp")
+        await store.close()
+        return holds
     }
 
     /// The longest actor hold of each WP-C operation once on a store of `count` assets (WP-B's stretches inside them
