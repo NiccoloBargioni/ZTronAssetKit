@@ -16,6 +16,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 | Tags | `harness-frozen`, `contracts`, `l1-merged`, `l2-merged`, **`l3-base`** (`l2-merged` + the iOS Simulator test build + doc follow-ups) |
 | Worktrees | **`.worktrees/c` on `wp/c`**: WP-C implemented, 72 commits on `l3-base`, clean |
 | Level 3 progress | Main run `wf_7bbebd31-575` done (author → 3 verification rounds → 2 fix rounds; blocking 8 → 5 → 5). Close-out `wf_23e43bcf-739`: cycle 1 fixed all 5 and applied rulings R1–R5 (its verification: 2 blocking / 11); **cycle 2 fixed both blockers and the clear non-blocking items but is NOT yet independently verified** — the run stopped at the usage gate before `verify:2` (55 %) |
+| Live run | Owner 2026-10-10: **finish Level 3** (no stop at 55 %). Close-out continuation `wf_6f1cfb40-9ad` (verify cycle 2 first, then cycles 3–5; safety usage stop 75 %; OI-8 included via `.build-orchestrator/l3-continue-previous.json`). Then merge, docs (ADR-051), tag `l3-merged` |
 | Findings files | `.build-orchestrator/l3-remaining-c.json` (round 3), `.build-orchestrator/l3-close1-verify-c.json` (close-out cycle 1 — what cycle 2 fixed) |
 | Rulings | In `.claude/workflows/assetkit-stage2-l3-close.js` (`RULINGS`) and recorded in `docs/adr-drafts/c.md`: R1 CCR-2 (orphan GC vs `apply` adoption; merge-gating), R2 CCR-1 (`doomOrphans` primitive in `StoreInternals.swift`), R3 OI-1 (`apply` never re-adopts `absent(.evicted)`), R4 C2 ≤ 10 ms at 10,000 records, R5 deviations C-6/C-12/C-13/C-14/C-15 accepted, to be tagged NEEDS-HUMAN-REVIEW in ADR-051 |
 | Owner stash | `git stash` "owner iOS 26 availability edits…" = the owner's original edits, identical to commit `b9f2752`; the owner may drop it |
@@ -63,7 +64,7 @@ A full week holds roughly $1,300 of this workload.
 Background URLSession (R-NET-3) · R-INT-4 deep verification · R-CLN-11 cache purging · crash enumeration beyond single-lifetime scenarios · benchmarks P-7 and P-9 · mutation probes (Q-8) · one verifier instead of two · the simulator run in every verifier (keep it in the author and one verifier). Cutting a MUST or a budget means marking it deferred in `SPEC.md` with a `DECISIONS.md` entry; never edit `Scripts/`.
 
 ## Open questions for the owner
-1. **Continue Level 3 now, or after the weekly reset?** (asked 2026-10-09 at 55 %.)
+1. ~~Continue Level 3 now?~~ Answered 2026-10-10: finish Level 3.
 2. **P-13** (ADR-050 · NEEDS-HUMAN-REVIEW): Option A (recommended) p99 per batch; Option B raise `batch_ms_max` to 15 ms.
 3. **NEEDS-HUMAN-REVIEW items of ADR-050:** B-3 index layout; D-10 `shutdown()` cancels background downloads; public `startDownload(…resumeData:)`; D-19.2 task-tag format. Coming in ADR-051: WP-C's R-STO-11 deviations (C-12 checksum-less legacy files without a local checksum are re-downloaded, C-13 an undecodable legacy manifest adopts nothing, C-14 a legacy root on another volume is dropped, C-15 phase 4 keeps unattributable files and a non-empty root).
 4. Outside-repository leftovers (owner may delete; agents may not): `CFNetworkDownload_*.tmp`, `ResultBundle_*.xcresult` and macro-expansion dumps in the per-user temp folder; `~/Library/Developer/Xcode/DerivedData/{l2fu-*,ZTronAssetKit-*}`.
