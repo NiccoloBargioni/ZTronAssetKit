@@ -31,7 +31,9 @@ extension AssetStore {
     /// `state.core.syncDue` (directly or through `markSyncDue()`), then commits durably.
     ///
     /// Progress is cumulative over the lifetime; `finished` once the tree and the key are gone (also when there was
-    /// nothing to migrate). A cancelled caller gets `.cancelled` and the file it was hashing stays queued; a file whose
+    /// nothing to migrate). A call may end with nothing remaining and `finished` still false, when phase 4 could not
+    /// remove everything or every pass of phase 3's check was interrupted by a mutation (ADR draft C-24): the caller calls
+    /// again later. A cancelled caller gets `.cancelled` and the file it was hashing stays queued; a file whose
     /// bytes do not verify, that vanished or that no record wants any more counts as dropped. Phase 3 never overrides a
     /// newer stamp the engine wrote meanwhile.
     package func migrateLegacy(maxFiles: Int) async throws(StoreError) -> LegacyMigrationProgress {
