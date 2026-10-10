@@ -176,7 +176,7 @@ extension AssetStore {
         let rules = self.evictionRules()
         var evicted = [Bool](repeating: false, count: victims.count)
         var any = false
-        for run in runs where self.evict(Array(victims[run]), rules: rules, scan: &scan) != nil {
+        for run in runs where self.evict(victims[run], rules: rules, scan: &scan) != nil {
             for index in run {
                 evicted[index] = true
             }
@@ -260,7 +260,11 @@ extension AssetStore {
     /// (`holders(of:known:scan:)`, read now with the turn's `scan`) are exactly `victims`, and each of them is still
     /// evictable under the turn's `rules` and was not accessed since the selection. Returns what happened to the blob,
     /// or `nil` when nothing was evicted.
-    func evict(_ victims: [EvictionVictim], rules: EvictionOrder.Rules, scan: inout HolderScan) -> BlobEviction? {
+    func evict<Victims: RandomAccessCollection<EvictionVictim>>(
+        _ victims: Victims,
+        rules: EvictionOrder.Rules,
+        scan: inout HolderScan
+    ) -> BlobEviction? {
         guard let key = victims.first?.blob, case .live(let references)? = self.state.core.blobTable[key],
             self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
             self.state.cleanup.leases.isEmpty || self.state.cleanup.leases[key]?.isEmpty ?? true
@@ -274,7 +278,7 @@ extension AssetStore {
             // of it, ADR draft C-22 cycle 6): it still holds the blob, is still evictable and was not accessed since the
             // selection; and when the blob counts another reference, that one is not a record (an id bound since the
             // selection keeps the blob; the provisional reference of a publication in flight does not).
-            let victim = victims[0]
+            let victim = victims[victims.startIndex]
             guard let byteSize = EvictionOrder.stillEvictable(victim, of: key, in: self.state.core.records, rules: rules) else {
                 return nil
             }
