@@ -166,6 +166,9 @@ struct EvictionOverlapTests {
         /// `recordFailure(_:identity:reason:)` with `.notFound`: the record becomes `failed`, its blob doomed
         /// `unreferenced`.
         case failure
+        /// `recordIntegrityFailure(_:identity:)` up to `maxIntegrityAttempts` (three): the record serves its bytes during
+        /// the backoff, then becomes `failed(.integrity)`, its blob doomed `unreferenced`.
+        case integrityFailures
 
         var testDescription: String {
             self.rawValue
@@ -175,7 +178,8 @@ struct EvictionOverlapTests {
     /// Review of the L3 close-out cycle 6 (probe ZP6-overlap-quarantine; orchestrator ruling R7 at cycle 7): a quarantine
     /// dooms the most recently used asset's blob while the run computes its candidates. Those bytes left `usedBytes` as
     /// surely as an eviction's, so they count toward the need: counted, the run evicts what a measurement after the
-    /// quarantine asks for; not counted, it evicts one asset too many, to be downloaded again.
+    /// quarantine asks for; not counted, it evicts one asset too many, to be downloaded again. A recorded failure, and the
+    /// last of a record's integrity failures, doom the blob the same way.
     @Test(
         "R-CLN-4: bytes a quarantine or a recorded failure dooms while quota eviction computes its candidates count toward its need",
         .timeLimit(.minutes(1)),
@@ -200,6 +204,10 @@ struct EvictionOverlapTests {
                 try await harness.store.reportUnreadable(last.id)
             case .failure:
                 try await harness.store.recordFailure([last.id], identity: last.entry.contentIdentity, reason: .notFound)
+            case .integrityFailures:
+                for _ in 0..<harness.configuration.policy.maxIntegrityAttempts {
+                    try await harness.store.recordIntegrityFailure([last.id], identity: last.entry.contentIdentity)
+                }
             }
         }
         #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[last.key], release == .quarantine ? .corrupt : .unreferenced))
