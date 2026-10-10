@@ -49,17 +49,28 @@ extension ModelSuites {
         func estimateBoundsReusedBlocks() {
             // A freed block of B bytes is reused for a request of just over B / 2 (measured in fresh processes, ADR draft
             // A-8), the most it can add; whether this process reuses it here depends on its allocator state, so the check
-            // is that the growth never exceeds the estimate, whichever block serves the request.
+            // is that the block serving the request never exceeds the estimate, whichever block that is. The block is
+            // the array's own, as the allocator sized it: the process-wide in-use growth around the allocation also
+            // counted whatever the tests running beside this one allocated meanwhile (OI-8: 4 KB to 193 KB too much on
+            // the iOS Simulator).
             for block in [3 << 20, 4 << 20, 8 << 20, 16 << 20, 29 << 20] {
                 let request = block / 2 + 1
                 var worst = 0
+                var notTheArray: [Int] = []
                 for _ in 0..<3 {
                     let held = DecodeMeasurement.serveFromBlocksTwiceAsLarge([request])
-                    let growth = DecodeMeasurement.retainedGrowth(runs: 1) { [UInt8](repeating: 1, count: request - 32) }
+                    // A 32-byte header and `request - 32` elements: one malloc request of exactly `request` bytes.
+                    let array = [UInt8](repeating: 1, count: request - 32)
+                    let served = DecodeMeasurement.storageBlockSize(of: array)
                     withExtendedLifetime(held) {}
-                    worst = max(worst, growth)
+                    // The block read is the array's: it holds the whole request.
+                    if served < request {
+                        notTheArray.append(served)
+                    }
+                    worst = max(worst, served)
                 }
-                print("R-MAN-3 reuse: a \(request)-byte request grew the heap by \(worst) B (\(Double(worst) / Double(request))x)")
+                print("R-MAN-3 reuse: a \(request)-byte request was served a \(worst)-byte block (\(Double(worst) / Double(request))x)")
+                #expect(notTheArray.isEmpty, "\(request): blocks smaller than the request read \(notTheArray)")
                 #expect(worst <= ManifestFootprint.allocated(request), "\(request): \(worst) > \(ManifestFootprint.allocated(request))")
             }
         }
@@ -69,22 +80,25 @@ extension ModelSuites {
             .enabled(if: !DecodeMeasurement.underThreadSanitizer)
         )
         func tableEstimateBoundsDictionaries() {
-            // Warm the dictionary type's runtime metadata, which is allocated once per process.
-            var warm: [AssetID: Int] = [:]
-            warm.reserveCapacity(1)
-            withExtendedLifetime(warm) {}
+            // The table's own block, as the allocator sized it: the process-wide in-use growth around the reservation
+            // also counted whatever the tests running beside this one allocated meanwhile (OI-8).
+            let stride = MemoryLayout<AssetID>.stride + MemoryLayout<Int>.stride
             var under: [(count: Int, measured: Int, estimated: Int)] = []
+            var notTheTable: [(count: Int, measured: Int, capacity: Int)] = []
             for count in Array(1...200) + [1_000, 10_000, 49_152, 49_153, 100_000] {
-                let measured = DecodeMeasurement.retainedGrowth {
-                    var table: [AssetID: Int] = [:]
-                    table.reserveCapacity(count)
-                    return table
+                var table: [AssetID: Int] = [:]
+                table.reserveCapacity(count)
+                let measured = DecodeMeasurement.storageBlockSize(of: table)
+                // The block read is the table's: it holds at least the buckets its capacity needs.
+                if measured < table.capacity * stride {
+                    notTheTable.append((count, measured, table.capacity))
                 }
-                let estimated = ManifestFootprint.table(count: count, stride: MemoryLayout<AssetID>.stride + MemoryLayout<Int>.stride)
+                let estimated = ManifestFootprint.table(count: count, stride: stride)
                 if measured > estimated {
                     under.append((count, measured, estimated))
                 }
             }
+            #expect(notTheTable.isEmpty, "\(notTheTable.count) tables whose storage block was not found, first: \(notTheTable.prefix(8))")
             #expect(under.isEmpty, "\(under.count) counts estimated below their storage, first: \(under.prefix(8))")
             // The index is only built past the linear-lookup limit.
             #expect(ManifestFootprint.index(count: 8) == 0 && ManifestFootprint.index(count: 9) > 0)

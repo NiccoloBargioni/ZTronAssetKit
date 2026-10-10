@@ -1,3 +1,4 @@
+import Foundation
 import ZTronAssetModel
 
 /// Where legacy migration stands (ADR-029). Persisted by WP-B's index codec as STAMPS `legacyState`
@@ -24,4 +25,36 @@ struct MigrationState: Sendable {
     var legacyStamp: String?
     /// Phase-2 progress so far.
     var progress = LegacyMigrationProgress(adopted: 0, remaining: 0, dropped: 0, finished: false)
+
+    // MARK: WP-C bookkeeping, in memory (rebuilt by phase 1 at every launch)
+
+    /// The legacy root this lifetime resolved; `nil` until phase 1 ran (migration disabled, or a read-only lifetime).
+    var root: URL?
+    /// Files still to adopt, in **reverse** path order: the next one is the last, so a batch takes it and a call that
+    /// did not finish puts it back in O(1) (C2: a migration of `maxEntries` files stays linear).
+    var queue: [LegacyFile] = []
+    /// Files a batch or an adopt-on-demand took from `queue` and is processing (REENTRANCY R11, R18).
+    var claimed: [LegacyFile] = []
+    /// Every entry of the legacy manifest, in manifest order: phase 3 migrates the stamp only when each one is present
+    /// at its current content.
+    var legacyIDs: [AssetID] = []
+    /// The digest of the legacy manifest phase 1 decoded in this lifetime (`nil`: none was found or decoded, and then
+    /// nothing counts as fully adopted). Phase 3 migrates the stamp only while the applied manifest is still this one: a
+    /// newer manifest applied during migration was never synced, whatever is present (review round 3, ZProbe-stamp).
+    var manifestDigest: ContentHash?
+    /// Deferrals of each legacy file in this lifetime, by its path below the root (`AssetStore.deferLegacyFile`).
+    var deferrals: [[String]: Int] = [:]
+    /// Legacy files kept where they are after `AssetStore.legacyAttempts` deferrals in this lifetime: phase 4 of this
+    /// lifetime never removes them, since nothing ever read them (review of the L3 close-out, ZProbe-hash).
+    var kept: Set<[String]> = []
+    /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
+    /// moved files that no committed record expects).
+    var planCommitted = false
+    /// Legacy entries phase 3's check reads between two releases of the actor (`AssetStore.legacyEntriesPresent`):
+    /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation
+    /// (G4: the seam that release needs).
+    var checkChunk: Int = AssetStore.legacyCheckChunk
+    /// Passes of phase 3's check a mutation may interrupt before the call leaves phase 3 to the next call:
+    /// `AssetStore.legacyCheckPasses`; a test lowers it to reach that outcome.
+    var checkPasses: Int = AssetStore.legacyCheckPasses
 }

@@ -54,7 +54,9 @@ extension AssetStore {
         }
         if !unchanged || !report.reused.isEmpty {
             if let eviction {
-                report.evicted = self.applyEviction(eviction)
+                // REENTRANCY: c-8 (proposed) — behind the fence (see `pace`); the hook re-validates each chunk's victims
+                // against the state as it is in that chunk's own turn.
+                report.evicted = await self.applyEvictionInChunks(eviction)
             }
             self.state.core.degraded = false
             self.markDirtyInternal(.soon)
@@ -89,6 +91,47 @@ extension AssetStore {
         // plan and the applied manifest unchanged; every caller re-reads the record it touches next; the phase and
         // writability are re-checked by `apply`'s commit after the last write.
         await Task.yield()
+    }
+
+    /// Evicts `apply`'s plan through WP-C's hook `applyEviction(_:)`, one chunk of whole blobs per actor turn behind the
+    /// commit fence (C2; orchestrator ruling R6 at the L3 close-out cycle 7, CCR-3): the hook re-validates every victim
+    /// in its chunk's turn, so a plan of any size holds the actor for at most a chunk's worth of records (about 1.4 µs
+    /// each; `EvictionState.chunk`, `AssetStore.evictionChunk` unless a test lowers it). A plan within one chunk is
+    /// evicted in this turn, as before. The evicted ids are returned in plan order.
+    private func applyEvictionInChunks(_ plan: EvictionPlan) async -> [AssetID] {
+        let limit = max(1, self.state.eviction.chunk)
+        guard plan.victims.count > limit else {
+            return self.applyEviction(plan)
+        }
+        // REENTRANCY: c-8 (proposed) — nothing stops the writes (as b-7): the cut is a pure computation over the plan, a
+        // value; each chunk's victims are re-validated by the hook in that chunk's turn.
+        let cut = await self.runUnit(on: self.environment.bulkExecutor) {
+            ApplyEvictionChunks(cutting: plan, records: limit)
+        }
+        var evicted: [AssetID] = []
+        for (index, chunk) in cut.chunks.enumerated() {
+            if index > 0 {
+                // The actor is released between chunks by a no-op metadata unit, as quota eviction does (a test can hold
+                // `apply` at this very point).
+                // REENTRANCY: c-8 (proposed) — behind the fence (see `pace`): nothing persists or reports the half-done
+                // eviction meanwhile and `close()` waits for the fence; the hook re-validates every victim of the next
+                // chunk against the state as it is then (still present at the planned blob, unleased, not being placed,
+                // not accessed since the plan, still evictable under rules whose clock is read in that turn, against its
+                // holders as they are then), so one accessed, leased, pinned, purged or re-bound meanwhile is kept.
+                await self.runUnit(on: self.environment.metadataExecutor) {}
+            }
+            evicted.append(contentsOf: self.applyEviction(chunk))
+        }
+        guard !cut.inPlanOrder else {
+            return evicted
+        }
+        // A plan that names a blob in several places was grouped by key: its report keeps the plan's order.
+        let done = evicted
+        // REENTRANCY: c-8 (proposed) — nothing: a pure computation over the plan and the ids evicted above.
+        return await self.runUnit(on: self.environment.bulkExecutor) {
+            let ids = Set(done)
+            return plan.victims.map(\.id).filter { ids.contains($0) }
+        }
     }
 
     /// Lowers the commit fence after `apply`'s last write and resumes everything that waited for it (ADR draft
@@ -250,10 +293,13 @@ extension AssetStore {
     }
 
     /// Binds `id` to a blob the store already knows (live, rescuable, or an orphan confirmed on disk) when its
-    /// record accepts adoption and expects that key and size; no I/O (store.md §2.6 7c).
+    /// record accepts adoption and expects that key and size; no I/O (store.md §2.6 7c). A record quota eviction made
+    /// `absent(.evicted)` is adopted only by the launch adoption (crash recovery, ADR-018), never here: an `apply` or
+    /// `admit` within the deletion grace would rescue the very blob the eviction doomed and undo it (OI-1; orchestrator
+    /// ruling R3 at the L3 close-out). It is fetched again on demand, and a publication dedupes onto a live key.
     func adoptKnownBlob(for id: AssetID, orphans confirmed: [BlobKey: Int64], now: Date) -> Bool {
-        guard var record = self.state.core.records[id], record.acceptsAdoption, let key = record.expectedKey,
-            !self.state.core.publishing.contains(key)
+        guard var record = self.state.core.records[id], record.acceptsAdoption, record.residency != .absent(.evicted),
+            let key = record.expectedKey, !self.state.core.publishing.contains(key)
         else {
             return false
         }
@@ -270,7 +316,11 @@ extension AssetStore {
             }
             size = known
         case nil:
-            guard let orphan = confirmed[key] else {
+            // A launch orphan binds only while it still is one, at the size `apply` confirmed: orphan GC dooms the orphans
+            // it sweeps and forgets them in that same turn (`doomOrphans`), so a key swept after the confirmation is
+            // rescued from its doom above while it is on disk, and never bound once the reaper unlinked it (CCR-2;
+            // orchestrator ruling R1 at the L3 close-out).
+            guard let orphan = confirmed[key], self.state.core.orphans[key] == orphan else {
                 return false
             }
             size = orphan

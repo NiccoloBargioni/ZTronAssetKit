@@ -80,12 +80,12 @@ enum DecodeMeasurement {
         for request in large {
             var freshInARow = 0
             for _ in 0..<64 where freshInARow < 2 {
-                let before = DecodeMeasurement.heapInUse()
                 var block = [UInt8](repeating: 0, count: request - 32)
                 block[block.count - 1] = 1
-                let growth = DecodeMeasurement.heapInUse() - before
+                // The block's own size: the in-use growth around it also counted other threads' allocations (OI-8).
+                let served = DecodeMeasurement.storageBlockSize(of: block)
                 held.append(block)
-                freshInARow = growth <= malloc_good_size(request) ? freshInARow + 1 : 0
+                freshInARow = served <= malloc_good_size(request) ? freshInARow + 1 : 0
             }
         }
         var freed: [[UInt8]] = []
@@ -117,6 +117,23 @@ enum DecodeMeasurement {
             lowest = min(lowest, after - before)
         }
         return lowest
+    }
+
+    /// The size of the malloc block holding the native storage of `collection`, an `Array` or a `Dictionary`, or 0 when
+    /// its one word does not point at the start of a malloc block (an empty collection's shared static storage). Both
+    /// are one reference to a storage object that tail-allocates the elements (a dictionary also its occupancy bitmap)
+    /// in a single allocation, and their layout is ABI-stable on Apple platforms, so this is exactly what the
+    /// collection's storage costs the heap, read from the allocator itself rather than from the process-wide in-use
+    /// figure, which every thread's allocations move (OI-8: tests running beside the measurement made the in-use growth
+    /// around one 128-byte table read 544 to 19,680 bytes on the iOS Simulator, and around one 1,572,865-byte array up
+    /// to 193 KB more than its block). A large block the allocator reuses from its cache is reported whole.
+    static func storageBlockSize<Collection>(of collection: Collection) -> Int {
+        withUnsafeBytes(of: collection) { bytes in
+            guard bytes.count == MemoryLayout<UInt>.size, let storage = UnsafeRawPointer(bitPattern: bytes.load(as: UInt.self)) else {
+                return 0
+            }
+            return malloc_size(storage)
+        }
     }
 
     /// Runs `body` on the calling thread while a sampler thread tracks the heap's in-use bytes.

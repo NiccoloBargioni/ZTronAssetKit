@@ -15,20 +15,39 @@ extension AssetStore {
     /// that manifest lists and the index lacks, each as `absent(.neverFetched)` with `expectedBlob`, and sets
     /// `degraded` when `manifest.json` cannot be decoded. It cannot call `apply`: async APIs await `open()`
     /// (REENTRANCY R1).
+    ///
+    /// Nothing happens in a lifetime that cannot write (B-34) or whose legacy root cannot be stat-ed. Without a legacy
+    /// tree before migration started, the prior art's stamp is removed and never migrated (D-6). A legacy entry is
+    /// planned only when its file appears in the listing and its bytes have a verifiable digest (the manifest checksum,
+    /// or for a checksum-less entry the prior art's local checksum); everything else is dropped and downloaded again. A
+    /// failed phase-1 commit leaves the writes dirty for the launch commit; phase 2 commits before it moves a file.
     func runLegacyPhaseOne() async throws(StoreError) -> Bool {
-        fatalError("WP-C: AssetStore.runLegacyPhaseOne not implemented")
+        // REENTRANCY: R1, R11 — `performLegacyPhaseOne` re-checks the phase (`opening`) after each of its units.
+        try await self.performLegacyPhaseOne()
     }
 
     /// Adopts up to `maxFiles` legacy files (hash, then `adoptVerifiedFile`), publishing snapshots as it goes at bulk
     /// urgency; phases 3 and 4 run when nothing remains. Phase 3 sets `state.core.stamp` (every entry adopted) or
     /// `state.core.syncDue` (directly or through `markSyncDue()`), then commits durably.
+    ///
+    /// Progress is cumulative over the lifetime; `finished` once the tree and the key are gone (also when there was
+    /// nothing to migrate). A call may end with nothing remaining and `finished` still false, when phase 4 could not
+    /// remove everything or every pass of phase 3's check was interrupted by a mutation (ADR draft C-24): the caller calls
+    /// again later. A cancelled caller gets `.cancelled` and the file it was hashing stays queued; a file whose
+    /// bytes do not verify, that vanished or that no record wants any more counts as dropped. Phase 3 never overrides a
+    /// newer stamp the engine wrote meanwhile.
     package func migrateLegacy(maxFiles: Int) async throws(StoreError) -> LegacyMigrationProgress {
-        fatalError("WP-C: AssetStore.migrateLegacy not implemented")
+        // REENTRANCY: R1, R11, R17, c-4 (proposed) — `performMigrateLegacy` re-validates every file after each await.
+        try await self.performMigrateLegacy(maxFiles: maxFiles)
     }
 
     /// Adopt-on-demand for a `resolve` or lease of a legacy id not yet adopted (store-2 S2-09); installs its
     /// snapshot at once.
+    ///
+    /// Returns the asset's current location when it is present (adopted or not), `nil` when it is neither present nor a
+    /// legacy file still to adopt, or when its file did not verify.
     package func adoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
-        fatalError("WP-C: AssetStore.adoptLegacyNow not implemented")
+        // REENTRANCY: R1, R18 — `performAdoptLegacyNow` re-validates the file and reads the location from the record.
+        try await self.performAdoptLegacyNow(id)
     }
 }

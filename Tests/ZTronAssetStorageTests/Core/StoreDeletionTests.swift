@@ -136,7 +136,8 @@ struct StoreDeletionTests {
     @available(macOS 15.0, iOS 18.0, *)
     func leaseBlockedKeys() async throws {
         let (harness, keyA, _) = try await StoreDeletionTests.prunedStore()
-        await harness.store.testSetLease(keyA, token: 1, id: "a")
+        let lease = try await harness.store.acquireLease("a")
+        #expect(lease.blob == keyA)
         _ = try await harness.store.apply(CoreFixture.manifest([CoreFixture.entry("b", CoreFixture.bytes(71))]), etag: nil, eviction: nil)
         harness.time.advance(by: 60)
         let leased = await harness.store.runDueWork()
@@ -144,7 +145,7 @@ struct StoreDeletionTests {
         #expect(await harness.store.reapDeletable(maxKeys: 10) == CleanupResult(bytesFreed: 0, filesRemoved: 0, bytesDeferred: 300))
         let free = try await harness.store.freeSpace()
         #expect(free.pendingReclaim == 0 && free.usedBytes == 300)
-        await harness.store.testClearLeases()
+        _ = await harness.store.releaseLease(lease)
         #expect(await harness.store.nextDeadline() == harness.time.monotonicNow())
         #expect(await harness.store.runDueWork().reapedKeys == 1)
     }
@@ -271,16 +272,6 @@ final class SteppingClock: TimeSource {
 }
 
 extension AssetStore {
-    /// Inserts a lease the way WP-C's `acquireLease` will (test seam; WP-C's API is a stub at L2).
-    func testSetLease(_ key: BlobKey, token: UInt64, id: AssetID) {
-        self.state.cleanup.leases[key, default: [:]][token] = id
-    }
-
-    /// Drops every lease.
-    func testClearLeases() {
-        self.state.cleanup.leases = [:]
-    }
-
     /// Commits pending state and installs a snapshot now.
     func flushAndInstall() async throws(StoreError) {
         try await self.requireCommittedInternal(.ordered)

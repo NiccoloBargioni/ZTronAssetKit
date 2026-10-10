@@ -156,7 +156,7 @@ struct StoreReentrancyTests {
         try sink.createPartial(name)
         _ = try sink.appendPartial(bytes, to: name)
         _ = try await store.publish(StagedFile(name: name, byteCount: 300, resumed: false, httpStatus: nil, etag: nil), binding: [entry.identifier], expecting: entry.contentIdentity, urgency: .bulk)
-        await store.testSetRetentionScope(.prefix("pack/"))
+        await store.setRetentionScope(.prefix("pack/"))
         let syncsBefore = spy.syncs.count
         let report = try await store.adoptionReport()
         #expect(report.adoptedRemotePaths == [entry.remotePath] && report.excludedRemotePaths == [outside.remotePath])
@@ -242,12 +242,5 @@ struct StoreReentrancyTests {
         let applied = try await reopened.store.planningView()
         #expect(applied.appliedManifest.digest == server.digest)
         #expect(applied.records.keys.sorted() == ["a"])
-    }
-}
-
-extension AssetStore {
-    /// Sets the retention scope the way WP-C's `setRetentionScope(_:)` will (test seam; a stub at L2).
-    func testSetRetentionScope(_ scope: AssetScope) {
-        self.state.eviction.retentionScope = scope
     }
 }
