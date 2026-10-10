@@ -47,7 +47,8 @@ extension AssetStore {
     }
 
     /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks, publishes the snapshot without the
-    /// victims and commits.
+    /// victims and commits. It stops once the bytes released since the measurement, by itself or by any eviction,
+    /// `apply`'s plan or purge that ran while it awaited (`EvictionState.releasedBytes`), cover what it measured.
     func performEvictIfNeeded() async throws(StoreError) -> CleanupResult {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -56,9 +57,12 @@ extension AssetStore {
         defer {
             interval.end()
         }
-        // REENTRANCY: R13 — the figures are a snapshot taken at the unit; the candidates are computed afterwards from
-        // the state as it is then, and every one is re-validated before it is marked.
+        // REENTRANCY: R13 — the figures are a snapshot taken at the unit, and `releasedBytes` is read in the turn they
+        // were summed: every byte an eviction, an `apply`'s plan or a purge releases from then on (this run's included)
+        // counts toward the need, which is re-checked before each candidate; the candidates are computed afterwards
+        // from the state as it is then, and every one is re-validated before it is marked.
         let space = try await self.freeSpace()
+        let releasedAtMeasure = self.state.eviction.releasedBytes
         try self.checkWritable()
         let needed = EvictionOrder.bytesToFree(
             usedBytes: space.usedBytes,
@@ -70,8 +74,9 @@ extension AssetStore {
         guard needed > 0 else {
             return result
         }
-        // REENTRANCY: R8 — the phase and writability below, then per candidate (in `evict`): still present at the same
-        // blob, unleased, not accessed since selection, still evictable, against its holders as they are then.
+        // REENTRANCY: R8 — the phase and writability below, then the need against every byte released since the
+        // measurement, then per candidate (in `evict`): still present at the same blob, unleased, not accessed since
+        // selection, still evictable, against its holders as they are then.
         let candidates = await self.evictionCandidatesOffActor()
         try self.checkLive()
         try self.checkWritable()
@@ -80,17 +85,19 @@ extension AssetStore {
         var scan = HolderScan(blobs: [])
         var rules = self.evictionRules()
         for (index, candidate) in candidates.enumerated() {
-            guard result.bytesFreed < needed else {
+            // Bytes released since the measurement left `usedBytes` as this run's own do (C-2, cycle 6).
+            guard self.state.eviction.releasedBytes - releasedAtMeasure < needed else {
                 break
             }
             if index % chunk == 0 {
                 if index > 0 {
                     // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
                     // meanwhile, and a test can hold eviction at this very point.
-                    // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob,
-                    // unleased, not accessed since selection, still evictable under rules read again (the clock); its
-                    // holders are read again, with this chunk's own scan (the previous one is dropped: records may have
-                    // been bound meanwhile).
+                    // REENTRANCY: R8 — the phase, then the need against every byte released since the measurement
+                    // (the loop's guard), then per candidate (in `evict`): still present at the same blob, unleased, not
+                    // accessed since selection, still evictable under rules read again (the clock); its holders are read
+                    // again, with this chunk's own scan (the previous one is dropped: records may have been bound
+                    // meanwhile).
                     await self.runUnit(on: self.environment.metadataExecutor) {}
                     try self.checkLive()
                     try self.checkWritable()
@@ -110,13 +117,16 @@ extension AssetStore {
                 break
             }
         }
+        let remaining = needed - (self.state.eviction.releasedBytes - releasedAtMeasure)
         guard evictedAny else {
-            self.environment.log.log(.store, .info, "quota eviction found nothing evictable: \(needed) bytes over target remain")
+            if remaining > 0 {
+                self.environment.log.log(.store, .info, "quota eviction found nothing evictable: \(remaining) bytes over target remain")
+            }
             return result
         }
         self.stampCleanup()
-        if result.bytesFreed < needed {
-            self.environment.log.log(.store, .info, "quota eviction shortfall: \(needed - result.bytesFreed) bytes are protected")
+        if remaining > 0 {
+            self.environment.log.log(.store, .info, "quota eviction shortfall: \(remaining) bytes are protected")
         }
         // REENTRANCY: R17 — nothing but the phase: the evictions were made synchronously above; the result describes
         // them.
@@ -247,6 +257,7 @@ extension AssetStore {
             return .stillReferenced
         }
         self.state.core.metrics.evictedBytes = self.state.core.metrics.evictedBytes.addingSaturating(bytes)
+        self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
         return .doomed(bytes: bytes)
     }
 

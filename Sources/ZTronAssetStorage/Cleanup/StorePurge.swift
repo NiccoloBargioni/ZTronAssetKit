@@ -130,6 +130,10 @@ extension AssetStore {
             // A blob is in one group only, so it is waited for once.
             if let bytes {
                 reclaim.append(PurgeSelection.Reclaim(key: group.blob, bytes: bytes))
+                // Bytes a maintenance eviction measured as used are released now (`EvictionState.releasedBytes`).
+                if case .doomed? = self.state.core.blobTable[group.blob] {
+                    self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+                }
             }
         }
         return purged
