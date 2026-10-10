@@ -142,10 +142,12 @@ extension AssetStore {
     /// Waits until every blob of `reclaim` is reaped, rescued, or blocked by something waiting cannot clear (a lease, a
     /// sink that does not acknowledge, an uncommitted generation, a degraded or unavailable store, a failed unlink's
     /// backoff), reaping whatever is deletable and installing once the fresh snapshot ADR-017 needs after the grace.
-    /// Reads only the blob table's doom bookkeeping (`DoomInfo.eligibleAt`) and the leases. Each round makes one pass over
-    /// the blobs still pending, in chunks of `CleanupState.chunk` with the actor released in between (C2: one turn over
-    /// the selection of a full-store purge took 27.6 ms at `maxEntries`, review of the L3 close-out). Returns the bytes of
-    /// the selection that were deleted and of those still leased.
+    /// A blob another reaper run is deleting (the engine's `runDueWork()`, another purge's wait) is waited for: its
+    /// deletion unit ends on its own, and stopping there reported its bytes neither freed nor deferred (review of the L3
+    /// close-out cycle 7, probe ZP7-purge-deleting). Reads only the blob table's doom bookkeeping (`DoomInfo.eligibleAt`)
+    /// and the leases. Each round makes one pass over the blobs still pending, in chunks of `CleanupState.chunk` with the
+    /// actor released in between (C2: one turn over the selection of a full-store purge took 27.6 ms at `maxEntries`,
+    /// review of the L3 close-out). Returns the bytes of the selection that were deleted and of those still leased.
     func awaitReclaim(_ reclaim: [PurgeSelection.Reclaim]) async throws(StoreError) -> (freed: Int64, deferred: Int64) {
         var pending = reclaim
         var freed: Int64 = 0
@@ -188,6 +190,18 @@ extension AssetStore {
                 freshInstalled = true
                 // REENTRANCY: R12, R9 — the grace ended before this install started; the loop reaps and recomputes.
                 await self.publishSnapshot(urgency: .userInitiated)
+            } else if !pass.inFlight.isEmpty {
+                // Read in this turn, so the deletion awaited is still running and its end resumes the wait (the reaper
+                // resumes a key's waiters after every deletion unit, and `close()` all of them). One that ended since
+                // the pass saw it needs no wait: the next round classifies it again.
+                if let key = pass.inFlight.first(where: { self.state.core.blobTable[$0] == .deleting }) {
+                    // REENTRANCY: R9 amendment (cycle 8) — the loop re-checks the phase, reaps, and classifies every
+                    // pending key from the blob table again; a cancelled caller leaves here as from the grace wait.
+                    await self.waitForKey(key)
+                    if Task.isCancelled {
+                        throw .cancelled
+                    }
+                }
             } else {
                 break
             }
@@ -196,9 +210,9 @@ extension AssetStore {
     }
 
     /// Classifies `items` against the blob table now, O(1) each: a key gone from it was freed, a live one was rescued;
-    /// a doomed or deleting one stays pending (its bytes deferred while a lease holds it), and a doomed one whose grace
-    /// runs sets the wake-up, or asks for the fresh install once its grace ended (one with a failed unlink waits for the
-    /// reaper's backoff, one not yet acknowledged for an install).
+    /// a doomed or deleting one stays pending (its bytes deferred while a lease holds it), a deleting one is noted as in
+    /// flight, and a doomed one whose grace runs sets the wake-up, or asks for the fresh install once its grace ended (one
+    /// with a failed unlink waits for the reaper's backoff, one not yet acknowledged for an install).
     func reclaimPass(_ items: ArraySlice<PurgeSelection.Reclaim>, into pass: inout PurgeSelection.ReclaimPass) {
         let uptime = self.environment.time.uptimeNow()
         let monotonic = self.environment.time.monotonicNow()
@@ -214,6 +228,7 @@ extension AssetStore {
                 doom = info
             case .deleting?:
                 doom = nil
+                pass.inFlight.append(item.key)
             }
             pass.pending.append(item)
             if !(self.state.cleanup.leases[item.key]?.isEmpty ?? true) {
@@ -254,6 +269,9 @@ enum PurgeSelection {
         var wake: MonotonicInstant?
         /// A pending blob's grace ended: the fresh install ADR-017 needs may unblock it.
         var graceOver = false
+        /// The pending blobs another reaper run was deleting when the pass reached them, in pass order: each deletion
+        /// unit ends on its own, so the wait goes on until it did.
+        var inFlight: [BlobKey] = []
     }
 
     /// The selected records of one blob, as they were when the selection was made.
