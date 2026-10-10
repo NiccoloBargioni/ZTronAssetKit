@@ -54,7 +54,7 @@ struct MigrationState: Sendable {
     /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation
     /// (G4: the seam that release needs).
     var checkChunk: Int = AssetStore.legacyCheckChunk
-    /// Passes of phase 3's check a mutation may interrupt before it is made in one turn: `AssetStore.legacyCheckPasses`;
-    /// a test lowers it to reach that turn.
+    /// Passes of phase 3's check a mutation may interrupt before the call leaves phase 3 to the next call:
+    /// `AssetStore.legacyCheckPasses`; a test lowers it to reach that outcome.
     var checkPasses: Int = AssetStore.legacyCheckPasses
 }

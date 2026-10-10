@@ -390,9 +390,15 @@ extension AssetStore {
     func finishLegacyMigration(_ root: URL) async throws(StoreError) {
         // REENTRANCY: c-7 (proposed) — see `legacyEntriesPresent`, which returns in the turn its answer holds for; then
         // writability and the migration: a call that finished it meanwhile, or a file back in the queue, leaves it here.
-        let present = try await self.legacyEntriesPresent()
+        let answer = try await self.legacyEntriesPresent()
         try self.checkWritable()
         guard self.state.migration.phase == .inProgress, self.state.migration.queue.isEmpty, self.state.migration.claimed.isEmpty else {
+            return
+        }
+        guard let present = answer else {
+            // Every pass was interrupted by a counted mutation (access stamps, pins, publications): the next call checks
+            // again, rather than this one checking every entry in one turn (35–40 ms at `maxEntries`, close-out cycle 4).
+            self.environment.log.log(.store, .info, "legacy phase 3's check was interrupted in every pass; the next call decides")
             return
         }
         let migration = self.state.migration
@@ -424,16 +430,19 @@ extension AssetStore {
     /// entries took 26 ms in release, review of the L3 close-out cycle 2); `MigrationState.checkChunk`.
     static let legacyCheckChunk = 5_000
 
-    /// Passes of phase 3's chunked check that a mutation may interrupt before the check is made in one turn.
+    /// Passes of phase 3's chunked check that a mutation may interrupt before the call leaves phase 3 to the next call.
     static let legacyCheckPasses = 3
 
-    /// Phase 3's check: whether every legacy entry is present at its current content, as of the turn it returns in. The
-    /// entries are read in chunks of `MigrationState.checkChunk` with the actor released in between (a no-op metadata
-    /// unit); a pass answers "yes" only if no mutation was counted meanwhile (`CommitBookkeeping.mutationSerial`, which
-    /// every persisted change bumps in its own turn through `markDirty`), else it starts again; after
-    /// `MigrationState.checkPasses` interrupted passes the check is made in one turn. An entry found missing is missing in that
-    /// turn, so "no" needs no such guard.
-    func legacyEntriesPresent() async throws(StoreError) -> Bool {
+    /// Phase 3's check: whether every legacy entry is present at its current content, as of the turn it returns in, or
+    /// `nil` when no pass could answer. The entries are read in chunks of `MigrationState.checkChunk` with the actor
+    /// released in between (a no-op metadata unit); a pass answers "yes" only if no mutation was counted meanwhile
+    /// (`CommitBookkeeping.mutationSerial`, which every persisted change bumps in its own turn through `markDirty`), else
+    /// it starts again. After `MigrationState.checkPasses` interrupted passes the answer is `nil`: a check of every entry
+    /// in one turn would hold the actor 35–40 ms at `maxEntries` (review of close-out cycle 3: reachable whenever access
+    /// stamps or pins arrive during the check), so the caller decides nothing and the next call checks again. A store of
+    /// at most one chunk of legacy entries is checked in one turn and always answers. An entry found missing is missing
+    /// in that turn, so "no" needs no such guard.
+    func legacyEntriesPresent() async throws(StoreError) -> Bool? {
         let ids = self.state.migration.legacyIDs
         let chunk = max(1, self.state.migration.checkChunk)
         for _ in 0..<max(1, self.state.migration.checkPasses) {
@@ -455,7 +464,7 @@ extension AssetStore {
                 return true
             }
         }
-        return LegacyDecoding.present(ids[...], in: self.state.core.records)
+        return nil
     }
 
     /// Phase 4: the tree, then the key (only once the tree is done, so the order holds when a call stops part way).

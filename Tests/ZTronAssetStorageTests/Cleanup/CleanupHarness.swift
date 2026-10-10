@@ -195,7 +195,7 @@ extension AssetStore {
     }
 
     /// Test seam for `MigrationState.checkChunk` and `checkPasses`: lets a handful of legacy entries reach the release of
-    /// the actor inside phase 3's check, and its one-turn fallback (proposed REENTRANCY row c-7).
+    /// the actor inside phase 3's check, and a call whose every pass was interrupted (proposed REENTRANCY row c-7).
     func testSetLegacyCheck(chunk: Int, passes: Int) {
         self.state.migration.checkChunk = chunk
         self.state.migration.checkPasses = passes
