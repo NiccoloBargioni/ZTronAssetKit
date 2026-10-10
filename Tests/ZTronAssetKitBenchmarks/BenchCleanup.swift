@@ -94,6 +94,32 @@ extension ZTronAssetKitBenchmarks {
                 }
             }
         }
+
+        /// Review of the L3 close-out cycle 4: a selection that a later `apply` outdates (an alias bound to a candidate's
+        /// blob, or every id renamed) made each re-validated blob scan every record, so one turn scanned once per blob:
+        /// an eviction chunk of 1,000 held the actor about 1.7 s at 10,000 assets, and `apply`'s eviction of a plan of
+        /// half about 4.3 s. Each operation's longest hold after the outdating `apply` (WP-B's probe, best of three runs),
+        /// asserted against the 10 ms; and the thread CPU of `apply`'s eviction hook over a plan of half, with and
+        /// without the rename (recorded: one synchronous turn inside `apply`'s fence, ADR draft C-22).
+        @Test(
+            "C2: quota eviction, apply's eviction plan and an evictable purge hold the actor at most 10 ms at 10,000 assets when ids were bound to their blobs after the selection",
+            .timeLimit(.minutes(10))
+        )
+        @available(macOS 15.0, iOS 18.0, *)
+        func holdsAfterBinding() async throws {
+            var holds: [String: [Double]] = [:]
+            for run in 0..<3 {
+                for (name, hold) in try await CleanupBench.bindingHolds(count: 10_000, seed: UInt64(2_000_000 + run * 100_000)) {
+                    holds[name, default: []].append(hold)
+                }
+            }
+            let figures = CleanupBench.bindingOperations.map { ($0, holds[$0] ?? []) }
+            print("C2 after ids were bound to the selected blobs at 10,000 assets (best of 3): " + figures.map { "\($0.0) \($0.1.min() ?? 0) ms (max of runs \($0.1.max() ?? 0) ms)" }.joined(separator: ", "))
+            for (name, runs) in figures where CleanupBench.boundedBindingOperations.contains(name) {
+                #expect(runs.count == 3, "\(name) ran in every run")
+                #expect((runs.min() ?? .infinity) <= CleanupBenchmarks.budget, "\(name): \(runs)")
+            }
+        }
     }
 }
 
@@ -132,7 +158,11 @@ enum CleanupBench {
 
     /// A store over a fresh fake volume holding `count` present 64-byte assets (adopted by hash at the launch, as in
     /// WP-B's C2 test), with dispatch executors; a byte budget of half the usage, no residency window, no grace.
-    static func store(count: Int, seed: UInt64) async throws -> (store: AssetStore, fileSystem: FakeFileSystem, time: ManualTimeSource, entries: [ManifestEntry]) {
+    static func store(
+        count: Int,
+        seed: UInt64,
+        bulk: (any BlockingExecutor)? = nil
+    ) async throws -> (store: AssetStore, fileSystem: FakeFileSystem, time: ManualTimeSource, entries: [ManifestEntry]) {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(time: time)
         let base = URL(fileURLWithPath: "/bench/cleanup", isDirectory: true)
@@ -156,13 +186,13 @@ enum CleanupBench {
             }
             try fileSystem.write(bytes, to: layout.blobURL(key), mode: .truncate)
         }
-        let store = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count)
+        let store = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count, bulk: bulk)
         _ = try await store.open()
         return (store, fileSystem, time, entries)
     }
 
-    /// The store of `store(count:seed:)`.
-    static func makeStore(base: URL, fileSystem: FakeFileSystem, time: ManualTimeSource, count: Int) -> AssetStore {
+    /// The store of `store(count:seed:bulk:)`; `bulk` replaces its dispatch bulk executor.
+    static func makeStore(base: URL, fileSystem: FakeFileSystem, time: ManualTimeSource, count: Int, bulk: (any BlockingExecutor)? = nil) -> AssetStore {
         var policy = StoragePolicy()
         policy.budget = .bytes(Int64(count) * 64 / 2)
         policy.reserveFreeBytes = 0
@@ -179,7 +209,7 @@ enum CleanupBench {
         let environment = AssetEnvironment(
             fileSystem: fileSystem,
             metadataExecutor: DispatchBlockingExecutor(label: "bench.cleanup.metadata"),
-            bulkExecutor: DispatchBlockingExecutor(label: "bench.cleanup.bulk"),
+            bulkExecutor: bulk ?? DispatchBlockingExecutor(label: "bench.cleanup.bulk"),
             time: time,
             random: SeededRandom(seed: 17),
             conditions: FakeDeviceConditionsSource(),
@@ -627,6 +657,104 @@ enum CleanupBench {
             }))
             await full.close()
         }
+        return holds
+    }
+
+    /// The figures of `bindingHolds(count:seed:)`, in order.
+    static let bindingOperations = [
+        "quota eviction after an alias was bound to every candidate",
+        "apply renaming every id with an eviction plan of half",
+        "purge(.evictable) after an alias was bound to every selected blob",
+        "apply's eviction hook over a plan of half (thread CPU)",
+        "apply's eviction hook over a plan of half after a rename (thread CPU)",
+    ]
+
+    /// The figures of `bindingOperations` asserted against the C2 budget; the others are recorded.
+    static let boundedBindingOperations: Set<String> = [
+        bindingOperations[0], bindingOperations[1], bindingOperations[2], bindingOperations[4],
+    ]
+
+    /// `entries` renamed with `prefix`, same bytes.
+    static func renamed(_ entries: [ManifestEntry], _ prefix: String) -> [ManifestEntry] {
+        entries.map { entry in
+            ManifestEntry(identifier: AssetID(prefix + entry.identifier.rawValue), fileExtension: "png", remotePath: prefix + "/" + entry.remotePath, byteSize: 64, checksum: entry.checksum)
+        }
+    }
+
+    /// Applies `manifest` to `store` while a unit of `bulk` stays held: every other unit of `bulk` is let through.
+    static func apply(_ manifest: ValidatedManifest, to store: AssetStore, releasing bulk: SteppedBlockingExecutor, except held: Int) async throws {
+        let done = Mutex(false)
+        let applying = Task {
+            defer {
+                done.withLock { $0 = true }
+            }
+            _ = try await store.apply(manifest, etag: nil, eviction: nil)
+        }
+        while !done.withLock({ $0 }) {
+            for unit in await bulk.heldUnits where unit != held {
+                await bulk.release(unit)
+            }
+            await Task.yield()
+        }
+        try await applying.value
+    }
+
+    /// On fresh stores of `count` assets: the longest hold of quota eviction, and of `purge(.evictable)`, after an
+    /// `apply` bound an alias to every blob while the operation's selection unit was held; of an `apply` that renames
+    /// every id and carries an eviction plan of half made before it; and the thread CPU of `apply`'s eviction hook over
+    /// such a plan, without and with the rename.
+    static func bindingHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
+        var holds: [(String, Double)] = []
+        let digest = { (tag: String) in ContentHash.sha256(of: Data("c2c-binding-\(seed)-\(tag)".utf8)) }
+        for (index, purging) in [false, true].enumerated() {
+            let bulk = SteppedBlockingExecutor(holding: false)
+            let (store, _, _, entries) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 10_000, bulk: bulk)
+            let aliased = try ValidatedManifest(entries: entries + CleanupBench.renamed(entries, "alias"), digest: digest("aliased-\(index)"))
+            await bulk.setHolding(true)
+            let operation = Task { () -> Int in
+                if purging {
+                    return try await store.purge(.evictable).assetsRemoved
+                }
+                return try await store.evictIfNeeded().filesRemoved
+            }
+            try await bulk.requireHeldUnits(atLeast: 1)
+            let selection = try #require(await bulk.heldUnits.first)
+            try await CleanupBench.apply(aliased, to: store, releasing: bulk, except: selection)
+            holds.append((CleanupBench.bindingOperations[purging ? 2 : 0], try await ActorHoldProbe.longestHold(of: store) {
+                await bulk.setHolding(false)
+                let removed = try await operation.value
+                // Eviction keeps a blob whose holders it did not select; an evictable purge takes every holder.
+                #expect(removed == (purging ? 2 * count : 0))
+            }))
+            await store.close()
+        }
+        // `apply` renaming every id, with a plan of half made before it.
+        let (store, _, _, entries) = try await CleanupBench.store(count: count, seed: seed + 20_000)
+        let plan = try #require(await store.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
+        let renamed = try ValidatedManifest(entries: CleanupBench.renamed(entries, "renamed"), digest: digest("renamed"))
+        holds.append((CleanupBench.bindingOperations[1], try await ActorHoldProbe.longestHold(of: store) {
+            let report = try await store.apply(renamed, etag: nil, eviction: plan)
+            #expect(report.evicted.isEmpty, "every planned id was renamed")
+        }))
+        await store.close()
+        // The hook alone, in one turn: over the plan as made, then after a rename (applied without the plan first).
+        let (plain, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 30_000)
+        let half = try #require(await plain.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
+        let evicted = await plain.benchThreadCPU { store in
+            store.performApplyEviction(half).count
+        }
+        #expect(evicted.value == half.victims.count)
+        holds.append((CleanupBench.bindingOperations[3], evicted.milliseconds))
+        await plain.close()
+        let (moved, _, _, movedEntries) = try await CleanupBench.store(count: count, seed: seed + 40_000)
+        let stale = try #require(await moved.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
+        _ = try await moved.apply(try ValidatedManifest(entries: CleanupBench.renamed(movedEntries, "renamed"), digest: digest("moved")), etag: nil, eviction: nil)
+        let none = await moved.benchThreadCPU { store in
+            store.performApplyEviction(stale).count
+        }
+        #expect(none.value == 0)
+        holds.append((CleanupBench.bindingOperations[4], none.milliseconds))
+        await moved.close()
         return holds
     }
 }

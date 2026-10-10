@@ -153,6 +153,7 @@ extension AssetStore {
         if still.count == references {
             return still
         }
+        self.state.eviction.holderScans += 1
         return self.state.core.records.compactMap { $0.value.referencedBlob == key ? $0.key : nil }
     }
 
