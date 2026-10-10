@@ -45,8 +45,21 @@ Calibration: the plan meter moved ~0.075 points per API-equivalent dollar in Lev
 
 Spent on Level 3 so far: the iOS Simulator test build $18, the main run $104, close-out cycles 1–2 ~$55 — 15 weekly points with orchestration (40 % → 55 %). Blocking findings went 8 → 5 → 5 → 2 → (unverified); Level 2's WP-B needed five close-out cycles, so one or two more is the likely range, with three as the bad case (~+2 points).
 
-## Later levels (same scripts, change `args`)
-L4 `["f"]` (sync engine, the largest package; expect ~$250–350, ~20–26 points) on `l3-merged` · L5 `["g"]` then `["k"]` · WP-I docs, Stage 3 hardening, Stage 5 final `verify.sh --full`.
+## Forecast for the remaining work (re-estimated 2026-10-10 from Levels 2–3 measurements)
+Calibration: ~0.072 weekly points per API-equivalent dollar; a close-out cycle (fixer + two verifiers, each running macOS tests ×3, TSan, coverage, release/iOS builds and the ~800-test simulator suite) takes ~2–2.5 h and ~$30–45. Level 3 (WP-C, 19 §11 rows) needed a $104 main run plus 8 close-out cycles (~$240): the correctness verifier, told to hunt for new bugs every cycle, proved one new edge case almost every round. "Strict" = keep that bar (0 blocking, hunting every cycle); "converge" = after the first close-out cycles, verifiers confirm fixes and regressions, and new edge cases block only if they break I-1…I-5 or lose data (the rest go to Stage 3 with their probes).
+
+| Step | Scope | Strict: points / run time | Converge: points / run time |
+|---|---|---|---|
+| Level 3 rest | cycle 8 verification, ≤ 1 more cycle, merge, docs (ADR-051) | 5–7 / 4–7 h | 4–5 / 4–5 h |
+| L4 WP-F sync engine | 39 §11 rows (largest), 32 stubs, P-4/P-7/P-11/P-14, ADR-050 assignments | 32–53 / 28–45 h | 25–32 / 18–24 h |
+| L5 WP-G facade | 19 rows, P-1/P-8/P-9/P-12, main-thread rules | 14–25 / 14–22 h | 11–16 / 10–14 h |
+| L5 WP-K shims | R-CAR-6 shims, test target only | 6–10 / 6–10 h | 4–7 / 4–7 h |
+| WP-I docs | `docs/**`, README | 3–6 / 3–5 h | 3–6 / 3–5 h |
+| Stage 3 hardening | coverage closure, adversarial hunters, ≥ 12 mutation probes, benchmarks, Stage-3 backlog (C-22/OI-9 maxEntries holds, R8, TSan headroom, P-13 once ruled); up to 3 rounds | 18–32 / 12–24 h | 15–25 / 10–18 h |
+| Stage 5 final | `verify.sh --full`, VERIFICATION / DEVICE-TEST-PLAN / RESIDUAL-RISKS | 3–6 / 3–6 h | 3–6 / 3–6 h |
+| **Total after Level 3** | | **76–132 points / 66–112 h** | **61–92 points / 48–74 h** |
+
+Run time assumes the Mac stays awake, no outages and no waiting for the owner. Calendar: Level 3 ends at ~70–72 % this week, so ~28 points remain before the reset (Thu 15 Oct 04:00 CEST) — enough for most of L4's main run; L4 finishes after the reset. The week from 15 Oct (~100 points) then covers the rest under "converge" (~33–64 points left) and very likely under "strict" (~48–104), with the bad strict case spilling into the following week. Confidence is lowest for WP-F (most concurrent code, most requirements) and Stage 3 (its exit needs `--full` green, which needs the owner's P-13 ruling and Sync ≥ 90 % coverage).
 
 ## Cost — measured, Opus 5.5 API-equivalent
 Summed from the agents' transcript usage (`subagents/workflows/<run>/agent-*.jsonl`, max usage per message) at $4 / $20 / $0.20 (cache read) / $5 (cache write) per MTok.
