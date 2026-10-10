@@ -193,6 +193,12 @@ extension AssetStore {
     func testSetCleanupChunk(_ chunk: Int) {
         self.state.cleanup.chunk = chunk
     }
+
+    /// Test seam for `MigrationState.checkChunk`: lets a handful of legacy entries reach the release of the actor inside
+    /// phase 3's check (proposed REENTRANCY row c-7).
+    func testSetLegacyCheckChunk(_ chunk: Int) {
+        self.state.migration.checkChunk = chunk
+    }
 }
 
 /// Drives one operation through a `SteppedBlockingExecutor` while other units stay held (REENTRANCY tests: the

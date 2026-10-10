@@ -50,4 +50,8 @@ struct MigrationState: Sendable {
     /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
     /// moved files that no committed record expects).
     var planCommitted = false
+    /// Legacy entries phase 3's check reads between two releases of the actor (`AssetStore.legacyEntriesPresent`):
+    /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation
+    /// (G4: the seam that release needs).
+    var checkChunk: Int = 5_000
 }

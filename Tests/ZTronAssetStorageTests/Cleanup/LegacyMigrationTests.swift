@@ -296,4 +296,69 @@ struct LegacyMigrationTests {
         }
         #expect(!commitsBefore.isEmpty, "a commit holding the plan landed before the first legacy file moved")
     }
+
+    /// What happens to the first legacy entry while phase 3's check has the actor released.
+    enum CheckInterruption: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// It is quarantined: no longer present, so the stamp must not migrate.
+        case quarantine
+        /// It is pinned: a counted mutation that leaves it present, so the stamp still migrates.
+        case pin
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @Test(
+        "R-STO-11: phase 3 checks the legacy entries with the actor released between chunks and migrates the stamp only over a pass no mutation interrupted",
+        .timeLimit(.minutes(1)),
+        arguments: CheckInterruption.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func phaseThreeCheckRevalidates(_ interruption: CheckInterruption) async throws {
+        let files = try LegacyFixture.fixtureFiles()
+        let entries = try LegacyFixture.entries()
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
+        let harness = CoreHarness.cleanup(disk: try LegacyFixture.disk(files), legacy: CleanupFixture.legacyPolicy, defaults: defaults, metadata: metadata)
+        #expect(try await harness.store.open().legacyMigrationPending)
+        // Every file adopted on demand: the queue is empty and phase 3 has not run.
+        for entry in entries {
+            _ = try await harness.store.adoptLegacyNow(entry.identifier)
+        }
+        try await harness.store.flush(.durable)
+        let migration = await harness.state.migration
+        #expect(migration.phase == .inProgress && migration.queue.isEmpty && migration.claimed.isEmpty)
+        await harness.store.testSetLegacyCheckChunk(2)
+        await metadata.setHolding(true)
+        let finishing = Task {
+            try await harness.store.migrateLegacy(maxFiles: 10)
+        }
+        // The first chunk (the first two entries) was read; the release after it is held.
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let parked = try #require(await metadata.heldUnits.first)
+        let first = try #require(entries.first?.identifier)
+        switch interruption {
+        case .quarantine:
+            _ = try await CleanupSteps.run(metadata, keeping: [parked]) {
+                try await harness.store.reportUnreadable(first)
+            }
+        case .pin:
+            _ = try await CleanupSteps.run(metadata, keeping: [parked]) {
+                try await harness.store.setPinned([first], pinned: true)
+            }
+        }
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        #expect(try await finishing.value.finished)
+        let view = try await harness.store.planningView()
+        #expect(await harness.state.migration.phase == .done)
+        switch interruption {
+        case .quarantine:
+            #expect(view.stamp == nil && view.syncDue, "an entry quarantined during the check is not claimed synced")
+        case .pin:
+            #expect(view.stamp?.appVersion == "1.4+77", "the interrupted pass started again and found every entry present")
+        }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
 }
