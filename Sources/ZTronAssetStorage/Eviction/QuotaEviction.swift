@@ -8,21 +8,23 @@ extension AssetStore {
     /// Candidates are marked in chunks of this many blobs, yielding the actor in between (C2, REENTRANCY R8).
     static let evictionChunk = 1_000
 
-    /// The evictable blobs of the current state, in eviction order, computed on the actor: only for the synchronous
-    /// dry run (`evictionPlan`, a contract signature); the async callers use `evictionCandidatesOffActor()`.
-    func evictionCandidates(protecting: Set<AssetID>) -> [EvictionCandidate] {
+    /// The dry run's plan over the current state, computed on the actor: only for the synchronous `evictionPlan` (a
+    /// contract signature, OI-4); the async callers use `evictionCandidatesOffActor()`. One pass over the records and a
+    /// sort of plain values, victims built for the plan's prefix only (`EvictionOrder.plan`; C2, ADR draft C-22 cycle 6).
+    func evictionDryRun(toFree bytes: Int64, protecting: Set<AssetID>) -> EvictionPlan? {
         let rules = EvictionOrder.Rules(
             policy: self.configuration.policy,
             scope: self.state.eviction.retentionScope,
             protecting: protecting,
             now: self.environment.time.now()
         )
-        return EvictionOrder.candidates(
+        return EvictionOrder.plan(
             records: self.state.core.records,
             blobTable: self.state.core.blobTable,
             publishing: self.state.core.publishing,
             leases: self.state.cleanup.leases,
-            rules: rules
+            rules: rules,
+            toFree: bytes
         )
     }
 

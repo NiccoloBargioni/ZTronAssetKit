@@ -15,7 +15,7 @@ extension AssetStore {
         guard self.state.core.phase == .open else {
             return nil
         }
-        return EvictionOrder.plan(self.evictionCandidates(protecting: protecting), toFree: bytes)
+        return self.evictionDryRun(toFree: bytes, protecting: protecting)
     }
 
     /// The client's retention scope (R-CAR-5, ADR-027): what the app wants kept, e.g. the entries its paywall
