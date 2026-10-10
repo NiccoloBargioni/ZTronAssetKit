@@ -435,7 +435,7 @@ enum CleanupBench {
             evictions.append(await store.benchThreadCPU { store in
                 var scan = HolderScan(blobs: slice.map(\.key))
                 let rules = store.evictionRules()
-                return slice.reduce(0) { $0 + (store.evict($1.victims, rules: rules, scan: &scan) == nil ? 0 : 1) }
+                return slice.reduce(0) { $0 + (store.evict($1.victims[...], rules: rules, scan: &scan) == nil ? 0 : 1) }
             }.milliseconds)
         }
         record("eviction chunk of \(chunk)", bounded: true, evictions)
@@ -621,7 +621,7 @@ enum CleanupBench {
         #expect(candidates.count == 1 && candidate.victims.count == count)
         let evicted = await one.benchThreadCPU { store in
             var scan = HolderScan(blobs: [candidate.key])
-            return store.evict(candidate.victims, rules: store.evictionRules(), scan: &scan)
+            return store.evict(candidate.victims[...], rules: store.evictionRules(), scan: &scan)
         }
         #expect(evicted.value == .doomed(bytes: 64))
         holds.append((CleanupBench.sharedBlobOperations[2], evicted.milliseconds))

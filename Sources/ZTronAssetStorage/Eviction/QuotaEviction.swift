@@ -116,7 +116,7 @@ extension AssetStore {
                 }
                 scan = HolderScan(blobs: candidates[index..<end].map(\.key))
             }
-            switch self.evict(candidate.victims, rules: rules, scan: &scan) {
+            switch self.evict(candidate.victims[...], rules: rules, scan: &scan) {
             case .doomed(let bytes)?:
                 result.bytesFreed = result.bytesFreed.addingSaturating(bytes)
                 result.filesRemoved += 1
@@ -203,7 +203,7 @@ extension AssetStore {
         var scan = HolderScan(blobs: order)
         let rules = self.evictionRules()
         for key in order {
-            if self.evict(groups[key] ?? [], rules: rules, scan: &scan) != nil {
+            if self.evict((groups[key] ?? [])[...], rules: rules, scan: &scan) != nil {
                 evicted.formUnion(groups[key]?.map(\.id) ?? [])
             }
         }
@@ -260,11 +260,7 @@ extension AssetStore {
     /// (`holders(of:known:scan:)`, read now with the turn's `scan`) are exactly `victims`, and each of them is still
     /// evictable under the turn's `rules` and was not accessed since the selection. Returns what happened to the blob,
     /// or `nil` when nothing was evicted.
-    func evict<Victims: RandomAccessCollection<EvictionVictim>>(
-        _ victims: Victims,
-        rules: EvictionOrder.Rules,
-        scan: inout HolderScan
-    ) -> BlobEviction? {
+    func evict(_ victims: ArraySlice<EvictionVictim>, rules: EvictionOrder.Rules, scan: inout HolderScan) -> BlobEviction? {
         guard let key = victims.first?.blob, case .live(let references)? = self.state.core.blobTable[key],
             self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
             self.state.cleanup.leases.isEmpty || self.state.cleanup.leases[key]?.isEmpty ?? true
