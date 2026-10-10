@@ -15,9 +15,10 @@ struct CleanupState: Sendable {
     /// The size of each leased blob, recorded at acquisition (the record's size then), so a leased blob that is doomed
     /// meanwhile still counts in `StorageReport.bytesByState.pendingDeletion`; dropped with the blob's last lease.
     var leasedBytes: [BlobKey: Int64] = [:]
-    /// When the last orphan GC, staging GC, quota eviction or purge finished (`StorageReport.lastCleanupAt`,
-    /// R-CLN-9); persisted. Written only by WP-C's own operations: the reaper's deletions of pruned blobs (WP-B's
-    /// `runDueWork()`) are not a cleanup run and do not stamp it.
+    /// When the last orphan GC, staging GC, quota eviction or purge that removed, doomed, evicted or purged something
+    /// finished (`StorageReport.lastCleanupAt`, R-CLN-9; a run that changed nothing does not stamp it, ADR draft C-4;
+    /// a purge stamps once committed and again after its wait); persisted. Written only by WP-C's own operations: the
+    /// reaper's deletions of pruned blobs (WP-B's `runDueWork()`) are not a cleanup run and do not stamp it.
     var lastCleanupAt: Date?
     /// The unreferenced blobs the last orphan GC listing found and left (younger than the grace, or adoptable), with
     /// their sizes: `StorageReport.orphanBytes`. `nil` until the first orphan GC of this lifetime: the report then counts

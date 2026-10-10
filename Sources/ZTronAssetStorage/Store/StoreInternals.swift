@@ -12,8 +12,9 @@ enum DirtyUrgency: Sendable, Hashable {
 
 /// The primitives WP-B provides for WP-C's extension files (ADR-046). Contract signatures, implemented by WP-B in
 /// Stage 2 level L2 and used by WP-C in level L3, so WP-C never re-implements reference counting, commit
-/// scheduling, snapshot publication, hashing or blob placement, and never edits a WP-B file. `doomOrphans(_:)` was
-/// added at the L3 close-out (CCR-1, orchestrator ruling R2).
+/// scheduling, snapshot publication, hashing or blob placement, and edits a WP-B file only under an orchestrator ruling
+/// (at L3: this file, ruling R2; `AssetStore+Apply.swift` and `ApplyPlan.swift`, rulings R1, R3 and R6; ADR-052).
+/// `doomOrphans(_:)` was added at the L3 close-out (CCR-1, orchestrator ruling R2).
 extension AssetStore {
     /// Throws unless the store is open: `.notOpen` while `created` or `opening`, `.closed` once `close()` began
     /// (store-1 S1-09, store-2 S2-07). Every mutating entry point of both packages calls it first and again after

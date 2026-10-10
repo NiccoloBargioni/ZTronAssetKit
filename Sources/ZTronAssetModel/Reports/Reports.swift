@@ -103,7 +103,8 @@ public struct StorageReport: Sendable, Hashable, Codable {
     public var freeBytesOpportunistic: Int64
     /// Checksum-less present assets (R-INT-5).
     public var unverifiedCount: Int
-    /// The last GC, eviction or purge.
+    /// When the last orphan GC, staging GC, quota eviction or purge that removed, doomed, evicted or purged something
+    /// finished; a run that changed nothing does not set it.
     public var lastCleanupAt: Date?
 
     /// Creates a report.

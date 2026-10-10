@@ -5,7 +5,7 @@ import ZTronAssetModel
 ///
 /// It stores only the suite name, because `UserDefaults` is not `Sendable` (store.md §10). Called only inside
 /// units, never on the main thread. Tests never use it: writing real defaults would write outside this
-/// repository (owner directive), so its two lines are the store's one deliberately untested seam (ARCHITECTURE §14).
+/// repository (owner directive), so its bodies are deliberately untested (ARCHITECTURE §14; ADR-052).
 public struct LiveLegacyDefaults: LegacyDefaults {
     /// The suite; `nil` means `.standard`.
     public let suiteName: String?
