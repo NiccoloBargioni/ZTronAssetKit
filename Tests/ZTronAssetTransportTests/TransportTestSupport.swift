@@ -97,10 +97,15 @@ struct LoopbackRig {
     let tap: RecordingLogTap
     let base: URL
 
+    /// `requestTimeout` is the sessions' request timeout: short by default, so a missed event fails long before a test's
+    /// time limit (transport.md §12); a test that queues many tasks behind few connections passes a longer one, since a
+    /// queued task's wall-clock timeout runs while it waits for a connection and a loaded host stretches that wait (ADR draft
+    /// C OI-10: 191 of 500 queued transfers timed out on the iOS Simulator at a load average of 110).
     static func make(
         appKey: AppKey? = TransportFixtures.canaryKey,
         allowedHosts: Set<String> = ["127.0.0.1"],
         maxConnections: Int = 6,
+        requestTimeout: TimeInterval = 10,
         manifestPath: String = "manifest.json",
         background: (any TransferBackend)? = nil,
         staging: FakeStagingSink = FakeStagingSink(),
@@ -116,11 +121,10 @@ struct LoopbackRig {
         let log = LogRoute.tapOnly(tap)
         let policy = TransportSecurityPolicy.loopbackTesting(allowedHosts: allowedHosts)
         let delegate = SessionDelegate(mode: .foreground, staging: sink, policy: policy)
-        // A short request timeout: a missed event fails long before the test's time limit (transport.md §12).
         let foreground = ForegroundTransferBackend(
             delegate: delegate,
             maxConnectionsPerHost: maxConnections,
-            requestTimeout: 10,
+            requestTimeout: requestTimeout,
             appKey: appKey,
             log: log
         )
@@ -129,7 +133,7 @@ struct LoopbackRig {
             manifestPath: manifestPath,
             appKey: appKey,
             maxConnectionsPerHost: maxConnections,
-            requestTimeout: 10
+            requestTimeout: requestTimeout
         )
         let source = HTTPRemoteSource(
             configuration: configuration,

@@ -11,8 +11,10 @@ struct ForegroundBackendTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: 500 downloads through one backend use at most maxConnectionsPerHost TCP connections", .timeLimit(.minutes(1)))
     func connectionReuse() async throws {
-        // 3 is below URLSession's own default per-host limit (6 on macOS), so only the configured cap explains it.
-        let rig = try await LoopbackRig.make(maxConnections: 3) { request in
+        // 3 is below URLSession's own default per-host limit (6 on macOS), so only the configured cap explains it. The
+        // 500 tasks queue behind 3 connections and a queued task's request timeout runs while it waits, so the timeout is
+        // 50 s, within the test's minute, rather than the rig's 10 s, which a loaded host outlasted (ADR draft C OI-10).
+        let rig = try await LoopbackRig.make(maxConnections: 3, requestTimeout: 50) { request in
             LoopbackResponse(body: Data(request.target.utf8) + TransportFixtures.payload(1_000))
         }
         let outcomes = await withTaskGroup(of: (Int, TransferUpdate?).self) { group in
