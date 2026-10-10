@@ -577,6 +577,59 @@ struct EvictionTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Ruling R6 at the L3 close-out cycle 7: `apply`'s chunks hold whole blobs, as quota eviction's do, because a blob's
+    /// records are re-validated and leave together (C-1). With a chunk of three records and two ids per blob, the first
+    /// chunk ends after the second blob (four records, the first boundary at or past three) and the last chunk holds the
+    /// remaining blob alone.
+    @Test(
+        "R-SYN-11: apply passes its eviction plan to the hook in chunks of whole blobs, each ending at the first blob boundary at or past a chunk's records",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func applyPlanChunksAtBlobBoundaries() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let blobs = (0..<3).map { CoreFixture.bytes(820 + UInt64($0), count: 100) }
+        let pairs = blobs.enumerated().map { index, bytes in
+            ["a", "b"].map { CleanupFixture.Asset(entry: CoreFixture.entry("c\(index)\($0)", bytes), bytes: bytes) }
+        }
+        let manifest = CoreFixture.manifest(pairs.flatMap { $0.map(\.entry) })
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(manifest, etag: nil, eviction: nil)
+        for (index, pair) in pairs.enumerated() {
+            try await harness.publish(blobs[index], pair.map(\.entry), sequence: UInt32(index + 1))
+        }
+        // Least recently used first: c0, c1, c2.
+        for asset in pairs.flatMap({ $0 }) {
+            harness.time.advance(by: 60)
+            _ = await harness.store.location(for: asset.id, extensions: [], recordingAccess: true)
+        }
+        harness.time.advance(by: 3_600)
+        let plan = try #require(await harness.store.evictionPlan(toFree: 300, protecting: []))
+        #expect(plan.victims.map(\.blob) == pairs.flatMap { $0.map(\.key) }, "each blob's two records listed together, c0 first")
+        await harness.store.testSetEvictionChunk(3)
+        await metadata.setHolding(true)
+        let applying = Task {
+            try await harness.store.apply(manifest, etag: nil, eviction: plan)
+        }
+        try await CorePoll.until("apply yields after its plan's first chunk") {
+            if await harness.record(pairs[1][1].id)?.residency == .absent(.evicted) {
+                return await !metadata.heldUnits.isEmpty
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        let firstChunk = await pairs.flatMap { $0 }.asyncFilter { await harness.record($0.id)?.residency == .absent(.evicted) }
+        #expect(firstChunk.map(\.id) == (pairs[0] + pairs[1]).map(\.id), "the first chunk is the first two blobs' four records")
+        await metadata.setHolding(false)
+        let report = try await applying.value
+        #expect(report.evicted == plan.victims.map(\.id), "the last chunk, c2's two records, is evicted too")
+        #expect(await harness.store.metrics().evictions == 6)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-4: pins persist across a reopen and keep an asset out of eviction until it is unpinned", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pinsPersist() async throws {
