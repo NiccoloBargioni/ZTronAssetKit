@@ -43,9 +43,10 @@ extension ZTronAssetKitBenchmarks {
 
         /// Ruling R4's second half: the thread CPU of each of WP-C's actor stretches, measured directly on the actor (as
         /// the round-3 review measured them), at 10,000 and at `ManifestLimits.maxEntries` assets. The stretches WP-C made
-        /// O(1) per item and chunked are asserted against the 10 ms at both scales (best of five chunks); the ones that stay
-        /// linear on the actor (the first copy of `records` while a snapshot is alive, and WP-B's own stretches inside the
-        /// operations, seen by the probe at 100,000) are recorded (ADR draft C-22).
+        /// O(1) per item and chunked are asserted against the 10 ms at both scales (best of five chunks), the synchronous
+        /// eviction dry run at 10,000 only; the ones that stay linear on the actor (the first copy of `records` while a
+        /// snapshot is alive, the dry run at `maxEntries`, and WP-B's own stretches inside the operations, seen by the probe
+        /// at 100,000) are recorded (ADR draft C-22).
         @Test("C2: WP-C's actor stretches at 10,000 and at 100,000 assets (maxEntries), thread CPU per stretch", .timeLimit(.minutes(10)))
         @available(macOS 15.0, iOS 18.0, *)
         func stretchesAtMaxEntries() async throws {
@@ -378,6 +379,24 @@ enum CleanupBench {
             )
         }
         record("eviction candidates (off the actor since round 2)", bounded: false, [candidates.milliseconds])
+        // The engine's synchronous dry run, one actor turn by contract (OI-4; review of the L3 close-out cycle 5: 14.2 to
+        // 15.3 ms at 10,000 assets): a plan of the whole store, and of everything but every other id, which it protects.
+        // Asserted at 10,000 assets (ruling R4), recorded at `maxEntries`.
+        let everyOther = Set(entries.enumerated().filter { $0.offset % 2 == 0 }.map(\.element.identifier))
+        for (name, protecting, toFree) in [
+            ("eviction dry run of the whole store", Set<AssetID>(), Int64(count) * 64),
+            ("eviction dry run protecting every other id", everyOther, Int64(count - everyOther.count) * 64),
+        ] {
+            var dryRuns: [Double] = []
+            for _ in 0..<5 {
+                let plan = await store.benchThreadCPU { store in
+                    store.evictionPlan(toFree: toFree, protecting: protecting)
+                }
+                #expect(plan.value?.bytes == toFree && plan.value?.victims.allSatisfy { !protecting.contains($0.id) } == true, "\(name)")
+                dryRuns.append(plan.milliseconds)
+            }
+            record(name, bounded: count <= 10_000, dryRuns)
+        }
         var evictions: [Double] = []
         for sample in 0..<5 {
             let slice = Array(candidates.value[(sample * chunk)..<min(candidates.value.count, (sample + 1) * chunk)])
