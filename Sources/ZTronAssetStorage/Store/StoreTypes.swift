@@ -293,9 +293,10 @@ package struct StagingInventory: Sendable, Hashable {
 
 /// The outcome of a cleanup step (R-CLN-*).
 package struct CleanupResult: Sendable, Hashable {
-    /// Bytes deleted; for quota eviction and orphan GC, the bytes the run released to the reaper (they leave
-    /// `FreeSpace.usedBytes` at once and are unlinked after acknowledgement and grace, which `runDueWork()` reports in
-    /// `reapedBytes`; ADR drafts C-3, C-23).
+    /// Bytes deleted; for quota eviction and orphan GC, the bytes the run released to the reaper (quota eviction's leave
+    /// `FreeSpace.usedBytes` at once; orphan GC's files, which the blob table did not know, join
+    /// `FreeSpace.pendingReclaim`; both are unlinked after acknowledgement and grace, which `runDueWork()` reports in
+    /// `reapedBytes`; ADR drafts C-3, C-11, C-23).
     package var bytesFreed: Int64
     /// Files deleted; for quota eviction and orphan GC, the blobs the run released to the reaper.
     package var filesRemoved: Int

@@ -92,10 +92,10 @@ struct StoreCoreState: Sendable {
     /// it builds them off the actor beside the store's own and assigns the whole dictionary while `opening` (ADR draft
     /// C-24).
     var records: [AssetID: AssetRecord] = [:]
-    /// The sync stamp (R-STO-2); every purge (WP-C) clears it before its first own await and again in the turn of its
-    /// last chunk, so the purge's commits hold it (ADR draft C-5); legacy phase 3 (WP-C) sets it from the legacy stamp
-    /// only while none is set, the applied manifest is still the one phase 1 decoded and every one of its entries is
-    /// present (ADR-029, ADR draft C-15).
+    /// The sync stamp (R-STO-2); every purge (WP-C) clears it before its first own await, and again in the turn of its
+    /// last chunk when it purged something, so the purge's commits hold it (ADR draft C-5); legacy phase 3 (WP-C) sets
+    /// it from the legacy stamp only while none is set, the applied manifest is still the one phase 1 decoded and every
+    /// one of its entries is present (ADR-029, ADR draft C-15).
     var stamp: SyncStamp?
     /// The persisted "sync due" flag. Legacy phase 3 (WP-C) sets it, directly or through `markSyncDue()`, when not
     /// every legacy entry was adopted; every purge (WP-C) sets it with the stamp cleared (R-CLN-6, ADR draft C-5).
