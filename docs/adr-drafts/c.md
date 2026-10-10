@@ -1460,6 +1460,8 @@ final ones (`245647e` changes the benchmark file only, this record the ADR draft
   last calls in every run (16,572–16,637 and 15,939 stamps), longest batch of 500 0.67 / 13.87 ms. At `245647e` (`--filter
   holdsAfterBinding`, 13:14, load 1.78): `apply's eviction hook over a plan of half after an alias was bound to half its
   blobs (thread CPU) 10.306333 ms (max of runs 10.443167 ms)`, the other six figures within 0.2 ms of the run above.
+- `--quick` again at `cf84d41` (the record above; 13:16:56–13:19:24, load 1.60 → 3.69): `VERIFY: PASS`, Storage bundle
+  `Test run with 433 tests in 58 suites passed after 59.292 seconds`, the other bundles 151, 10, 84, 12, 3 and 104.
 - `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 5 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
