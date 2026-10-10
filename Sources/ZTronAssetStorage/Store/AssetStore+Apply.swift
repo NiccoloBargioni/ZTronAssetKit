@@ -77,8 +77,8 @@ extension AssetStore {
     /// release on a Mac, so a chunk holds the actor for a few milliseconds even on a slower device).
     static let sweepChunk = 512
 
-    /// Counts one item of a long sweep and yields the actor after every `sweepChunk` items (C2, as REENTRANCY R8
-    /// does for eviction and reconciliation chunks). It never throws: the writes run behind the commit fence and
+    /// Counts one item of a long sweep and yields the actor after every `sweepChunk` items (C2; REENTRANCY b-7,
+    /// as quota eviction releases the actor between its chunks under R8). It never throws: the writes run behind the commit fence and
     /// always run to the end, because a half-applied state must never be the one a commit or `close()` persists
     /// (ADR draft B-23).
     private func pace(_ swept: inout Int) async {

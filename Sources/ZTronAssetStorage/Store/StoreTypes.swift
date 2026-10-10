@@ -366,7 +366,7 @@ package struct LegacyMigrationProgress: Sendable, Hashable {
     package var remaining: Int
     /// Files dropped, whose assets are downloaded again: an invalid path or one through a symbolic link, a stale or
     /// missing checksum, bytes that do not verify, a file no record wants or no listing found (unless an earlier
-    /// lifetime adopted it), one that vanished, a root on another volume, or a file kept in place after three failed
+    /// lifetime adopted it), an entry naming a file another entry already claims with another digest, one that vanished, a root on another volume, or a file kept in place after three failed
     /// attempts (ADR drafts C-12, C-14).
     package var dropped: Int
     /// Phases 3 and 4 completed: the legacy tree and key are gone.
