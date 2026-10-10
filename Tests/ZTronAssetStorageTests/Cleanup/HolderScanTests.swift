@@ -180,4 +180,26 @@ struct HolderScanTests {
         }
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
+
+    /// `count` blob keys from `seed` (SHA-256 of distinct strings, as a store's keys are digests).
+    static func keys(_ count: Int, seed: String) -> [BlobKey] {
+        (0..<count).map { BlobKey(hash: ContentHash.sha256(of: Data("\(seed)-\($0)".utf8)), ext: AssetFileExtension("png")!) }
+    }
+
+    /// The scan skips a record whose blob the prefilter rejects without hashing its key, so the filter must never
+    /// reject a re-validated blob; it grows with the number of blobs (at least 16 slots each), so few others pass and the
+    /// scan stays one pass of cheap tests (C2).
+    @Test(
+        "R-CLN-4: the holders scan's prefilter never rejects a blob of the turn and lets few others through, however many blobs the turn re-validates",
+        arguments: [1, 300, 5_000]
+    )
+    func prefilterSizing(count: Int) {
+        let wanted = HolderScanTests.keys(count, seed: "wanted")
+        let filter = HolderScan.Prefilter(Set(wanted))
+        #expect(wanted.allSatisfy(filter.mayContain), "no blob of the turn is ever skipped")
+        let others = HolderScanTests.keys(5_000, seed: "other")
+        let passed = others.filter(filter.mayContain).count
+        // At most one wanted key per 16 slots: under 1 - e^(-1/16) ≈ 6.1 % of the others pass on average.
+        #expect(passed * 100 < others.count * 7, "\(passed) of \(others.count) other blobs pass the filter of \(count)")
+    }
 }
