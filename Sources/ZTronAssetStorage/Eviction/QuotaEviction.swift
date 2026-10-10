@@ -76,20 +76,29 @@ extension AssetStore {
         try self.checkLive()
         try self.checkWritable()
         let chunk = max(1, self.state.eviction.chunk)
-        var visited = 0
         var evictedAny = false
-        for candidate in candidates where result.bytesFreed < needed {
-            if visited > 0, visited % chunk == 0 {
-                // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
-                // meanwhile, and a test can hold eviction at this very point.
-                // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob, unleased,
-                // not accessed since selection, still evictable; its holders are read again.
-                await self.runUnit(on: self.environment.metadataExecutor) {}
-                try self.checkLive()
-                try self.checkWritable()
+        var scan = HolderScan(blobs: [])
+        var rules = self.evictionRules()
+        for (index, candidate) in candidates.enumerated() {
+            guard result.bytesFreed < needed else {
+                break
             }
-            visited += 1
-            switch self.evict(candidate.victims) {
+            if index % chunk == 0 {
+                if index > 0 {
+                    // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
+                    // meanwhile, and a test can hold eviction at this very point.
+                    // REENTRANCY: R8 — the phase, then per candidate (in `evict`): still present at the same blob,
+                    // unleased, not accessed since selection, still evictable under rules read again (the clock); its
+                    // holders are read again, with this chunk's own scan (the previous one is dropped: records may have
+                    // been bound meanwhile).
+                    await self.runUnit(on: self.environment.metadataExecutor) {}
+                    try self.checkLive()
+                    try self.checkWritable()
+                    rules = self.evictionRules()
+                }
+                scan = HolderScan(blobs: candidates[index..<min(index + chunk, candidates.count)].map(\.key))
+            }
+            switch self.evict(candidate.victims, rules: rules, scan: &scan) {
             case .doomed(let bytes)?:
                 result.bytesFreed = result.bytesFreed.addingSaturating(bytes)
                 result.filesRemoved += 1
@@ -129,8 +138,11 @@ extension AssetStore {
             groups[victim.blob, default: []].append(victim)
         }
         var evicted: Set<AssetID> = []
+        // One turn: the holders of every planned blob are read with at most one scan of the records (C2).
+        var scan = HolderScan(blobs: order)
+        let rules = self.evictionRules()
         for key in order {
-            if self.evict(groups[key] ?? []) != nil {
+            if self.evict(groups[key] ?? [], rules: rules, scan: &scan) != nil {
                 evicted.formUnion(groups[key]?.map(\.id) ?? [])
             }
         }
@@ -143,18 +155,25 @@ extension AssetStore {
     /// The present records referencing `key` now: `known` (the ids a snapshot saw referencing it) re-read, in
     /// O(`known`), when they account for every reference the blob table counts for it (each present record holds one,
     /// ADR-018); otherwise, when a publication of the same bytes holds a provisional reference or a record was bound
-    /// after the snapshot, one scan of the records. Replaces the full reference index each chunk, quarantine and slice
-    /// rebuilt on the actor (C2, review round 3: 2.6 ms at 10,000 records, 45 ms at `maxEntries`).
-    func holders(of key: BlobKey, known: [AssetID]) -> [AssetID] {
+    /// after the snapshot, from `scan`, the turn's one scan of the records (`HolderScan`; made here if this is the first
+    /// blob of the turn that needs it). Replaces the full reference index each chunk, quarantine and slice rebuilt on
+    /// the actor (C2, review round 3: 2.6 ms at 10,000 records, 45 ms at `maxEntries`), and a scan per blob (review of
+    /// the L3 close-out cycle 4).
+    func holders(of key: BlobKey, known: [AssetID], scan: inout HolderScan) -> [AssetID] {
         guard case .live(let references)? = self.state.core.blobTable[key] else {
             return []
         }
-        let still = IntegrityBookkeeping.unique(known).filter { self.state.core.records[$0]?.referencedBlob == key }
+        let distinct = known.count < 2 ? known : IntegrityBookkeeping.unique(known)
+        let still = distinct.filter { self.state.core.records[$0]?.referencedBlob == key }
         if still.count == references {
             return still
         }
-        self.state.eviction.holderScans += 1
-        return self.state.core.records.compactMap { $0.value.referencedBlob == key ? $0.key : nil }
+        if !scan.covers(key) {
+            self.state.eviction.holderScans += 1
+            scan.scan(self.state.core.records, for: key)
+        }
+        // The turn's records only lost references since the scan: re-read each one found.
+        return scan.holders(of: key).filter { self.state.core.records[$0]?.referencedBlob == key }
     }
 
     /// What evicting one blob's records did.
@@ -166,34 +185,62 @@ extension AssetStore {
         case stillReferenced
     }
 
-    /// Evicts one blob's records when the blob is still live, unleased and not being placed, its present records
-    /// (`holders(of:known:)`, read now) are exactly `victims`, and each of them is still evictable and was not accessed
-    /// since the selection. Returns what happened to the blob, or `nil` when nothing was evicted.
-    func evict(_ victims: [EvictionVictim]) -> BlobEviction? {
-        guard let key = victims.first?.blob, case .live? = self.state.core.blobTable[key], !self.state.core.publishing.contains(key),
-            self.state.cleanup.leases[key]?.isEmpty ?? true
-        else {
-            return nil
-        }
-        let holders = self.holders(of: key, known: victims.map(\.id))
-        let rules = EvictionOrder.Rules(
+    /// The rules a turn re-validates candidates against (the clock read once per turn: a turn is synchronous).
+    func evictionRules() -> EvictionOrder.Rules {
+        EvictionOrder.Rules(
             policy: self.configuration.policy,
             scope: self.state.eviction.retentionScope,
             protecting: [],
             now: self.environment.time.now()
         )
-        let planned = Dictionary(victims.map { ($0.id, $0.lastAccess) }, uniquingKeysWith: { first, _ in first })
-        guard holders.count == planned.count,
-            holders.allSatisfy({ id in
-                guard let lastAccess = planned[id], let record = self.state.core.records[id], record.referencedBlob == key else {
-                    return false
-                }
-                return rules.allows(record) && record.lastAccess <= lastAccess
-            })
+    }
+
+    /// Evicts one blob's records when the blob is still live, unleased and not being placed, its present records
+    /// (`holders(of:known:scan:)`, read now with the turn's `scan`) are exactly `victims`, and each of them is still
+    /// evictable under the turn's `rules` and was not accessed since the selection. Returns what happened to the blob,
+    /// or `nil` when nothing was evicted.
+    func evict(_ victims: [EvictionVictim], rules: EvictionOrder.Rules, scan: inout HolderScan) -> BlobEviction? {
+        guard let key = victims.first?.blob, case .live(let references)? = self.state.core.blobTable[key],
+            !self.state.core.publishing.contains(key), self.state.cleanup.leases[key]?.isEmpty ?? true
         else {
             return nil
         }
-        let bytes = holders.first.flatMap { self.state.core.records[$0] }.map(EvictionOrder.recordedSize) ?? 0
+        let bytes: Int64
+        if victims.count == 1 {
+            // The common case, one selected record, read once (C2: `apply`'s eviction of a plan of half is one turn): it
+            // still holds the blob, is still evictable and was not accessed since the selection; and when the blob
+            // counts another reference, that one is not a record (an id bound since the selection keeps the blob; the
+            // provisional reference of a publication in flight does not).
+            let victim = victims[0]
+            guard let record = self.state.core.records[victim.id], record.referencedBlob == key, rules.allows(record),
+                record.lastAccess <= victim.lastAccess
+            else {
+                return nil
+            }
+            if references != 1, self.holders(of: key, known: [victim.id], scan: &scan).count != 1 {
+                return nil
+            }
+            bytes = EvictionOrder.recordedSize(record)
+        } else {
+            // Every selected record must still hold the blob (the holders must be exactly the victims): one that left
+            // it, renamed or changed since the selection, fails here in O(victims), before any scan of the records.
+            guard victims.allSatisfy({ self.state.core.records[$0.id]?.referencedBlob == key }) else {
+                return nil
+            }
+            let holders = self.holders(of: key, known: victims.map(\.id), scan: &scan)
+            let planned = Dictionary(victims.map { ($0.id, $0.lastAccess) }, uniquingKeysWith: { first, _ in first })
+            guard holders.count == planned.count,
+                holders.allSatisfy({ id in
+                    guard let lastAccess = planned[id], let record = self.state.core.records[id], record.referencedBlob == key else {
+                        return false
+                    }
+                    return rules.allows(record) && record.lastAccess <= lastAccess
+                })
+            else {
+                return nil
+            }
+            bytes = holders.first.flatMap { self.state.core.records[$0] }.map(EvictionOrder.recordedSize) ?? 0
+        }
         for victim in victims {
             self.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
         }

@@ -95,10 +95,12 @@ extension AssetStore {
     /// Purges one chunk of the selection (one actor turn) and returns how many records it purged. Each blob and record is
     /// re-validated against the state as it is now (REENTRANCY c-5). `.all` and `.scope`: each selected record that still
     /// references its blob. `.evictable`: a blob still live, unleased and not being placed, whose every current holder
-    /// (`holders(of:known:)`, O(holders) unless a record was bound to it since the selection) is still neither essential
-    /// nor pinned, loses all of them; one that is not stays with all of them, as the selection's rule says.
+    /// (`holders(of:known:scan:)`, O(holders) unless a record was bound to it since the selection, then from the chunk's
+    /// one scan of the records) is still neither essential nor pinned, loses all of them; one that is not stays with all
+    /// of them, as the selection's rule says.
     func purgeChunk(_ groups: ArraySlice<PurgeSelection.Group>, request: PurgeRequest, reclaim: inout [PurgeSelection.Reclaim]) -> Int {
         var purged = 0
+        var scan = HolderScan(blobs: request == .evictable ? groups.map(\.blob) : [])
         for group in groups {
             var bytes: Int64?
             let ids: [AssetID]
@@ -109,7 +111,7 @@ extension AssetStore {
                 else {
                     continue
                 }
-                let holders = self.holders(of: group.blob, known: group.ids)
+                let holders = self.holders(of: group.blob, known: group.ids, scan: &scan)
                 guard holders.allSatisfy({ self.state.core.records[$0].map { $0.entry.policy != .essential && !$0.pinned } ?? false }) else {
                     continue
                 }

@@ -20,7 +20,7 @@ extension AssetStore {
         let done = self.state.integrity.verifiedInPass
         // REENTRANCY: c-6 (proposed) — the phase and writability below; the due list describes the state when the unit
         // was submitted, so each blob is checked again before its hash (live, not being placed, not verified in this
-        // pass meanwhile) and after it (R16), and its holders are read again (`holders(of:known:)`).
+        // pass meanwhile) and after it (R16), and its holders are read again (`holders(of:known:scan:)`).
         let due = await self.runUnit(on: self.environment.bulkExecutor) {
             DeepVerification.due(records: records, blobTable: blobTable, publishing: publishing, done: done)
         }
@@ -69,8 +69,10 @@ extension AssetStore {
                 continue
             }
             self.state.integrity.verifiedInPass.insert(key)
+            // This turn reads the blob's holders at most once from the records, for the check and the quarantine (C2).
+            var scan = HolderScan(blobs: [key])
             guard case .live? = self.state.core.blobTable[key], !self.state.core.degraded,
-                case let holders = self.holders(of: key, known: item.holders),
+                case let holders = self.holders(of: key, known: item.holders, scan: &scan),
                 let first = holders.min(by: { $0.rawValue < $1.rawValue })
             else {
                 continue
@@ -84,7 +86,7 @@ extension AssetStore {
                 }
                 self.markDirty(.lazy)
             } else {
-                report.corrupt.append(contentsOf: self.quarantine(blob: key, known: holders))
+                report.corrupt.append(contentsOf: self.quarantine(blob: key, known: holders, scan: &scan))
                 self.environment.log.log(.store, .error, "deep verification found a corrupt blob; it is quarantined")
             }
         }

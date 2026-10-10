@@ -349,10 +349,23 @@ enum CleanupBench {
         for sample in 0..<5 {
             let slice = Array(keys[(sample * chunk)..<min(count, (sample + 1) * chunk)])
             holders.append(await store.benchThreadCPU { store in
-                slice.reduce(0) { $0 + store.holders(of: $1.key, known: [$1.id]).count }
+                var scan = HolderScan(blobs: slice.map(\.key))
+                return slice.reduce(0) { $0 + store.holders(of: $1.key, known: [$1.id], scan: &scan).count }
             }.milliseconds)
         }
         record("holders of \(chunk) blobs", bounded: true, holders)
+        // The same when none of the known ids accounts for its blob (ids bound after the selection): the chunk's one scan.
+        var scanned: [Double] = []
+        for sample in 0..<5 {
+            let slice = Array(keys[(sample * chunk)..<min(count, (sample + 1) * chunk)])
+            let found = await store.benchThreadCPU { store in
+                var scan = HolderScan(blobs: slice.map(\.key))
+                return slice.reduce(0) { $0 + store.holders(of: $1.key, known: [], scan: &scan).count }
+            }
+            #expect(found.value == slice.count, "the scan found every blob's holder")
+            scanned.append(found.milliseconds)
+        }
+        record("holders of \(chunk) blobs by one scan of the records", bounded: false, scanned)
         // Quota eviction's chunk: `evict` of 1,000 candidates in one turn.
         let candidates = await store.benchThreadCPU { store in
             EvictionOrder.candidates(
@@ -368,7 +381,9 @@ enum CleanupBench {
         for sample in 0..<5 {
             let slice = Array(candidates.value[(sample * chunk)..<min(candidates.value.count, (sample + 1) * chunk)])
             evictions.append(await store.benchThreadCPU { store in
-                slice.reduce(0) { $0 + (store.evict($1.victims) == nil ? 0 : 1) }
+                var scan = HolderScan(blobs: slice.map(\.key))
+                let rules = store.evictionRules()
+                return slice.reduce(0) { $0 + (store.evict($1.victims, rules: rules, scan: &scan) == nil ? 0 : 1) }
             }.milliseconds)
         }
         record("eviction chunk of \(chunk)", bounded: true, evictions)
@@ -432,13 +447,14 @@ enum CleanupBench {
         var scans: [Double] = []
         for _ in 0..<5 {
             let scan = await store.benchThreadCPU { store in
-                store.holders(of: live, known: []).count
+                var scan = HolderScan(blobs: [live])
+                return store.holders(of: live, known: [], scan: &scan).count
             }
             #expect(scan.value == 1, "the scan found the blob's holder")
             scans.append(scan.milliseconds)
         }
         record("holders(of:known:) fallback scan", bounded: false, scans)
-        // Purge(.evictable)'s chunk: every holder of each blob re-read (`holders(of:known:)`) and re-validated.
+        // Purge(.evictable)'s chunk: every holder of each blob re-read (`holders(of:known:scan:)`) and re-validated.
         let evictable = await store.benchThreadCPU { store in
             PurgeSelection.select(.evictable, records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: store.state.core.publishing, leases: store.state.cleanup.leases)
         }.value
@@ -667,11 +683,12 @@ enum CleanupBench {
         "purge(.evictable) after an alias was bound to every selected blob",
         "apply's eviction hook over a plan of half (thread CPU)",
         "apply's eviction hook over a plan of half after a rename (thread CPU)",
+        "purge(.evictable) chunk of 1,000 blobs after an alias was bound to each (thread CPU)",
     ]
 
     /// The figures of `bindingOperations` asserted against the C2 budget; the others are recorded.
     static let boundedBindingOperations: Set<String> = [
-        bindingOperations[0], bindingOperations[1], bindingOperations[2], bindingOperations[4],
+        bindingOperations[0], bindingOperations[1], bindingOperations[2], bindingOperations[4], bindingOperations[5],
     ]
 
     /// `entries` renamed with `prefix`, same bytes.
@@ -754,6 +771,24 @@ enum CleanupBench {
         }
         #expect(none.value == 0)
         holds.append((CleanupBench.bindingOperations[4], none.milliseconds))
+        // One chunk of an evictable purge whose selection predates the aliases: twice the records, and the chunk's scan.
+        let selection = await moved.benchThreadCPU { store in
+            PurgeSelection.select(.evictable, records: store.state.core.records, blobTable: store.state.core.blobTable, publishing: [], leases: [:])
+        }.value
+        _ = try await moved.apply(
+            try ValidatedManifest(
+                entries: CleanupBench.renamed(movedEntries, "renamed") + CleanupBench.renamed(movedEntries, "alias"),
+                digest: digest("moved-aliased")
+            ),
+            etag: nil,
+            eviction: nil
+        )
+        let chunk = await moved.benchThreadCPU { store in
+            var reclaim: [PurgeSelection.Reclaim] = []
+            return store.purgeChunk(selection.prefix(AssetStore.cleanupChunk), request: .evictable, reclaim: &reclaim)
+        }
+        #expect(chunk.value == 2 * AssetStore.cleanupChunk, "each selected blob lost its record and the alias bound since")
+        holds.append((CleanupBench.bindingOperations[5], chunk.milliseconds))
         await moved.close()
         return holds
     }

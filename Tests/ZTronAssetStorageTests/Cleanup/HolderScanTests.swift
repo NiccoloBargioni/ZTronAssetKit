@@ -17,7 +17,11 @@ struct HolderScanTests {
         /// `evictIfNeeded()` with its candidates unit held while `apply` binds an alias to every candidate's blob; two
         /// chunks of four.
         case evictionChunks
-        /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest renaming every id with that plan: one turn.
+        /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest adding an alias of every id with that plan:
+        /// one turn.
+        case applyEvictionAfterAliases
+        /// `evictionPlan(toFree:protecting:)`, then `apply` of a manifest renaming every id with that plan: one turn, in
+        /// which no planned record holds its blob any more, so nothing needs a scan.
         case applyEvictionAfterRename
         /// `purge(.evictable)` with its selection unit held while `apply` binds an alias to every selected blob; two
         /// chunks of four.
@@ -73,6 +77,17 @@ struct HolderScanTests {
                 #expect(await harness.isPresent(asset.id, at: asset.key), "\(asset.id.rawValue) is kept")
                 #expect(await harness.isPresent(AssetID("alias-" + asset.id.rawValue), at: asset.key), "its alias is kept")
             }
+        case .applyEvictionAfterAliases:
+            let plan = try #require(await harness.store.evictionPlan(toFree: 800, protecting: []))
+            #expect(Set(plan.victims.map(\.id)) == Set(assets.map(\.id)))
+            let report = try await harness.store.apply(aliased, etag: nil, eviction: plan)
+            #expect(report.evicted.isEmpty, "every planned blob has an alias the plan never saw")
+            let scans = await harness.state.eviction.holderScans - scansBefore
+            #expect(scans == 1, "one scan for the whole plan, not one per planned blob")
+            for asset in assets {
+                #expect(await harness.isPresent(asset.id, at: asset.key), "\(asset.id.rawValue) is kept")
+                #expect(await harness.isPresent(AssetID("alias-" + asset.id.rawValue), at: asset.key), "its alias is kept")
+            }
         case .applyEvictionAfterRename:
             let plan = try #require(await harness.store.evictionPlan(toFree: 800, protecting: []))
             #expect(Set(plan.victims.map(\.id)) == Set(assets.map(\.id)))
@@ -80,7 +95,7 @@ struct HolderScanTests {
             let report = try await harness.store.apply(renamed, etag: nil, eviction: plan)
             #expect(report.evicted.isEmpty, "every planned id is gone; the renamed ids were never planned")
             let scans = await harness.state.eviction.holderScans - scansBefore
-            #expect(scans == 1, "one scan for the whole plan, not one per planned blob")
+            #expect(scans == 0, "a planned record that left its blob fails re-validation before any scan")
             for asset in assets {
                 #expect(await harness.isPresent(AssetID("renamed-" + asset.id.rawValue), at: asset.key), "the renamed \(asset.id.rawValue) is kept")
             }
@@ -105,6 +120,63 @@ struct HolderScanTests {
                 #expect(await harness.record(AssetID("alias-" + asset.id.rawValue))?.residency == .absent(.purged))
                 #expect(!harness.hasBlob(asset.key), "\(asset.id.rawValue)'s blob is reaped")
             }
+        }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// The scan is valid for one turn only: eviction drops it at each release of the actor between chunks, so an id bound
+    /// meanwhile to a later chunk's blob is seen and keeps that blob (a scan kept across the release would evict the
+    /// selected record and leave the blob to the new one).
+    @Test(
+        "R-CLN-4: an alias bound while eviction releases the actor between chunks keeps a later chunk's blob: each chunk scans the records afresh",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func scanDroppedAtEachRelease() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(100)), metadata: metadata, bulk: bulk)
+        let assets = HolderScanTests.assets()
+        // Least recently used first: h0 … h7; two chunks of four.
+        try await EvictionTests.seedWithAccesses(harness, assets, recent: assets.map(\.id))
+        await harness.store.testSetEvictionChunk(4)
+        let entries = assets.map(\.entry)
+        await bulk.setHolding(true)
+        let eviction = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        // h0 gains an alias after the selection, so the first chunk needs a scan of the records.
+        _ = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(entries + [HolderScanTests.entry("alias-", assets[0])]), etag: nil, eviction: nil)
+        }
+        await metadata.setHolding(true)
+        await bulk.setHolding(false)
+        try await CorePoll.until("eviction yields after its first chunk") {
+            if await harness.record(assets[3].id)?.residency == .absent(.evicted) {
+                return await !metadata.heldUnits.isEmpty
+            }
+            return false
+        }
+        // Meanwhile h5, in the second chunk, gains an alias too.
+        let release = Set(await metadata.heldUnits)
+        _ = try await CleanupSteps.run(metadata, keeping: release) {
+            try await harness.store.apply(
+                CoreFixture.manifest(entries + [HolderScanTests.entry("alias-", assets[0]), HolderScanTests.entry("alias-", assets[5])]),
+                etag: nil,
+                eviction: nil
+            )
+        }
+        await metadata.setHolding(false)
+        let result = try await eviction.value
+        #expect(result.filesRemoved == 6 && result.bytesFreed == 600, "every blob but h0's and h5's")
+        for index in [0, 5] {
+            #expect(await harness.isPresent(assets[index].id, at: assets[index].key), "h\(index) keeps its blob")
+            #expect(await harness.isPresent(AssetID("alias-h\(index)"), at: assets[index].key), "with its alias")
+        }
+        for index in [1, 2, 3, 4, 6, 7] {
+            #expect(await harness.record(assets[index].id)?.residency == .absent(.evicted), "h\(index) is evicted")
         }
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
