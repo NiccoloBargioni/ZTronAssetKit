@@ -519,6 +519,57 @@ struct EvictionTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Orchestrator ruling R6 at the L3 close-out cycle 7 (CCR-3): the hook evicted a whole plan in one turn inside
+    /// `apply`'s write fence (14 ms of thread CPU for a plan of 10,000 blobs, 20 ms with two ids per blob). `apply` now
+    /// passes a plan larger than a chunk to the hook one chunk of whole blobs per turn, releasing the actor in between
+    /// behind its fence, and every chunk is re-validated in its own turn: a victim the app reads or leases after an earlier
+    /// chunk was evicted is kept.
+    @Test(
+        "R-SYN-11: apply evicts a large plan in chunks, releasing the actor in between, and re-validates every later victim: one accessed or leased meanwhile is kept",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func applyPlanInChunksRevalidates() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let assets = (0..<6).map { CleanupFixture.asset("p\($0)", seed: 1_500 + UInt64($0), count: 100) }
+        // Least recently used first: p0 … p5.
+        try await EvictionTests.seedWithAccesses(harness, assets, recent: assets.map(\.id))
+        let plan = try #require(await harness.store.evictionPlan(toFree: 600, protecting: []))
+        #expect(plan.victims.map(\.id) == assets.map(\.id))
+        await harness.store.testSetEvictionChunk(2)
+        await metadata.setHolding(true)
+        let applying = Task {
+            try await harness.store.apply(CoreFixture.manifest(assets.map(\.entry)), etag: nil, eviction: plan)
+        }
+        // The first chunk (p0, p1) is evicted, then `apply` releases the actor in a metadata unit, behind its fence.
+        try await CorePoll.until("apply yields after its plan's first chunk") {
+            if await harness.record(assets[1].id)?.residency == .absent(.evicted) {
+                return await !metadata.heldUnits.isEmpty
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "nothing after the first chunk is evicted yet")
+        // Meanwhile the app reads p2 and holds p3 open.
+        harness.time.advance(by: 1)
+        #expect(await harness.store.location(for: assets[2].id, extensions: [], recordingAccess: true) != nil)
+        let lease = try await harness.store.acquireLease(assets[3].id)
+        await metadata.setHolding(false)
+        let report = try await applying.value
+        #expect(report.evicted == [assets[0].id, assets[1].id, assets[4].id, assets[5].id], "in plan order, without p2 and p3")
+        for index in [0, 1, 4, 5] {
+            #expect(await harness.record(assets[index].id)?.residency == .absent(.evicted), "p\(index) is evicted")
+        }
+        #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "accessed since the plan")
+        #expect(await harness.isPresent(assets[3].id, at: assets[3].key), "leased since the plan")
+        #expect(await harness.store.metrics().evictions == 4)
+        _ = await harness.store.releaseLease(lease)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-4: pins persist across a reopen and keep an asset out of eviction until it is unpinned", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pinsPersist() async throws {

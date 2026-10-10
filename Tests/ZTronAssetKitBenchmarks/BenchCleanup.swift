@@ -144,6 +144,31 @@ extension ZTronAssetKitBenchmarks {
                 #expect((runs.min() ?? .infinity) <= CleanupBenchmarks.budget, "\(name): \(runs)")
             }
         }
+
+        /// Orchestrator ruling R6 at the L3 close-out cycle 7 (CCR-3): `apply` ran its eviction hook over the whole plan in
+        /// one turn inside its write fence, about 1.4 µs per victim, so a plan of the whole store held the actor 14–16 ms at
+        /// 10,000 records, 20 ms with two ids per blob, and a plan of half with two ids per blob 10.2–10.4 ms (the review
+        /// of cycle 6). The longest hold of an `apply` carrying each plan shape the reviews measured, and of one that binds
+        /// an alias to half the planned blobs as it evicts, is asserted against the 10 ms (WP-B's probe, best of three).
+        @Test(
+            "C2: apply holds the actor at most 10 ms at 10,000 records with an eviction plan of the whole store, of one or two ids per blob, and while it binds aliases",
+            .timeLimit(.minutes(5))
+        )
+        @available(macOS 15.0, iOS 18.0, *)
+        func applyEvictionHolds() async throws {
+            var holds: [String: [Double]] = [:]
+            for run in 0..<3 {
+                for (name, hold) in try await CleanupBench.applyEvictionHolds(count: 10_000, seed: UInt64(4_000_000 + run * 100_000)) {
+                    holds[name, default: []].append(hold)
+                }
+            }
+            let figures = CleanupBench.applyEvictionOperations.map { ($0, holds[$0] ?? []) }
+            print("C2 of apply with an eviction plan at 10,000 records (best of 3): " + figures.map { "\($0.0) \($0.1.min() ?? 0) ms (max of runs \($0.1.max() ?? 0) ms)" }.joined(separator: ", "))
+            for (name, runs) in figures {
+                #expect(runs.count == 3, "\(name) ran in every run")
+                #expect((runs.min() ?? .infinity) <= CleanupBenchmarks.budget, "\(name): \(runs)")
+            }
+        }
     }
 }
 
@@ -590,6 +615,41 @@ enum CleanupBench {
         await other.close()
         figures.append(Stretch(name: "WP-B: setResidency of \(alone.value) victims alone (one turn)", best: alone.milliseconds, worst: alone.milliseconds, bounded: false))
         return figures
+    }
+
+    /// The figures of `applyEvictionHolds(count:seed:)`, in order (ruling R6 at the L3 close-out cycle 7).
+    static let applyEvictionOperations = [
+        "apply with an eviction plan of every blob, one id per blob",
+        "apply with an eviction plan of every blob, two ids per blob",
+        "apply with an eviction plan of half the blobs, two ids per blob",
+        "apply binding an alias to half the planned blobs, with an eviction plan of every blob",
+    ]
+
+    /// On fresh stores of `count` records: the longest hold of an `apply` of the store's own entries (under a new digest)
+    /// carrying the engine's dry run of every blob, with one and with two ids per blob, and of half the blobs with two
+    /// ids per blob; and of an `apply` that also lists an alias of half the planned blobs, so it binds them by hash
+    /// before its eviction (those blobs stay, the hook scanning the records for their holders).
+    static func applyEvictionHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
+        var holds: [(String, Double)] = []
+        let shapes: [(idsPerBlob: Int, share: Int, aliases: Bool)] = [(1, 1, false), (2, 1, false), (2, 2, false), (1, 1, true)]
+        for (index, shape) in shapes.enumerated() {
+            let (store, _, _, entries) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 10_000, idsPerBlob: shape.idsPerBlob)
+            let blobs = count / shape.idsPerBlob
+            let plan = try #require(await store.evictionPlan(toFree: Int64(blobs / shape.share) * 64, protecting: []))
+            #expect(plan.victims.count == count / shape.share)
+            let planned = Set(plan.victims.map(\.id))
+            let aliased = shape.aliases ? Array(entries.filter { planned.contains($0.identifier) }.prefix(blobs / 2)) : []
+            let manifest = try ValidatedManifest(
+                entries: entries + CleanupBench.renamed(aliased, "alias"),
+                digest: ContentHash.sha256(of: Data("c2c-apply-eviction-\(seed)-\(index)".utf8))
+            )
+            holds.append((CleanupBench.applyEvictionOperations[index], try await ActorHoldProbe.longestHold(of: store) {
+                let report = try await store.apply(manifest, etag: nil, eviction: plan)
+                #expect(report.evicted.count == plan.victims.count - aliased.count, "every planned id but the aliased blobs' is evicted")
+            }))
+            await store.close()
+        }
+        return holds
     }
 
     /// The figures of `sharedBlobHolds(count:seed:)`, in order.
