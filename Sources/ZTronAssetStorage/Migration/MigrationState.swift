@@ -53,5 +53,5 @@ struct MigrationState: Sendable {
     /// Legacy entries phase 3's check reads between two releases of the actor (`AssetStore.legacyEntriesPresent`):
     /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation
     /// (G4: the seam that release needs).
-    var checkChunk: Int = 5_000
+    var checkChunk: Int = AssetStore.legacyCheckChunk
 }

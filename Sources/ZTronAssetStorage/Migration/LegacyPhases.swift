@@ -388,16 +388,18 @@ extension AssetStore {
     /// is made due. The "done" generation is committed **durably** before the irrevocable removal of the tree and of the
     /// `UserDefaults` key.
     func finishLegacyMigration(_ root: URL) async throws(StoreError) {
+        // REENTRANCY: c-7 (proposed) — see `legacyEntriesPresent`, which returns in the turn its answer holds for; then
+        // writability and the migration: a call that finished it meanwhile, or a file back in the queue, leaves it here.
+        let present = try await self.legacyEntriesPresent()
+        try self.checkWritable()
+        guard self.state.migration.phase == .inProgress, self.state.migration.queue.isEmpty, self.state.migration.claimed.isEmpty else {
+            return
+        }
         let migration = self.state.migration
         // A manifest applied during migration (the engine synced, or an interrupted run resumed after an apply) may list
         // entries nobody fetched: a stamp over its digest would claim them synced (review round 3, ZProbe-stamp).
         let current = migration.manifestDigest.map { $0 == self.state.core.appliedManifest.digest } ?? false
-        let allAdopted = current && migration.legacyIDs.allSatisfy { id in
-            guard let record = self.state.core.records[id] else {
-                return false
-            }
-            return record.referencedBlob != nil && !record.isStale
-        }
+        let allAdopted = current && present
         if self.state.core.stamp == nil {
             if allAdopted, let legacyStamp = migration.legacyStamp {
                 self.state.core.stamp = SyncStamp(
@@ -416,6 +418,44 @@ extension AssetStore {
         try await self.requireCommitted(.durable)
         // REENTRANCY: c-4 (proposed) — see `finishLegacyRemoval`.
         try await self.finishLegacyRemoval(root)
+    }
+
+    /// Ids phase 3's check reads between two releases of the actor (C2 at `maxEntries`: one turn over 100,000 legacy
+    /// entries took 26 ms in release, review of the L3 close-out cycle 2); `MigrationState.checkChunk`.
+    static let legacyCheckChunk = 5_000
+
+    /// Passes of phase 3's chunked check that a mutation may interrupt before the check is made in one turn.
+    static let legacyCheckPasses = 3
+
+    /// Phase 3's check: whether every legacy entry is present at its current content, as of the turn it returns in. The
+    /// entries are read in chunks of `MigrationState.checkChunk` with the actor released in between (a no-op metadata
+    /// unit); a pass answers "yes" only if no mutation was counted meanwhile (`CommitBookkeeping.mutationSerial`, which
+    /// every persisted change bumps in its own turn through `markDirty`), else it starts again; after
+    /// `legacyCheckPasses` interrupted passes the check is made in one turn. An entry found missing is missing in that
+    /// turn, so "no" needs no such guard.
+    func legacyEntriesPresent() async throws(StoreError) -> Bool {
+        let ids = self.state.migration.legacyIDs
+        let chunk = max(1, self.state.migration.checkChunk)
+        for _ in 0..<AssetStore.legacyCheckPasses {
+            let serial = self.state.core.commits.mutationSerial
+            var start = 0
+            while start < ids.count {
+                let end = min(start + chunk, ids.count)
+                guard LegacyDecoding.present(ids[start..<end], in: self.state.core.records) else {
+                    return false
+                }
+                start = end
+                if start < ids.count {
+                    // REENTRANCY: c-7 (proposed) — the phase; the pass answers only if no mutation was counted meanwhile.
+                    await self.runUnit(on: self.environment.metadataExecutor) {}
+                    try self.checkLive()
+                }
+            }
+            if self.state.core.commits.mutationSerial == serial {
+                return true
+            }
+        }
+        return LegacyDecoding.present(ids[...], in: self.state.core.records)
     }
 
     /// Phase 4: the tree, then the key (only once the tree is done, so the order holds when a call stops part way).
@@ -607,6 +647,16 @@ enum LegacyDecoding {
     /// Whether some record of `file` in `records` already holds its bytes.
     static func adopted(_ file: LegacyFile, in records: [AssetID: AssetRecord]) -> Bool {
         file.ids.contains { records[$0]?.referencedBlob?.hash == file.digest }
+    }
+
+    /// Whether every id of `ids` has a record in `records` that holds a blob of its current content (phase 3).
+    static func present(_ ids: ArraySlice<AssetID>, in records: [AssetID: AssetRecord]) -> Bool {
+        ids.allSatisfy { id in
+            guard let record = records[id] else {
+                return false
+            }
+            return record.referencedBlob != nil && !record.isStale
+        }
     }
 
     /// Whether the record of an entry whose file is not in the tree holds the bytes the entry expected.
