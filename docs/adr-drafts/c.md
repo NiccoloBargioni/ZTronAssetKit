@@ -14,7 +14,9 @@ paths: WP-A's table-estimate test and its helper (`Tests/ZTronAssetModelTests/Ma
 `Tests/ZTronAssetModelTests/Support/DecodeMeasurement.swift`; OI-8) and WP-D's loopback rig and 500-download test
 (`Tests/ZTronAssetTransportTests/TransportTestSupport.swift`, `ForegroundBackendTests.swift`; OI-10). No production file
 outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised edit of the same WP-A test file and helper
-(OI-8's sibling); cycle 5 changed nothing outside WP-C's paths (its new source file is `Eviction/HolderScan.swift`).
+(OI-8's sibling); cycle 5 changed nothing outside WP-C's paths (its new source file is `Eviction/HolderScan.swift`). Cycle 6
+changed nothing outside WP-C's paths either (its new test files are `Cleanup/EvictionOverlapTests.swift` and
+`Cleanup/EvictionOrderTests.swift`).
 
 ## C-1 — Eviction candidates are blobs, evicted with all their records
 - **Context.** R-CLN-4 orders *assets*; bytes are freed per *blob*, and identical bytes dedupe (SPEC §4.3), so evicting
@@ -46,6 +48,32 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   `EvictionOrder.swift:129` fails both cases (`second == CleanupResult(bytesFreed: 20000, filesRemoved: 2)` for the
   reserve, `10000, 1` for the fraction) while the byte-budget test passes it. For the orchestrator: §12.2's S2-06 row
   should name the new test.
+
+- **Amended at the L3 close-out, cycle 6 (review of cycle 5; blocking): bytes released since the measurement count
+  toward the need.** A maintenance run measured its need once (`freeSpace()`), then awaited its candidates unit and its
+  releases between chunks, and stopped only on its own bytes. Bytes another `evictIfNeeded`, an `apply` carrying an
+  eviction plan or a purge doomed meanwhile had left `usedBytes` just as surely, so every overlapping run chased the need
+  it had measured alone: the review measured two maintenance runs issued together, and `apply` with a plan of 5,500
+  beside one, evicting all 10,000 assets against a hysteresis target of 288,000 bytes, every extra asset to be downloaded
+  again. Now `EvictionState.releasedBytes` (never decreasing, in memory) counts every byte eviction (`evict`, so both
+  maintenance and `apply`'s hook) and purge (`purgeChunk`, once the blob is doomed) release to the reaper, in the turn the
+  blob is doomed. A run reads it in the turn `freeSpace()` summed its figures (an isolated callee returns to its caller on
+  the same actor without a suspension), and before each candidate stops once the bytes released since cover its need;
+  its log lines report what is still over target after counting them. A purge counts because its selection leaves
+  `usedBytes` as an eviction's does. A reaper unlink of an earlier doom needs no count (it moves bytes from pending
+  reclaim to free space, which leaves the need unchanged); a publication that rescues a doomed key after the measurement
+  makes the run free a little less than a fresh measurement would, and the next run makes up the rest. Not counted: bytes
+  an `apply` prunes while the run awaits (WP-B's `prune` dooms through its own path, outside WP-C's files), so a run
+  overlapping a pruning `apply` can still free up to the pruned bytes more than needed (OI-14). Single-flight runs (as `collectGarbage`) were not taken: they would not cover
+  `apply`'s plan or a purge. Tests (`EvictionOverlapTests.swift`; ten 100-byte assets against a budget of 500, a run alone
+  evicts six): `R-CLN-4: two quota evictions measured together free what one frees: bytes the other doomed meanwhile count
+  toward the need`, `R-CLN-4: a quota eviction measured before apply evicted its plan frees only what is still needed`,
+  `R-CLN-4: bytes apply's eviction plan dooms while quota eviction releases the actor between chunks count toward its
+  need` and `R-CLN-4: bytes a purge dooms while quota eviction computes its candidates count toward its need`. Failed
+  first in `3eec1a2` (8 issues: the second run evicted the other four, `[0, …, 9]`; with `apply`'s plan, at the yield and
+  with the purge 8 of 10 instead of 6); fix `a4b5a3a`. Mutants (each reverted): purge's bytes not counted → the purge case
+  fails (2 issues); the mark read after the candidates unit instead of in the measurement's turn → three cases fail (6
+  issues). REENTRANCY: the R13 amendment and the R8 amendment as amended in cycle 6.
 
 ## C-3 — What `evictIfNeeded()` reports
 - **Decision.** `CleanupResult.bytesFreed`/`filesRemoved` of quota eviction are the bytes and blobs released to the
@@ -333,6 +361,19 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   fan-out's blobs, which are the root's siblings, not its descendants. The review found no invariant broken, nothing left
   under `blobs/` and a clean relaunch. The other three placements it tried (a base that is a link to the root, a base two
   levels below a link into the root, a root linked into `staging/`) are caught.
+- **Amended at the L3 close-out, cycle 6 (review of cycle 5): the fan-out directories themselves.** The exclusion above
+  covers the fan-out directories and everything below them: `storeHolds` neither compares a fan-out directory's identity
+  nor enters it. The review placed a root that is a fan-out itself (`<link> → <container>/blobs`, root `<link>/f6`):
+  migration ran (`legacyMigrationPending`), and it was harmless, even with the legacy manifest naming the store blob's own
+  file name. The harmlessness rests on WP-B's launch, which the text above did not say: its foreign sweep
+  (`deleteForeign`, `AssetStore+Open.swift`, after legacy phase 1 and before `open()` returns) removes every item of a
+  fan-out that is not a well-named blob, files and directories alike (`LaunchReconciliation.classify`), so the legacy
+  `manifest.json` and the prior art's directories are gone before phase 2: phase 4's removal set, which that manifest
+  attributes, is empty, queued entries whose files were swept are downloaded again, and an entry naming one of the
+  store's own blobs finds the blob's own bytes under the store's name (the review's blob survived and its relaunch was
+  clean; the directories' removal is code reading). Kept as it is: comparing the 256
+  fan-out directories' identities would cost 256 stats at every launch with legacy migration enabled, to refuse a
+  placement that a link must construct and that loses nothing.
 - **Deviation from store.md §7 (for the orchestrator; accepted by ruling R5, to be tagged NEEDS-HUMAN-REVIEW by the
   orchestrator).** An undecodable legacy manifest does not hash and move the
   legacy files as protected orphans: placing a blob with no record that expects it needs a store primitive that does
@@ -562,6 +603,20 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   every selected record is known to hold the blob. Mutants: without that first check the renamed case scans (1 issue);
   without the rules check the read case is evicted (3 issues).
 
+- **Amended at the L3 close-out, cycle 6 (review of cycle 5): a chunk counts records.** `EvictionState.chunk` (1,000)
+  counted candidates, i.e. blobs, so where several ids share each blob one chunk changed up to ten times as many records
+  in one turn: quota eviction of a store of 10,000 records held the actor 16.41 ms with ten ids per blob and 8.82 ms with
+  five (WP-B's probe, best of three; failing benchmark `188c799`; the review: 16.19–16.38 and 8.76–9.63 ms of thread CPU
+  per chunk). A chunk now takes whole candidates until it holds `chunk` records, so it ends at the first blob boundary at
+  or past it (a blob's records leave together, C-1), as purge's chunks do (C-5): 1.97 and 2.07 ms, asserted by `C2: quota
+  eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob`. Test `R-CLN-4: eviction
+  releases the actor after a chunk's worth of records, cut at blob boundaries, however many ids share a blob` (chunk 2,
+  two ids per blob: the first release comes after one blob; failed first in `188c799` with `[s0a, s0b, s1a, s1b]` evicted
+  before it); fix `3884b59`. Residual (recorded, inherent): a blob's holders leave in one turn whatever the chunk, so a
+  blob that 10,000 ids share costs 15.3 ms of thread CPU in that turn, about 1.5 µs per holder (each re-read, one
+  `setResidency` each); the review measured `purge(.evictable)` of such a blob at 13.43 ms. Splitting it would leave the
+  blob with part of its records evicted, which frees nothing and breaks C-1's all-or-none.
+
 ## C-22 — C2 at the benchmark scale and at `maxEntries` (review round 3, ruling R4)
 - **Context.** Round 3 measured, as thread CPU of exactly the actor stretches in release: deep verification's due list
   13.5–14.0 ms at 10,000 records (198–204 ms at 100,000), purge's selection, sort and one `setResidency` per record in
@@ -661,6 +716,45 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   worst 6.87 ms at 100,000), holds at 100,000: report 8.30, verification slice 2.21, orphan GC of 100 3.18, quarantine
   6.45, eviction of half 21.70, `purge(.all)` of the rest 22.76, full-store purges 33.48 / 33.54, orphan GC of 100,000
   orphans 18.63 ms.
+
+- **Amended at the L3 close-out, cycle 6 (review of cycle 5; two blocking issues).** Release, this Mac, `BenchCleanup.swift`
+  at `ec854b7` (load 4.96 → 2.73; cycle-6 Evidence). (1) **The synchronous dry run.** `evictionPlan(toFree:protecting:)`
+  (a contract signature, OI-4) grouped and sorted every record in one actor turn: 14.17 ms of thread CPU for a plan of the
+  whole store at 10,000 assets and 9.45 ms protecting every other id (failing benchmark `498d1cf`; the review:
+  14.22–15.25 and 9.32–9.90 ms; OI-4's "a few ms at realistic catalog sizes" understated it). Two causes, found with
+  scratch probes (not committed): every record was copied whole into an array per blob, and the sort compared `Date`s,
+  whose operators are calls into Foundation rather than inlined code (a sort of 10,000 candidates took 5.5 ms comparing
+  `Date`s, 1.0 ms comparing the same times as `Double`). `EvictionOrder.Ranking`, shared by the dry run, maintenance's
+  candidates unit and the storage report, makes one pass reading each record's fields in place, keeps a lone holder in its
+  blob's tally (only blobs several records share list their holders), sorts plain values (access times as
+  `TimeInterval`, the hash's first word before the key) and builds victims for the plan's prefix only (`bd61e6f`; its
+  shared-blob and tie-break branches tested in `ec854b7`, three mutants caught). Now 2.55 ms for the whole store and
+  2.31 ms protecting every other id at 10,000 assets, asserted ≤ 10 ms; at `maxEntries` 38.3 ms and 30.6 ms, recorded
+  (192.0 and 131.3 ms before; OI-4). (2) **`apply`'s eviction hook over a plan of more than about 70 % of the store.** The
+  review measured a plan of all 10,000 blobs at 16.04–16.39 ms of thread CPU (`apply`'s longest hold 16.05–16.43 ms), and
+  a plan of half after an `apply` aliased half its blobs at 11.75–12.28 ms. WP-C's share is cut (`c5d3c5c`, `ffcecc0`,
+  `af0085f`): the hook reads the plan as runs of one blob instead of a dictionary of arrays and two sets of ids (a plan
+  that names a blob in two places is still grouped by key: `R-SYN-11: apply evicts a shared blob whose records its plan
+  lists apart…`, whose mutant without that fallback fails with 4 issues), and a lone victim is re-validated in place
+  through one access of the records (`EvictionOrder.stillEvictable`) instead of a whole-record copy and a `Date`
+  comparison. This cycle's figures: 7.26 ms for a plan of 5,000 blobs at 10,000 assets (8.26 in cycle 5), **13.94 ms for
+  the whole store**, of which WP-B's `setResidency` of the same 10,000 victims alone in one turn is 8.79 ms; at `maxEntries`
+  92.0 ms for 50,000 blobs and 179.4 ms for 100,000 (`setResidency` alone 125.6 ms). That is about 1.4 µs per blob, so
+  **any plan above about 7,000 blobs breaks R4's 10 ms at 10,000 assets** (about 5,900 before this cycle; the review: "about
+  2 µs per blob, so about 5,000 blobs per 10 ms"), and WP-B's 0.88 µs per blob alone puts a plan above about 11,000 blobs
+  out of reach of any change to WP-C's share. When ids were bound to the planned blobs since the plan, the turn also scans
+  the records once (C-21, cycle 5): a plan of half after an `apply` bound an alias to half its blobs holds 10.31 ms
+  (`245647e`, recorded; the review: 11.75–12.28 ms), so with aliases the threshold is about 5,000 blobs. No WP-C change can close it while the hook runs in one turn inside `apply`'s
+  fence: CCR-3 (WP-B chunks the plan behind its fence), or a cap of about 5,000 blobs per `apply` plan in the engine (WP-F,
+  the rest left to `evictIfNeeded`'s chunks), or an explicit exception to R4 — for the orchestrator, before merge. Once
+  CCR-3 lands the benchmark's hook figures become per chunk and are asserted. (3) **Shared blobs** (C-21, cycle 6): quota
+  eviction of a store of 10,000 records holds the actor 1.96 ms with ten ids per blob and 2.05 ms with five (16.41 and
+  8.82 before), asserted; a blob that 10,000 ids share leaves in one turn, 15.31 ms of thread CPU (about 1.5 µs per
+  holder), recorded as inherent. (4) The rest of the run, as in cycle 5: every 10,000-asset hold ≤ 1.85 ms (quota eviction
+  of half 1.63), every asserted chunk ≤ 1.42 ms at 10,000 and ≤ 1.77 ms at 100,000 (best of five; the eviction chunk 1.34
+  and 1.77; the `purge(.evictable)` chunk's worst 6.77 at 100,000); holds at 100,000: storage report 7.67, verification slice
+  2.26, orphan GC of 100 3.03, quarantine 4.91, eviction of half 20.99, `purge(.all)` of the rest 23.19, full-store purges
+  33.10 / 33.28, orphan GC of 100,000 orphans 18.34; WP-B's grace start 33.63 and reaper queue 22.91, the records copy 9.14.
 
 ## C-23 — Orphan GC dooms; a launch orphan binds only while it is one (CCR-1, CCR-2; rulings R1, R2)
 - **Decision.** `StoreInternals.swift` gains `doomOrphans(_ orphans: [BlobKey: Int64]) -> [BlobKey]` (ruling R2,
@@ -842,6 +936,15 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   awaits carry R8's re-validation); each blob is still re-validated as now and the report keeps plan order.
   Alternatively the orchestrator caps plan sizes in the engine (WP-F). Not made here: the call site is WP-B's.
 
+- **CCR-3, cycle 6 (review of cycle 5: blocking for the orchestrator).** The review measured the hook over a plan of the
+  whole store, which the engine's `evictionPlan(toFree:)` gives for a large sync on a full device: 16.04–16.39 ms of
+  thread CPU at 10,000 assets (`apply`'s hold 16.05–16.43 ms). After this cycle's cut of WP-C's share (C-22, cycle 6 (2)):
+  13.94 ms for 10,000 blobs (WP-B's `setResidency` alone 8.79 ms), 7.26 ms for 5,000; 92.0 and 179.4 ms for 50,000 and
+  100,000 at `maxEntries`; a plan of half after an alias was bound to half its blobs 10.31 ms (the review: 11.75–12.28).
+  About 1.4 µs per blob: R4's 10 ms at 10,000 records is exceeded by any `apply` whose plan holds more than about 7,000
+  blobs (about 5,000 when aliases bound since the plan make the turn scan the records) until this CCR lands, the engine caps plans (about 5,000 blobs per `apply`, the rest to
+  `evictIfNeeded`), or the orchestrator records an exception to R4. Each needs a decision outside WP-C's files.
+
 ## Open issues (for the orchestrator)
 
 - **OI-1 — `apply` rescues blobs that quota eviction just doomed. Closed at the L3 close-out (ruling R3; see the ruling's
@@ -863,6 +966,13 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   synchronous package API by contract, so its grouping and sort (about 228 ms at `maxEntries` under load, a few ms at
   realistic catalog sizes) stay one actor stretch. Moving it off the actor needs an `async` signature (a contract
   change, for the orchestrator with WP-F, its caller).
+- **OI-4, cycle 6 (review of cycle 5, blocking).** "A few ms at realistic catalog sizes" understated it: the review measured
+  14.22–15.25 ms at 10,000 assets for a plan of the whole store (9.32–9.90 protecting 5,000 ids), above R4's 10 ms. Fixed
+  inside the signature instead (option (a) of the review): the dry run is one pass over the records and a sort of plain
+  values (C-22, cycle 6 (1)), 2.55 ms for the whole store and 2.31 ms protecting every other id at 10,000 assets,
+  asserted by the benchmark. At `maxEntries` it stays one linear stretch, 38.3 ms (30.6 ms protecting half), recorded with
+  C-22's other `maxEntries` stretches for Stage 3 (ruling R4); the `async` signature remains the way to move it off the
+  actor there (a contract change with WP-F), not needed at the benchmark scale.
 - **OI-5 — ARCHITECTURE §14 (orchestrator).** It describes `LiveLegacyDefaults.swift`'s untested part as 3 lines; the
   coverage export counts 3 of 14 lines covered (11 uncovered). The file is unchanged since the contract.
 
@@ -1009,6 +1119,28 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
   storage report 8.30, quarantine 6.45, eviction of half 21.70, `purge(.all)` of the rest 22.76, full-store purges 33.48
   / 33.54 ms. They depend on host load (OI-9, cycle 3 note).
 
+- **OI-6, cycle 6 additions.** §4.6: quota eviction counts toward its need every byte an eviction, an `apply`'s plan or a
+  purge released since it measured (`EvictionState.releasedBytes`, C-2 cycle 6), and its chunks hold whole blobs up to
+  1,000 records (C-21, cycle 6). §10.1: the R13 amendment (new) and the R8 amendment as amended in cycle 6. §11, R-CLN-4:
+  the four tests of `EvictionOverlapTests.swift`, `R-CLN-4: eviction releases the actor after a chunk's worth of records…`
+  and `R-CLN-4: a blob several records share is a candidate only when all of them are evictable…`; R-SYN-11: `R-SYN-11:
+  apply evicts a shared blob whose records its plan lists apart…`; R-SYN-1: `R-SYN-1: blobs tied on access and size are
+  evicted in key order…`. §1.2: `BenchCleanup.swift` (OI-7, unchanged).
+- **OI-9, cycle 6 note.** This cycle's 100,000 figures (release, load 4.96 → 2.73, the run at `ec854b7`): WP-B's grace start
+  33.63 ms and reaper queue 22.91 ms, the records copy 9.14 ms, WP-B's present-table copy 3.61 ms (worst 5.90), storage
+  report 7.67, quarantine 4.91, eviction of half 20.99, `purge(.all)` of the rest 23.19, full-store purges 33.10 / 33.28,
+  orphan GC of 100,000 orphans 18.34, the legacy batch of 500 13.87; new at this scale: the dry run 38.3 ms (OI-4) and
+  `apply`'s hook over 50,000 and 100,000 blobs 92.0 and 179.4 ms (CCR-3). The review's figures at load up to 52 ran 15–30 %
+  higher (grace start 39.42, reaper queue 26.34, eviction of half 26.48, full-store purges 35.12 / 35.52).
+
+- **OI-14 — quota eviction overlapping a pruning `apply` (cycle 6, for WP-B and the orchestrator; residual of C-2's
+  cycle-6 fix).** Bytes released to the reaper count toward a running eviction's need only when WP-C releases them
+  (eviction, `apply`'s plan, purge). An `apply` that prunes records while a maintenance eviction awaits its candidates unit
+  or a release between chunks lowers `usedBytes` too, and the eviction does not see it, so it can free up to the pruned
+  bytes more than a fresh measurement would ask. Closing it needs the count in WP-B's release path (`releaseReference`
+  dooming a live blob) or a WP-B counter WP-C can read; not made here (§1.1 rule 1). Engines that run maintenance apart
+  from a sync's `apply` never meet it.
+
 ## Proposed REENTRANCY rows (ARCHITECTURE §10.1)
 
 | Row | Await | Re-validated afterwards |
@@ -1024,7 +1156,8 @@ outside WP-C's directories changed in cycle 3. Cycle 4 made one more authorised 
 | c-7 (proposed, cycle 3; amended in cycle 4) | phase 3's no-op metadata unit between chunks of its check (`legacyEntriesPresent`), and the return to `finishLegacyMigration` | the phase after each release; the pass answers "present" only if `commits.mutationSerial` is unchanged since it began (else it starts again; after three interrupted passes the call decides nothing and the next call checks again, C-24 cycle 4); a missing entry is missing in the turn it is found; then writability, and the migration's phase, queue and claims (a call that finished migration meanwhile, or a file back in the queue, leaves it) (C-24) |
 | c-4 amendment (proposed, cycle 3) | the listing units of phases 1 and 4 (`LegacyListingUnit`) and phase 1's bulk unit | an I/O error on either stat of a listing unit fails the walk as a failed listing (C-13, cycle 3); phase 1's bulk unit builds the records and the queue from snapshots that nothing else writes while the store is `opening` (R1), and they replace the store's whole (C-24) |
 | R16 amendment (proposed) | `verifyIntegrity`'s stat units around each hash (`blobIncarnation`) | as R16, plus: the identity and size under the name are the same before and after the hash and the key is not in `publishing`; otherwise the result is discarded and the key stays due in this pass (C-8) |
-| R8 amendment (proposed) | quota eviction's candidate unit (bulk) and its no-op metadata unit between chunks | as R8: the phase and writability, then per candidate against its holders as they are then (`holders(of:known:)`, review round 3; C-21); since cycle 5 from at most one scan of the records per chunk, made after the release (the previous chunk's is dropped), and under rules whose clock is read again after it (`holders(of:known:scan:)`, C-21 cycle 5) |
+| R8 amendment (proposed; amended in cycle 6) | quota eviction's candidate unit (bulk) and its no-op metadata unit between chunks | as R8: the phase and writability, then per candidate against its holders as they are then (`holders(of:known:)`, review round 3; C-21); since cycle 5 from at most one scan of the records per chunk, made after the release (the previous chunk's is dropped), and under rules whose clock is read again after it (`holders(of:known:scan:)`, C-21 cycle 5); since cycle 6, before each candidate, the need against every byte released since the measurement (R13 amendment), and a chunk is whole candidates up to `EvictionState.chunk` records (C-21, cycle 6) |
+| R13 amendment (proposed, cycle 6) | quota eviction's `freeSpace()` unit | the figures are a snapshot; `EvictionState.releasedBytes` is read in the turn they were summed, and every byte an eviction, an `apply`'s plan or a purge releases afterwards (this run's included) counts toward the need, re-checked before each candidate, so a run that awaited while another released bytes frees only what is still needed (C-2, cycle 6) |
 
 Existing rows WP-C's awaits cite: R1 (async APIs await `open()`; phase-1 units), R3/R4 (through `adoptVerifiedFile`),
 R7 and R9 (purge's reap and grace wait), R8 (eviction chunks), R10 (orphan listing and decision), R11 (migration units), R12
@@ -1195,6 +1328,29 @@ rest are for the orchestrator. None is declined.
 | 9 | correct: carried orchestrator items | as 3 |
 | — | orchestrator note: OI-8 | closed in cycle 3 (`2f07410`) and its sibling in cycle 4 (`3ab4022`), each shown passing 20 times on macOS and on this simulator and failing against mutants; neither review since reports it open, so no edit of WP-A's tests in this cycle; this cycle's full simulator run includes WP-A's tests (Evidence) |
 
+## Review of cycle 5 — dispositions (L3 close-out, cycle 6)
+
+The close-out verification of cycle 5 reported 11 issues, 3 of them blocking; the orchestrator's note repeats OI-8. Two
+blocking ones are fixed with their failing tests or benchmarks committed first. The third, `apply`'s eviction hook over
+a large plan, is cut on WP-C's side and recorded with this cycle's figures, because what is left needs a decision outside
+WP-C's files (CCR-3, an engine cap, or an exception to R4). Every clearly-right non-blocking issue is fixed, again with a
+failing test or benchmark first, or recorded with figures. The rest are for the orchestrator. None is declined.
+
+| # | Lens, issue | Disposition |
+|---|---|---|
+| 1 | reqs, blocking: the synchronous eviction dry run took 14.2–15.3 ms at 10,000 assets (OI-4) | fixed without a signature change (the review's option (a); C-22 cycle 6 (1), OI-4 cycle 6): failing benchmark `498d1cf` (14.17 / 9.45 ms), fix `bd61e6f` (2.55 / 2.31 ms, asserted ≤ 10 ms for the whole store and for every other id protected); the ranking's shared-blob and tie-break branches tested in `ec854b7` (three mutants caught); 38.3 ms at `maxEntries`, recorded |
+| 2 | reqs, blocking: `apply`'s eviction hook over a plan of more than ~60 % of the store (16.0–16.4 ms) | WP-C's share cut (`c5d3c5c`, `ffcecc0`, `af0085f`; plan-apart test with its mutant): 13.94 ms for the whole store, 7.26 ms for half (8.26 in cycle 5), WP-B's `setResidency` alone 8.79 ms; C-22 cycle 6 (2) and CCR-3 amended with the review's and this cycle's figures and the threshold (about 7,000 blobs; about 5,000 after aliases). The rest cannot be closed in WP-C's write set: for the orchestrator before merge (CCR-3, a WP-F cap of about 5,000 blobs per plan, or an exception to R4) |
+| 3 | reqs: TSan headroom of the shared Storage bundle (WP-H's start/stop race) | for the orchestrator and WP-H (idle host, one agent at a time; the race's rounds split into cases); this cycle's TSan run passed, the race after 36.1 s at load 5.6–8.3 (Evidence) |
+| 4 | reqs: phase 3 liveness under access stamps and the WP-F handoff | for the orchestrator with WP-F (OI-6 cycle 5: RE-S29 and §4.7 call again while `!finished`, with a backoff); this cycle: 3 last calls end `finished: false` at 10,000 (16,572–16,637 stamps) and 100,000 files (15,939), holds 3.03 and 7.46 ms |
+| 5 | reqs: carried orchestrator items | for the orchestrator, unchanged: OI-5 (11 of 14 lines uncovered, measured again), OI-7, OI-9 (cycle-6 note), OI-11 (a)/(b) NEEDS-HUMAN-REVIEW, OI-12, OI-13 (not reproduced: WP-A's 84 tests passed in `--quick` and on the simulator); OI-4 is fixed at the benchmark scale (row 1) |
+| 6 | correct, blocking: overlapping quota evictions free far more than the hysteresis target | fixed (C-2 cycle 6; R13 amendment, R8 amendment as amended): failing tests `3eec1a2` (the review's (a), (b) and (c), and a purge overlapping the candidates unit), fix `a4b5a3a` (`EvictionState.releasedBytes`, read in the measurement's turn); two mutants caught; the residual for an overlapping pruning `apply` is OI-14 (WP-B's release path) |
+| 7 | correct: the hook over a plan larger than about half, or after aliases | as 2; the case after aliases is measured by the benchmark too (`245647e`: 10.31 ms; the review 11.75–12.28) |
+| 8 | correct: eviction chunks count blobs, not records | fixed (C-21 cycle 6): failing test and benchmark `188c799` (16.41 / 8.82 ms with ten / five ids per blob), fix `3884b59` (1.96 / 2.05 ms, asserted); the single-blob residual (15.31 ms for 10,000 holders, about 1.5 µs per holder) recorded as inherent |
+| 9 | correct: the overlap guard's precision for a root that is a fan-out directory | C-13 amended (cycle 6): the exclusion covers the fan-out directories themselves, and the harmlessness rests on WP-B's foreign sweep at launch, now stated |
+| 10 | correct: TSan headroom under host load | as 3 |
+| 11 | correct: carried orchestrator items | as 5 |
+| — | orchestrator note: OI-8 | closed in cycle 3 (`2f07410`) and its sibling in cycle 4 (`3ab4022`), each shown passing 20 times on macOS and on this simulator and failing against mutants; neither review since reports it open, so WP-A's tests were not edited in this cycle; this cycle's simulator run includes WP-A's 84 tests (797 of 797 passed, Evidence) |
+
 ## Not verified here
 
 - Device behaviour of the legacy rename (`Caches` → `Application Support` on one APFS volume) and of a legacy root on
@@ -1231,6 +1387,80 @@ rest are for the orchestrator. None is declined.
   closure, which only the probe sees.
 - The holders scan's prefilter (C-21, cycle 5) assumes the first word of a blob's SHA-256 spreads evenly over its slots,
   as a digest does; a skew would cost time only (a set bit is checked against the set), never a holder.
+
+## Evidence of the L3 close-out, cycle 6 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
+
+Commits, in order: `3eec1a2` (failing overlap tests), `a4b5a3a` (released bytes count toward the need), `498d1cf` (failing
+dry-run benchmark), `bd61e6f` (the ranking), `c5d3c5c` (the hook's runs and in-place re-validation, the plan-apart test,
+the hook over the whole store and WP-B's share measured), `188c799` (failing chunk test and shared-blob benchmark),
+`3884b59` (chunks by records), `ffcecc0` and `af0085f` (slices to `evict`, concrete), `ec854b7` (the ranking's tests),
+`245647e` (the hook after aliases measured), then this record. The runs below are at `ec854b7`, whose sources are the
+final ones (`245647e` changes the benchmark file only, this record the ADR draft only).
+
+- Failing first (debug, `swift test --skip-build --scratch-path .build-c --filter EvictionOverlapTests`, at `3eec1a2`): `Test
+  run with 4 tests in 1 suite failed … with 8 issues`; `secondResult → CleanupResult(bytesFreed: 400, filesRemoved: 4,
+  bytesDeferred: 0)` and `evicted → [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]` (two runs); `result → CleanupResult(bytesFreed: 600,
+  filesRemoved: 6, …)` and `evicted → [0, …, 7]` (apply's plan at the candidates unit and at the yield), `evicted → [2, 3,
+  4, 5, 6, 7]` (purge). `--filter chunkCountsRecords` at `188c799`: `firstChunk.map(\.id) → [s0a, s0b, s1a, s1b]`, 1 issue.
+  Benchmarks (release, `swift test -c release --skip-build --scratch-path .build-c-perf -Xswiftc -enable-testing`):
+  `--filter stretchesAtMaxEntries` at `498d1cf` (12:12–12:13, load 3.64 → 2.81) `failed after 42.349 seconds with 1
+  issue`: `10000 assets, eviction dry run of the whole store: 14.173708 ms` (protecting every other id 9.454917; at
+  100,000: 192.024167 and 131.28975, recorded); `--filter sharedBlobHolds` at `188c799` (12:39, load 2.83): `quota
+  eviction of every blob with 5 ids per blob 8.817792 ms …, with 10 ids per blob 16.407833 ms …` (1 issue).
+- Mutants (each reverted; `git diff -- Sources` empty afterwards): purge's released bytes not counted → 2 issues (the purge
+  case); the mark read after the candidates unit → 6 issues (three cases); the hook without its by-key fallback → 4 issues
+  (`R-SYN-11: apply evicts a shared blob whose records its plan lists apart…`); the ranking leaving a blob evictable when a
+  later holder is protected → 5 issues, without its third holder → 11 issues, with the key order reversed → 2 issues
+  (`EvictionOrderTests`).
+- `TMPDIR=… SWIFTPM_SCRATCH=.build-c bash Scripts/verify.sh --quick` (12:54:57–12:57:25, load 3.16 → 4.08): `VERIFY: PASS`
+  (`::: SUMMARY mode=--quick steps-failed=0`; Storage bundle `Test run with 433 tests in 58 suites passed after 60.486
+  seconds`; the other bundles 151, 10, 84, 12, 3 and 104 tests passed).
+- `swift build -c release --scratch-path .build-c -Xswiftc -warnings-as-errors`: `Build complete! (20,76 s)`, exit 0, no
+  warning.
+- `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Every `await` in WP-C's four directories,
+  `StoreInternals.swift` and `AssetStore+Apply.swift` has a `// REENTRANCY:` line (scripted check: `awaits 145 missing 0`).
+- Storage tests three times (`swift test --scratch-path .build-c --skip Benchmarks --filter ZTronAssetStorageTests`,
+  12:58:01–13:01:31, load 3.18 → 8.25): `Test run with 433 tests in 58 suites passed after 59.155 / 60.854 / 61.954
+  seconds`.
+- TSan once (`swift test --scratch-path .build-c-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetStorageTests`, 13:01:31–13:05:45, load 8.25 → 5.61): `Test run with 433 tests in 58 suites passed after
+  200.567 seconds`, 0 `ThreadSanitizer` lines, 0 failures; WP-H's `start racing stop …` passed after 36.107 seconds.
+- Coverage (the `--quick` run above, `default.profdata` written 12:57; `llvm-cov export -summary-only` over the 8 test
+  bundles; `gates.py coverage`): `COVERAGE target=ZTronAssetStorage lines= 97.33% (7813/8027) min=90.0 OK`; WP-C's files
+  with `StoreInternals.swift` 2848/2935 = 97.04%, lowest `LiveLegacyDefaults.swift` 21.43% (11 of 14 lines uncovered,
+  OI-5), then `LegacyPlacement.swift` 95.24%, `DeepVerification.swift` 95.42%, `StorageReporting.swift` 95.49%;
+  `EvictionOrder.swift` 97.67% (252/258), `QuotaEviction.swift` 96.94% (285/294), `StorePurge.swift` 98.44%,
+  `HolderScan.swift` 98.21%, `EvictionState.swift` 100%. `ZTronAssetKit` 37.82% and `ZTronAssetSync` 30.57% fail on the
+  WP-F/WP-G stubs, as in cycles 1 to 5 (`COVERAGE: FAIL` for those two only).
+- `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-c/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` (13:05:51–13:06:07): exit 0, no error or warning.
+- iOS Simulator, full (`897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0; `caffeinate -i xcodebuild test -scheme
+  ZTronAssetKit -destination 'platform=iOS Simulator,id=897F9D8D-B10D-4D91-8E22-417A2B9D70AA' -derivedDataPath
+  .build-c/xcode-sim -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never
+  OTHER_SWIFT_FLAGS='-warnings-as-errors'`, 13:06:11–13:09:18, load 4.56 at the start, 32.12 at the end): `** TEST
+  SUCCEEDED **`; `xcresulttool get test-results summary` of `Test-ZTronAssetKit-2026.10.10_13-06-24-+0200.xcresult`:
+  `{'result': 'Passed', 'totalTestCount': 797, 'passedTests': 797, 'failedTests': 0, 'skippedTests': 0,
+  'expectedFailures': 0}`; 0 "Restarting after" or "exceeded execution time"; WP-A's 84 tests among them. The simulator
+  is shut down (`simctl` reports it `Shutdown`).
+- C2 benchmarks at `ec854b7` (release; `swift test -c release --skip-build --scratch-path .build-c-perf -Xswiftc
+  -enable-testing --filter CleanupBenchmarks`, 13:11:37–13:13:22, load 4.96 → 2.73): `Test run with 5 tests in 2 suites
+  passed after 102.376 seconds`. At 10,000 assets: `eviction dry run of the whole store 2.553958 ms (worst 2.588833 ms)`,
+  `eviction dry run protecting every other id 2.309166 ms (worst 2.33375 ms)`, `eviction chunk of 1000 1.338125 ms`,
+  `apply's eviction hook over a plan of 5000 blobs (one turn) 7.256416 ms`, `… of 10000 blobs (one turn) 13.935167 ms`,
+  `WP-B: setResidency of 10000 victims alone (one turn) 8.787041 ms`; holds ≤ 1.85 ms (`quota eviction of half 1.62525 ms`,
+  `purge(.evictable) of all 1.847167 ms`); `quota eviction of every blob with 5 ids per blob 2.052917 ms (max of runs
+  2.09725 ms), quota eviction of every blob with 10 ids per blob 1.960375 ms (max of runs 2.024917 ms), eviction of one
+  blob 10,000 ids share (thread CPU) 15.310458 ms`; after bindings: `apply's eviction hook over a plan of half (thread CPU)
+  7.18425 ms`, eviction after aliases 2.88, `apply` renaming with a plan 2.95, `purge(.evictable)` after aliases 5.72 ms.
+  At 100,000: the dry run 38.28 / 30.59 ms, the eviction chunk 1.77, the hook over 50,000 and 100,000 blobs 92.02 and 179.38
+  ms, `setResidency` alone 125.63; holds: report 7.67, verification slice 2.26, orphan GC of 100 3.03, quarantine 4.91,
+  eviction of half 20.99, `purge(.all)` of the rest 23.19, full-store purges 33.10 / 33.28, orphan GC of 100,000 orphans
+  18.34; legacy migration (best of 3 / 1): last calls while access stamps arrive 3.03 / 7.46 ms, `finished: false` after 3
+  last calls in every run (16,572–16,637 and 15,939 stamps), longest batch of 500 0.67 / 13.87 ms. At `245647e` (`--filter
+  holdsAfterBinding`, 13:14, load 1.78): `apply's eviction hook over a plan of half after an alias was bound to half its
+  blobs (thread CPU) 10.306333 ms (max of runs 10.443167 ms)`, the other six figures within 0.2 ms of the run above.
+- `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 5 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
 
