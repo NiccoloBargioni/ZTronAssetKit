@@ -328,6 +328,25 @@ enum EvictionOrder {
         }
     }
 
+    /// The size `victim`'s record records for `key` when the record still holds `key`, was not accessed since the
+    /// selection and `rules` still allow it; `nil` otherwise. Reads the record's fields in place, through one access of
+    /// `records` (C2: `evict` read them through the actor's state field by field, each read an access of its own, and
+    /// compared `Date`s through Foundation's calls: about 0.5 µs per blob, ADR draft C-22 cycle 6).
+    static func stillEvictable(_ victim: EvictionVictim, of key: BlobKey, in records: [AssetID: AssetRecord], rules: Rules) -> Int64? {
+        guard let index = records.index(forKey: victim.id), case .present(let blob, let bytes, _) = records.values[index].residency,
+            blob == key
+        else {
+            return nil
+        }
+        let lastAccess = records.values[index].lastAccess
+        guard lastAccess.timeIntervalSinceReferenceDate <= victim.lastAccess.timeIntervalSinceReferenceDate,
+            rules.allows(policy: records.values[index].entry.policy, pinned: records.values[index].pinned, lastAccess: lastAccess, id: victim.id)
+        else {
+            return nil
+        }
+        return bytes
+    }
+
     /// How many bytes quota eviction must free (store.md §6.4, store-2 S2-06): the budget is resolved over usage plus
     /// free space **plus the pending reclaim** (doomed bytes the reaper frees after grace), eviction triggers when usage
     /// passes the budget or free space plus pending reclaim falls short of the reserve, and it then evicts down to

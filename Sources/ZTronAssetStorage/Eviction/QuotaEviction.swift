@@ -140,7 +140,48 @@ extension AssetStore {
 
     /// `applyEviction(_:)`, run synchronously inside `apply`'s write fence: evicts each blob of the plan whose records are
     /// all still evictable exactly as planned (REENTRANCY R8's re-validation), and returns the evicted ids in plan order.
+    ///
+    /// One turn (ARCHITECTURE §1.1 rule 4(c)), so its per-blob cost bounds the plans `apply` can carry within C2: a plan
+    /// lists each blob's victims together (`EvictionOrder.plan`), so the blobs are read as runs of the plan, without a
+    /// dictionary of arrays or a set of every evicted id (ADR draft C-22, cycle 6); a plan that names a blob in two
+    /// places is grouped by key instead.
     func performApplyEviction(_ plan: EvictionPlan) -> [AssetID] {
+        let victims = plan.victims
+        var runs: [Range<Int>] = []
+        var seen: Set<BlobKey> = []
+        seen.reserveCapacity(victims.count)
+        var start = 0
+        while start < victims.count {
+            var end = start + 1
+            while end < victims.count, victims[end].blob == victims[start].blob {
+                end += 1
+            }
+            guard seen.insert(victims[start].blob).inserted else {
+                return self.applyEvictionByKey(plan)
+            }
+            runs.append(start..<end)
+            start = end
+        }
+        // One turn: the holders of every planned blob are read with at most one scan of the records (C2).
+        var scan = HolderScan(blobs: runs.map { victims[$0.lowerBound].blob })
+        let rules = self.evictionRules()
+        var evicted = [Bool](repeating: false, count: victims.count)
+        var any = false
+        for run in runs where self.evict(Array(victims[run]), rules: rules, scan: &scan) != nil {
+            for index in run {
+                evicted[index] = true
+            }
+            any = true
+        }
+        if any {
+            self.stampCleanup()
+        }
+        return victims.indices.filter { evicted[$0] }.map { victims[$0].id }
+    }
+
+    /// `performApplyEviction` for a plan that names a blob in more than one place: its victims grouped by key, the blobs
+    /// in the order the plan first names them.
+    private func applyEvictionByKey(_ plan: EvictionPlan) -> [AssetID] {
         var order: [BlobKey] = []
         var groups: [BlobKey: [EvictionVictim]] = [:]
         for victim in plan.victims {
@@ -150,7 +191,6 @@ extension AssetStore {
             groups[victim.blob, default: []].append(victim)
         }
         var evicted: Set<AssetID> = []
-        // One turn: the holders of every planned blob are read with at most one scan of the records (C2).
         var scan = HolderScan(blobs: order)
         let rules = self.evictionRules()
         for key in order {
@@ -213,26 +253,26 @@ extension AssetStore {
     /// or `nil` when nothing was evicted.
     func evict(_ victims: [EvictionVictim], rules: EvictionOrder.Rules, scan: inout HolderScan) -> BlobEviction? {
         guard let key = victims.first?.blob, case .live(let references)? = self.state.core.blobTable[key],
-            !self.state.core.publishing.contains(key), self.state.cleanup.leases[key]?.isEmpty ?? true
+            self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
+            self.state.cleanup.leases.isEmpty || self.state.cleanup.leases[key]?.isEmpty ?? true
         else {
             return nil
         }
         let bytes: Int64
         if victims.count == 1 {
-            // The common case, one selected record, read once (C2: `apply`'s eviction of a plan of half is one turn): it
-            // still holds the blob, is still evictable and was not accessed since the selection; and when the blob
-            // counts another reference, that one is not a record (an id bound since the selection keeps the blob; the
-            // provisional reference of a publication in flight does not).
+            // The common case, one selected record, read once and in place (C2: `apply`'s eviction of its plan is one
+            // turn; copying the record whole, and comparing `Date`s through Foundation's calls, were most of WP-C's share
+            // of it, ADR draft C-22 cycle 6): it still holds the blob, is still evictable and was not accessed since the
+            // selection; and when the blob counts another reference, that one is not a record (an id bound since the
+            // selection keeps the blob; the provisional reference of a publication in flight does not).
             let victim = victims[0]
-            guard let record = self.state.core.records[victim.id], record.referencedBlob == key, rules.allows(record),
-                record.lastAccess <= victim.lastAccess
-            else {
+            guard let byteSize = EvictionOrder.stillEvictable(victim, of: key, in: self.state.core.records, rules: rules) else {
                 return nil
             }
             if references != 1, self.holders(of: key, known: [victim.id], scan: &scan).count != 1 {
                 return nil
             }
-            bytes = EvictionOrder.recordedSize(record)
+            bytes = byteSize
         } else {
             // Every selected record must still hold the blob (the holders must be exactly the victims): one that left
             // it, renamed or changed since the selection, fails here in O(victims), before any scan of the records.

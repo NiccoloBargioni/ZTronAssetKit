@@ -531,17 +531,33 @@ enum CleanupBench {
         return figures
     }
 
-    /// `apply`'s eviction hook over a plan of half the store, in the one synchronous turn `apply` runs it in (review of
-    /// the L3 close-out cycle 4; WP-C cannot split it without a change to `apply`, CCR-3): recorded at both scales.
+    /// `apply`'s eviction hook over a plan of half the store and over a plan of the whole store, each in the one
+    /// synchronous turn `apply` runs it in (review of the L3 close-out cycles 4 and 5; WP-C cannot split it without a
+    /// change to `apply`, CCR-3): recorded at both scales, with WP-B's `setResidency` of the same victims alone in one turn
+    /// on a store of its own, the part of the hook that is not WP-C's.
     static func applyEvictionStretch(count: Int, seed: UInt64) async throws -> [Stretch] {
-        let (store, _, _, _) = try await CleanupBench.store(count: count, seed: seed)
-        let plan = try #require(await store.evictionPlan(toFree: Int64(count) * 64 / 2, protecting: []))
-        let evicted = await store.benchThreadCPU { store in
-            store.performApplyEviction(plan).count
+        var figures: [Stretch] = []
+        for (index, share) in [(0, 2), (1, 1)] {
+            let (store, _, _, _) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 10_000)
+            let plan = try #require(await store.evictionPlan(toFree: Int64(count) * 64 / Int64(share), protecting: []))
+            let evicted = await store.benchThreadCPU { store in
+                store.performApplyEviction(plan).count
+            }
+            #expect(evicted.value == plan.victims.count && evicted.value == count / share)
+            await store.close()
+            figures.append(Stretch(name: "apply's eviction hook over a plan of \(evicted.value) blobs (one turn)", best: evicted.milliseconds, worst: evicted.milliseconds, bounded: false))
         }
-        #expect(evicted.value == plan.victims.count && evicted.value == count / 2)
-        await store.close()
-        return [Stretch(name: "apply's eviction hook over a plan of \(evicted.value) blobs (one turn)", best: evicted.milliseconds, worst: evicted.milliseconds, bounded: false)]
+        let (other, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 20_000)
+        let plan = try #require(await other.evictionPlan(toFree: Int64(count) * 64, protecting: []))
+        let alone = await other.benchThreadCPU { store in
+            for victim in plan.victims {
+                store.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
+            }
+            return plan.victims.count
+        }
+        await other.close()
+        figures.append(Stretch(name: "WP-B: setResidency of \(alone.value) victims alone (one turn)", best: alone.milliseconds, worst: alone.milliseconds, bounded: false))
+        return figures
     }
 
     /// Legacy migration's measured calls, in order.

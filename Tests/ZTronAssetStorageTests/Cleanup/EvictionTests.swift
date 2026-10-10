@@ -444,6 +444,35 @@ struct EvictionTests {
         #expect(await harness.store.metrics().evictions == 1)
     }
 
+    /// `apply`'s hook reads a plan as runs of victims naming one blob (the dry run lists a blob's records together, ADR
+    /// draft C-22 cycle 6); a plan that names a blob in two places is grouped by key, so the shared blob still leaves
+    /// with both its records, and the report keeps the plan's order.
+    @Test("R-SYN-11: apply evicts a shared blob whose records its plan lists apart, and reports the evicted ids in plan order", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func applyPlanNamingBlobApart() async throws {
+        let harness = CoreHarness.cleanup()
+        let bytes = CoreFixture.bytes(73, count: 200)
+        let first = CleanupFixture.Asset(entry: CoreFixture.entry("first", bytes), bytes: bytes)
+        let second = CleanupFixture.Asset(entry: CoreFixture.entry("second", bytes), bytes: bytes)
+        let other = CleanupFixture.asset("other", seed: 74, count: 100)
+        _ = try await harness.store.open()
+        let manifest = CoreFixture.manifest([first.entry, second.entry, other.entry])
+        _ = try await harness.store.apply(manifest, etag: nil, eviction: nil)
+        try await harness.publish(bytes, [first.entry, second.entry], sequence: 1)
+        try await harness.publish(other.bytes, [other.entry], sequence: 2)
+        harness.time.advance(by: 3_600)
+        let dryRun = try #require(await harness.store.evictionPlan(toFree: 300, protecting: []))
+        let victims = Dictionary(uniqueKeysWithValues: dryRun.victims.map { ($0.id, $0) })
+        let apart = try [first.id, other.id, second.id].map { try #require(victims[$0]) }
+        let report = try await harness.store.apply(manifest, etag: nil, eviction: EvictionPlan(victims: apart, bytes: 300))
+        #expect(report.evicted == [first.id, other.id, second.id])
+        for id in [first.id, second.id, other.id] {
+            #expect(await harness.record(id)?.residency == .absent(.evicted), "\(id.rawValue) is evicted")
+        }
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[first.key], .unreferenced))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-4: pins persist across a reopen and keep an asset out of eviction until it is unpinned", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pinsPersist() async throws {
