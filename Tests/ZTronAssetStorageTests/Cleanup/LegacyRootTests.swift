@@ -157,6 +157,45 @@ struct LegacyRootTests {
     }
 
     @Test(
+        "R-STO-11: an I/O error on a stat of the legacy walk decides nothing, and the walk never enters the store's directory",
+        .timeLimit(.minutes(1)),
+        arguments: Array(2...10)
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func storeStatIOInsideTheWalk(_ nth: Int) async throws {
+        // The store's base lies inside the legacy root through a link below it (`linkIntoRoot`), so only the walk's
+        // identity check sees the overlap; the `nth` stat of a path ending in `ZTronAssetKit` fails with EIO. Stat 1 is
+        // WP-B's own, which fails `open()`; 2–5 are the overlap check's; 6 and 7 are the walk's, of the store's directory
+        // in its first unit and of the same directory reached below the root (review of the L3 close-out cycle 2,
+        // ZProbe-overlap-io: both were taken for "no identity", and the walk listed the store).
+        let files = try LegacyFixture.fixtureFiles()
+        let placement = Overlap.linkIntoRoot.placement
+        let fileSystem = FakeFileSystem(disk: try LegacyFixture.disk(files, root: placement.physicalRoot), time: ManualTimeSource())
+        let (path, destination) = try #require(placement.link)
+        try LegacyFixture.makeDirectories(URL(fileURLWithPath: destination, isDirectory: true), on: fileSystem)
+        try fileSystem.createSymbolicLink(at: URL(fileURLWithPath: path), destination: destination)
+        try LegacyFixture.makeDirectories(placement.base, on: fileSystem)
+        var disk = fileSystem.survivingDisk()
+        disk.makeDurable()
+        let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
+        let legacy = LegacyMigrationPolicy(enabled: true, root: placement.root)
+        let harness = CoreHarness.cleanup(disk: disk, location: .custom(placement.base), legacy: legacy, defaults: defaults)
+        harness.fileSystem.addFault(FaultRule(operation: .itemInfo, matching: URLMatcher(lastComponentSuffix: "ZTronAssetKit"), occurrence: .nth(nth), error: .io))
+        let report = try await harness.store.open()
+        let storeListed = harness.fileSystem.operations.contains {
+            $0.kind == .contentsOfDirectory && $0.url.path.hasPrefix(placement.root.path) && $0.url.path.contains("ZTronAssetKit")
+        }
+        #expect(!storeListed, "the walk never lists the store's directory")
+        #expect(!report.legacyMigrationPending && !report.degraded)
+        #expect(await harness.state.migration.phase == .notStarted)
+        #expect(await harness.state.core.records.isEmpty)
+        #expect(defaults.string(forKey: CleanupFixture.legacyKey) == "1.4+77" && defaults.removedKeys.isEmpty)
+        for (relative, bytes) in files {
+            #expect(harness.content(placement.root.appendingPathComponent(relative)) == bytes, "\(relative) is untouched")
+        }
+    }
+
+    @Test(
         "R-STO-11: phase 4 removes only what the prior art wrote, never recursively: other files in the legacy root survive",
         .timeLimit(.minutes(1))
     )
