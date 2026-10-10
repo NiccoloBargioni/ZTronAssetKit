@@ -97,6 +97,28 @@ extension ZTronAssetKitBenchmarks {
             }
         }
 
+        /// Review of the L3 close-out cycle 5: eviction's chunks counted blobs, so where several ids share each blob a
+        /// chunk of 1,000 changed up to ten times as many records in one turn (16.2–16.4 ms of thread CPU at 10,000 records
+        /// with ten ids per blob). Quota eviction of the whole store, with five and with ten ids per blob, holds the actor
+        /// at most 10 ms (WP-B's probe, best of three runs); a blob that 10,000 ids share leaves in one turn whatever the
+        /// chunk (its holders go together, C-1), recorded as thread CPU.
+        @Test("C2: quota eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob", .timeLimit(.minutes(5)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func sharedBlobHolds() async throws {
+            var holds: [String: [Double]] = [:]
+            for run in 0..<3 {
+                for (name, hold) in try await CleanupBench.sharedBlobHolds(count: 10_000, seed: UInt64(3_000_000 + run * 100_000)) {
+                    holds[name, default: []].append(hold)
+                }
+            }
+            let figures = CleanupBench.sharedBlobOperations.map { ($0, holds[$0] ?? []) }
+            print("C2 with shared blobs at 10,000 records (best of 3): " + figures.map { "\($0.0) \($0.1.min() ?? 0) ms (max of runs \($0.1.max() ?? 0) ms)" }.joined(separator: ", "))
+            for (name, runs) in figures where CleanupBench.boundedSharedBlobOperations.contains(name) {
+                #expect(runs.count == 3, "\(name) ran in every run")
+                #expect((runs.min() ?? .infinity) <= CleanupBenchmarks.budget, "\(name): \(runs)")
+            }
+        }
+
         /// Review of the L3 close-out cycle 4: a selection that a later `apply` outdates (an alias bound to a candidate's
         /// blob, or every id renamed) made each re-validated blob scan every record, so one turn scanned once per blob:
         /// an eviction chunk of 1,000 held the actor about 1.7 s at 10,000 assets, and `apply`'s eviction of a plan of
@@ -163,19 +185,21 @@ enum CleanupBench {
     static func store(
         count: Int,
         seed: UInt64,
-        bulk: (any BlockingExecutor)? = nil
+        bulk: (any BlockingExecutor)? = nil,
+        idsPerBlob: Int = 1,
+        budget: StorageBudget? = nil
     ) async throws -> (store: AssetStore, fileSystem: FakeFileSystem, time: ManualTimeSource, entries: [ManifestEntry]) {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(time: time)
         let base = URL(fileURLWithPath: "/bench/cleanup", isDirectory: true)
         try fileSystem.createDirectory(at: base.deletingLastPathComponent())
         try fileSystem.createDirectory(at: base)
-        let payloads = (0..<count).map { GeneratedPayload.bytes(seed: seed + UInt64($0), offset: 0, length: 64) }
+        let payloads = (0..<count).map { GeneratedPayload.bytes(seed: seed + UInt64($0 / max(1, idsPerBlob)), offset: 0, length: 64) }
         let entries = payloads.enumerated().map { index, bytes in
             ManifestEntry(identifier: AssetID("c2c.asset.\(index)"), fileExtension: "png", remotePath: "media/\(index).png", byteSize: 64, checksum: ContentHash.sha256(of: bytes))
         }
         let manifest = try ValidatedManifest(entries: entries, digest: ContentHash.sha256(of: Data("c2c-\(seed)".utf8)))
-        let first = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count)
+        let first = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count, budget: budget)
         _ = try await first.open()
         _ = try await first.apply(manifest, etag: nil, eviction: nil)
         await first.close()
@@ -188,15 +212,23 @@ enum CleanupBench {
             }
             try fileSystem.write(bytes, to: layout.blobURL(key), mode: .truncate)
         }
-        let store = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count, bulk: bulk)
+        let store = CleanupBench.makeStore(base: base, fileSystem: fileSystem, time: time, count: count, bulk: bulk, budget: budget)
         _ = try await store.open()
         return (store, fileSystem, time, entries)
     }
 
-    /// The store of `store(count:seed:bulk:)`; `bulk` replaces its dispatch bulk executor.
-    static func makeStore(base: URL, fileSystem: FakeFileSystem, time: ManualTimeSource, count: Int, bulk: (any BlockingExecutor)? = nil) -> AssetStore {
+    /// The store of `store(count:seed:bulk:idsPerBlob:budget:)`; `bulk` replaces its dispatch bulk executor, `budget` the
+    /// budget of half the usage of `count` distinct assets.
+    static func makeStore(
+        base: URL,
+        fileSystem: FakeFileSystem,
+        time: ManualTimeSource,
+        count: Int,
+        bulk: (any BlockingExecutor)? = nil,
+        budget: StorageBudget? = nil
+    ) -> AssetStore {
         var policy = StoragePolicy()
-        policy.budget = .bytes(Int64(count) * 64 / 2)
+        policy.budget = budget ?? .bytes(Int64(count) * 64 / 2)
         policy.reserveFreeBytes = 0
         policy.minimumResidency = 0
         policy.deletionGrace = 0
@@ -558,6 +590,43 @@ enum CleanupBench {
         await other.close()
         figures.append(Stretch(name: "WP-B: setResidency of \(alone.value) victims alone (one turn)", best: alone.milliseconds, worst: alone.milliseconds, bounded: false))
         return figures
+    }
+
+    /// The figures of `sharedBlobHolds(count:seed:)`, in order.
+    static let sharedBlobOperations = [
+        "quota eviction of every blob with 5 ids per blob",
+        "quota eviction of every blob with 10 ids per blob",
+        "eviction of one blob 10,000 ids share (thread CPU)",
+    ]
+
+    /// The figures of `sharedBlobOperations` asserted against the C2 budget; the last is inherent and recorded.
+    static let boundedSharedBlobOperations: Set<String> = [sharedBlobOperations[0], sharedBlobOperations[1]]
+
+    /// On stores of `count` records where every 5, then every 10, consecutive ids share one 64-byte blob, with a budget
+    /// of 0 bytes: the longest hold of quota eviction of every blob; then, on a store where all `count` ids share one
+    /// blob, the thread CPU of that blob's eviction in one turn.
+    static func sharedBlobHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
+        var holds: [(String, Double)] = []
+        for (index, idsPerBlob) in [5, 10].enumerated() {
+            let (store, _, _, _) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 10_000, idsPerBlob: idsPerBlob, budget: .bytes(0))
+            holds.append((CleanupBench.sharedBlobOperations[index], try await ActorHoldProbe.longestHold(of: store) {
+                let result = try await store.evictIfNeeded()
+                #expect(result.filesRemoved == count / idsPerBlob)
+            }))
+            await store.close()
+        }
+        let (one, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 50_000, idsPerBlob: count, budget: .bytes(0))
+        let candidates = await one.evictionCandidatesOffActor()
+        let candidate = try #require(candidates.first)
+        #expect(candidates.count == 1 && candidate.victims.count == count)
+        let evicted = await one.benchThreadCPU { store in
+            var scan = HolderScan(blobs: [candidate.key])
+            return store.evict(candidate.victims, rules: store.evictionRules(), scan: &scan)
+        }
+        #expect(evicted.value == .doomed(bytes: 64))
+        holds.append((CleanupBench.sharedBlobOperations[2], evicted.milliseconds))
+        await one.close()
+        return holds
     }
 
     /// Legacy migration's measured calls, in order.

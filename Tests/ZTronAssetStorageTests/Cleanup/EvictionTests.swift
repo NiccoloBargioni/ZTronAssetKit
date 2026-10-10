@@ -86,6 +86,52 @@ struct EvictionTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Review of the L3 close-out cycle 5 (C2): a chunk counted blobs, so where several ids share each blob a chunk of
+    /// 1,000 changed up to 10,000 records in one turn (16 ms at 10,000 records with ten ids per blob). A chunk now ends at
+    /// the first blob boundary at or after `chunk` records: with a chunk of two records and two ids per blob, the first
+    /// yield comes after one blob.
+    @Test("R-CLN-4: eviction releases the actor after a chunk's worth of records, cut at blob boundaries, however many ids share a blob", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func chunkCountsRecords() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0)), metadata: metadata)
+        let blobs = (0..<3).map { CoreFixture.bytes(800 + UInt64($0), count: 100) }
+        let pairs = blobs.enumerated().map { index, bytes in
+            ["a", "b"].map { CleanupFixture.Asset(entry: CoreFixture.entry("s\(index)\($0)", bytes), bytes: bytes) }
+        }
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest(pairs.flatMap { $0.map(\.entry) }), etag: nil, eviction: nil)
+        for (index, pair) in pairs.enumerated() {
+            try await harness.publish(blobs[index], pair.map(\.entry), sequence: UInt32(index + 1))
+        }
+        // Least recently used first: s0, s1, s2.
+        for asset in pairs.flatMap({ $0 }) {
+            harness.time.advance(by: 60)
+            _ = await harness.store.location(for: asset.id, extensions: [], recordingAccess: true)
+        }
+        harness.time.advance(by: 3_600)
+        await harness.store.testSetEvictionChunk(2)
+        await metadata.setHolding(true)
+        let eviction = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        try await CorePoll.until("eviction yields after its first chunk") {
+            if await harness.record(pairs[0][1].id)?.residency == .absent(.evicted) {
+                return await !metadata.heldUnits.isEmpty
+            }
+            if let unit = await metadata.heldUnits.first {
+                await metadata.release(unit)
+            }
+            return false
+        }
+        let firstChunk = await pairs.flatMap { $0 }.asyncFilter { await harness.record($0.id)?.residency == .absent(.evicted) }
+        #expect(firstChunk.map(\.id) == pairs[0].map(\.id), "the first chunk is the first blob's two records")
+        await metadata.setHolding(false)
+        let result = try await eviction.value
+        #expect(result == CleanupResult(bytesFreed: 300, filesRemoved: 3))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     /// How a test reaches eviction: the maintenance run, or the engine's dry run applied by `apply`.
     enum Route: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case maintenance
