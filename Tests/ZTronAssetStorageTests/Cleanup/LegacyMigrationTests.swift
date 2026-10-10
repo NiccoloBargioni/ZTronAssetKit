@@ -309,27 +309,35 @@ struct LegacyMigrationTests {
         }
     }
 
-    @Test(
-        "R-STO-11: phase 3 checks the legacy entries with the actor released between chunks and migrates the stamp only over a pass no mutation interrupted",
-        .timeLimit(.minutes(1)),
-        arguments: CheckInterruption.allCases
-    )
+    /// A store whose legacy files were all adopted on demand, so the queue is empty and phase 3 has not run, with phase
+    /// 3's check lowered to chunks of two entries and `passes` interrupted passes.
     @available(macOS 15.0, iOS 18.0, *)
-    func phaseThreeCheckRevalidates(_ interruption: CheckInterruption) async throws {
+    static func adoptedOnDemand(_ metadata: SteppedBlockingExecutor, passes: Int = AssetStore.legacyCheckPasses) async throws -> (CoreHarness, FakeLegacyDefaults, [ManifestEntry]) {
         let files = try LegacyFixture.fixtureFiles()
         let entries = try LegacyFixture.entries()
-        let metadata = SteppedBlockingExecutor(holding: false)
         let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
         let harness = CoreHarness.cleanup(disk: try LegacyFixture.disk(files), legacy: CleanupFixture.legacyPolicy, defaults: defaults, metadata: metadata)
         #expect(try await harness.store.open().legacyMigrationPending)
-        // Every file adopted on demand: the queue is empty and phase 3 has not run.
         for entry in entries {
             _ = try await harness.store.adoptLegacyNow(entry.identifier)
         }
         try await harness.store.flush(.durable)
         let migration = await harness.state.migration
         #expect(migration.phase == .inProgress && migration.queue.isEmpty && migration.claimed.isEmpty)
-        await harness.store.testSetLegacyCheckChunk(2)
+        await harness.store.testSetLegacyCheck(chunk: 2, passes: passes)
+        return (harness, defaults, entries)
+    }
+
+    @Test(
+        "R-STO-11: phase 3 checks the legacy entries with the actor released between chunks and migrates the stamp only over a pass no mutation interrupted",
+        .timeLimit(.minutes(1)),
+        arguments: CheckInterruption.allCases, [AssetStore.legacyCheckPasses, 1]
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func phaseThreeCheckRevalidates(_ interruption: CheckInterruption, passes: Int) async throws {
+        // With one pass allowed, the interrupted pass is not repeated: the check is made in one turn.
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let (harness, _, entries) = try await LegacyMigrationTests.adoptedOnDemand(metadata, passes: passes)
         await metadata.setHolding(true)
         let finishing = Task {
             try await harness.store.migrateLegacy(maxFiles: 10)
@@ -360,5 +368,37 @@ struct LegacyMigrationTests {
             #expect(view.stamp?.appVersion == "1.4+77", "the interrupted pass started again and found every entry present")
         }
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    @Test(
+        "R-STO-11: a call whose phase 3 check was running while another call finished the migration decides nothing again",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func secondFinishingCallLeavesIt() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let (harness, defaults, _) = try await LegacyMigrationTests.adoptedOnDemand(metadata)
+        await metadata.setHolding(true)
+        let first = Task {
+            try await harness.store.migrateLegacy(maxFiles: 10)
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let parked = try #require(await metadata.heldUnits.first)
+        // A second call runs phases 3 and 4 to the end while the first one's check is held.
+        let second = try await CleanupSteps.run(metadata, keeping: [parked]) {
+            try await harness.store.migrateLegacy(maxFiles: 10)
+        }
+        let done = LegacyMigrationProgress(adopted: 13, remaining: 0, dropped: 0, finished: true)
+        #expect(second.value == done)
+        #expect(await harness.state.migration.phase == .done && defaults.removedKeys == [CleanupFixture.legacyKey])
+        let operations = harness.fileSystem.operations.count
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
+        // The first call's pass was interrupted (the second call's writes were counted) and starts again; then it finds
+        // the migration done and leaves it: no second "done" commit, no second removal pass.
+        #expect(try await first.value == done)
+        #expect(harness.fileSystem.operations.count == operations, "the first call touched nothing once the second finished")
+        #expect(try await harness.store.planningView().stamp?.appVersion == "1.4+77")
+        #expect(defaults.removedKeys == [CleanupFixture.legacyKey])
     }
 }

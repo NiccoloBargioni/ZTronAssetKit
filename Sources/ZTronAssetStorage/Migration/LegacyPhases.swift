@@ -431,12 +431,12 @@ extension AssetStore {
     /// entries are read in chunks of `MigrationState.checkChunk` with the actor released in between (a no-op metadata
     /// unit); a pass answers "yes" only if no mutation was counted meanwhile (`CommitBookkeeping.mutationSerial`, which
     /// every persisted change bumps in its own turn through `markDirty`), else it starts again; after
-    /// `legacyCheckPasses` interrupted passes the check is made in one turn. An entry found missing is missing in that
+    /// `MigrationState.checkPasses` interrupted passes the check is made in one turn. An entry found missing is missing in that
     /// turn, so "no" needs no such guard.
     func legacyEntriesPresent() async throws(StoreError) -> Bool {
         let ids = self.state.migration.legacyIDs
         let chunk = max(1, self.state.migration.checkChunk)
-        for _ in 0..<AssetStore.legacyCheckPasses {
+        for _ in 0..<max(1, self.state.migration.checkPasses) {
             let serial = self.state.core.commits.mutationSerial
             var start = 0
             while start < ids.count {
