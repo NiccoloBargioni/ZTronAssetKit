@@ -1644,6 +1644,8 @@ an in-flight deletion), then this record. Every run below is at `d192edc`, whose
   orphans 19.08, `purge's reclaim pass, chunk of 1000 0.150292 ms`, the legacy batch of 500 17.50. Legacy migration: the
   last calls while access stamps arrive 3.44 / 8.66 ms, `finished: false` after 3 last calls in every run (16,263–16,876
   and 16,494 stamps).
+- `--quick` again at `5fdf1ab` (the record above; 16:24:34–16:27:56, load 2.72 → 9.87): `VERIFY: PASS`, Storage bundle
+  `Test run with 440 tests in 58 suites passed after 80.625 seconds`, the other bundles 151, 10, 84, 12, 3 and 104.
 - `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 7 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
