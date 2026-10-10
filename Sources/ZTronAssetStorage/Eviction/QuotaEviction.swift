@@ -5,7 +5,8 @@ import ZTronAssetModel
 /// `apply`'s re-validation of a plan. Eviction dooms through `setResidency(.absent(.evicted), of:dooming: .unreferenced)`
 /// only; the reaper deletes after acknowledgement, grace, commit and leases (ARCHITECTURE §4.4).
 extension AssetStore {
-    /// Candidates are marked in chunks of this many blobs, yielding the actor in between (C2, REENTRANCY R8).
+    /// Candidates are marked in chunks of whole blobs holding this many records, yielding the actor in between (C2,
+    /// REENTRANCY R8).
     static let evictionChunk = 1_000
 
     /// The dry run's plan over the current state, computed on the actor: only for the synchronous `evictionPlan` (a
@@ -86,12 +87,13 @@ extension AssetStore {
         var evictedAny = false
         var scan = HolderScan(blobs: [])
         var rules = self.evictionRules()
+        var end = 0
         for (index, candidate) in candidates.enumerated() {
             // Bytes released since the measurement left `usedBytes` as this run's own do (C-2, cycle 6).
             guard self.state.eviction.releasedBytes - releasedAtMeasure < needed else {
                 break
             }
-            if index % chunk == 0 {
+            if index == end {
                 if index > 0 {
                     // The actor is released between chunks by a no-op metadata unit (C2): every other caller runs
                     // meanwhile, and a test can hold eviction at this very point.
@@ -105,7 +107,14 @@ extension AssetStore {
                     try self.checkWritable()
                     rules = self.evictionRules()
                 }
-                scan = HolderScan(blobs: candidates[index..<min(index + chunk, candidates.count)].map(\.key))
+                // A chunk is whole candidates up to `chunk` records: a turn's cost follows the records it changes, and a
+                // blob's records leave together (C-1), so the chunk ends at the first blob boundary at or past `chunk`.
+                var records = 0
+                while end < candidates.count, records < chunk {
+                    records += candidates[end].victims.count
+                    end += 1
+                }
+                scan = HolderScan(blobs: candidates[index..<end].map(\.key))
             }
             switch self.evict(candidate.victims, rules: rules, scan: &scan) {
             case .doomed(let bytes)?:
