@@ -699,7 +699,8 @@ enum CleanupBench {
         "eviction of one blob 10,000 ids share (thread CPU)",
     ]
 
-    /// The figures of `sharedBlobOperations` asserted against the C2 budget; the last is inherent and recorded.
+    /// The figures of `sharedBlobOperations` asserted against the C2 budget; the last is recorded, an exception to R4
+    /// for Stage 3 (orchestrator ruling R8 at the L3 close-out cycle 7: chunking one blob's holders).
     static let boundedSharedBlobOperations: Set<String> = [sharedBlobOperations[0], sharedBlobOperations[1]]
 
     /// On stores of `count` records where every 5, then every 10, consecutive ids share one 64-byte blob, with a budget
