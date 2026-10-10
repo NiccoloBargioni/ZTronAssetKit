@@ -305,79 +305,160 @@ struct PurgeTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
-    /// The same with the engine's reaper (probe ZP7-purge): `runDueWork()` fires at the end of the grace the purge sleeps
-    /// until, and its deletion unit holds the purge's blobs while the purge's pass, released between its chunks, reaches
-    /// them. The purge reported nothing freed although every blob was reaped.
+    /// A purge of two 100-byte assets over `runDueWork()`'s reaper (probe ZP7-purge): the engine fires at the end of the
+    /// grace the purge sleeps until, and its deletion unit holds both blobs while the purge's pass, released between its
+    /// one-blob chunks, has yet to reach the second. Returns once both keys are `deleting`, the engine's deletion unit
+    /// (`deletionUnit`) is held and so is the purge's release between its chunks (`purgeYield`).
+    @available(macOS 15.0, iOS 18.0, *)
+    struct EngineReaperOverlap {
+        let harness: CoreHarness
+        let metadata: SteppedBlockingExecutor
+        let assets: [CleanupFixture.Asset]
+        let finished = UnitCounter()
+        let purge: Task<PurgeResult, any Error>
+        let work: Task<StoreWorkReport, Never>
+        let purgeYield: Int
+        let deletionUnit: Int
+
+        init() async throws {
+            let metadata = SteppedBlockingExecutor(holding: false)
+            let harness = CoreHarness.cleanup(metadata: metadata)
+            let assets = (0..<2).map { CleanupFixture.asset("zr\($0)", seed: 254 + UInt64($0), count: 100) }
+            try await harness.seed(assets)
+            // One blob per chunk of the reclaim pass, so the purge releases the actor between its two blobs.
+            await harness.store.testSetCleanupChunk(1)
+            let finished = self.finished
+            let purge = Task {
+                let result = try await harness.store.purge(.all)
+                await finished.increment()
+                return result
+            }
+            try await harness.time.requireSleepers(atLeast: 1)
+            await metadata.setHolding(true)
+            harness.time.advance(by: harness.configuration.policy.deletionGrace)
+            // The purge's pass classified zr0 (its grace is over) and is held between its chunks.
+            try await metadata.requireHeldUnits(atLeast: 1)
+            let purgeYield = await metadata.heldUnits[0]
+            let work = Task {
+                await harness.store.runDueWork()
+            }
+            // The engine installs the fresh snapshot and its reaper takes both keys; every unit but the purge's goes
+            // through until then. The held units are read before the check: a key turns `deleting` before its unit is
+            // submitted.
+            try await CorePoll.until("runDueWork's reaper is deleting both blobs") {
+                let held = await metadata.heldUnits
+                var deleting = true
+                for asset in assets {
+                    if case .deleting? = await harness.state.core.blobTable[asset.key] {
+                        continue
+                    }
+                    deleting = false
+                }
+                if deleting {
+                    return true
+                }
+                for sequence in held where sequence != purgeYield {
+                    await metadata.release(sequence)
+                }
+                return false
+            }
+            try await metadata.requireHeldUnits(atLeast: 2)
+            self.deletionUnit = try #require(await metadata.heldUnits.first { $0 != purgeYield })
+            self.harness = harness
+            self.metadata = metadata
+            self.assets = assets
+            self.purge = purge
+            self.work = work
+            self.purgeYield = purgeYield
+        }
+
+        /// Lets every held unit but `kept` through until the purge returned or waits for an in-flight deletion.
+        func untilPurgeReturnsOrWaits(keeping kept: Int) async throws {
+            try await CorePoll.until("the purge returned or waits for the in-flight deletion") {
+                let held = await self.metadata.heldUnits
+                if await self.finished.value > 0 {
+                    return true
+                }
+                let waiters = await self.harness.state.core.keyWaiters
+                if self.assets.contains(where: { waiters[$0.key] != nil }) {
+                    return true
+                }
+                for sequence in held where sequence != kept {
+                    await self.metadata.release(sequence)
+                }
+                return false
+            }
+        }
+
+        /// The store's end state: both blobs reaped, the invariants hold.
+        func expectReaped() async {
+            for asset in self.assets {
+                #expect(!self.harness.hasBlob(asset.key), "\(asset.id.rawValue)'s blob is reaped")
+            }
+            #expect(await CoreInvariants.violations(of: self.harness).isEmpty)
+        }
+    }
+
+    /// The same with the engine's reaper (probe ZP7-purge): the purge reported nothing freed although every blob was
+    /// reaped.
     @Test("R-CLN-6: a purge waits for its blobs while runDueWork's reaper deletes them, and counts their bytes", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func purgeWaitsForEngineReaper() async throws {
-        let metadata = SteppedBlockingExecutor(holding: false)
-        let harness = CoreHarness.cleanup(metadata: metadata)
-        let assets = (0..<2).map { CleanupFixture.asset("zr\($0)", seed: 254 + UInt64($0), count: 100) }
-        try await harness.seed(assets)
-        // One blob per chunk of the reclaim pass, so the purge releases the actor between its two blobs.
-        await harness.store.testSetCleanupChunk(1)
-        let finished = UnitCounter()
-        let purge = Task {
-            let result = try await harness.store.purge(.all)
-            await finished.increment()
-            return result
-        }
-        try await harness.time.requireSleepers(atLeast: 1)
-        await metadata.setHolding(true)
-        harness.time.advance(by: harness.configuration.policy.deletionGrace)
-        // The purge's pass classified zr0 (its grace is over) and is held between its chunks.
-        try await metadata.requireHeldUnits(atLeast: 1)
-        let purgeYield = await metadata.heldUnits[0]
-        let work = Task {
-            await harness.store.runDueWork()
-        }
-        // The engine installs the fresh snapshot and its reaper takes both keys; every unit but the purge's goes through
-        // until then. The held units are read before the check: a key turns `deleting` before its unit is submitted.
-        try await CorePoll.until("runDueWork's reaper is deleting both blobs") {
-            let held = await metadata.heldUnits
-            var deleting = true
-            for asset in assets {
-                if case .deleting? = await harness.state.core.blobTable[asset.key] {
-                    continue
-                }
-                deleting = false
-            }
-            if deleting {
-                return true
-            }
-            for sequence in held where sequence != purgeYield {
-                await metadata.release(sequence)
-            }
-            return false
-        }
-        try await metadata.requireHeldUnits(atLeast: 2)
-        let deletionUnit = try #require(await metadata.heldUnits.first { $0 != purgeYield })
+        let overlap = try await EngineReaperOverlap()
         // The purge's pass goes on while the engine's deletion unit is held: it returns, or waits for that unit.
-        await metadata.release(purgeYield)
-        try await CorePoll.until("the purge returned or waits for the in-flight deletion") {
-            let held = await metadata.heldUnits
-            if await finished.value > 0 {
-                return true
-            }
-            let waiters = await harness.state.core.keyWaiters
-            if assets.contains(where: { waiters[$0.key] != nil }) {
-                return true
-            }
-            for sequence in held where sequence != deletionUnit {
-                await metadata.release(sequence)
-            }
-            return false
-        }
-        await metadata.setHolding(false)
-        let report = await work.value
-        let result = try await purge.value
+        await overlap.metadata.release(overlap.purgeYield)
+        try await overlap.untilPurgeReturnsOrWaits(keeping: overlap.deletionUnit)
+        await overlap.metadata.setHolding(false)
+        let report = await overlap.work.value
+        let result = try await overlap.purge.value
         #expect(report.reapedKeys == 2, "the engine's reaper deleted both blobs")
         #expect(result == PurgeResult(bytesFreed: 200, bytesDeferred: 0, assetsRemoved: 2))
-        for asset in assets {
-            #expect(!harness.hasBlob(asset.key), "\(asset.id.rawValue)'s blob is reaped")
+        await overlap.expectReaped()
+    }
+
+    /// A deletion that ends while the pass is released between its chunks is classified again by the next round, not
+    /// waited for: its waiters were resumed before the purge could register, so a wait would never end.
+    @Test("R-CLN-6: a purge does not wait for a deletion that ended while its pass was released between chunks", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func purgeSkipsEndedDeletion() async throws {
+        let overlap = try await EngineReaperOverlap()
+        // The purge finds zr1 `deleting`, installs the fresh snapshot, and its next pass finds zr0 `deleting` and is held
+        // between its chunks again.
+        await overlap.metadata.release(overlap.purgeYield)
+        try await CorePoll.until("the purge's next pass is held between its chunks") {
+            await overlap.metadata.heldUnits.contains { $0 != overlap.deletionUnit }
         }
-        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+        // The engine's deletion unit ends meanwhile, before the purge reaches the end of that pass.
+        await overlap.metadata.release(overlap.deletionUnit)
+        let report = await overlap.work.value
+        #expect(report.reapedKeys == 2)
+        await overlap.metadata.setHolding(false)
+        try await CorePoll.until("the purge returned") {
+            await overlap.finished.value > 0
+        }
+        let result = try await overlap.purge.value
+        #expect(result == PurgeResult(bytesFreed: 200, bytesDeferred: 0, assetsRemoved: 2))
+        await overlap.expectReaped()
+    }
+
+    /// A caller that leaves while the purge waits for another reaper's deletion gets `.cancelled` once that unit ended,
+    /// as from the grace wait (C-5 (6)); the purge stays committed and the blobs are reaped.
+    @Test("R-CLN-6: a purge cancelled while it waits for an in-flight deletion leaves with cancelled, its selection purged", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func purgeCancelledDuringInFlightWait() async throws {
+        let overlap = try await EngineReaperOverlap()
+        await overlap.metadata.release(overlap.purgeYield)
+        try await overlap.untilPurgeReturnsOrWaits(keeping: overlap.deletionUnit)
+        overlap.purge.cancel()
+        await overlap.metadata.setHolding(false)
+        _ = await overlap.work.value
+        await #expect(throws: StoreError.cancelled) {
+            try await overlap.purge.value
+        }
+        for asset in overlap.assets {
+            #expect(await overlap.harness.record(asset.id)?.residency == .absent(.purged))
+        }
+        await overlap.expectReaped()
     }
 
     @Test("R-CLN-6: a purge cancelled during its grace wait still leaves the selection purged, and the reaper finishes it", .timeLimit(.minutes(1)))
