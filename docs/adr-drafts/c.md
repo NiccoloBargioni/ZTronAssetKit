@@ -1586,6 +1586,8 @@ ran at `1f541aa`; `52fe97c` changes a comment only.
   16.400459 ms (max of runs 17.436459 ms)` (ruling R8). The rest is in C-22 cycle 7 (3). Legacy migration (best of 3 / 1):
   the last calls while access stamps arrive 3.40 / 8.22 ms, `finished: false` after 3 last calls in every run
   (16,415–17,080 and 16,350 stamps), the longest batch of 500 0.68 / 16.61 ms.
+- `--quick` again at `3649b6c` (the record above; 14:52:56–14:55:17, load 2.57 → 4.33): `VERIFY: PASS`, Storage bundle
+  `Test run with 436 tests in 58 suites passed after 63.792 seconds`, the other bundles 151, 10, 84, 12, 3 and 104.
 - `docs/TRACEABILITY.md`: untouched (`--gates-only` and `--full` were not run).
 
 ## Evidence of the L3 close-out, cycle 6 (this worktree, `wp/c`, 2026-10-10; this Mac, 8 cores: 4 performance, 4 efficiency)
