@@ -104,8 +104,8 @@ extension AssetStore {
 
     /// Every item below `root`, as path components relative to it, from a **non-following** listing (one unit per
     /// directory, S2-10): a symbolic link is neither descended into nor followed, so no planned path passes through one.
-    /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited. A listing that fails stops
-    /// the walk and marks the tree `failed`. The store's own directory is never entered: each directory is stat-ed in its
+    /// At most `maxDepth` directory levels and `limits.maxEntries` directories are visited. A listing that fails, or an
+    /// I/O error on a unit's stat (`LegacyListingUnit`), stops the walk and marks the tree `failed`. The store's own directory is never entered: each directory is stat-ed in its
     /// listing unit and compared with the store's (`reachesStore`). The phase is re-checked after every unit, and with
     /// `cancellable` (phase 4, which runs in the caller's task) the caller's cancellation too, so neither a closed store
     /// nor a cancelled caller submits further listings (review round 3).
@@ -288,10 +288,24 @@ struct LegacyListingUnit: Sendable {
     /// The directory is the store's own: it was not listed.
     var isStore: Bool
 
-    /// Stats `store` when given, compares `url`'s identity with the store's, and lists `url` unless they are equal.
+    /// Stats `store` when given, compares `url`'s identity with the store's, and lists `url` unless they are equal. An I/O
+    /// error on either stat fails the unit as a failed listing would, since the walk could then enter the store's own
+    /// directory unseen (review of the L3 close-out cycle 2, ZProbe-overlap-io); any other error is no match, as in
+    /// `LegacyPlacement.identity(_:_:)`.
     static func run(_ url: URL, fileSystem: any FileSystem, store: URL?, known: FileIdentity?) -> LegacyListingUnit {
-        let storeIdentity = store.flatMap { ((try? fileSystem.itemInfo(at: $0)) ?? nil)?.identity } ?? known
-        if let storeIdentity, ((try? fileSystem.itemInfo(at: url)) ?? nil)?.identity == storeIdentity {
+        let storeIdentity: FileIdentity?
+        let identity: FileIdentity?
+        do throws(FileSystemError) {
+            if let store {
+                storeIdentity = try LegacyPlacement.identity(store, fileSystem) ?? known
+            } else {
+                storeIdentity = known
+            }
+            identity = storeIdentity == nil ? nil : try LegacyPlacement.identity(url, fileSystem)
+        } catch {
+            return LegacyListingUnit(listing: .failure(error), store: known, isStore: false)
+        }
+        if let storeIdentity, identity == storeIdentity {
             return LegacyListingUnit(listing: .success([]), store: storeIdentity, isStore: true)
         }
         return LegacyListingUnit(listing: CleanupUnits.list(url, fileSystem: fileSystem), store: storeIdentity, isStore: false)
