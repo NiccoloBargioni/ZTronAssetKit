@@ -47,7 +47,7 @@ under ruling R6 (C-22 cycle 7 (1)); cycle 8 changed nothing outside WP-C's paths
   window, against a reserve and a fractional budget (store-2 S2-06)` makes free space decide it: four 10,000-byte assets,
   a reserve 15,000 bytes above free space (unlimited budget) and a `.fractionOfFreeSpace(0.5)` budget with 10,000 bytes
   free; the first run evicts two (20,000), the second nothing. The mutant `effective = max(0, available)` at
-  `EvictionOrder.swift:129` fails both cases (`second == CleanupResult(bytesFreed: 20000, filesRemoved: 2)` for the
+  `EvictionOrder.swift:129` (`:356` at the merge, ADR-052) fails both cases (`second == CleanupResult(bytesFreed: 20000, filesRemoved: 2)` for the
   reserve, `10000, 1` for the fraction) while the byte-budget test passes it. For the orchestrator: §12.2's S2-06 row
   should name the new test.
 
@@ -233,7 +233,8 @@ under ruling R6 (C-22 cycle 7 (1)); cycle 8 changed nothing outside WP-C's paths
   `(st_dev, st_ino)`, size) in one metadata unit before the hash and again after it; a change, or a placement of the
   key in flight (`publishing`), discards the result: no quarantine, no `verifiedAt`, and the key is not marked done,
   so the pass checks it again (`R-INT-4: deep verification discards a hash whose blob name was replaced meanwhile…`,
-  failing first in `28076fa`). A write in place keeps the identity and is what verification exists to find. A
+  failing first in `28076fa`; at the merge `R-INT-4: deep verification discards a hash whose blob was quarantined or
+  replaced meanwhile and never quarantines the new bytes`, ADR-052). A write in place keeps the identity and is what verification exists to find. A
   per-key placement serial from WP-B would be an alternative; the identity needs no contract change.
 - **Amended in review round 3 (C2, ruling R4).** The due list (live, referenced, not being placed, not verified in this
   pass; oldest `verifiedAt` first, then key) is built and sorted on the bulk executor from a value snapshot
@@ -261,7 +262,7 @@ under ruling R6 (C-22 cycle 7 (1)); cycle 8 changed nothing outside WP-C's paths
   at the deadline. The re-check runs in the turn that submits **each** removal unit, including the units a removal
   batch's time budget splits off (`removeInUnits(recheck:)`); a file whose unlink fails stays an orphan for the next
   run and never stops the sweep, which ends only at the deadline or the caller's cancellation (review round 2; test
-  `R-CLN-2: an orphan whose removal keeps failing does not stop orphan GC…`). Suspended while degraded (S1-11) or unwritable (B-15/B-34, through `checkWritable()`). The
+  `R-CLN-2: an orphan whose removal keeps failing does not stop orphan GC…`; since C-23 `R-CLN-2: an orphan whose unlink keeps failing stays doomed with backoff and does not stop the others from being collected`, ADR-052). Suspended while degraded (S1-11) or unwritable (B-15/B-34, through `checkWritable()`). The
   unreferenced blobs it leaves (young or adoptable) are remembered for the report (`CleanupState.orphans`).
 - **Residual risk, reported as CCR-1 — closed at the L3 close-out (C-23).** The unlink unit ran off the actor: between
   the sweep decision and the unit, a publication of the very same bytes for a record that did not expect them at
