@@ -155,6 +155,56 @@ struct EngineOutcomeTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes", .timeLimit(.minutes(1)))
+    func transferProbePublishesHalfOpen() async throws {
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
+        let failing = (0..<5).map { EngineHarness.onDemand("f\($0)", EngineFixture.bytes(UInt64(495 + $0))) }
+        let probeBytes = EngineFixture.bytes(494)
+        let probeEntry = EngineHarness.onDemand("probe", probeBytes)
+        await harness.serveManifest(failing + [probeEntry])
+        for entry in failing {
+            await harness.source.script(entry.transferID, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil))])
+        }
+        await harness.source.script(probeEntry.transferID, [.hold, .stage(probeBytes)])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        let engine = harness.engine
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        let groups = try await engine.registerGroup(failing.map(\.identifier), lane: .prefetch).get()
+        let opened = await probe.next { event in
+            if case .circuitChanged(_, .open(.serverErrors, _)) = event {
+                return true
+            }
+            return false
+        }
+        #expect(opened != nil)
+        await engine.releaseGroup(groups)
+        harness.time.advance(by: CircuitBreakerPolicy().serverCooldownBase + 1)
+        let request = Task { await engine.awaitAsset("probe", lane: .userInitiated) }
+        await engine.waitUntil { $0.running == 1 }
+        // While the probe is held no other breaker event can replace the half-open one in the subscriber's slot.
+        let halfOpen = await probe.next { event in
+            if case .circuitChanged(_, .halfOpen(.serverErrors, _)) = event {
+                return true
+            }
+            return false
+        }
+        #expect(halfOpen != nil, "the probe's admission is published")
+        await harness.source.release(probeEntry.transferID, with: .progress(received: 0, expected: nil))
+        let location = try await request.value.get()
+        #expect(location.byteSize == Int64(probeBytes.count))
+        let closed = await probe.next { event in
+            if case .circuitChanged(_, .closed) = event {
+                return true
+            }
+            return false
+        }
+        #expect(closed != nil)
+        await probe.stop()
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-1: the first call of any API starts the engine", .timeLimit(.minutes(1)))
     func implicitStart() async throws {
         let harness = EngineHarness.make()
