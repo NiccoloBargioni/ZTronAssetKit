@@ -311,6 +311,67 @@ struct EngineOutcomeTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-3: staging GC during maintenance keeps the file of a publication in flight, however old", .timeLimit(.minutes(1)))
+    func maintenanceKeepsPublicationInFlight() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = EngineHarness.make(bulk: bulk)
+        let bytes = EngineFixture.bytes(490)
+        let entry = EngineHarness.onDemand("claimed", bytes)
+        await harness.serveManifest([entry])
+        // A second attempt is scripted so that a collected file shows as a re-download rather than a hang.
+        await harness.source.script(entry.transferID, [.hold, .stage(bytes), .stage(bytes)])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        let engine = harness.engine
+        let waiter = Task { await engine.awaitAsset("claimed", lane: .userInitiated) }
+        await engine.waitUntil { $0.running == 1 }
+        // From here every bulk unit is held: the staging writes are released until the publication hashes its claim.
+        await bulk.setHolding(true)
+        await harness.source.release(entry.transferID, with: .progress(received: 0, expected: nil))
+        while await engine.introspect().jobsByState[.verifying] != 1 {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    await engine.waitUntil { $0.jobsByState[.verifying] == 1 }
+                }
+                group.addTask {
+                    await bulk.waitForHeldUnits(atLeast: 1)
+                }
+                _ = await group.next()
+                group.cancelAll()
+            }
+            if await engine.introspect().jobsByState[.verifying] != 1 {
+                for unit in await bulk.heldUnits {
+                    await bulk.release(unit)
+                }
+            }
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let hashing = Set(await bulk.heldUnits)
+        // The claimed file is now older than the unclaimed-file grace: only the engine's claim keeps it.
+        harness.time.advance(by: StoragePolicy().stagingClaimGrace + 60)
+        let report = Mutex<Result<MaintenanceReport, AssetError>?>(nil)
+        let maintenance = Task {
+            let result = await engine.performMaintenance(timeBudget: 3_600)
+            report.withLock { $0 = result }
+            _ = await bulk.run { 0 }
+        }
+        while report.withLock({ $0 }) == nil {
+            try await bulk.requireHeldUnits(atLeast: hashing.count + 1)
+            for unit in await bulk.heldUnits where !hashing.contains(unit) {
+                await bulk.release(unit)
+            }
+        }
+        _ = try #require(report.withLock { $0 }).get()
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
+        await maintenance.value
+        let location = try await harness.withClock { try await waiter.value.get() }
+        #expect(location.byteSize == Int64(bytes.count))
+        #expect(await harness.source.starts.count == 1, "the publication completed from the file staging GC kept")
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-12: the invariant check reports every broken engine invariant it guards", .timeLimit(.minutes(1)))
     func invariantOracle() async throws {
         let harness = EngineHarness.make()
