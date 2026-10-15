@@ -102,18 +102,39 @@ struct LiveEngineHarness {
         return self.files().filter { $0.key.hasPrefix(prefix) }
     }
 
-    /// `CFNetworkDownload_*` files in the temporary directories a URLSession download could use (none expected: the
-    /// foreground transport uses data tasks, ADR-019).
-    static func networkTemporaries() -> Int {
+    /// The `CFNetworkDownload_*` files in the temporary directories a URLSession download could use (none expected:
+    /// the foreground transport uses data tasks, ADR-019), by path.
+    static func networkTemporaries() -> Set<String> {
         var directories = [FileManager.default.temporaryDirectory]
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         if confstr(_CS_DARWIN_USER_TEMP_DIR, &buffer, buffer.count) > 0 {
             let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
             directories.append(URL(fileURLWithPath: String(decoding: bytes, as: UTF8.self), isDirectory: true))
         }
-        return directories.reduce(0) { count, directory in
+        var paths: Set<String> = []
+        for directory in directories {
             let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-            return count + names.filter { $0.hasPrefix("CFNetworkDownload_") }.count
+            for name in names where name.hasPrefix("CFNetworkDownload_") {
+                paths.insert(directory.appendingPathComponent(name).path)
+            }
+        }
+        return paths
+    }
+
+    /// The `CFNetworkDownload_*` files created since `before` that hold bytes of one of `bodies` (their first bytes are
+    /// a run of a body, so a partial or a resumed download counts too). Other tests of the same process (the iOS
+    /// Simulator runs suites in parallel) create and remove such files of their own; only this test's bodies are its
+    /// bytes, and an empty file holds none.
+    static func networkTemporaries(since before: Set<String>, holding bodies: [Data]) -> [String] {
+        LiveEngineHarness.networkTemporaries().subtracting(before).sorted().filter { path in
+            guard let handle = FileHandle(forReadingAtPath: path) else {
+                return false
+            }
+            defer {
+                try? handle.close()
+            }
+            let head = (try? handle.read(upToCount: 4_096)) ?? Data()
+            return !head.isEmpty && bodies.contains { $0.range(of: head) != nil }
         }
     }
 
@@ -265,7 +286,8 @@ struct EngineLiveTransportTests {
         let outside = harness.files().keys.filter { !$0.hasPrefix(root) }
         #expect(outside.isEmpty, "files outside the store root: \(outside)")
         #expect(harness.staging().isEmpty, "the cancelled and failed partials were discarded")
-        #expect(LiveEngineHarness.networkTemporaries() <= temporaries, "no CFNetwork temporary file was created")
+        let created = LiveEngineHarness.networkTemporaries(since: temporaries, holding: [cancelled, paused, failed, page])
+        #expect(created.isEmpty, "no CFNetwork temporary file holds this test's bytes: \(created)")
         #expect(await harness.server.requests.contains { $0.target == "/media/failed.bin" })
         await harness.tearDown()
     }

@@ -9,8 +9,10 @@ import ZTronAssetTestSupport
 /// Event broadcast and backpressure (R-SYN-12, H-9, ADR-023).
 @Suite("Engine events")
 struct EngineEventsTests {
+    // Three minutes, not one: the sync takes about 10 s on macOS but 58 s under the thread sanitizer and 36 to 57 s on
+    // the iOS Simulator under load, where an overrun restarts the runner (F-17). No assertion depends on the limit.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(3)))
     func stalledSubscriberIsBounded() async throws {
         let concurrency = 8
         // Index commits of 10,000 records are coalesced to one per hour of manual time (the run needs very few), and
