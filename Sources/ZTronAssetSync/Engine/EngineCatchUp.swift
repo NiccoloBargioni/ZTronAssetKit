@@ -14,6 +14,8 @@ extension SyncEngine {
     func applyAndFollow(_ manifest: ValidatedManifest, etag: ETag?, eviction: EvictionPlan?) async -> Result<ApplyReport, StoreError> {
         self.state.manifestCatchUps += 1
         self.state.appliesInFlight += 1
+        // A waiting test seam re-evaluates its condition (an `apply` in flight is a state change like any other).
+        self.notifyObservers()
         let serial = self.state.ledgerForgets
         let result: Result<ApplyReport, StoreError>
         do {
@@ -147,6 +149,10 @@ extension SyncEngine {
     /// `apply` threw meanwhile, else releases the held jobs: those whose content the copy now names elsewhere were moved
     /// by `followApplied`, the rest start again (T11).
     func manifestCaughtUp() {
+        // Waiting test seams re-evaluate their conditions once the catch-up state is final for this turn.
+        defer {
+            self.notifyObservers()
+        }
         self.state.manifestCatchUps = max(0, self.state.manifestCatchUps - 1)
         guard self.state.manifestCatchUps == 0 else {
             return
