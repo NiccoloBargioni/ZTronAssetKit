@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
@@ -9,10 +8,12 @@ import ZTronAssetTestSupport
 /// Event broadcast and backpressure (R-SYN-12, H-9, ADR-023).
 @Suite("Engine events")
 struct EngineEventsTests {
-    // Three minutes, not one: the sync takes about 10 s on macOS but 58 s under the thread sanitizer and 36 to 57 s on
-    // the iOS Simulator under load, where an overrun restarts the runner (F-17). No assertion depends on the limit.
+    // Four minutes: the sync takes about 4 s in debug and 16 s under the thread sanitizer alone, but its in-suite
+    // sanitizer time grows with the host's load (115 s at a load of about 25 and 151 s near 73 before L4-R8 cut the
+    // engine's per-pump and per-settle passes; F-17). An overrun restarts the simulator runner (ios.md item 8). No
+    // assertion depends on the limit.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(3)))
+    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(4)))
     func stalledSubscriberIsBounded() async throws {
         let concurrency = 8
         // Index commits of 10,000 records are coalesced to one per hour of manual time (the run needs very few), and
@@ -25,38 +26,23 @@ struct EngineEventsTests {
         }
         await harness.serve(catalog)
         let engine = harness.engine
-        // Subscribed before `start()`, so the stalled subscriber sees the launch run from its first event.
+        // Subscribed before `start()`, so the stalled subscriber sees the launch run from its first event. Its queue
+        // records the most live slots it ever held, at every publication (no sampler evaluated after each mutation).
         let stalled = try await engine.subscribe().get()
-        // Every mutation re-evaluates condition waits: this one samples the backlog after each and never holds. It and
-        // the wait for the transfers read the engine directly: an introspection snapshot per mutation (what `waitUntil`
-        // evaluates) would dominate a 10,000-asset sync under the thread sanitizer (F-17).
-        let peak = Mutex(0)
-        let (registered, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
-        let sampler = Task {
-            await engine.awaitCondition { engine in
-                let backlog = engine.state.subscribers.values.reduce(0) { $0 + $1.liveCount }
-                peak.withLock { $0 = max($0, backlog) }
-                signal.yield()
-                return false
-            }
-        }
-        // The first evaluation runs in the turn that registers the sampler, before `start()` reaches the engine.
-        var registration = registered.makeAsyncIterator()
-        _ = await registration.next()
         try await harness.start()
         // Commit windows and install intervals pass on the manual clock; the manifest deadline must not.
-        // The clock moves only for the run's two commits: `apply` (once the manifest is fetched) and the stamp.
+        // The clock moves only for the run's two commits: `apply` (once the manifest is fetched) and the stamp. The wait
+        // for the transfers reads the engine directly: an introspection snapshot per mutation (what `waitUntil`
+        // evaluates) would dominate a 10,000-asset sync under the thread sanitizer (F-17).
         try await harness.drive(maxStep: 3_600) { !$0.jobsByState.isEmpty || $0.groups == 0 }
         await engine.awaitCondition { $0.state.jobs.isEmpty }
         try await harness.drive(maxStep: 3_600) { $0.groups == 0 }
-        sampler.cancel()
-        await sampler.value
-        signal.finish()
+        let peak = await engine.peakSubscriberBacklogForTests()
         // Progress keys: at most one transfer key per running non-bulk transfer (none here) plus run, snapshot and
         // conditions; subjects: client, run started, run finished, breaker, maintenance (bulk outcomes fold).
         let bound = (concurrency + 3) + 5
-        #expect(peak.withLock { $0 } <= bound, "peak backlog \(peak.withLock { $0 })")
-        #expect(peak.withLock { $0 } >= 3, "the stalled subscriber did accumulate a backlog")
+        #expect(peak <= bound, "peak backlog \(peak)")
+        #expect(peak >= 3, "the stalled subscriber did accumulate a backlog")
         await engine.shutdown()
         var slots: [EventSlot] = []
         var fetched = 0
@@ -99,10 +85,15 @@ struct EngineEventsTests {
         let waiter = Task { await engine.awaitAsset("viewed", lane: .userInitiated) }
         await engine.waitUntil { $0.running == 1 }
         for round in 0..<rounds {
+            // Each round starts once the collector has pulled everything published so far, so no emission is coalesced
+            // into a later one because the collector was not scheduled: the lower bound below does not depend on
+            // scheduling (L4-R8; the queue coalesces newest-wins per key and retires the key with the transfer, §7.9).
+            await engine.awaitCondition { $0.state.subscribers.values.allSatisfy { $0.liveCount == 0 } }
             await harness.source.release(entry.transferID, with: .progress(received: Int64(10 + round), expected: Int64(bytes.count)))
             harness.time.advance(by: 0.02)
             await engine.waitUntil { $0.running == 1 }
         }
+        await engine.awaitCondition { $0.state.subscribers.values.allSatisfy { $0.liveCount == 0 } }
         await harness.source.release(entry.transferID, with: .progress(received: Int64(bytes.count), expected: Int64(bytes.count)))
         _ = try await waiter.value.get()
         await engine.shutdown()
@@ -185,5 +176,12 @@ struct EngineEventsTests {
         }
         _ = await run.value
         await engine.shutdown()
+    }
+}
+
+extension SyncEngine {
+    /// Test seam: the most live slots any subscriber queue held (R-SYN-12's bound).
+    func peakSubscriberBacklogForTests() -> Int {
+        self.state.subscribers.values.map(\.peakLiveCount).max() ?? 0
     }
 }

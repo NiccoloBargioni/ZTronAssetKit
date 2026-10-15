@@ -17,31 +17,56 @@ extension SyncEngine {
 
     /// Transfers counted as running: downloading and not paused for preemption.
     var runningCount: Int {
-        self.state.jobs.values.reduce(0) { count, job in
-            job.state == .downloading && job.active?.preempting != true ? count + 1 : count
-        }
+        self.slotCounts.running
     }
 
-    /// Running user-initiated transfers.
-    private var runningUser: Int {
-        self.state.jobs.values.reduce(0) { count, job in
-            job.state == .downloading && job.active?.preempting != true && job.lane == .userInitiated ? count + 1 : count
-        }
-    }
+    /// The slot figures of `pump()`, in one pass over the jobs (each figure used to be its own pass, evaluated in every
+    /// loop condition; L4-R8 measured the passes as a third of a 10,000-asset sync's engine time under the sanitizer).
+    struct SlotCounts {
+        /// Downloading and not paused for preemption.
+        var running = 0
+        /// Running user-initiated transfers.
+        var runningUser = 0
+        /// Jobs of non-user lanes in downloading ∪ verifying ∪ committing (the pipeline cap gates only those, S2-10).
+        var nonUserPipeline = 0
 
-    /// Jobs of non-user lanes in downloading ∪ verifying ∪ committing (the pipeline cap gates only those, S2-10).
-    private var nonUserPipeline: Int {
-        self.state.jobs.values.reduce(0) { count, job in
-            guard job.lane < .userInitiated else {
-                return count
+        /// Counts a transfer `pump()` just started in `lane` (a start moves one queued job to downloading and changes
+        /// nothing else; a park or a fail-fast answer changes no running job, so the figures need no new pass then).
+        mutating func started(in lane: AssetPriority) {
+            self.running += 1
+            if lane == .userInitiated {
+                self.runningUser += 1
+            } else {
+                self.nonUserPipeline += 1
             }
+        }
+    }
+
+    /// The slot figures now.
+    var slotCounts: SlotCounts {
+        var counts = SlotCounts()
+        for job in self.state.jobs.values {
+            let lane = job.lane
             switch job.state {
-            case .downloading, .verifying, .committing:
-                return count + 1
-            default:
-                return count
+            case .downloading:
+                if job.active?.preempting != true {
+                    counts.running += 1
+                    if lane == .userInitiated {
+                        counts.runningUser += 1
+                    }
+                }
+                if lane < .userInitiated {
+                    counts.nonUserPipeline += 1
+                }
+            case .verifying, .committing:
+                if lane < .userInitiated {
+                    counts.nonUserPipeline += 1
+                }
+            case .queued, .blocked, .failed:
+                break
             }
         }
+        return counts
     }
 
     /// The slots user-initiated work may take: every slot, or `interactiveConcurrencyAtCritical` at `.critical`.
@@ -64,16 +89,23 @@ extension SyncEngine {
         self.materializeRun()
         self.materializeEnsures()
         let maximum = self.tuning.maxConcurrentTransfers
+        let userCap = self.userCap
         var guardCount = 0
         while guardCount < 10_000 {
             guardCount += 1
             var started = false
+            // One pass per round; a start in the round is counted in place (`SlotCounts.started(in:)`), and the next
+            // round, which follows any start, reads the jobs again.
+            var counts = self.slotCounts
             for kind in [LaneQueues.Kind.userSingle, .userBatch] {
-                while maximum - self.runningCount > 0, self.runningUser < self.userCap {
+                while maximum - counts.running > 0, counts.runningUser < userCap {
                     guard let transfer = self.popDispatchable(kind) else {
                         break
                     }
-                    started = self.dispatch(transfer) || started
+                    if self.dispatch(transfer) {
+                        started = true
+                        counts.started(in: self.state.jobs[transfer]?.lane ?? .userInitiated)
+                    }
                 }
             }
             if self.hasQueuedUser {
@@ -84,11 +116,14 @@ extension SyncEngine {
             }
             let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
             let pipelineCap = self.tuning.pipelineDepth * maximum
-            while maximum - self.runningCount > 0, self.runningCount - self.runningUser < nonUserCap, self.nonUserPipeline < pipelineCap {
+            while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
                 guard let transfer = self.nextNonUser() else {
                     break
                 }
-                started = self.dispatch(transfer) || started
+                if self.dispatch(transfer) {
+                    started = true
+                    counts.started(in: self.state.jobs[transfer]?.lane ?? .bulk)
+                }
                 self.materializeRun()
             }
             if !started {

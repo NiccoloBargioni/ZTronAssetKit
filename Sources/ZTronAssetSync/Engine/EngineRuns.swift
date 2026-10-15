@@ -538,6 +538,22 @@ extension SyncEngine {
         }
         // One read of the job table: a closure over `self.state` would copy the whole engine state per claim.
         let jobs = self.state.jobs
+        // Most calls find a claimed job still working for the run: then nothing can settle and nothing else is needed
+        // (a claim on a job that lost the run's interest is found by the pass below once no claimed job works; each
+        // lookup copies a job in debug and sanitizer builds, so the common answer takes one, L4-R8).
+        for (transfer, _) in current.outstanding {
+            guard let job = jobs[transfer], job.interests[current.token] != nil else {
+                continue
+            }
+            switch job.state {
+            case .blocked(.awaitingSpace):
+                return
+            case .blocked, .failed(.whenOnline):
+                continue
+            default:
+                return
+            }
+        }
         let orphaned = current.outstanding.keys.filter { jobs[$0]?.interests[current.token] == nil }
         if !orphaned.isEmpty {
             // A claim on a job that no longer holds the run's interest can never be answered (every path that moves or

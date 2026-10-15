@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
@@ -357,46 +358,104 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// Which of the two racing events comes first: the alarm that opens the pending run's gate, or the blocked run's own
+    /// task finishing the run (F-3).
+    enum GateOrder: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        /// The gate opens in the actor turn that settles the run, before the run's task can finish it.
+        case gateFirst
+        /// The run finishes, then the debounce passes on the manual clock.
+        case runFirst
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    // Each order is forced, not raced (L4-R8): the debounce keeps the real alarm asleep on the manual clock, and the
+    // gate-first order fires the pending run's deadline from a condition wait that runs in the turn that settles the
+    // run, before the run's task can resume.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished", .timeLimit(.minutes(1)))
-    func pendingRunGateOpensBeforeFinish() async throws {
-        // With no debounce the alarm that opens the gate races the blocked run's own task; whichever wins, the pending
-        // run must start. Repeated so that both orders occur.
-        for iteration in 0..<500 {
-            let harness = EngineHarness.make(tuning: SyncTuning(pendingRunDebounce: 0))
-            let catalog = EngineSyncTests.catalog(1)
-            await harness.serveManifest(catalog.map(\.0))
-            await harness.source.script(catalog[0].0.transferID, [.fail(.offline(.noConnection)), .stage(catalog[0].1)])
-            let probe = EventProbe(stream: try await harness.engine.subscribe().get())
-            try await harness.start()
-            let blocked = await probe.next { event in
-                if case .syncFinished = event {
+    @Test(
+        "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished",
+        .timeLimit(.minutes(1)),
+        arguments: GateOrder.allCases
+    )
+    func pendingRunGateOpensBeforeFinish(order: GateOrder) async throws {
+        let debounce: TimeInterval = 1
+        let harness = EngineHarness.make(tuning: SyncTuning(pendingRunDebounce: debounce))
+        let catalog = EngineSyncTests.catalog(1)
+        await harness.serveManifest(catalog.map(\.0))
+        await harness.source.script(catalog[0].0.transferID, [.fail(.offline(.noConnection)), .stage(catalog[0].1)])
+        let engine = harness.engine
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        // 0: waiting, 1: firing (a re-entrant evaluation while the deadline fires answers false), 2: fired.
+        let gate = Mutex(0)
+        var opener: Task<Void, Never>?
+        if order == .gateFirst {
+            let (registered, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+            opener = Task {
+                await engine.awaitCondition { engine in
+                    signal.yield()
+                    guard engine.state.run?.settlement != nil, engine.state.pendingRun != nil else {
+                        return false
+                    }
+                    let fire = gate.withLock { phase -> Bool in
+                        guard phase == 0 else {
+                            return false
+                        }
+                        phase = 1
+                        return true
+                    }
+                    guard fire else {
+                        return gate.withLock { $0 } == 2
+                    }
+                    engine.firePendingRunDeadlineForTests()
+                    gate.withLock { $0 = 2 }
                     return true
                 }
-                return false
             }
-            guard case .syncFinished(_, .blocked(.offline, _))? = blocked else {
-                Issue.record("iteration \(iteration): expected an offline run, got \(String(describing: blocked))")
-                break
-            }
-            let violations = await harness.engine.invariantViolations()
-            #expect(violations.isEmpty, "iteration \(iteration): \(violations)")
-            guard violations.isEmpty else {
-                // A stranded pending run never starts: waiting for it would only hang.
-                await probe.stop()
-                await harness.engine.shutdown()
-                break
-            }
-            let resumed = await probe.next { event in
-                if case .syncFinished(_, .complete(let report)) = event {
-                    return report.trigger == .conditionsChanged
-                }
-                return false
-            }
-            #expect(resumed != nil, "iteration \(iteration)")
-            await probe.stop()
-            await harness.engine.shutdown()
+            var registration = registered.makeAsyncIterator()
+            _ = await registration.next()
         }
+        try await harness.start()
+        let blocked = await probe.next { event in
+            if case .syncFinished = event {
+                return true
+            }
+            return false
+        }
+        guard case .syncFinished(_, .blocked(.offline, _))? = blocked else {
+            Issue.record("expected an offline run, got \(String(describing: blocked))")
+            opener?.cancel()
+            await probe.stop()
+            await engine.shutdown()
+            return
+        }
+        if order == .gateFirst {
+            await opener?.value
+            #expect(gate.withLock { $0 } == 2, "the gate opened before the blocked run's task finished it")
+        }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        guard violations.isEmpty else {
+            // A stranded pending run never starts: waiting for it would only hang.
+            await probe.stop()
+            await engine.shutdown()
+            return
+        }
+        if order == .runFirst {
+            await engine.waitUntil { $0.scheduledDeadlines >= 1 }
+            harness.time.advance(by: debounce)
+        }
+        let resumed = await probe.next { event in
+            if case .syncFinished(_, .complete(let report)) = event {
+                return report.trigger == .conditionsChanged
+            }
+            return false
+        }
+        #expect(resumed != nil)
+        await probe.stop()
+        await engine.shutdown()
     }
 
     @available(macOS 15.0, iOS 18.0, *)
@@ -485,5 +544,14 @@ struct EngineRunPathTests {
         }
         #expect(try await engine.metrics().get().integrityFailures == 1)
         await engine.shutdown()
+    }
+}
+
+extension SyncEngine {
+    /// Test seam: the alarm fires the pending run's deadline now, as `fireDue` does (the heap entry is consumed first).
+    /// It neither publishes nor notifies when a run is still in place, so a condition wait may call it.
+    func firePendingRunDeadlineForTests() {
+        self.state.heap.remove(.pendingRun)
+        self.pendingRunDeadlineFired()
     }
 }

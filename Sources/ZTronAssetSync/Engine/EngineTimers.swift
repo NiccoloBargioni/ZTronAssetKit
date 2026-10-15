@@ -93,14 +93,7 @@ extension SyncEngine {
             case .store:
                 storeDue = true
             case .pendingRun:
-                guard let pending = self.state.pendingRun else {
-                    continue
-                }
-                if pending.gate == .conditions, self.laneVerdict(.bulk) != .admit {
-                    self.state.pendingRun?.scheduled = false
-                    continue
-                }
-                self.fulfilPendingRun()
+                self.pendingRunDeadlineFired()
             case .progress(let slot):
                 self.flushProgress(slot, now: now)
             case .heal(let asset):
@@ -130,6 +123,20 @@ extension SyncEngine {
         self.pump()
         self.rearm()
         self.reconcileIdle()
+    }
+
+    /// The pending run's deadline (its debounce or throttle end) fired: the run starts unless conditions refuse bulk work
+    /// now (the watcher re-arms it), or a run still in place makes `fulfilPendingRun` leave it to that run's finish
+    /// (`reconsiderPendingRun`, F-3).
+    func pendingRunDeadlineFired() {
+        guard let pending = self.state.pendingRun else {
+            return
+        }
+        if pending.gate == .conditions, self.laneVerdict(.bulk) != .admit {
+            self.state.pendingRun?.scheduled = false
+            return
+        }
+        self.fulfilPendingRun()
     }
 
     /// After a breaker deadline fired, keeps the next one (a watchdog of a new probe) in the heap.

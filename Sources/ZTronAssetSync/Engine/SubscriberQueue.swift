@@ -77,6 +77,9 @@ struct SubscriberQueue {
     var pending: CheckedContinuation<AssetEvent?, Never>?
     /// Whether `clientShutDown` was published: nothing follows it.
     private(set) var finished = false
+    /// The most live slots the queue ever held: R-SYN-12's bound holds at every publication, not only where a sampler
+    /// happens to look (the 10,000-asset test reads it once instead of sampling after every mutation, L4-R8).
+    private(set) var peakLiveCount = 0
 
     /// Live slots (`EngineIntrospection.bufferedEvents`).
     var liveCount: Int {
@@ -114,6 +117,7 @@ struct SubscriberQueue {
             return (nil, true)
         }
         self.slots[slot] = Live(sequence: sequence, event: event)
+        self.peakLiveCount = max(self.peakLiveCount, self.slots.count)
         self.order.append((sequence, slot))
         self.compactIfNeeded()
         return (nil, false)
