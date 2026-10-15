@@ -11,10 +11,19 @@ extension SyncEngine {
     /// An `apply` that throws may have written in memory first (its index commit failed, or it was cancelled while
     /// waiting for the commit window; ADR-050): the engine then forgets every binding it remembers (an eviction or prune
     /// it never saw may have ended any of them; L4-R5) and re-reads the store once no `apply` is in flight (L4-R10).
+    /// One `apply` at a time reaches the store, and the next only after the engine followed it (`takeApplyTurn`): the
+    /// engine then follows its applies in the store's commit order, whatever the priorities of the tasks that resume.
     func applyAndFollow(_ manifest: ValidatedManifest, etag: ETag?, eviction: EvictionPlan?) async -> Result<ApplyReport, StoreError> {
         self.state.manifestCatchUps += 1
+        // A waiting test seam re-evaluates its condition (an `apply` begun, and below one in flight, is a state change
+        // like any other).
+        self.notifyObservers()
+        // REENTRANCY: f-13 (proposed) — the lifecycle: an apply whose turn came after shutdown began sends nothing.
+        guard await self.takeApplyTurn() else {
+            self.manifestCaughtUp()
+            return .failure(.closed)
+        }
         self.state.appliesInFlight += 1
-        // A waiting test seam re-evaluates its condition (an `apply` in flight is a state change like any other).
         self.notifyObservers()
         let serial = self.state.ledgerForgets
         let result: Result<ApplyReport, StoreError>
@@ -44,8 +53,56 @@ extension SyncEngine {
         case .success, .failure:
             break
         }
+        self.passApplyTurn()
         self.manifestCaughtUp()
         return result
+    }
+
+    /// Waits until no other engine `apply` holds the turn (one sent to the store and not yet followed), then takes it;
+    /// `false`, without the turn, when the engine stopped running meanwhile (shutdown resumes every waiter). Waiters go
+    /// in ticket order; a waiter that finds the turn taken again keeps its ticket.
+    private func takeApplyTurn() async -> Bool {
+        var ticket: UInt64?
+        while self.state.applyTurnHeld {
+            let mine = ticket ?? self.nextApplyTicket()
+            ticket = mine
+            // REENTRANCY: f-13 (proposed) — the lifecycle and the turn, both re-read below: resumed once by
+            // `passApplyTurn` (the turn is free then, unless an apply that never waited took it first) or by shutdown.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.state.applyQueue[mine] = continuation
+            }
+            guard self.isRunning else {
+                return false
+            }
+        }
+        guard self.isRunning else {
+            return false
+        }
+        self.state.applyTurnHeld = true
+        return true
+    }
+
+    /// The next waiting ticket.
+    private func nextApplyTicket() -> UInt64 {
+        self.state.lastApplyTicket &+= 1
+        return self.state.lastApplyTicket
+    }
+
+    /// Frees the turn once the engine followed its `apply` (or its failure), and wakes the waiter with the lowest ticket.
+    private func passApplyTurn() {
+        self.state.applyTurnHeld = false
+        if let ticket = self.state.applyQueue.keys.min() {
+            self.state.applyQueue.removeValue(forKey: ticket)?.resume()
+        }
+    }
+
+    /// Shutdown: every apply still waiting for its turn is resumed and sends nothing (`takeApplyTurn`).
+    func releaseApplyQueue() {
+        let waiting = self.state.applyQueue
+        self.state.applyQueue.removeAll()
+        for ticket in waiting.keys.sorted() {
+            waiting[ticket]?.resume()
+        }
     }
 
     /// Test seam: the follow-up of the next `apply` to return from the store waits until `releaseApplyFollow()`, so a

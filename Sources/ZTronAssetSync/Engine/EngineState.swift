@@ -48,9 +48,18 @@ struct EngineState {
     /// in-memory state stays authoritative), so once no `apply` is in flight the engine re-reads the store and follows
     /// it (`catchUpWithStore`, L4-R10).
     var catchUpAfterFailedApply = false
-    /// Store `apply` calls in flight (a subset of `manifestCatchUps`). A store view read while one is may show its
-    /// in-memory writes before the engine follows them, or miss them: it is not followed (`followStoreView`).
+    /// Store `apply` calls in flight (a subset of `manifestCatchUps`): sent to the store and not yet followed, so at most
+    /// one (`applyTurnHeld`). A store view read while one is may show its in-memory writes before the engine follows
+    /// them, or miss them: it is not followed (`followStoreView`).
     var appliesInFlight = 0
+    /// One engine `apply` at a time holds the turn, from before it reaches the store until the engine has followed it
+    /// (`takeApplyTurn`, `passApplyTurn`): the engine follows its applies in the order the store commits them, so an
+    /// older report can never be followed after a newer one (review of close-out cycle 4, PROBE-C4-4).
+    var applyTurnHeld = false
+    /// Applies waiting for the turn, by ticket (the lowest goes next); each counts in `manifestCatchUps` meanwhile.
+    var applyQueue: [UInt64: CheckedContinuation<Void, Never>] = [:]
+    /// The last ticket handed out.
+    var lastApplyTicket: UInt64 = 0
     /// Test seam (close-out cycle 5): the follow-up of the next `apply` to return from the store waits until a test
     /// releases it (`holdNextApplyFollow()`, `releaseApplyFollow()`), so the test decides what the engine does in
     /// between. No production path arms it.

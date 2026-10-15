@@ -367,7 +367,9 @@ extension SyncEngine {
     /// in-memory writes has already advanced (ADR-050): a later `apply` of that manifest, or of any manifest that also
     /// drops those ids, reports no prune for them, and the catch-up the failure owes then finds the copy equal to the
     /// store, so they would never be announced (review of close-out cycle 3, PROBE-C3-7). An id is announced when it
-    /// leaves the copy, here or in `followStoreView`, so it is announced once. Empty when the store diffed against the
+    /// leaves the copy, here or in `followStoreView`, so it is announced once: the engine follows its applies in the
+    /// store's commit order (`takeApplyTurn`), so a report is never followed after a newer one (PROBE-C4-4), and a view
+    /// is followed only when no `apply` was in flight during its read. Empty when the store diffed against the
     /// copy (its prunes are then exactly these ids). One pass over the copy with O(1) lookups (about 6 to 8 ms for
     /// 100,000 ids, measured in an optimised build), the pass a catch-up makes, and nothing when the copy is `manifest`.
     private func prunesUnreported(by report: ApplyReport, in manifest: ValidatedManifest) -> [AssetID] {
