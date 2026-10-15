@@ -521,6 +521,13 @@ extension SyncEngine {
             }
             return
         }
+        defer {
+            if let previous = request.resume?.previous {
+                // A resumed attempt took the earlier partial over by an exclusive rename; the earlier attempt's sidecar
+                // is garbage whatever the outcome (the next resume point is read from this attempt's own names).
+                self.discardLater(previous)
+            }
+        }
         switch update {
         case .staged(let file):
             let downloaded = PlanBuilder.adding(self.state.metrics.bytesDownloaded, file.byteCount)
@@ -536,6 +543,17 @@ extension SyncEngine {
             await self.failed(transfer, epoch: epoch, request: request, error: error)
         case .progress:
             return
+        }
+    }
+
+    /// Removes a staging file and its sidecar in an owned task (idempotent; never blocks the caller's turn).
+    func discardLater(_ name: StagingFileName) {
+        guard let staging = self.state.staging else {
+            return
+        }
+        self.spawn(.entry) { _ in
+            // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal that completes regardless of cancellation.
+            await staging.discard(name)
         }
     }
 
