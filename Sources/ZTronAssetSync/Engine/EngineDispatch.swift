@@ -575,6 +575,11 @@ extension SyncEngine {
         if await self.answeredFromStore(transfer, epoch: epoch, attempt: request.attempt) {
             return
         }
+        // Shutdown (or a degradation) may have begun during the reads: an attempt of an engine that is not running is
+        // cancelled without a drain below anyway, so no request is sent for it (close-out cycle 4, F-24).
+        guard self.isRunning else {
+            return
+        }
         // Counted where the request is sent: an attempt answered from the store sent none.
         self.state.metrics.transferRequests += 1
         if self.state.jobs[transfer]?.interests.values.contains(where: { $0.kind == .waiter }) == true {
