@@ -90,7 +90,9 @@ struct EngineHarness {
         fileSystem existing: FakeFileSystem? = nil,
         sink existingSink: ScriptedSnapshotSink? = nil,
         remote: (any RemoteSource)? = nil,
-        factory: (any RemoteSourceFactory)? = nil
+        factory: (any RemoteSourceFactory)? = nil,
+        legacy: LegacyMigrationPolicy = LegacyMigrationPolicy(enabled: false),
+        legacyDefaults: FakeLegacyDefaults = FakeLegacyDefaults()
     ) -> EngineHarness {
         let fileSystem = existing ?? FakeFileSystem(
             disk: disk,
@@ -110,14 +112,14 @@ struct EngineHarness {
             conditions: conditionsSource,
             remoteSources: factory ?? FakeRemoteSourceFactory(source: remote ?? source),
             appVersion: FakeAppVersionSource(version: appVersion),
-            legacyDefaults: FakeLegacyDefaults(),
+            legacyDefaults: legacyDefaults,
             memoryPressure: pressure,
             logTap: tap
         )
         let storeConfiguration = StoreConfiguration(
             location: .applicationSupport,
             policy: storage,
-            legacy: LegacyMigrationPolicy(enabled: false),
+            legacy: legacy,
             limits: ManifestLimits(),
             commitMinimumInterval: commitInterval,
             snapshotInstallInterval: installInterval
