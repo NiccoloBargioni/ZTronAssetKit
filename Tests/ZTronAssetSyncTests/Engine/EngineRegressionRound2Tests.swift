@@ -104,6 +104,38 @@ struct EngineRegressionRound2Tests {
         await engine.shutdown()
     }
 
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: an id a shared publication cannot bind because the store moved it to new content follows that content", .timeLimit(.minutes(1)))
+    func sharedPublicationPartlyBound() async throws {
+        let harness = EngineHarness.make()
+        let shared = EngineFixture.bytes(2_121)
+        let c2 = EngineFixture.bytes(2_122)
+        let a = EngineHarness.onDemand("a", shared)
+        let b1 = EngineHarness.onDemand("b", shared)
+        let b2 = EngineHarness.onDemand("b", c2)
+        await harness.serveManifest([a, b1])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.source.script(a.transferID, [.hold, .stage(shared), .stage(shared)])
+        await harness.source.script(b2.transferID, [.stage(c2)])
+        let first = Task { await engine.awaitAsset("a", lane: .userInitiated) }
+        await engine.waitUntil { $0.running == 1 }
+        let second = Task { await engine.awaitAsset("b", lane: .userInitiated) }
+        await engine.waitUntil { $0.waiters == 2 }
+        await engine.waitForHandle(a.transferID)
+        // The store applies v2 (b's content changed) behind the engine's back, then the shared publication lands.
+        let v2 = try ValidatedManifest(entries: [a, b2], digest: ContentHash.sha256(of: Data("v2".utf8)))
+        _ = try await harness.store.apply(v2, etag: nil, eviction: nil)
+        await harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        #expect(await first.value.map(\.byteSize) == .success(Int64(shared.count)))
+        let followed = await second.value
+        #expect(followed.map(\.byteSize) == .success(Int64(c2.count)), "b follows its content in the store, got \(followed)")
+        #expect(await engine.appliedTransferForTests("b") == b2.transferID)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
     // MARK: A purge while a run's apply commits (F-18 principle: the engine follows the store)
 
     @available(macOS 15.0, iOS 18.0, *)
@@ -223,6 +255,22 @@ struct EngineRegressionRound2Tests {
         let resolved = await engine.awaitAsset("b", lane: .userInitiated)
         #expect(resolved.map(\.byteSize) == .success(Int64(bBytes.count)), "the join re-checks the headroom, got \(resolved)")
         #expect(await harness.source.starts.filter { $0.id == b.transferID }.count == 1)
+        await engine.releaseGroup(group)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a prefetch that joins a job parked for lack of space starts it once it fits", .timeLimit(.minutes(1)))
+    func parkedJobReevaluatedOnSameLaneJoin() async throws {
+        let (harness, b, _, group) = try await EngineRegressionRound2Tests.parkedBehindAnotherTransfer(2_331)
+        let engine = harness.engine
+        // Same lane: no promotion re-runs admission, the join itself re-checks the headroom.
+        let joiner = try await engine.registerGroup(["b"], lane: .prefetch).get()
+        await engine.waitForJobEnd(b.transferID)
+        #expect(try await harness.view().records["b"]?.referencedBlob != nil)
+        #expect(await harness.source.starts.filter { $0.id == b.transferID }.count == 1)
+        await engine.releaseGroup(joiner)
         await engine.releaseGroup(group)
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
@@ -599,6 +647,33 @@ struct EngineRegressionRound2Tests {
             appVersion: appVersion
         )
         return (second, source, entry)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-3: at launch, staging files nobody can use are discarded: another transfer's partial, and a finished download that fails verification", .timeLimit(.minutes(1)))
+    func launchDiscardsUnusableStaging() async throws {
+        let time = ManualTimeSource()
+        let bytes = EngineFixture.bytes(2_921)
+        let entry = EngineHarness.onDemand("done", bytes)
+        let first = try await EngineLaunchTests.firstLifetime([entry], time: time)
+        let fileSystem = FakeFileSystem(disk: first.fileSystem.survivingDisk(), time: time)
+        let layout = StoreLayout(base: EngineHarness.base)
+        // The OS finished a download whose bytes do not match the entry (same length), and a partial of a transfer the
+        // manifest no longer wants is left over.
+        let finished = StagingFileName(transfer: entry.transferID, attempt: TransferAttempt(epoch: 1, sequence: 4), kind: .partial)
+        try fileSystem.write(EngineFixture.bytes(2_999), to: layout.stagingURL(finished), mode: .truncate)
+        let stranger = EngineHarness.onDemand("gone", EngineFixture.bytes(2_922))
+        let orphan = StagingFileName(transfer: stranger.transferID, attempt: TransferAttempt(epoch: 1, sequence: 5), kind: .partial)
+        try fileSystem.write(Data(repeating: 1, count: 64), to: layout.stagingURL(orphan), mode: .truncate)
+        let source = FakeRemoteSource(capabilities: EngineLaunchTests.background)
+        await source.scriptReattached([ReattachedTransfer(name: finished, isRunning: false, bytesReceived: Int64(bytes.count))])
+        let second = EngineHarness.make(time: time, source: source, fileSystem: fileSystem)
+        try await second.start()
+        #expect(try fileSystem.itemInfo(at: layout.stagingURL(finished)) == nil, "a finished download that fails verification is discarded")
+        #expect(try fileSystem.itemInfo(at: layout.stagingURL(orphan)) == nil, "a partial nobody wants is discarded")
+        #expect(try await second.view().records["done"]?.referencedBlob == nil, "nothing was adopted")
+        #expect(await source.starts.isEmpty)
+        await second.engine.shutdown()
     }
 
     @available(macOS 15.0, iOS 18.0, *)

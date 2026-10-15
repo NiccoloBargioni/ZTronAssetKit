@@ -707,6 +707,7 @@ extension SyncEngine {
             // to the interests present now.
             locations = try await self.store.publish(file, binding: ids, expecting: identity, urgency: lane)
         } catch {
+            // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.publicationFailed(transfer, epoch: epoch, file: file, error: error, cancelledAttempt: cancelledAttempt)
             return
         }
