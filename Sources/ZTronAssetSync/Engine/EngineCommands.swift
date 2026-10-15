@@ -818,8 +818,8 @@ extension SyncEngine {
         }
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: false) { engine, _ in
-            // REENTRANCY: RE-S30 — nothing: a snapshot of who holds the blob now; each holder is re-read from the store's
-            // records after the quarantine before it is announced or healed.
+            // REENTRANCY: f-12 (proposed) — nothing: a snapshot of who holds the blob now; each holder is re-read from the
+            // store's records after the quarantine before it is announced or healed.
             let holders = await engine.blobHolders(of: id)
             do throws(StoreError) {
                 // REENTRANCY: RE-S30 — the lifecycle.
@@ -869,7 +869,8 @@ extension SyncEngine {
     private func blobHolders(of id: AssetID) async -> [AssetID] {
         let view: StorePlanningView
         do {
-            // REENTRANCY: RE-S30 — the lifecycle (re-read by the caller's next step); the records are a snapshot.
+            // REENTRANCY: f-12 (proposed) — nothing: the records are a snapshot, re-read after the quarantine; the caller's
+            // next step re-validates the lifecycle.
             view = try await self.store.planningView()
         } catch {
             return []
@@ -877,7 +878,7 @@ extension SyncEngine {
         guard let key = view.records[id]?.referencedBlob else {
             return []
         }
-        // REENTRANCY: RE-S07 — nothing: a pure scan of the snapshot off the actor.
+        // REENTRANCY: f-12 (proposed) — nothing: a pure scan of the snapshot off the actor (C2).
         return await SyncEngine.holdersOffActor(of: key, besides: id, in: view.records)
     }
 
