@@ -256,12 +256,14 @@ struct EngineHarness {
         try await self.conditions.requireObservers(equalTo: 0)
     }
 
-    /// Runs `sync(.force)` while driving the clock (store commit windows and the alarm need time to pass).
+    /// Runs `sync(.force)` while driving the clock (store commit windows and the alarm need time to pass). The
+    /// clock never jumps by half the manifest fetch deadline or more, so a fetch still in flight (the launch run's,
+    /// which `sync` joins) is never timed out by the driver.
     func syncDriven(_ mode: SyncMode = .force) async throws -> SyncOutcome {
         let engine = self.engine
         let run = Task { await engine.sync(mode) }
         await engine.waitUntil { $0.groups >= 1 || $0.lifecycle != .running }
-        try await self.drive { $0.groups == 0 }
+        try await self.drive(maxStep: self.configuration.tuning.manifestFetchDeadline / 2) { $0.groups == 0 }
         return await run.value
     }
 }
