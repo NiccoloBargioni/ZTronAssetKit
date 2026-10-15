@@ -125,6 +125,9 @@ struct EngineCommandTests {
         let group = try await engine.registerGroup(["shared"], lane: .prefetch).get()
         let caller = Task { await engine.ensureAvailable(scope: .identifiers(["alone", "shared"])) }
         await engine.waitUntil { $0.running == 2 && $0.groups == 2 }
+        // Both drivers hold their handles, so a withdrawal cancels in the turn that retires the job (a handle still on
+        // its way is cancelled by its driver later, which the control log would see only by timing).
+        await engine.waitForAllHandles()
         caller.cancel()
         #expect(await caller.value == .failure(.cancelled))
         await engine.waitUntil { $0.groups == 1 && $0.running == 1 }
@@ -207,6 +210,8 @@ struct EngineCommandTests {
         let engine = harness.engine
         let run = Task { await engine.sync(.force) }
         await engine.waitUntil { $0.running == 2 }
+        // Both drivers hold their handles, so the purge's withdrawal cancels in the turn that retires each job.
+        await engine.waitForAllHandles()
         _ = try await harness.withClock { try await engine.purge(.all).get() }
         #expect(await run.value == .failed(.cancelled))
         await engine.waitUntil { $0.jobsByState.isEmpty }

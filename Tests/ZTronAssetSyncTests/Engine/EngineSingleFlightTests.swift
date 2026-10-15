@@ -71,6 +71,8 @@ struct EngineSingleFlightTests {
         let engine = harness.engine
         let callers = (0..<100).map { _ in Task { await engine.awaitAsset("shared", lane: .userInitiated) } }
         await engine.waitUntil { $0.waiters == 100 && $0.running == 1 }
+        // The driver holds its handle, so the last withdrawal cancels in the turn that retires the job.
+        await engine.waitForAllHandles()
         for (index, caller) in callers.dropLast().enumerated() {
             caller.cancel()
             await engine.waitUntil { $0.waiters == 99 - index }
