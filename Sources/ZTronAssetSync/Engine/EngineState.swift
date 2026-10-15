@@ -172,6 +172,9 @@ struct EngineState {
     /// The alarm's `store.runDueWork()` and what follows it (a free-space read after reaped bytes) are under way: the
     /// store deadline is cleared meanwhile, yet that work may still reap.
     var storeWorkInFlight = false
+    /// A re-read of the store's next deadline is under way for a job parked `awaitingSpace` while none was armed
+    /// (`ensureSpaceWake`).
+    var spaceDeadlineReread = false
 
     // MARK: Conditions (R-SYN-7, R-SYN-13)
 

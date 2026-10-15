@@ -289,6 +289,10 @@ extension SyncEngine {
             self.scheduleBreakerDeadline()
         }
         self.failFast(transfer, reason: reason)
+        if reason == .awaitingSpace {
+            // Only the store's due work wakes it: make sure something will run that work.
+            self.ensureSpaceWake()
+        }
         self.notifyObservers()
     }
 

@@ -126,6 +126,8 @@ extension SyncEngine {
                 self.unblock { $0 == .awaitingSpace }
             }
         }
+        // The store's work is over: a job still waiting for space with no store deadline armed has no wake left.
+        self.settleUnwakeableSpaceWaits()
         self.pump()
         self.rearm()
         self.reconcileIdle()
@@ -175,7 +177,8 @@ extension SyncEngine {
         await self.refreshStoreDeadline()
     }
 
-    /// Replaces the heap's store entry.
+    /// Replaces the heap's store entry; a cleared one leaves jobs waiting for space without a wake (see
+    /// `settleUnwakeableSpaceWaits`).
     func setStoreDeadline(_ deadline: MonotonicInstant?) {
         self.state.storeDeadline = deadline
         if let deadline {
@@ -185,6 +188,62 @@ extension SyncEngine {
         }
         self.rearm()
         self.reconcileIdle()
+        self.settleUnwakeableSpaceWaits()
+    }
+
+    // MARK: Waiting for reclaimed space (ADR-022, S1-14; review of close-out cycle 4)
+
+    /// Whether something will run the store's due work, the only wake of a job parked `awaitingSpace`: an armed store
+    /// deadline, the alarm's store work under way, or a re-read of the store's deadline in flight.
+    var spaceWakeExpected: Bool {
+        self.state.storeDeadline != nil || self.state.storeWorkInFlight || self.state.spaceDeadlineReread
+    }
+
+    /// A job was parked `awaitingSpace`: the bytes it waits for are reclaimed only by `runDueWork()`, which only the
+    /// store deadline brings. When none is armed, the store's next deadline is read again (the engine's copy may predate
+    /// work the store took on since); `settleUnwakeableSpaceWaits` then decides.
+    func ensureSpaceWake() {
+        guard self.isRunning, !self.spaceWakeExpected else {
+            return
+        }
+        self.state.spaceDeadlineReread = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle.
+            await engine.rereadStoreDeadlineForSpace()
+        }
+        if spawned == nil {
+            self.state.spaceDeadlineReread = false
+        }
+    }
+
+    /// The re-read `ensureSpaceWake` owes; jobs still without a wake afterwards are settled.
+    private func rereadStoreDeadlineForSpace() async {
+        // REENTRANCY: RE-S40 — the lifecycle; a stale entry is replaced by the newest deadline, and the parked jobs are
+        // re-read below.
+        await self.refreshStoreDeadline()
+        self.state.spaceDeadlineReread = false
+        self.settleUnwakeableSpaceWaits()
+    }
+
+    /// Jobs parked `awaitingSpace` while nothing will run the store's due work (no store deadline, no store work under
+    /// way, no re-read in flight): the store counts the bytes they wait for as pending reclaim but schedules nothing that
+    /// reclaims them on time alone (their blocker is an acknowledgement or a commit only its later work brings), so no
+    /// alarm would ever wake them and their callers waited until they gave up. They are parked `insufficientSpace`
+    /// instead (ARCHITECTURE §7.6's row for a shortage without pending reclaim): waiters and ensures get the typed
+    /// figures at once, a run settles blocked and stays due, and the job is re-admitted at any later free-space read that
+    /// holds it, a read after reaped bytes included.
+    func settleUnwakeableSpaceWaits() {
+        guard self.isRunning, !self.spaceWakeExpected else {
+            return
+        }
+        var settled = false
+        for transfer in self.state.jobs.keys.sorted() where self.state.jobs[transfer]?.state == .blocked(.awaitingSpace) {
+            self.park(transfer, reason: .insufficientSpace)
+            settled = true
+        }
+        if settled {
+            self.checkRunSettled()
+        }
     }
 
     /// A manifest fetch outlived `manifestFetchDeadline`: runs waiting for it use the applied manifest (T2-14).
