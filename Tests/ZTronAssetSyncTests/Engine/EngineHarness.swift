@@ -89,7 +89,8 @@ struct EngineHarness {
         seed: UInt64 = 0x5EED,
         fileSystem existing: FakeFileSystem? = nil,
         sink existingSink: ScriptedSnapshotSink? = nil,
-        remote: (any RemoteSource)? = nil
+        remote: (any RemoteSource)? = nil,
+        factory: (any RemoteSourceFactory)? = nil
     ) -> EngineHarness {
         let fileSystem = existing ?? FakeFileSystem(
             disk: disk,
@@ -107,7 +108,7 @@ struct EngineHarness {
             time: time,
             random: SeededRandom(seed: seed),
             conditions: conditionsSource,
-            remoteSources: FakeRemoteSourceFactory(source: remote ?? source),
+            remoteSources: factory ?? FakeRemoteSourceFactory(source: remote ?? source),
             appVersion: FakeAppVersionSource(version: appVersion),
             legacyDefaults: FakeLegacyDefaults(),
             memoryPressure: pressure,
