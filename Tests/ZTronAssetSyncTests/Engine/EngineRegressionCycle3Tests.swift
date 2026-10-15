@@ -316,6 +316,39 @@ struct EngineRegressionCycle3Tests {
         await engine.shutdown()
     }
 
+    // MARK: One insufficientSpace convention at the ledger's parking site (F-22; review of close-out cycle 2, M-JOBS)
+
+    /// The third site of F-22's convention, which no test pinned: a job the headroom ledger parks for lack of space,
+    /// with no ENOSPC before it and nothing to reclaim, answers its waiter with the bytes it needs against the room
+    /// above the reserve. Under mutant M-JOBS (the raw volume, reserve included) `available` exceeds both.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a waiter of a job the ledger parks for lack of space gets the bytes it needs and the room above the reserve", .timeLimit(.minutes(1)))
+    func parkedFiguresExcludeTheReserve() async throws {
+        let room: Int64 = 100
+        let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + room)
+        let bytes = EngineFixture.bytes(9_961, count: 300)
+        let entry = EngineHarness.onDemand("big", bytes)
+        await harness.serveManifest([entry])
+        await harness.source.script(entry.transferID, [.stage(bytes)])
+        try await harness.start()
+        let engine = harness.engine
+        // The run reads the free space; the on-demand entry is not fetched by it.
+        _ = await engine.sync(.force)
+        #expect(await engine.readForTests { $0.state.freeSpace != nil }, "setup: the engine holds a free-space reading")
+        let result = await engine.awaitAsset("big", lane: .userInitiated)
+        guard case .failure(.insufficientSpace(let required, let available)) = result else {
+            Issue.record("expected insufficientSpace, got \(result)")
+            await engine.shutdown()
+            return
+        }
+        #expect(required == Int64(bytes.count), "the entry's size: \(required)")
+        #expect(available <= room, "the room above the reserve, never the raw volume: \(available)")
+        #expect(available < required)
+        #expect(await harness.source.starts.filter { $0.id == entry.transferID }.isEmpty, "parked by the ledger, never started")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
     // MARK: A store view older than the copy is never followed (review of close-out cycle 2, by reading)
 
     /// A catch-up (or a resolve, a prefetch join, a point admission) reads the store's view, and an `apply` the engine
