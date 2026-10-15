@@ -31,7 +31,7 @@ struct EngineRegressionCycle4Tests {
     /// holds when the second ensure applies a later manifest that does not list `z` either.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
-        "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of the same manifest commits",
+        "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits",
         .timeLimit(.minutes(1)),
         arguments: SecondManifest.allCases
     )
