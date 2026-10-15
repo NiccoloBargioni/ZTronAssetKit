@@ -110,35 +110,40 @@ extension SyncEngine {
             _ = retryAfter
         case .permanentMissing:
             self.transition(transfer, to: .failed(.untilEntryChanges))
-            // A 404 for content never fails an asset the store holds at that content (R-NET-6, L4-R5): the ids the
-            // store shows present are answered from it and left out of the recorded failure.
-            let view: StorePlanningView?
-            do {
-                // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch below; the present ids are read from
-                // this snapshot, and the job's own ids are re-read after it.
-                view = try await self.store.planningView()
-            } catch {
-                view = nil
+            // A 404 for content never fails an asset the store holds at that content (R-NET-6, L4-R5): an id the store
+            // serves at its current content (a location that is not stale) while the engine's copy maps it to this
+            // content is answered from the store and left out of the recorded failure. One O(1) read per id of the job,
+            // never a whole planning view.
+            var present: Set<AssetID> = []
+            for id in job.assets.sorted() where self.state.applied.entry(for: id)?.transferID == transfer {
+                // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch, re-checked after the reads; the
+                // interests answered from the store are those the job holds then.
+                if let location = await self.store.location(for: id, extensions: [], recordingAccess: false), !location.isStale {
+                    present.insert(id)
+                }
             }
-            guard self.isRunning, let current = self.state.jobs[transfer], current.epoch == epoch else {
+            guard self.isRunning else {
                 return
             }
-            if let view {
-                self.noteBound(from: view, ids: current.assets)
+            for id in present {
+                self.state.boundContent[id] = transfer
             }
-            let present = current.assets.filter { self.isBound($0, to: transfer) }
-            self.answerPresentMembers(of: transfer, present)
-            if self.state.jobs[transfer]?.interests.isEmpty == true {
-                // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
-                self.removeJob(transfer)
+            if let current = self.state.jobs[transfer], current.epoch == epoch {
+                self.answerPresentMembers(of: transfer, present)
+                if self.state.jobs[transfer]?.interests.isEmpty == true {
+                    // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
+                    self.removeJob(transfer)
+                }
             }
-            let ids = current.assets.subtracting(present).sorted()
+            // The failure is persisted for the job's absent ids even when the job ended meanwhile (ADR-032: no run and no
+            // relaunch requests the content again before its entry changes).
+            let ids = job.assets.subtracting(present).sorted()
             self.forgetBound(ids)
             if !ids.isEmpty {
                 do {
                     // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store re-checks the
                     // identity itself.
-                    try await self.store.recordFailure(ids, identity: current.identity, reason: .notFound)
+                    try await self.store.recordFailure(ids, identity: job.identity, reason: .notFound)
                 } catch {
                     self.record(ids.first, .storage, "recording a 404 failed: \(error)")
                 }
