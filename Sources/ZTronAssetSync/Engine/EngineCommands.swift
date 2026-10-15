@@ -779,7 +779,7 @@ extension SyncEngine {
             if !verification.corrupt.isEmpty {
                 // REENTRANCY: RE-S30 — the lifecycle; the quarantined assets are announced and their re-downloads
                 // scheduled from the records read as a snapshot (as after `reportUnreadable`).
-                await self.quarantined(verification.corrupt)
+                await self.quarantined(verification.corrupt, sharing: nil)
             }
             if self.state.migration.deferred, self.state.migration.pending, !expired() {
                 self.startMigration()
@@ -841,23 +841,25 @@ extension SyncEngine {
         return .failure(.cancelled)
     }
 
-    /// Announces quarantined assets and schedules their re-downloads. `ids` are the assets the store reported (every
-    /// holder of a corrupt blob, for deep verification); `holders` are other assets that referenced a reported asset's
-    /// blob before the quarantine (`reportUnreadable` reports only its id, yet the store quarantines every holder of the
-    /// blob, R-CLN-8): each one the store's records show quarantined or failed afterwards is announced and healed too.
-    private func quarantined(_ ids: [AssetID], sharing holders: [AssetID] = []) async {
-        if holders.isEmpty {
+    /// Announces quarantined assets and schedules their re-downloads. `ids` are the assets the store reported: every
+    /// holder of a corrupt blob, for deep verification (`holders` is `nil`). `reportUnreadable` reports only its id, yet
+    /// the store quarantines every holder of the blob (R-CLN-8): `holders` are the other assets that referenced it in a
+    /// snapshot taken before the quarantine, and each one the store's records show quarantined or failed afterwards is
+    /// announced and healed too.
+    private func quarantined(_ ids: [AssetID], sharing holders: [AssetID]?) async {
+        if holders == nil {
             self.forgetBound(ids)
         } else {
-            // The store quarantined holders of the blob the engine may know only partly (one gained between the snapshot
-            // and the quarantine is in no list): no binding is trusted; an attempt asks the store first (L4-R5).
+            // The store quarantined holders of the blob the engine knows only from a snapshot (one gained between the
+            // snapshot and the quarantine, or every one when the snapshot could not be read, is in no list): no binding
+            // is trusted; an attempt asks the store first (L4-R5).
             self.dropBindings()
         }
         for id in ids {
             self.broadcast(.assetRemoved(id, .quarantined))
         }
         // REENTRANCY: RE-S30 — the lifecycle.
-        await self.scheduleHeals(ids, sharing: holders)
+        await self.scheduleHeals(ids, sharing: holders ?? [])
         // REENTRANCY: RE-S40 — the lifecycle.
         await self.refreshStoreDeadline()
     }
