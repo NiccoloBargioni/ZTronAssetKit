@@ -18,8 +18,12 @@ extension SyncEngine {
         return record.entry.transferID == transfer
     }
 
-    /// Records what a store view shows for `ids`: an id present at its applied entry's content is bound to it.
-    func noteBound(from view: StorePlanningView, ids: some Sequence<AssetID>) {
+    /// Records what a store view shows for `ids`: an id present at its applied entry's content is bound to it, unless
+    /// the engine forgot a binding since the read began (`serial`, see `bind(_:to:since:)`).
+    func noteBound(from view: StorePlanningView, ids: some Sequence<AssetID>, since serial: UInt64) {
+        guard self.state.ledgerForgets == serial else {
+            return
+        }
         for id in ids {
             guard let transfer = view.appliedManifest.entry(for: id)?.transferID, SyncEngine.isPresent(view.records[id], at: transfer) else {
                 continue

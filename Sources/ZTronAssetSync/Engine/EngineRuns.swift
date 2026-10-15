@@ -329,17 +329,21 @@ extension SyncEngine {
     }
 
     /// The engine's side of a committed `apply` (a run's or `ensureAvailable`'s): the applied copy, pruned jobs (T21),
-    /// changed identities (T22), removal events and the generation.
-    func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport) {
+    /// changed identities (T22), removal events and the generation. `serial` is the ledger's forget serial when the
+    /// apply began: its reuses are remembered only when nothing was forgotten during it.
+    func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport, since serial: UInt64) {
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
         // that follows it there is answered from the store. Relocations are not bindings (an absent record is relocated
         // too), and they leave the content, so no job moves for them.
+        let trusted = self.state.ledgerForgets == serial
         self.forgetBound(report.contentChanged)
-        for id in report.reused {
-            if let transfer = manifest.entry(for: id)?.transferID {
-                self.state.boundContent[id] = transfer
+        if trusted {
+            for id in report.reused {
+                if let transfer = manifest.entry(for: id)?.transferID {
+                    self.state.boundContent[id] = transfer
+                }
             }
         }
         self.forgetBound(report.evicted)

@@ -315,6 +315,47 @@ struct EngineRegressionCycle3Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: A store view older than the copy is never followed (review of close-out cycle 2, by reading)
+
+    /// A catch-up (or a resolve, a prefetch join, a point admission) reads the store's view, and an `apply` the engine
+    /// makes lands before the read's continuation runs: following that view would take the engine's copy back to the
+    /// older manifest, announce the ids the apply added as pruned and move their jobs to stale entries. No seam orders
+    /// the two continuations, so the landing is reproduced by handing `followStoreView` a view read before the apply.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a store view read before an apply the engine followed never takes the engine's copy back", .timeLimit(.minutes(1)))
+    func olderViewIsNotFollowed() async throws {
+        let harness = EngineHarness.make()
+        let engine = harness.engine
+        let aBytes = EngineFixture.bytes(9_971)
+        let a = EngineFixture.entry("a", aBytes)
+        await harness.serve([(a, aBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        // A read that began before the next apply.
+        let mark = await engine.readForTests { $0.state.copySerial }
+        let older = try await harness.view()
+        let generation = await engine.readForTests { $0.state.generation }
+        // The next manifest adds the on-demand b; ensureAvailable applies it and the engine follows it.
+        let bBytes = EngineFixture.bytes(9_972)
+        let b = EngineHarness.onDemand("b", bBytes)
+        await harness.serveManifest([a, b], etag: "v2")
+        await harness.source.script(b.transferID, [.stage(bBytes)])
+        let ensured = try await engine.ensureAvailable(scope: .identifiers(["b"])).get()
+        #expect(ensured.present == 1, "setup: b is applied and fetched: \(ensured)")
+        #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b, "setup: the copy lists b")
+        let followed = await engine.readForTests { $0.followStoreView(older, readAt: mark) }
+        #expect(!followed, "a view read before an apply the engine followed is not followed")
+        #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b, "the copy keeps b")
+        #expect(await engine.readForTests { $0.state.generation } > generation, "the generation never goes back")
+        // A view read now is current: following it changes nothing.
+        let mark2 = await engine.readForTests { $0.state.copySerial }
+        let current = try await harness.view()
+        #expect(await engine.readForTests { $0.followStoreView(current, readAt: mark2) })
+        #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
 
 extension SyncEngine {

@@ -483,6 +483,7 @@ extension SyncEngine {
     /// `ensureAvailable` apply or a store re-read lands while a run holds a fetched, unapplied manifest), so replacing it
     /// would drop ids only that fetch lists from the S1-13 checks.
     func adoptApplied(_ manifest: ValidatedManifest, etag: ETag?) {
+        self.state.copySerial &+= 1
         self.state.applied = manifest
         self.state.appliedETag = etag
         if (self.state.newest?.sequence ?? 0) == 0 {

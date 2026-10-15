@@ -270,14 +270,17 @@ extension SyncEngine {
                 continue
             }
             if self.state.applied.entry(for: waiter.asset) == nil {
+                let mark = self.state.copySerial
+                let serial = self.state.ledgerForgets
                 do {
                     // REENTRANCY: RE-S37 — the waiter is re-checked as still registered right below.
                     try await self.store.admit(entry)
-                    // REENTRANCY: RE-S37 — the lifecycle; the applied manifest is re-read as a snapshot, and an admitted
-                    // record the store bound to a live blob is answered from the store.
+                    // REENTRANCY: RE-S37 — the lifecycle; the applied manifest is re-read as a snapshot and followed
+                    // unless the read may predate the copy (`followStoreView`), and an admitted record the store bound to
+                    // a live blob is answered from the store.
                     let view = try await self.store.planningView()
-                    self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
-                    self.noteBound(from: view, ids: [waiter.asset])
+                    self.followStoreView(view, readAt: mark)
+                    self.noteBound(from: view, ids: [waiter.asset], since: serial)
                 } catch {
                     if let pending = self.state.unknownWaiters.removeValue(forKey: token) {
                         pending.continuation.resume(returning: .failure(error.assetError))

@@ -34,6 +34,8 @@ extension SyncEngine {
         // From the first read to the registration, a binding the engine learns (a commit of this id) is kept, so the
         // registration below never creates a job for an asset committed meanwhile (L4-R5).
         self.state.presenceReaders += 1
+        let mark = self.state.copySerial
+        let serial = self.state.ledgerForgets
         let view: StorePlanningView
         do {
             defer {
@@ -75,10 +77,9 @@ extension SyncEngine {
         guard self.isRunning else {
             return .failure(.shutDown)
         }
-        if view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
-            self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
-        }
-        self.noteBound(from: view, ids: [id])
+        // A store manifest the copy lacks is followed with its announcements, unless the read may predate the copy.
+        self.followStoreView(view, readAt: mark)
+        self.noteBound(from: view, ids: [id], since: serial)
         if let error = self.heldBackError(view.records[id], entry: view.appliedManifest.entry(for: id)) {
             return .failure(error)
         }
@@ -206,13 +207,15 @@ extension SyncEngine {
             return
         }
         let view: StorePlanningView
+        let mark = self.state.copySerial
         self.state.presenceReaders += 1
         do {
             defer {
                 self.state.presenceReaders -= 1
             }
             // REENTRANCY: RE-S30 — the lifecycle and the group still registered (a release drops it); a binding learned
-            // while the read is in flight is kept for the joins below (L4-R5).
+            // while the read is in flight is kept for the joins below (L4-R5); the view's manifest is followed only when
+            // the read cannot predate the copy (`followStoreView`).
             view = try await self.store.planningView()
         } catch {
             return
@@ -220,9 +223,7 @@ extension SyncEngine {
         guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
             return
         }
-        if view.appliedManifest.digest != self.state.applied.digest {
-            self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
-        }
+        self.followStoreView(view, readAt: mark)
         for id in ids {
             guard let entry = self.state.applied.entry(for: id) else {
                 continue

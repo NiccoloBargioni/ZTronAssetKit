@@ -13,17 +13,21 @@ extension SyncEngine {
     /// it never saw may have ended any of them; L4-R5) and re-reads the store once no `apply` is in flight (L4-R10).
     func applyAndFollow(_ manifest: ValidatedManifest, etag: ETag?, eviction: EvictionPlan?) async -> Result<ApplyReport, StoreError> {
         self.state.manifestCatchUps += 1
+        self.state.appliesInFlight += 1
+        let serial = self.state.ledgerForgets
         let result: Result<ApplyReport, StoreError>
         do {
             // REENTRANCY: RE-S09 — the lifecycle: a committed apply is followed while the engine runs; jobs of pruned
-            // ids end (T21) and jobs whose identity changed follow (T22); no generation guard (sync-1 S1-12).
+            // ids end (T21) and jobs whose identity changed follow (T22); no generation guard (sync-1 S1-12); the
+            // apply's reuses are remembered only when no binding was forgotten during it.
             result = .success(try await self.store.apply(manifest, etag: etag, eviction: eviction))
         } catch {
             result = .failure(error)
         }
+        self.state.appliesInFlight -= 1
         switch result {
         case .success(let report) where self.isRunning:
-            self.applied(manifest, etag: etag, report: report)
+            self.applied(manifest, etag: etag, report: report, since: serial)
         case .failure where self.isRunning:
             self.storeMutationFailed()
             self.state.catchUpAfterFailedApply = true
@@ -71,38 +75,60 @@ extension SyncEngine {
     /// blob to reap, which a job awaiting space waits for) is otherwise never run, since only a committed apply
     /// refreshed the heap's store entry.
     private func catchUpWithStore(afterFailedApply: Bool) async {
+        let mark = self.state.copySerial
+        let serial = self.state.ledgerForgets
         let view: StorePlanningView?
         do {
-            // REENTRANCY: f-9 (proposed) — the lifecycle; the copy is replaced only by a store view that differs from it,
-            // and the held jobs are released in the same turn.
+            // REENTRANCY: f-9 (proposed) — the lifecycle; the copy is replaced only by a store view that differs from it
+            // and was read with no `apply` in flight and none followed since (else the read is owed again), and the held
+            // jobs are released in the same turn.
             view = try await self.store.planningView()
         } catch {
             view = nil
         }
-        if self.isRunning, let view, view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
-            // The store applied a manifest the engine did not see apply (its prunes, evictions and content changes
-            // were never reported): every binding the engine remembers is checked against the view, and the ids of jobs
-            // the view holds present at their entries' content follow there without a job (L4-R5).
-            self.state.boundContent = self.state.boundContent.filter { SyncEngine.isPresent(view.records[$0.key], at: $0.value) }
-            self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets))
-            // What `applied` announces for an apply the engine made, announced for one it only finds (an apply that
-            // threw after its in-memory writes): the ids the copy lists and the store no longer does, in the copy's
-            // order, then the store's generation (L4-R7). A later apply of the same manifest prunes nothing, so these
-            // removals would otherwise never be announced.
-            let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
-            self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
-            self.state.generation = max(self.state.generation, view.generation)
-            for id in pruned {
-                self.broadcast(.assetRemoved(id, .pruned))
+        if self.isRunning, let view {
+            if self.followStoreView(view, readAt: mark) {
+                // The ids of jobs the view holds present at their entries' content follow there without a job (L4-R5).
+                self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets), since: serial)
+            } else {
+                // An `apply` was in flight during the read, or the engine followed one since: the view may be older than
+                // the copy. The last catch-up to end reads the store again.
+                self.state.catchUpAfterFailedApply = true
             }
-            self.broadcast(.snapshotChanged(generation: self.state.generation))
-            self.followApplied()
         }
         if afterFailedApply, self.isRunning {
             // REENTRANCY: RE-S40 — the lifecycle; a stale entry is replaced by the newest deadline.
             await self.refreshStoreDeadline()
         }
         self.manifestCaughtUp()
+    }
+
+    /// Follows the store's applied manifest as `view` shows it when it differs from the engine's copy (the store applied a
+    /// manifest the engine did not see apply: an `apply` that threw after its in-memory writes, ADR-050, L4-R10), doing
+    /// what `applied` does for an apply the engine made (L4-R7): the bindings the view no longer shows present are
+    /// forgotten, the ids the copy lists and the view does not are announced pruned (in the copy's order; a later apply
+    /// of the same manifest prunes nothing, so they would never be announced), the view's generation is taken,
+    /// `snapshotChanged` is published and the jobs follow (T21/T22). `mark` is `copySerial` when the read began. A view
+    /// read while an `apply` was in flight, or before a change of the copy the engine made meanwhile, may be older than
+    /// the copy (review of close-out cycle 2): it is not followed, and `false` is returned.
+    @discardableResult
+    func followStoreView(_ view: StorePlanningView, readAt mark: UInt64) -> Bool {
+        guard self.state.appliesInFlight == 0, self.state.copySerial == mark else {
+            return false
+        }
+        guard view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count else {
+            return true
+        }
+        self.forgetBound(self.state.boundContent.filter { !SyncEngine.isPresent(view.records[$0.key], at: $0.value) }.keys)
+        let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
+        self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
+        self.state.generation = max(self.state.generation, view.generation)
+        for id in pruned {
+            self.broadcast(.assetRemoved(id, .pruned))
+        }
+        self.broadcast(.snapshotChanged(generation: self.state.generation))
+        self.followApplied()
+        return true
     }
 
     /// One catch-up ended (an `apply` returned, or a re-read landed); the last one re-reads the store first when an

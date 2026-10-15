@@ -48,6 +48,12 @@ struct EngineState {
     /// in-memory state stays authoritative), so once no `apply` is in flight the engine re-reads the store and follows
     /// it (`catchUpWithStore`, L4-R10).
     var catchUpAfterFailedApply = false
+    /// Store `apply` calls in flight (a subset of `manifestCatchUps`). A store view read while one is may show its
+    /// in-memory writes before the engine follows them, or miss them: it is not followed (`followStoreView`).
+    var appliesInFlight = 0
+    /// Bumped whenever the engine's copy of the applied manifest changes (`adoptApplied`). A store view read before a
+    /// change the engine made meanwhile may be older than the copy: it is not followed (close-out cycle 3, F-23).
+    var copySerial: UInt64 = 0
     /// Ids the engine saw bound to content, by the transfer of that content: a commit's locations, an apply's reuses, a
     /// store read. No interest creates or joins a job for an id bound to its entry's content (ARCHITECTURE §7.1: only
     /// outstanding work has a job; L4-R5); such an interest is answered from the store. An entry goes when the engine

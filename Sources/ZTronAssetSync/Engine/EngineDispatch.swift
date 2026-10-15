@@ -749,6 +749,7 @@ extension SyncEngine {
         let ids = job.assets.sorted()
         let identity = job.identity
         let lane = job.lane
+        let serial = self.state.ledgerForgets
         let locations: [AssetID: AssetLocation]
         do {
             // REENTRANCY: RE-S14 — the lifecycle and the epoch; `.superseded` re-routes the interests; the result goes
@@ -769,7 +770,7 @@ extension SyncEngine {
         self.transition(transfer, to: .committing)
         self.state.committedSinceRead = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
         self.state.committedTotal = PlanBuilder.adding(self.state.committedTotal, file.byteCount)
-        self.committed(transfer, binding: ids, locations: locations)
+        self.committed(transfer, binding: ids, locations: locations, since: serial)
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()
     }
@@ -780,14 +781,13 @@ extension SyncEngine {
     /// copy still maps to this content moves to a fresh job of it once this one is gone, because it joined after the
     /// publication's binding was captured (the next publication binds it; the store deduplicates the bytes, ADR-020),
     /// or because the store refused it while holding a newer manifest than the copy (held until the copy catches up).
-    private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation]) {
+    private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
         let captured = Set(ids)
-        for asset in locations.keys {
-            self.state.boundContent[asset] = transfer
-        }
+        // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).
+        self.bind(locations.keys, to: transfer, since: serial)
         var deferred: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
         var refused = false
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
