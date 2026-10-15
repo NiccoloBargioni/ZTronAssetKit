@@ -112,33 +112,13 @@ extension SyncEngine {
             self.transition(transfer, to: .failed(.untilEntryChanges))
             // A 404 for content never fails an asset the store holds at that content (R-NET-6, L4-R5): an id the store
             // serves at its current content (a location that is not stale) while the engine's copy maps it to this
-            // content is answered from the store and left out of the recorded failure. One O(1) read per id of the job,
-            // never a whole planning view.
-            var present: Set<AssetID> = []
-            for id in job.assets.sorted() where self.state.applied.entry(for: id)?.transferID == transfer {
-                // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch, re-checked after the reads; the
-                // interests answered from the store are those the job holds then.
-                if let location = await self.store.location(for: id, extensions: [], recordingAccess: false), !location.isStale {
-                    present.insert(id)
-                }
-            }
+            // content is answered from the store and left out of the recorded failure.
+            // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch, re-checked after the reads; the interests
+            // answered from the store are those the job holds then.
+            let ids = await self.sparePresent(of: transfer, epoch: epoch, assets: job.assets)
             // The failure is persisted for the job's absent ids even when the job ended meanwhile, or shutdown began
             // during the reads (ADR-032: no run and no relaunch requests the content again before its entry changes; the
             // store refuses the write once it closed).
-            let ids = job.assets.subtracting(present).sorted()
-            if self.isRunning {
-                for id in present {
-                    self.state.boundContent[id] = transfer
-                }
-                if let current = self.state.jobs[transfer], current.epoch == epoch {
-                    self.answerPresentMembers(of: transfer, present)
-                    if self.state.jobs[transfer]?.interests.isEmpty == true {
-                        // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
-                        self.removeJob(transfer)
-                    }
-                }
-                self.forgetBound(ids)
-            }
             if !ids.isEmpty {
                 do {
                     // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store re-checks the
@@ -307,23 +287,66 @@ extension SyncEngine {
     /// receives `.integrityFailure`, and the persisted quarantine decides the next attempt (every lane honours it).
     func integrityFailed(_ transfer: TransferID, epoch: UInt64, ids: [AssetID], identity: ContentIdentity) async {
         self.transition(transfer, to: .failed(.untilEntryChanges))
-        // The store's bookkeeping may unbind them (a failure at the cap, L4-R5).
-        self.forgetBound(ids)
-        do {
-            // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store leaves records whose
-            // identity changed alone.
-            try await self.store.recordIntegrityFailure(ids, identity: identity)
-        } catch {
-            self.record(ids.first, .storage, "recording an integrity failure failed: \(error)")
+        // A failed transfer never fails a present record (L4-R5, R-INT-3), as for a 404: the ids the store serves at
+        // their current content while the engine's copy maps them to this content are answered from the store and left
+        // out of the bookkeeping, which would otherwise count the failure against a valid copy (and, at the cap, drop it).
+        // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch, re-checked after the reads; the interests
+        // answered from the store are those the job holds then.
+        let absent = await self.sparePresent(of: transfer, epoch: epoch, assets: Set(ids))
+        if !absent.isEmpty {
+            do {
+                // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store leaves records whose
+                // identity changed alone.
+                try await self.store.recordIntegrityFailure(absent, identity: identity)
+            } catch {
+                if self.isRunning {
+                    self.record(absent.first, .storage, "recording an integrity failure failed: \(error)")
+                }
+            }
+            // A binding learned during the await may have ended with it (a failure at the cap), thrown or not (ADR-050).
+            self.forgetBound(absent)
         }
-        // A binding learned during the await may have ended with it (a failure at the cap), thrown or not (ADR-050).
-        self.forgetBound(ids)
         guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
+            if self.isRunning {
+                // Every interest may have been answered from the store: the job's pipeline place is free.
+                self.pump()
+            }
             return
         }
         self.resolveAll(transfer, with: .failed(.integrityFailure))
         // REENTRANCY: RE-S40 — the lifecycle; the store entry of the heap is replaced.
         await self.refreshStoreDeadline()
+    }
+
+    /// Before a failure of `transfer`'s content is recorded (a 404, an integrity failure), reads which of `assets` the
+    /// store serves at their current content while the engine's copy maps them to this content (one O(1) location read
+    /// per id, never a planning view, C2), answers those from the store when the job is still `epoch`'s, and returns the
+    /// others, sorted: the ids the failure is recorded for (L4-R5: a failed transfer never fails a present record). The
+    /// bindings read are recorded unless a binding was forgotten during the reads; the returned ids are forgotten (the
+    /// store's bookkeeping may unbind them).
+    func sparePresent(of transfer: TransferID, epoch: UInt64, assets: Set<AssetID>) async -> [AssetID] {
+        let serial = self.state.ledgerForgets
+        var present: Set<AssetID> = []
+        for id in assets.sorted() where self.state.applied.entry(for: id)?.transferID == transfer {
+            // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch, re-checked after the reads.
+            if let location = await self.store.location(for: id, extensions: [], recordingAccess: false), !location.isStale {
+                present.insert(id)
+            }
+        }
+        let absent = assets.subtracting(present).sorted()
+        guard self.isRunning else {
+            return absent
+        }
+        self.bind(present, to: transfer, since: serial)
+        if let current = self.state.jobs[transfer], current.epoch == epoch {
+            self.answerPresentMembers(of: transfer, present)
+            if self.state.jobs[transfer]?.interests.isEmpty == true {
+                // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
+                self.removeJob(transfer)
+            }
+        }
+        self.forgetBound(absent)
+        return absent
     }
 
     /// ENOSPC (ARCHITECTURE §7.6), decided on a fresh free-space read: `awaitingSpace` when the store has pending
