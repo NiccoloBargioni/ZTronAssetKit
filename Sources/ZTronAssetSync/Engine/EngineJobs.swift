@@ -317,6 +317,9 @@ extension SyncEngine {
             for asset in interest.assets where group.pending[asset] == transfer {
                 group.pending[asset] = nil
             }
+            if interest.kind == .ensure, group.spaceFailure == nil, case .failed(let error) = outcome, case .insufficientSpace = error {
+                group.spaceFailure = error
+            }
             self.state.groups[token] = group
             if interest.kind == .ensure, group.isSettled {
                 self.state.groups[token]?.continuation = nil

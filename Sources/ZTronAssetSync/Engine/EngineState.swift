@@ -404,6 +404,9 @@ struct Group {
     var cursor = 0
     /// `ensureAvailable`'s completion (RE-S20).
     var continuation: CheckedContinuation<Bool, Never>?
+    /// The first `insufficientSpace` a member of an `ensureAvailable` group was failed with: the ensure answers it when
+    /// its scope is still incomplete, so a shortage met at dispatch is typed as one met by the plan (R-SYN-11).
+    var spaceFailure: AssetError?
 
     /// Whether the group waits for nothing more: no pending member and no fetch left to materialise.
     var isSettled: Bool {

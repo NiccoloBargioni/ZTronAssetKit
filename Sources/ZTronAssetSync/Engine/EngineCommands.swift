@@ -429,6 +429,7 @@ extension SyncEngine {
                 return .failure(self.isShuttingDown ? .shutDown : .cancelled)
             }
         }
+        let spaceFailure = self.state.groups[token]?.spaceFailure
         self.performReleaseGroup(token)
         // REENTRANCY: RE-S20 — the lifecycle; the report is recomputed from the store.
         var report = await self.store.availability(of: scope)
@@ -436,6 +437,11 @@ extension SyncEngine {
             return .failure(.shutDown)
         }
         report.manifestFresh = fresh
+        if let spaceFailure, !report.isComplete {
+            // A member failed for lack of space at dispatch (the plan fitted, the headroom beside the bytes in flight did
+            // not) and the scope is still incomplete: the caller gets the typed shortage, as from the plan (R-SYN-11).
+            return .failure(spaceFailure)
+        }
         return .success(report)
     }
 
