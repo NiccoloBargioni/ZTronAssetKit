@@ -80,4 +80,52 @@ struct EngineRegressionCloseOutTests {
         _ = await run.value
         await engine.shutdown()
     }
+
+    /// Found while fixing PROBE-C1-N1: a run's `apply` that wrote its manifest in memory and then threw left the engine's
+    /// copy behind the store's until some later publication was superseded, so the ids it pruned were never announced
+    /// (a re-apply of the same manifest prunes nothing). The engine now re-reads the store once no `apply` is in flight.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes", .timeLimit(.minutes(1)))
+    func failedApplyIsFollowed() async throws {
+        let harness = EngineHarness.make()
+        let xBytes = EngineFixture.bytes(9_601)
+        let zBytes = EngineFixture.bytes(9_602)
+        let x = EngineFixture.entry("x", xBytes)
+        let z = EngineFixture.entry("z", zBytes)
+        await harness.serveManifest([x, z])
+        await harness.scriptTransfers([(x, xBytes), (z, zBytes)])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        // v2 drops z; the index commit of its apply fails once, after the store's in-memory writes.
+        await harness.serveManifest([x])
+        harness.fileSystem.addFault(FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: "index.tmp"), occurrence: .nth(1), error: .io))
+        let outcome = await engine.sync(.force)
+        guard case .failed(.storageUnavailable) = outcome else {
+            Issue.record("the failed index commit fails the run: \(outcome)")
+            await probe.stop()
+            await engine.shutdown()
+            return
+        }
+        let view = try await harness.view()
+        #expect(view.appliedManifest.entry(for: "z") == nil, "the store applied v2 in memory")
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply }
+        #expect(await engine.appliedEntryForTests("z") == nil, "the engine follows the store's manifest")
+        await engine.shutdown()
+        _ = await probe.next { $0 == .clientShutDown }
+        let received = await probe.received
+        let removal = received.firstIndex(of: .assetRemoved("z", .pruned))
+        #expect(removal != nil, "z left the manifest the engine follows: \(received)")
+        #expect(received.contains(.snapshotChanged(generation: view.generation)), "the store's generation is announced: \(received)")
+        await probe.stop()
+    }
+}
+
+extension SyncEngine {
+    /// Test seam: the engine's copy of the applied manifest's entry for `id`.
+    func appliedEntryForTests(_ id: AssetID) -> ManifestEntry? {
+        self.state.applied.entry(for: id)
+    }
 }
