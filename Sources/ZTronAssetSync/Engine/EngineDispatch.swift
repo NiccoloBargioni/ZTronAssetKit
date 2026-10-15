@@ -407,6 +407,9 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
+        // A publication of a file an earlier attempt staged has no stream: nothing is left to drain if its job is
+        // retired before its driver runs (`publish` then discards the file).
+        job.active?.terminalReceived = adopt != nil
         self.state.jobs[transfer] = job
         if adopt == nil {
             self.state.metrics.transferRequests += 1
@@ -512,7 +515,7 @@ extension SyncEngine {
 
     /// Applies an attempt's terminal element (T5, T6, T7).
     func finishAttempt(_ transfer: TransferID, epoch: UInt64, request: TransferRequest, update: TransferUpdate) async {
-        if self.state.draining[transfer] == request.attempt {
+        if self.state.draining[transfer]?.attempt == request.attempt {
             self.state.draining[transfer] = nil
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.drained(transfer, request: request, update: update)
@@ -525,6 +528,8 @@ extension SyncEngine {
             }
             return
         }
+        // The stream is over: from here on, retiring the job (during an await below) leaves nothing to drain.
+        self.state.jobs[transfer]?.active?.terminalReceived = true
         defer {
             if let previous = request.resume?.previous {
                 // A resumed attempt took the earlier partial over by an exclusive rename; the earlier attempt's sidecar
@@ -590,6 +595,9 @@ extension SyncEngine {
     /// locations (RE-S14).
     func publish(_ transfer: TransferID, epoch: UInt64, file: StagedFile, cancelledAttempt: Bool) async {
         guard var job = self.state.jobs[transfer], job.epoch == epoch else {
+            // The job was retired (or replaced) before this publication began: nobody else will publish the file.
+            // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a copy nobody wants.
+            await self.state.staging?.discard(file.name)
             return
         }
         guard self.transition(transfer, to: .verifying) else {
@@ -623,31 +631,50 @@ extension SyncEngine {
         await self.refreshStoreDeadlineAfterPublish()
     }
 
-    /// Delivers a commit to every interest (waiters whose asset was not bound follow their new content, T22).
+    /// Delivers a commit to every interest. Interests in assets the store did not bind (their content changed while
+    /// the job published, T22) first follow their new content, so a waiter is never answered `.notFound` for an asset
+    /// that still exists and the run keeps its claim until that content commits.
     private func committed(_ transfer: TransferID, locations: [AssetID: AssetLocation]) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        var moved: [(InterestToken, JobInterest, AssetID)] = []
-        for (token, interest) in job.interests {
-            for asset in interest.assets where locations[asset] == nil {
-                moved.append((token, interest, asset))
+        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
+            let unbound = interest.assets.filter { locations[$0] == nil }
+            guard !unbound.isEmpty else {
+                continue
+            }
+            let bound = interest.assets.subtracting(unbound)
+            if bound.isEmpty {
+                self.state.jobs[transfer]?.interests[token] = nil
+            } else {
+                self.state.jobs[transfer]?.interests[token]?.assets = bound
+            }
+            for asset in unbound.sorted() {
+                self.reroute(token, interest: interest, asset: asset, from: transfer)
             }
         }
         self.resolveAll(transfer, with: .committed(locations))
-        for (token, interest, asset) in moved.sorted(by: { $0.0 < $1.0 }) {
-            self.reroute(token, interest: interest, asset: asset)
-        }
         self.pump()
         self.reconcileIdle()
     }
 
-    /// Moves an interest whose asset's content changed to the job of its current entry, or fails it with `.notFound`
-    /// when the asset left the manifest (T21, T22).
-    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID) {
+    /// Moves `token`'s interest in `asset` from the job of `old` to the job of the asset's current entry (T22), or ends
+    /// it when the asset left the manifest (T21): a waiter gets `.notFound`, a group drops the member, a heal is
+    /// forgotten. The run's claim leaves `old` either way, so the run never waits for a job that will not report to it.
+    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID) {
+        if interest.kind == .run {
+            self.releaseRunClaim(token, asset: asset, from: old)
+        }
         guard let entry = self.state.applied.entry(for: asset) else {
-            if interest.kind == .waiter, let waiter = self.state.waiters.removeValue(forKey: token) {
-                waiter.continuation.resume(returning: .failure(.notFound))
+            switch interest.kind {
+            case .waiter:
+                self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound))
+            case .prefetch, .ensure:
+                self.dropGroupMember(token, asset: asset, from: old)
+            case .system:
+                self.state.heals[asset] = nil
+            case .run:
+                break
             }
             return
         }
@@ -738,7 +765,7 @@ extension SyncEngine {
                     // Still this content for the engine's copy of the manifest: the store knows better; fail it.
                     self.deliver(.failed(.notFound), to: token, interest: JobInterest(lane: interest.lane, kind: interest.kind, assets: [asset]), transfer: transfer)
                 } else {
-                    self.reroute(token, interest: interest, asset: asset)
+                    self.reroute(token, interest: interest, asset: asset, from: transfer)
                 }
             }
         }

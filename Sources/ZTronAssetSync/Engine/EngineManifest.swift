@@ -155,6 +155,11 @@ extension SyncEngine {
                 if sequence > (self.state.newest?.sequence ?? 0) {
                     self.state.newest = (manifest, sequence)
                 }
+                // Identifiers a fresh manifest lists are no longer unknown (sync-1 S1-13): a cached `.notFound` would
+                // answer a waiter wrongly until the manifest is applied.
+                for id in self.state.negativeCache.expiry.keys.sorted() where manifest.entry(for: id) != nil {
+                    self.state.negativeCache.remove(id)
+                }
                 return .fetched(manifest, etag: payload.etag, sequence: sequence)
             case .failure(let error):
                 self.record(nil, .rejected, "manifest rejected: \(error)")

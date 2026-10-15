@@ -118,8 +118,12 @@ extension SyncEngine {
                 return nil
             case .degraded(let reason):
                 return .storageUnavailable(reason)
-            case .created, .starting, .shuttingDown, .shutDown:
+            case .shuttingDown, .shutDown:
                 return .shutDown
+            case .created, .starting:
+                // Start still runs, so the wait ended by this caller's own cancellation: `.shutDown` is reserved for
+                // after shutdown (R-SYN-15).
+                return .cancelled
             }
         }
     }
@@ -160,6 +164,7 @@ extension SyncEngine {
                     continuation.resume(returning: settled)
                 } else {
                     self.state.startJoiners[token] = continuation
+                    self.notifyObservers()
                 }
             }
         } onCancel: {
@@ -222,10 +227,10 @@ extension SyncEngine {
         }
         self.state.generation = report.generation
         self.state.retentionSequence += 1
-        let scope = self.state.retentionScope
-        // REENTRANCY: f-1 (proposed) — the lifecycle; the scope pushed is the one in force now (a later
-        // `setRetentionScope` pushes again with a newer sequence).
-        await self.store.setRetentionScope(scope)
+        var pushed = self.state.retentionSequence
+        // REENTRANCY: f-1 (proposed) — the lifecycle; the scope pushed is the one in force now; a scope set while
+        // start still runs is pushed again before the engine is marked running (below).
+        await self.store.setRetentionScope(self.state.retentionScope)
         // REENTRANCY: RE-S02 — the lifecycle.
         let version = await self.environment.appVersion.currentAppVersion()
         guard !self.isShuttingDown else {
@@ -238,6 +243,12 @@ extension SyncEngine {
             // REENTRANCY: f-1 (proposed) — the lifecycle.
             sink = try await self.store.makeStagingSink()
         } catch {
+            if !self.isShuttingDown {
+                // No start task is left to settle later callers: the engine degrades, as for a failed open.
+                let reason = SyncEngine.unavailableReason(error)
+                self.state.lifecycle = .degraded(reason)
+                self.record(nil, .storage, "staging unavailable: \(error)")
+            }
             self.settleStart(.failure(self.isShuttingDown ? .shutDown : error.assetError))
             return
         }
@@ -276,6 +287,18 @@ extension SyncEngine {
             self.settleStart(.failure(.shutDown))
             return
         }
+        while self.state.retentionSequence != pushed {
+            // `setRetentionScope` during start only replaced the engine's copy (it pushes only while running): push
+            // the newest scope, until none is set meanwhile; the engine is marked running in the turn of the last
+            // check, after which every scope pushes itself.
+            pushed = self.state.retentionSequence
+            // REENTRANCY: f-1 (proposed) — the lifecycle; the sequence is compared again by the loop.
+            await self.store.setRetentionScope(self.state.retentionScope)
+            guard !self.isShuttingDown else {
+                self.settleStart(.failure(.shutDown))
+                return
+            }
+        }
         self.state.lifecycle = .running
         self.state.migration.pending = report.legacyMigrationPending
         self.broadcast(.clientStarted(generation: report.generation))
@@ -301,6 +324,24 @@ extension SyncEngine {
         }
         self.pump()
         self.reconcileIdle()
+    }
+
+    /// The applied entries that are not present (absent or stale, never failed), by transfer: what launch
+    /// reconciliation may attach, adopt or resume. Off the actor (C2), like the planner.
+    @concurrent
+    nonisolated static func wantedTransfers(_ view: StorePlanningView) async -> [TransferID: [ManifestEntry]] {
+        var wanted: [TransferID: [ManifestEntry]] = [:]
+        for entry in view.appliedManifest.entries {
+            let record = view.records[entry.identifier]
+            if record?.referencedBlob != nil, record?.isStale == false {
+                continue
+            }
+            if case .failed? = record?.residency {
+                continue
+            }
+            wanted[entry.transferID, default: []].append(entry)
+        }
+        return wanted
     }
 
     /// The `StorageUnavailableReason` of a failed open.
@@ -336,16 +377,11 @@ extension SyncEngine {
             return
         }
         self.adoptApplied(view.appliedManifest, etag: view.stamp?.manifestETag)
-        var wanted: [TransferID: [ManifestEntry]] = [:]
-        for entry in view.appliedManifest.entries {
-            let record = view.records[entry.identifier]
-            if record?.referencedBlob != nil, record?.isStale == false {
-                continue
-            }
-            if case .failed? = record?.residency {
-                continue
-            }
-            wanted[entry.transferID, default: []].append(entry)
+        // REENTRANCY: RE-S28 — the lifecycle; the wanted set is computed off the actor from the view, a value (C2: one
+        // pass over up to `maxEntries` entries).
+        let wanted = await SyncEngine.wantedTransfers(view)
+        guard !self.isShuttingDown else {
+            return
         }
         let actions = TransferReconciler.plan(live: live, staged: inventory, wanted: Set(wanted.keys))
         for action in actions {

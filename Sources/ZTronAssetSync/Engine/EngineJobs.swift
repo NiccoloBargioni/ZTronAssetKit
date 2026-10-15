@@ -77,7 +77,21 @@ extension SyncEngine {
         }
         self.state.jobs[transfer] = job
         self.relane(transfer, from: before)
+        self.failFastJoiner(token, of: transfer)
         self.notifyObservers()
+    }
+
+    /// A new interest in a job that stays parked gets the answer a new job would get when it parks (the fail-fast
+    /// policy runs only when a job parks, so a joiner would otherwise wait for a gate that may never open).
+    private func failFastJoiner(_ token: InterestToken, of transfer: TransferID) {
+        switch self.state.jobs[transfer]?.state {
+        case .blocked(let reason)?:
+            self.failFast(transfer, reason: reason, only: token)
+        case .failed(.whenOnline)?:
+            self.failFast(transfer, reason: .offline, only: token)
+        default:
+            break
+        }
     }
 
     /// A system interest (launch re-attachment, healing): released when the job ends or the first run claims it.
@@ -168,19 +182,32 @@ extension SyncEngine {
         case .verifying, .committing:
             return
         case .downloading:
-            if let active = job.active {
-                self.state.draining[transfer] = active.attempt
-                if let handle = active.handle {
-                    handle.cancel()
-                } else {
-                    // The driver cancels the handle as soon as `remote.transfer` returns it (RE-S12).
-                }
+            if let active = job.active, self.abandon(transfer, active) {
                 self.recordBreaker(.abandoned(transfer))
             }
         case .queued, .failed, .blocked:
             break
         }
         self.removeJob(transfer)
+    }
+
+    /// Cancels a running attempt nobody wants any more and, while its terminal element is still outstanding, records it
+    /// as draining so no new attempt of the transfer starts before its stream ended (`finishAttempt` clears it). An
+    /// attempt whose terminal element was consumed (its driver awaits a sidecar read or a discard) or that has no stream
+    /// is over: recording it would leave a drain nothing clears, and every later job of the transfer would stay queued.
+    /// `true` when the attempt was still running.
+    @discardableResult
+    func abandon(_ transfer: TransferID, _ active: ActiveAttempt) -> Bool {
+        guard !active.terminalReceived else {
+            return false
+        }
+        self.state.draining[transfer] = DrainingAttempt(attempt: active.attempt, driver: active.driver)
+        if let handle = active.handle {
+            handle.cancel()
+        } else {
+            // The driver cancels the handle as soon as `remote.transfer` returns it (RE-S12).
+        }
+        return true
     }
 
     /// Drops a job and every deadline and progress key it owns (sync-1 S1-10, ADR-023).
@@ -292,6 +319,20 @@ extension SyncEngine {
         }
     }
 
+    /// Drops `asset` from group `token` while it still waits for `transfer` (the asset left the manifest, T21); an
+    /// `ensureAvailable` group whose last member went completes.
+    func dropGroupMember(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
+        guard var group = self.state.groups[token], group.pending[asset] == transfer else {
+            return
+        }
+        group.pending[asset] = nil
+        self.state.groups[token] = group
+        if group.kind == .ensure, group.pending.isEmpty, let continuation = group.continuation {
+            self.state.groups[token]?.continuation = nil
+            continuation.resume(returning: true)
+        }
+    }
+
     /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job.
     func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome) {
         guard let job = self.state.jobs[transfer] else {
@@ -325,13 +366,14 @@ extension SyncEngine {
         }
     }
 
-    /// The fail-fast policy when a job is parked (ARCHITECTURE §7.6/§7.7): which interests get an answer now.
-    func failFast(_ transfer: TransferID, reason: BlockReason) {
+    /// The fail-fast policy when a job is parked (ARCHITECTURE §7.6/§7.7): which interests get an answer now; `only`
+    /// restricts it to one interest (a joiner of a parked job).
+    func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
         let now = self.environment.time.monotonicNow()
-        for token in job.interests.keys.sorted() {
+        for token in job.interests.keys.sorted() where only == nil || only == token {
             guard let interest = self.state.jobs[transfer]?.interests[token], interest.kind == .waiter || interest.kind == .ensure else {
                 continue
             }

@@ -32,12 +32,13 @@ extension SyncEngine {
             return .failure(error)
         }
         // REENTRANCY: RE-S36 — the lifecycle; a `nil` location falls through to the job path, which re-reads the record.
-        if let location = await self.store.location(for: id, extensions: [], recordingAccess: true) {
-            self.state.metrics.resolveHits += 1
-            return .success(location)
-        }
+        let present = await self.store.location(for: id, extensions: [], recordingAccess: true)
         guard self.isRunning else {
             return .failure(.shutDown)
+        }
+        if let present {
+            self.state.metrics.resolveHits += 1
+            return .success(present)
         }
         if self.state.migration.pending {
             do {
@@ -97,7 +98,11 @@ extension SyncEngine {
                     return
                 }
                 let now = self.environment.time.monotonicNow()
-                if self.state.negativeCache.contains(id, at: now) {
+                if self.state.newest?.manifest.entry(for: id) != nil {
+                    // A newer manifest than the applied one (a run's fetch not applied yet) lists it: never `.notFound`
+                    // (sync-1 S1-13); the point admission below answers from the newest manifest seen.
+                    self.state.negativeCache.remove(id)
+                } else if self.state.negativeCache.contains(id, at: now) {
                     continuation.resume(returning: .failure(.notFound))
                     return
                 }
@@ -291,6 +296,9 @@ extension SyncEngine {
             // Unreachable: the applied manifest decides; a complete scope is answered, otherwise the mapped error.
             // REENTRANCY: RE-S20 — the lifecycle; the report is the store's snapshot.
             let report = await self.store.availability(of: scope)
+            guard self.isRunning else {
+                return .failure(.shutDown)
+            }
             if report.isComplete {
                 return .success(report)
             }
@@ -345,14 +353,21 @@ extension SyncEngine {
             return .failure(.insufficientSpace(required: required, available: available))
         }
         if manifest != nil || eviction != nil {
+            let report: ApplyReport
             do {
-                // REENTRANCY: RE-S09 — jobs of pruned ids end and changed identities follow (as a run's apply).
-                let report = try await self.store.apply(target, etag: etag, eviction: eviction)
-                self.adoptApplied(target, etag: etag)
-                self.state.generation = max(self.state.generation, report.generation)
+                // REENTRANCY: RE-S09 — jobs of pruned ids end (T21) and changed identities follow (T22), as after a
+                // run's apply; no generation guard (sync-1 S1-12).
+                report = try await self.store.apply(target, etag: etag, eviction: eviction)
             } catch {
                 return .failure(error.assetError)
             }
+            guard self.isRunning else {
+                return .failure(.shutDown)
+            }
+            // The store committed: the engine follows it even when this caller has gone (removal events, T21, T22).
+            self.applied(target, etag: etag, report: report)
+            // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced (apply committed).
+            await self.refreshStoreDeadline()
             guard self.isRunning, !Task.isCancelled else {
                 return .failure(self.isShuttingDown ? .shutDown : .cancelled)
             }
@@ -699,8 +714,9 @@ extension SyncEngine {
             report.corruptFound = verification.corrupt.count
             report.budgetExhausted = !verification.completedPass
             if !verification.corrupt.isEmpty {
-                // REENTRANCY: RE-S30 — the lifecycle; quarantines read as a snapshot schedule their re-downloads.
-                await self.scheduleHeals(verification.corrupt)
+                // REENTRANCY: RE-S30 — the lifecycle; the quarantined assets are announced and their re-downloads
+                // scheduled from the records read as a snapshot (as after `reportUnreadable`).
+                await self.quarantined(verification.corrupt)
             }
             if self.state.migration.deferred, self.state.migration.pending, !expired() {
                 self.startMigration()
@@ -1165,6 +1181,14 @@ extension SyncEngine {
         }
         if let stranded = self.strandedPendingRun() {
             violations.append(stranded)
+        }
+        for (transfer, drain) in self.state.draining where self.isRunning && self.state.tasks[drain.driver] == nil {
+            violations.append("\(transfer) drains an attempt whose driver ended")
+        }
+        if let run = self.state.run, run.transferring, run.settlement == nil {
+            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil {
+                violations.append("the run claims \(transfer), whose job does not hold its interest")
+            }
         }
         return violations
     }

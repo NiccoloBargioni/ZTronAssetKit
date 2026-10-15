@@ -424,7 +424,7 @@ package struct CircuitBreaker: Sendable, Hashable {
     }
 
     /// The public face of the state (events, diagnostics).
-    package var publicState: CircuitState {
+    var publicState: CircuitState {
         switch self.state {
         case .closed:
             return .closed

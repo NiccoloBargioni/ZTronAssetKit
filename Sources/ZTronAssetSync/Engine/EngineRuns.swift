@@ -52,6 +52,7 @@ extension SyncEngine {
                     continuation.resume(returning: .failed(self.isShuttingDown ? .shutDown : .cancelled))
                 } else {
                     self.state.syncJoiners[token] = continuation
+                    self.notifyObservers()
                 }
             }
         } onCancel: {
@@ -134,7 +135,7 @@ extension SyncEngine {
             }
             let assetError = error.assetError(now: self.environment.time.now())
             if case .offline = error {
-                self.setPendingRun(.conditions, trigger: .conditionsChanged)
+                self.setOfflinePendingRun()
             }
             return .failed(assetError)
         case .invalid:
@@ -246,6 +247,11 @@ extension SyncEngine {
             guard run.failures.isEmpty, !run.overBudget else {
                 return .completeWithFailures(summary)
             }
+            guard run.manifestFresh else {
+                // The manifest fetch passed its deadline: the run completed over the applied manifest, but nothing
+                // says it is current, so the sync stays due (no stamp; F-15) and the next due check fetches it again.
+                return .complete(summary)
+            }
             if let launch = self.state.launch, let digest = run.stampDigest {
                 let stamp = SyncStamp(appVersion: launch.appVersion, completedAt: self.environment.time.now(), manifestETag: run.stampETag, manifestDigest: digest)
                 do {
@@ -315,9 +321,9 @@ extension SyncEngine {
         }
     }
 
-    /// The engine's side of a committed `apply`: the applied copy, pruned jobs (T21), changed identities (T22),
-    /// removal events and the generation.
-    private func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport) {
+    /// The engine's side of a committed `apply` (a run's or `ensureAvailable`'s): the applied copy, pruned jobs (T21),
+    /// changed identities (T22), removal events and the generation.
+    func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport) {
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         for id in report.pruned {
@@ -339,19 +345,16 @@ extension SyncEngine {
                 continue
             }
             if moved.count == job.assets.count {
-                if job.state == .downloading {
-                    self.stop(transfer, .cancel)
-                    if let attempt = job.active?.attempt {
-                        self.state.draining[transfer] = attempt
-                    }
+                if job.state == .downloading, let active = job.active, !self.abandon(transfer, active) {
+                    // The attempt's stream already ended: nothing to cancel or drain.
                 }
                 self.supersede(transfer)
             } else {
                 self.state.jobs[transfer]?.assets.subtract(moved)
                 for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-                    for asset in interest.assets where moved.contains(asset) {
+                    for asset in interest.assets.sorted() where moved.contains(asset) {
                         self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
-                        self.reroute(token, interest: interest, asset: asset)
+                        self.reroute(token, interest: interest, asset: asset, from: transfer)
                     }
                     if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
                         self.removeInterest(token, from: transfer)
@@ -359,6 +362,7 @@ extension SyncEngine {
                 }
             }
         }
+        self.checkRunSettled()
     }
 
     /// Skipped entries whose records failed until their entry changes count as the run's failures (a run with them
@@ -423,6 +427,17 @@ extension SyncEngine {
         }
     }
 
+    /// Drops the run's claim on `asset` in `transfer` (the asset follows other content now, or left the manifest): a
+    /// claim left on a job that will never report to the run would keep the run from settling.
+    func releaseRunClaim(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
+        guard var run = self.state.run, run.token == token, var claimed = run.outstanding[transfer] else {
+            return
+        }
+        claimed.remove(asset)
+        run.outstanding[transfer] = claimed.isEmpty ? nil : claimed
+        self.state.run = run
+    }
+
     /// Records a job's outcome for the run.
     func recordRunOutcome(_ outcome: InterestOutcome, transfer: TransferID, assets: Set<AssetID>) {
         guard var run = self.state.run else {
@@ -483,8 +498,20 @@ extension SyncEngine {
             return
         }
         self.materializeRun()
-        guard let current = self.state.run else {
+        guard var current = self.state.run else {
             return
+        }
+        let orphaned = current.outstanding.keys.filter { self.state.jobs[$0]?.interests[current.token] == nil }
+        if !orphaned.isEmpty {
+            // A claim on a job that no longer holds the run's interest can never be answered (every path that moves or
+            // ends one releases it; this keeps a missed one from stranding the run): its assets count as failed, so
+            // the run still settles and the sync stays due.
+            for transfer in orphaned.sorted() {
+                for asset in (current.outstanding.removeValue(forKey: transfer) ?? []).sorted() {
+                    current.failures[asset] = AssetFailure(id: asset, error: .cancelled, failureClass: SyncEngine.failureClass(of: .cancelled))
+                }
+            }
+            self.state.run = current
         }
         if current.cursor >= current.fetches.count, current.outstanding.isEmpty {
             self.settleRun(.finished)
@@ -517,7 +544,9 @@ extension SyncEngine {
             self.removeInterest(current.token, from: transfer)
         }
         switch reason {
-        case .offline, .policy:
+        case .offline:
+            self.setOfflinePendingRun()
+        case .policy:
             self.setPendingRun(.conditions, trigger: .conditionsChanged)
         case .circuitOpen:
             self.setPendingRun(.breaker, trigger: .breakerClosed)
@@ -581,6 +610,13 @@ extension SyncEngine {
             joiners[token]?.resume(returning: outcome)
         }
         self.broadcast(.syncFinished(run.id, outcome))
+        switch outcome {
+        case .failed(.offline), .blocked(.offline, _):
+            break
+        default:
+            // A run that got past the network ends a streak of offline runs (F-16).
+            self.state.offlineRunsWithoutEdge = 0
+        }
         if self.isRunning, run.fetched > 0 || (run.applyReport?.reused.isEmpty == false), self.state.remote?.capabilities.keepsSourceCopies == true {
             self.spawn(.entry) { engine in
                 // REENTRANCY: RE-S34 — the lifecycle; the report is the store's durable capture.
@@ -597,12 +633,25 @@ extension SyncEngine {
 
     // MARK: Pending runs (sync-2 S2-03, S2-25)
 
-    /// Remembers a run to start when `gate` opens.
-    func setPendingRun(_ gate: PendingRunGate, trigger: SyncTrigger) {
+    /// The pending run after an offline failure (R-SYN-13). The first run since the last satisfied-path edge that ends
+    /// offline is retried after the debounce (once conditions admit bulk work): a path monitor often reports satisfied
+    /// a moment before connections work, or its first element was not in yet. When the retried run ends offline too
+    /// while the conditions read the path satisfied (a VPN, captive or roaming path the transport cannot use), the
+    /// pending run waits for a satisfied-path edge, so no timer requests the manifest once per `pendingRunDebounce` for
+    /// ever (F-16).
+    func setOfflinePendingRun() {
+        self.state.offlineRunsWithoutEdge += 1
+        let contradicted = self.state.conditions?.network.satisfied == true && self.state.offlineRunsWithoutEdge > 1
+        self.setPendingRun(.conditions, trigger: .conditionsChanged, awaitsNetworkEdge: contradicted)
+    }
+
+    /// Remembers a run to start when `gate` opens; `awaitsNetworkEdge` (conditions gate only) waits for a
+    /// satisfied-path edge first.
+    func setPendingRun(_ gate: PendingRunGate, trigger: SyncTrigger, awaitsNetworkEdge: Bool = false) {
         guard self.isRunning else {
             return
         }
-        self.state.pendingRun = PendingRun(gate: gate, trigger: trigger)
+        self.state.pendingRun = PendingRun(gate: gate, trigger: trigger, awaitsNetworkEdge: gate == .conditions && awaitsNetworkEdge)
         switch gate {
         case .throttle:
             if let origin = self.state.remote?.originID, let until = self.state.throttles[origin] {
@@ -624,7 +673,7 @@ extension SyncEngine {
         guard let pending = self.state.pendingRun, pending.gate == .conditions else {
             return
         }
-        if self.laneVerdict(.bulk) == .admit {
+        if self.laneVerdict(.bulk) == .admit, !pending.awaitsNetworkEdge {
             if !pending.scheduled {
                 let at = self.environment.time.monotonicNow().adding(seconds: max(0, self.tuning.pendingRunDebounce))
                 self.state.heap.schedule(.pendingRun, at: at)
@@ -654,7 +703,7 @@ extension SyncEngine {
         let origin = self.state.remote?.originID
         switch pending.gate {
         case .conditions:
-            guard self.laneVerdict(.bulk) == .admit else {
+            guard self.laneVerdict(.bulk) == .admit, !pending.awaitsNetworkEdge else {
                 return self.state.watcher == nil ? .unarmed : .armed
             }
             if self.state.heap.deadline(for: .pendingRun) != nil {

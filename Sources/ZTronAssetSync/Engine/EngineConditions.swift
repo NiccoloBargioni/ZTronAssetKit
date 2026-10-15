@@ -101,6 +101,9 @@ extension SyncEngine {
         }
         let edge = conditions.network.satisfied && (previous.map { !$0.network.satisfied || $0.network != conditions.network } ?? false)
         if edge {
+            // The edge an offline-failed pending run waits for (R-SYN-13): its debounce may start now.
+            self.state.pendingRun?.awaitsNetworkEdge = false
+            self.state.offlineRunsWithoutEdge = 0
             for transfer in self.state.jobs.keys.sorted() {
                 guard let job = self.state.jobs[transfer] else {
                     continue

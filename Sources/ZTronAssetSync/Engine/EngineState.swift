@@ -37,7 +37,7 @@ struct EngineState {
     /// One job per transfer (ADR-020).
     var jobs: [TransferID: Job] = [:]
     /// Attempts the engine cancelled whose driver still drains the stream to its terminal element.
-    var draining: [TransferID: TransferAttempt] = [:]
+    var draining: [TransferID: DrainingAttempt] = [:]
     /// The last job epoch handed out.
     var lastEpoch: UInt64 = 0
     /// `resolve` waiters.
@@ -90,6 +90,9 @@ struct EngineState {
     var syncedThisLaunch = false
     /// The engine's purge epoch: bumped before any await of a purge (R-CLN-6, RE-S24).
     var purgeEpoch: UInt64 = 0
+    /// Runs in a row that ended offline, with no satisfied-path edge in between (R-SYN-13): the first is retried after
+    /// the debounce, a later one that ended while the path read satisfied waits for an edge.
+    var offlineRunsWithoutEdge = 0
 
     // MARK: Manifest (R-NET-5, sync.md §6.5)
 
@@ -245,6 +248,18 @@ struct ActiveAttempt {
     var pendingStop: PendingStop?
     /// A priority change the handle did not exist for yet.
     var pendingPriority: AssetPriority?
+    /// Whether the driver consumed the attempt's terminal element (or the attempt has no stream: the publication of a
+    /// file an earlier attempt staged). Such an attempt is over: retiring its job leaves nothing to drain.
+    var terminalReceived = false
+}
+
+/// A cancelled attempt whose driver still drains its stream: no new attempt of the transfer starts until the terminal
+/// element arrives (a completion racing the cancel is published instead, `drained`).
+struct DrainingAttempt: Hashable {
+    /// The attempt.
+    let attempt: TransferAttempt
+    /// Its driver's owned-task key (the invariant check: a drain without a running driver is never cleared).
+    let driver: UInt64
 }
 
 /// One transfer's outstanding work (ARCHITECTURE §7.1).
@@ -381,6 +396,10 @@ struct PendingRun {
     var trigger: SyncTrigger
     /// Whether its debounce or throttle deadline is in the heap.
     var scheduled = false
+    /// A repeated offline failure while the conditions read satisfied (the path says online, the transport says
+    /// offline): the gate opens only on a satisfied-path edge (R-SYN-13), never on the debounce alone, so no timer
+    /// polls the origin.
+    var awaitsNetworkEdge = false
 }
 
 /// The run in progress (sync.md §12.5).
