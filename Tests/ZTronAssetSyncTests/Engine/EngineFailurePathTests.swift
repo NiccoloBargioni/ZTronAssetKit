@@ -310,7 +310,7 @@ struct EngineFailurePathTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a manifest fetch past its deadline falls back to the applied manifest", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a manifest fetch past its deadline falls back to the applied manifest and leaves the sync due", .timeLimit(.minutes(1)))
     func manifestDeadlineFallsBack() async throws {
         let base = FakeRemoteSource()
         let slow = SlowManifestSource(base: base)
@@ -322,12 +322,13 @@ struct EngineFailurePathTests {
         await base.script(entry.transferID, [.stage(bytes)])
         try await harness.start()
         _ = try #require(await harness.engine.sync(.force).completeReport)
-        // A second lifetime whose fetches hang until released.
+        // A second lifetime, of a new app version (a sync is due), whose fetches hang until released.
         await harness.engine.shutdown()
         let hanging = SlowManifestSource(base: FakeRemoteSource())
-        let second = EngineHarness.make(disk: harness.fileSystem.survivingDisk(), time: harness.time, remote: hanging)
+        let second = EngineHarness.make(disk: harness.fileSystem.survivingDisk(), time: harness.time, appVersion: "1.1+2", remote: hanging)
         try await second.start()
         let engine = second.engine
+        #expect(try await engine.isSyncDue().get())
         let run = Task { await engine.sync(.force) }
         await engine.waitUntil { $0.groups == 1 && $0.armedTimers == 1 }
         try await second.time.requireSleepers(atLeast: 1)
@@ -338,6 +339,8 @@ struct EngineFailurePathTests {
             return
         }
         #expect(!report.manifestFresh)
+        // The new version's manifest was never fetched: no stamp is written, so the sync stays due (F-15).
+        #expect(try await engine.isSyncDue().get(), "a run that could not fetch the manifest leaves the sync due")
         await hanging.release()
         await engine.shutdown()
     }

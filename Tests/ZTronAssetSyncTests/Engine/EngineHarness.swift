@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
-import ZTronAssetSync
+@testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
 /// Manifest and payload builders for engine tests (WP-F).
@@ -272,4 +272,214 @@ struct EngineHarness {
 enum EngineHarnessError: Error {
     /// The engine kept owning work.
     case neverQuiesced(EngineIntrospection)
+}
+
+/// A factory whose `makeRemoteSource` waits until the test opens it, so a test can act while `start()` is in its
+/// `.starting` phase after the store opened and the retention scope was pushed. An actor: no lock (C1); its waits are
+/// resumed by `open()` and by nothing else, so every test that enters it opens it.
+@available(macOS 15.0, iOS 18.0, *)
+actor GatedSourceFactory: RemoteSourceFactory {
+    private let base: FakeRemoteSourceFactory
+    private var entered = false
+    private var isOpen = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var enteredWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(source: FakeRemoteSource) {
+        self.base = FakeRemoteSourceFactory(source: source)
+    }
+
+    func makeRemoteSource(configuration: RemoteConfiguration, staging: any StagingSink, log: LogRoute) async throws(AssetError) -> any RemoteSource {
+        self.entered = true
+        let waiting = self.enteredWaiters
+        self.enteredWaiters.removeAll()
+        for waiter in waiting {
+            waiter.resume()
+        }
+        if !self.isOpen {
+            // REENTRANCY: nothing is read after it but the immutable base factory.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.gate = continuation
+            }
+        }
+        // REENTRANCY: nothing: the base factory attaches the staging sink and returns its source.
+        return try await self.base.makeRemoteSource(configuration: configuration, staging: staging, log: log)
+    }
+
+    /// Suspends until `start()` asked for the source.
+    func waitUntilEntered() async {
+        guard !self.entered else {
+            return
+        }
+        // REENTRANCY: nothing: resumed by `makeRemoteSource`.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.enteredWaiters.append(continuation)
+        }
+    }
+
+    /// Lets `makeRemoteSource` return.
+    func open() {
+        self.isOpen = true
+        self.gate?.resume()
+        self.gate = nil
+    }
+}
+
+extension SyncEngine {
+    /// Test seam: the transfers whose cancelled attempt still counts as draining.
+    func drainingTransfers() -> [TransferID] {
+        self.state.draining.keys.sorted()
+    }
+
+    /// Test seam: the owned-task key of the running attempt of `transfer`.
+    func activeDriver(_ transfer: TransferID) -> UInt64? {
+        self.state.jobs[transfer]?.active?.driver
+    }
+
+    /// Test seam: whether owned task `key` still runs.
+    func ownsTask(_ key: UInt64) -> Bool {
+        self.state.tasks[key] != nil
+    }
+
+    /// Test seam: `true` when no run exists or the active one has settled.
+    func runSettledOrGone() -> Bool {
+        self.state.run.map { $0.settlement != nil } ?? true
+    }
+}
+
+/// A blocking executor that runs every unit at once except the one submitted next after `holdNext()`, which waits
+/// for `release()`: a test holds one store step (a publication's hash, a commit) at an exact point without counting the
+/// units before it (a `SteppedBlockingExecutor` holds every unit while holding). An actor: no lock (C1); a held unit is
+/// resumed by `release()` and by nothing else, so every test that holds one releases it.
+actor NextUnitGate: BlockingExecutor {
+    private var armed = false
+    private var held: CheckedContinuation<Void, Never>?
+    private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        if self.armed {
+            self.armed = false
+            // REENTRANCY: nothing: `work` is the caller's value; only `release()` resumes the unit.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.held = continuation
+                let waiting = self.heldWaiters
+                self.heldWaiters.removeAll()
+                for waiter in waiting {
+                    waiter.resume()
+                }
+            }
+        }
+        return work()
+    }
+
+    /// Holds the next unit submitted.
+    func holdNext() {
+        self.armed = true
+    }
+
+    /// Suspends until a unit is held.
+    func waitForHold() async {
+        guard self.held == nil else {
+            return
+        }
+        // REENTRANCY: nothing: resumed by `run` when it holds a unit.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.heldWaiters.append(continuation)
+        }
+    }
+
+    /// Lets the held unit run.
+    func release() {
+        self.held?.resume()
+        self.held = nil
+    }
+}
+
+/// A `FakeRemoteSource` that records how many file-system operations had happened when each transfer started, so a
+/// test orders a transfer's start against the store's commits (R-SYN-8). An actor: no lock (C1).
+@available(macOS 15.0, iOS 18.0, *)
+actor OperationStampingSource: RemoteSource, StagingAttachable {
+    nonisolated let base: FakeRemoteSource
+    nonisolated let fileSystem: FakeFileSystem
+    /// `fileSystem.operations.count` at each transfer's first start.
+    private(set) var stamps: [TransferID: Int] = [:]
+
+    init(base: FakeRemoteSource, fileSystem: FakeFileSystem) {
+        self.base = base
+        self.fileSystem = fileSystem
+    }
+
+    nonisolated var originID: String {
+        self.base.originID
+    }
+
+    nonisolated var capabilities: RemoteSourceCapabilities {
+        self.base.capabilities
+    }
+
+    func attach(staging: any StagingSink) async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.attach(staging: staging)
+    }
+
+    func fetchManifest(_ request: ManifestRequest) async throws(TransferError) -> ManifestFetchResult {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        try await self.base.fetchManifest(request)
+    }
+
+    func transfer(_ request: TransferRequest) async -> any TransferHandle {
+        if self.stamps[request.id] == nil {
+            self.stamps[request.id] = self.fileSystem.operations.count
+        }
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        return await self.base.transfer(request)
+    }
+
+    func reattachedTransfers() async -> [ReattachedTransfer] {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.reattachedTransfers()
+    }
+
+    func cancelTransfer(_ name: StagingFileName) async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.cancelTransfer(name)
+    }
+
+    func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.reclaimSourceCopies(report)
+    }
+
+    func sourceCopyBytes() async -> Int64 {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.sourceCopyBytes()
+    }
+
+    func handleBackgroundEvents(identifier: String) async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.handleBackgroundEvents(identifier: identifier)
+    }
+
+    func invalidate() async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.invalidate()
+    }
+}
+
+/// Waits until `task` finished or the engine shows `predicate`, whichever comes first: the two outcomes a test cannot
+/// otherwise tell apart when a call is either answered at once or registered (the `waitUntil` ends on cancellation).
+@available(macOS 15.0, iOS 18.0, *)
+func untilFinishedOrObserved<T: Sendable>(_ task: Task<T, Never>, _ engine: SyncEngine, _ predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async {
+    let (signals, signal) = AsyncStream.makeStream(of: Void.self)
+    Task {
+        _ = await task.value
+        signal.yield()
+    }
+    let observed = Task {
+        await engine.waitUntil(predicate)
+        signal.yield()
+    }
+    var iterator = signals.makeAsyncIterator()
+    _ = await iterator.next()
+    observed.cancel()
 }

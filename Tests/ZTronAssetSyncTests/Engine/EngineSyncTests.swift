@@ -44,7 +44,16 @@ struct EngineSyncTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-8: reconcile is committed before the first transfer starts", .timeLimit(.minutes(1)))
     func reconcileBeforeTransfer() async throws {
-        let harness = EngineHarness.make()
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: 64 << 30, opportunisticCapacity: 64 << 30)
+        )
+        let base = FakeRemoteSource()
+        // The source stamps each transfer's start with the file-system operation count at that moment.
+        let stamping = OperationStampingSource(base: base, fileSystem: fileSystem)
+        let harness = EngineHarness.make(time: time, source: base, fileSystem: fileSystem, remote: stamping)
         let kept = EngineSyncTests.catalog(2)
         await harness.serve(kept)
         try await harness.start()
@@ -56,9 +65,16 @@ struct EngineSyncTests {
         let manifest = [moved, kept[1].0, added]
         await harness.serveManifest(manifest, etag: "v2")
         await harness.source.script(added.transferID, [.hold])
+        let before = fileSystem.operations.count
         let run = Task { await harness.engine.sync(.force) }
         await harness.engine.waitUntil { $0.running == 1 }
         await harness.engine.waitForHandle(added.transferID)
+        // The order itself: the index generation holding v2 was renamed into place before the transfer started.
+        let started = try #require(await stamping.stamps[added.transferID])
+        let operations = fileSystem.operations
+        #expect(started > before)
+        let commits = operations[before..<max(before, started)].filter { $0.kind == .rename && $0.destination?.lastPathComponent == "index.bin" }
+        #expect(!commits.isEmpty, "no index commit lies between the run's start and the first transfer's start")
         let view = try await harness.view()
         #expect(view.appliedManifest.entries == manifest, "the new manifest is committed while the first transfer runs")
         #expect(view.records["a0"]?.entry.localPathComponents == ["elsewhere"])

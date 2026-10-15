@@ -201,33 +201,51 @@ struct EngineIdleTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: no store mutation or commit happens after close returns", .timeLimit(.minutes(1)))
     func noMutationAfterClose() async throws {
-        let bulk = SteppedBlockingExecutor(holding: false)
+        let bulk = NextUnitGate()
         let harness = EngineHarness.make(bulk: bulk, commitInterval: 0.25)
         let catalog = EngineSyncTests.catalog(4)
         await harness.serve(catalog)
         try await harness.start()
         let engine = harness.engine
-        await bulk.setHolding(true)
+        _ = try #require(try await harness.syncDriven().completeReport)
+        // v2 prunes a0 (its blob's deletion becomes due work) and adds b0, whose transfer is held.
+        let addedBytes = EngineFixture.bytes(77)
+        let added = EngineFixture.entry("b0", addedBytes)
+        await harness.serveManifest(catalog.dropFirst().map(\.0) + [added], etag: "v2")
+        await harness.source.script(added.transferID, [.hold, .stage(addedBytes)])
         let run = Task { await engine.sync(.force) }
-        // A publication's hash unit is held: a publish, the coalesced commit and the run's apply are in flight.
-        try await bulk.requireHeldUnits(atLeast: 1)
+        // The run applies v2 (its commit window passes on the clock) and starts b0.
+        try await harness.drive(maxStep: 1) { $0.running == 1 }
+        await engine.waitForHandle(added.transferID)
+        // b0 stages; its publication is held at its first store unit (verifying, with a coalesced commit to follow).
+        await bulk.holdNext()
+        await harness.source.release(added.transferID, with: .progress(received: 0, expected: nil))
+        await bulk.waitForHold()
+        #expect(await engine.introspect().jobsByState[.verifying] == 1)
         let shutdown = Task { await engine.shutdown() }
         await engine.waitUntil { $0.lifecycle == .shuttingDown }
-        await bulk.setHolding(false)
-        await bulk.releaseAll()
-        await shutdown.value
+        await bulk.release()
+        // Shutdown joins the publication, whose commit window needs the clock, then closes the store.
+        await harness.withClock {
+            await shutdown.value
+        }
         _ = await run.value
-        let mutations = harness.fileSystem.mutationCount
-        let operations = harness.fileSystem.operations.count
-        // Nothing the engine still has can touch the store: every API fails, time moves, nothing is written.
-        #expect(await engine.awaitAsset("a0", lane: .userInitiated) == .failure(.shutDown))
+        // The baseline is close's return: the store releases its lock last.
+        let operations = harness.fileSystem.operations
+        let closed = try #require(operations.lastIndex { $0.kind == .releaseLock }, "close released the lock")
+        #expect(!operations[(closed + 1)...].contains { $0.kind.isMutation }, "no mutation after the lock was released")
+        #expect(operations[..<closed].contains { $0.kind == .rename && $0.destination?.lastPathComponent == "index.bin" })
+        // Nothing the engine still has can touch the store: every API fails, nothing sleeps, nothing is owned.
+        #expect(await engine.awaitAsset("a1", lane: .userInitiated) == .failure(.shutDown))
         #expect(await engine.performMaintenance(timeBudget: 10) == .failure(.shutDown))
-        await engine.releaseLease(AssetLease(id: "a0", blob: BlobKey(hash: ContentHash.sha256(of: Data()), ext: AssetFileExtension("png")!), token: 1, url: EngineHarness.base))
-        harness.time.advance(by: 3_600)
-        await Task.yield()
-        #expect(harness.fileSystem.mutationCount == mutations)
-        #expect(harness.fileSystem.operations.count == operations)
+        await engine.releaseLease(AssetLease(id: "a1", blob: BlobKey(hash: ContentHash.sha256(of: Data()), ext: AssetFileExtension("png")!), token: 1, url: EngineHarness.base))
         #expect(await engine.introspect().ownedTasks == 0)
+        #expect(harness.time.pendingSleepers == 0, "no sleeper is left that could wake and write")
+        // With no owned task and no sleeper, moving the clock wakes nothing: the record is final.
+        harness.time.advance(by: 3_600)
+        let after = harness.fileSystem.operations
+        #expect(after.count == operations.count)
+        #expect(!after[(closed + 1)...].contains { $0.kind.isMutation })
     }
 }
 

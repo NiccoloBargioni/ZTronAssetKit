@@ -171,6 +171,8 @@ struct EngineConditionsTests {
         let engine = harness.engine
         let stream = try await engine.subscribe().get()
         let probe = EventProbe(stream: stream)
+        // The clock does not move before the 429 arrives: its Retry-After counts from now.
+        let delivered = harness.time.monotonicNow()
         // A throttle-only blocked run ends blocked and leaves a pending run at the throttle's end (sync-2 S2-03).
         let throttled = await engine.sync(.force)
         guard case .blocked(.throttled, _) = throttled else {
@@ -178,9 +180,12 @@ struct EngineConditionsTests {
             return
         }
         try await harness.time.requireSleepers(atLeast: 1)
+        #expect(harness.time.nextDeadline == delivered.adding(seconds: 30), "the origin is held until exactly Retry-After")
         #expect(await harness.source.starts.count == 1)
+        let sleepers = harness.time.pendingSleepers
         harness.time.advance(by: 29)
-        await Task.yield()
+        // Nothing was due before the throttle's end, so no sleeper woke: nothing in the engine could have run.
+        #expect(harness.time.nextDeadline == delivered.adding(seconds: 30) && harness.time.pendingSleepers == sleepers)
         #expect(await harness.source.starts.count == 1, "nothing starts before Retry-After elapses")
         harness.time.advance(by: 1)
         let finished = await probe.next { event in
