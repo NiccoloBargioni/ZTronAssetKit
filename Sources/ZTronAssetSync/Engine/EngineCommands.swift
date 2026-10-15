@@ -1154,6 +1154,9 @@ extension SyncEngine {
                 violations.append("group \(token.rawValue) member \(asset) without an interest")
             }
         }
+        if self.state.queues.storedCount > 2 * self.state.jobs.count + 16 {
+            violations.append("lane queues hold \(self.state.queues.storedCount) entries for \(self.state.jobs.count) jobs")
+        }
         if self.state.metrics.illegalTransitions > 0 {
             violations.append("\(self.state.metrics.illegalTransitions) illegal transitions")
         }

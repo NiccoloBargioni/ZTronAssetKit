@@ -42,13 +42,6 @@ struct LaneQueues {
         }
     }
 
-    /// The valid entries of `kind` in order, without removing them.
-    func valid(_ kind: Kind, isValid: (Entry) -> Bool) -> [Entry] {
-        let list = self.entries[kind] ?? []
-        let head = self.heads[kind] ?? 0
-        return list[head...].filter(isValid)
-    }
-
     /// Removes and returns the first valid entry of `kind` that `accept` takes; invalid entries before it are
     /// dropped, valid ones it skips stay in order.
     mutating func pop(_ kind: Kind, isValid: (Entry) -> Bool, accept: (Entry) -> Bool = { _ in true }) -> Entry? {
@@ -98,12 +91,12 @@ struct LaneQueues {
         return nil
     }
 
-    /// Drops every invalid entry (after mass withdrawals), keeping order.
+    /// Drops every invalid entry, keeping order (the engine calls it when stale entries outnumber the jobs).
     mutating func compact(isValid: (Entry) -> Bool) {
         for kind in Kind.allCases {
             let list = self.entries[kind] ?? []
             let head = self.heads[kind] ?? 0
-            self.entries[kind] = list[head...].filter(isValid)
+            self.entries[kind] = list[min(head, list.count)...].filter(isValid)
             self.heads[kind] = 0
         }
     }

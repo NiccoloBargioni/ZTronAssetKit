@@ -223,6 +223,13 @@ extension SyncEngine {
         let kind = self.queueKind(job)
         let entry = LaneQueues.Entry(ticket: job.ticket, transfer: transfer, queuedAt: job.queuedAt)
         self.state.queues.push(entry, to: kind, front: front)
+        if self.state.queues.storedCount > 2 * self.state.jobs.count + 16 {
+            // Stale entries outnumber the jobs (sync.md §7.2): keep the queues within twice the live entries.
+            var queues = self.state.queues
+            self.state.queues = LaneQueues()
+            queues.compact { self.isValid($0) }
+            self.state.queues = queues
+        }
     }
 
     /// Whether a queue entry still stands for a queued job.
