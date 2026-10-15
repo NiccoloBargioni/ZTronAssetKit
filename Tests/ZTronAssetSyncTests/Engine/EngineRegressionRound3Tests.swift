@@ -75,6 +75,90 @@ struct EngineRegressionRound3Tests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-3: a prefetch member whose asset an apply binds to content already present is done, and nothing is downloaded again", .timeLimit(.minutes(1)))
+    func prefetchMemberOfReusedContentIsDone() async throws {
+        let harness = EngineHarness.make()
+        let c1 = EngineFixture.bytes(4_121)
+        let shared = EngineFixture.bytes(4_122)
+        let x1 = EngineHarness.onDemand("x", c1)
+        let y = EngineFixture.entry("y", shared)
+        let x2 = EngineHarness.onDemand("x", shared)
+        await harness.serveManifest([x1, y])
+        await harness.scriptTransfers([(y, shared)])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.source.script(x1.transferID, [.hold, .stage(c1)])
+        await harness.source.script(y.transferID, [.stage(shared)])
+        let group = try await engine.registerGroup(["x"], lane: .prefetch).get()
+        await engine.waitUntil { $0.running == 1 }
+        await engine.waitForHandle(x1.transferID)
+        // v2 gives x y's content: the run's apply binds x to y's blob and the prefetch member follows it (T22).
+        await harness.serveManifest([x2, y], etag: "v2")
+        _ = await engine.sync(.force)
+        await engine.waitUntil { $0.jobsByState.isEmpty }
+        #expect(await engine.introspect().interests == 0, "the member is done: no job holds the group's interest")
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.count == 1, "the shared content was fetched once")
+        #expect(try await harness.view().records["x"]?.referencedBlob != nil)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: a run whose planned asset another apply binds to content already present counts it as fetched and downloads nothing", .timeLimit(.minutes(1)))
+    func runAssetOfReusedContentCountsAsFetched() async throws {
+        let harness = EngineHarness.make()
+        let c1 = EngineFixture.bytes(4_131)
+        let shared = EngineFixture.bytes(4_132)
+        let x1 = EngineHarness.onDemand("x", c1)
+        let y = EngineFixture.entry("y", shared)
+        let x2 = EngineHarness.onDemand("x", shared)
+        await harness.serveManifest([x1, y])
+        await harness.scriptTransfers([(y, shared)])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        // An explicit retention scope puts the on-demand x in runs: the next run downloads x@c1.
+        _ = try await engine.setRetentionScope(.identifiers(["x", "y"])).get()
+        await harness.source.script(x1.transferID, [.hold, .stage(c1)])
+        await harness.source.script(y.transferID, [.stage(shared)])
+        let run = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.run?.outstanding[x1.transferID] != nil }
+        await engine.waitForHandle(x1.transferID)
+        // ensureAvailable fetches v2, which gives x y's content: its apply binds x to y's blob while the run downloads x.
+        await harness.serveManifest([x2, y], etag: "v2")
+        _ = try await engine.ensureAvailable(scope: .identifiers(["y"])).get()
+        let outcome = await run.value
+        let report = try #require(outcome.completeReport, "\(outcome)")
+        #expect(report.fetched == 1, "the run counts x, present at its new content, as fetched")
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.count == 1, "the shared content was fetched once")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: a binding the engine remembers but the store no longer holds sends the waiter down the job path, never a wrong answer", .timeLimit(.minutes(1)))
+    func staleBindingFallsBackToTheJobPath() async throws {
+        let harness = EngineHarness.make()
+        let bytes = EngineFixture.bytes(4_141)
+        let x = EngineHarness.onDemand("x", bytes)
+        await harness.serveManifest([x])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.source.script(x.transferID, [.stage(bytes)])
+        // A test seam edits the state no correct path produces: the engine believes x bound while the store holds
+        // nothing for it (the safety net of a binding that ended unseen).
+        await engine.rememberBindingForTests("x", x.transferID)
+        let result = await engine.awaitAsset("x", lane: .userInitiated)
+        #expect(result.map(\.byteSize) == .success(Int64(bytes.count)), "the store read finds nothing, so x is downloaded: \(result)")
+        #expect(await harness.source.starts.filter { $0.id == x.transferID }.count == 1)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-10: ensureAvailable does not download a member another interest committed after its plan", .timeLimit(.minutes(1)))
     func ensureSkipsMembersCommittedSincePlan() async throws {
         // One member at a time (pipelineDepth × maxConcurrentTransfers + runLookahead = 1).
@@ -362,5 +446,12 @@ struct EngineRegressionRound3Tests {
         await engine.shutdown()
         #expect(await engine.diagnostics() == .failure(.shutDown), "after shutdown it still fails (ADR-042)")
         await owner.engine.shutdown()
+    }
+}
+
+extension SyncEngine {
+    /// Test seam: records a binding the store does not hold (the state a binding that ended unseen would leave).
+    func rememberBindingForTests(_ asset: AssetID, _ transfer: TransferID) {
+        self.state.boundContent[asset] = transfer
     }
 }
