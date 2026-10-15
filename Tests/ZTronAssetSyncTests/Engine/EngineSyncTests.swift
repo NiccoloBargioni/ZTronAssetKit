@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
-import ZTronAssetSync
+@testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
 /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
@@ -58,6 +58,7 @@ struct EngineSyncTests {
         await harness.source.script(added.transferID, [.hold])
         let run = Task { await harness.engine.sync(.force) }
         await harness.engine.waitUntil { $0.running == 1 }
+        await harness.engine.waitForHandle(added.transferID)
         let view = try await harness.view()
         #expect(view.appliedManifest.entries == manifest, "the new manifest is committed while the first transfer runs")
         #expect(view.records["a0"]?.entry.localPathComponents == ["elsewhere"])
