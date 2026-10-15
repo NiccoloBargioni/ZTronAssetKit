@@ -296,4 +296,43 @@ struct EngineRegressionRound3Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: Catch-up announces what it follows (L4-R7, L4-V3-14)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: a catch-up with the store's manifest announces the ids it pruned and the store's generation", .timeLimit(.minutes(1)))
+    func catchUpAnnouncesPrunes() async throws {
+        let harness = EngineHarness.make()
+        let c1 = EngineFixture.bytes(5_001)
+        let c2 = EngineFixture.bytes(5_002)
+        let zBytes = EngineFixture.bytes(5_003)
+        let x1 = EngineHarness.onDemand("x", c1)
+        let x2 = EngineHarness.onDemand("x", c2)
+        let z = EngineFixture.entry("z", zBytes)
+        await harness.serveManifest([x1, z])
+        await harness.scriptTransfers([(z, zBytes)])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        await harness.source.script(x1.transferID, [.hold, .stage(c1)])
+        await harness.source.script(x2.transferID, [.stage(c2)])
+        let waiter = Task { await engine.awaitAsset("x", lane: .userInitiated) }
+        await engine.waitUntil { $0.running == 1 }
+        await engine.waitForHandle(x1.transferID)
+        // The store applies v2 (x changed, z removed) without the engine's bookkeeping: what a store `apply` that
+        // throws after its in-memory writes leaves (AssetStore+Apply, requireCommittedInternal).
+        let v2 = try ValidatedManifest(entries: [x2], digest: ContentHash.sha256(of: Data("v2".utf8)))
+        let report = try await harness.store.apply(v2, etag: nil, eviction: nil)
+        #expect(report.pruned == ["z"])
+        // x@c1's publication is superseded: the engine re-reads the store and follows it.
+        await harness.source.release(x1.transferID, with: .progress(received: 0, expected: nil))
+        #expect(await waiter.value.map(\.byteSize) == .success(Int64(c2.count)))
+        await engine.shutdown()
+        _ = await probe.next { $0 == .clientShutDown }
+        let received = await probe.received
+        #expect(received.contains(.assetRemoved("z", .pruned)), "z left the manifest the engine follows: \(received)")
+        #expect(received.contains(.snapshotChanged(generation: report.generation)), "the store's generation is announced: \(received)")
+        await probe.stop()
+    }
 }
