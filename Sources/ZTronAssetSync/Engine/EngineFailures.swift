@@ -333,6 +333,7 @@ extension SyncEngine {
         breaker.record(outcome, at: self.environment.time.monotonicNow(), seed: self.environment.random.seed)
         self.state.breakers[origin] = breaker
         self.breakerChanged(origin, from: before)
+        self.reconsiderPendingRun()
     }
 
     /// Emits and schedules after a breaker change.

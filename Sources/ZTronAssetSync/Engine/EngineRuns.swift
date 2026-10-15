@@ -590,6 +590,7 @@ extension SyncEngine {
         if case .failed(.shutDown) = outcome {
             return
         }
+        self.reconsiderPendingRun()
         self.pump()
         self.reconcileIdle()
     }
@@ -681,6 +682,37 @@ extension SyncEngine {
                 return .open
             }
             return self.state.heap.deadline(for: .pendingRun) == nil ? .unarmed : .armed
+        }
+    }
+
+    /// Starts the pending run when its gate is already open, and arms whatever opens a closed one.
+    ///
+    /// A gate can open while a settled run's task has not finished it yet (the alarm and that task race for the
+    /// actor): `fulfilPendingRun` then finds the run in place and returns, so the run's finish asks again. A breaker
+    /// whose probe ended without a verdict (`halfOpen(probe: nil)`) admits the pending run's own probe.
+    func reconsiderPendingRun() {
+        guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
+            return
+        }
+        switch self.pendingRunGate(pending) {
+        case .open:
+            self.fulfilPendingRun()
+        case .armed:
+            return
+        case .unarmed:
+            switch pending.gate {
+            case .conditions:
+                self.considerPendingRun()
+                self.ensureWatcher()
+            case .breaker:
+                self.scheduleBreakerDeadline()
+            case .throttle:
+                if let origin = self.state.remote?.originID, let until = self.state.throttles[origin] {
+                    self.state.heap.schedule(.pendingRun, at: until)
+                    self.state.pendingRun?.scheduled = true
+                    self.rearm()
+                }
+            }
         }
     }
 
