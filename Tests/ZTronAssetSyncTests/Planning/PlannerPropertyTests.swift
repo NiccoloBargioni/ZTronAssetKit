@@ -221,7 +221,8 @@ struct PlannerPropertyTests {
         #expect(plan.skipped == [PlannedSkip(id: "s1", reason: .overBudget)])
         #expect(plan.space == .partial(admittedFetches: 3, skippedBytes: 400))
         let strict = PlanFixture.plan(PlanFixture.manifest(entries), PlanFixture.view(applied: .empty(), records: []), policy: PlanFixture.policy(prefix: false, eviction: false), space: PlanFixture.space(free: 5_000, budget: 1_000, reserve: 100))
-        #expect(strict.space == .insufficient(required: 1_500, available: 5_000))
+        // The plan's known bytes against the room it had: within the budget, above the reserve (ARCHITECTURE §7.10).
+        #expect(strict.space == .insufficient(required: 1_400, available: 1_000))
     }
 
     @Test("R-SYN-11: a manifest without byteSize never fails the space check with insufficientSpace")

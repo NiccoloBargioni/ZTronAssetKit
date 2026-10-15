@@ -160,6 +160,33 @@ struct EngineRegressionCloseOutTests {
         await probe.stop()
         await engine.shutdown()
     }
+
+    // MARK: One convention for insufficientSpace's figures (ARCHITECTURE §7.6, §7.10)
+
+    /// Review of close-out cycle 1 (PROBE-C1-10a): the engine's ENOSPC path reported the raw volume as `available`, the
+    /// 256 MiB reserve included, so a failure for lack of 300 bytes read `insufficientSpace(required: 300, available:
+    /// 268435656)`; the planner reported `required` with the reserve added instead. Both now report the bytes needed and
+    /// the room the decision had above the reserve (§7.10's `available`).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an ENOSPC failure reports the bytes it needed and the room above the reserve, which is smaller", .timeLimit(.minutes(1)))
+    func enospcFiguresExcludeTheReserve() async throws {
+        let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
+        let entry = EngineHarness.onDemand("big", EngineFixture.bytes(9_801))
+        await harness.serveManifest([entry])
+        await harness.source.script(entry.transferID, [.fail(.insufficientSpace(requiredBytes: 9_000))])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        let result = await harness.engine.awaitAsset("big", lane: .userInitiated)
+        guard case .failure(.insufficientSpace(let required, let available)) = result else {
+            Issue.record("expected insufficientSpace, got \(result)")
+            await harness.engine.shutdown()
+            return
+        }
+        #expect(required == 9_000)
+        #expect(available <= 4_096, "the room above the reserve, never the raw volume: \(available)")
+        #expect(available < required)
+        await harness.engine.shutdown()
+    }
 }
 
 extension SyncEngine {
