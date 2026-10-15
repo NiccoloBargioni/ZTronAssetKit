@@ -65,8 +65,10 @@ let package = Package(
         .testTarget(
             name: "ZTronAssetSyncTests",
             // Transport is a test-only dependency: WP-F drives the real foreground backend in two storage-root
-            // tests (ARCHITECTURE §13.5). Sync's production dependencies stay Model and Storage.
-            dependencies: ["ZTronAssetSync", "ZTronAssetTransport", "ZTronAssetTestSupport"],
+            // tests (ARCHITECTURE §13.5). AppleHosted is test-only too: the end-to-end R-APL-3 test drives the
+            // Apple tier's source through the real engine and store (Level 4 ruling L4-R1). Sync's production
+            // dependencies stay Model and Storage.
+            dependencies: ["ZTronAssetSync", "ZTronAssetTransport", "ZTronAssetAppleHosted", "ZTronAssetTestSupport"],
             swiftSettings: strictConcurrency
         ),
         .testTarget(
