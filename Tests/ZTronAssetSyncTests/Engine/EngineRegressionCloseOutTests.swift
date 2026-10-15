@@ -68,6 +68,11 @@ struct EngineRegressionCloseOutTests {
         }
         let evicted = try #require(try await harness.view().records["z"])
         #expect(evicted.referencedBlob == nil, "the store evicted z in memory: \(evicted.residency)")
+        // The volume is roomy again, so what the ensure does with z depends on the binding ledger alone, never on when the
+        // store reclaims z's evicted bytes (a fetch short of those is `R-SYN-11: ensureAvailable short of bytes the store
+        // has not scheduled to reclaim fails with insufficientSpace instead of waiting for ever`; review of close-out
+        // cycle 4: with h in flight z's job waited for them and the result depended on the alarm's timing).
+        try harness.fileSystem.removeItem(at: EngineHarness.base.appendingPathComponent("ballast"))
         let second = await harness.withClock { await engine.ensureAvailable(scope: .identifiers(["z"])) }
         #expect((try? second.get())?.present == 1, "z is downloaded again: \(second)")
         #expect(await harness.source.starts.filter { $0.id == z.transferID }.count == 2, "the run's download and the ensure's")
@@ -113,12 +118,21 @@ struct EngineRegressionCloseOutTests {
         #expect(view.appliedManifest.entry(for: "z") == nil, "the store applied v2 in memory")
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply }
         #expect(await engine.appliedEntryForTests("z") == nil, "the engine follows the store's manifest")
+        // The generation of the store view the engine followed: the store's own due work (the commit retry and the
+        // install its catch-up armed) may move the store's generation on before or after that view was read, so a view
+        // the test reads is not necessarily the one the engine followed (review of close-out cycle 4).
+        let followed = await engine.readForTests { $0.state.generation }
         await engine.shutdown()
         _ = await probe.next { $0 == .clientShutDown }
         let received = await probe.received
         let removal = received.firstIndex(of: .assetRemoved("z", .pruned))
         #expect(removal != nil, "z left the manifest the engine follows: \(received)")
-        #expect(received.contains(.snapshotChanged(generation: view.generation)), "the store's generation is announced: \(received)")
+        if let removal {
+            #expect(
+                received[removal...].contains(.snapshotChanged(generation: followed)),
+                "the generation the engine followed is announced with z's removal: \(received)"
+            )
+        }
         await probe.stop()
     }
 
