@@ -61,9 +61,10 @@ struct EngineRegressionCycle4Tests {
         await bulk.holdNext(skipping: 1)
         let first = Task { await engine.ensureAvailable(scope: .identifiers(["a"])) }
         await bulk.waitForHold()
-        // The second ensure fetches its manifest and begins its own `apply`, which waits for the gate.
+        // The second ensure fetches its manifest and begins its own `apply`, which waits for the first (both count as
+        // catch-ups from the moment they begin, whether they wait at the store's gate or for the engine's turn).
         let secondEnsure = Task { await engine.ensureAvailable(scope: .identifiers(["a"])) }
-        await engine.awaitCondition { $0.state.appliesInFlight == 2 }
+        await engine.awaitCondition { $0.state.manifestCatchUps == 2 }
         await bulk.release()
         let firstResult = await first.value
         let secondResult = await secondEnsure.value
