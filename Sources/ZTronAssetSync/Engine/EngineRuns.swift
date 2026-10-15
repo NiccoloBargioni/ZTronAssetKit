@@ -154,8 +154,12 @@ extension SyncEngine {
         let space: FreeSpace
         let view: StorePlanningView
         do {
-            // REENTRANCY: RE-S06 — the lifecycle and the run token.
-            space = try await self.store.freeSpace()
+            // REENTRANCY: RE-S06 — the lifecycle and the run token; the read became the ledger's base in the turn it
+            // returned (L4-R7), and parked jobs are re-evaluated against it there.
+            space = try await self.readFreeSpace()
+            if self.isRunning {
+                self.reconsiderSpaceBlocked()
+            }
             guard self.stillCurrent(token) else {
                 return .failed(self.isShuttingDown ? .shutDown : .cancelled)
             }
@@ -167,9 +171,6 @@ extension SyncEngine {
         guard self.stillCurrent(token) else {
             return .failed(self.isShuttingDown ? .shutDown : .cancelled)
         }
-        self.state.freeSpace = space
-        self.state.committedSinceRead = 0
-        self.reconsiderSpaceBlocked()
         let target = manifest ?? view.appliedManifest
         let scope = self.state.retentionScope
         let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())

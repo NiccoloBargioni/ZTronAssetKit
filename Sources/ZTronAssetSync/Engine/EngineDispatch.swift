@@ -756,8 +756,8 @@ extension SyncEngine {
             return
         }
         self.transition(transfer, to: .committing)
-        let committed = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
-        self.state.committedSinceRead = committed
+        self.state.committedSinceRead = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
+        self.state.committedTotal = PlanBuilder.adding(self.state.committedTotal, file.byteCount)
         self.committed(transfer, binding: ids, locations: locations)
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()

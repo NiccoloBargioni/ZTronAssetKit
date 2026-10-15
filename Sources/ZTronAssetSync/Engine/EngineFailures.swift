@@ -348,16 +348,27 @@ extension SyncEngine {
     /// Reads the store's free space into the headroom ledger (S2-09: committed bytes stay until the next read).
     func refreshFreeSpace() async {
         do {
-            // REENTRANCY: f-4 (proposed) — the lifecycle; the read replaces the ledger's base atomically.
-            let space = try await self.store.freeSpace()
-            self.state.freeSpace = space
-            self.state.committedSinceRead = 0
+            // REENTRANCY: f-4 (proposed) — the lifecycle; the read is adopted in the turn it returns (`readFreeSpace`).
+            _ = try await self.readFreeSpace()
         } catch {
             return
         }
         if self.isRunning {
             self.reconsiderSpaceBlocked()
         }
+    }
+
+    /// One free-space read, adopted as the headroom ledger's base in the turn it returns (L4-R7, S2-09): the bytes
+    /// committed since the read began stay in the ledger, because the read may have measured the volume before they
+    /// landed (counting them twice only understates headroom; dropping them would overstate it).
+    func readFreeSpace() async throws(StoreError) -> FreeSpace {
+        let mark = self.state.committedTotal
+        // REENTRANCY: f-4 (proposed) — the lifecycle (the callers re-check it); the ledger's base is replaced whole by
+        // this read, keeping only the commits counted since `mark`.
+        let space = try await self.store.freeSpace()
+        self.state.freeSpace = space
+        self.state.committedSinceRead = max(0, self.state.committedTotal &- mark)
+        return space
     }
 
     // MARK: Breaker bookkeeping (ARCHITECTURE §7.7)

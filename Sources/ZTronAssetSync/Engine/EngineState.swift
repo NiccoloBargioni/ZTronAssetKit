@@ -162,6 +162,8 @@ struct EngineState {
     var freeSpace: FreeSpace?
     /// Bytes committed since that read (they stay in the headroom ledger until the next read).
     var committedSinceRead: Int64 = 0
+    /// Bytes committed in this process, saturating: a read keeps the commits counted since it began (`readFreeSpace`).
+    var committedTotal: Int64 = 0
 
     // MARK: Events (R-SYN-12)
 

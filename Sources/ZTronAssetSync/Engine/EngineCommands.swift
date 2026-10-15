@@ -344,8 +344,12 @@ extension SyncEngine {
         let measured: FreeSpace
         let view: StorePlanningView
         do {
-            // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation.
-            measured = try await self.store.freeSpace()
+            // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation; the measured read became the ledger's
+            // base in the turn it returned (L4-R7), and parked jobs are re-evaluated against it there.
+            measured = try await self.readFreeSpace()
+            if self.isRunning {
+                self.reconsiderSpaceBlocked()
+            }
             // User work plans against the space the OS keeps for important usage (sync-2 S2-23).
             space = FreeSpace(
                 volumeImportant: measured.volumeImportant,
@@ -363,11 +367,8 @@ extension SyncEngine {
         guard self.isRunning, !Task.isCancelled else {
             return .failure(self.isShuttingDown ? .shutDown : .cancelled)
         }
-        // The headroom ledger keeps the measured reading: the important-for-opportunistic copy is this ensure's own plan
-        // and space decision, never the base other lanes are admitted against (S2-23, L4-R6).
-        self.state.freeSpace = measured
-        self.state.committedSinceRead = 0
-        self.reconsiderSpaceBlocked()
+        // The headroom ledger keeps the measured reading (`readFreeSpace`): the important-for-opportunistic copy is this
+        // ensure's own plan and space decision, never the base other lanes are admitted against (S2-23, L4-R6).
         let target = manifest ?? view.appliedManifest
         let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())
         // REENTRANCY: RE-S07 — the lifecycle; apply diffs against current state anyway.

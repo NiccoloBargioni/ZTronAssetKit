@@ -58,7 +58,18 @@ extension SyncEngine {
         if self.isRunning, let view, view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
             // The ids of jobs the view holds present at their entries' content follow there without a job (L4-R5).
             self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets))
+            // What `applied` announces for an apply the engine made, announced for one it only finds (an apply that
+            // threw after its in-memory writes): the ids the copy lists and the store no longer does, in the copy's
+            // order, then the store's generation (L4-R7). A later apply of the same manifest prunes nothing, so these
+            // removals would otherwise never be announced.
+            let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
             self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
+            self.state.generation = max(self.state.generation, view.generation)
+            for id in pruned {
+                self.state.boundContent[id] = nil
+                self.broadcast(.assetRemoved(id, .pruned))
+            }
+            self.broadcast(.snapshotChanged(generation: self.state.generation))
             self.followApplied()
         }
         self.manifestCaughtUp()
