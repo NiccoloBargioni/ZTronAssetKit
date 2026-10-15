@@ -362,8 +362,12 @@ extension SyncEngine {
             return
         }
         if probe, var breaker = self.state.breakers[remote.originID] {
+            let before = breaker.publicState
             _ = breaker.admit(transfer, at: self.environment.time.monotonicNow())
             self.state.breakers[remote.originID] = breaker
+            // Publishes `circuitChanged(.halfOpen)` when this probe opened the half-open state, and schedules its
+            // watchdog.
+            self.breakerChanged(remote.originID, from: before)
             self.scheduleBreakerDeadline()
         }
         guard self.transition(transfer, to: .downloading) else {
