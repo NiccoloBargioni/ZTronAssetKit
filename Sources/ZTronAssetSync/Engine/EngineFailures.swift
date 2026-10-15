@@ -5,16 +5,16 @@ import ZTronAssetStorage
 extension SyncEngine {
     // MARK: Pause (T7)
 
-    /// A paused attempt: a preempted one resumes first in its lane, a policy pause parks it; a resumable pause keeps a
-    /// resume point read from the attempt's sidecar.
-    func paused(_ transfer: TransferID, epoch: UInt64, request: TransferRequest, resumable: Bool) async {
+    /// A paused attempt: a preempted one resumes first in its lane, a policy pause parks it; the next attempt continues
+    /// from the attempt's sidecar when there is one (the transport's resumable flag is not trusted, D-13).
+    func paused(_ transfer: TransferID, epoch: UInt64, request: TransferRequest) async {
         guard let job = self.state.jobs[transfer], let active = job.active else {
             return
         }
         self.recordBreaker(.abandoned(transfer))
         let policyPause = active.policyPause
         // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch below; the resume point is kept only for this job.
-        let resume = await self.resumePoint(after: request, resumable: resumable)
+        let resume = await self.resumePoint(after: request)
         guard self.isRunning, var current = self.state.jobs[transfer], current.epoch == epoch else {
             return
         }
@@ -32,8 +32,10 @@ extension SyncEngine {
 
     /// The point the next attempt continues from: the attempt's sidecar, when the content is checksummed and the
     /// source can resume (the engine looks for a sidecar rather than trusting a flag, ARCHITECTURE §7.6, D-13). A
-    /// partial without one is discarded.
-    func resumePoint(after request: TransferRequest, resumable: Bool) async -> ResumePoint? {
+    /// partial without one is discarded whatever the transport's resumable flag said: no attempt can continue it (the
+    /// live transport leaves one after a dropped connection on a response without a validator), and staging GC would
+    /// otherwise find it only at the next launch or maintenance window.
+    func resumePoint(after request: TransferRequest) async -> ResumePoint? {
         guard let staging = self.state.staging else {
             return nil
         }
@@ -45,10 +47,8 @@ extension SyncEngine {
                 return ResumePoint(previous: name, offset: sidecar.receivedBytes, validator: sidecar.validator)
             }
         }
-        if !resumable || !canResume {
-            // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a partial nobody can continue.
-            await staging.discard(name)
-        }
+        // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a partial nobody can continue.
+        await staging.discard(name)
         return nil
     }
 
@@ -98,7 +98,7 @@ extension SyncEngine {
             self.throttled(transfer, retryAfter: retryAfter, wall: wall)
         case .transient(let cause, let retryAfter):
             // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch, re-checked right below.
-            let resume = await self.resumePoint(after: request, resumable: true)
+            let resume = await self.resumePoint(after: request)
             guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
                 return
             }
@@ -138,7 +138,8 @@ extension SyncEngine {
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.integrityFailed(transfer, epoch: epoch, ids: job.assets.sorted(), identity: job.identity)
         case .insufficientSpace(let required):
-            self.transition(transfer, to: .blocked(.insufficientSpace))
+            // Undecided until the free space is read: parked, retried or awaiting the reaper (`spaceFailed`).
+            self.transition(transfer, to: .failed(.nextRun))
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.spaceFailed(transfer, epoch: epoch, required: required ?? job.entry.byteSize ?? 0)
         case .rejected:
@@ -171,15 +172,15 @@ extension SyncEngine {
         }
     }
 
-    /// Backoff with full jitter (R-SYN-5): interests whose lane's attempt cap is reached receive the error, the rest
-    /// wait for `failed(.at)` (the alarm re-queues, T18) or a satisfied edge (T19). The interactive policy applies while
-    /// the job's lane is user-initiated (sync.md §8.2).
-    func retryLater(_ transfer: TransferID, error: TransferError) {
+    /// Backoff with full jitter (R-SYN-5): interests whose lane's attempt cap is reached receive the error (or
+    /// `answer`, the engine's own figures), the rest wait for `failed(.at)` (the alarm re-queues, T18) or a satisfied
+    /// edge (T19). The interactive policy applies while the job's lane is user-initiated (sync.md §8.2).
+    func retryLater(_ transfer: TransferID, error: TransferError, answer: AssetError? = nil) {
         guard var job = self.state.jobs[transfer] else {
             return
         }
         let wall = self.environment.time.now()
-        let assetError = error.assetError(now: wall)
+        let assetError = answer ?? error.assetError(now: wall)
         job.attempts += 1
         job.active = nil
         job.transientFailure = true
@@ -274,8 +275,10 @@ extension SyncEngine {
         await self.refreshStoreDeadline()
     }
 
-    /// ENOSPC (ARCHITECTURE §7.6): `awaitingSpace` when the store has pending reclaim (the reaper wakes it), else
-    /// `insufficientSpace` with the store's measured figures.
+    /// ENOSPC (ARCHITECTURE §7.6), decided on a fresh free-space read: `awaitingSpace` when the store has pending
+    /// reclaim (the reaper wakes it); a retry with backoff when the volume holds what the job needs after all (the
+    /// ENOSPC was transient: parking it would fail every joiner with stale figures and leave the job parked for ever);
+    /// else `insufficientSpace` with the store's measured figures, re-evaluated at every later read (T17).
     func spaceFailed(_ transfer: TransferID, epoch: UInt64, required: Int64) async {
         self.state.jobs[transfer]?.active = nil
         // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot.
@@ -286,25 +289,20 @@ extension SyncEngine {
         let space = self.state.freeSpace
         let reclaiming = (space?.pendingReclaim ?? 0) > 0
         let volume = job.lane == .userInitiated ? space?.volumeImportant : space?.volumeOpportunistic
-        self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: max(0, volume ?? 0))
-        switch job.state {
-        case .failed:
-            guard self.transition(transfer, to: .queued) else {
-                return
-            }
-        case .blocked:
-            break
-        case .queued:
-            break
-        default:
+        let figures = AssetError.insufficientSpace(required: required, available: max(0, volume ?? 0))
+        self.state.jobs[transfer]?.lastError = figures
+        guard case .failed = job.state else {
+            // A user request re-queued it meanwhile (T20): the gate's ledger decides with the figures just read.
             return
         }
-        let reason: BlockReason = reclaiming ? .awaitingSpace : .insufficientSpace
-        if case .blocked(let current) = self.state.jobs[transfer]?.state, current == reason {
-            self.failFast(transfer, reason: reason)
-        } else {
-            self.park(transfer, reason: reason)
+        if !reclaiming, let measured = self.state.jobs[transfer], self.spaceBlock(measured) == nil {
+            self.retryLater(transfer, error: .insufficientSpace(requiredBytes: required), answer: figures)
+            return
         }
+        guard self.transition(transfer, to: .queued) else {
+            return
+        }
+        self.park(transfer, reason: reclaiming ? .awaitingSpace : .insufficientSpace)
         self.checkRunSettled()
     }
 
@@ -317,6 +315,9 @@ extension SyncEngine {
             self.state.committedSinceRead = 0
         } catch {
             return
+        }
+        if self.isRunning {
+            self.reconsiderSpaceBlocked()
         }
     }
 

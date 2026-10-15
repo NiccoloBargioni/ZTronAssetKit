@@ -107,16 +107,19 @@ struct EngineOutcomeTests {
         let bytes = EngineFixture.bytes(451)
         let entry = EngineHarness.onDemand("enospc", bytes)
         await harness.serveManifest([entry])
-        await harness.source.script(entry.transferID, [.stage(bytes)])
+        // The volume holds the file, so the ENOSPC is retried within the interactive policy's attempts (F-20).
+        await harness.source.script(entry.transferID, [.stage(bytes), .stage(bytes)])
         try await harness.start()
         _ = await harness.engine.sync(.force)
         harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".part"), occurrence: .every, error: .noSpace))
-        let result = await harness.engine.awaitAsset("enospc", lane: .userInitiated)
+        let engine = harness.engine
+        let result = await harness.withClock { await engine.awaitAsset("enospc", lane: .userInitiated) }
         guard case .failure(.insufficientSpace(let required, _)) = result else {
             Issue.record("expected insufficientSpace, got \(result)")
             return
         }
         #expect(required == Int64(bytes.count))
+        #expect(await harness.source.starts.count == SyncTuning().interactiveRetry.maxAttemptsPerRun)
         await harness.engine.shutdown()
     }
 

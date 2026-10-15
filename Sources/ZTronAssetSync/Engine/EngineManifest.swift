@@ -284,12 +284,25 @@ extension SyncEngine {
         self.pump()
     }
 
-    /// Fails every unknown-id waiter with `error`.
+    /// Fails every unknown-id waiter with `error`, except those whose id the applied manifest lists by now (a run or an
+    /// `ensureAvailable` applied it while the fetch failed): they join their job (sync-1 S1-13).
     private func failUnknownWaiters(_ error: AssetError) {
         let waiting = self.state.unknownWaiters
         self.state.unknownWaiters.removeAll()
+        var joined = false
         for token in waiting.keys.sorted() {
-            waiting[token]?.continuation.resume(returning: .failure(error))
+            guard let waiter = waiting[token] else {
+                continue
+            }
+            if let entry = self.state.applied.entry(for: waiter.asset) {
+                self.join(token, waiter: waiter, entry: entry)
+                joined = true
+            } else {
+                waiter.continuation.resume(returning: .failure(error))
+            }
+        }
+        if joined {
+            self.pump()
         }
         self.notifyObservers()
     }

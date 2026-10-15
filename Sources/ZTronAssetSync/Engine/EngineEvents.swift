@@ -5,27 +5,26 @@ extension SyncEngine {
     // MARK: Broadcast (R-SYN-12, ADR-023)
 
     /// Publishes `event` to every subscriber queue (bounded per key and subject); a waiting pull receives it directly.
+    /// Each queue is mutated in place through the dictionary (a copy taken out and written back would copy a stalled
+    /// subscriber's slots on every publication: O(n) each, O(n²) for a mass prune announced in one turn).
     func broadcast(_ event: AssetEvent) {
         self.state.lastEventSequence += 1
         let sequence = self.state.lastEventSequence
         var handOffs: [CheckedContinuation<AssetEvent?, Never>] = []
         for key in self.state.subscribers.keys.sorted() {
-            guard var queue = self.state.subscribers[key] else {
+            guard let published = self.state.subscribers[key]?.publish(event, sequence: sequence) else {
                 continue
             }
-            let (handOff, coalesced) = queue.publish(event, sequence: sequence)
-            if coalesced {
+            if published.coalesced {
                 self.state.metrics.eventsCoalesced += 1
             }
-            if let handOff {
+            if let handOff = published.handOff {
                 handOffs.append(handOff)
                 self.state.metrics.eventsDelivered += 1
-                if queue.finished, queue.isEmpty {
+                if let queue = self.state.subscribers[key], queue.finished, queue.isEmpty {
                     self.state.subscribers[key] = nil
-                    continue
                 }
             }
-            self.state.subscribers[key] = queue
         }
         for handOff in handOffs {
             handOff.resume(returning: event)
@@ -139,32 +138,28 @@ extension SyncEngine {
     func pull(_ key: UInt64) async -> AssetEvent? {
         // REENTRANCY: f-6 (proposed) — nothing: the body takes or registers synchronously; the event arrives by value.
         await withCheckedContinuation { (continuation: CheckedContinuation<AssetEvent?, Never>) in
-            guard var queue = self.state.subscribers[key] else {
+            // Taken in place, as `broadcast` publishes (no copy of a long backlog per pull).
+            guard self.state.subscribers[key] != nil else {
                 continuation.resume(returning: nil)
                 return
             }
-            if let event = queue.take() {
+            if let event = self.state.subscribers[key]?.take() {
                 self.state.metrics.eventsDelivered += 1
-                if queue.finished, queue.isEmpty {
+                if let queue = self.state.subscribers[key], queue.finished, queue.isEmpty {
                     self.state.subscribers[key] = nil
-                } else {
-                    self.state.subscribers[key] = queue
                 }
                 self.notifyObservers()
                 continuation.resume(returning: event)
                 return
             }
-            if queue.finished {
+            if self.state.subscribers[key]?.finished == true {
                 self.state.subscribers[key] = nil
                 self.notifyObservers()
                 continuation.resume(returning: nil)
                 return
             }
-            if let previous = queue.pending {
-                previous.resume(returning: nil)
-            }
-            queue.pending = continuation
-            self.state.subscribers[key] = queue
+            self.state.subscribers[key]?.pending?.resume(returning: nil)
+            self.state.subscribers[key]?.pending = continuation
         }
     }
 

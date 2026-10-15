@@ -101,7 +101,10 @@ extension SyncEngine {
     /// Whether a valid user-initiated entry waits.
     private var hasQueuedUser: Bool {
         for kind in [LaneQueues.Kind.userSingle, .userBatch] {
-            if self.state.queues.first(kind, isValid: { self.isValid($0) && self.state.draining[$0.transfer] == nil }) != nil {
+            let ready: (LaneQueues.Entry) -> Bool = { entry in
+                self.isValid(entry) && self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
+            }
+            if self.state.queues.first(kind, isValid: ready) != nil {
                 return true
             }
         }
@@ -185,7 +188,7 @@ extension SyncEngine {
     /// The gates of one queued job: lane admission, the Apple-tier access gate (E-17), the origin throttle, the
     /// breaker and the headroom ledger (sync.md §7.3, §12.1).
     func gate(_ transfer: TransferID) -> DispatchGate {
-        guard let job = self.state.jobs[transfer], let remote = self.state.remote else {
+        guard let job = self.state.jobs[transfer], let remote = self.state.remote, !self.state.heldForManifest.contains(transfer) else {
             return .wait
         }
         let lane = job.lane
@@ -263,9 +266,15 @@ extension SyncEngine {
     }
 
     /// The headroom ledger (S2-09, S2-29): a fetch of known size starts only if the volume minus the reserve, the
-    /// bytes in flight and the bytes committed since the last read still holds it; unknown sizes always fit.
-    private func spaceBlock(_ job: Job) -> BlockReason? {
-        guard let size = job.entry.byteSize, size > 0, let space = self.state.freeSpace else {
+    /// bytes in flight and the bytes committed since the last read still holds it; unknown sizes always fit. The size is
+    /// the entry's, or the larger figure an earlier ENOSPC reported (the transport's `required`), so a job parked for
+    /// lack of space is re-admitted only when that much is free (T17).
+    func spaceBlock(_ job: Job) -> BlockReason? {
+        var size = job.entry.byteSize ?? 0
+        if case .insufficientSpace(let required, _)? = job.lastError {
+            size = max(size, required)
+        }
+        guard size > 0, let space = self.state.freeSpace else {
             return nil
         }
         let volume = job.lane == .userInitiated ? space.volumeImportant : space.volumeOpportunistic
@@ -544,9 +553,9 @@ extension SyncEngine {
             self.noteRunBytes(transfer, file.byteCount)
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.publish(transfer, epoch: epoch, file: file, cancelledAttempt: false)
-        case .paused(let resumable):
+        case .paused:
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
-            await self.paused(transfer, epoch: epoch, request: request, resumable: resumable)
+            await self.paused(transfer, epoch: epoch, request: request)
         case .failed(let error):
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.failed(transfer, epoch: epoch, request: request, error: error)
@@ -566,8 +575,9 @@ extension SyncEngine {
         }
     }
 
-    /// The terminal element of an attempt the engine cancelled. A staged file is published for a job of the same
-    /// transfer that is queued again (a completion that raced the cancel); otherwise it is discarded.
+    /// The terminal element of an attempt the engine cancelled. A staged file is kept for the next attempt of a job of
+    /// the same transfer that still wants the content and is not running or publishing (queued, parked or waiting for a
+    /// retry: a completion that raced the cancel is not wasted); otherwise it is discarded.
     private func drained(_ transfer: TransferID, request: TransferRequest, update: TransferUpdate) async {
         defer {
             self.pump()
@@ -575,7 +585,14 @@ extension SyncEngine {
         guard case .staged(let file) = update else {
             return
         }
-        guard let job = self.state.jobs[transfer], job.state == .queued, !job.interests.isEmpty else {
+        let idle: Bool
+        switch self.state.jobs[transfer]?.state {
+        case .queued?, .blocked?, .failed(.at)?, .failed(.whenOnline)?, .failed(.nextRun)?:
+            idle = true
+        case .downloading?, .verifying?, .committing?, .failed(.untilEntryChanges)?, nil:
+            idle = false
+        }
+        guard idle, let job = self.state.jobs[transfer], !job.interests.isEmpty, job.adopt == nil else {
             // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a copy nobody wants.
             await self.state.staging?.discard(file.name)
             return
@@ -595,7 +612,11 @@ extension SyncEngine {
     /// locations (RE-S14).
     func publish(_ transfer: TransferID, epoch: UInt64, file: StagedFile, cancelledAttempt: Bool) async {
         guard var job = self.state.jobs[transfer], job.epoch == epoch else {
-            // The job was retired (or replaced) before this publication began: nobody else will publish the file.
+            // The job was retired (or replaced) before this publication began: nobody else will publish the file. The
+            // transfer ended without a verdict (a half-open probe's exit, §7.7) unless a new job of it runs.
+            if self.state.jobs[transfer] == nil {
+                self.recordBreaker(.abandoned(transfer))
+            }
             // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a copy nobody wants.
             await self.state.staging?.discard(file.name)
             return
@@ -619,25 +640,34 @@ extension SyncEngine {
             await self.publicationFailed(transfer, epoch: epoch, file: file, error: error, cancelledAttempt: cancelledAttempt)
             return
         }
-        guard self.isRunning, let current = self.state.jobs[transfer], current.epoch == epoch else {
+        guard self.isRunning else {
+            return
+        }
+        self.recordBreaker(.objectSuccess(transfer))
+        guard let current = self.state.jobs[transfer], current.epoch == epoch else {
             return
         }
         self.transition(transfer, to: .committing)
         let committed = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
         self.state.committedSinceRead = committed
-        self.recordBreaker(.objectSuccess(transfer))
-        self.committed(transfer, locations: locations)
+        self.committed(transfer, binding: ids, locations: locations)
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()
     }
 
-    /// Delivers a commit to every interest. Interests in assets the store did not bind (their content changed while
-    /// the job published, T22) first follow their new content, so a waiter is never answered `.notFound` for an asset
-    /// that still exists and the run keeps its claim until that content commits.
-    private func committed(_ transfer: TransferID, locations: [AssetID: AssetLocation]) {
+    /// Delivers a commit to every interest. Interests in assets the store did not bind first follow their content, so a
+    /// waiter is never answered `.notFound` for an asset that still exists and the run keeps its claim until that content
+    /// commits: an asset whose content changed while the job published moves to its new job (T22); one the engine's
+    /// copy still maps to this content moves to a fresh job of it once this one is gone, because it joined after the
+    /// publication's binding was captured (the next publication binds it; the store deduplicates the bytes, ADR-020),
+    /// or because the store refused it while holding a newer manifest than the copy (held until the copy catches up).
+    private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation]) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
+        let captured = Set(ids)
+        var deferred: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
+        var refused = false
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
             let unbound = interest.assets.filter { locations[$0] == nil }
             guard !unbound.isEmpty else {
@@ -650,10 +680,22 @@ extension SyncEngine {
                 self.state.jobs[transfer]?.interests[token]?.assets = bound
             }
             for asset in unbound.sorted() {
-                self.reroute(token, interest: interest, asset: asset, from: transfer)
+                guard self.state.applied.entry(for: asset)?.transferID == transfer else {
+                    self.reroute(token, interest: interest, asset: asset, from: transfer)
+                    continue
+                }
+                refused = refused || captured.contains(asset)
+                deferred.append((token, interest, asset))
             }
         }
-        self.resolveAll(transfer, with: .committed(locations))
+        self.resolveAll(transfer, with: .committed(locations)) {
+            if refused {
+                self.holdForManifest(transfer)
+            }
+            for item in deferred {
+                self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
+            }
+        }
         self.pump()
         self.reconcileIdle()
     }
@@ -704,8 +746,14 @@ extension SyncEngine {
     /// A publication failed (ARCHITECTURE §7.6 store rows).
     private func publicationFailed(_ transfer: TransferID, epoch: UInt64, file: StagedFile, error: StoreError, cancelledAttempt: Bool) async {
         guard self.isRunning, let job = self.state.jobs[transfer], job.epoch == epoch else {
+            if self.isRunning, self.state.jobs[transfer] == nil {
+                self.recordBreaker(.abandoned(transfer))
+            }
             return
         }
+        // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
+        // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
+        self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
         switch error {
         case .superseded:
             // The ids no longer want this content (T22/T11): their interests follow their current entries.
@@ -719,7 +767,6 @@ extension SyncEngine {
         case .fileSystem(.notFound) where cancelledAttempt:
             // ENOENT for an attempt the engine cancelled is that cancellation (ARCHITECTURE §7.6, D-13): a fresh
             // attempt, no failure, no backoff.
-            self.recordBreaker(.abandoned(transfer))
             if self.transition(transfer, to: .queued) {
                 self.state.jobs[transfer]?.resume = nil
                 self.enqueue(transfer)
@@ -749,27 +796,38 @@ extension SyncEngine {
         self.reconcileIdle()
     }
 
-    /// Re-routes every interest of a job whose content its ids no longer want, and removes the job.
+    /// Re-routes every interest of a job whose content its ids no longer want, and removes the job. An asset the
+    /// engine's copy of the manifest still maps to this content was superseded by a manifest the store holds and the
+    /// copy does not show yet: it waits on a fresh, held job of the content until the copy catches up (F-20), never
+    /// `.notFound` while the asset is listed.
     func supersede(_ transfer: TransferID) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
         self.state.jobs[transfer]?.interests.removeAll()
         self.removeJob(transfer)
+        if job.interests.values.contains(where: { interest in interest.assets.contains { self.state.applied.entry(for: $0)?.transferID == transfer } }) {
+            self.holdForManifest(transfer)
+        }
         for token in job.interests.keys.sorted() {
             guard let interest = job.interests[token] else {
                 continue
             }
             for asset in interest.assets.sorted() {
-                if self.state.applied.entry(for: asset)?.transferID == transfer {
-                    // Still this content for the engine's copy of the manifest: the store knows better; fail it.
-                    self.deliver(.failed(.notFound), to: token, interest: JobInterest(lane: interest.lane, kind: interest.kind, assets: [asset]), transfer: transfer)
-                } else {
-                    self.reroute(token, interest: interest, asset: asset, from: transfer)
-                }
+                self.reroute(token, interest: interest, asset: asset, from: transfer)
             }
         }
         self.checkRunSettled()
         self.pump()
+    }
+
+    /// The breaker input of a publication failure: none counts, but every one ends the transfer (ARCHITECTURE §7.7).
+    static func publicationBreakerOutcome(_ error: StoreError, transfer: TransferID) -> CircuitBreaker.Outcome {
+        switch error {
+        case .superseded, .cancelled, .closed, .notOpen:
+            return .abandoned(transfer)
+        default:
+            return .neutral(transfer)
+        }
     }
 }

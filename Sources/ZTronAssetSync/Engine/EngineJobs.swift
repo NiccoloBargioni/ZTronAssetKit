@@ -82,8 +82,15 @@ extension SyncEngine {
     }
 
     /// A new interest in a job that stays parked gets the answer a new job would get when it parks (the fail-fast
-    /// policy runs only when a job parks, so a joiner would otherwise wait for a gate that may never open).
+    /// policy runs only when a job parks, so a joiner would otherwise wait for a gate that may never open). A job parked
+    /// for lack of space is re-checked first against the latest free-space read: a new job would start if it fits.
     private func failFastJoiner(_ token: InterestToken, of transfer: TransferID) {
+        if case .blocked(.insufficientSpace)? = self.state.jobs[transfer]?.state, let job = self.state.jobs[transfer], self.spaceBlock(job) == nil {
+            if self.transition(transfer, to: .queued) {
+                self.enqueue(transfer)
+            }
+            return
+        }
         switch self.state.jobs[transfer]?.state {
         case .blocked(let reason)?:
             self.failFast(transfer, reason: reason, only: token)
@@ -132,7 +139,7 @@ extension SyncEngine {
                 }
             }
         case .blocked(let reason):
-            if after > before, self.blockCleared(reason, lane: after) {
+            if after > before, self.blockCleared(reason, lane: after, job: job) {
                 if self.transition(transfer, to: .queued) {
                     self.enqueue(transfer)
                 }
@@ -182,9 +189,11 @@ extension SyncEngine {
         case .verifying, .committing:
             return
         case .downloading:
-            if let active = job.active, self.abandon(transfer, active) {
-                self.recordBreaker(.abandoned(transfer))
+            if let active = job.active {
+                self.abandon(transfer, active)
             }
+            // Whether or not its stream already ended, the transfer leaves without a verdict (§7.7).
+            self.recordBreaker(.abandoned(transfer))
         case .queued, .failed, .blocked:
             break
         }
@@ -210,10 +219,14 @@ extension SyncEngine {
         return true
     }
 
-    /// Drops a job and every deadline and progress key it owns (sync-1 S1-10, ADR-023).
+    /// Drops a job and every deadline, progress key and kept staged file it owns (sync-1 S1-10, ADR-023).
     func removeJob(_ transfer: TransferID) {
         guard let job = self.state.jobs.removeValue(forKey: transfer) else {
             return
+        }
+        if let adopt = job.adopt {
+            // A drained copy nobody will publish now.
+            self.discardLater(adopt.name)
         }
         self.state.heap.remove(.retry(transfer, epoch: job.epoch))
         for asset in job.assets {
@@ -311,8 +324,12 @@ extension SyncEngine {
         case .run:
             self.recordRunOutcome(outcome, transfer: transfer, assets: interest.assets)
         case .system:
-            if case .committed = outcome {
-                for asset in interest.assets {
+            // A heal ends with its job, committed or failed (a heal still scheduled for later is kept).
+            let now = self.environment.time.monotonicNow()
+            for asset in interest.assets {
+                if case .committed = outcome {
+                    self.state.heals[asset] = nil
+                } else if let due = self.state.heals[asset], due <= now {
                     self.state.heals[asset] = nil
                 }
             }
@@ -333,8 +350,9 @@ extension SyncEngine {
         }
     }
 
-    /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job.
-    func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome) {
+    /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job; `follow` runs once
+    /// the job is gone and before the run is checked for settling (interests that move to a fresh job of the transfer).
+    func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, then follow: () -> Void = {}) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
@@ -346,6 +364,7 @@ extension SyncEngine {
         self.state.jobs[transfer]?.interests.removeAll()
         self.removeJob(transfer)
         self.publishTerminal(job: job, outcome: outcome)
+        follow()
         self.checkRunSettled()
     }
 
@@ -388,7 +407,11 @@ extension SyncEngine {
                 let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
                 error = wait > limit ? .serverUnavailable(retryAfter: wait) : nil
             case .insufficientSpace:
-                error = job.lastError ?? .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace?.volumeImportant ?? 0)
+                if case .insufficientSpace? = job.lastError {
+                    error = job.lastError
+                } else {
+                    error = .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace?.volumeImportant ?? 0)
+                }
             case .policy, .awaitingSpace:
                 error = nil
             }
@@ -398,8 +421,9 @@ extension SyncEngine {
         }
     }
 
-    /// Whether a blocked reason no longer applies to `lane`.
-    func blockCleared(_ reason: BlockReason, lane: AssetPriority) -> Bool {
+    /// Whether a blocked reason no longer applies to `job` at `lane`: lack of space is re-checked against the latest
+    /// free-space read (T17); `awaitingSpace` waits for the reaper.
+    func blockCleared(_ reason: BlockReason, lane: AssetPriority, job: Job) -> Bool {
         switch reason {
         case .offline, .policy:
             return self.laneVerdict(lane) == .admit
@@ -413,8 +437,28 @@ extension SyncEngine {
                 return until <= self.environment.time.monotonicNow()
             }
             return true
-        case .awaitingSpace, .insufficientSpace:
+        case .insufficientSpace:
+            // `job` already holds the interest that changed its lane, so the ledger reads the lane's volume.
+            return self.spaceBlock(job) == nil
+        case .awaitingSpace:
             return false
+        }
+    }
+
+    /// Re-queues every job parked for lack of space whose headroom the latest free-space read admits (T17).
+    func reconsiderSpaceBlocked() {
+        var cleared = false
+        for transfer in self.state.jobs.keys.sorted() {
+            guard let job = self.state.jobs[transfer], job.state == .blocked(.insufficientSpace), self.spaceBlock(job) == nil else {
+                continue
+            }
+            if self.transition(transfer, to: .queued) {
+                self.enqueue(transfer)
+                cleared = true
+            }
+        }
+        if cleared {
+            self.pump()
         }
     }
 
@@ -434,12 +478,15 @@ extension SyncEngine {
         self.log.log(.sync, .error, "failure \(label) \(hashedID)")
     }
 
-    /// Takes the manifest the store applied as the engine's copy.
+    /// Takes the manifest the store applied as the engine's copy. The newest manifest seen stays the newest one fetched
+    /// (sequence > 0) once there is one: an applied manifest never comes from a later fetch (a point admission, an
+    /// `ensureAvailable` apply or a store re-read lands while a run holds a fetched, unapplied manifest), so replacing it
+    /// would drop ids only that fetch lists from the S1-13 checks.
     func adoptApplied(_ manifest: ValidatedManifest, etag: ETag?) {
         self.state.applied = manifest
         self.state.appliedETag = etag
-        if self.state.newest.map({ $0.sequence == 0 || $0.manifest.digest != manifest.digest }) ?? true {
-            self.state.newest = (manifest, self.state.newest?.sequence ?? 0)
+        if (self.state.newest?.sequence ?? 0) == 0 {
+            self.state.newest = (manifest, 0)
         }
     }
 }

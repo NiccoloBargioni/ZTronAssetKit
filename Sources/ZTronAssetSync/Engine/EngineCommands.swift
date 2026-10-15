@@ -331,6 +331,8 @@ extension SyncEngine {
             return .failure(self.isShuttingDown ? .shutDown : .cancelled)
         }
         self.state.freeSpace = space
+        self.state.committedSinceRead = 0
+        self.reconsiderSpaceBlocked()
         let target = manifest ?? view.appliedManifest
         let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())
         // REENTRANCY: RE-S07 — the lifecycle; apply diffs against current state anyway.
@@ -353,19 +355,14 @@ extension SyncEngine {
             return .failure(.insufficientSpace(required: required, available: available))
         }
         if manifest != nil || eviction != nil {
-            let report: ApplyReport
-            do {
-                // REENTRANCY: RE-S09 — jobs of pruned ids end (T21) and changed identities follow (T22), as after a
-                // run's apply; no generation guard (sync-1 S1-12).
-                report = try await self.store.apply(target, etag: etag, eviction: eviction)
-            } catch {
+            // REENTRANCY: RE-S09 — the lifecycle; the callee has followed a committed apply (removal events, T21, T22)
+            // even when this caller has gone, as after a run's apply.
+            if case .failure(let error) = await self.applyAndFollow(target, etag: etag, eviction: eviction) {
                 return .failure(error.assetError)
             }
             guard self.isRunning else {
                 return .failure(.shutDown)
             }
-            // The store committed: the engine follows it even when this caller has gone (removal events, T21, T22).
-            self.applied(target, etag: etag, report: report)
             // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced (apply committed).
             await self.refreshStoreDeadline()
             guard self.isRunning, !Task.isCancelled else {
@@ -612,8 +609,26 @@ extension SyncEngine {
                 continue
             }
             for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
-                if !interest.assets.isDisjoint(with: purged) {
+                let withdrawn = interest.assets.intersection(purged)
+                guard !withdrawn.isEmpty else {
+                    continue
+                }
+                // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of
+                // a purged id is forgotten.
+                for asset in withdrawn.sorted() {
+                    switch interest.kind {
+                    case .prefetch, .ensure:
+                        self.dropGroupMember(token, asset: asset, from: transfer)
+                    case .system:
+                        self.state.heals[asset] = nil
+                    case .run, .waiter:
+                        break
+                    }
+                }
+                if withdrawn.count == interest.assets.count {
                     self.removeInterest(token, from: transfer)
+                } else {
+                    self.state.jobs[transfer]?.interests[token]?.assets.subtract(withdrawn)
                 }
             }
         }
@@ -1189,6 +1204,9 @@ extension SyncEngine {
             for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil {
                 violations.append("the run claims \(transfer), whose job does not hold its interest")
             }
+        }
+        if self.isRunning, self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+            violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
         }
         return violations
     }

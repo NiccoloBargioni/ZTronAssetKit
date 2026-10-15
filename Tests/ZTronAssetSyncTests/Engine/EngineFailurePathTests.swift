@@ -191,7 +191,8 @@ struct EngineFailurePathTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim fails its waiter with the store's figures", .timeLimit(.minutes(1)))
     func enospcWithoutReclaim() async throws {
-        let harness = EngineHarness.make()
+        // The volume cannot hold the 9,000 bytes the ENOSPC asks for (on one that can, the failure is retried, F-20).
+        let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
         let entry = EngineHarness.onDemand("big", EngineFixture.bytes(306))
         await harness.serveManifest([entry])
         await harness.source.script(entry.transferID, [.fail(.insufficientSpace(requiredBytes: 9_000))])

@@ -304,7 +304,9 @@ struct EngineRegressionTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-4: a resolve that joins a job blocked for lack of space is answered at once, as a new job would be", .timeLimit(.minutes(1)))
     func joinerOfBlockedJobFailsFast() async throws {
-        let harness = EngineHarness.make()
+        // The volume holds both entries but not the 5,000 bytes a's ENOSPC asks for, so a parks (F-20: on a volume that
+        // holds the transfer the ENOSPC is transient and retried instead).
+        let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
         let aBytes = EngineFixture.bytes(1_101)
         let bBytes = EngineFixture.bytes(1_102)
         let a = EngineFixture.entry("a", aBytes)

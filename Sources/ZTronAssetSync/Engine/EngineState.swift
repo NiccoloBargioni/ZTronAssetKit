@@ -38,6 +38,12 @@ struct EngineState {
     var jobs: [TransferID: Job] = [:]
     /// Attempts the engine cancelled whose driver still drains the stream to its terminal element.
     var draining: [TransferID: DrainingAttempt] = [:]
+    /// Transfers whose interests wait for the engine's manifest copy to catch up with the store: the store superseded a
+    /// publication the copy still names (a store `apply` whose await has not returned, or one the engine never saw).
+    /// Their jobs stay queued and are not dispatched while `manifestCatchUps > 0` (F-20).
+    var heldForManifest: Set<TransferID> = []
+    /// Store `apply` calls in flight plus store re-reads under way; the last to end releases `heldForManifest`.
+    var manifestCatchUps = 0
     /// The last job epoch handed out.
     var lastEpoch: UInt64 = 0
     /// `resolve` waiters.

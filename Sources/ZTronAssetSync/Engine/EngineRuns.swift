@@ -169,6 +169,7 @@ extension SyncEngine {
         }
         self.state.freeSpace = space
         self.state.committedSinceRead = 0
+        self.reconsiderSpaceBlocked()
         let target = manifest ?? view.appliedManifest
         let scope = self.state.retentionScope
         let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())
@@ -202,17 +203,21 @@ extension SyncEngine {
             return .failed(.insufficientSpace(required: required, available: available))
         }
         let report: ApplyReport
-        do {
-            // REENTRANCY: RE-S09 — jobs of pruned ids end (T21), jobs whose identity changed follow (T22); no
-            // generation guard (sync-1 S1-12).
-            report = try await self.store.apply(target, etag: etag, eviction: eviction)
-        } catch {
+        // REENTRANCY: RE-S09 — the run token below; the callee has followed a committed apply (T21, T22) whether or not
+        // this run is still current (a purge may have ended it meanwhile).
+        switch await self.applyAndFollow(target, etag: etag, eviction: eviction) {
+        case .success(let committed):
+            report = committed
+        case .failure(let error):
             return .failed(error.assetError)
         }
         guard self.stillCurrent(token) else {
+            if self.isRunning {
+                // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced (apply committed).
+                await self.refreshStoreDeadline()
+            }
             return .failed(self.isShuttingDown ? .shutDown : .cancelled)
         }
-        self.applied(target, etag: etag, report: report)
         self.state.run?.applyReport = report
         self.state.run?.planned = plan.totals
         self.state.run?.fetches = plan.fetches
@@ -223,7 +228,7 @@ extension SyncEngine {
         }
         self.recordSkippedFailures(plan, view: view)
         self.state.run?.transferring = true
-        self.releaseSystemReattachments()
+        self.releaseSystemReattachments(keeping: Set(plan.fetches.map(\.transfer)))
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced (apply committed).
         await self.refreshStoreDeadline()
         guard self.stillCurrent(token) else {
@@ -330,6 +335,12 @@ extension SyncEngine {
             self.broadcast(.assetRemoved(id, .pruned))
         }
         self.broadcast(.snapshotChanged(generation: self.state.generation))
+        self.followApplied()
+    }
+
+    /// Moves every job to the engine's copy of the applied manifest: a job none of whose ids still want its content is
+    /// superseded (its interests follow their entries, T22, or end, T21), one some of whose ids moved lets them go.
+    func followApplied() {
         for transfer in self.state.jobs.keys.sorted() {
             guard let job = self.state.jobs[transfer] else {
                 continue
@@ -345,8 +356,12 @@ extension SyncEngine {
                 continue
             }
             if moved.count == job.assets.count {
-                if job.state == .downloading, let active = job.active {
-                    self.abandon(transfer, active)
+                if job.state == .downloading {
+                    if let active = job.active {
+                        self.abandon(transfer, active)
+                    }
+                    // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
+                    self.recordBreaker(.abandoned(transfer))
                 }
                 self.supersede(transfer)
             } else {
@@ -390,9 +405,12 @@ extension SyncEngine {
         }
     }
 
-    /// Releases the system interests launch re-attachment created: the run now holds its own (sync.md §7.1).
-    private func releaseSystemReattachments() {
-        for transfer in self.state.jobs.keys.sorted() {
+    /// Releases the system interests launch re-attachment created for transfers the run does not plan (sync.md §7.1).
+    /// A re-attached transfer the run plans keeps its interest until the run's own joins it (materialisation is bounded
+    /// by the pipeline, S1-15): releasing it first would retire the job, cancel the live OS task and start the same
+    /// transfer again (R-NET-3: joined once, never duplicated).
+    private func releaseSystemReattachments(keeping planned: Set<TransferID>) {
+        for transfer in self.state.jobs.keys.sorted() where !planned.contains(transfer) {
             guard let job = self.state.jobs[transfer] else {
                 continue
             }
