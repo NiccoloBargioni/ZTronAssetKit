@@ -331,6 +331,17 @@ extension SyncEngine {
     func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport) {
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
+        // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
+        // that follows it there is answered from the store. Relocations are not bindings (an absent record is relocated
+        // too), and they leave the content, so no job moves for them.
+        self.forgetBound(report.contentChanged)
+        for id in report.reused {
+            if let transfer = manifest.entry(for: id)?.transferID {
+                self.state.boundContent[id] = transfer
+            }
+        }
+        self.forgetBound(report.evicted)
+        self.forgetBound(report.pruned)
         for id in report.pruned {
             self.broadcast(.assetRemoved(id, .pruned))
         }
@@ -437,6 +448,12 @@ extension SyncEngine {
             let fetch = run.fetches[cursor]
             cursor += 1
             self.state.run?.cursor = cursor
+            if self.isBound(fetch.id, to: fetch.transfer) {
+                // Another interest committed it (or an apply bound it) after the run's planning view: nothing to fetch
+                // (F-19, L4-R5).
+                self.countRunFetched(run.token)
+                continue
+            }
             if self.state.run?.outstanding[fetch.transfer] == nil {
                 outstanding += 1
             }

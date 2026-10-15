@@ -31,37 +31,46 @@ extension SyncEngine {
         if let error = await self.ensureStarted() {
             return .failure(error)
         }
-        // REENTRANCY: RE-S36 — the lifecycle; a `nil` location falls through to the job path, which re-reads the record.
-        let present = await self.store.location(for: id, extensions: [], recordingAccess: true)
-        guard self.isRunning else {
-            return .failure(.shutDown)
-        }
-        if let present {
-            self.state.metrics.resolveHits += 1
-            return .success(present)
-        }
-        if self.state.migration.pending {
-            do {
-                // REENTRANCY: RE-S36 — the lifecycle; a `nil` answer falls through to the job path.
-                if let location = try await self.store.adoptLegacyNow(id) {
-                    return .success(location)
-                }
-            } catch .cancelled {
-                return .failure(.cancelled)
-            } catch {
-                // A legacy file that cannot be adopted is downloaded instead.
+        // From the first read to the registration, a binding the engine learns (a commit of this id) is kept, so the
+        // registration below never creates a job for an asset committed meanwhile (L4-R5).
+        self.state.presenceReaders += 1
+        let view: StorePlanningView
+        do {
+            defer {
+                self.state.presenceReaders -= 1
             }
+            // REENTRANCY: RE-S36 — the lifecycle; a `nil` location falls through to the job path, which re-reads the record.
+            let present = await self.store.location(for: id, extensions: [], recordingAccess: true)
             guard self.isRunning else {
                 return .failure(.shutDown)
             }
-        }
-        let view: StorePlanningView
-        do {
-            // REENTRANCY: f-5 (proposed) — the lifecycle; the record decides T2 (quarantined: no job) before the join,
-            // which is synchronous.
-            view = try await self.store.planningView()
-        } catch {
-            return .failure(error.assetError)
+            if let present {
+                self.state.metrics.resolveHits += 1
+                return .success(present)
+            }
+            if self.state.migration.pending {
+                do {
+                    // REENTRANCY: RE-S36 — the lifecycle; a `nil` answer falls through to the job path.
+                    if let location = try await self.store.adoptLegacyNow(id) {
+                        return .success(location)
+                    }
+                } catch .cancelled {
+                    return .failure(.cancelled)
+                } catch {
+                    // A legacy file that cannot be adopted is downloaded instead.
+                }
+                guard self.isRunning else {
+                    return .failure(.shutDown)
+                }
+            }
+            do {
+                // REENTRANCY: f-5 (proposed) — the lifecycle; the record decides T2 (quarantined: no job) before the join,
+                // which is synchronous, and a record present at its content (bound since the location read) is answered
+                // from the store.
+                view = try await self.store.planningView()
+            } catch {
+                return .failure(error.assetError)
+            }
         }
         guard self.isRunning else {
             return .failure(.shutDown)
@@ -69,6 +78,7 @@ extension SyncEngine {
         if view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
             self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
         }
+        self.noteBound(from: view, ids: [id])
         if let error = self.heldBackError(view.records[id], entry: view.appliedManifest.entry(for: id)) {
             return .failure(error)
         }
@@ -89,10 +99,14 @@ extension SyncEngine {
                     return
                 }
                 if let entry = self.state.applied.entry(for: id) {
+                    self.state.waiters[token] = Waiter(asset: id, transfer: entry.transferID, continuation: continuation)
+                    if self.isBound(id, to: entry.transferID) {
+                        self.answerWaiterFromStore(token, asset: id, lane: lane, transfer: entry.transferID)
+                        return
+                    }
                     if self.state.jobs[entry.transferID] != nil {
                         self.state.metrics.resolveJoins += 1
                     }
-                    self.state.waiters[token] = Waiter(asset: id, transfer: entry.transferID, continuation: continuation)
                     self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .waiter)
                     self.pump()
                     return
@@ -192,8 +206,13 @@ extension SyncEngine {
             return
         }
         let view: StorePlanningView
+        self.state.presenceReaders += 1
         do {
-            // REENTRANCY: RE-S30 — the lifecycle and the group still registered (a release drops it).
+            defer {
+                self.state.presenceReaders -= 1
+            }
+            // REENTRANCY: RE-S30 — the lifecycle and the group still registered (a release drops it); a binding learned
+            // while the read is in flight is kept for the joins below (L4-R5).
             view = try await self.store.planningView()
         } catch {
             return
@@ -210,6 +229,10 @@ extension SyncEngine {
             }
             let record = view.records[id]
             if record?.referencedBlob != nil, record?.isStale == false {
+                continue
+            }
+            if self.isBound(id, to: entry.transferID) {
+                // Committed since the view was read (L4-R5).
                 continue
             }
             if self.heldBackError(record, entry: entry) != nil {
@@ -276,6 +299,15 @@ extension SyncEngine {
     private func ensureTask(_ token: InterestToken, scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
         if let error = self.missingSourceError {
             return .failure(error)
+        }
+        // Until its group exists (which then keeps them while it materialises), bindings the engine learns after the
+        // plan's view are kept, so no member is downloaded again (L4-R5).
+        self.state.presenceReaders += 1
+        var reading = true
+        defer {
+            if reading {
+                self.state.presenceReaders -= 1
+            }
         }
         // REENTRANCY: RE-S04 — the lifecycle; the outcome is that of the shared fetch.
         let outcome = await self.fetchManifest(token, deadline: false)
@@ -374,6 +406,8 @@ extension SyncEngine {
         var group = Group(kind: .ensure, lane: .userInitiated)
         group.fetches = plan.fetches
         self.state.groups[token] = group
+        self.state.presenceReaders -= 1
+        reading = false
         self.pump()
         if !(self.state.groups[token]?.isSettled ?? true) {
             // REENTRANCY: RE-S20 — the lifecycle and the group still registered; the report is recomputed from the
@@ -584,6 +618,8 @@ extension SyncEngine {
             return .failure(error)
         }
         self.state.purgeEpoch += 1
+        // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
+        self.state.boundContent.removeAll()
         self.settleRun(.cancelled)
         for transfer in self.state.jobs.keys.sorted() {
             guard let job = self.state.jobs[transfer] else {
@@ -651,6 +687,8 @@ extension SyncEngine {
             guard self.isRunning else {
                 return .failure(.shutDown)
             }
+            // Bindings learned while the purge ran may be purged too (L4-R5).
+            self.state.boundContent.removeAll()
             self.broadcast(.snapshotChanged(generation: self.state.generation))
             // REENTRANCY: RE-S40 — the lifecycle.
             await self.refreshStoreDeadline()
@@ -692,6 +730,9 @@ extension SyncEngine {
         func expired() -> Bool {
             Task.isCancelled || !self.isRunning || self.environment.time.monotonicNow() >= deadline
         }
+        // Eviction and deep verification unbind assets the engine is not told about one by one: a binding seen before or
+        // during maintenance is not assumed present afterwards (L4-R5).
+        self.state.boundContent.removeAll()
         do {
             var claims = Set(self.state.jobs.keys)
             claims.formUnion(self.state.draining.keys)
@@ -715,6 +756,7 @@ extension SyncEngine {
             // REENTRANCY: RE-S23 — as above.
             let eviction = try await self.store.evictIfNeeded()
             report.evictedBytes = eviction.bytesFreed
+            self.state.boundContent.removeAll()
             if expired() {
                 report.budgetExhausted = true
                 // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
@@ -780,6 +822,7 @@ extension SyncEngine {
 
     /// Announces quarantined assets and schedules their re-downloads.
     private func quarantined(_ ids: [AssetID]) async {
+        self.forgetBound(ids)
         for id in ids {
             self.broadcast(.assetRemoved(id, .quarantined))
         }
@@ -1160,7 +1203,7 @@ extension SyncEngine {
     /// The engine invariants (sync.md §6.2, ARCHITECTURE §7.1), as violations; checked by the model-based test.
     func invariantViolations() -> [String] {
         var violations: [String] = []
-        for (token, waiter) in self.state.waiters where self.state.jobs[waiter.transfer]?.interests[token] == nil {
+        for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
             violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
         }
         for (transfer, job) in self.state.jobs {

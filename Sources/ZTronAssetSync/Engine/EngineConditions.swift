@@ -13,6 +13,7 @@ extension SyncEngine {
     /// Stops the watcher when no work is left (its stream ends, so the source stops observing) and keeps the alarm
     /// only for a non-empty heap (sync-1 S1-10).
     func reconcileIdle() {
+        self.pruneBoundContent()
         if !self.hasWork, let watcher = self.state.watcher {
             self.state.watcher = nil
             self.state.conditions = nil

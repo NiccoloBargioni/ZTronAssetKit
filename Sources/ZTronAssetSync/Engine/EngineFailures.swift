@@ -110,15 +110,44 @@ extension SyncEngine {
             _ = retryAfter
         case .permanentMissing:
             self.transition(transfer, to: .failed(.untilEntryChanges))
-            let ids = job.assets.sorted()
+            // A 404 for content never fails an asset the store holds at that content (R-NET-6, L4-R5): the ids the
+            // store shows present are answered from it and left out of the recorded failure.
+            let view: StorePlanningView?
             do {
-                // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store re-checks the
-                // identity itself.
-                try await self.store.recordFailure(ids, identity: job.identity, reason: .notFound)
+                // REENTRANCY: f-10 (proposed) — the lifecycle and the job epoch below; the present ids are read from
+                // this snapshot, and the job's own ids are re-read after it.
+                view = try await self.store.planningView()
             } catch {
-                self.record(ids.first, .storage, "recording a 404 failed: \(error)")
+                view = nil
+            }
+            guard self.isRunning, let current = self.state.jobs[transfer], current.epoch == epoch else {
+                return
+            }
+            if let view {
+                self.noteBound(from: view, ids: current.assets)
+            }
+            let present = current.assets.filter { self.isBound($0, to: transfer) }
+            self.answerPresentMembers(of: transfer, present)
+            if self.state.jobs[transfer]?.interests.isEmpty == true {
+                // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
+                self.removeJob(transfer)
+            }
+            let ids = current.assets.subtracting(present).sorted()
+            self.forgetBound(ids)
+            if !ids.isEmpty {
+                do {
+                    // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store re-checks the
+                    // identity itself.
+                    try await self.store.recordFailure(ids, identity: current.identity, reason: .notFound)
+                } catch {
+                    self.record(ids.first, .storage, "recording a 404 failed: \(error)")
+                }
             }
             guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
+                if self.isRunning {
+                    self.pump()
+                    self.reconcileIdle()
+                }
                 return
             }
             self.resolveAll(transfer, with: .failed(.notFound))
@@ -260,6 +289,8 @@ extension SyncEngine {
     /// receives `.integrityFailure`, and the persisted quarantine decides the next attempt (every lane honours it).
     func integrityFailed(_ transfer: TransferID, epoch: UInt64, ids: [AssetID], identity: ContentIdentity) async {
         self.transition(transfer, to: .failed(.untilEntryChanges))
+        // The store's bookkeeping may unbind them (a failure at the cap, L4-R5).
+        self.forgetBound(ids)
         do {
             // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store leaves records whose
             // identity changed alone.

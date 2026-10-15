@@ -44,6 +44,15 @@ struct EngineState {
     var heldForManifest: Set<TransferID> = []
     /// Store `apply` calls in flight plus store re-reads under way; the last to end releases `heldForManifest`.
     var manifestCatchUps = 0
+    /// Ids the engine saw bound to content, by the transfer of that content: a commit's locations, an apply's reuses, a
+    /// store read. No interest creates or joins a job for an id bound to its entry's content (ARCHITECTURE §7.1: only
+    /// outstanding work has a job; L4-R5); such an interest is answered from the store. An entry goes when the engine
+    /// learns the binding ended (prune, eviction, content change, purge, maintenance, quarantine, a recorded failure), and
+    /// the ledger keeps only what a plan, a read in flight or a job could still consult (`pruneBoundContent`).
+    var boundContent: [AssetID: TransferID] = [:]
+    /// Store reads in flight whose answer registers an interest afterwards (`resolve`, a prefetch join, a point
+    /// admission, `ensureAvailable` until its group exists): while one is, a binding the engine learns meanwhile is kept.
+    var presenceReaders = 0
     /// The last job epoch handed out.
     var lastEpoch: UInt64 = 0
     /// `resolve` waiters.
@@ -323,6 +332,9 @@ struct Waiter {
     var transfer: TransferID
     /// Its continuation.
     let continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>
+    /// Answered by a store read in an owned task instead of a job: the engine knows the asset is bound to `transfer`'s
+    /// content (L4-R5). Such a waiter holds no interest; a read that finds nothing puts it on the job path.
+    var fromStore = false
 }
 
 /// A `resolve` caller of an identifier the applied manifest does not list.

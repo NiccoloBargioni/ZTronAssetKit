@@ -250,6 +250,11 @@ extension SyncEngine {
             return
         }
         let now = self.environment.time.monotonicNow()
+        // Bindings learned while an admission's reads are in flight are kept for the joins (L4-R5).
+        self.state.presenceReaders += 1
+        defer {
+            self.state.presenceReaders -= 1
+        }
         for token in self.state.unknownWaiters.keys.sorted() {
             guard let waiter = self.state.unknownWaiters[token] else {
                 continue
@@ -268,9 +273,11 @@ extension SyncEngine {
                 do {
                     // REENTRANCY: RE-S37 — the waiter is re-checked as still registered right below.
                     try await self.store.admit(entry)
-                    // REENTRANCY: RE-S37 — the lifecycle; the applied manifest is re-read as a snapshot.
+                    // REENTRANCY: RE-S37 — the lifecycle; the applied manifest is re-read as a snapshot, and an admitted
+                    // record the store bound to a live blob is answered from the store.
                     let view = try await self.store.planningView()
                     self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
+                    self.noteBound(from: view, ids: [waiter.asset])
                 } catch {
                     if let pending = self.state.unknownWaiters.removeValue(forKey: token) {
                         pending.continuation.resume(returning: .failure(error.assetError))
@@ -294,6 +301,10 @@ extension SyncEngine {
     /// Turns an admitted unknown-id waiter into an ordinary waiter of its job (T1).
     private func join(_ token: InterestToken, waiter: UnknownWaiter, entry: ManifestEntry) {
         self.state.waiters[token] = Waiter(asset: waiter.asset, transfer: entry.transferID, continuation: waiter.continuation)
+        if self.isBound(waiter.asset, to: entry.transferID) {
+            self.answerWaiterFromStore(token, asset: waiter.asset, lane: waiter.lane, transfer: entry.transferID)
+            return
+        }
         self.addInterest(token, asset: waiter.asset, entry: entry, lane: waiter.lane, kind: .waiter)
     }
 }

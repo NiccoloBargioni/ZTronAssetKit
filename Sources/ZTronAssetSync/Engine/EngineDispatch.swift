@@ -119,7 +119,9 @@ extension SyncEngine {
             while group.cursor < group.fetches.count, group.pending.count < limit {
                 let id = group.fetches[group.cursor].id
                 group.cursor += 1
-                guard let entry = self.state.applied.entry(for: id) else {
+                // An asset that left the manifest is dropped (T21); one bound to its content since the plan (another
+                // interest committed it, an apply reused a blob) is done (L4-R5).
+                guard let entry = self.state.applied.entry(for: id), !self.isBound(id, to: entry.transferID) else {
                     continue
                 }
                 group.pending[id] = entry.transferID
@@ -737,6 +739,9 @@ extension SyncEngine {
             return
         }
         let captured = Set(ids)
+        for asset in locations.keys {
+            self.state.boundContent[asset] = transfer
+        }
         var deferred: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
         var refused = false
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
@@ -774,6 +779,8 @@ extension SyncEngine {
     /// Moves `token`'s interest in `asset` from the job of `old` to the job of the asset's current entry (T22), or ends
     /// it when the asset left the manifest (T21): a waiter gets `.notFound`, a group drops the member, a heal is
     /// forgotten. The run's claim leaves `old` either way, so the run never waits for a job that will not report to it.
+    /// An asset the store holds at its current entry's content (an apply reused a blob for it) joins no job: it is
+    /// answered from the store (L4-R5).
     func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID) {
         if interest.kind == .run {
             self.releaseRunClaim(token, asset: asset, from: old)
@@ -789,6 +796,10 @@ extension SyncEngine {
             case .run:
                 break
             }
+            return
+        }
+        if self.isBound(asset, to: entry.transferID) {
+            self.answerPresent(token, kind: interest.kind, lane: interest.lane, asset: asset, at: entry.transferID, from: old)
             return
         }
         switch interest.kind {

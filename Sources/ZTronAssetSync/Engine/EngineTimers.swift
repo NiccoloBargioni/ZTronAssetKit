@@ -198,7 +198,8 @@ extension SyncEngine {
 
     /// The quarantine of `asset` ended: a system interest fetches it again.
     private func heal(_ asset: AssetID) {
-        guard self.state.heals[asset] != nil, let entry = self.state.applied.entry(for: asset) else {
+        guard self.state.heals[asset] != nil, let entry = self.state.applied.entry(for: asset), !self.isBound(asset, to: entry.transferID) else {
+            // Gone from the manifest, or present again (a resolve downloaded it meanwhile, L4-R5): nothing to heal.
             self.state.heals[asset] = nil
             return
         }

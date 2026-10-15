@@ -56,6 +56,8 @@ extension SyncEngine {
             view = nil
         }
         if self.isRunning, let view, view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
+            // The ids of jobs the view holds present at their entries' content follow there without a job (L4-R5).
+            self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets))
             self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
             self.followApplied()
         }
