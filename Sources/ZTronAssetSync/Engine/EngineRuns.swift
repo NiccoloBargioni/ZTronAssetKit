@@ -126,6 +126,12 @@ extension SyncEngine {
         case .timedOut:
             break
         case .failed(let error):
+            if let cause = self.openBreakerCause() {
+                // The fetch tripped the origin's breaker (a key-rejected 403 opens it at once): the run is blocked by
+                // it and the half-open probe is the next run's manifest fetch (ARCHITECTURE §7.6, §7.7).
+                self.setPendingRun(.breaker, trigger: .breakerClosed)
+                return .blocked(.circuitOpen(cause), self.report(manifestFresh: false))
+            }
             let assetError = error.assetError(now: self.environment.time.now())
             if case .offline = error {
                 self.setPendingRun(.conditions, trigger: .conditionsChanged)
@@ -257,6 +263,14 @@ extension SyncEngine {
             self.state.syncedThisLaunch = true
             return .complete(summary)
         }
+    }
+
+    /// The cause of the origin's breaker when it is open.
+    func openBreakerCause() -> BreakerCause? {
+        guard let origin = self.state.remote?.originID, case .open(let cause, _, _)? = self.state.breakers[origin]?.state else {
+            return nil
+        }
+        return cause
     }
 
     /// Runs the planner off the actor (C2, RE-S07): a nonisolated, concurrent function.
