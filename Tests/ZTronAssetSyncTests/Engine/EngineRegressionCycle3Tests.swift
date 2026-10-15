@@ -389,6 +389,44 @@ struct EngineRegressionCycle3Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    /// The other half of the guard: a refused view must not leave the copy behind the store. Here the store holds a
+    /// manifest the engine never applied (what an `apply` that throws after its in-memory writes leaves), and the view
+    /// showing it is refused as if the copy had changed during its read: the engine owes a re-read of the store, which
+    /// then follows it with its announcements. Without the owed re-read the copy stays behind until some later event.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a store view refused as possibly older than the copy is read again, so the engine still follows the store", .timeLimit(.minutes(1)))
+    func refusedViewIsReadAgain() async throws {
+        let harness = EngineHarness.make()
+        let engine = harness.engine
+        let aBytes = EngineFixture.bytes(9_981)
+        let zBytes = EngineFixture.bytes(9_982)
+        let a = EngineFixture.entry("a", aBytes)
+        let z = EngineFixture.entry("z", zBytes)
+        await harness.serve([(a, aBytes), (z, zBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        // The store applies v2 (z removed) without the engine's bookkeeping.
+        let v2 = try ValidatedManifest(entries: [a], digest: ContentHash.sha256(of: Data("v2".utf8)))
+        let report = try await harness.store.apply(v2, etag: nil, eviction: nil)
+        #expect(report.pruned == ["z"], "setup: the store pruned z")
+        let view = try await harness.view()
+        // The view is refused: its read began before a change of the copy (a mark older than the copy's).
+        let followed = await engine.readForTests { engine in
+            engine.followStoreView(view, readAt: engine.state.copySerial &- 1)
+        }
+        #expect(!followed, "a view whose read may predate the copy is not followed")
+        // The owed re-read is a catch-up: once none is in flight, the engine follows the store.
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply }
+        #expect(await engine.readForTests { $0.state.applied.digest } == v2.digest, "the engine follows the store's manifest")
+        await engine.shutdown()
+        _ = await probe.next { $0 == .clientShutDown }
+        let received = await probe.received
+        #expect(received.contains(.assetRemoved("z", .pruned)), "z's removal is announced: \(received)")
+        #expect(received.contains(.snapshotChanged(generation: report.generation)), "the store's generation is announced")
+        await probe.stop()
+    }
 }
 
 extension SyncEngine {
