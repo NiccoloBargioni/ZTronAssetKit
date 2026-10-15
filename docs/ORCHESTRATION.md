@@ -2,7 +2,13 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
-## Next session: start here (written 2026-10-11 when the owner moved to a fresh session to save credits)
+## Level 4 in progress (2026-10-15)
+- **Owner decisions (2026-10-15 08:55 CEST):** close-out bar **strict**; weekly-usage stop **55 %**; all roles on **Opus 5.5** (session model, no `models` arg). Usage at launch: weekly all-models 2 %, Fable 0 % (reset 15 Oct 04:00; next reset Thu 22 Oct 04:00 CEST).
+- **Forecast (strict):** Level 4 in total 27–45 weekly points, 25–35 h (main run ~8–11 points; close-out 7–10 cycles; docs 2–3 points). Rest of the project after L4 under strict: 44–79 points — likely spills into the week of 22 Oct.
+- **Running:** main run `Workflow({scriptPath: ".claude/workflows/assetkit-stage2-level.js", args: {level: "L4", base: "l3-merged", wps: ["f"], bar: "strict", usageStop: 55}})`, run id `wf_3286fe9b-a79`, session `4920f51b-9e95-4e57-8e1e-df565b6e74bf` (resume only from that session with `resumeFromRunId`; from a fresh session, read the run's `journal.jsonl` under `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/4920f51b-9e95-4e57-8e1e-df565b6e74bf/subagents/workflows/wf_3286fe9b-a79/` and continue by hand). `caffeinate -ims -t 172800` started 08:55.
+- **Next:** after the main run, write `.build-orchestrator/l4-rulings.md` and `l4-remaining-f.json`, then the close-out (`assetkit-closeout.js`, `bar: "strict"`, `usageStop: 55`, the args listed under "Level 4" below), merge, gates, docs, tag `l4-merged`.
+
+## Previous hand-off (written 2026-10-11 when the owner moved to a fresh session to save credits)
 Level 3 is **complete** (`l3-merged`, see the table below). Nothing is running; no worktrees; `feature/asset-kit` is clean. Before anything else, settle with the owner:
 1. **Close-out bar for L4 onward** — "converge" recommended (see the forecast). Level 3's strict bar took 8 close-out cycles.
 2. **Model plan** (owner asked; analysis below) — recommended: L4 and L5 on Opus 5.5 with the converge bar; **Stage 3's adversarial hunters and mutation-probe agent on Fable 5.1** (note 2026-10-13: Fable usage also counts toward the all-models limit, so this costs ~1.7× Opus for those agents) (fresh eyes over the whole package, backstop for edge cases deferred under "converge"), Stage 3 fixers on Opus; Stage 5 on Opus. The level script's `agent()` calls take a `model` option (`'fable'`, `'opus'`, `'sonnet'`, `'haiku'`) — add an `args.authorModel` / `args.fixModel` / `args.verifyModel` if a level should use another model.
@@ -81,7 +87,7 @@ A full week holds roughly $1,300–1,400 of this workload.
 Background URLSession (R-NET-3) · R-INT-4 deep verification · R-CLN-11 cache purging · crash enumeration beyond single-lifetime scenarios · benchmarks P-7 and P-9 · mutation probes (Q-8) · one verifier instead of two · the simulator run in every verifier (keep it in the author and one verifier) · the "converge" close-out bar. Cutting a MUST or a budget means marking it deferred in `SPEC.md` with a `DECISIONS.md` entry; never edit `Scripts/`.
 
 ## Open questions for the owner
-1. **Close-out bar for L4 onward:** strict (Level 3's: 8 cycles) or converge (recommended)?
+1. ~~Close-out bar for L4 onward~~ — answered 2026-10-15: **strict** for L4 (ask again for L5).
 2. **P-13** (ADR-050 · NEEDS-HUMAN-REVIEW): Option A (recommended) p99 per batch; Option B raise `batch_ms_max` to 15 ms.
 3. **NEEDS-HUMAN-REVIEW items:** ADR-050 — B-3 index layout; D-10 `shutdown()` cancels background downloads; public `startDownload(…resumeData:)`; D-19.2 task-tag format. ADR-052 — WP-C's R-STO-11 deviations C-12 (checksum-less legacy files without a local checksum are re-downloaded), C-13 (an undecodable legacy manifest adopts nothing), C-14 (a legacy root on another volume is dropped; a legacy file failing three times in one lifetime is abandoned), C-15 (phase 4 keeps unattributable files and a non-empty root).
 4. Whether CLAUDE.md should mention the simulator run (ADR-051 "Open"; agents may not edit CLAUDE.md).
