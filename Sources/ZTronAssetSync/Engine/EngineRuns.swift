@@ -519,7 +519,9 @@ extension SyncEngine {
         guard var current = self.state.run else {
             return
         }
-        let orphaned = current.outstanding.keys.filter { self.state.jobs[$0]?.interests[current.token] == nil }
+        // One read of the job table: a closure over `self.state` would copy the whole engine state per claim.
+        let jobs = self.state.jobs
+        let orphaned = current.outstanding.keys.filter { jobs[$0]?.interests[current.token] == nil }
         if !orphaned.isEmpty {
             // A claim on a job that no longer holds the run's interest can never be answered (every path that moves or
             // ends one releases it; this keeps a missed one from stranding the run): its assets count as failed, so
@@ -538,9 +540,21 @@ extension SyncEngine {
         guard !current.outstanding.isEmpty else {
             return
         }
+        // Most calls find a job still working: that answer needs no order, so the claims are sorted (for the reason
+        // reported) only once every one of them is parked.
+        for transfer in current.outstanding.keys {
+            switch jobs[transfer]?.state {
+            case .blocked(.awaitingSpace)?:
+                return
+            case .blocked?, .failed(.whenOnline)?, nil:
+                continue
+            default:
+                return
+            }
+        }
         var reasons: [BlockReason] = []
         for transfer in current.outstanding.keys.sorted() {
-            guard let job = self.state.jobs[transfer] else {
+            guard let job = jobs[transfer] else {
                 continue
             }
             switch job.state {

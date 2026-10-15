@@ -102,7 +102,13 @@ struct EngineModelTests {
                 // Commands that wait for the store's commit window run beside the operations (the clock moves in them).
                 let entry = entries[pick(entries.count)]
                 if reports.count < 40 {
-                    reports.append(Task { _ = await engine.reportUnreadable(entry.identifier) })
+                    if pick(2) == 0 {
+                        reports.append(Task { _ = await engine.reportUnreadable(entry.identifier) })
+                    } else {
+                        // A purge withdraws the prefetch interests in what it purges, groups included (member ⇒ interest).
+                        let request: PurgeRequest = pick(4) == 0 ? .evictable : .scope(.identifiers([entry.identifier]))
+                        reports.append(Task { _ = await engine.purge(request) })
+                    }
                 }
             }
             let violations = await engine.invariantViolations()

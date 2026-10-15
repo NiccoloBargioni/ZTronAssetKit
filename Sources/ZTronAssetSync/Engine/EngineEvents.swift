@@ -87,8 +87,9 @@ extension SyncEngine {
         let total = run.fetches.count
         let done = run.fetched + run.failures.count
         var inFlight: Int64 = 0
+        let jobs = self.state.jobs
         for transfer in run.outstanding.keys {
-            inFlight = PlanBuilder.adding(inFlight, self.state.jobs[transfer]?.active?.bytesReceived ?? 0)
+            inFlight = PlanBuilder.adding(inFlight, jobs[transfer]?.active?.bytesReceived ?? 0)
         }
         let received = PlanBuilder.adding(run.bytes, inFlight)
         let expected = run.planned.fetchBytes

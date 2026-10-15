@@ -53,7 +53,9 @@ struct EngineSyncTests {
         let base = FakeRemoteSource()
         // The source stamps each transfer's start with the file-system operation count at that moment.
         let stamping = OperationStampingSource(base: base, fileSystem: fileSystem)
-        let harness = EngineHarness.make(time: time, source: base, fileSystem: fileSystem, remote: stamping)
+        let bulk = NextUnitGate()
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = EngineHarness.make(time: time, source: base, metadata: metadata, bulk: bulk, fileSystem: fileSystem, remote: stamping)
         let kept = EngineSyncTests.catalog(2)
         await harness.serve(kept)
         try await harness.start()
@@ -66,7 +68,19 @@ struct EngineSyncTests {
         await harness.serveManifest(manifest, etag: "v2")
         await harness.source.script(added.transferID, [.hold])
         let before = fileSystem.operations.count
+        // The run's apply is held inside the store, first at its planning unit (after the manifest's decode on the same
+        // executor), then at its commit: while it is held, nothing may start, whatever the scheduling (a mutant that
+        // dispatches before `apply` fails here every time).
+        await bulk.holdNext(skipping: 1)
         let run = Task { await harness.engine.sync(.force) }
+        await bulk.waitForHold()
+        await metadata.setHolding(true)
+        await bulk.release()
+        try await metadata.requireHeldUnits(atLeast: 1)
+        #expect(await stamping.stamps[added.transferID] == nil, "a transfer started while the store applied the manifest")
+        #expect(await harness.source.starts.count == 2, "only the first sync's transfers have started")
+        await metadata.setHolding(false)
+        await metadata.releaseAll()
         await harness.engine.waitUntil { $0.running == 1 }
         await harness.engine.waitForHandle(added.transferID)
         // The order itself: the index generation holding v2 was renamed into place before the transfer started.

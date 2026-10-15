@@ -102,6 +102,25 @@ extension ZTronAssetKitBenchmarks {
             print("P-11 \(assets) assets at \(latency) ms: concurrency 1 \(serial) s, \(concurrency) \(parallel) s, speedup \(speedup) (min \(speedupMin))")
             #expect(speedup >= speedupMin)
         }
+
+        /// The announcement of a mass prune runs in one actor turn of the engine (`applied`): with a subscriber that
+        /// never pulls, each `assetRemoved` takes a slot of its queue, so a queue copied per publication made that turn
+        /// quadratic (about 0.16 s at 4,000 ids, C2). Medians of three, after a warm-up.
+        @Test("R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed", .timeLimit(.minutes(1)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func stalledPruneAnnouncement() async throws {
+            _ = try await SyncBench.pruneSyncSeconds(count: 1_000, stalled: true)
+            var quiet: [Double] = []
+            var stalled: [Double] = []
+            for _ in 0..<3 {
+                quiet.append(try await SyncBench.pruneSyncSeconds(count: 10_000, stalled: false))
+                stalled.append(try await SyncBench.pruneSyncSeconds(count: 10_000, stalled: true))
+            }
+            let unobserved = quiet.sorted()[1]
+            let observed = stalled.sorted()[1]
+            print("R-SYN-12 prune of 10,000 ids: nobody subscribed \(unobserved) s, one stalled subscriber \(observed) s, ratio \(observed / max(unobserved, 0.000_001)) (max 2, plus 5 ms)")
+            #expect(observed <= 2 * unobserved + 0.005)
+        }
     }
 }
 
@@ -219,6 +238,60 @@ enum SyncBench {
             environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink())
         )
         return SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+    }
+
+    /// The wall time of a sync that prunes `count` on-demand entries (nothing is downloaded), with one subscriber that
+    /// never pulls when `stalled`.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func pruneSyncSeconds(count: Int, stalled: Bool) async throws -> Double {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let environment = AssetEnvironment(
+            fileSystem: FakeFileSystem(time: time),
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x12),
+            conditions: FakeDeviceConditionsSource(),
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        // No commit window: the timed sync needs no clock.
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let keep = SyncBench.entry("keep", GeneratedPayload.bytes(seed: 0x12_000, offset: 0, length: 16), policy: .onDemand)
+        let doomed = (0..<count).map { index in
+            SyncBench.entry("p\(index)", GeneratedPayload.bytes(seed: 0x12_001 + UInt64(index), offset: 0, length: 16), policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData([keep] + doomed), etag: ETag(rawValue: "\"v1\""))])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the first sync did not complete")
+        }
+        let subscription = stalled ? try await engine.subscribe().get() : nil
+        await source.scriptManifest([.fetched(SyncBench.manifestData([keep]), etag: ETag(rawValue: "\"v2\""))])
+        let clock = ContinuousClock()
+        let started = clock.now
+        let outcome = await engine.sync(.force)
+        let elapsed = clock.now - started
+        guard case .complete(let report) = outcome, report.pruned == count else {
+            throw SyncBenchError.incomplete("the timed sync: \(outcome)")
+        }
+        if subscription != nil, await engine.introspect().bufferedEvents < count {
+            throw SyncBenchError.incomplete("the stalled subscriber did not hold one slot per pruned id")
+        }
+        await engine.shutdown()
+        _ = subscription
+        return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
     }
 
     /// An engine configuration with defaults and `tuning`.

@@ -27,23 +27,31 @@ struct EngineEventsTests {
         let engine = harness.engine
         // Subscribed before `start()`, so the stalled subscriber sees the launch run from its first event.
         let stalled = try await engine.subscribe().get()
-        // Every mutation re-evaluates `waitUntil` predicates: this one samples the backlog after each and never holds.
+        // Every mutation re-evaluates condition waits: this one samples the backlog after each and never holds. It and
+        // the wait for the transfers read the engine directly: an introspection snapshot per mutation (what `waitUntil`
+        // evaluates) would dominate a 10,000-asset sync under the thread sanitizer (F-17).
         let peak = Mutex(0)
+        let (registered, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         let sampler = Task {
-            await engine.waitUntil { state in
-                peak.withLock { $0 = max($0, state.bufferedEvents) }
+            await engine.awaitCondition { engine in
+                let backlog = engine.state.subscribers.values.reduce(0) { $0 + $1.liveCount }
+                peak.withLock { $0 = max($0, backlog) }
+                signal.yield()
                 return false
             }
         }
-        await engine.waitUntilObservers(1)
+        // The first evaluation runs in the turn that registers the sampler, before `start()` reaches the engine.
+        var registration = registered.makeAsyncIterator()
+        _ = await registration.next()
         try await harness.start()
         // Commit windows and install intervals pass on the manual clock; the manifest deadline must not.
         // The clock moves only for the run's two commits: `apply` (once the manifest is fetched) and the stamp.
         try await harness.drive(maxStep: 3_600) { !$0.jobsByState.isEmpty || $0.groups == 0 }
-        await engine.waitUntil { $0.jobsByState.isEmpty }
+        await engine.awaitCondition { $0.state.jobs.isEmpty }
         try await harness.drive(maxStep: 3_600) { $0.groups == 0 }
         sampler.cancel()
         await sampler.value
+        signal.finish()
         // Progress keys: at most one transfer key per running non-bulk transfer (none here) plus run, snapshot and
         // conditions; subjects: client, run started, run finished, breaker, maintenance (bulk outcomes fold).
         let bound = (concurrency + 3) + 5
