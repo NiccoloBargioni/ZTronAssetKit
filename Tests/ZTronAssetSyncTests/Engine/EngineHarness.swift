@@ -230,6 +230,24 @@ struct EngineHarness {
         throw EngineHarnessError.neverQuiesced(await engine.introspect())
     }
 
+    /// Runs `operation` while a driver wakes every sleeper on the manual clock (a purge's grace wait, a commit window,
+    /// a backoff), then stops the driver (its wait ends on cancellation).
+    func withClock<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T {
+        let time = self.time
+        let driver = Task {
+            while !Task.isCancelled {
+                await time.waitForSleepers(atLeast: 1)
+                if let deadline = time.nextDeadline {
+                    time.advance(to: deadline)
+                }
+            }
+        }
+        defer {
+            driver.cancel()
+        }
+        return try await operation()
+    }
+
     /// Drives the clock until the engine is idle-silent and the conditions source observes nothing.
     func settle(rounds: Int = 256) async throws {
         try await self.drive(rounds: rounds) { $0.isIdleSilent }
