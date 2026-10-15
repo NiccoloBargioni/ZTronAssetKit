@@ -169,6 +169,9 @@ struct EngineState {
     var lastAlarm: UInt64 = 0
     /// The store's next deadline as last read.
     var storeDeadline: MonotonicInstant?
+    /// The alarm's `store.runDueWork()` and what follows it (a free-space read after reaped bytes) are under way: the
+    /// store deadline is cleared meanwhile, yet that work may still reap.
+    var storeWorkInFlight = false
 
     // MARK: Conditions (R-SYN-7, R-SYN-13)
 

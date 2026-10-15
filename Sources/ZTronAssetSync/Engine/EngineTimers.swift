@@ -104,6 +104,12 @@ extension SyncEngine {
         }
         if storeDue {
             self.state.storeDeadline = nil
+            self.state.storeWorkInFlight = true
+            defer {
+                self.state.storeWorkInFlight = false
+                // Waiting test seams re-evaluate their conditions once the store's work is over.
+                self.notifyObservers()
+            }
             // REENTRANCY: RE-S27 — the lifecycle; reaped bytes wake `awaitingSpace` jobs; re-armed from the store's
             // new `nextDeadline()`.
             let work = await self.store.runDueWork()
