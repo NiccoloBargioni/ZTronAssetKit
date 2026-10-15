@@ -173,4 +173,69 @@ struct EngineRegressionRound3Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: Space and staging (L4-R6: R-SYN-11 / S2-23 headroom ledger, R-CLN-3 staging hygiene)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: ensureAvailable's plan against important capacity never admits a prefetch parked for opportunistic space", .timeLimit(.minutes(1)))
+    func ensureKeepsOpportunisticLedger() async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        // Room for user work, none for opportunistic work.
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: 64 << 30, opportunisticCapacity: reserve + 100)
+        )
+        let harness = EngineHarness.make(time: time, fileSystem: fileSystem)
+        let pBytes = EngineFixture.bytes(4_501, count: 300)
+        let qBytes = EngineFixture.bytes(4_502, count: 32)
+        let p = EngineHarness.onDemand("p", pBytes)
+        let q = EngineHarness.onDemand("q", qBytes)
+        await harness.serveManifest([p, q])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.source.script(p.transferID, [.stage(pBytes)])
+        await harness.source.script(q.transferID, [.stage(qBytes)])
+        let group = try await engine.registerGroup(["p"], lane: .prefetch).get()
+        await engine.waitUntil { ($0.jobsByState[.blocked] ?? 0) == 1 }
+        let report = try await engine.ensureAvailable(scope: .identifiers(["q"])).get()
+        #expect(report.isComplete && report.present == 1, "user work plans against important capacity: \(report)")
+        #expect(await engine.jobStateForTests(p.transferID) == .blocked, "opportunistic capacity did not change")
+        #expect(await harness.source.starts.filter { $0.id == p.transferID }.isEmpty)
+        await engine.releaseGroup(group)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-3: an attempt that fails for lack of space leaves no partial without a sidecar in staging", .timeLimit(.minutes(1)))
+    func noSpacePartialDiscarded() async throws {
+        let harness = EngineHarness.make()
+        let bytes = EngineFixture.bytes(4_601)
+        let x = EngineHarness.onDemand("x", bytes)
+        await harness.serveManifest([x])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.source.script(x.transferID, [.hold, .stage(bytes)])
+        let waiter = Task { await engine.awaitAsset("x", lane: .userInitiated) }
+        await engine.waitUntil { $0.running == 1 }
+        await engine.waitForHandle(x.transferID)
+        let first = try #require(await harness.source.starts.last)
+        // What the staging sink leaves when a write hits ENOSPC: the bytes written before it, and no sidecar.
+        let sink = try #require(await harness.source.attachedStaging)
+        try sink.createPartial(first.partialName)
+        _ = try sink.appendPartial(Data(repeating: 7, count: 120), to: first.partialName)
+        // A 64 GiB volume holds the job: the engine retries (F-20).
+        await harness.source.release(x.transferID, with: .failed(.insufficientSpace(requiredBytes: 300)))
+        let result = await harness.withClock { await waiter.value }
+        #expect(result.map(\.byteSize) == .success(Int64(bytes.count)), "\(result)")
+        await engine.waitUntil { $0.jobsByState.isEmpty }
+        let inventory = try await harness.store.stagingInventory()
+        let left = inventory.items.keys.filter { $0.transfer == x.transferID && $0.attempt == first.attempt }
+        #expect(left.isEmpty, "the dead partial occupies the space that is short: \(left)")
+        await engine.shutdown()
+    }
 }
