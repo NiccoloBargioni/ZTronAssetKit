@@ -70,6 +70,10 @@ struct EngineState {
     var presenceReaders = 0
     /// The last job epoch handed out.
     var lastEpoch: UInt64 = 0
+    /// Jobs created (T1) since the engine was made. The binding ledger exists to keep this from growing for an id the
+    /// store holds present (L4-R5): the pre-transfer read (`answeredFromStore`) keeps such a job from downloading, so
+    /// only this count shows a job the ledger should have avoided (review of close-out cycle 3, mutant M-NOLEDGER).
+    var jobsCreated: UInt64 = 0
     /// `resolve` waiters.
     var waiters: [InterestToken: Waiter] = [:]
     /// `resolve` waiters of identifiers the applied manifest does not list (point admission, sync.md §6.5).

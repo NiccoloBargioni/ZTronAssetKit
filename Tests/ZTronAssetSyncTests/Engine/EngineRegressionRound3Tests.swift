@@ -186,9 +186,13 @@ struct EngineRegressionRound3Tests {
         // Another interest downloads and commits e1 while the ensure waits for e0's retry.
         let other = await engine.awaitAsset("e1", lane: .prefetch)
         #expect(other.map(\.byteSize) == .success(Int64(b1.count)))
+        let created = await engine.readForTests { $0.state.jobsCreated }
         let report = try await harness.withClock { try await ensure.value.get() }
         #expect(report.isComplete && report.present == 2, "\(report)")
         #expect(await harness.source.starts.filter { $0.id == e1.transferID }.count == 1, "e1 was present when the ensure reached it")
+        // Not only no second download: the binding the commit taught the engine keeps e1 from getting a job at all
+        // (L4-R5; the pre-transfer read alone would only keep that job from downloading).
+        #expect(await engine.readForTests { $0.state.jobsCreated } == created, "the ensure created no job for e1")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
@@ -219,10 +223,14 @@ struct EngineRegressionRound3Tests {
         }
         let other = await engine.awaitAsset("r1", lane: .prefetch)
         #expect(other.map(\.byteSize) == .success(Int64(b1.count)))
+        let created = await engine.readForTests { $0.state.jobsCreated }
         let outcome = await harness.withClock { await run.value }
         let report = try #require(outcome.completeReport, "\(outcome)")
         #expect(report.fetched == 2, "the run counts r1, present when it reached it, as fetched")
         #expect(await harness.source.starts.filter { $0.id == r1.transferID }.count == 1, "r1 was present when the run reached it")
+        // Not only no second download: the binding the commit taught the engine keeps r1 from getting a job at all
+        // (L4-R5; the pre-transfer read alone would only keep that job from downloading).
+        #expect(await engine.readForTests { $0.state.jobsCreated } == created, "the run created no job for r1")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }

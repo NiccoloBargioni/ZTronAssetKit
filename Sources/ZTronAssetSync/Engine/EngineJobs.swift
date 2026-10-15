@@ -46,6 +46,7 @@ extension SyncEngine {
         let now = self.environment.time.monotonicNow()
         if self.state.jobs[transfer] == nil {
             self.state.lastEpoch += 1
+            self.state.jobsCreated += 1
             var job = Job(
                 transfer: transfer,
                 entry: entry,
