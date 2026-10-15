@@ -377,6 +377,9 @@ struct EngineRegressionCycle3Tests {
         let ensured = try await engine.ensureAvailable(scope: .identifiers(["b"])).get()
         #expect(ensured.present == 1, "setup: b is applied and fetched: \(ensured)")
         #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b, "setup: the copy lists b")
+        let applied = await engine.readForTests { $0.state.generation }
+        // What subscribers see: following the older view would announce b, which the apply added, as pruned.
+        let probe = EventProbe(stream: try await engine.subscribe().get())
         let followed = await engine.readForTests { $0.followStoreView(older, readAt: mark) }
         #expect(!followed, "a view read before an apply the engine followed is not followed")
         #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b, "the copy keeps b")
@@ -388,6 +391,17 @@ struct EngineRegressionCycle3Tests {
         #expect(await engine.readForTests { $0.state.applied.entry(for: "b") } == b)
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
+        _ = await probe.next { $0 == .clientShutDown }
+        let received = await probe.received
+        await probe.stop()
+        #expect(!received.contains(.assetRemoved("b", .pruned)), "b, which the copy keeps, is never announced removed: \(received)")
+        let olderSnapshots = received.filter { event in
+            if case .snapshotChanged(let announced) = event {
+                return announced < applied
+            }
+            return false
+        }
+        #expect(olderSnapshots.isEmpty, "no snapshot generation older than the apply's is announced: \(olderSnapshots)")
     }
 
     /// The other half of the guard: a refused view must not leave the copy behind the store. Here the store holds a
