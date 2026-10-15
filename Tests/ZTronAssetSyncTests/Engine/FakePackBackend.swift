@@ -24,9 +24,10 @@ final class FakePackBackend: PackBackend {
     }
 
     private struct CallWaiter {
+        let id: UInt64
         let call: Call
         let count: Int
-        let continuation: CheckedContinuation<Void, Never>
+        let continuation: CheckedContinuation<Bool, Never>
     }
 
     private struct State {
@@ -34,6 +35,10 @@ final class FakePackBackend: PackBackend {
         var remote: [PackID: [String: Data]] = [:]
         var calls: [Call] = []
         var callWaiters: [CallWaiter] = []
+        /// The last waiter id handed out.
+        var lastWaiter: UInt64 = 0
+        /// Waiters cancelled before they registered (the cancellation handler can run first).
+        var cancelledWaiters: Set<UInt64> = []
     }
 
     private let state: Mutex<State>
@@ -56,20 +61,40 @@ final class FakePackBackend: PackBackend {
         self.state.withLock { Set($0.installed.keys) }
     }
 
-    /// Returns once `call` was recorded at least `count` times. Every test that waits for a call makes the engine
-    /// perform it (the wait has no cancellation path of its own; the test's time limit bounds it).
-    func waitFor(_ call: Call, count: Int = 1) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let ready = self.state.withLock { state -> Bool in
-                guard state.calls.filter({ $0 == call }).count < count else {
-                    return true
+    /// Returns `true` once `call` was recorded at least `count` times, or `false` when the waiting task is cancelled
+    /// first: a test whose engine never makes the call then fails at its time limit and ends, instead of hanging the
+    /// runner (a waiter that ignored cancellation kept the test process alive after the limit).
+    @discardableResult
+    func waitFor(_ call: Call, count: Int = 1) async -> Bool {
+        let id = self.state.withLock { state -> UInt64 in
+            state.lastWaiter += 1
+            return state.lastWaiter
+        }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                let ready = self.state.withLock { state -> Bool? in
+                    if state.cancelledWaiters.remove(id) != nil {
+                        return false
+                    }
+                    guard state.calls.filter({ $0 == call }).count < count else {
+                        return true
+                    }
+                    state.callWaiters.append(CallWaiter(id: id, call: call, count: count, continuation: continuation))
+                    return nil
                 }
-                state.callWaiters.append(CallWaiter(call: call, count: count, continuation: continuation))
-                return false
+                if let ready {
+                    continuation.resume(returning: ready)
+                }
             }
-            if ready {
-                continuation.resume()
+        } onCancel: {
+            let waiter = self.state.withLock { state -> CallWaiter? in
+                guard let index = state.callWaiters.firstIndex(where: { $0.id == id }) else {
+                    state.cancelledWaiters.insert(id)
+                    return nil
+                }
+                return state.callWaiters.remove(at: index)
             }
+            waiter?.continuation.resume(returning: false)
         }
     }
 
@@ -136,9 +161,9 @@ final class FakePackBackend: PackBackend {
     }
 
     private func record(_ call: Call) {
-        let ready = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
+        let ready = self.state.withLock { state -> [CheckedContinuation<Bool, Never>] in
             state.calls.append(call)
-            var ready: [CheckedContinuation<Void, Never>] = []
+            var ready: [CheckedContinuation<Bool, Never>] = []
             var waiting: [CallWaiter] = []
             for waiter in state.callWaiters {
                 if state.calls.filter({ $0 == waiter.call }).count >= waiter.count {
@@ -151,7 +176,7 @@ final class FakePackBackend: PackBackend {
             return ready
         }
         for continuation in ready {
-            continuation.resume()
+            continuation.resume(returning: true)
         }
     }
 }

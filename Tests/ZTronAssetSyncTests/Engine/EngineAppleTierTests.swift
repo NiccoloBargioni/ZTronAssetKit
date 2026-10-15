@@ -48,7 +48,7 @@ struct EngineAppleTierTests {
         let report = try #require(await engine.sync(.force).completeReport)
         #expect(report.fetched == 1, "the run adopted x from its pack")
         // The run's finish reports the durable adoption, and the source releases the media pack (ADR-027).
-        await backend.waitFor(.remove(mediaPack))
+        try #require(await backend.waitFor(.remove(mediaPack)), "the source releases the media pack")
         #expect(!backend.installedPacks.contains(mediaPack), "the media pack is released")
         let location = try await engine.awaitAsset("x", lane: .userInitiated).get()
         let blobs = StoreLayout(base: EngineHarness.base).blobsDirectory.standardizedFileURL.path
