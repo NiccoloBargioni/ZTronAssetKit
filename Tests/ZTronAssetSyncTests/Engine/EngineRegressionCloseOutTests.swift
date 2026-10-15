@@ -121,6 +121,45 @@ struct EngineRegressionCloseOutTests {
         #expect(received.contains(.snapshotChanged(generation: view.generation)), "the store's generation is announced: \(received)")
         await probe.stop()
     }
+
+    // MARK: Diagnostics while the store cannot answer (L4-R9)
+
+    /// Review of close-out cycle 1 (by reading): the last-known generation was taken only from the open report and from
+    /// views diagnostics read, so after the engine applied manifests a store that could not answer made diagnostics
+    /// report a generation older than the one subscribers had already seen.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-OBS-3: diagnostics never report a generation older than the engine announced when the store cannot answer", .timeLimit(.minutes(1)))
+    func diagnosticsGenerationNeverLags() async throws {
+        let harness = EngineHarness.make()
+        let xBytes = EngineFixture.bytes(9_701)
+        let x = EngineFixture.entry("x", xBytes)
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes)])
+        try await harness.start()
+        let engine = harness.engine
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        _ = try #require(await engine.sync(.force).completeReport)
+        // Events arrive in order: once the run's finish is received, so is every generation its apply announced.
+        _ = await probe.next { event in
+            if case .syncFinished = event {
+                return true
+            }
+            return false
+        }
+        let announced = await probe.received.compactMap { event -> UInt64? in
+            if case .snapshotChanged(let generation) = event {
+                return generation
+            }
+            return nil
+        }.max()
+        let newest = try #require(announced, "the run's apply announced a generation")
+        // The store stops answering (its planning view throws): diagnostics fall back to the last-known figures.
+        await harness.store.close()
+        let report = try await engine.diagnostics().get()
+        #expect(report.indexGeneration >= newest, "announced \(newest), diagnosed \(report.indexGeneration)")
+        await probe.stop()
+        await engine.shutdown()
+    }
 }
 
 extension SyncEngine {
