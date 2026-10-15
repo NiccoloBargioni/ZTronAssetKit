@@ -247,6 +247,70 @@ struct EngineOutcomeTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: ensureAvailable for a scope that cannot fit fails with insufficientSpace before any transfer", .timeLimit(.minutes(1)))
+    func ensureAvailableCannotFit() async throws {
+        let harness = EngineHarness.make(storage: StoragePolicy(reserveFreeBytes: 0), capacity: 500)
+        let big = EngineFixture.bytes(480, count: 600)
+        let entry = EngineHarness.onDemand("big", big)
+        await harness.serveManifest([entry])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        await harness.serveManifest([entry], etag: "v2")
+        let result = await harness.engine.ensureAvailable(scope: .identifiers(["big"]))
+        guard case .failure(.insufficientSpace(let required, let available)) = result else {
+            Issue.record("expected insufficientSpace, got \(result)")
+            return
+        }
+        #expect(required >= 600 && available <= 500)
+        #expect(await harness.source.starts.isEmpty, "decided before any transfer")
+        await harness.engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: ensureAvailable evicts least-recently-used standard assets to make room within the budget", .timeLimit(.minutes(1)))
+    func ensureAvailableEvicts() async throws {
+        let harness = EngineHarness.make(storage: StoragePolicy(budget: .bytes(700), reserveFreeBytes: 0, minimumResidency: 0))
+        let standard = (0..<2).map { index -> (ManifestEntry, Data) in
+            let bytes = EngineFixture.bytes(UInt64(481 + index))
+            return (EngineFixture.entry("s\(index)", bytes), bytes)
+        }
+        let wanted = EngineFixture.bytes(483)
+        let onDemand = EngineHarness.onDemand("wanted", wanted)
+        await harness.serveManifest(standard.map(\.0) + [onDemand])
+        await harness.scriptTransfers(standard)
+        await harness.source.script(onDemand.transferID, [.stage(wanted)])
+        try await harness.start()
+        _ = try #require(await harness.engine.sync(.force).completeReport)
+        await harness.serveManifest(standard.map(\.0) + [onDemand], etag: "v2")
+        harness.time.advance(by: 60)
+        let engine = harness.engine
+        let report = try await harness.withClock { try await engine.ensureAvailable(scope: .identifiers(["wanted"])).get() }
+        #expect(report.present == 1 && report.isComplete)
+        let view = try await harness.view()
+        let evicted = standard.filter { entry in
+            if case .absent(.evicted)? = view.records[entry.0.identifier]?.residency {
+                return true
+            }
+            return false
+        }
+        #expect(evicted.count == 1, "one standard asset made room")
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-12: maintenance with no time budget stops after its first step and reports the budget exhausted", .timeLimit(.minutes(1)))
+    func maintenanceWithoutBudget() async throws {
+        let harness = EngineHarness.make()
+        await harness.serve(EngineSyncTests.catalog(2))
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        let report = try await harness.engine.performMaintenance(timeBudget: 0).get()
+        #expect(report.budgetExhausted)
+        #expect(report.verifiedBytes == 0 && report.corruptFound == 0, "verification never started")
+        await harness.engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-12: the invariant check reports every broken engine invariant it guards", .timeLimit(.minutes(1)))
     func invariantOracle() async throws {
         let harness = EngineHarness.make()
