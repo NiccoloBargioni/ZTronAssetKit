@@ -5,8 +5,8 @@ import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// Regressions the level-4 verifiers found in WP-F verification round 3 (orchestrator rulings L4-R5, L4-R6, L4-R7).
-/// Each test failed before its fix (`docs/adr-drafts/f.md`, F-21).
+/// Regressions the level-4 verifiers found in WP-F verification round 3, and the behaviour the orchestrator's close-out
+/// rulings pin (L4-R4 to L4-R7, L4-R9). Each regression test failed before its fix (`docs/adr-drafts/f.md`, F-21).
 @Suite("Engine regressions, round 3")
 struct EngineRegressionRound3Tests {
     // MARK: Present assets get no job (L4-R5: ARCHITECTURE §7.1 "only outstanding work has a job", T22, R-NET-6)
@@ -236,6 +236,64 @@ struct EngineRegressionRound3Tests {
         let inventory = try await harness.store.stagingInventory()
         let left = inventory.items.keys.filter { $0.transfer == x.transferID && $0.attempt == first.attempt }
         #expect(left.isEmpty, "the dead partial occupies the space that is short: \(left)")
+        await engine.shutdown()
+    }
+
+    // MARK: ENOSPC on a roomy volume is retried within the ordinary budget (L4-R4)
+
+    /// Who waits for the transfer: a `resolve` (the interactive budget) or a run (the background budget).
+    enum SpaceRetryCaller: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case resolve
+        case run
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent",
+        .timeLimit(.minutes(1)),
+        arguments: SpaceRetryCaller.allCases
+    )
+    func spaceRetriesAreBounded(caller: SpaceRetryCaller) async throws {
+        let harness = EngineHarness.make()
+        let bytes = EngineFixture.bytes(4_901)
+        // Standard for the run (runs fetch it), on demand for the resolve (the first sync leaves it absent).
+        let x = caller == .run ? EngineFixture.entry("x", bytes) : EngineHarness.onDemand("x", bytes)
+        let budget = caller == .run ? RetryPolicy.background.maxAttemptsPerRun : RetryPolicy.interactive.maxAttemptsPerRun
+        // More failures than the budget: an attempt past it would consume one.
+        let failures = Array(repeating: FakeTransferStep.fail(.insufficientSpace(requiredBytes: 10)), count: budget + 3)
+        let engine = harness.engine
+        switch caller {
+        case .resolve:
+            await harness.serveManifest([x])
+            try await harness.start()
+            _ = try #require(await engine.sync(.force).completeReport)
+            await harness.source.script(x.transferID, failures)
+            let result = await harness.withClock { await engine.awaitAsset("x", lane: .userInitiated) }
+            guard case .failure(.insufficientSpace(let required, _)) = result else {
+                Issue.record("expected insufficientSpace once the budget is spent, got \(result)")
+                await engine.shutdown()
+                return
+            }
+            #expect(required == 10, "the figures the ENOSPC reported")
+        case .run:
+            await harness.serveManifest([x])
+            await harness.source.script(x.transferID, failures)
+            try await harness.start()
+            let outcome = try await harness.syncDriven()
+            guard case .completeWithFailures(let report) = outcome else {
+                Issue.record("expected the run to end with x failed, got \(outcome)")
+                await engine.shutdown()
+                return
+            }
+            #expect(report.failures.map(\.failureClass) == [.insufficientSpace], "\(report.failures)")
+        }
+        try await harness.settle()
+        #expect(await harness.source.starts.filter { $0.id == x.transferID }.count == budget, "one start per attempt of the budget, then none")
+        #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
 }
