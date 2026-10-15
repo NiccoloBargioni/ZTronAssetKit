@@ -369,20 +369,17 @@ extension SyncEngine {
                 return .failure(self.isShuttingDown ? .shutDown : .cancelled)
             }
         }
+        // The fetches become members (and jobs) a pipeline's worth at a time (S1-15): registering a scope of 100,000
+        // missing entries at once held the actor about 0.4 s (C2).
         var group = Group(kind: .ensure, lane: .userInitiated)
-        for fetch in plan.fetches {
-            group.pending[fetch.id] = fetch.transfer
-        }
+        group.fetches = plan.fetches
         self.state.groups[token] = group
-        for fetch in plan.fetches {
-            self.addInterest(token, asset: fetch.id, entry: fetch.entry, lane: .userInitiated, kind: .ensure)
-        }
         self.pump()
-        if !(self.state.groups[token]?.pending.isEmpty ?? true) {
+        if !(self.state.groups[token]?.isSettled ?? true) {
             // REENTRANCY: RE-S20 — the lifecycle and the group still registered; the report is recomputed from the
             // store afterwards.
             let completed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                if self.state.groups[token]?.pending.isEmpty ?? true {
+                if self.state.groups[token]?.isSettled ?? true {
                     continuation.resume(returning: self.state.groups[token] != nil)
                 } else {
                     self.state.groups[token]?.continuation = continuation

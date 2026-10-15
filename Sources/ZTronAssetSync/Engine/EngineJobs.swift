@@ -317,7 +317,7 @@ extension SyncEngine {
                 group.pending[asset] = nil
             }
             self.state.groups[token] = group
-            if interest.kind == .ensure, group.pending.isEmpty {
+            if interest.kind == .ensure, group.isSettled {
                 self.state.groups[token]?.continuation = nil
                 group.continuation?.resume(returning: true)
             }
@@ -344,7 +344,7 @@ extension SyncEngine {
         }
         group.pending[asset] = nil
         self.state.groups[token] = group
-        if group.kind == .ensure, group.pending.isEmpty, let continuation = group.continuation {
+        if group.kind == .ensure, group.isSettled, let continuation = group.continuation {
             self.state.groups[token]?.continuation = nil
             continuation.resume(returning: true)
         }

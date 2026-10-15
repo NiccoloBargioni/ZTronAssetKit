@@ -62,6 +62,7 @@ extension SyncEngine {
             return
         }
         self.materializeRun()
+        self.materializeEnsures()
         let maximum = self.tuning.maxConcurrentTransfers
         var guardCount = 0
         while guardCount < 10_000 {
@@ -95,7 +96,76 @@ extension SyncEngine {
             }
         }
         self.checkRunSettled()
+        self.scheduleEnsureRefill()
         self.notifyObservers()
+    }
+
+    // MARK: ensureAvailable materialisation (S1-15, C2)
+
+    /// The members a group materialises at most at a time (the run's bound: the pipeline plus `runLookahead`).
+    private var materializationLimit: Int {
+        max(1, self.tuning.pipelineDepth * self.tuning.maxConcurrentTransfers + self.tuning.runLookahead)
+    }
+
+    /// Turns `ensureAvailable` groups' planned fetches into members and jobs while fewer than the limit are pending. A
+    /// fetch follows its asset's current entry (T22) and is dropped when the asset left the manifest (T21).
+    func materializeEnsures() {
+        let limit = self.materializationLimit
+        for token in self.state.groups.keys.sorted() {
+            guard var group = self.state.groups[token], group.kind == .ensure, group.cursor < group.fetches.count, group.pending.count < limit else {
+                continue
+            }
+            var added: [(id: AssetID, entry: ManifestEntry)] = []
+            while group.cursor < group.fetches.count, group.pending.count < limit {
+                let id = group.fetches[group.cursor].id
+                group.cursor += 1
+                guard let entry = self.state.applied.entry(for: id) else {
+                    continue
+                }
+                group.pending[id] = entry.transferID
+                added.append((id, entry))
+            }
+            if group.cursor >= group.fetches.count {
+                group.fetches = []
+                group.cursor = 0
+            }
+            // Every remaining fetch may have left the manifest: then nothing is left to wait for.
+            let completion = group.isSettled ? group.continuation : nil
+            if completion != nil {
+                group.continuation = nil
+            }
+            self.state.groups[token] = group
+            for member in added {
+                self.addInterest(token, asset: member.id, entry: member.entry, lane: .userInitiated, kind: .ensure)
+            }
+            completion?.resume(returning: true)
+        }
+    }
+
+    /// Schedules one later `pump()` when an `ensureAvailable` group has fetches left and room for them (members that
+    /// failed fast inside this pump freed it): each batch is materialised in its own actor turn, never in a loop here.
+    private func scheduleEnsureRefill() {
+        guard !self.state.ensureRefillScheduled else {
+            return
+        }
+        let limit = self.materializationLimit
+        guard self.state.groups.values.contains(where: { $0.kind == .ensure && $0.cursor < $0.fetches.count && $0.pending.count < limit }) else {
+            return
+        }
+        self.state.ensureRefillScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; `pump` re-reads every group.
+            await engine.refillEnsures()
+        }
+        if spawned == nil {
+            self.state.ensureRefillScheduled = false
+        }
+    }
+
+    /// The scheduled refill.
+    private func refillEnsures() {
+        self.state.ensureRefillScheduled = false
+        self.pump()
     }
 
     /// Whether a valid user-initiated entry waits.

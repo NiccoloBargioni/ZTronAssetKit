@@ -52,6 +52,9 @@ struct EngineState {
     var unknownWaiters: [InterestToken: UnknownWaiter] = [:]
     /// Prefetch handles and `ensureAvailable` groups.
     var groups: [InterestToken: Group] = [:]
+    /// A later turn's `pump()` is scheduled to materialise `ensureAvailable` fetches (a batch that failed fast inside a
+    /// pump left room nobody else would fill).
+    var ensureRefillScheduled = false
     /// Callers joined to `start()`.
     var startJoiners: [InterestToken: CheckedContinuation<Result<OpenReport, AssetError>, Never>] = [:]
     /// Callers joined to `shutdown()`.
@@ -340,8 +343,18 @@ struct Group {
     let lane: AssetPriority
     /// Members still pending, by asset.
     var pending: [AssetID: TransferID] = [:]
+    /// `ensureAvailable`'s planned fetches; those from `cursor` on are not members yet (S1-15: only the pipeline plus
+    /// `runLookahead` become jobs at a time, as for a run).
+    var fetches: [PlannedFetch] = []
+    /// The next fetch to materialise.
+    var cursor = 0
     /// `ensureAvailable`'s completion (RE-S20).
     var continuation: CheckedContinuation<Bool, Never>?
+
+    /// Whether the group waits for nothing more: no pending member and no fetch left to materialise.
+    var isSettled: Bool {
+        self.pending.isEmpty && self.cursor >= self.fetches.count
+    }
 }
 
 /// A `waitUntil` caller.

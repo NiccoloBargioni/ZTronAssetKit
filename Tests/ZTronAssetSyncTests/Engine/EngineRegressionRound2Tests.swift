@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
@@ -9,6 +10,11 @@ extension SyncEngine {
     /// Test seam: the transfer the engine's copy of the applied manifest names for `id`.
     func appliedTransferForTests(_ id: AssetID) -> TransferID? {
         self.state.applied.entry(for: id)?.transferID
+    }
+
+    /// Test seam: the heals the engine still schedules or runs.
+    func healsForTests() -> [AssetID] {
+        self.state.heals.keys.sorted()
     }
 
     /// Test seam: the state of the job of `transfer`, if any.
@@ -425,6 +431,149 @@ struct EngineRegressionRound2Tests {
         let outcome = await run.value
         #expect(outcome.completeReport != nil, "b was never missing: \(outcome)")
         #expect(try await harness.view().records["b"]?.referencedBlob != nil)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    // MARK: Heals (R-CLN-8)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-16: a heal whose re-download fails ends, and the engine forgets it", .timeLimit(.minutes(1)))
+    func failedHealIsForgotten() async throws {
+        let harness = EngineHarness.make()
+        let catalog = EngineSyncTests.catalog(2)
+        await harness.serve(catalog)
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        let (entry, bytes) = catalog[0]
+        let location = try await engine.awaitAsset(entry.identifier, lane: .userInitiated).get()
+        var corrupted = bytes
+        corrupted[corrupted.startIndex] ^= 0xFF
+        try harness.fileSystem.write(corrupted, to: location.url, mode: .truncate)
+        // The origin no longer has the content when the quarantine ends.
+        await harness.source.script(entry.transferID, [.fail(.permanentMissing(httpStatus: 404))])
+        let report = try await engine.performMaintenance(timeBudget: 60).get()
+        #expect(report.corruptFound == 1)
+        #expect(await engine.healsForTests() == [entry.identifier], "the heal is scheduled at the quarantine's end")
+        await harness.withClock {
+            await engine.awaitCondition { $0.state.metrics.failures[.notFound] >= 1 && $0.state.jobs.isEmpty }
+        }
+        #expect(await harness.source.starts.count == 3, "two at the sync, one heal")
+        #expect(await engine.healsForTests().isEmpty, "a heal that ended with a failure is not kept for the process lifetime")
+        await engine.shutdown()
+    }
+
+    // MARK: Unknown identifiers (S1-13)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-2: an identifier the newest fetched manifest lists is admitted from it when the refetch fails", .timeLimit(.minutes(1)))
+    func unknownIDAdmittedFromNewestWhenRefetchFails() async throws {
+        let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
+        let x = EngineHarness.onDemand("x", EngineFixture.bytes(3_301))
+        let qBytes = EngineFixture.bytes(3_302)
+        let q = EngineHarness.onDemand("q", qBytes)
+        let big = EngineFixture.entry("big", EngineFixture.bytes(3_303, count: 8_000))
+        await harness.serveManifest([x])
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        // A run fetches v2, which lists q, but cannot hold v2's standard entry, so it applies nothing: v2 is the newest
+        // manifest seen, and neither the engine nor the store applied it.
+        await harness.serveManifest([x, q, big], etag: "v2")
+        guard case .failed(.insufficientSpace) = await engine.sync(.force) else {
+            Issue.record("the run was expected to stop before its apply")
+            await engine.shutdown()
+            return
+        }
+        #expect(try await harness.view().appliedManifest.entry(for: "q") == nil)
+        let requests = try await engine.metrics().get().manifestRequests
+        // The point-admission refetch for q fails.
+        await harness.source.scriptManifest([.fail(.transient(.serverError(httpStatus: 503), retryAfter: nil))])
+        await harness.source.script(q.transferID, [.stage(qBytes)])
+        let resolved = await engine.awaitAsset("q", lane: .userInitiated)
+        #expect(resolved.map(\.byteSize) == .success(Int64(qBytes.count)), "q is admitted from v2, got \(resolved)")
+        #expect(try await engine.metrics().get().manifestRequests == requests + 1, "the refetch was asked for and failed")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    // MARK: ensureAvailable materialisation (S1-15, C2)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: ensureAvailable turns its fetches into jobs a pipeline at a time and completes the whole scope", .timeLimit(.minutes(1)))
+    func ensureMaterialisesInBatches() async throws {
+        // At most pipelineDepth × maxConcurrentTransfers + runLookahead = 2 × 2 + 4 = 8 members at a time.
+        let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0, pipelineDepth: 2, runLookahead: 4)
+        let harness = EngineHarness.make(tuning: tuning)
+        let catalog = (0..<40).map { index -> (ManifestEntry, Data) in
+            let bytes = EngineFixture.bytes(UInt64(3_000 + index), count: 32)
+            return (EngineHarness.onDemand("e\(index)", bytes), bytes)
+        }
+        await harness.serveManifest(catalog.map(\.0))
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        await harness.scriptTransfers(catalog)
+        let peak = Mutex(0)
+        let (registered, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        let sampler = Task {
+            await engine.awaitCondition { engine in
+                peak.withLock { $0 = max($0, engine.state.jobs.count) }
+                signal.yield()
+                return false
+            }
+        }
+        var registration = registered.makeAsyncIterator()
+        _ = await registration.next()
+        let report = try await engine.ensureAvailable(scope: .identifiers(Set(catalog.map(\.0.identifier)))).get()
+        sampler.cancel()
+        await sampler.value
+        signal.finish()
+        #expect(report.isComplete && report.present == 40, "\(report)")
+        #expect(peak.withLock { $0 } <= 8, "jobs at once: \(peak.withLock { $0 })")
+        #expect(peak.withLock { $0 } >= 2, "the sampler saw the ensure's jobs")
+        #expect(await harness.source.starts.count == 40)
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: an ensureAvailable whose members fail fast as they become jobs still settles, a batch per actor turn", .timeLimit(.minutes(1)))
+    func ensureSettlesWhenMembersFailFast() async throws {
+        let bulk = NextUnitGate()
+        let tuning = SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0, pipelineDepth: 1, runLookahead: 3)
+        let harness = EngineHarness.make(tuning: tuning, bulk: bulk)
+        let failing = (0..<5).map { EngineHarness.onDemand("f\($0)", EngineFixture.bytes(UInt64(3_100 + $0))) }
+        let wanted = (0..<20).map { EngineHarness.onDemand("w\($0)", EngineFixture.bytes(UInt64(3_200 + $0))) }
+        await harness.serveManifest(failing + wanted)
+        for entry in failing {
+            await harness.source.script(entry.transferID, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil))])
+        }
+        try await harness.start()
+        let engine = harness.engine
+        _ = try #require(await engine.sync(.force).completeReport)
+        // The ensure fetches v2 and is held at its apply's planning unit while the origin's breaker opens.
+        await harness.serveManifest(failing + wanted, etag: "v2")
+        await bulk.holdNext(skipping: 1)
+        let ensure = Task { await engine.ensureAvailable(scope: .identifiers(Set(wanted.map(\.identifier)))) }
+        await bulk.waitForHold()
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        let groups = try await engine.registerGroup(failing.map(\.identifier), lane: .prefetch).get()
+        let opened = await probe.next { event in
+            if case .circuitChanged(_, .open(.serverErrors, _)) = event {
+                return true
+            }
+            return false
+        }
+        #expect(opened != nil)
+        await engine.releaseGroup(groups)
+        await probe.stop()
+        // Every member the ensure materialises is refused by the open breaker and answered at once.
+        await bulk.release()
+        let report = try await ensure.value.get()
+        #expect(report.present == 0 && report.missing == 20, "\(report)")
+        #expect(await harness.source.starts.filter { start in wanted.contains { $0.transferID == start.id } }.isEmpty)
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }

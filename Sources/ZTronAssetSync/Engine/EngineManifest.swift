@@ -221,30 +221,32 @@ extension SyncEngine {
     // MARK: Unknown identifiers (point admission, sync.md §6.5)
 
     /// Answers every registered unknown-id waiter from the fetch's outcome: listed → admitted and joined (T1); absent
-    /// → `.notFound` plus the negative cache; a failed fetch → the mapped error.
+    /// → `.notFound` plus the negative cache. A fetch that failed still answers from the newest manifest seen (sync-1
+    /// S1-13): an id that manifest or the applied one lists is admitted or joined, and only the others get the mapped
+    /// error, never a manifest's verdict.
     private func answerUnknownWaiters(_ outcome: ManifestOutcome) async {
         let manifest: ValidatedManifest?
+        let failure: AssetError?
         switch outcome {
         case .fetched(let fetched, _, _):
             manifest = fetched
+            failure = nil
         case .notModified:
             manifest = self.state.newest?.manifest ?? self.state.applied
+            failure = nil
         case .failed(let error):
-            self.failUnknownWaiters(error.assetError(now: self.environment.time.now()))
-            return
+            manifest = self.state.newest?.manifest
+            failure = error.assetError(now: self.environment.time.now())
         case .invalid:
-            self.failUnknownWaiters(.serverUnavailable(retryAfter: nil))
-            return
+            manifest = self.state.newest?.manifest
+            failure = .serverUnavailable(retryAfter: nil)
         case .circuitOpen(let cause):
-            self.failUnknownWaiters(cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil))
-            return
+            manifest = self.state.newest?.manifest
+            failure = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
         case .throttled(let until):
-            self.failUnknownWaiters(.serverUnavailable(retryAfter: until.seconds(since: self.environment.time.monotonicNow())))
-            return
+            manifest = self.state.newest?.manifest
+            failure = .serverUnavailable(retryAfter: until.seconds(since: self.environment.time.monotonicNow()))
         case .timedOut, .cancelled, .shutDown:
-            manifest = nil
-        }
-        guard let manifest else {
             return
         }
         let now = self.environment.time.monotonicNow()
@@ -252,10 +254,14 @@ extension SyncEngine {
             guard let waiter = self.state.unknownWaiters[token] else {
                 continue
             }
-            guard let entry = self.state.applied.entry(for: waiter.asset) ?? manifest.entry(for: waiter.asset) else {
+            guard let entry = self.state.applied.entry(for: waiter.asset) ?? manifest?.entry(for: waiter.asset) else {
                 self.state.unknownWaiters[token] = nil
-                self.state.negativeCache.insert(waiter.asset, until: now.adding(seconds: self.tuning.unknownIDRefetchInterval), capacity: self.tuning.unknownIDCacheCapacity)
-                waiter.continuation.resume(returning: .failure(.notFound))
+                if let failure {
+                    waiter.continuation.resume(returning: .failure(failure))
+                } else {
+                    self.state.negativeCache.insert(waiter.asset, until: now.adding(seconds: self.tuning.unknownIDRefetchInterval), capacity: self.tuning.unknownIDCacheCapacity)
+                    waiter.continuation.resume(returning: .failure(.notFound))
+                }
                 continue
             }
             if self.state.applied.entry(for: waiter.asset) == nil {
@@ -282,28 +288,6 @@ extension SyncEngine {
             self.join(token, waiter: pending, entry: entry)
         }
         self.pump()
-    }
-
-    /// Fails every unknown-id waiter with `error`, except those whose id the applied manifest lists by now (a run or an
-    /// `ensureAvailable` applied it while the fetch failed): they join their job (sync-1 S1-13).
-    private func failUnknownWaiters(_ error: AssetError) {
-        let waiting = self.state.unknownWaiters
-        self.state.unknownWaiters.removeAll()
-        var joined = false
-        for token in waiting.keys.sorted() {
-            guard let waiter = waiting[token] else {
-                continue
-            }
-            if let entry = self.state.applied.entry(for: waiter.asset) {
-                self.join(token, waiter: waiter, entry: entry)
-                joined = true
-            } else {
-                waiter.continuation.resume(returning: .failure(error))
-            }
-        }
-        if joined {
-            self.pump()
-        }
         self.notifyObservers()
     }
 
