@@ -341,10 +341,11 @@ extension SyncEngine {
             return .failure(.shutDown)
         }
         let space: FreeSpace
+        let measured: FreeSpace
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation.
-            let measured = try await self.store.freeSpace()
+            measured = try await self.store.freeSpace()
             // User work plans against the space the OS keeps for important usage (sync-2 S2-23).
             space = FreeSpace(
                 volumeImportant: measured.volumeImportant,
@@ -362,7 +363,9 @@ extension SyncEngine {
         guard self.isRunning, !Task.isCancelled else {
             return .failure(self.isShuttingDown ? .shutDown : .cancelled)
         }
-        self.state.freeSpace = space
+        // The headroom ledger keeps the measured reading: the important-for-opportunistic copy is this ensure's own plan
+        // and space decision, never the base other lanes are admitted against (S2-23, L4-R6).
+        self.state.freeSpace = measured
         self.state.committedSinceRead = 0
         self.reconsiderSpaceBlocked()
         let target = manifest ?? view.appliedManifest

@@ -169,6 +169,14 @@ extension SyncEngine {
         case .insufficientSpace(let required):
             // Undecided until the free space is read: parked, retried or awaiting the reaper (`spaceFailed`).
             self.transition(transfer, to: .failed(.nextRun))
+            // The bytes written before ENOSPC stay in the attempt's partial and occupy the space that is short: kept
+            // for resume when a sidecar makes them resumable, otherwise discarded now (R-CLN-3, L4-R6).
+            // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch, re-checked right below.
+            let resume = await self.resumePoint(after: request)
+            guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
+                return
+            }
+            self.state.jobs[transfer]?.resume = resume
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.spaceFailed(transfer, epoch: epoch, required: required ?? job.entry.byteSize ?? 0)
         case .rejected:
