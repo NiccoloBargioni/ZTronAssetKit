@@ -205,7 +205,7 @@ package enum SyncPlanner {
         policy: PlanningPolicy,
         freeSpace: FreeSpace
     ) -> SyncPlan {
-        fatalError("WP-F: SyncPlanner.plan not implemented")
+        PlanBuilder.plan(manifest: manifest, snapshot: snapshot, scope: scope, policy: policy, freeSpace: freeSpace)
     }
 }
 
