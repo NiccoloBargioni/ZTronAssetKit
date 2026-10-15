@@ -622,6 +622,8 @@ extension SyncEngine {
             return .failure(error)
         }
         self.state.purgeEpoch += 1
+        // The store clears the stamp before its first await of the purge (R-CLN-6).
+        self.state.lastStamp = nil
         // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
         self.state.boundContent.removeAll()
         self.settleRun(.cancelled)
@@ -900,35 +902,47 @@ extension SyncEngine {
         return .success(metrics)
     }
 
-    /// Counters, recent errors, launch facts and the store's generation and stamp.
+    /// Counters, recent errors, launch facts and the store's generation and stamp. A degraded engine, or a store that
+    /// cannot answer, still answers, because that is when support needs the error ring most (R-OBS-3, L4-R9): with the
+    /// last-known generation (0 if never read) and stamp (`nil` if never read). After shutdown it fails `.shutDown`
+    /// (ADR-042); a caller cancelled while start runs gets `.cancelled`.
     func performDiagnostics() async -> Result<EngineDiagnostics, AssetError> {
         // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
         if let error = await self.ensureStarted() {
-            return .failure(error)
+            guard case .storageUnavailable = error else {
+                return .failure(error)
+            }
+            return .success(self.makeDiagnostics())
         }
-        let view: StorePlanningView
         do {
-            // REENTRANCY: RE-S38 — the lifecycle; a snapshot.
-            view = try await self.store.planningView()
+            // REENTRANCY: RE-S38 — the lifecycle; a snapshot, kept as the last-known figures.
+            let view = try await self.store.planningView()
+            self.state.lastIndexGeneration = view.generation
+            self.state.lastStamp = view.stamp
         } catch {
-            return .failure(error.assetError)
+            // The store cannot answer now: the last-known figures stand in.
         }
-        guard self.isRunning else {
+        guard !self.isShuttingDown else {
             return .failure(.shutDown)
         }
+        return .success(self.makeDiagnostics())
+    }
+
+    /// The diagnostics from the engine's own state and the last-known index figures.
+    private func makeDiagnostics() -> EngineDiagnostics {
         var errors = self.state.recentErrors
         for field in self.state.clampedFields {
             errors.append(DiagnosticError(at: self.environment.time.now(), id: nil, failureClass: .rejected, detail: "clamped \(field)"))
         }
-        return .success(EngineDiagnostics(
+        return EngineDiagnostics(
             introspection: self.currentIntrospection(),
             recentErrors: Array(errors.suffix(EngineDiagnostics.recentErrorCapacity)),
             appVersion: self.state.launch?.appVersion,
             launchEpoch: self.state.launch?.report.launchEpoch,
-            indexGeneration: view.generation,
-            stamp: view.stamp,
+            indexGeneration: self.state.lastIndexGeneration,
+            stamp: self.state.lastStamp,
             retentionScope: self.state.retentionScope
-        ))
+        )
     }
 
     // MARK: Memory pressure (R-CLN-11, ADR-044)

@@ -226,6 +226,8 @@ extension SyncEngine {
             return
         }
         self.state.generation = report.generation
+        self.state.lastIndexGeneration = report.generation
+        self.state.lastStamp = report.stamp
         self.state.retentionSequence += 1
         var pushed = self.state.retentionSequence
         // REENTRANCY: f-1 (proposed) — the lifecycle; the scope pushed is the one in force now; a scope set while

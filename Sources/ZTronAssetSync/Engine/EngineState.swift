@@ -177,6 +177,11 @@ struct EngineState {
     var progress = ProgressGate()
     /// The last index generation the engine learned (events, replay).
     var generation: UInt64 = 0
+    /// The index generation and stamp the store last reported (its open report, a view, a stamp the engine wrote):
+    /// what `diagnostics()` reports while the store cannot answer (R-OBS-3, L4-R9).
+    var lastIndexGeneration: UInt64 = 0
+    /// See `lastIndexGeneration`; `nil` until the store reported one, and after a purge cleared it.
+    var lastStamp: SyncStamp?
 
     // MARK: Leases, pins, scope, memory pressure, migration
 

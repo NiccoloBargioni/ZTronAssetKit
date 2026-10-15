@@ -192,7 +192,8 @@ package actor SyncEngine {
     }
 
     /// Counters, the ring of recent errors (`EngineDiagnostics.recentErrorCapacity`) and the store's generation
-    /// and stamp, for `diagnosticReport()` (R-OBS-3).
+    /// and stamp, for `diagnosticReport()` (R-OBS-3). It answers while the engine is degraded or its store cannot
+    /// answer, with the last-known generation and stamp (L4-R9); after shutdown it fails `.shutDown`.
     package func diagnostics() async -> Result<EngineDiagnostics, AssetError> {
         // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
         await self.performDiagnostics()

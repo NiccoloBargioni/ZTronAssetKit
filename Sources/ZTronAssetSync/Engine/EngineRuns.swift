@@ -263,6 +263,7 @@ extension SyncEngine {
                 do {
                     // REENTRANCY: RE-S11 — the lifecycle; `.purgeRaced` leaves the sync due.
                     try await self.store.markSynced(stamp, ifPurgeEpoch: view.purgeEpoch)
+                    self.state.lastStamp = stamp
                 } catch .purgeRaced {
                     return .failed(.cancelled)
                 } catch {
