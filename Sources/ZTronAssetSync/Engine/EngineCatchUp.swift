@@ -56,7 +56,10 @@ extension SyncEngine {
             view = nil
         }
         if self.isRunning, let view, view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count {
-            // The ids of jobs the view holds present at their entries' content follow there without a job (L4-R5).
+            // The store applied a manifest the engine did not see apply (its prunes, evictions and content changes
+            // were never reported): every binding the engine remembers is checked against the view, and the ids of jobs
+            // the view holds present at their entries' content follow there without a job (L4-R5).
+            self.state.boundContent = self.state.boundContent.filter { SyncEngine.isPresent(view.records[$0.key], at: $0.value) }
             self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets))
             // What `applied` announces for an apply the engine made, announced for one it only finds (an apply that
             // threw after its in-memory writes): the ids the copy lists and the store no longer does, in the copy's
@@ -66,7 +69,6 @@ extension SyncEngine {
             self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
             self.state.generation = max(self.state.generation, view.generation)
             for id in pruned {
-                self.state.boundContent[id] = nil
                 self.broadcast(.assetRemoved(id, .pruned))
             }
             self.broadcast(.snapshotChanged(generation: self.state.generation))
