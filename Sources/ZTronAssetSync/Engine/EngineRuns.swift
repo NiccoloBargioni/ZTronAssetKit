@@ -162,7 +162,8 @@ extension SyncEngine {
         let target = manifest ?? view.appliedManifest
         let scope = self.state.retentionScope
         let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())
-        let interval = self.log.interval(.plan, category: .sync, "run \(self.state.run?.id.rawValue ?? 0)")
+        let number = self.state.lastRunID
+        let interval = self.log.interval(.plan, category: .sync, "run \(number)")
         // REENTRANCY: RE-S07 — the lifecycle and the run token; the store may have advanced (apply diffs anyway).
         var plan = await SyncEngine.planOffActor(self.planner, manifest: target, view: view, scope: scope, policy: policy, space: space)
         interval.end()

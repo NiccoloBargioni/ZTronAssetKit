@@ -22,7 +22,9 @@ extension SyncEngine {
         }
         guard job.state.allows(next) else {
             self.state.metrics.illegalTransitions += 1
-            self.log.log(.sync, .fault, "illegal transition \(job.state.kind.rawValue) → \(next.kind.rawValue)")
+            let from = String(describing: job.state.kind)
+            let to = String(describing: next.kind)
+            self.log.log(.sync, .fault, "illegal transition \(from) → \(to)")
             return false
         }
         job.state = next
@@ -376,8 +378,11 @@ extension SyncEngine {
         if overflow > 0 {
             self.state.recentErrors.removeFirst(overflow)
         }
-        let subject = id.map(AssetLog.hashed) ?? "-"
-        self.log.log(.sync, .error, "\(failureClass.rawValue) \(subject): \(detail)")
+        // The line carries the class and the hashed identifier only: error descriptions can name identifiers, so the
+        // detail stays in the diagnostics ring (R-OBS-1, R-SEC-1).
+        let label = String(describing: failureClass)
+        let hashedID = id.map(AssetLog.hashed) ?? "-"
+        self.log.log(.sync, .error, "failure \(label) \(hashedID)")
     }
 
     /// Takes the manifest the store applied as the engine's copy.
