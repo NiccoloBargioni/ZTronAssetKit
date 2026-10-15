@@ -817,18 +817,21 @@ extension SyncEngine {
         }
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: false) { engine, _ in
+            // REENTRANCY: RE-S30 — nothing: a snapshot of who holds the blob now; each holder is re-read from the store's
+            // records after the quarantine before it is announced or healed.
+            let holders = await engine.blobHolders(of: id)
             do throws(StoreError) {
                 // REENTRANCY: RE-S30 — the lifecycle.
                 try await engine.store.reportUnreadable(id)
             } catch {
-                // The store may have quarantined the blob in memory before its commit threw (ADR-050): the id's binding
-                // is not trusted (L4-R5).
-                // REENTRANCY: RE-S21 — nothing: a synchronous forget on the actor.
-                await engine.forgetBound([id])
+                // The store may have quarantined the blob, and with it every holder, in memory before its commit threw
+                // (ADR-050): no binding is trusted (L4-R5).
+                // REENTRANCY: RE-S21 — nothing: a synchronous drop on the actor.
+                await engine.storeMutationFailed()
                 return .done(.failure(error.assetError))
             }
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
-            await engine.quarantined([id])
+            await engine.quarantined([id], sharing: holders)
             return .done(.success(()))
         }
         if case .done(let outcome) = result {
@@ -837,20 +840,53 @@ extension SyncEngine {
         return .failure(.cancelled)
     }
 
-    /// Announces quarantined assets and schedules their re-downloads.
-    private func quarantined(_ ids: [AssetID]) async {
-        self.forgetBound(ids)
+    /// Announces quarantined assets and schedules their re-downloads. `ids` are the assets the store reported (every
+    /// holder of a corrupt blob, for deep verification); `holders` are other assets that referenced a reported asset's
+    /// blob before the quarantine (`reportUnreadable` reports only its id, yet the store quarantines every holder of the
+    /// blob, R-CLN-8): each one the store's records show quarantined or failed afterwards is announced and healed too.
+    private func quarantined(_ ids: [AssetID], sharing holders: [AssetID] = []) async {
+        if holders.isEmpty {
+            self.forgetBound(ids)
+        } else {
+            // The store quarantined holders of the blob the engine may know only partly (one gained between the snapshot
+            // and the quarantine is in no list): no binding is trusted; an attempt asks the store first (L4-R5).
+            self.dropBindings()
+        }
         for id in ids {
             self.broadcast(.assetRemoved(id, .quarantined))
         }
         // REENTRANCY: RE-S30 — the lifecycle.
-        await self.scheduleHeals(ids)
+        await self.scheduleHeals(ids, sharing: holders)
         // REENTRANCY: RE-S40 — the lifecycle.
         await self.refreshStoreDeadline()
     }
 
-    /// Schedules a re-download at the end of each asset's quarantine (read from the store's records).
-    private func scheduleHeals(_ ids: [AssetID]) async {
+    /// The other ids whose records reference `id`'s blob in a store snapshot, found off the actor (C2: the scan visits
+    /// every record). Empty when the store cannot answer or `id` holds no blob.
+    private func blobHolders(of id: AssetID) async -> [AssetID] {
+        let view: StorePlanningView
+        do {
+            // REENTRANCY: RE-S30 — the lifecycle (re-read by the caller's next step); the records are a snapshot.
+            view = try await self.store.planningView()
+        } catch {
+            return []
+        }
+        guard let key = view.records[id]?.referencedBlob else {
+            return []
+        }
+        // REENTRANCY: RE-S07 — nothing: a pure scan of the snapshot off the actor.
+        return await SyncEngine.holdersOffActor(of: key, besides: id, in: view.records)
+    }
+
+    /// The ids of `records` other than `id` that reference blob `key`, sorted: a pure scan, off the actor (C2).
+    @concurrent
+    nonisolated static func holdersOffActor(of key: BlobKey, besides id: AssetID, in records: [AssetID: AssetRecord]) async -> [AssetID] {
+        records.compactMap { $0.key != id && $0.value.referencedBlob == key ? $0.key : nil }.sorted()
+    }
+
+    /// Schedules a re-download at the end of each asset's quarantine (read from the store's records); a holder of a
+    /// reported blob that the records show quarantined or failed is announced first.
+    private func scheduleHeals(_ ids: [AssetID], sharing holders: [AssetID] = []) async {
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S30 — the lifecycle; the records are a snapshot.
@@ -861,9 +897,19 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
+        var healed = ids
+        for holder in holders where !ids.contains(holder) {
+            switch view.records[holder]?.residency {
+            case .quarantined?, .failed(.unreadable)?:
+                self.broadcast(.assetRemoved(holder, .quarantined))
+                healed.append(holder)
+            default:
+                continue
+            }
+        }
         let wall = self.environment.time.now()
         let now = self.environment.time.monotonicNow()
-        for id in ids {
+        for id in healed {
             guard case .quarantined(let until)? = view.records[id]?.residency else {
                 continue
             }
