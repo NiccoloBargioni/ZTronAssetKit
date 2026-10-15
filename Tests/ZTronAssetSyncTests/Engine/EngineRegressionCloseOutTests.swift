@@ -85,7 +85,7 @@ struct EngineRegressionCloseOutTests {
     /// copy behind the store's until some later publication was superseded, so the ids it pruned were never announced
     /// (a re-apply of the same manifest prunes nothing). The engine now re-reads the store once no `apply` is in flight.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-10: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes", .timeLimit(.minutes(1)))
     func failedApplyIsFollowed() async throws {
         let harness = EngineHarness.make()
         let xBytes = EngineFixture.bytes(9_601)
