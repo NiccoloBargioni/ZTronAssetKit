@@ -335,4 +335,32 @@ struct EngineRegressionRound3Tests {
         #expect(received.contains(.snapshotChanged(generation: report.generation)), "the store's generation is announced: \(received)")
         await probe.stop()
     }
+
+    // MARK: Diagnostics while degraded (L4-R9)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-OBS-3: diagnostics answer while the engine is degraded, with its error ring and the last-known generation and stamp", .timeLimit(.minutes(1)))
+    func diagnosticsWhileDegraded() async throws {
+        // Another client holds the store's lock: this engine's start degrades it (R-CAR-7).
+        let owner = EngineHarness.make()
+        try await owner.start()
+        let second = EngineHarness.make(time: owner.time, fileSystem: owner.fileSystem)
+        let engine = second.engine
+        #expect(await engine.start() == .failure(.storageUnavailable(.locked)))
+        let diagnostics = await engine.diagnostics()
+        guard case .success(let report) = diagnostics else {
+            Issue.record("support needs the diagnostics of a degraded engine most, got \(diagnostics)")
+            await engine.shutdown()
+            await owner.engine.shutdown()
+            return
+        }
+        #expect(report.introspection.lifecycle == .degraded(.locked))
+        #expect(report.recentErrors.contains { $0.failureClass == .storage }, "the open failure is in the ring: \(report.recentErrors)")
+        #expect(report.indexGeneration == 0, "never read")
+        #expect(report.stamp == nil, "never read")
+        #expect(report.appVersion == nil && report.launchEpoch == nil, "start never learned them")
+        await engine.shutdown()
+        #expect(await engine.diagnostics() == .failure(.shutDown), "after shutdown it still fails (ADR-042)")
+        await owner.engine.shutdown()
+    }
 }
