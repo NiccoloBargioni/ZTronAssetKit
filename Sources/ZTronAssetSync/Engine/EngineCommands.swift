@@ -701,6 +701,8 @@ extension SyncEngine {
             self.pump()
             return .success(result)
         } catch {
+            // A purge that threw may have removed records in memory first (ADR-050), bound meanwhile too (L4-R5).
+            self.storeMutationFailed()
             // REENTRANCY: RE-S40 — the lifecycle.
             await self.refreshStoreDeadline()
             return .failure(self.isShuttingDown ? .shutDown : error.assetError)
@@ -782,8 +784,13 @@ extension SyncEngine {
                 self.startMigration()
             }
         } catch .cancelled {
+            // The step that threw may have evicted or quarantined in memory first (ADR-050): no binding learned during
+            // maintenance is trusted (L4-R5).
+            self.storeMutationFailed()
             report.budgetExhausted = true
         } catch {
+            // As above.
+            self.storeMutationFailed()
             return .failure(self.isShuttingDown ? .shutDown : error.assetError)
         }
         // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
@@ -814,6 +821,10 @@ extension SyncEngine {
                 // REENTRANCY: RE-S30 — the lifecycle.
                 try await engine.store.reportUnreadable(id)
             } catch {
+                // The store may have quarantined the blob in memory before its commit threw (ADR-050): the id's binding
+                // is not trusted (L4-R5).
+                // REENTRANCY: RE-S21 — nothing: a synchronous forget on the actor.
+                await engine.forgetBound([id])
                 return .done(.failure(error.assetError))
             }
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.

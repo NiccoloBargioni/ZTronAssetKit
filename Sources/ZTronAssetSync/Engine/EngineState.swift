@@ -44,11 +44,16 @@ struct EngineState {
     var heldForManifest: Set<TransferID> = []
     /// Store `apply` calls in flight plus store re-reads under way; the last to end releases `heldForManifest`.
     var manifestCatchUps = 0
+    /// A store `apply` threw: it may have written its manifest, prunes and evictions in memory first (ADR-050: the
+    /// in-memory state stays authoritative), so once no `apply` is in flight the engine re-reads the store and follows
+    /// it (`catchUpWithStore`, L4-R10).
+    var catchUpAfterFailedApply = false
     /// Ids the engine saw bound to content, by the transfer of that content: a commit's locations, an apply's reuses, a
     /// store read. No interest creates or joins a job for an id bound to its entry's content (ARCHITECTURE §7.1: only
     /// outstanding work has a job; L4-R5); such an interest is answered from the store. An entry goes when the engine
-    /// learns the binding ended (prune, eviction, content change, purge, maintenance, quarantine, a recorded failure), and
-    /// the ledger keeps only what a plan, a read in flight or a job could still consult (`pruneBoundContent`).
+    /// learns the binding ended (prune, eviction, content change, purge, maintenance, quarantine, a recorded failure) or
+    /// may have: a store mutation that threw may have unbound ids in memory first (ADR-050), so the whole ledger goes
+    /// then. It keeps only what a plan, a read in flight or a job could still consult (`pruneBoundContent`).
     var boundContent: [AssetID: TransferID] = [:]
     /// Store reads in flight whose answer registers an interest afterwards (`resolve`, a prefetch join, a point
     /// admission, `ensureAvailable` until its group exists): while one is, a binding the engine learns meanwhile is kept.

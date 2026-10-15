@@ -122,31 +122,36 @@ extension SyncEngine {
                     present.insert(id)
                 }
             }
-            guard self.isRunning else {
-                return
-            }
-            for id in present {
-                self.state.boundContent[id] = transfer
-            }
-            if let current = self.state.jobs[transfer], current.epoch == epoch {
-                self.answerPresentMembers(of: transfer, present)
-                if self.state.jobs[transfer]?.interests.isEmpty == true {
-                    // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
-                    self.removeJob(transfer)
-                }
-            }
-            // The failure is persisted for the job's absent ids even when the job ended meanwhile (ADR-032: no run and no
-            // relaunch requests the content again before its entry changes).
+            // The failure is persisted for the job's absent ids even when the job ended meanwhile, or shutdown began
+            // during the reads (ADR-032: no run and no relaunch requests the content again before its entry changes; the
+            // store refuses the write once it closed).
             let ids = job.assets.subtracting(present).sorted()
-            self.forgetBound(ids)
+            if self.isRunning {
+                for id in present {
+                    self.state.boundContent[id] = transfer
+                }
+                if let current = self.state.jobs[transfer], current.epoch == epoch {
+                    self.answerPresentMembers(of: transfer, present)
+                    if self.state.jobs[transfer]?.interests.isEmpty == true {
+                        // Every interest was in a present id: nobody is left to answer (the absent ids are still recorded).
+                        self.removeJob(transfer)
+                    }
+                }
+                self.forgetBound(ids)
+            }
             if !ids.isEmpty {
                 do {
                     // REENTRANCY: RE-S35 — the job's next state was decided before the await; the store re-checks the
-                    // identity itself.
+                    // identity itself; a binding of these ids learned meanwhile is forgotten below.
                     try await self.store.recordFailure(ids, identity: job.identity, reason: .notFound)
                 } catch {
-                    self.record(ids.first, .storage, "recording a 404 failed: \(error)")
+                    // After shutdown began the store refuses, or the commit is cancelled: nothing is left to report to.
+                    if self.isRunning {
+                        self.record(ids.first, .storage, "recording a 404 failed: \(error)")
+                    }
                 }
+                // An id bound during the await may have been marked failed with it (the residual window, F-22).
+                self.forgetBound(ids)
             }
             guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
                 if self.isRunning {
@@ -311,6 +316,8 @@ extension SyncEngine {
         } catch {
             self.record(ids.first, .storage, "recording an integrity failure failed: \(error)")
         }
+        // A binding learned during the await may have ended with it (a failure at the cap), thrown or not (ADR-050).
+        self.forgetBound(ids)
         guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
             return
         }
