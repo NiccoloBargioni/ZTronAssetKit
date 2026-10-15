@@ -353,11 +353,14 @@ extension SyncEngine {
 /// resumed by `release()` and by nothing else, so every test that holds one releases it.
 actor NextUnitGate: BlockingExecutor {
     private var armed = false
+    private var skipping = 0
     private var held: CheckedContinuation<Void, Never>?
     private var heldWaiters: [CheckedContinuation<Void, Never>] = []
 
     func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        if self.armed {
+        if self.armed, self.skipping > 0 {
+            self.skipping -= 1
+        } else if self.armed {
             self.armed = false
             // REENTRANCY: nothing: `work` is the caller's value; only `release()` resumes the unit.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -372,9 +375,11 @@ actor NextUnitGate: BlockingExecutor {
         return work()
     }
 
-    /// Holds the next unit submitted.
-    func holdNext() {
+    /// Holds the next unit submitted after `skipped` more have run (a run's manifest decode, then its `apply`'s
+    /// planning unit, share the bulk executor).
+    func holdNext(skipping skipped: Int = 0) {
         self.armed = true
+        self.skipping = max(0, skipped)
     }
 
     /// Suspends until a unit is held.
