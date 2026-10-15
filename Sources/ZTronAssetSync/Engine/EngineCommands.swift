@@ -1163,6 +1163,25 @@ extension SyncEngine {
         for (key, queue) in self.state.subscribers where queue.storedOrderCount > 2 * queue.liveCount + 16 {
             violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
         }
+        if let stranded = self.strandedPendingRun() {
+            violations.append(stranded)
+        }
         return violations
+    }
+
+    /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
+    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25).
+    private func strandedPendingRun() -> String? {
+        guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
+            return nil
+        }
+        switch self.pendingRunGate(pending) {
+        case .open:
+            return "the pending run's \(pending.gate) gate is open but no run started"
+        case .armed:
+            return nil
+        case .unarmed:
+            return "nothing will open the pending run's \(pending.gate) gate"
+        }
     }
 }

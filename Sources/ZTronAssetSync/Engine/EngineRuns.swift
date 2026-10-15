@@ -637,6 +637,53 @@ extension SyncEngine {
         }
     }
 
+    /// Where a pending run's gate stands (sync-2 S2-03, S2-25).
+    enum PendingRunGateState: Equatable {
+        /// The gate is open: the run may start now.
+        case open
+        /// A deadline, the conditions watcher or a probe in flight will open it.
+        case armed
+        /// Closed with nothing to open it.
+        case unarmed
+    }
+
+    /// The state of `pending`'s gate now.
+    func pendingRunGate(_ pending: PendingRun) -> PendingRunGateState {
+        let now = self.environment.time.monotonicNow()
+        let origin = self.state.remote?.originID
+        switch pending.gate {
+        case .conditions:
+            guard self.laneVerdict(.bulk) == .admit else {
+                return self.state.watcher == nil ? .unarmed : .armed
+            }
+            if self.state.heap.deadline(for: .pendingRun) != nil {
+                return .armed
+            }
+            // Admitted with its debounce already fired, or never scheduled.
+            return pending.scheduled ? .open : .unarmed
+        case .breaker:
+            guard let origin, let breaker = self.state.breakers[origin] else {
+                return .open
+            }
+            switch breaker.state {
+            case .closed:
+                return .open
+            case .open(_, let until, _):
+                if until <= now {
+                    return .open
+                }
+                return self.state.heap.deadline(for: .breaker(origin)) == nil ? .unarmed : .armed
+            case .halfOpen(_, _, let probe, _):
+                return probe == nil ? .open : .armed
+            }
+        case .throttle:
+            guard let origin, let until = self.state.throttles[origin], until > now else {
+                return .open
+            }
+            return self.state.heap.deadline(for: .pendingRun) == nil ? .unarmed : .armed
+        }
+    }
+
     /// Starts the pending run now.
     func fulfilPendingRun() {
         guard let pending = self.state.pendingRun, self.state.run == nil else {

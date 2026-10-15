@@ -358,6 +358,48 @@ struct EngineRunPathTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished", .timeLimit(.minutes(1)))
+    func pendingRunGateOpensBeforeFinish() async throws {
+        // With no debounce the alarm that opens the gate races the blocked run's own task; whichever wins, the pending
+        // run must start. Repeated so that both orders occur.
+        for iteration in 0..<500 {
+            let harness = EngineHarness.make(tuning: SyncTuning(pendingRunDebounce: 0))
+            let catalog = EngineSyncTests.catalog(1)
+            await harness.serveManifest(catalog.map(\.0))
+            await harness.source.script(catalog[0].0.transferID, [.fail(.offline(.noConnection)), .stage(catalog[0].1)])
+            let probe = EventProbe(stream: try await harness.engine.subscribe().get())
+            try await harness.start()
+            let blocked = await probe.next { event in
+                if case .syncFinished = event {
+                    return true
+                }
+                return false
+            }
+            guard case .syncFinished(_, .blocked(.offline, _))? = blocked else {
+                Issue.record("iteration \(iteration): expected an offline run, got \(String(describing: blocked))")
+                break
+            }
+            let violations = await harness.engine.invariantViolations()
+            #expect(violations.isEmpty, "iteration \(iteration): \(violations)")
+            guard violations.isEmpty else {
+                // A stranded pending run never starts: waiting for it would only hang.
+                await probe.stop()
+                await harness.engine.shutdown()
+                break
+            }
+            let resumed = await probe.next { event in
+                if case .syncFinished(_, .complete(let report)) = event {
+                    return report.trigger == .conditionsChanged
+                }
+                return false
+            }
+            #expect(resumed != nil, "iteration \(iteration)")
+            await probe.stop()
+            await harness.engine.shutdown()
+        }
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: a catalog larger than the budget syncs its largest fitting prefix essential-first and stays due", .timeLimit(.minutes(1)))
     func overBudgetCatalog() async throws {
         let storage = StoragePolicy(budget: .bytes(700), reserveFreeBytes: 0, evictionPermitted: false)
