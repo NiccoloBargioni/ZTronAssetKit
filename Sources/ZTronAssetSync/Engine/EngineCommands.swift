@@ -939,7 +939,9 @@ extension SyncEngine {
         return .success(self.makeDiagnostics())
     }
 
-    /// The diagnostics from the engine's own state and the last-known index figures.
+    /// The diagnostics from the engine's own state and the last-known index figures. The generation is never older
+    /// than one the engine already announced (`snapshotChanged` after an apply or a catch-up), even when the store
+    /// last answered before those applies.
     private func makeDiagnostics() -> EngineDiagnostics {
         var errors = self.state.recentErrors
         for field in self.state.clampedFields {
@@ -950,7 +952,7 @@ extension SyncEngine {
             recentErrors: Array(errors.suffix(EngineDiagnostics.recentErrorCapacity)),
             appVersion: self.state.launch?.appVersion,
             launchEpoch: self.state.launch?.report.launchEpoch,
-            indexGeneration: self.state.lastIndexGeneration,
+            indexGeneration: max(self.state.lastIndexGeneration, self.state.generation),
             stamp: self.state.lastStamp,
             retentionScope: self.state.retentionScope
         )
