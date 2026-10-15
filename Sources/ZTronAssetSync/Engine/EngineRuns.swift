@@ -330,8 +330,11 @@ extension SyncEngine {
 
     /// The engine's side of a committed `apply` (a run's or `ensureAvailable`'s): the applied copy, pruned jobs (T21),
     /// changed identities (T22), removal events and the generation. `serial` is the ledger's forget serial when the
-    /// apply began: its reuses are remembered only when nothing was forgotten during it.
+    /// apply began: its reuses are remembered only when nothing was forgotten during it. The removals announced are the
+    /// store's prunes and every id the engine's copy listed that `manifest` does not (`prunesUnreported`), so what the
+    /// engine announces never depends on which manifest the store diffed against (L4-R7, L4-R10).
     func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport, since serial: UInt64) {
+        let unreported = self.prunesUnreported(by: report, in: manifest)
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
@@ -348,11 +351,41 @@ extension SyncEngine {
         }
         self.forgetBound(report.evicted)
         self.forgetBound(report.pruned)
+        self.forgetBound(unreported)
         for id in report.pruned {
+            self.broadcast(.assetRemoved(id, .pruned))
+        }
+        for id in unreported {
             self.broadcast(.assetRemoved(id, .pruned))
         }
         self.broadcast(.snapshotChanged(generation: self.state.generation))
         self.followApplied()
+    }
+
+    /// The ids the engine's copy lists and `manifest` does not that the store's report leaves out, in the copy's order;
+    /// read before the copy moves. The store diffs against its own manifest, which an `apply` that threw past its
+    /// in-memory writes has already advanced (ADR-050): a later `apply` of that manifest, or of any manifest that also
+    /// drops those ids, reports no prune for them, and the catch-up the failure owes then finds the copy equal to the
+    /// store, so they would never be announced (review of close-out cycle 3, PROBE-C3-7). An id is announced when it
+    /// leaves the copy, here or in `followStoreView`, so it is announced once. Empty when the store diffed against the
+    /// copy (its prunes are then exactly these ids). One pass over the copy with O(1) lookups (about 6 to 8 ms for
+    /// 100,000 ids, measured in an optimised build), the pass a catch-up makes, and nothing when the copy is `manifest`.
+    private func prunesUnreported(by report: ApplyReport, in manifest: ValidatedManifest) -> [AssetID] {
+        let copy = self.state.applied
+        guard copy.digest != manifest.digest || copy.count != manifest.count else {
+            return []
+        }
+        var reported: Set<AssetID>?
+        var unreported: [AssetID] = []
+        for entry in copy.entries where !manifest.contains(entry.identifier) {
+            if reported == nil {
+                reported = Set(report.pruned)
+            }
+            if reported?.contains(entry.identifier) == false {
+                unreported.append(entry.identifier)
+            }
+        }
+        return unreported
     }
 
     /// Moves every job to the engine's copy of the applied manifest: a job none of whose ids still want its content is
