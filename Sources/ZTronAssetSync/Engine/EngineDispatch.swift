@@ -384,6 +384,16 @@ extension SyncEngine {
         guard size > 0, let space = self.state.freeSpace else {
             return nil
         }
+        guard size > self.headroom(for: job, in: space) else {
+            return nil
+        }
+        return space.pendingReclaim > 0 ? .awaitingSpace : .insufficientSpace
+    }
+
+    /// The ledger's room for `job`: its lane's volume above the reserve, less the bytes of the other jobs in flight and
+    /// the bytes committed since the last read. It is also the `available` an `insufficientSpace` for the job reports,
+    /// so `required` exceeds it whenever the job was parked for lack of space (ARCHITECTURE §7.6, §7.10).
+    func headroom(for job: Job, in space: FreeSpace) -> Int64 {
         let volume = job.lane == .userInitiated ? space.volumeImportant : space.volumeOpportunistic
         var inFlight: Int64 = 0
         for other in self.state.jobs.values where other.transfer != job.transfer {
@@ -394,11 +404,7 @@ extension SyncEngine {
                 continue
             }
         }
-        let headroom = volume.subtractingClamped(max(0, space.reserveBytes)).subtractingClamped(inFlight).subtractingClamped(self.state.committedSinceRead)
-        guard size > headroom else {
-            return nil
-        }
-        return space.pendingReclaim > 0 ? .awaitingSpace : .insufficientSpace
+        return max(0, volume.subtractingClamped(max(0, space.reserveBytes)).subtractingClamped(inFlight).subtractingClamped(self.state.committedSinceRead))
     }
 
     // MARK: Preemption (T16, H-4)

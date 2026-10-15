@@ -339,8 +339,8 @@ extension SyncEngine {
         }
         let space = self.state.freeSpace
         let reclaiming = (space?.pendingReclaim ?? 0) > 0
-        let volume = job.lane == .userInitiated ? space?.volumeImportant : space?.volumeOpportunistic
-        let figures = AssetError.insufficientSpace(required: required, available: max(0, volume ?? 0))
+        // The bytes the attempt needed and the job's room above the reserve (the planner's convention, §7.10).
+        let figures = AssetError.insufficientSpace(required: required, available: space.map { self.headroom(for: job, in: $0) } ?? 0)
         self.state.jobs[transfer]?.lastError = figures
         guard case .failed = job.state else {
             // A user request re-queued it meanwhile (T20): the gate's ledger decides with the figures just read.

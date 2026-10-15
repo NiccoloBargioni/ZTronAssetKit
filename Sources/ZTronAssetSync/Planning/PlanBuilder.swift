@@ -253,7 +253,7 @@ enum PlanBuilder {
                 return .partial(admittedFetches: count, skippedBytes: rest)
             }
         }
-        return .insufficient(required: PlanBuilder.adding(need, max(0, freeSpace.reserveBytes)), available: max(0, freeSpace.volumeOpportunistic))
+        return .insufficient(required: need, available: room)
     }
 
     /// `min(available, budgetRoom)` with `available = volume − reserve + pendingReclaim` and

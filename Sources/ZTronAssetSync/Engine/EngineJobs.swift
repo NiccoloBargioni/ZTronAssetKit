@@ -410,7 +410,7 @@ extension SyncEngine {
                 if case .insufficientSpace? = job.lastError {
                     error = job.lastError
                 } else {
-                    error = .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace?.volumeImportant ?? 0)
+                    error = .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace.map { self.headroom(for: job, in: $0) } ?? 0)
                 }
             case .policy, .awaitingSpace:
                 error = nil
