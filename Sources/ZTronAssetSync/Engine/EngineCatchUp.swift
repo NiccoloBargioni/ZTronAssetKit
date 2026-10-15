@@ -87,13 +87,11 @@ extension SyncEngine {
             view = nil
         }
         if self.isRunning, let view {
+            // A view that may be older than the copy (an `apply` in flight during the read, or one followed since) is
+            // not followed; `followStoreView` owes the re-read, which the last catch-up to end makes.
             if self.followStoreView(view, readAt: mark) {
                 // The ids of jobs the view holds present at their entries' content follow there without a job (L4-R5).
                 self.noteBound(from: view, ids: self.state.jobs.values.flatMap(\.assets), since: serial)
-            } else {
-                // An `apply` was in flight during the read, or the engine followed one since: the view may be older than
-                // the copy. The last catch-up to end reads the store again.
-                self.state.catchUpAfterFailedApply = true
             }
         }
         if afterFailedApply, self.isRunning {
@@ -110,14 +108,20 @@ extension SyncEngine {
     /// of the same manifest prunes nothing, so they would never be announced), the view's generation is taken,
     /// `snapshotChanged` is published and the jobs follow (T21/T22). `mark` is `copySerial` when the read began. A view
     /// read while an `apply` was in flight, or before a change of the copy the engine made meanwhile, may be older than
-    /// the copy (review of close-out cycle 2): it is not followed, and `false` is returned.
+    /// the copy (review of close-out cycle 2): it is not followed, `false` is returned, and a re-read of the store is
+    /// owed (now when no catch-up or `apply` is in flight, else when the last one ends), so a refused view never leaves
+    /// the copy behind the store.
     @discardableResult
     func followStoreView(_ view: StorePlanningView, readAt mark: UInt64) -> Bool {
-        guard self.state.appliesInFlight == 0, self.state.copySerial == mark else {
-            return false
-        }
         guard view.appliedManifest.digest != self.state.applied.digest || view.appliedManifest.count != self.state.applied.count else {
             return true
+        }
+        guard self.state.appliesInFlight == 0, self.state.copySerial == mark else {
+            self.state.catchUpAfterFailedApply = true
+            if self.state.manifestCatchUps == 0 {
+                self.scheduleOwedCatchUp()
+            }
+            return false
         }
         self.forgetBound(self.state.boundContent.filter { !SyncEngine.isPresent(view.records[$0.key], at: $0.value) }.keys)
         let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
@@ -129,6 +133,14 @@ extension SyncEngine {
         self.broadcast(.snapshotChanged(generation: self.state.generation))
         self.followApplied()
         return true
+    }
+
+    /// Starts the re-read a refused view owes when no catch-up or `apply` is in flight to make it when it ends.
+    private func scheduleOwedCatchUp() {
+        self.state.catchUpAfterFailedApply = false
+        if self.isRunning {
+            self.scheduleCatchUp(afterFailedApply: true)
+        }
     }
 
     /// One catch-up ended (an `apply` returned, or a re-read landed); the last one re-reads the store first when an
