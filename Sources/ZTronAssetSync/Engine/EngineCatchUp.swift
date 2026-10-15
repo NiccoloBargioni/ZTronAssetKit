@@ -26,6 +26,14 @@ extension SyncEngine {
         } catch {
             result = .failure(error)
         }
+        if case .armed = self.state.applyFollowHold {
+            // REENTRANCY: f-8 (proposed) — nothing: a test seam no production path arms, resumed once by
+            // `releaseApplyFollow()` or by shutdown; the follow-up below re-reads the lifecycle as it does without it.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.state.applyFollowHold = .holding(continuation)
+                self.notifyObservers()
+            }
+        }
         self.state.appliesInFlight -= 1
         switch result {
         case .success(let report) where self.isRunning:
@@ -38,6 +46,29 @@ extension SyncEngine {
         }
         self.manifestCaughtUp()
         return result
+    }
+
+    /// Test seam: the follow-up of the next `apply` to return from the store waits until `releaseApplyFollow()`, so a
+    /// test can let other engine work run between a committed `apply` and the engine's side of it (close-out cycle 5).
+    func holdNextApplyFollow() {
+        self.state.applyFollowHold = .armed
+    }
+
+    /// Test seam: lets a held follow-up run, or disarms a hold nothing reached; shutdown calls it too.
+    func releaseApplyFollow() {
+        let hold = self.state.applyFollowHold
+        self.state.applyFollowHold = .idle
+        if case .holding(let continuation) = hold {
+            continuation.resume()
+        }
+    }
+
+    /// Test seam: whether an `apply`'s follow-up is held.
+    var applyFollowHeld: Bool {
+        if case .holding = self.state.applyFollowHold {
+            return true
+        }
+        return false
     }
 
     /// A store mutation threw after it may have unbound ids in memory (ADR-050): the binding ledger is a cache of what

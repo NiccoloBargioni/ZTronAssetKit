@@ -51,6 +51,10 @@ struct EngineState {
     /// Store `apply` calls in flight (a subset of `manifestCatchUps`). A store view read while one is may show its
     /// in-memory writes before the engine follows them, or miss them: it is not followed (`followStoreView`).
     var appliesInFlight = 0
+    /// Test seam (close-out cycle 5): the follow-up of the next `apply` to return from the store waits until a test
+    /// releases it (`holdNextApplyFollow()`, `releaseApplyFollow()`), so the test decides what the engine does in
+    /// between. No production path arms it.
+    var applyFollowHold: ApplyFollowHold = .idle
     /// Bumped whenever the engine's copy of the applied manifest changes (`adoptApplied`). A store view read before a
     /// change the engine made meanwhile may be older than the copy: it is not followed (close-out cycle 3, F-23).
     var copySerial: UInt64 = 0
@@ -609,4 +613,15 @@ struct NegativeCache {
             self.order.removeAll { $0 == id }
         }
     }
+}
+
+/// The apply follow-up test seam (`SyncEngine.holdNextApplyFollow()`): a test holds the engine's side of one committed
+/// `apply` to order it against other engine work, which no production path can do.
+enum ApplyFollowHold {
+    /// Nothing armed (always, outside tests).
+    case idle
+    /// The next `apply` to return from the store waits before the engine follows it.
+    case armed
+    /// That follow-up waits for `releaseApplyFollow()` or for shutdown.
+    case holding(CheckedContinuation<Void, Never>)
 }
