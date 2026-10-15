@@ -625,7 +625,7 @@ extension SyncEngine {
         // The store clears the stamp before its first await of the purge (R-CLN-6).
         self.state.lastStamp = nil
         // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
-        self.state.boundContent.removeAll()
+        self.dropBindings()
         self.settleRun(.cancelled)
         for transfer in self.state.jobs.keys.sorted() {
             guard let job = self.state.jobs[transfer] else {
@@ -694,7 +694,7 @@ extension SyncEngine {
                 return .failure(.shutDown)
             }
             // Bindings learned while the purge ran may be purged too (L4-R5).
-            self.state.boundContent.removeAll()
+            self.dropBindings()
             self.broadcast(.snapshotChanged(generation: self.state.generation))
             // REENTRANCY: RE-S40 — the lifecycle.
             await self.refreshStoreDeadline()
@@ -740,7 +740,7 @@ extension SyncEngine {
         }
         // Eviction and deep verification unbind assets the engine is not told about one by one: a binding seen before or
         // during maintenance is not assumed present afterwards (L4-R5).
-        self.state.boundContent.removeAll()
+        self.dropBindings()
         do {
             var claims = Set(self.state.jobs.keys)
             claims.formUnion(self.state.draining.keys)
@@ -764,7 +764,7 @@ extension SyncEngine {
             // REENTRANCY: RE-S23 — as above.
             let eviction = try await self.store.evictIfNeeded()
             report.evictedBytes = eviction.bytesFreed
-            self.state.boundContent.removeAll()
+            self.dropBindings()
             if expired() {
                 report.budgetExhausted = true
                 // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.

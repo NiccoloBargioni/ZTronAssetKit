@@ -55,6 +55,10 @@ struct EngineState {
     /// may have: a store mutation that threw may have unbound ids in memory first (ADR-050), so the whole ledger goes
     /// then. It keeps only what a plan, a read in flight or a job could still consult (`pruneBoundContent`).
     var boundContent: [AssetID: TransferID] = [:]
+    /// Bumped whenever the engine forgets a binding (or drops the ledger). A binding learned from a store read or a
+    /// mutation's result is recorded only when no binding was forgotten while that call was in flight: the read may
+    /// predate what ended the binding (close-out cycle 3, F-23).
+    var ledgerForgets: UInt64 = 0
     /// Store reads in flight whose answer registers an interest afterwards (`resolve`, a prefetch join, a point
     /// admission, `ensureAvailable` until its group exists): while one is, a binding the engine learns meanwhile is kept.
     var presenceReaders = 0

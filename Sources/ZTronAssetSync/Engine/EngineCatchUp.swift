@@ -38,7 +38,7 @@ extension SyncEngine {
     /// the engine saw the store bind, so it is dropped whole rather than trusted (L4-R5). An interest that would have
     /// been answered from it creates a job instead, which the store's own state then decides (a commit binds again).
     func storeMutationFailed() {
-        self.state.boundContent.removeAll()
+        self.dropBindings()
     }
 
     /// The store refused content that the engine's copy of the applied manifest still names for an asset (`.superseded`,

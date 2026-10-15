@@ -533,12 +533,6 @@ extension SyncEngine {
         // retired before its driver runs (`publish` then discards the file).
         job.active?.terminalReceived = adopt != nil
         self.state.jobs[transfer] = job
-        if adopt == nil {
-            self.state.metrics.transferRequests += 1
-            if job.interests.values.contains(where: { $0.kind == .waiter }) {
-                self.state.metrics.resolveTransfers += 1
-            }
-        }
         self.notifyObservers()
     }
 
@@ -570,10 +564,21 @@ extension SyncEngine {
         }
     }
 
-    /// One attempt: start the transfer, consume its updates, apply the terminal element.
+    /// One attempt: ask the store whether it already holds the content (L4-R5), start the transfer, consume its
+    /// updates, apply the terminal element.
     func drive(_ transfer: TransferID, epoch: UInt64, request: TransferRequest) async {
         guard let remote = self.state.remote else {
             return
+        }
+        // REENTRANCY: f-11 (proposed) — the callee re-validates the lifecycle, the job epoch and the attempt after its
+        // reads; an attempt it did not end goes on below, which re-validates them after `remote.transfer`.
+        if await self.answeredFromStore(transfer, epoch: epoch, attempt: request.attempt) {
+            return
+        }
+        // Counted where the request is sent: an attempt answered from the store sent none.
+        self.state.metrics.transferRequests += 1
+        if self.state.jobs[transfer]?.interests.values.contains(where: { $0.kind == .waiter }) == true {
+            self.state.metrics.resolveTransfers += 1
         }
         // REENTRANCY: RE-S12 — the lifecycle and the job epoch: an attempt nobody wants any more is cancelled at
         // once (its stream is still drained, so a completion racing the cancel is not lost, ARCHITECTURE §7.6).
