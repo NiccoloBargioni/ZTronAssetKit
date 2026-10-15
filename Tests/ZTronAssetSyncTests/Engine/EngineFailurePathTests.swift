@@ -189,7 +189,7 @@ struct EngineFailurePathTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim fails its waiter with the store's figures", .timeLimit(.minutes(1)))
+    @Test("R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim fails its waiter with the bytes it needs and the room above the reserve", .timeLimit(.minutes(1)))
     func enospcWithoutReclaim() async throws {
         // The volume cannot hold the 9,000 bytes the ENOSPC asks for (on one that can, the failure is retried, F-20).
         let harness = EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
@@ -204,7 +204,8 @@ struct EngineFailurePathTests {
             return
         }
         #expect(required == 9_000)
-        #expect(available > 0, "the store's measured free space")
+        // The job's room above the reserve (F-22): positive, and at most what the 4,096 bytes over the reserve leave.
+        #expect(available > 0 && available <= 4_096, "the job's room above the reserve: \(available)")
         await harness.engine.shutdown()
     }
 
