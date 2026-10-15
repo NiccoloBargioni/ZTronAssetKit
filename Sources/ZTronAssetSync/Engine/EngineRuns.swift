@@ -345,8 +345,8 @@ extension SyncEngine {
                 continue
             }
             if moved.count == job.assets.count {
-                if job.state == .downloading, let active = job.active, !self.abandon(transfer, active) {
-                    // The attempt's stream already ended: nothing to cancel or drain.
+                if job.state == .downloading, let active = job.active {
+                    self.abandon(transfer, active)
                 }
                 self.supersede(transfer)
             } else {
