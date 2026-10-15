@@ -96,4 +96,114 @@ struct EngineRegressionCycle5Tests {
         #expect(zPrunes == 1, "\(second): z's prune is announced exactly once: \(received)")
         #expect(bRemovals == 0, "\(second): b, which the store lists, is never announced removed: \(received)")
     }
+
+    // MARK: An ensure whose member lacks room (R-SYN-11, R-SYN-10; review of close-out cycle 4)
+
+    /// Review of close-out cycle 4 (non-blocking, by reading): the ensure's plan fits the volume, but its member's job
+    /// lacks room once the bytes of another job in flight are counted (the headroom ledger, S2-09). The member was failed
+    /// with `insufficientSpace` and dropped, and the ensure answered `.success` with the member missing, so the caller
+    /// never learned why; R-SYN-11 asks for a typed `insufficientSpace(required:available:)` on a shortage.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: ensureAvailable whose member lacks room beside a transfer in flight fails with insufficientSpace",
+        .timeLimit(.minutes(1))
+    )
+    func ensureMemberShortOfRoomFailsTyped() async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 100_000, opportunisticCapacity: reserve + 100_000)
+        )
+        let harness = EngineHarness.make(time: time, fileSystem: fileSystem)
+        let engine = harness.engine
+        let hBytes = EngineFixture.bytes(9_911, count: 300)
+        let yBytes = EngineFixture.bytes(9_912, count: 300)
+        let h = EngineFixture.entry("h", hBytes)
+        let y = EngineHarness.onDemand("y", yBytes)
+        await harness.serveManifest([h, y])
+        await harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        await harness.source.script(y.transferID, [.stage(yBytes)])
+        try await harness.start()
+        let run = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.jobs[h.transferID]?.state == .downloading }
+        await engine.waitForHandle(h.transferID)
+        try await harness.store.flush(.ordered)
+        // 450 bytes of room above the reserve: y (300) fits the volume, but not beside h's 300 bytes in flight.
+        let room = try await harness.store.freeSpace().volumeImportant - reserve
+        try fileSystem.write(Data(repeating: 1, count: Int(room - 450)), to: EngineHarness.base.appendingPathComponent("ballast"), mode: .truncate)
+        let ensured = await engine.ensureAvailable(scope: .identifiers(["y"]))
+        if case .failure(.insufficientSpace(let required, let available)) = ensured {
+            #expect(required == Int64(yBytes.count), "the bytes y needs: \(required)")
+            #expect(available <= 150, "the room above the reserve beside h's bytes in flight: \(available)")
+        } else {
+            Issue.record("the ensure fails with a typed insufficientSpace: \(ensured)")
+        }
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.isEmpty, "no transfer of y began")
+        #expect(await engine.invariantViolations().isEmpty)
+        await harness.source.release(h.transferID, with: .progress(received: 0, expected: nil))
+        _ = await run.value
+        await engine.shutdown()
+    }
+
+    // MARK: Bytes the store has not scheduled to reclaim (R-SYN-11, L4-R8; review of close-out cycle 4)
+
+    /// Review of close-out cycle 4 (blocking; the in-suite failure and the hang of
+    /// `R-SYN-10: ensureAvailable downloads a member that an apply evicted before it threw`): an ensure's member short of
+    /// space while the store counts doomed bytes as pending reclaim parked `awaitingSpace`, which only the alarm's
+    /// `runDueWork()` wakes. When the store schedules nothing that would reclaim them (no `nextDeadline()`: their blocker
+    /// is an acknowledgement or a commit only the store's later work brings), no alarm fires and the caller waited until it
+    /// gave up. The verifier reached that state through the store's timing after an `apply` that threw; here the snapshot
+    /// sink keeps its snapshot (a main actor that did not take the install), which leaves the pruned blob waiting for an
+    /// acknowledgement with no deadline, deterministically.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: ensureAvailable short of bytes the store has not scheduled to reclaim fails with insufficientSpace instead of waiting for ever",
+        .timeLimit(.minutes(1))
+    )
+    func unscheduledReclaimFailsTyped() async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 100_000, opportunisticCapacity: reserve + 100_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 0), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(9_901, count: 300)
+        let yBytes = EngineFixture.bytes(9_902, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let y = EngineHarness.onDemand("y", yBytes)
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes), (y, yBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        // The store's due work after x's publication (its trailing install, which readers acknowledge) is done.
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // 200 bytes of room above the reserve: y (300) needs x's bytes reclaimed.
+        let room = try await harness.store.freeSpace().volumeImportant - reserve
+        try fileSystem.write(Data(repeating: 1, count: Int(room - 200)), to: EngineHarness.base.appendingPathComponent("ballast"), mode: .truncate)
+        // v2 prunes x and lists the on-demand y; no install is acknowledged from now on.
+        await harness.sink.setBehaviour(.ignore)
+        await harness.serveManifest([y], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's pruned bytes wait for reclaim")
+        #expect(await harness.store.nextDeadline() == nil, "setup: the store schedules no work that would reclaim them")
+        // The ensure reads the free space (x's bytes pending reclaim), so its plan fits; its member's job then lacks room
+        // on the volume until those bytes are reclaimed.
+        let ensured = await harness.withClock { await engine.ensureAvailable(scope: .identifiers(["y"])) }
+        if case .failure(.insufficientSpace(let required, let available)) = ensured {
+            #expect(required == Int64(yBytes.count), "the bytes y needs: \(required)")
+            #expect(available < required, "the room above the reserve y's job had: \(available)")
+        } else {
+            Issue.record("y's fetch fails with a typed insufficientSpace instead of waiting: \(ensured)")
+        }
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.isEmpty, "no transfer of y began")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
