@@ -71,6 +71,9 @@ extension SyncEngine {
         if let error = self.heldBackError(view.records[id], entry: view.appliedManifest.entry(for: id)) {
             return .failure(error)
         }
+        if let error = self.missingSourceError {
+            return .failure(error)
+        }
         let token = self.nextToken()
         // REENTRANCY: RE-S25 — nothing: the body registers synchronously; the result arrives by value.
         return await withTaskCancellationHandler {
@@ -108,6 +111,14 @@ extension SyncEngine {
                 await self.withdraw(token)
             }
         }
+    }
+
+    /// The error every fetch answers when `start()` could not build the remote source; `nil` when it exists.
+    var missingSourceError: AssetError? {
+        guard self.state.remote == nil else {
+            return nil
+        }
+        return self.state.remoteError ?? .serverUnavailable(retryAfter: nil)
     }
 
     /// The stored answer for an asset that must not be fetched now (T2, ADR-032): failed until its entry changes, or
@@ -182,7 +193,7 @@ extension SyncEngine {
         } catch {
             return
         }
-        guard self.isRunning, self.state.groups[token] != nil else {
+        guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
             return
         }
         if view.appliedManifest.digest != self.state.applied.digest {
@@ -258,6 +269,9 @@ extension SyncEngine {
 
     /// The `ensureAvailable` task.
     private func ensureTask(_ token: InterestToken, scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
+        if let error = self.missingSourceError {
+            return .failure(error)
+        }
         // REENTRANCY: RE-S04 — the lifecycle; the outcome is that of the shared fetch.
         let outcome = await self.fetchManifest(token, deadline: false)
         guard self.isRunning, !Task.isCancelled else {

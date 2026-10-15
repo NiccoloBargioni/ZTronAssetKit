@@ -106,6 +106,9 @@ extension SyncEngine {
 
     /// The steps up to the outcome.
     private func runSteps(_ token: InterestToken) async -> SyncOutcome {
+        if let error = self.missingSourceError {
+            return .failed(error)
+        }
         // REENTRANCY: RE-S04 — the lifecycle and the run token, re-checked by `stillCurrent`.
         let fetched = await self.fetchManifest(token, deadline: true)
         guard self.stillCurrent(token) else {
