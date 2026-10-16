@@ -64,6 +64,28 @@ extension JobState {
     }
 }
 
+/// The re-queues re-admission turns still owe, read once by a caller that checks many jobs (`checkRunSettled`): a job
+/// they cover waits for a follow-up turn because of the bound on one turn's re-queues, not for its gate, which has
+/// opened. Mirrors what `readmit` takes in its next turn: the jobs an event owed (`originOwed`, `edgeOwed`, each a subset
+/// of the jobs parked or failed the way it was owed, kept by the transition funnel) and, while a conditions pass is owed,
+/// the jobs a lane-wide gate parked in a lane the conditions now admit. O(1) per job (C2).
+struct OwedRequeues {
+    /// `originOwed`.
+    let origin: Set<TransferID>
+    /// `edgeOwed`.
+    let edge: Set<TransferID>
+    /// The lanes the conditions admit while a conditions pass is owed; empty otherwise.
+    let lanes: Set<AssetPriority>
+
+    /// Whether a follow-up turn owes `job` (at `transfer`) a re-queue.
+    func contains(_ transfer: TransferID, _ job: Job) -> Bool {
+        if self.origin.contains(transfer) || self.edge.contains(transfer) {
+            return true
+        }
+        return !self.lanes.isEmpty && job.state.isLaneParked && self.lanes.contains(job.lane)
+    }
+}
+
 /// What parked a job at its origin (`SyncEngine.unblockOrigin`).
 enum OriginBlock: Hashable {
     /// The breaker (`blocked(circuitOpen)`).

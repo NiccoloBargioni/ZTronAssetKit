@@ -579,9 +579,18 @@ extension SyncEngine {
         }
         // One read of the job table: a closure over `self.state` would copy the whole engine state per claim.
         let jobs = self.state.jobs
+        let owed = OwedRequeues(
+            origin: self.state.originOwed,
+            edge: self.state.edgeOwed,
+            lanes: self.state.readmissionsOwed.contains(.conditions) ? Set(AssetPriority.allCases.filter { self.laneAdmitsAfterConditions($0) }) : []
+        )
         // Most calls find a claimed job still working for the run: then nothing can settle and nothing else is needed
         // (a claim on a job that lost the run's interest is found by the pass below once no claimed job works; each
-        // lookup copies a job in debug and sanitizer builds, so the common answer takes one, L4-R8).
+        // lookup copies a job in debug and sanitizer builds, so the common answer takes one, L4-R8). A parked claim that a
+        // re-admission turn still owes a re-queue counts as working: its gate has opened, and only the bound on one
+        // turn's re-queues (`readmissionsPerTurn`) left it to the follow-up turn, whose pump checks again. Settling now
+        // would report a gate that is open, retire the claim's job and start the pending run at once (close-out cycle 16,
+        // F-36). Every claim with the run's interest passes here, so this is the one check before the passes below.
         for (transfer, _) in current.outstanding {
             guard let job = jobs[transfer], job.interests[current.token] != nil else {
                 continue
@@ -590,6 +599,9 @@ extension SyncEngine {
             case .blocked(.awaitingSpace):
                 return
             case .blocked, .failed(.whenOnline):
+                if owed.contains(transfer, job) {
+                    return
+                }
                 continue
             default:
                 return
