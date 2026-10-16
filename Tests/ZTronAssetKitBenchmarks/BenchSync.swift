@@ -247,11 +247,14 @@ extension ZTronAssetKitBenchmarks {
         }
 
         /// C2 at SPEC §6's reference scale when a released handle's members regain an interest at once (review of
-        /// close-out cycle 11, PROBE-C11C-3): a 10,000-member handle is released and the same identifiers are registered
-        /// again before the release's later turns ran, so every member the release has not reached yet is joined again
-        /// and every member it set aside or left in place gets a fresh ticket and is merged back at its place
-        /// (`reinstate`, `LaneQueues.absorb`). Prefetch and bulk handles; medians of three against P-9, the best of the
-        /// three against C2, after a warm-up.
+        /// close-out cycle 11, PROBE-C11C-3): a 10,000-member handle is released and its members are joined again while
+        /// the release is still pending, so a member the release has not reached yet keeps its job, gets a fresh ticket
+        /// and is merged back at its place (`reinstate`, `LaneQueues.absorb`), then the same identifiers are registered
+        /// again. A handle's join task reads the store before its first batch, by which time the release's turns, 512
+        /// members each, have passed every member it would join (close-out cycle 12's verifier counted no reinstated
+        /// member), so the release's own turn and each of its later turns are met by one join batch from the end of the
+        /// release order (`SyncBench.handleRejoinWait`). Prefetch and bulk handles; medians of three against P-9, the
+        /// best of the three against C2, after a warm-up.
         @Test("R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func handleRejoinTurns() async throws {
@@ -259,14 +262,16 @@ extension ZTronAssetKitBenchmarks {
             let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
             for lane in [AssetPriority.prefetch, .bulk] {
                 _ = try await SyncBench.handleRejoinWait(members: 1_000, lane: lane)
-                var runs: [Double] = []
+                var runs: [(wait: Double, reinstated: Int)] = []
                 for _ in 0..<3 {
                     runs.append(try await SyncBench.handleRejoinWait(members: 10_000, lane: lane))
                 }
-                let median = runs.sorted()[1]
-                print("R-SYN-3 re-join of a released 10,000-member \(lane) handle: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+                let median = runs.map(\.wait).sorted()[1]
+                let reinstated = runs.map(\.reinstated)
+                print("R-SYN-3 re-join of a released 10,000-member \(lane) handle: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs.map(\.wait)); members re-joined while the release was pending \(reinstated)")
                 #expect(median <= gapMax, "\(lane)")
-                #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(lane): \(runs)")
+                #expect((runs.map(\.wait).min() ?? .infinity) <= Self.c2Budget, "\(lane): \(runs.map(\.wait))")
+                #expect(reinstated.allSatisfy { $0 > 0 }, "\(lane): every run re-joined members the release had not reached: \(reinstated)")
             }
         }
 
@@ -679,12 +684,15 @@ enum SyncBench {
         return wait
     }
 
-    /// The heartbeat's longest wait while a handle of `count` on-demand members at `lane` on a roomy volume (three
-    /// start and hold, the others wait in the queue) is released and a handle over the same identifiers is registered
-    /// at once, until the release ended (nothing left to release, no follow-up turn owed) and every member is again a
-    /// job that runs or waits in its queue.
+    /// The heartbeat's longest wait, and how many members were joined again while only the released handle wanted them,
+    /// while a handle of `count` on-demand members at `lane` on a roomy volume (three start and hold, the others wait in
+    /// the queue) is released and its members are joined again, until the release ended (nothing left to release, no
+    /// follow-up turn owed) and every member is again a job that runs or waits in its queue. The release's own turn and
+    /// each of its later turns are met by one join batch (`materializationLimit` members, what a handle's join task adds
+    /// per turn) from the end of the release order, which the release reaches last: those members are reinstated, not
+    /// joined afresh. A handle over the same identifiers is then registered and joins the rest.
     @available(macOS 15.0, iOS 18.0, *)
-    static func handleRejoinWait(members count: Int, lane: AssetPriority) async throws -> Double {
+    static func handleRejoinWait(members count: Int, lane: AssetPriority) async throws -> (wait: Double, reinstated: Int) {
         let bench = try await SyncBench.scaleBench(members: count, room: nil)
         let engine = bench.engine
         let ids = bench.entries.map(\.identifier)
@@ -695,8 +703,22 @@ enum SyncBench {
             await Task.yield()
         }
         await engine.waitForAllHandles()
+        // The release visits the members in the order the handle joined them (sorted identifiers).
+        let byID = Dictionary(uniqueKeysWithValues: bench.entries.map { ($0.identifier, $0) })
+        let order = Set(ids).sorted().compactMap { byID[$0] }
+        let batch = await engine.materializationLimit
+        var reinstated = 0
         let wait = try await SyncBench.longestWait(on: engine) {
-            await engine.releaseGroup(token)
+            var tail = order[...]
+            reinstated += await SyncBench.releaseAndRejoin(engine, token: token, batch: Array(tail.suffix(batch)), lane: lane)
+            tail = tail.dropLast(batch)
+            while !Task.isCancelled, !tail.isEmpty {
+                guard let joined = await SyncBench.rejoinWhileReleasing(engine, batch: Array(tail.suffix(batch)), lane: lane) else {
+                    break
+                }
+                reinstated += joined
+                tail = tail.dropLast(batch)
+            }
             guard case .success = await engine.registerGroup(ids, lane: lane) else {
                 throw SyncBenchError.incomplete("the second handle was refused")
             }
@@ -705,7 +727,36 @@ enum SyncBench {
             }
         }
         await engine.shutdown()
-        return wait
+        return (wait, reinstated)
+    }
+
+    /// Releases the handle `token` and, in the same turn, joins `batch` again at `lane` as a handle's join batch would
+    /// (its interests, then a pump); the members only the released handle wanted, which are reinstated.
+    static func releaseAndRejoin(_ engine: isolated SyncEngine, token: InterestToken, batch: [ManifestEntry], lane: AssetPriority) -> Int {
+        engine.performReleaseGroup(token)
+        return SyncBench.rejoin(engine, batch: batch, lane: lane)
+    }
+
+    /// Joins `batch` again at `lane` while a release is pending, as one join batch; `nil` once no release is pending.
+    static func rejoinWhileReleasing(_ engine: isolated SyncEngine, batch: [ManifestEntry], lane: AssetPriority) -> Int? {
+        guard !engine.state.releasing.isEmpty else {
+            return nil
+        }
+        return SyncBench.rejoin(engine, batch: batch, lane: lane)
+    }
+
+    /// Adds an interest at `lane` in each of `batch`, then pumps; returns how many of them were queued jobs only released
+    /// handles wanted (each then reinstated at its place).
+    static func rejoin(_ engine: isolated SyncEngine, batch: [ManifestEntry], lane: AssetPriority) -> Int {
+        var reinstated = 0
+        for entry in batch {
+            if let job = engine.state.jobs[entry.transferID], job.state == .queued, engine.isReleasedOnly(job) {
+                reinstated += 1
+            }
+            engine.addSystemInterest(entry: entry, lane: lane)
+        }
+        engine.pump()
+        return reinstated
     }
 
     /// Whether a release ended (nothing left to release, no follow-up turn owed) with `count` jobs, none parked.
