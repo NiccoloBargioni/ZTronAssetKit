@@ -245,6 +245,26 @@ extension ZTronAssetKitBenchmarks {
             #expect(median <= gapMax)
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
+
+        /// C2 at SPEC §6's reference scale when a resolve's caller cancels while 10,000 prefetch members wait (review of
+        /// close-out cycle 9, PROBE-C9R-1): the withdrawal sorted every job's transfer to find the caller's interest (5.8
+        /// to 6.4 ms at a load about 7.5, the least margin of the measured turns). Medians of three against P-9, the best
+        /// of the three against C2, after a warm-up.
+        @Test("R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func resolveCancelTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.resolveCancelWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.resolveCancelWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
     }
 }
 
@@ -609,6 +629,47 @@ enum SyncBench {
         }
         await engine.shutdown()
         return wait
+    }
+
+    /// The heartbeat's longest wait while a user-initiated resolve's caller cancels beside a prefetch handle of `count`
+    /// on-demand members on a roomy volume (three members start and hold, the others wait in the queue; the resolve's
+    /// asset, outside the handle, starts in the fourth slot), until its job is gone.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func resolveCancelWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count + 1, room: nil)
+        let engine = bench.engine
+        let members = bench.entries.dropLast().map(\.identifier)
+        let resolved = try #require(bench.entries.last)
+        guard case .success = await engine.registerGroup(Array(members), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        let caller = Task {
+            await engine.awaitAsset(resolved.identifier, lane: .userInitiated)
+        }
+        let transfer = resolved.transferID
+        while !(await SyncBench.isRunning(engine, transfer)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let wait = try await SyncBench.longestWait(on: engine) {
+            caller.cancel()
+            guard case .failure(.cancelled) = await caller.value else {
+                throw SyncBenchError.incomplete("the cancelled resolve was not answered cancelled")
+            }
+            while !(await SyncBench.noneParked(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// Whether `transfer`'s job downloads.
+    static func isRunning(_ engine: isolated SyncEngine, _ transfer: TransferID) -> Bool {
+        engine.state.jobs[transfer]?.state == .downloading
     }
 
     /// Whether the engine holds no job.

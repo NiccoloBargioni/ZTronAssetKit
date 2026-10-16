@@ -164,13 +164,14 @@ extension SyncEngine {
         return nil
     }
 
-    /// A caller's cancellation (H-3): withdraws exactly its token.
+    /// A caller's cancellation (H-3): withdraws exactly its token. A waiter's one interest is in the job it names
+    /// (`Waiter.transfer`, which every reroute moves with it; the model test checks both directions after every
+    /// operation), so only that job is touched: a sorted pass over every job held the actor about 6 ms at 10,000 queued
+    /// prefetch members (review of close-out cycle 9, PROBE-C9R-1, C2).
     func withdraw(_ token: InterestToken) {
         if let waiter = self.state.waiters.removeValue(forKey: token) {
             waiter.continuation.resume(returning: .failure(.cancelled))
-            for transfer in self.state.jobs.keys.sorted() where self.state.jobs[transfer]?.interests[token] != nil {
-                self.removeInterest(token, from: transfer)
-            }
+            self.removeInterest(token, from: waiter.transfer)
             self.pump()
         } else if let waiter = self.state.unknownWaiters.removeValue(forKey: token) {
             waiter.continuation.resume(returning: .failure(.cancelled))
@@ -325,13 +326,13 @@ extension SyncEngine {
             self.state.releasing[token] = release.members.isEmpty ? nil : release
         }
         guard !self.state.releasing.isEmpty else {
-            return true
             // No release is left: an entry a scan set aside whose job is still queued (none, unless an interest of a
             // released group outlived its release) goes back to its queue.
             var queues = self.state.queues
             self.state.queues = LaneQueues()
             queues.restoreAside { self.isValid($0) }
             self.state.queues = queues
+            return true
         }
         guard !self.state.releaseFollowUpScheduled else {
             return false
@@ -1407,8 +1408,15 @@ extension SyncEngine {
             if (job.state == .downloading) != (job.active != nil) {
                 violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
             }
-            for token in job.interests.keys where job.interests[token]?.kind == .waiter && self.state.waiters[token] == nil {
-                violations.append("waiter interest \(token.rawValue) without a waiter")
+            for token in job.interests.keys where job.interests[token]?.kind == .waiter {
+                if let waiter = self.state.waiters[token] {
+                    // A waiter's interest is only ever in the job it names (`withdraw` touches that job only).
+                    if waiter.transfer != transfer {
+                        violations.append("waiter \(token.rawValue) names \(waiter.transfer) but holds an interest in \(transfer)")
+                    }
+                } else {
+                    violations.append("waiter interest \(token.rawValue) without a waiter")
+                }
             }
         }
         if self.runningCount > self.tuning.maxConcurrentTransfers {
@@ -1511,14 +1519,6 @@ extension SyncEngine {
         for token in self.state.releasing.keys where self.state.groups[token] != nil {
             violations.append("group \(token.rawValue) is released and registered")
         }
-        return violations
-    }
-
-    /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
-    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25).
-    private func strandedPendingRun() -> String? {
-        guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
-            return nil
         // A job set aside waits in no queue: it must be one only released groups want.
         let strayAside = self.state.queues.asideEntries.filter { entry in
             guard self.isValid(entry), let job = self.state.jobs[entry.transfer] else {
@@ -1529,6 +1529,14 @@ extension SyncEngine {
         if !strayAside.isEmpty {
             violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
         }
+        return violations
+    }
+
+    /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
+    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25).
+    private func strandedPendingRun() -> String? {
+        guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
+            return nil
         }
         switch self.pendingRunGate(pending) {
         case .open:
