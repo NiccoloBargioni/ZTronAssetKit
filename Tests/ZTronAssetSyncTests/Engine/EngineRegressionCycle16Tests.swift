@@ -386,4 +386,44 @@ struct EngineRegressionCycle16Tests {
         #expect(answered == .failure(.serverUnavailable(retryAfter: throttleEnd.seconds(since: after.2))), "the user request fails fast with the origin's wait: \(answered)")
         await engine.shutdown()
     }
+
+    // MARK: Which parked claims a follow-up turn still owes a re-queue (R-SYN-6; F-36)
+
+    /// The run's check (`OwedRequeues`) mirrors what the next re-admission turn takes: the jobs an event owed
+    /// (`originOwed` for a closed breaker or an ended throttle, `edgeOwed` for a satisfied network edge) and, while a
+    /// conditions pass is owed, the jobs a lane-wide gate parked in a lane the conditions now admit. The breaker, edge and
+    /// conditions cases share the throttle case's mechanism (the test above); this pins each branch and the jobs that
+    /// stay parked.
+    @Test("R-SYN-6: a parked claim counts as owed a re-queue exactly when a follow-up re-admission turn will take it")
+    func owedRequeuesMirrorTheFollowUp() {
+        let entry = EngineFixture.entry("owed", EngineFixture.bytes(9_001))
+        func job(_ state: JobState, lane: AssetPriority) -> Job {
+            var job = Job(
+                transfer: entry.transferID,
+                entry: entry,
+                identity: entry.contentIdentity,
+                assets: [entry.identifier],
+                state: state,
+                epoch: 1,
+                queuedAt: MonotonicInstant(nanoseconds: 0)
+            )
+            job.interests[InterestToken(rawValue: 1)] = JobInterest(lane: lane, kind: .run, assets: [entry.identifier])
+            return job
+        }
+        let transfer = entry.transferID
+        let throttled = job(.blocked(.throttled(until: MonotonicInstant(nanoseconds: 1))), lane: .bulk)
+        let offline = job(.blocked(.offline), lane: .bulk)
+        let whenOnline = job(.failed(.whenOnline), lane: .bulk)
+        let none = OwedRequeues(origin: [], edge: [], lanes: [])
+        // Owed by an event: the origin's (a closed breaker, an ended throttle) or a network edge's.
+        #expect(OwedRequeues(origin: [transfer], edge: [], lanes: []).contains(transfer, throttled))
+        #expect(OwedRequeues(origin: [], edge: [transfer], lanes: []).contains(transfer, whenOnline))
+        #expect(!none.contains(transfer, throttled), "a throttle-parked claim no event owes waits for its gate")
+        #expect(!none.contains(transfer, whenOnline), "a claim failed whenOnline no edge owes waits for one")
+        // Owed by a conditions pass: lane-parked, in a lane the conditions admit, while the pass is owed.
+        #expect(OwedRequeues(origin: [], edge: [], lanes: [.bulk]).contains(transfer, offline))
+        #expect(!OwedRequeues(origin: [], edge: [], lanes: [.prefetch, .userInitiated]).contains(transfer, offline), "a lane the conditions still refuse")
+        #expect(!none.contains(transfer, offline), "no conditions pass is owed")
+        #expect(!OwedRequeues(origin: [], edge: [], lanes: [.bulk]).contains(transfer, throttled), "a conditions pass takes only lane-parked jobs")
+    }
 }
