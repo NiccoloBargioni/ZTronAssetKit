@@ -227,4 +227,64 @@ struct EngineRegressionCycle10Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: A lane-wide park that user work interrupts (C2 bound of cycle 9; a test gap of F-29)
+
+    /// Four one-member user-initiated handles hold every slot and more prefetch members than one pump parks wait in the
+    /// queue. In one actor turn: Low Data Mode refuses the prefetch lane (no slot is free, so nothing parks), one user
+    /// handle is released (its slot frees, no user work waits, so the pump takes a prefetch member, which the lane's
+    /// policy parks with as many queued members as the turn's bound allows), and user work (a system interest at
+    /// user-initiated priority, the synchronous stand-in for a resolve) arrives and takes the freed slot at the next
+    /// pump. The lane park that stopped at the bound must still reach every queued member, though no slot frees for a
+    /// prefetch dispatch any more (`laneParksOwed`; mutant M-LANEOWED, which leaves 64 members queued).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-7: a lane-wide policy park that stops at its turn's bound reaches every queued member even when user work takes the freed slot",
+        .timeLimit(.minutes(1))
+    )
+    func lanePolicyParkReachesEveryMemberBehindUserWork() async throws {
+        let count = SyncEngine.parksPerPump + 64
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0))
+        let engine = harness.engine
+        let users = (0..<5).map { index in
+            EngineHarness.onDemand("u\(index)", EngineFixture.bytes(11_110 + UInt64(index), count: 300))
+        }
+        let members = (0..<count).map { index in
+            EngineHarness.onDemand("p\(index)", EngineFixture.bytes(11_200 + UInt64(index), count: 300))
+        }
+        await harness.serveManifest(users + members)
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        var userTokens: [InterestToken] = []
+        for user in users.prefix(4) {
+            userTokens.append(try await engine.registerGroup([user.identifier], lane: .userInitiated).get())
+        }
+        await engine.awaitCondition { $0.state.inFlight.count == 4 }
+        _ = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count + 4 }
+        let memberTransfers = Set(members.map(\.transferID))
+        #expect(await engine.readForTests { engine in memberTransfers.allSatisfy { engine.state.jobs[$0]?.state == .queued } }, "setup: every member waits behind user work")
+        await engine.waitForAllHandles()
+        let extra = users[4]
+        let released = userTokens[0]
+        let turn = await engine.readForTests { engine in
+            engine.apply(Self.constrained)
+            engine.performReleaseGroup(released)
+            let parkedAtBound = memberTransfers.filter { engine.state.jobs[$0]?.state.kind == .blocked }.count
+            engine.addSystemInterest(entry: extra, lane: .userInitiated)
+            engine.pump()
+            return (parkedAtBound, engine.state.jobs[extra.transferID]?.state)
+        }
+        #expect(turn.0 == SyncEngine.parksPerPump, "setup: the release's pump parked as many members as its bound allows")
+        #expect(turn.1 == .downloading, "setup: the user work took the freed slot")
+        await engine.awaitCondition { !$0.state.pumpFollowUpScheduled }
+        let states = await engine.readForTests { engine in
+            memberTransfers.compactMap { engine.state.jobs[$0]?.state }
+        }
+        #expect(states.count == count)
+        #expect(states.allSatisfy { $0 == .blocked(.policy(.constrainedNetwork)) }, "every member is parked: \(states.filter { $0 == .queued }.count) still queued")
+        #expect(await engine.readForTests { $0.state.inFlight.count } == 4, "user work keeps every slot")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
