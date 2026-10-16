@@ -363,10 +363,10 @@ extension SyncEngine {
     }
 
     /// ENOSPC (ARCHITECTURE §7.6), decided on a fresh free-space read: `awaitingSpace` when the store has pending
-    /// reclaim (the reaper wakes it; the attempt counts toward the retry caps, L4-R4); a retry with backoff when the volume holds what the job needs after all (the
-    /// ENOSPC was transient: parking it would fail every joiner with stale figures and leave the job parked for ever);
-    /// else `insufficientSpace` with the bytes the attempt needs and the job's room above the reserve (F-22),
-    /// re-evaluated at every later read (T17).
+    /// reclaim (the reaper wakes it; the attempt counts toward the retry caps, L4-R4); a retry with backoff when the
+    /// volume holds what the job needs after all (the ENOSPC was transient: parking it would fail every joiner with stale
+    /// figures and leave the job parked for ever); else `insufficientSpace` with the bytes the attempt needs and the job's
+    /// room above the reserve (F-22), re-evaluated at every later read (T17).
     func spaceFailed(_ transfer: TransferID, epoch: UInt64, required: Int64) async {
         self.state.jobs[transfer]?.active = nil
         // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot.
