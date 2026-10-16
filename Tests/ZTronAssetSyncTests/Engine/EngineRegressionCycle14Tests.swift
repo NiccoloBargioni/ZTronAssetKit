@@ -88,4 +88,53 @@ struct EngineRegressionCycle14Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: Only an alarm that will fire the gate's deadline excuses an open gate (R-SYN-2; cycle-13 verifier)
+
+    /// The exemption above trusted `state.alarm != nil`: an alarm whose owned task had ended without firing (or one
+    /// armed later than the gate's deadline, which a `rearm` that never moves the alarm earlier leaves) excused the open
+    /// gate for ever, so the model test could not name either defect. In the turn that moves the clock to the gate's
+    /// deadline, the engine's alarm is replaced by each of those two, the invariants are checked, and the engine's own
+    /// alarm is put back before the turn ends: the throttle gate is reported stranded behind an alarm whose task is
+    /// gone and behind an alarm later than the gate's deadline, and only the live alarm at the heap's earliest deadline
+    /// excuses it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-2: an open pending-run gate is excused only by a live alarm armed at or before its deadline", .timeLimit(.minutes(1)))
+    func onlyALiveTimelyAlarmExcusesAnOpenGate() async throws {
+        let harness = EngineHarness.make()
+        let catalog = EngineSyncTests.catalog(1)
+        await harness.scriptTransfers(catalog)
+        let manifest = FakeManifestResponse.fetched(EngineFixture.manifestData(catalog.map(\.0)), etag: EngineFixture.etag("v1"))
+        await harness.source.scriptManifest([.fail(.transient(.throttled, retryAfter: .seconds(20))), manifest])
+        let engine = harness.engine
+        let time = harness.time
+        try await harness.start()
+        await engine.awaitCondition { engine in
+            engine.state.run == nil && engine.state.pendingRun?.gate == .throttle && engine.state.heap.deadline(for: .pendingRun) != nil
+                && engine.state.alarm != nil
+        }
+        let checks = await engine.readForTests { engine -> (dead: [String], late: [String], live: [String])? in
+            guard let at = engine.state.heap.deadline(for: .pendingRun), let alarm = engine.state.alarm else {
+                return nil
+            }
+            time.advance(to: at)
+            let unused = (engine.state.tasks.keys.max() ?? 0) + 1
+            engine.state.alarm = Alarm(token: alarm.token, task: unused, deadline: alarm.deadline)
+            let dead = engine.invariantViolations()
+            engine.state.alarm = Alarm(token: alarm.token, task: alarm.task, deadline: at.adding(seconds: 1))
+            let late = engine.invariantViolations()
+            engine.state.alarm = alarm
+            return (dead, late, engine.invariantViolations())
+        }
+        let found = try #require(checks, "setup: the throttle's deadline and the alarm")
+        #expect(found.dead == ["the pending run's throttle gate is open but no run started"], "an alarm whose task ended: \(found.dead)")
+        #expect(found.late == ["the pending run's throttle gate is open but no run started"], "an alarm after the gate's deadline: \(found.late)")
+        #expect(found.live.isEmpty, "the engine's own alarm: \(found.live)")
+        // The engine's alarm, put back, starts the pending run.
+        await engine.awaitCondition { engine in
+            engine.state.pendingRun == nil
+        }
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
