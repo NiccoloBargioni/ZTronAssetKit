@@ -131,7 +131,8 @@ struct EngineLaneTests {
             released += 1
         }
         #expect(peak == concurrency, "the slots fill up")
-        let outcome = await run.value
+        // Ends on the test's cancellation too: a loop cut short leaves transfers held that only the test releases.
+        let outcome = await joinCancelling(run)
         #expect(outcome.completeReport?.fetched == catalog.count)
         await engine.shutdown()
     }

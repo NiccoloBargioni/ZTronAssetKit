@@ -588,6 +588,16 @@ actor OperationStampingSource: RemoteSource, StagingAttachable {
     }
 }
 
+/// Joins `task`, cancelling it when the caller is cancelled (a test past its time limit): a join on an operation the test
+/// lets finish step by step (a run whose held transfers it releases) then ends instead of hanging the runner (L4-R17).
+func joinCancelling<T: Sendable>(_ task: Task<T, Never>) async -> T {
+    await withTaskCancellationHandler {
+        await task.value
+    } onCancel: {
+        task.cancel()
+    }
+}
+
 /// Waits until `task` finished or the engine shows `predicate`, whichever comes first: the two outcomes a test cannot
 /// otherwise tell apart when a call is either answered at once or registered (the `waitUntil` ends on cancellation).
 @available(macOS 15.0, iOS 18.0, *)
