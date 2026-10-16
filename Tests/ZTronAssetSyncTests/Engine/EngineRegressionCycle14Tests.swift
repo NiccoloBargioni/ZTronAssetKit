@@ -1,0 +1,91 @@
+import Foundation
+import Testing
+import ZTronAssetModel
+@testable import ZTronAssetSync
+import ZTronAssetTestSupport
+
+/// Pins from close-out cycle 14 of the level-4 close-out (`docs/adr-drafts/f.md`, F-34).
+@Suite("Engine regressions, close-out cycle 14")
+struct EngineRegressionCycle14Tests {
+    // MARK: A gate the clock opened while the alarm's turn runs the store's due work (R-SYN-2; cycle-13 verifier)
+
+    /// The alarm clears `state.alarm` before it fires what is due, and a due store deadline suspends its turn in
+    /// `store.runDueWork()`. A clock move in that window opens a pending run's throttle or breaker gate; the run starts
+    /// once the turn resumes (it re-arms at the gate's due deadline, and that alarm starts the run), yet the invariant
+    /// check made in the window, with no alarm armed, reported "the pending run's throttle gate is open but no run
+    /// started" (the cycle-13 verifier's PROBE-ALARMSTOREWORK; seeds 155605 and 155545 of the model test with a store
+    /// whose due work takes 50 ms). The store's commit unit is held, so the window is entered deterministically; the
+    /// check runs in the turn that opens the gate; then the store is released and the alarm starts the run.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work", .timeLimit(.minutes(1)), arguments: EngineRegressionCycle13Tests.TimedGate.allCases)
+    func clockOpenedGateDuringStoreWork(gate: EngineRegressionCycle13Tests.TimedGate) async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = EngineHarness.make(metadata: metadata, commitInterval: 2)
+        let viewedBytes = EngineFixture.bytes(4_242)
+        let viewed = EngineHarness.onDemand("viewed", viewedBytes)
+        let catalog = EngineSyncTests.catalog(1) + [(viewed, viewedBytes)]
+        await harness.serve(catalog)
+        let manifest = FakeManifestResponse.fetched(EngineFixture.manifestData(catalog.map(\.0)), etag: EngineFixture.etag("v1"))
+        let engine = harness.engine
+        let time = harness.time
+        try await harness.start()
+        // The launch run downloads the catalog through its commit windows.
+        _ = try await harness.syncDriven()
+        // A publication outside any run: the store's commit window opens on the manual clock, after `now`.
+        let located = await engine.awaitAsset(viewed.identifier, lane: .userInitiated)
+        #expect(try located.get().id == viewed.identifier)
+        let pendingGate: PendingRunGate
+        let deadline: DeadlineReason
+        switch gate {
+        case .throttle:
+            await harness.source.scriptManifest([.fail(.transient(.throttled, retryAfter: .seconds(20))), manifest])
+            pendingGate = .throttle
+            deadline = .pendingRun
+        case .breaker:
+            let evidence = EngineFailurePathTests.evidence(.manifest, xml: false, bytes: 0)
+            await harness.source.scriptManifest([.fail(.authentication(.forbiddenAmbiguous(evidence))), manifest])
+            pendingGate = .breaker
+            deadline = .breaker(harness.source.originID)
+        }
+        let blocked = await engine.sync(.force)
+        guard case .blocked = blocked else {
+            Issue.record("setup: the run was not blocked: \(blocked)")
+            await engine.shutdown()
+            return
+        }
+        // The blocked run has ended; its pending run waits for the deadline that opens its gate, and the store's
+        // commit deadline comes first.
+        await engine.awaitCondition { engine in
+            engine.state.run == nil && engine.state.pendingRun?.gate == pendingGate && engine.state.heap.deadline(for: deadline) != nil
+                && engine.state.heap.deadline(for: .store) != nil
+        }
+        let (storeDeadline, gateDeadline) = await engine.readForTests { engine in
+            (engine.state.heap.deadline(for: .store), engine.state.heap.deadline(for: deadline))
+        }
+        let storeAt = try #require(storeDeadline)
+        let gateAt = try #require(gateDeadline)
+        try #require(storeAt < gateAt, "setup: the store's deadline \(storeAt) comes before the gate's \(gateAt)")
+        // The store's commit unit is held: the alarm's turn fires the store deadline and suspends in its due work.
+        await metadata.setHolding(true)
+        time.advance(to: storeAt)
+        try await metadata.requireHeldUnits(atLeast: 1)
+        let window = await engine.readForTests { engine in
+            engine.state.alarm == nil && engine.state.storeWorkRuns == 1 && engine.state.run == nil && engine.state.pendingRun?.gate == pendingGate
+        }
+        try #require(window, "setup: the alarm's turn waits in the store's due work, with no alarm armed and the run pending")
+        let violations = await engine.readForTests { engine -> [String] in
+            // The clock reaches the gate's deadline in this turn: nothing has run since the move.
+            time.advance(to: gateAt)
+            #expect(engine.pendingRunGate(engine.state.pendingRun ?? PendingRun(gate: pendingGate, trigger: .explicit)) == .open, "setup: the gate is open")
+            return engine.invariantViolations()
+        }
+        #expect(violations.isEmpty, "\(gate): \(violations)")
+        // The store's work ends, the turn re-arms at the gate's due deadline, and that alarm starts the pending run.
+        await metadata.setHolding(false)
+        await engine.awaitCondition { engine in
+            engine.state.pendingRun == nil
+        }
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+}
