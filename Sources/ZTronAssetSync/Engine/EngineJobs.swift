@@ -504,7 +504,8 @@ extension SyncEngine {
             case .circuitOpen(let cause):
                 error = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
             case .throttled(let until):
-                let wait = until.seconds(since: now)
+                // The origin's end, not the job's: a later 429 may have extended the throttle after it parked (F-36).
+                let wait = self.throttleEnd(after: until).seconds(since: now)
                 let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
                 error = wait > limit ? .serverUnavailable(retryAfter: wait) : nil
             case .insufficientSpace:
@@ -522,6 +523,26 @@ extension SyncEngine {
         }
     }
 
+    /// The end of the throttle a job parked with `until` waits for. A parked job keeps the end it was parked with, while
+    /// a later 429 extends the origin's throttle and moves only the origin's `.throttle` deadline, which alone re-admits
+    /// the job (F-35): the origin's end when it is later, else `until`. Every reader of a parked job's end, the fail-fast
+    /// answer, a run's blocked outcome and whether the block cleared, reads it here, so each tells the caller the end a
+    /// fresh request would get (close-out cycle 16, F-36).
+    func throttleEnd(after until: MonotonicInstant) -> MonotonicInstant {
+        guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
+            return until
+        }
+        return max(end, until)
+    }
+
+    /// `reason` with a throttle's end read through `throttleEnd(after:)`.
+    func currentReason(_ reason: BlockReason) -> BlockReason {
+        if case .throttled(let until) = reason {
+            return .throttled(until: self.throttleEnd(after: until))
+        }
+        return reason
+    }
+
     /// Whether a blocked reason no longer applies to `job` at `lane`: lack of space is re-checked against the latest
     /// free-space read (T17); `awaitingSpace` waits for the reaper.
     func blockCleared(_ reason: BlockReason, lane: AssetPriority, job: Job) -> Bool {
@@ -529,7 +550,7 @@ extension SyncEngine {
         case .offline, .policy:
             return self.laneVerdict(lane) == .admit
         case .throttled(let until):
-            return until <= self.environment.time.monotonicNow()
+            return self.throttleEnd(after: until) <= self.environment.time.monotonicNow()
         case .circuitOpen:
             guard let origin = self.state.remote?.originID, let breaker = self.state.breakers[origin] else {
                 return true
