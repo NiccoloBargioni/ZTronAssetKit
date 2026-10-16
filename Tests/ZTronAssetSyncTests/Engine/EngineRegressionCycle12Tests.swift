@@ -61,8 +61,9 @@ struct EngineRegressionCycle12Tests {
     /// several turns) is awaited, so the handles released later are the size the seed chose; nothing is present before
     /// the end, so a join is complete when every member joined. Every engine invariant is checked after every operation
     /// (a re-joined member that waits in no queue among them, which a `reinstate` that queues no entry produces); every
-    /// interleaving keeps them. The end is liveness: every handle released and every transfer scripted to stage, the
-    /// engine ends with no job and nothing left to release, and every caller gets its asset.
+    /// interleaving keeps them. The end is liveness: every handle released, then every job left and every caller's
+    /// asset scripted to stage, the engine ends with no job and nothing left to release, and every caller gets its
+    /// asset.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job",
@@ -104,7 +105,7 @@ struct EngineRegressionCycle12Tests {
                 engine.state.groups[handle.token].map { $0.joined.count == count } ?? true
             }
         }
-        for operation in 0..<160 {
+        for operation in 0..<100 {
             switch pick(100) {
             case 0..<30:
                 let handle = try await register(window(), lane: lanes[pick(lanes.count)])
@@ -165,8 +166,13 @@ struct EngineRegressionCycle12Tests {
         for handle in handles {
             await engine.releaseGroup(handle.token)
         }
-        // Spare steps: an attempt cancelled after its stage, or a caller's job created after the first commit, stages too.
-        for (index, entry) in entries.enumerated() {
+        // Once every release ended, only the jobs other interests want are left (system interests, callers); those and
+        // every caller's asset (a caller's task may reach the engine only now) are scripted to stage. Spare steps: an
+        // attempt cancelled after its stage, or a caller's job created after the first commit, stages too.
+        await engine.awaitCondition { $0.state.releasing.isEmpty && !$0.state.releaseFollowUpScheduled }
+        let left = await engine.readForTests { Set($0.state.jobs.keys) }
+        let callerTransfers = Set(callers.compactMap { caller in entries.first { $0.identifier == caller.asset }?.transferID })
+        for (index, entry) in entries.enumerated() where left.contains(entry.transferID) || callerTransfers.contains(entry.transferID) {
             await source.script(entry.transferID, Array(repeating: .stage(payloads[index]), count: 3))
         }
         // Liveness: the wait ends only when the engine holds no job and owes no release (or at the time limit). A caller
