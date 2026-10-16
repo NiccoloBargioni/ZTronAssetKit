@@ -11,7 +11,10 @@ struct EngineEventsTests {
     // Four minutes: the sync takes about 4 s in debug and 16 s under the thread sanitizer alone, but its in-suite
     // sanitizer time grows with the host's load (115 s at a load of about 25 and 151 s near 73 before L4-R8 cut the
     // engine's per-pump and per-settle passes; F-17). An overrun restarts the simulator runner (ios.md item 8). No
-    // assertion depends on the limit.
+    // assertion depends on the limit. `harness.start()` raises the engine's utility-priority tasks (the run and its bulk
+    // drivers) to the default priority: beside 16 default-QoS busy loops on 8 cores the test overran its limit at
+    // 258 s, every transfer's actor hand-offs waiting for the scheduler's share of a starved priority class, and took
+    // 45 s once raised (close-out cycle 13, F-17).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(4)))
     func stalledSubscriberIsBounded() async throws {

@@ -49,7 +49,8 @@ extension SyncEngine {
         }
         self.state.lastTaskKey += 1
         let key = self.state.lastTaskKey
-        let task = Task(priority: kind.priority) {
+        let priority = self.state.ownedTaskPriorityFloor.map { max(kind.priority, $0) } ?? kind.priority
+        let task = Task(priority: priority) {
             // REENTRANCY: RE-S21 — nothing: the task then removes only its own key (a successor has another key).
             await operation(self)
             self.taskEnded(key)

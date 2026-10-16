@@ -83,6 +83,13 @@ struct LiveEngineHarness {
         return LiveEngineHarness(directory: directory, server: server, time: time, store: store, engine: engine, layout: StoreLayout(base: directory))
     }
 
+    /// Starts the engine, its owned tasks spawned at `EngineHarness.ownedTaskPriorityFloor` or above (F-17), and requires
+    /// success.
+    func start() async throws {
+        await self.engine.setOwnedTaskPriorityFloor(EngineHarness.ownedTaskPriorityFloor)
+        _ = try await self.engine.start().get()
+    }
+
     /// Every regular file under the test directory, by path.
     func files() -> [String: Int64] {
         var result: [String: Int64] = [:]
@@ -214,7 +221,7 @@ struct EngineLiveTransportTests {
             }
         }
         let engine = harness.engine
-        _ = try await engine.start().get()
+        try await harness.start()
         _ = await engine.sync(.force)
         let probe = EventProbe(stream: try await engine.subscribe().get())
         let group = try await engine.registerGroup(["paused"], lane: .prefetch).get()
@@ -266,7 +273,7 @@ struct EngineLiveTransportTests {
             }
         }
         let engine = harness.engine
-        _ = try await engine.start().get()
+        try await harness.start()
         _ = await engine.sync(.force)
         let probe = EventProbe(stream: try await engine.subscribe().get())
         // Cancelled: the only interest is released while the transfer is mid-body.
@@ -322,7 +329,7 @@ struct EngineLiveTransportTests {
             return LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: stall), rangeETag: "\"s\"")
         }
         let engine = harness.engine
-        _ = try await engine.start().get()
+        try await harness.start()
         _ = await engine.sync(.force)
         let probe = EventProbe(stream: try await engine.subscribe().get())
         _ = try await engine.registerGroup(["streamed"], lane: .prefetch).get()

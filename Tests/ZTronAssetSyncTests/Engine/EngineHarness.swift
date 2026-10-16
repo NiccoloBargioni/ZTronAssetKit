@@ -187,10 +187,18 @@ struct EngineHarness {
         await self.source.scriptManifest([.fetched(EngineFixture.manifestData(entries), etag: EngineFixture.etag(etag))])
     }
 
-    /// Starts the engine and requires success.
+    /// The lowest priority a harness engine spawns its owned tasks at (F-17): the default priority of the processes that
+    /// load a test host. At their own utility priority (a run, its bulk drivers, the alarm; sync-1 S1-17) a host saturated
+    /// by default-QoS processes starves each of the engine's actor hand-offs, so a test's time depended on that load: the
+    /// 10,000-asset sync overran its four minutes in the sanitizer suite beside 16 busy loops on 8 cores (close-out
+    /// cycle 13). No assertion depends on a task's priority, and the lanes' relative priorities above it are kept.
+    static let ownedTaskPriorityFloor = TaskPriority.medium
+
+    /// Starts the engine, its owned tasks spawned at `ownedTaskPriorityFloor` or above, and requires success.
     @discardableResult
     func start() async throws -> OpenReport {
-        try await self.engine.start().get()
+        await self.engine.setOwnedTaskPriorityFloor(EngineHarness.ownedTaskPriorityFloor)
+        return try await self.engine.start().get()
     }
 
     /// The store's planning view.
@@ -441,6 +449,11 @@ extension SyncEngine {
             fence = min(fence ?? watchdog, watchdog)
         }
         return fence
+    }
+
+    /// Test seam (F-17): spawns every later owned task at `floor` or above (`EngineHarness.ownedTaskPriorityFloor`).
+    func setOwnedTaskPriorityFloor(_ floor: TaskPriority) {
+        self.state.ownedTaskPriorityFloor = floor
     }
 
     /// Test seam: the transfers whose cancelled attempt still counts as draining.

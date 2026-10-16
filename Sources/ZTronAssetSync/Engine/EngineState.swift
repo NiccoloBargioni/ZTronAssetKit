@@ -29,6 +29,11 @@ struct EngineState {
     var tasks: [UInt64: Task<Void, Never>] = [:]
     /// The last spawn id.
     var lastTaskKey: UInt64 = 0
+    /// Test seam: a floor under every owned task's priority (`OwnedTaskKind.priority`); `nil` in production.
+    /// The test harnesses raise it to the default priority before `start()`: at utility priority (a run, its bulk
+    /// drivers, the alarm; sync-1 S1-17) a host saturated by default-QoS processes starves every actor hand-off, so a
+    /// test's duration measured the host's load rather than the engine (close-out cycle 13, F-17).
+    var ownedTaskPriorityFloor: TaskPriority?
     /// The start task, while it runs.
     var startTask: UInt64?
 
