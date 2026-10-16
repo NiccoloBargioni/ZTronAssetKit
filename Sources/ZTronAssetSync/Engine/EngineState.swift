@@ -145,6 +145,9 @@ struct EngineState {
     /// Runs in a row that ended offline, with no satisfied-path edge in between (R-SYN-13): the first is retried after
     /// the debounce, a later one that ended while the path read satisfied waits for an edge.
     var offlineRunsWithoutEdge = 0
+    /// Satisfied-path edges applied so far: an attempt records the count when it starts, so an offline failure that
+    /// arrives after an edge (URLSession's error lags the path monitor) knows the edge that re-queues it has passed.
+    var networkEdgeSerial: UInt64 = 0
 
     // MARK: Manifest (R-NET-5, sync.md §6.5)
 
@@ -365,6 +368,9 @@ struct ActiveAttempt {
     var policyPause: PolicyBlock?
     /// The half-open breaker's single probe (never a preemption victim, ADR-031).
     var probe = false
+    /// `EngineState.networkEdgeSerial` when the attempt started: an offline failure after a later edge is retried at
+    /// once instead of waiting for an edge that already passed (R-SYN-13).
+    var edgeSerial: UInt64 = 0
     /// A control the handle did not exist for yet.
     var pendingStop: PendingStop?
     /// A priority change the handle did not exist for yet.

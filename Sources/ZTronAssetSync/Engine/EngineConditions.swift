@@ -94,6 +94,7 @@ extension SyncEngine {
             // The edge an offline-failed pending run waits for (R-SYN-13): its debounce may start now.
             self.state.pendingRun?.awaitsNetworkEdge = false
             self.state.offlineRunsWithoutEdge = 0
+            self.state.networkEdgeSerial += 1
             for transfer in self.state.failedJobs {
                 guard let job = self.state.jobs[transfer], job.state.owedOnEdge(transient: job.transientFailure) else {
                     continue

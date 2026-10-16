@@ -706,6 +706,7 @@ extension SyncEngine {
     /// One attempt: ask the store whether it already holds the content (L4-R5), start the transfer, consume its
     /// updates, apply the terminal element.
     func drive(_ transfer: TransferID, epoch: UInt64, request: TransferRequest) async {
+        job.active?.edgeSerial = self.state.networkEdgeSerial
         guard let remote = self.state.remote else {
             return
         }

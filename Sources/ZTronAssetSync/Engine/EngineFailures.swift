@@ -77,9 +77,16 @@ extension SyncEngine {
         case .cancelled(.bySystem):
             self.retryLater(transfer, error: .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
         case .offline:
+            // The edge that re-queues jobs failed offline (T19) may have been applied while this attempt still ran
+            // (URLSession's error lags the path monitor): its job was not failed then, so with the path satisfied now no
+            // further edge need come. Such a failure is retried at once; otherwise it waits for the next edge (R-SYN-13;
+            // review of close-out cycle 9, PROBE-C9C-3).
+            let edgePassed = job.active.map { $0.edgeSerial != self.state.networkEdgeSerial } ?? false
             self.state.jobs[transfer]?.active = nil
             self.state.jobs[transfer]?.transientFailure = true
-            if self.transition(transfer, to: .failed(.whenOnline)) {
+            if edgePassed, self.state.conditions?.network.satisfied == true {
+                self.requeue(transfer, discarding: request)
+            } else if self.transition(transfer, to: .failed(.whenOnline)) {
                 self.failFast(transfer, reason: .offline)
             }
         case .transient(.resumeRejected, _):
