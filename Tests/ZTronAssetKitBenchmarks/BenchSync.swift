@@ -316,6 +316,27 @@ extension ZTronAssetKitBenchmarks {
             #expect(median <= gapMax)
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
+
+        /// C2 at SPEC §6's reference scale when a 429 extends an origin's throttle under user-initiated waiters (close-out
+        /// cycle 16, F-36): a 1 s 429 throttles the origin, 10,000 user-initiated `resolve` callers park within
+        /// `interactiveMaxWait` and wait, and a running member's 60 s 429 then extends the throttle; later turns answer
+        /// every waiter fail-fast, at most `parksPerPump` jobs a turn. Medians of three against P-9, the best of the three
+        /// against C2, after a warm-up.
+        @Test("R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func throttleExtensionTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.throttleExtensionWait(waiters: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.throttleExtensionWait(waiters: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
     }
 }
 
@@ -847,6 +868,46 @@ enum SyncBench {
             }
         }
         await engine.shutdown()
+        return wait
+    }
+
+    /// The heartbeat's longest wait while a 429 extends the origin's throttle under `count` user-initiated `resolve`
+    /// callers of on-demand members: one member's 1 s 429 throttles the origin, the callers' jobs park within
+    /// `interactiveMaxWait`, then a held member answers 429 with 60 s, until every caller is answered. Each caller must get
+    /// the fail-fast answer.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func throttleExtensionWait(waiters count: Int) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count + 2, room: nil)
+        let engine = bench.engine
+        let throttling = bench.entries[0]
+        let extending = bench.entries[1]
+        await bench.source.script(extending.transferID, [.hold])
+        await bench.source.script(throttling.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(1)))])
+        let holder = Task { await engine.awaitAsset(extending.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[extending.transferID]?.active != nil }
+        let parker = Task { await engine.awaitAsset(throttling.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[throttling.transferID]?.state.isThrottleParked == true }
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in bench.entries.dropFirst(2) {
+            callers.append(Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) })
+        }
+        await engine.awaitCondition { engine in
+            engine.state.throttleParked.count == count + 1 && engine.state.waiters.count == count + 2 && !engine.state.pumpFollowUpScheduled
+        }
+        let wait = try await SyncBench.longestWait(on: engine) {
+            await bench.source.release(extending.transferID, with: .failed(.transient(.throttled, retryAfter: .seconds(60))))
+            await engine.awaitCondition { engine in
+                engine.state.waiters.count == 2 && !engine.state.throttleAnswersScheduled
+            }
+        }
+        for caller in callers {
+            guard case .failure(.serverUnavailable) = await caller.value else {
+                throw SyncBenchError.incomplete("a user-initiated caller was not failed fast")
+            }
+        }
+        await engine.shutdown()
+        _ = await holder.value
+        _ = await parker.value
         return wait
     }
 
