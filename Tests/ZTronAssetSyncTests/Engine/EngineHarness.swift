@@ -363,12 +363,26 @@ struct EngineHarness {
     /// Runs `sync(.force)` while driving the clock (store commit windows and the alarm need time to pass). The
     /// clock never jumps by half the manifest fetch deadline or more, so a fetch still in flight (the launch run's,
     /// which `sync` joins) is never timed out by the driver.
+    ///
+    /// The drive starts only once this call has joined a run (or started one: it joins the run it starts), or has been
+    /// answered without one. Waiting for "a run exists" instead was satisfied by the launch run `start()` began before
+    /// the `sync` task had even run; the drive then ended with the launch run, and the late `sync` started a run of its
+    /// own that no driver moved the clock for, its commit window never reached (close-out cycle 14's requirements
+    /// verifier: a whole test process idle for minutes). Each wait ends on cancellation, and so does the join: a
+    /// cancelled `sync` caller is answered `.cancelled` (L4-R17).
     func syncDriven(_ mode: SyncMode = .force) async throws -> SyncOutcome {
         let engine = self.engine
         let run = Task { await engine.sync(mode) }
-        await engine.waitUntil { $0.groups >= 1 || $0.lifecycle != .running }
-        try await self.drive(maxStep: self.configuration.tuning.manifestFetchDeadline / 2) { $0.groups == 0 }
-        return await run.value
+        do {
+            await untilFinishedOrCondition(run, engine) { engine in
+                !engine.state.syncJoiners.isEmpty || engine.state.lifecycle != .running
+            }
+            try await self.drive(maxStep: self.configuration.tuning.manifestFetchDeadline / 2) { $0.groups == 0 }
+        } catch {
+            run.cancel()
+            throw error
+        }
+        return await joinCancelling(run)
     }
 }
 
@@ -622,6 +636,29 @@ func untilFinishedOrObserved<T: Sendable>(_ task: Task<T, Never>, _ engine: Sync
     }
     let observed = Task {
         await engine.waitUntil(predicate)
+        signal.yield()
+    }
+    var iterator = signals.makeAsyncIterator()
+    _ = await iterator.next()
+    observed.cancel()
+}
+
+/// Waits until `task` finished or `condition` holds on the engine, whichever comes first; ends on cancellation (the
+/// stream's `next()` and `awaitCondition` both do). The isolated form of `untilFinishedOrObserved`, for a condition the
+/// introspection does not carry (a `sync` caller registered as a joiner of the run).
+@available(macOS 15.0, iOS 18.0, *)
+func untilFinishedOrCondition<T: Sendable>(
+    _ task: Task<T, Never>,
+    _ engine: SyncEngine,
+    _ condition: @escaping @Sendable (isolated SyncEngine) -> Bool
+) async {
+    let (signals, signal) = AsyncStream.makeStream(of: Void.self)
+    Task {
+        _ = await task.value
+        signal.yield()
+    }
+    let observed = Task {
+        await engine.awaitCondition(condition)
         signal.yield()
     }
     var iterator = signals.makeAsyncIterator()
