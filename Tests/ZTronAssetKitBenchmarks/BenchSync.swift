@@ -121,6 +121,32 @@ extension ZTronAssetKitBenchmarks {
             print("R-SYN-12 prune of 10,000 ids: nobody subscribed \(unobserved) s, one stalled subscriber \(observed) s, ratio \(observed / max(unobserved, 0.000_001)) (max 2, plus 5 ms)")
             #expect(observed <= 2 * unobserved + 0.005)
         }
+
+        /// C2 at SPEC §6's reference scale (review of close-out cycle 7, PROBE-C7C-2): a 10,000-member prefetch group on
+        /// a volume with room for two members parks the others for lack of space, and every later free-space read
+        /// re-checks them. The headroom ledger summed the bytes in flight over every job for each job it gated, so the
+        /// parking turn and an ENOSPC's re-check turn were quadratic (the verifier measured 9.8 s and 4.7 s at 10,000,
+        /// during which the engine answered no call). A high-priority heartbeat calls into the engine's actor back to
+        /// back: its longest wait bounds the longest actor turn. Medians of three, after a warm-up.
+        @Test("R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, never hold the engine's actor longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func spaceParkingTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.spaceParkingWaits(members: 1_000)
+            var parking: [Double] = []
+            var reading: [Double] = []
+            for _ in 0..<3 {
+                let waits = try await SyncBench.spaceParkingWaits(members: 10_000)
+                parking.append(waits.parking)
+                reading.append(waits.read)
+            }
+            let parked = parking.sorted()[1]
+            let read = reading.sorted()[1]
+            print("R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking \(parked) ms, during an ENOSPC's free-space read \(read) ms (budget \(gapMax) ms); runs \(parking) and \(reading)")
+            #expect(parked <= gapMax)
+            #expect(read <= gapMax)
+        }
     }
 }
 
@@ -292,6 +318,118 @@ enum SyncBench {
         await engine.shutdown()
         _ = subscription
         return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+    }
+
+    // MARK: Space parking at scale (C2, R-SYN-11)
+
+    /// One call into the engine's actor: a caller waits at least for the turn it queued behind.
+    static func pulse(_ engine: isolated SyncEngine) -> Int {
+        engine.state.jobs.count
+    }
+
+    /// Whether the engine holds `count` jobs and none waits in a queue (each runs or is parked).
+    static func noneQueued(_ engine: isolated SyncEngine, count: Int) -> Bool {
+        engine.state.jobs.count == count && !engine.state.jobs.values.contains { $0.state == .queued }
+    }
+
+    /// Whether `transfer` was parked for lack of space after its ENOSPC and no job waits in a queue.
+    static func parkedAfterENOSPC(_ engine: isolated SyncEngine, _ transfer: TransferID) -> Bool {
+        engine.state.jobs[transfer]?.state == .blocked(.insufficientSpace) && !engine.state.jobs.values.contains { $0.state == .queued }
+    }
+
+    /// Runs `work` while a high-priority heartbeat calls into `engine` back to back; returns the heartbeat's longest
+    /// wait in milliseconds (the longest actor turn it queued behind, plus scheduling noise).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func longestWait(on engine: SyncEngine, during work: () async throws -> Void) async throws -> Double {
+        let heartbeat = Task(priority: .high) {
+            let clock = ContinuousClock()
+            var longest = Duration.zero
+            while !Task.isCancelled {
+                let before = clock.now
+                _ = await SyncBench.pulse(engine)
+                longest = max(longest, clock.now - before)
+            }
+            return longest
+        }
+        let outcome: Result<Void, any Error>
+        do {
+            try await work()
+            outcome = .success(())
+        } catch {
+            outcome = .failure(error)
+        }
+        heartbeat.cancel()
+        let longest = await heartbeat.value
+        try outcome.get()
+        return Double(longest.components.seconds) * 1_000 + Double(longest.components.attoseconds) / 1e15
+    }
+
+    /// The heartbeat's longest waits while a prefetch group of `count` on-demand 400-byte members parks on a volume with
+    /// 1,000 bytes above the reserve (two members start and hold, the others park `insufficientSpace`), then while the
+    /// first started member's ENOSPC reads the free space and re-checks every parked member.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func spaceParkingWaits(members count: Int) async throws -> (parking: Double, read: Double) {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let fileSystem = FakeFileSystem(time: time)
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x11),
+            conditions: FakeDeviceConditionsSource(),
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        // No commit window: nothing here needs the clock.
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let size = 400
+        let entries = (0..<count).map { index in
+            SyncBench.entry("s\(index)", GeneratedPayload.bytes(seed: 0x11_000 + UInt64(index), offset: 0, length: size), policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(entries), etag: ETag(rawValue: "\"v1\""))])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        // 1,000 bytes above the reserve: two members fit, a third does not. Unscripted transfers wait in the fake source.
+        let free = try await store.freeSpace()
+        let ballast = URL(fileURLWithPath: "/fake-volume/Library/Application Support/ballast")
+        try fileSystem.write(Data(repeating: 1, count: Int(free.volumeOpportunistic - free.reserveBytes - 1_000)), to: ballast, mode: .truncate)
+        await engine.refreshFreeSpace()
+        let parking = try await SyncBench.longestWait(on: engine) {
+            guard case .success = await engine.registerGroup(entries.map(\.identifier), lane: .prefetch) else {
+                throw SyncBenchError.incomplete("the prefetch group was refused")
+            }
+            while !(await SyncBench.noneQueued(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        // The two started attempts reach the source in their drivers' own tasks.
+        await engine.waitForAllHandles()
+        let starts = await source.starts.map(\.id)
+        guard starts.count == 2, let first = starts.first else {
+            throw SyncBenchError.incomplete("expected two members to start, got \(starts.count)")
+        }
+        let read = try await SyncBench.longestWait(on: engine) {
+            await source.script(first, [.fail(.insufficientSpace(requiredBytes: Int64(size)))])
+            while !(await SyncBench.parkedAfterENOSPC(engine, first)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return (parking, read)
     }
 
     /// An engine configuration with defaults and `tuning`.
