@@ -259,11 +259,18 @@ extension SyncEngine {
         self.pump()
     }
 
+    /// Whether only released groups still want `job` (their interests leave over a few turns, `continueReleases`): it
+    /// never starts meanwhile (R-CAR-4), and it is no user work to preempt for.
+    func isReleasedOnly(_ job: Job) -> Bool {
+        !self.state.releasing.isEmpty && job.interests.keys.allSatisfy { self.state.releasing[$0] != nil }
+    }
+
     /// Whether a valid user-initiated entry waits.
     private var hasQueuedUser: Bool {
         for kind in [LaneQueues.Kind.userSingle, .userBatch] {
             let ready: (LaneQueues.Entry) -> Bool = { entry in
                 self.isValid(entry) && self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
+                    && (self.state.releasing.isEmpty || !(self.state.jobs[entry.transfer].map { self.isReleasedOnly($0) } ?? false))
             }
             if self.state.queues.first(kind, isValid: ready) != nil {
                 return true
@@ -432,9 +439,7 @@ extension SyncEngine {
         guard let job = self.state.jobs[transfer], let remote = self.state.remote, !self.state.heldForManifest.contains(transfer) else {
             return .wait
         }
-        if !self.state.releasing.isEmpty, job.interests.keys.allSatisfy({ self.state.releasing[$0] != nil }) {
-            // Only released groups still want it (their interests leave over a few turns, `continueReleases`): it
-            // never starts meanwhile (R-CAR-4).
+        if self.isReleasedOnly(job) {
             return .wait
         }
         let lane = job.lane
