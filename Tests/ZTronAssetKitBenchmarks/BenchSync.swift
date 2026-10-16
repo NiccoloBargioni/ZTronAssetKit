@@ -265,6 +265,28 @@ extension ZTronAssetKitBenchmarks {
             #expect(median <= gapMax)
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
+
+        /// C2 at SPEC §6's reference scale when a breaker's cooldown ends over the members it parked (review of close-out
+        /// cycle 9, PROBE-C9C-4, whose window was unreliable): 5xx answers open the breaker under a 10,000-member prefetch
+        /// group, the open breaker parks every queued member `circuitOpen`, and the clock then reaches the cooldown's end,
+        /// so the alarm owes every parked member a re-queue (`unblockOrigin`, at most `readmissionsPerTurn` per turn) and
+        /// the gate parks all but the half-open probe again. Medians of three against P-9, the best of the three against
+        /// C2, after a warm-up.
+        @Test("R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func cooldownEndTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.cooldownEndWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.cooldownEndWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
     }
 }
 
@@ -285,6 +307,8 @@ struct ScaleBench {
     let fileSystem: FakeFileSystem
     /// The file that takes the volume's room but `room` bytes (`nil` on a roomy volume).
     let ballast: URL?
+    /// The engine's clock (and the store's).
+    let time: ManualTimeSource
 
     /// Gives the volume its room back (the store learns it at its next free-space read).
     func removeBallast() throws {
@@ -667,6 +691,79 @@ enum SyncBench {
         return wait
     }
 
+    /// The heartbeat's longest wait while the clock reaches the cooldown's end of a breaker that parked a prefetch group
+    /// of `count` on-demand members on a roomy volume: the running members answer 500 until the 5xx breaker opens (three
+    /// run at a time; five samples open it), the open breaker parks every queued member, then the clock jumps to the
+    /// cooldown's end, until every member is parked again but the half-open probe and nothing is owed.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func cooldownEndWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count, room: nil)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        var rounds = 0
+        while await SyncBench.cooldownEnd(engine) == nil {
+            rounds += 1
+            guard rounds <= 4 else {
+                throw SyncBenchError.incomplete("the breaker did not open")
+            }
+            await engine.waitForAllHandles()
+            let running = await SyncBench.running(engine)
+            for transfer in running {
+                await bench.source.script(transfer, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil))])
+            }
+            while !(await SyncBench.attemptsEnded(engine, running)) {
+                await Task.yield()
+            }
+        }
+        while !(await SyncBench.originSettled(engine, probing: false)) {
+            await Task.yield()
+        }
+        guard let until = await SyncBench.cooldownEnd(engine) else {
+            throw SyncBenchError.incomplete("the breaker closed before its cooldown ended")
+        }
+        let wait = try await SyncBench.longestWait(on: engine) {
+            bench.time.advance(to: until)
+            while !(await SyncBench.originSettled(engine, probing: true)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// When the origin's open breaker half-opens, if it is open.
+    static func cooldownEnd(_ engine: isolated SyncEngine) -> MonotonicInstant? {
+        for breaker in engine.state.breakers.values {
+            if case .open(_, let until, _) = breaker.state {
+                return until
+            }
+        }
+        return nil
+    }
+
+    /// The transfers whose jobs download.
+    static func running(_ engine: isolated SyncEngine) -> [TransferID] {
+        engine.state.inFlight.filter { engine.state.jobs[$0]?.state == .downloading }.sorted()
+    }
+
+    /// Whether none of `transfers` downloads any more.
+    static func attemptsEnded(_ engine: isolated SyncEngine, _ transfers: [TransferID]) -> Bool {
+        transfers.allSatisfy { engine.state.jobs[$0]?.state != .downloading }
+    }
+
+    /// Whether no job waits in a queue and no re-queue, park or sweep is owed to a later turn, with a transfer running
+    /// (the half-open probe) when `probing`, none otherwise.
+    static func originSettled(_ engine: isolated SyncEngine, probing: Bool) -> Bool {
+        let downloading = engine.state.jobs.values.contains { $0.state == .downloading }
+        return downloading == probing && engine.state.originOwed.isEmpty && !engine.state.readmissionFollowUpScheduled
+            && !engine.state.pumpFollowUpScheduled && !engine.state.jobs.values.contains { $0.state == .queued }
+    }
+
     /// Whether `transfer`'s job downloads.
     static func isRunning(_ engine: isolated SyncEngine, _ transfer: TransferID) -> Bool {
         engine.state.jobs[transfer]?.state == .downloading
@@ -753,7 +850,7 @@ enum SyncBench {
             ballast = file
             await engine.refreshFreeSpace()
         }
-        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size, fileSystem: fileSystem, ballast: ballast)
+        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size, fileSystem: fileSystem, ballast: ballast, time: time)
     }
 
     /// An engine configuration with defaults and `tuning`.
