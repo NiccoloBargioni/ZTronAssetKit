@@ -176,10 +176,14 @@ extension SyncEngine {
                 let seconds = hint?.seconds(from: wall)
                 if let delay = Backoff.delay(attempt: 1, retryAfter: seconds, policy: self.tuning.retry, seed: self.environment.random.seed, key: StableHash.fnv1a64(remote.originID)) {
                     let until = self.environment.time.monotonicNow().adding(seconds: max(delay, seconds ?? 0))
-                    self.state.throttles[remote.originID] = max(self.state.throttles[remote.originID] ?? .zero, until)
-                    self.state.heap.schedule(.throttle(remote.originID), at: until)
+                    // A transfer's 429 may have throttled the origin for longer while this fetch was in flight: the
+                    // throttle, its deadline (which alone re-admits the jobs it parked) and the run's block all keep the
+                    // later end, as the transfer path does (close-out cycle 15, F-35).
+                    let end = max(self.state.throttles[remote.originID] ?? .zero, until)
+                    self.state.throttles[remote.originID] = end
+                    self.state.heap.schedule(.throttle(remote.originID), at: end)
                     self.rearm()
-                    return .throttled(until)
+                    return .throttled(end)
                 }
             }
             return .failed(error)
