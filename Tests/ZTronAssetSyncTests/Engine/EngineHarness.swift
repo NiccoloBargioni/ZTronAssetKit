@@ -67,10 +67,13 @@ struct EngineHarness {
     /// The store root's base on the fake volume.
     static let base = URL(fileURLWithPath: "/fake-volume/Library/Application Support", isDirectory: true)
 
-    /// Builds a harness; nothing is started.
+    /// Builds a harness; nothing is started. `storeTime`, when given, is the store's own clock (and the fake volume's):
+    /// a test that advances it ahead of the engine's `time` lets the store's timers (a purge's grace wait) run before the
+    /// engine's alarm for the same instant, the order a busy engine actor produces, without any wall-clock wait.
     static func make(
         disk: DiskImage = DiskImage(),
         time: ManualTimeSource = ManualTimeSource(),
+        storeTime: ManualTimeSource? = nil,
         source: FakeRemoteSource = FakeRemoteSource(),
         conditions: DeviceConditions = .unrestricted,
         tuning: SyncTuning = SyncTuning(),
@@ -96,7 +99,7 @@ struct EngineHarness {
     ) -> EngineHarness {
         let fileSystem = existing ?? FakeFileSystem(
             disk: disk,
-            time: time,
+            time: storeTime ?? time,
             configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
         )
         let sink = existingSink ?? ScriptedSnapshotSink()
@@ -124,7 +127,11 @@ struct EngineHarness {
             commitMinimumInterval: commitInterval,
             snapshotInstallInterval: installInterval
         )
-        let store = AssetStore(configuration: storeConfiguration, environment: StoreEnvironment(environment: environment, snapshotSink: sink))
+        var storeEnvironment = environment
+        if let storeTime {
+            storeEnvironment.time = storeTime
+        }
+        let store = AssetStore(configuration: storeConfiguration, environment: StoreEnvironment(environment: storeEnvironment, snapshotSink: sink))
         let configuration = EngineConfiguration(
             tuning: tuning,
             storage: storage,
