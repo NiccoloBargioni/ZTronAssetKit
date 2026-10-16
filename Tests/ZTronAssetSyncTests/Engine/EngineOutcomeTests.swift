@@ -266,6 +266,8 @@ struct EngineOutcomeTests {
             for unit in await bulk.heldUnits {
                 await bulk.release(unit)
             }
+            // Both waits above end on cancellation; the loop must too (a test past its time limit ends, never spins).
+            try Task.checkCancellation()
         }
         let report = try await starting.value.get()
         #expect(report.legacyMigrationPending)
@@ -397,6 +399,8 @@ struct EngineOutcomeTests {
                     await bulk.release(unit)
                 }
             }
+            // Both waits above end on cancellation; the loop must too (a test past its time limit ends, never spins).
+            try Task.checkCancellation()
         }
         try await bulk.requireHeldUnits(atLeast: 1)
         let hashing = Set(await bulk.heldUnits)
