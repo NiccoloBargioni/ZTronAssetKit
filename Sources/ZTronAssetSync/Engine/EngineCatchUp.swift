@@ -70,6 +70,8 @@ extension SyncEngine {
             // `passApplyTurn` (the turn is free then, unless an apply that never waited took it first) or by shutdown.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 self.state.applyQueue[mine] = continuation
+                // Waiting test seams re-evaluate their conditions once the apply has joined the queue.
+                self.notifyObservers()
             }
             guard self.isRunning else {
                 return false
