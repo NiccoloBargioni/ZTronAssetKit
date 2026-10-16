@@ -403,7 +403,7 @@ extension SyncEngine {
 
     /// The lane-wide block the gate gives a job of `lane` now, if any: the lane verdict, then, for the Apple tier, the
     /// engine's own conditions (E-17).
-    private func laneWideBlock(_ lane: AssetPriority) -> BlockReason? {
+    func laneWideBlock(_ lane: AssetPriority) -> BlockReason? {
         if case .block(let reason) = self.laneVerdict(lane) {
             return reason
         }

@@ -5,15 +5,20 @@ import ZTronAssetStorage
 extension SyncEngine {
     // MARK: Pause (T7)
 
-    /// A paused attempt: a preempted one resumes first in its lane, a policy pause parks it; the next attempt continues
-    /// from the attempt's sidecar when there is one (the transport's resumable flag is not trusted, D-13).
+    /// A paused attempt: a preempted one resumes first in its lane, a policy pause parks it while its lane is still
+    /// refused; the next attempt continues from the attempt's sidecar when there is one (the transport's resumable flag
+    /// is not trusted, D-13). A policy pause is decided on the lane verdict when the pause arrives, not when it was
+    /// asked for: conditions that admit the lane again may have been applied meanwhile (a Low Data Mode flap), and their
+    /// re-admission could not see the job, which still downloaded, so a park on the old reason would wait for a later
+    /// conditions element that may never come (T17; review of close-out cycle 9, PROBE-C9C-1a).
     func paused(_ transfer: TransferID, epoch: UInt64, request: TransferRequest) async {
         guard let job = self.state.jobs[transfer], let active = job.active else {
             return
         }
         self.recordBreaker(.abandoned(transfer))
         let policyPause = active.policyPause
-        // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch below; the resume point is kept only for this job.
+        // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch below; the resume point is kept only for this job;
+        // a policy pause re-reads the lane's block under the conditions now.
         let resume = await self.resumePoint(after: request)
         guard self.isRunning, var current = self.state.jobs[transfer], current.epoch == epoch else {
             return
@@ -21,8 +26,8 @@ extension SyncEngine {
         current.resume = resume
         current.active = nil
         self.state.jobs[transfer] = current
-        if let policyPause, current.lane < .userInitiated {
-            self.park(transfer, reason: .policy(policyPause))
+        if policyPause != nil, current.lane < .userInitiated, let block = self.laneWideBlock(current.lane) {
+            self.park(transfer, reason: block)
         } else if self.transition(transfer, to: .queued) {
             self.enqueue(transfer, front: true)
         }
