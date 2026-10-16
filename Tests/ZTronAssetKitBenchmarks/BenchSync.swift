@@ -122,13 +122,20 @@ extension ZTronAssetKitBenchmarks {
             #expect(observed <= 2 * unobserved + 0.005)
         }
 
+        /// The C2 rule's figure (CLAUDE.md C2: nothing holds a cooperative-pool thread longer than about 10 ms at a
+        /// stretch). `Scripts/quality-gates.json` has no C2 key and is frozen, so the rule's own figure is the budget, as
+        /// in `BenchCleanup` under the level-3 ruling R4 (ADR-052). It is asserted on the best of the runs: the heartbeat's
+        /// longest wait is the engine's longest turn plus scheduling noise, and noise only adds.
+        static let c2Budget = 10.0
+
         /// C2 at SPEC §6's reference scale (review of close-out cycle 7, PROBE-C7C-2): a 10,000-member prefetch group on
         /// a volume with room for two members parks the others for lack of space, and every later free-space read
         /// re-checks them. The headroom ledger summed the bytes in flight over every job for each job it gated, so the
         /// parking turn and an ENOSPC's re-check turn were quadratic (the verifier measured 9.8 s and 4.7 s at 10,000,
         /// during which the engine answered no call). A high-priority heartbeat calls into the engine's actor back to
-        /// back: its longest wait bounds the longest actor turn. Medians of three, after a warm-up.
-        @Test("R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, never hold the engine's actor longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
+        /// back: its longest wait bounds the longest actor turn. Medians of three against P-9, the best of the three
+        /// against C2 (`c2Budget`), after a warm-up.
+        @Test("R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func spaceParkingTurns() async throws {
             let budgets = try QualityBudgets()
@@ -143,16 +150,39 @@ extension ZTronAssetKitBenchmarks {
             }
             let parked = parking.sorted()[1]
             let read = reading.sorted()[1]
-            print("R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking \(parked) ms, during an ENOSPC's free-space read \(read) ms (budget \(gapMax) ms); runs \(parking) and \(reading)")
+            print("R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking \(parked) ms, during an ENOSPC's free-space read \(read) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(parking) and \(reading)")
             #expect(parked <= gapMax)
             #expect(read <= gapMax)
+            #expect((parking.min() ?? .infinity) <= Self.c2Budget, "parking: \(parking)")
+            #expect((reading.min() ?? .infinity) <= Self.c2Budget, "ENOSPC read: \(reading)")
+        }
+
+        /// C2 at SPEC §6's reference scale (review of close-out cycle 8, PROBE-C8C-2): 10,000 prefetch members are parked
+        /// for lack of space (two start and hold), then the volume gains room and one free-space read re-checks them.
+        /// The sweep re-admitted every member the room held in that one read's turn (15 to 26 ms at 10,000). Medians of
+        /// three against P-9, the best of the three against C2, after a warm-up.
+        @Test("R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func spaceReadmissionTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.spaceReadmissionWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.spaceReadmissionWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
         /// C2 at SPEC §6's reference scale (close-out cycle 8): with a 10,000-member prefetch group waiting in the queue
         /// behind its running members, the network drops (every queued member parks `offline`) and returns (every one
-        /// is re-queued). The heartbeat's longest wait bounds the longest actor turn of each edge; medians of three,
-        /// after a warm-up.
-        @Test("R-SYN-13: losing and regaining the network under a 10,000-member prefetch group never holds the engine's actor longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
+        /// is re-queued). The heartbeat's longest wait bounds the longest actor turn of each edge; medians of three
+        /// against P-9, the best of the three against C2 (one turn parked every queued member, about 15 ms, and one
+        /// re-queued every member, about 22 ms: review of close-out cycle 8), after a warm-up.
+        @Test("R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func networkEdgeTurns() async throws {
             let budgets = try QualityBudgets()
@@ -167,9 +197,30 @@ extension ZTronAssetKitBenchmarks {
             }
             let lost = offline.sorted()[1]
             let regained = online.sorted()[1]
-            print("R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline \(lost) ms, coming back \(regained) ms (budget \(gapMax) ms); runs \(offline) and \(online)")
+            print("R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline \(lost) ms, coming back \(regained) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(offline) and \(online)")
             #expect(lost <= gapMax)
             #expect(regained <= gapMax)
+            #expect((offline.min() ?? .infinity) <= Self.c2Budget, "going offline: \(offline)")
+            #expect((online.min() ?? .infinity) <= Self.c2Budget, "coming back: \(online)")
+        }
+
+        /// C2 at SPEC §6's reference scale (review of close-out cycle 8, PROBE-C8R-1 and PROBE-C8C-3): releasing a
+        /// prefetch handle of 10,000 members (three run, the others wait in the queue) removed every member's interest in
+        /// one actor turn (about 15 ms). Medians of three against P-9, the best of the three against C2, after a warm-up.
+        @Test("R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func handleReleaseTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.handleReleaseWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.handleReleaseWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
     }
 }
@@ -187,6 +238,17 @@ struct ScaleBench {
     let entries: [ManifestEntry]
     /// Each entry's size.
     let size: Int
+    /// Its volume.
+    let fileSystem: FakeFileSystem
+    /// The file that takes the volume's room but `room` bytes (`nil` on a roomy volume).
+    let ballast: URL?
+
+    /// Gives the volume its room back (the store learns it at its next free-space read).
+    func removeBallast() throws {
+        if let ballast = self.ballast {
+            try self.fileSystem.removeItem(at: ballast)
+        }
+    }
 }
 
 /// Helpers of `SyncBenchmarks` (namespaced so no other package's helpers can collide).
@@ -476,6 +538,60 @@ enum SyncBench {
         return (offline, online)
     }
 
+    /// The heartbeat's longest wait while the volume gains room under a prefetch group of `count` on-demand 400-byte
+    /// members parked for lack of space (two start and hold on a volume with 1,000 bytes above the reserve, the others
+    /// park `insufficientSpace`): the ballast is removed and one free-space read re-admits every parked member, until
+    /// none is parked (a third member starts in the free slot, the others wait in the queue).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func spaceReadmissionWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count, room: 1_000)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !(await SyncBench.noneQueued(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        try bench.removeBallast()
+        let wait = try await SyncBench.longestWait(on: engine) {
+            await engine.refreshFreeSpace()
+            while !(await SyncBench.noneParked(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// The heartbeat's longest wait while a prefetch handle of `count` on-demand members on a roomy volume (three start
+    /// and hold, the others wait in the queue) is released, until the engine holds no job.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func handleReleaseWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count, room: nil)
+        let engine = bench.engine
+        guard case .success(let token) = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let wait = try await SyncBench.longestWait(on: engine) {
+            await engine.releaseGroup(token)
+            while !(await SyncBench.noJobs(engine)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// Whether the engine holds no job.
+    static func noJobs(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.jobs.isEmpty
+    }
+
     /// Whether the engine applied conditions without a network.
     static func seesOffline(_ engine: isolated SyncEngine) -> Bool {
         engine.state.conditions?.network.satisfied == false
@@ -540,17 +656,19 @@ enum SyncBench {
         guard await engine.sync(.force).isComplete else {
             throw SyncBenchError.incomplete("the setup sync did not complete")
         }
+        var ballast: URL?
         if let room {
             let free = try await store.freeSpace()
             let ballastBytes = free.volumeOpportunistic - free.reserveBytes - room
             guard ballastBytes >= 0 else {
                 throw SyncBenchError.incomplete("the store's files left less than \(room) bytes above the reserve")
             }
-            let ballast = URL(fileURLWithPath: "/fake-volume/Library/Application Support/ballast")
-            try fileSystem.write(Data(repeating: 1, count: Int(ballastBytes)), to: ballast, mode: .truncate)
+            let file = URL(fileURLWithPath: "/fake-volume/Library/Application Support/ballast")
+            try fileSystem.write(Data(repeating: 1, count: Int(ballastBytes)), to: file, mode: .truncate)
+            ballast = file
             await engine.refreshFreeSpace()
         }
-        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size)
+        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size, fileSystem: fileSystem, ballast: ballast)
     }
 
     /// An engine configuration with defaults and `tuning`.
