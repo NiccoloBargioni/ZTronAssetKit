@@ -283,8 +283,11 @@ extension SyncEngine {
                 continue
             }
             if case .insufficientSpace(let required, _)? = job.lastError, let space = self.state.freeSpace {
-                // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job.
-                self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: self.headroom(for: job, in: space))
+                // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job. The room
+                // is computed before the write: the right side of an optional-chained assignment runs inside the write's
+                // access to `state`, and `headroom` reads `state` (an exclusivity conflict, review of close-out cycle 6).
+                let available = self.headroom(for: job, in: space)
+                self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: available)
             }
             self.park(transfer, reason: .insufficientSpace)
             settled = true
