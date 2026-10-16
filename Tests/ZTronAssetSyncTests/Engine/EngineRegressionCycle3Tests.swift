@@ -282,8 +282,15 @@ struct EngineRegressionCycle3Tests {
         #expect((try? ensured.get())?.present == 2, "setup: the ensure commits x and y: \(ensured)")
         #expect(await engine.readForTests { $0.state.boundContent["y"] } == y.transferID, "setup: the ledger binds y")
         let probe = EventProbe(stream: try await engine.subscribe().get())
-        let reported = await harness.withClock { await engine.reportUnreadable("x") }
+        // Nothing reportUnreadable does needs the clock (no commit window here): a clock driven meanwhile could reach the
+        // quarantine's end and heal before the announcements below are received (L4-R17).
+        let reported = await engine.reportUnreadable("x")
         #expect((try? reported.get()) != nil, "reportUnreadable succeeds: \(reported)")
+        // Both quarantines are received before the clock moves: each heal's `assetAvailable` has the same subject and
+        // would replace its quarantine in the probe's slot if the probe had not pulled it yet (§7.9; L4-R17).
+        let xQuarantined = await probe.next { $0 == .assetRemoved("x", .quarantined) }
+        let yQuarantined = await probe.next { $0 == .assetRemoved("y", .quarantined) }
+        #expect(xQuarantined != nil && yQuarantined != nil, "both quarantines are announced")
         let view = try await harness.view()
         guard case .quarantined? = view.records["y"]?.residency else {
             Issue.record("setup: the store quarantined y with x's blob: \(String(describing: view.records["y"]?.residency))")
@@ -294,7 +301,6 @@ struct EngineRegressionCycle3Tests {
         #expect(await engine.readForTests { $0.state.heals["y"] != nil }, "y's re-download is scheduled at the end of its quarantine")
         await harness.source.release(h1.transferID, with: .progress(received: 0, expected: nil))
         let outcome = await harness.withClock { await run.value }
-        // The run's end is announced after anything reportUnreadable announced: everything before it has been pulled.
         let finished = await probe.next { event in
             if case .syncFinished = event {
                 return true
@@ -302,8 +308,6 @@ struct EngineRegressionCycle3Tests {
             return false
         }
         #expect(finished != nil)
-        let events = await probe.received
-        #expect(events.contains(.assetRemoved("x", .quarantined)) && events.contains(.assetRemoved("y", .quarantined)), "both quarantines are announced")
         await probe.stop()
         let yLocation = await harness.store.location(for: "y", extensions: [], recordingAccess: false)
         let yAfter = try await harness.view().records["y"]?.residency

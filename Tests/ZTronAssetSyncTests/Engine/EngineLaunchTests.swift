@@ -112,9 +112,10 @@ struct EngineLaunchTests {
         sink.writeSidecar(ResumeSidecar(name: first.partialName, validator: validator, receivedBytes: 1_000, expectedBytes: Int64(bytes.count)))
         await harness.source.script(entry.transferID, [.fail(.transient(.resumeRejected, retryAfter: nil)), .stage(bytes)])
         await harness.source.release(entry.transferID, with: .failed(.transient(.connectionLost(resumable: true), retryAfter: nil)))
-        // The interactive backoff (at most 0.25 s) elapses on the manual clock.
-        try await harness.time.requireSleepers(atLeast: 1)
-        harness.time.advance(by: 1)
+        // The interactive backoff (at most 0.25 s) elapses on the manual clock, once the engine armed it (L4-R17: the
+        // retry's own deadline, not any sleeper).
+        let backoff = await EngineLaunchTests.retryDeadline(engine, entry.transferID)
+        harness.time.advance(to: backoff)
         let location = try await waiter.value.get()
         #expect(location.byteSize == Int64(bytes.count))
         let starts = await harness.source.starts
@@ -128,5 +129,21 @@ struct EngineLaunchTests {
         }
         #expect(try await engine.metrics().get().retries[.transient] == 1, "the refusal itself is retried without a backoff count")
         await engine.shutdown()
+    }
+
+    /// Waits until the engine armed the backoff of `transfer`'s retry and returns its deadline (ends on cancellation,
+    /// returning the clock's origin, so the caller's following expectations fail instead of hanging).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func retryDeadline(_ engine: SyncEngine, _ transfer: TransferID) async -> MonotonicInstant {
+        let find: @Sendable (isolated SyncEngine) -> MonotonicInstant? = { engine in
+            engine.state.heap.entries.first { deadline in
+                if case .retry(transfer, _) = deadline.reason {
+                    return true
+                }
+                return false
+            }?.at
+        }
+        await engine.awaitCondition { find($0) != nil }
+        return await engine.readForTests(find) ?? .zero
     }
 }

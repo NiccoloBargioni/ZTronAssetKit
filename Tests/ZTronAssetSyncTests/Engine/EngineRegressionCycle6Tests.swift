@@ -41,15 +41,30 @@ struct EngineRegressionCycle6Tests {
     /// earliest sleeper's deadline to it (never back), so a clock that is ahead stays put until the others reach it.
     /// Never a wall-clock wait; the driver's own wait ends on its cancellation, after which it advances nothing, and
     /// the call returns only once the driver has ended: a driver that outlived the call advanced the clocks to a sleeper
-    /// registered afterwards (PROBE-C8C-5, close-out cycle 9).
+    /// registered afterwards (PROBE-C8C-5, close-out cycle 9). With `fence`, the engine whose clock is among `clocks`,
+    /// no clock moves to or past the engine's clock fence (`SyncEngine.clockFence()`), decided in one engine turn: the
+    /// driver waits for the fenced work, which the fakes finish without the clock, or for one more sleeper (L4-R17).
+    /// `hooks` let the helper's own regression test observe the driver without yielding for it.
     @available(macOS 15.0, iOS 18.0, *)
-    static func driving<T: Sendable>(_ clocks: [ManualTimeSource], _ operation: @Sendable () async -> T) async -> T {
+    static func driving<T: Sendable>(
+        _ clocks: [ManualTimeSource],
+        fence engine: SyncEngine? = nil,
+        hooks: DrivingHooks? = nil,
+        _ operation: @Sendable () async -> T
+    ) async -> T {
         let driver = Task {
+            defer {
+                hooks?.ended()
+            }
             while !Task.isCancelled {
                 await withTaskGroup(of: Void.self) { group in
                     for clock in clocks {
                         group.addTask {
-                            await clock.waitForSleepers(atLeast: 1)
+                            if let hooks {
+                                _ = await clock.waitForSleepers(atLeast: 1, registered: hooks.waiting)
+                            } else {
+                                await clock.waitForSleepers(atLeast: 1)
+                            }
                         }
                     }
                     _ = await group.next()
@@ -59,11 +74,36 @@ struct EngineRegressionCycle6Tests {
                 guard !Task.isCancelled else {
                     return
                 }
-                guard let next = clocks.compactMap(\.nextDeadline).min() else {
+                guard let engine else {
+                    Self.advance(clocks)
                     continue
                 }
-                for clock in clocks where clock.monotonicNow() < next {
-                    clock.advance(to: next)
+                let fence = await engine.readForTests { engine -> MonotonicInstant? in
+                    guard !Task.isCancelled else {
+                        return nil
+                    }
+                    if let fence = engine.clockFence(), let next = clocks.compactMap(\.nextDeadline).min(), next >= fence {
+                        return fence
+                    }
+                    Self.advance(clocks)
+                    return nil
+                }
+                guard let fence, !Task.isCancelled else {
+                    continue
+                }
+                // Fenced: wait for the fenced work to end, or for one more sleeper on any clock (an earlier store wait).
+                let waiting = clocks.map(\.pendingSleepers)
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await engine.awaitCondition { $0.clockFence() != fence }
+                    }
+                    for (clock, count) in zip(clocks, waiting) {
+                        group.addTask {
+                            await clock.waitForSleepers(atLeast: count + 1)
+                        }
+                    }
+                    _ = await group.next()
+                    group.cancelAll()
                 }
             }
         }
@@ -71,6 +111,27 @@ struct EngineRegressionCycle6Tests {
         driver.cancel()
         await driver.value
         return value
+    }
+
+    /// What `driving` reports to its own regression test (`R-SYN-11: the clock driver of the space tests has stopped
+    /// when driving returns, …`): `waiting` runs each time a wait of the driver for a sleeper is registered, `ended`
+    /// once the driver's task has ended. Explicit signals, so the test waits for them instead of yielding (L4-R17).
+    struct DrivingHooks: Sendable {
+        /// A wait of the driver for a sleeper is registered.
+        let waiting: @Sendable () -> Void
+        /// The driver's task has ended.
+        let ended: @Sendable () -> Void
+    }
+
+    /// Moves every clock still before the earliest sleeper's deadline to it (never back).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func advance(_ clocks: [ManualTimeSource]) {
+        guard let next = clocks.compactMap(\.nextDeadline).min() else {
+            return
+        }
+        for clock in clocks where clock.monotonicNow() < next {
+            clock.advance(to: next)
+        }
     }
 
     // MARK: A purge reclaims the bytes a job waits for before the engine's alarm runs (R-SYN-11; PROBE-C5-4b)
@@ -119,7 +180,7 @@ struct EngineRegressionCycle6Tests {
         #expect(purged.successValue?.bytesFreed == Int64(qBytes.count), "the purge freed q: \(purged)")
         #expect(try await harness.store.freeSpace().pendingReclaim == 0, "setup: the purge's reaper reclaimed x's bytes too")
         // The engine's clock catches up: its alarm for x's deadline finds nothing left to reap.
-        let ensured = await Self.driving([time, storeTime]) { await ensure.value }
+        let ensured = await Self.driving([time, storeTime], fence: engine) { await ensure.value }
         let after = try await harness.store.freeSpace()
         switch ensured {
         case .success(let report):
@@ -212,7 +273,7 @@ struct EngineRegressionCycle6Tests {
         await harness.scriptTransfers([(x, xBytes), (q, qBytes), (y, yBytes)])
         try await harness.start()
         _ = try #require(await engine.sync(.force).completeReport)
-        let fetched = await Self.driving([time, storeTime]) { await engine.ensureAvailable(scope: .identifiers(["q"])) }
+        let fetched = await Self.driving([time, storeTime], fence: engine) { await engine.ensureAvailable(scope: .identifiers(["q"])) }
         #expect(fetched.successValue?.present == 1, "setup: q is present: \(fetched)")
         try await harness.store.flush(.ordered)
         await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
@@ -247,7 +308,7 @@ struct EngineRegressionCycle6Tests {
         #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes still wait for their deadline")
         let stateAfterPurge = await engine.readForTests { $0.state.jobs[y.transferID]?.state }
         #expect(stateAfterPurge != .blocked(.awaitingSpace), "y still waits for the store's next deadline after the purge reclaimed its room")
-        let ensured = await Self.driving([time, storeTime]) { await ensure.value }
+        let ensured = await Self.driving([time, storeTime], fence: engine) { await ensure.value }
         #expect(ensured.successValue?.present == 1, "y is present: \(ensured)")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()

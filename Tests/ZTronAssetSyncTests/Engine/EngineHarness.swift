@@ -206,62 +206,126 @@ struct EngineHarness {
         return state.isIdleSilent && state.waiters == 0 && state.interests == 0 && self.time.pendingSleepers == 0 && observers == 0 && transfers == 0
     }
 
-    /// Drives the manual clock until `predicate` holds. Each round advances the clock to the earliest sleeper (the
-    /// engine's alarm, or a store wait in an engine-owned task) when it is at most `maxStep` away and earlier than
-    /// `before`; otherwise it waits for whichever comes first: the predicate, any change of the engine's counters, or one
-    /// more sleeper (the other waits end on their cancellation). A sleeper further away than `maxStep`, or at `before` or
-    /// later, is a timeout the test must not trigger yet (the manifest fetch deadline while the fetch still works, a
-    /// breaker's cooldown before the run it blocks has settled). Never a wall-clock wait. A drive cancelled by the
-    /// test's time limit throws `neverQuiesced` with the engine's introspection, so the overrun says where it stopped.
+    /// What one step of `drive` found, decided in one engine turn.
+    private enum DriveStep: Sendable {
+        /// The predicate holds.
+        case done
+        /// The clock moved to the earliest sleeper.
+        case advanced
+        /// The advance budget is spent while a sleeper was still due to be woken.
+        case exhausted(EngineIntrospection)
+        /// Nothing may be woken now: wait for a change of these, or for one more sleeper.
+        case wait(EngineIntrospection, fence: MonotonicInstant?)
+    }
+
+    /// Drives the manual clock until `predicate` holds. Each step advances the clock to the earliest sleeper (the
+    /// engine's alarm, or a store wait in an engine-owned task) when it is at most `maxStep` away, earlier than `before`
+    /// and earlier than the engine's clock fence (`SyncEngine.clockFence()`: a manifest fetch's deadline or a probe's
+    /// watchdog while that work is in flight, which the fakes finish without the clock); otherwise it waits for whichever
+    /// comes first: the predicate, any change of the engine's counters or of its fence, or one more sleeper (the other
+    /// waits end on their cancellation). The predicate, the fence and the advance are decided in one engine turn, so the
+    /// clock never jumps to a timeout of work the engine began a moment earlier (L4-R17). A sleeper further away than
+    /// `maxStep`, or at `before` or later, is a timeout the test must not trigger yet (a breaker's cooldown before the
+    /// run it blocks has settled). `advances` bounds the clock's moves, not the waits: how many intermediate states a
+    /// wait happens to observe depends on scheduling, how often the clock must move does not (an engine that re-arms
+    /// a timer for ever exhausts it). Never a wall-clock wait. A drive cancelled by the test's time limit throws
+    /// `neverQuiesced` with the engine's introspection, so the overrun says where it stopped.
     func drive(
-        rounds: Int = 1_024,
+        advances: Int = 1_024,
         maxStep: TimeInterval = .infinity,
         before: MonotonicInstant? = nil,
         until predicate: @escaping @Sendable (EngineIntrospection) -> Bool
     ) async throws {
         let engine = self.engine
         let time = self.time
-        for _ in 0..<rounds {
-            let state = await engine.introspect()
-            if predicate(state) {
-                return
-            }
-            if let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep), before.map({ deadline < $0 }) ?? true {
+        var advanced = 0
+        while true {
+            let budgetLeft = advanced < advances
+            let step = await engine.readForTests { engine -> DriveStep in
+                let state = engine.introspect()
+                if predicate(state) {
+                    return .done
+                }
+                let fence = engine.clockFence()
+                guard let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep),
+                    before.map({ deadline < $0 }) ?? true, fence.map({ deadline < $0 }) ?? true
+                else {
+                    return .wait(state, fence: fence)
+                }
+                guard budgetLeft else {
+                    return .exhausted(state)
+                }
                 time.advance(to: deadline)
-                continue
+                return .advanced
             }
-            let waiting = time.pendingSleepers
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    await engine.waitUntil { $0 != state || predicate($0) }
+            switch step {
+            case .done:
+                return
+            case .advanced:
+                advanced += 1
+            case .exhausted(let state):
+                throw EngineHarnessError.neverQuiesced(state)
+            case .wait(let state, let fence):
+                let waiting = time.pendingSleepers
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await engine.awaitCondition { engine in
+                            let now = engine.introspect()
+                            return now != state || predicate(now) || engine.clockFence() != fence
+                        }
+                    }
+                    group.addTask {
+                        await time.waitForSleepers(atLeast: waiting + 1)
+                    }
+                    _ = await group.next()
+                    group.cancelAll()
                 }
-                group.addTask {
-                    await time.waitForSleepers(atLeast: waiting + 1)
+                if Task.isCancelled {
+                    throw EngineHarnessError.neverQuiesced(await engine.introspect())
                 }
-                _ = await group.next()
-                group.cancelAll()
-            }
-            if Task.isCancelled {
-                throw EngineHarnessError.neverQuiesced(await engine.introspect())
             }
         }
-        throw EngineHarnessError.neverQuiesced(await engine.introspect())
     }
 
     /// Runs `operation` while a driver wakes every sleeper on the manual clock (a purge's grace wait, a commit window,
-    /// a backoff), then stops the driver and returns once it has ended. Its wait ends on cancellation, after which it
+    /// a backoff), then stops the driver and returns once it has ended. Its waits end on cancellation, after which it
     /// advances nothing: a driver that outlived the call could advance the clock to a sleeper registered afterwards
-    /// (PROBE-C8C-5, close-out cycle 9).
+    /// (PROBE-C8C-5, close-out cycle 9). It never wakes a sleeper at or past the engine's clock fence
+    /// (`SyncEngine.clockFence()`), deciding the advance in one engine turn: it waits for the fenced work, which the fakes
+    /// finish without the clock, instead of timing it out because it had not been scheduled yet (L4-R17).
     func withClock<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T {
         let time = self.time
+        let engine = self.engine
         let driver = Task {
             while !Task.isCancelled {
                 await time.waitForSleepers(atLeast: 1)
                 guard !Task.isCancelled else {
                     return
                 }
-                if let deadline = time.nextDeadline {
+                // The fence check and the advance happen in one engine turn, and not once this driver is cancelled.
+                let fenced = await engine.readForTests { engine -> MonotonicInstant? in
+                    guard !Task.isCancelled, let deadline = time.nextDeadline else {
+                        return nil
+                    }
+                    if let fence = engine.clockFence(), deadline >= fence {
+                        return fence
+                    }
                     time.advance(to: deadline)
+                    return nil
+                }
+                guard let fence = fenced, !Task.isCancelled else {
+                    continue
+                }
+                let waiting = time.pendingSleepers
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await engine.awaitCondition { $0.clockFence() != fence }
+                    }
+                    group.addTask {
+                        await time.waitForSleepers(atLeast: waiting + 1)
+                    }
+                    _ = await group.next()
+                    group.cancelAll()
                 }
             }
         }
@@ -279,8 +343,8 @@ struct EngineHarness {
     }
 
     /// Drives the clock until the engine is idle-silent and the conditions source observes nothing.
-    func settle(rounds: Int = 256) async throws {
-        try await self.drive(rounds: rounds) { $0.isIdleSilent }
+    func settle(advances: Int = 256) async throws {
+        try await self.drive(advances: advances) { $0.isIdleSilent }
         try await self.conditions.requireObservers(equalTo: 0)
     }
 
@@ -354,6 +418,27 @@ actor GatedSourceFactory: RemoteSourceFactory {
 }
 
 extension SyncEngine {
+    /// Test seam for the clock drivers (`EngineHarness.drive`, `withClock`, `EngineRegressionCycle6Tests.driving`;
+    /// L4-R17): the earliest deadline that would time out work the test fakes finish without the clock, or `nil`. That
+    /// is an in-flight manifest fetch's deadline (`FakeRemoteSource` answers at once) and a breaker probe's watchdog
+    /// while the probe runs. A driver that woke such a deadline because the work had not been scheduled yet would turn a
+    /// scheduling delay into a timeout: the test's outcome would depend on the host's load, not on the engine. A test
+    /// that wants such a timeout moves the clock itself, once the work is held (`R-SYN-6: a manifest fetch past its
+    /// deadline falls back to the applied manifest and leaves the sync due`).
+    func clockFence() -> MonotonicInstant? {
+        var fence: MonotonicInstant?
+        if let fetch = self.state.manifestFetch, let at = self.state.heap.deadline(for: .manifest(fetch.sequence)) {
+            fence = at
+        }
+        for origin in self.state.breakers.keys.sorted() {
+            guard case .halfOpen(_, _, _?, let watchdog?)? = self.state.breakers[origin]?.state else {
+                continue
+            }
+            fence = min(fence ?? watchdog, watchdog)
+        }
+        return fence
+    }
+
     /// Test seam: the transfers whose cancelled attempt still counts as draining.
     func drainingTransfers() -> [TransferID] {
         self.state.draining.keys.sorted()

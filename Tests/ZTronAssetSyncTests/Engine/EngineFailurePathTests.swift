@@ -107,6 +107,16 @@ struct EngineFailurePathTests {
         await harness.engine.shutdown()
     }
 
+    /// Waits until no job runs and nothing the clock made due is still in the engine's heap: the work a test's own
+    /// clock move started (a heal, a retry) has run (L4-R17). Ends on the caller's cancellation.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func settleDue(_ engine: SyncEngine, time: ManualTimeSource) async {
+        let now = time.monotonicNow()
+        await engine.awaitCondition { engine in
+            engine.state.jobs.isEmpty && (engine.state.heap.first.map { $0.at > now } ?? true)
+        }
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a manifest 403 opens the breaker and resolve fails fast without a request", .timeLimit(.minutes(1)))
     func manifestForbiddenOpensBreaker() async throws {
@@ -154,7 +164,12 @@ struct EngineFailurePathTests {
         let engine = harness.engine
         for visit in 0..<8 {
             #expect(await engine.awaitAsset("corrupt", lane: .userInitiated) == .failure(.integrityFailure), "visit \(visit)")
+            // The visit's attempt has ended and its failure is recorded before the clock moves, so its backoff counts
+            // from this visit's instant (L4-R17)...
+            await engine.awaitCondition { $0.state.jobs[entry.transferID] == nil }
             harness.time.advance(by: 700)
+            // ...and whatever the move made due (a heal at the quarantine's end) has run before the next visit.
+            await EngineFailurePathTests.settleDue(engine, time: harness.time)
         }
         #expect(await harness.source.starts.count == harness.configuration.storage.maxIntegrityAttempts)
         guard case .failed(.integrity)? = try await harness.view().records["corrupt"]?.residency else {
@@ -332,9 +347,15 @@ struct EngineFailurePathTests {
         let engine = second.engine
         #expect(try await engine.isSyncDue().get())
         let run = Task { await engine.sync(.force) }
-        await engine.waitUntil { $0.groups == 1 && $0.armedTimers == 1 }
-        try await second.time.requireSleepers(atLeast: 1)
-        second.time.advance(by: second.configuration.tuning.manifestFetchDeadline)
+        // The run's fetch hangs with its deadline in the heap; the clock moves exactly to that deadline (L4-R17: the
+        // deadline itself, not any armed timer or sleeper).
+        await engine.awaitCondition { engine in
+            engine.state.manifestFetch.map { engine.state.heap.deadline(for: .manifest($0.sequence)) != nil } ?? false
+        }
+        let deadline = try #require(await engine.readForTests { engine in
+            engine.state.manifestFetch.flatMap { engine.state.heap.deadline(for: .manifest($0.sequence)) }
+        })
+        second.time.advance(to: deadline)
         let outcome = await run.value
         guard case .complete(let report) = outcome else {
             Issue.record("expected a complete run on the applied manifest, got \(outcome)")

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
@@ -17,36 +18,56 @@ struct EngineRegressionCycle9Tests {
     /// `R-SYN-10: ensureAvailable whose member waits for space fetches it as soon as a purge reclaimed the bytes, not at
     /// the store's next deadline` that sleeper was a purge's grace, which then reaped before the test's setup was done (a
     /// failed setup expectation, then a wait that never ended: the cycle-8 sanitizer run's time-limit overrun). Each round
-    /// drives nothing while the driver waits, registers a sleeper 60 s ahead, waits until it is registered and gives a
-    /// stale driver turns to act; the clock must not move. The verifier counted 7 and 6 stale advances in 2,000 rounds.
+    /// lets the driver register its wait for a sleeper, returns, registers a sleeper 60 s ahead and waits until it is
+    /// registered or woken, then waits for the driver's end; the driver must have ended before `driving` returned, and
+    /// the clock must not have moved. Every wait is an explicit signal that also ends on cancellation, never a number of
+    /// yields (L4-R17; the cycle-10 iOS Simulator run timed the earlier 10,000-yield wait out, L4-C10-07). The verifier
+    /// of cycle 8 counted 7 and 6 stale advances in 2,000 rounds of the cycle-8 driver.
     @Test("R-SYN-11: the clock driver of the space tests has stopped when driving returns, so it never advances a clock to a sleeper registered afterwards (2,000 rounds)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func drivingStopsBeforeReturning() async {
+        var running = 0
         var stale = 0
         var unseen = 0
         for _ in 0..<2_000 {
             let clock = ManualTimeSource()
             let start = clock.monotonicNow()
-            // The operation yields so the driver reaches its wait for a sleeper before `driving` cancels it.
-            let value = await EngineRegressionCycle6Tests.driving([clock]) {
-                for _ in 0..<4 {
-                    await Task.yield()
+            let ended = Mutex(false)
+            let (waits, waiting) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+            let (endings, ending) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+            let hooks = EngineRegressionCycle6Tests.DrivingHooks(
+                waiting: { waiting.yield() },
+                ended: {
+                    ended.withLock { $0 = true }
+                    ending.yield()
                 }
+            )
+            // The operation returns once the driver waits for a sleeper, so `driving` cancels a driver in that wait.
+            let value = await EngineRegressionCycle6Tests.driving([clock], hooks: hooks) {
+                var iterator = waits.makeAsyncIterator()
+                _ = await iterator.next()
                 return 0
             }
+            if !ended.withLock({ $0 }) {
+                running += 1
+            }
+            // The sleeper's registration, or its wake by a driver that outlived `driving`, whichever comes first.
+            let (signals, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
             let sleeper = Task {
                 try? await clock.sleep(until: start.adding(seconds: 60))
+                signal.yield()
             }
-            // The registration is awaited by yielding (never a wall-clock wait): a stale driver may wake the sleeper
-            // before it is seen, and then the clock has moved.
-            var turns = 0
-            while clock.pendingSleepers == 0, clock.monotonicNow() == start, turns < 10_000 {
-                await Task.yield()
-                turns += 1
+            let registration = Task {
+                await clock.waitForSleepers(atLeast: 1)
+                signal.yield()
             }
-            for _ in 0..<8 {
-                await Task.yield()
-            }
+            var signalled = signals.makeAsyncIterator()
+            _ = await signalled.next()
+            registration.cancel()
+            await registration.value
+            // The driver's end: after it nothing of the driver can act, so the clock's position is final.
+            var ends = endings.makeAsyncIterator()
+            _ = await ends.next()
             if clock.monotonicNow() != start || value != 0 {
                 stale += 1
             } else if clock.pendingSleepers == 0 {
@@ -54,7 +75,11 @@ struct EngineRegressionCycle9Tests {
             }
             sleeper.cancel()
             await sleeper.value
+            waiting.finish()
+            ending.finish()
+            signal.finish()
         }
+        #expect(running == 0, "driving returned before its driver ended in \(running) of 2,000 rounds")
         #expect(stale == 0, "the clock moved after driving returned in \(stale) of 2,000 rounds")
         #expect(unseen == 0, "the sleeper never registered in \(unseen) rounds")
     }

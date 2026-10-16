@@ -63,6 +63,10 @@ struct EngineRecoveryTests {
         let report = try await engine.performMaintenance(timeBudget: 60).get()
         #expect(report.corruptFound == 1)
         #expect(await engine.awaitAsset(entry.identifier, lane: .userInitiated) == .failure(.integrityFailure), "quarantined until its quarantine ends")
+        // The quarantine's announcement is received before the clock moves: the heal's `assetAvailable` has the same
+        // subject and would replace it in the probe's slot if the probe had not pulled it yet (§7.9; L4-R17).
+        let quarantined = await probe.next { $0 == .assetRemoved(entry.identifier, .quarantined) }
+        #expect(quarantined != nil, "the quarantine is announced")
         // The quarantine's end is a deadline on the engine's clock; the re-download is a system interest.
         let healed = await harness.withClock {
             await probe.next { event in
@@ -73,8 +77,6 @@ struct EngineRecoveryTests {
             }
         }
         #expect(healed != nil)
-        let events = await probe.received
-        #expect(events.contains(.assetRemoved(entry.identifier, .quarantined)))
         let restored = try await engine.awaitAsset(entry.identifier, lane: .userInitiated).get()
         #expect(try harness.fileSystem.read(from: restored.url, offset: 0, maxLength: bytes.count + 1) == bytes)
         #expect(await harness.source.starts.count == 3, "two at the sync, one heal")
@@ -144,8 +146,10 @@ struct EngineRecoveryTests {
         let probe = EventProbe(stream: try await engine.subscribe().get())
         let throttledAt = harness.time.monotonicNow()
         let group = try await engine.registerGroup(["p"], lane: .prefetch).get()
-        // A prefetch is not failed fast: it waits, blocked, for the throttle's end.
+        // A prefetch is not failed fast: it waits, blocked, for the throttle's end, whose deadline the engine arms.
         await engine.waitUntil { ($0.jobsByState[.blocked] ?? 0) == 1 }
+        let origin = harness.source.originID
+        await engine.awaitCondition { $0.state.heap.deadline(for: .throttle(origin)) != nil }
         try await harness.time.requireSleepers(atLeast: 1)
         #expect(harness.time.nextDeadline == throttledAt.adding(seconds: 30))
         #expect(await harness.source.starts.count == 1)
@@ -198,8 +202,10 @@ struct EngineRecoveryTests {
             return false
         }
         #expect(available != nil)
-        let events = await probe.received
-        #expect(events.contains(.circuitChanged(originID: harness.source.originID, .closed)))
+        // An explicit wait for the breaker's close: it may be published after the asset's availability, which the probe
+        // may have received first (L4-R17; no later breaker event can replace it in its slot).
+        let closed = await probe.next { $0 == .circuitChanged(originID: harness.source.originID, .closed) }
+        #expect(closed != nil)
         #expect(await harness.source.starts.count == 1)
         await engine.releaseGroup(group)
         await probe.stop()

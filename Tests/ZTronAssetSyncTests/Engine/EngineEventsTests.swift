@@ -83,24 +83,39 @@ struct EngineEventsTests {
             return progress
         }
         let waiter = Task { await engine.awaitAsset("viewed", lane: .userInitiated) }
-        await engine.waitUntil { $0.running == 1 }
+        let transfer = entry.transferID
+        let slot = EventSlot.transfer("viewed")
+        // The three updates before the hold, all at the start instant: the first is published, the other two leave a
+        // trailing emission for the interval's end.
+        await engine.awaitCondition { $0.state.jobs[transfer]?.active?.bytesReceived == 3 }
         for round in 0..<rounds {
             // Each round starts once the collector has pulled everything published so far, so no emission is coalesced
-            // into a later one because the collector was not scheduled: the lower bound below does not depend on
-            // scheduling (L4-R8; the queue coalesces newest-wins per key and retires the key with the transfer, §7.9).
+            // into a later one because the collector was not scheduled (the queue coalesces newest-wins per key and
+            // retires the key with the transfer, §7.9).
             await engine.awaitCondition { $0.state.subscribers.values.allSatisfy { $0.liveCount == 0 } }
-            await harness.source.release(entry.transferID, with: .progress(received: Int64(10 + round), expected: Int64(bytes.count)))
+            await harness.source.release(transfer, with: .progress(received: Int64(10 + round), expected: Int64(bytes.count)))
+            // The engine applies this round's update at this round's instant, before the clock moves (L4-C10-08)...
+            await engine.awaitCondition { $0.state.jobs[transfer]?.active?.bytesReceived == Int64(10 + round) }
             harness.time.advance(by: 0.02)
-            await engine.waitUntil { $0.running == 1 }
+            // ...and a trailing emission the move made due is flushed at its own instant, before the next update.
+            let now = harness.time.monotonicNow()
+            await engine.awaitCondition { engine in
+                engine.state.heap.deadline(for: .progress(slot)).map { $0 > now } ?? true
+            }
         }
         await engine.awaitCondition { $0.state.subscribers.values.allSatisfy { $0.liveCount == 0 } }
-        await harness.source.release(entry.transferID, with: .progress(received: Int64(bytes.count), expected: Int64(bytes.count)))
+        await harness.source.release(transfer, with: .progress(received: Int64(bytes.count), expected: Int64(bytes.count)))
         _ = try await waiter.value.get()
         await engine.shutdown()
         let progress = await collector.value
         let elapsed = Double(rounds) * 0.02
+        let interval = harness.configuration.tuning.progressInterval
         let ceiling = 1 + Int((elapsed / 0.1).rounded(.up)) + 1
+        // Every update is applied, and every trailing emission flushed, at its own instant: one emission at the start,
+        // then one per elapsed interval; the last update, inside the last interval, is retired with the transfer.
+        let expected = 1 + Int((elapsed / interval).rounded(.down))
         #expect(progress.count >= 2, "progress flows")
+        #expect(progress.count == expected, "\(progress.count) progress events in \(elapsed) s, \(expected) expected")
         #expect(progress.count <= ceiling, "\(progress.count) progress events in \(elapsed) s")
     }
 

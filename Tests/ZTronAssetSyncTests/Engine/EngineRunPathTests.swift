@@ -403,7 +403,11 @@ struct EngineRunPathTests {
         let harness = EngineHarness.make(tuning: SyncTuning(pendingRunDebounce: debounce))
         let catalog = EngineSyncTests.catalog(1)
         await harness.serveManifest(catalog.map(\.0))
-        await harness.source.script(catalog[0].0.transferID, [.fail(.offline(.noConnection)), .stage(catalog[0].1)])
+        // The pending run's attempt holds until the blocked run's end has been received: in the gate-first order the
+        // pending run starts in the turn that settles the blocked one, and its own end would otherwise replace the
+        // blocked run's in the probe's slot if the probe had not pulled it yet (one slot per subject, §7.9; L4-R17).
+        let transfer = catalog[0].0.transferID
+        await harness.source.script(transfer, [.fail(.offline(.noConnection)), .hold, .stage(catalog[0].1)])
         let engine = harness.engine
         let probe = EventProbe(stream: try await engine.subscribe().get())
         // 0: waiting, 1: firing (a re-entrant evaluation while the deadline fires answers false), 2: fired.
@@ -461,9 +465,12 @@ struct EngineRunPathTests {
             await engine.shutdown()
             return
         }
+        await harness.source.release(transfer, with: .progress(received: 0, expected: nil))
         if order == .runFirst {
-            await engine.waitUntil { $0.scheduledDeadlines >= 1 }
-            harness.time.advance(by: debounce)
+            // The pending run's debounce itself, not any deadline (L4-R17).
+            await engine.awaitCondition { $0.state.heap.deadline(for: .pendingRun) != nil }
+            let debounced = try #require(await engine.readForTests { $0.state.heap.deadline(for: .pendingRun) })
+            harness.time.advance(to: debounced)
         }
         let resumed = await probe.next { event in
             if case .syncFinished(_, .complete(let report)) = event {

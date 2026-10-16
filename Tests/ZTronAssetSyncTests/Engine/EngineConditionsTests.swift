@@ -71,8 +71,10 @@ struct EngineConditionsTests {
         let stream = try await engine.subscribe().get()
         let probe = EventProbe(stream: stream)
         await harness.conditions.send(.unrestricted)
-        try await harness.time.requireSleepers(atLeast: 1)
-        harness.time.advance(by: harness.configuration.tuning.pendingRunDebounce)
+        // The clock moves to the pending run's debounce once the engine armed it (L4-R17: that deadline, not any sleeper).
+        await engine.awaitCondition { $0.state.heap.deadline(for: .pendingRun) != nil }
+        let debounced = try #require(await engine.readForTests { $0.state.heap.deadline(for: .pendingRun) })
+        harness.time.advance(to: debounced)
         let finished = await probe.next { event in
             if case .syncFinished = event {
                 return true
