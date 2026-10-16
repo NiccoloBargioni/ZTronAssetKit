@@ -304,10 +304,39 @@ extension SyncEngine {
             return
         }
         let until = self.environment.time.monotonicNow().adding(seconds: max(delay, seconds ?? 0))
-        self.state.throttles[origin] = max(self.state.throttles[origin] ?? .zero, until)
+        let previous = self.state.throttles[origin]
+        let end = max(previous ?? .zero, until)
+        self.state.throttles[origin] = end
         self.state.metrics.retries[.throttled] += 1
         self.state.jobs[transfer]?.active = nil
-        self.park(transfer, reason: .throttled(until: self.state.throttles[origin] ?? until))
+        self.throttleExtended(from: previous)
+        self.park(transfer, reason: .throttled(until: end))
+    }
+
+    /// A 429 moved the origin's throttle end later than `previous`, the end in force before it. A user-initiated request
+    /// waits for a throttle only while its end is within `interactiveMaxWait` (sync.md §7.6, `RetryPolicy`), so the
+    /// user-initiated interests of the jobs the throttle had already parked get the fail-fast answer for the new end, the
+    /// one a request made now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. One pass over
+    /// the throttle's index (`throttleParked`), never every job, and only when an end moves later: while a throttle is in
+    /// force no transfer starts, so only the transfers already in flight and one manifest fetch can extend it (C2).
+    func throttleExtended(from previous: MonotonicInstant?) {
+        guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin], end > (previous ?? .zero), !self.state.throttleParked.isEmpty else {
+            return
+        }
+        // One read of the job table (a closure over `self.state` would copy the whole engine state per job).
+        let jobs = self.state.jobs
+        var users: [TransferID] = []
+        for transfer in self.state.throttleParked {
+            if let job = jobs[transfer], job.interests.values.contains(where: { $0.lane == .userInitiated }) {
+                users.append(transfer)
+            }
+        }
+        for transfer in users.sorted() {
+            guard case .blocked(let reason)? = self.state.jobs[transfer]?.state else {
+                continue
+            }
+            self.failFast(transfer, reason: reason)
+        }
     }
 
     /// Integrity bookkeeping in the store (R-INT-3, ADR-032): the failure is persisted with its backoff, every interest

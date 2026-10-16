@@ -179,9 +179,12 @@ extension SyncEngine {
                     // A transfer's 429 may have throttled the origin for longer while this fetch was in flight: the
                     // throttle, its deadline (which alone re-admits the jobs it parked) and the run's block all keep the
                     // later end, as the transfer path does (close-out cycle 15, F-35).
-                    let end = max(self.state.throttles[remote.originID] ?? .zero, until)
+                    let previous = self.state.throttles[remote.originID]
+                    let end = max(previous ?? .zero, until)
                     self.state.throttles[remote.originID] = end
                     self.state.heap.schedule(.throttle(remote.originID), at: end)
+                    // A user-initiated request a shorter throttle parked fails fast against the new end (F-36).
+                    self.throttleExtended(from: previous)
                     self.rearm()
                     return .throttled(end)
                 }
