@@ -234,6 +234,13 @@ struct EngineState {
     /// A space sweep stopped after `SyncEngine.parksPerPump` parks or re-admissions and owes a later turn the rest, in
     /// this mode (C2).
     var spaceSweepFollowUp: SpaceSweep?
+    /// Test seam (close-out cycle 17): while set, the scheduled space sweep follow-up keeps its sweep owed
+    /// (`spaceSweepFollowUp`) instead of running (`holdSpaceSweepFollowUps()`, `releaseSpaceSweepFollowUps()`), so a
+    /// test decides what the engine does while a sweep is owed, an order no production path fixes. No production path
+    /// sets it.
+    var spaceSweepFollowUpsHeld = false
+    /// Test seam: a follow-up sweep reached the hold and waits for its release.
+    var spaceSweepFollowUpWaiting = false
     /// The jobs a space sweep re-queued, by the ticket it queued them with: while one still waits in the queue with that
     /// ticket, every later sweep counts its bytes ahead of the jobs it re-checks, so the sweeps of one read that the
     /// bound splits over several turns, and the next read's, admit only what the room holds together (C2, T17).

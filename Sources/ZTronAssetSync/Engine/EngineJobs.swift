@@ -730,8 +730,30 @@ extension SyncEngine {
         }
     }
 
+    /// Test seam: the next space sweep follow-ups keep their sweep owed until `releaseSpaceSweepFollowUps()`.
+    func holdSpaceSweepFollowUps() {
+        self.state.spaceSweepFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held follow-up sweep run in this turn, or disarms a hold nothing reached.
+    func releaseSpaceSweepFollowUps() {
+        self.state.spaceSweepFollowUpsHeld = false
+        guard self.state.spaceSweepFollowUpWaiting else {
+            return
+        }
+        self.state.spaceSweepFollowUpWaiting = false
+        self.spaceSweepFollowUp()
+    }
+
     /// The scheduled follow-up sweep.
     private func spaceSweepFollowUp() {
+        if self.state.spaceSweepFollowUpsHeld {
+            // Test seam: the sweep stays owed (`spaceSweepFollowUp`) until the release runs it; a sweep owed meanwhile
+            // merges into it without a second task (`scheduleSpaceSweepFollowUp`).
+            self.state.spaceSweepFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
         guard let sweep = self.state.spaceSweepFollowUp else {
             return
         }
