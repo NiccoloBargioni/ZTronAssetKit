@@ -203,11 +203,48 @@ extension SyncEngine {
     /// `answer`, the engine's own figures), the rest wait for `failed(.at)` (the alarm re-queues, T18) or a satisfied
     /// edge (T19). The interactive policy applies while the job's lane is user-initiated (sync.md §8.2).
     func retryLater(_ transfer: TransferID, error: TransferError, answer: AssetError? = nil) {
-        guard var job = self.state.jobs[transfer] else {
-            return
-        }
         let wall = self.environment.time.now()
         let assetError = answer ?? error.assetError(now: wall)
+        guard let remaining = self.countFailedAttempt(transfer, error: error, assetError: assetError) else {
+            return
+        }
+        let attempts = remaining.attempts
+        let policy = remaining.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+        let retryAfter: TimeInterval?
+        if case .transient(_, let hint?) = error {
+            retryAfter = hint.seconds(from: wall)
+        } else {
+            retryAfter = nil
+        }
+        guard let delay = Backoff.delay(
+            attempt: attempts,
+            retryAfter: retryAfter,
+            policy: policy,
+            seed: self.environment.random.seed,
+            key: StableHash.fnv1a64(transfer.rawValue)
+        ) else {
+            self.transition(transfer, to: .failed(.nextRun))
+            self.resolveAll(transfer, with: .failed(assetError))
+            return
+        }
+        let at = self.environment.time.monotonicNow().adding(seconds: delay)
+        if self.transition(transfer, to: .failed(.at(at))) {
+            self.state.heap.schedule(.retry(transfer, epoch: remaining.epoch), at: at)
+            self.rearm()
+        }
+        self.notifyObservers()
+        self.checkRunSettled()
+    }
+
+    /// Counts a failed attempt toward the retry caps (R-SYN-5): the interests whose lane's cap the count reaches receive
+    /// `assetError` (the interactive policy for user-initiated ones, sync.md §8.2); when none is left the job ends
+    /// `failed(.nextRun)` and the run is checked for settling. Returns the job while interests remain. Shared by
+    /// `retryLater` and by an ENOSPC that parks `awaitingSpace` (L4-R4), so a wait for the store's reclaim joins the
+    /// same budget as a backoff.
+    private func countFailedAttempt(_ transfer: TransferID, error: TransferError, assetError: AssetError) -> Job? {
+        guard var job = self.state.jobs[transfer] else {
+            return nil
+        }
         job.attempts += 1
         job.active = nil
         job.transientFailure = true
@@ -234,33 +271,9 @@ extension SyncEngine {
                 self.removeJob(transfer)
             }
             self.checkRunSettled()
-            return
+            return nil
         }
-        let policy = remaining.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-        let retryAfter: TimeInterval?
-        if case .transient(_, let hint?) = error {
-            retryAfter = hint.seconds(from: wall)
-        } else {
-            retryAfter = nil
-        }
-        guard let delay = Backoff.delay(
-            attempt: attempts,
-            retryAfter: retryAfter,
-            policy: policy,
-            seed: self.environment.random.seed,
-            key: StableHash.fnv1a64(transfer.rawValue)
-        ) else {
-            self.transition(transfer, to: .failed(.nextRun))
-            self.resolveAll(transfer, with: .failed(assetError))
-            return
-        }
-        let at = self.environment.time.monotonicNow().adding(seconds: delay)
-        if self.transition(transfer, to: .failed(.at(at))) {
-            self.state.heap.schedule(.retry(transfer, epoch: remaining.epoch), at: at)
-            self.rearm()
-        }
-        self.notifyObservers()
-        self.checkRunSettled()
+        return remaining
     }
 
     /// A 429 (ARCHITECTURE §7.6): an origin-wide throttle until the clamped deadline (a `Retry-After` above
@@ -350,7 +363,7 @@ extension SyncEngine {
     }
 
     /// ENOSPC (ARCHITECTURE §7.6), decided on a fresh free-space read: `awaitingSpace` when the store has pending
-    /// reclaim (the reaper wakes it); a retry with backoff when the volume holds what the job needs after all (the
+    /// reclaim (the reaper wakes it; the attempt counts toward the retry caps, L4-R4); a retry with backoff when the volume holds what the job needs after all (the
     /// ENOSPC was transient: parking it would fail every joiner with stale figures and leave the job parked for ever);
     /// else `insufficientSpace` with the bytes the attempt needs and the job's room above the reserve (F-22),
     /// re-evaluated at every later read (T17).
@@ -373,6 +386,15 @@ extension SyncEngine {
         if !reclaiming, let measured = self.state.jobs[transfer], self.spaceBlock(measured) == nil {
             self.retryLater(transfer, error: .insufficientSpace(requiredBytes: required), answer: figures)
             return
+        }
+        if reclaiming {
+            // The wait for the reclaim stands where the backoff would, but the attempt joins the retry budget all the
+            // same (L4-R4): when nothing reclaims on time, the settlement's fresh read re-queues a job the volume holds
+            // at once, so a volume that keeps answering ENOSPC while it reads roomy would otherwise start the transfer
+            // again without end (review of close-out cycle 6). Interests at their cap get the figures; none left ends it.
+            guard self.countFailedAttempt(transfer, error: .insufficientSpace(requiredBytes: required), assetError: figures) != nil else {
+                return
+            }
         }
         guard self.transition(transfer, to: .queued) else {
             return
