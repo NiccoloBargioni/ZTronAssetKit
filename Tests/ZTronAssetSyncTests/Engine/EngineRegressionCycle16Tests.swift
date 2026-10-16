@@ -387,6 +387,61 @@ struct EngineRegressionCycle16Tests {
         await engine.shutdown()
     }
 
+    /// The answers to an extension come in turns of their own, at most `parksPerPump` jobs a turn (each answer costs about
+    /// what a park does, C2); a later turn takes the rest. More user-initiated waiters than one turn answers wait for a
+    /// 1 s throttle when a 60 s 429 extends it: every one of them gets the fail-fast answer, none is left waiting.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast", .timeLimit(.minutes(1)))
+    func everyUserWaiterFailsFastOnExtension() async throws {
+        let count = SyncEngine.parksPerPump + 8
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4))
+        let bytesA = EngineFixture.bytes(5_501)
+        let bytesB = EngineFixture.bytes(5_502)
+        let a = EngineHarness.onDemand("a", bytesA)
+        let b = EngineHarness.onDemand("b", bytesB)
+        let users = (0..<count).map { EngineHarness.onDemand("u\($0)", EngineFixture.bytes(UInt64(20_000 + $0))) }
+        await harness.serveManifest([a, b] + users)
+        let engine = harness.engine
+        let origin = harness.source.originID
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        await harness.source.script(b.transferID, [.hold, .stage(bytesB)])
+        await harness.source.script(a.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(1))), .stage(bytesA)])
+        let callerB = Task { await engine.awaitAsset(b.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[b.transferID]?.active != nil }
+        let callerA = Task { await engine.awaitAsset(a.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state.isThrottleParked == true }
+        // Every user request is parked by the 1 s throttle and waits: its end is within interactiveMaxWait.
+        var waiting: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in users {
+            waiting.append(Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) })
+        }
+        await engine.awaitCondition { engine in
+            engine.state.throttleParked.count == count + 1 && engine.state.waiters.count == count + 2 && !engine.state.pumpFollowUpScheduled
+        }
+        await harness.source.release(b.transferID, with: .failed(.transient(.throttled, retryAfter: .seconds(60))))
+        await engine.awaitCondition { $0.state.jobs[b.transferID]?.state.isThrottleParked == true }
+        await engine.awaitCondition { EngineRegressionCycle15Tests.quiet($0) && !$0.state.throttleAnswersScheduled }
+        let after = await engine.readForTests { engine in
+            (engine.state.waiters.count, engine.state.throttles[origin], engine.environment.time.monotonicNow(), engine.invariantViolations())
+        }
+        let throttleEnd = try #require(after.1, "setup: the origin is throttled")
+        #expect(after.0 == 2, "only the two prefetch callers still wait: \(after.0 - 2) user requests were left waiting")
+        #expect(after.3.isEmpty, "\(after.3)")
+        if after.0 != 2 {
+            await engine.shutdown()
+        }
+        let expected = Result<AssetLocation, AssetError>.failure(.serverUnavailable(retryAfter: throttleEnd.seconds(since: after.2)))
+        var answers: [Result<AssetLocation, AssetError>] = []
+        for task in waiting {
+            answers.append(await joinCancelling(task))
+        }
+        #expect(answers.filter { $0 != expected }.isEmpty, "every user request fails fast with the origin's wait: \(answers.filter { $0 != expected }.count) did not")
+        await engine.shutdown()
+        _ = await joinCancelling(callerA)
+        _ = await joinCancelling(callerB)
+    }
+
     // MARK: Which parked claims a follow-up turn still owes a re-queue (R-SYN-6; F-36)
 
     /// The run's check (`OwedRequeues`) mirrors what the next re-admission turn takes: the jobs an event owed

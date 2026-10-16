@@ -315,28 +315,79 @@ extension SyncEngine {
 
     /// A 429 moved the origin's throttle end later than `previous`, the end in force before it. A user-initiated request
     /// waits for a throttle only while its end is within `interactiveMaxWait` (sync.md §7.6, `RetryPolicy`), so the
-    /// user-initiated interests of the jobs the throttle had already parked get the fail-fast answer for the new end, the
-    /// one a request made now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. One pass over
-    /// the throttle's index (`throttleParked`), never every job, and only when an end moves later: while a throttle is in
-    /// force no transfer starts, so only the transfers already in flight and one manifest fetch can extend it (C2).
+    /// user-initiated waiters of the jobs the throttle had already parked get the fail-fast answer for the new end, the one
+    /// a request made now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. The answers
+    /// come in a later turn of their own (`answerThrottledUsers()`), so the 429's turn stays O(1).
     func throttleExtended(from previous: MonotonicInstant?) {
         guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin], end > (previous ?? .zero), !self.state.throttleParked.isEmpty else {
             return
         }
+        self.scheduleThrottleAnswers()
+    }
+
+    /// Schedules one later turn for `answerThrottledUsers()`.
+    private func scheduleThrottleAnswers() {
+        guard !self.state.throttleAnswersScheduled else {
+            return
+        }
+        self.state.throttleAnswersScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the turn re-reads the throttle, the
+            // clock and the throttle's index.
+            await engine.answerThrottledUsers()
+        }
+        if spawned == nil {
+            self.state.throttleAnswersScheduled = false
+        }
+    }
+
+    /// The scheduled turn: while the origin's throttle ends beyond `interactiveMaxWait`, the user-initiated `resolve`
+    /// and `ensureAvailable` interests of the jobs it parked get the fail-fast answer (`failFast`, which reads the
+    /// origin's end), at most `parksPerPump` jobs per turn, each answer costing about what a park does (C2); a later turn
+    /// takes the rest. Every interest it answers leaves its job, so each turn makes progress. One pass over the
+    /// throttle's index (`throttleParked`), never every job. A pump follows: an `ensureAvailable` group whose members
+    /// failed fast materialises its next ones, which the gate parks and answers the same way.
+    private func answerThrottledUsers() {
+        self.state.throttleAnswersScheduled = false
+        guard self.isRunning, let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
+            return
+        }
+        guard end.seconds(since: self.environment.time.monotonicNow()) > self.tuning.interactiveRetry.interactiveMaxWait else {
+            // Every user-initiated interest still waits within its bound.
+            return
+        }
         // One read of the job table (a closure over `self.state` would copy the whole engine state per job).
         let jobs = self.state.jobs
-        var users: [TransferID] = []
+        var users: [(ticket: UInt64, transfer: TransferID)] = []
         for transfer in self.state.throttleParked {
-            if let job = jobs[transfer], job.interests.values.contains(where: { $0.lane == .userInitiated }) {
-                users.append(transfer)
-            }
-        }
-        for transfer in users.sorted() {
-            guard case .blocked(let reason)? = self.state.jobs[transfer]?.state else {
+            guard let job = jobs[transfer] else {
                 continue
             }
-            self.failFast(transfer, reason: reason)
+            let answered = job.interests.values.contains { interest in
+                interest.lane == .userInitiated && (interest.kind == .waiter || interest.kind == .ensure)
+            }
+            if answered {
+                users.append((job.ticket, transfer))
+            }
         }
+        guard !users.isEmpty else {
+            return
+        }
+        // In queue order (the tickets), a deterministic order whose comparisons are integers: sorting 10,000 transfer
+        // identifiers, 66-character strings, took most of a turn's budget.
+        users.sort { ($0.ticket, $0.transfer) < ($1.ticket, $1.transfer) }
+        for user in users.prefix(Self.parksPerPump) {
+            guard case .blocked(let reason)? = self.state.jobs[user.transfer]?.state else {
+                continue
+            }
+            self.failFast(user.transfer, reason: reason)
+        }
+        if users.count > Self.parksPerPump {
+            self.scheduleThrottleAnswers()
+        }
+        self.pump()
+        self.rearm()
+        self.notifyObservers()
     }
 
     /// Integrity bookkeeping in the store (R-INT-3, ADR-032): the failure is persisted with its backoff, every interest

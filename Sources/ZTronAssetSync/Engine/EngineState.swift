@@ -267,6 +267,9 @@ struct EngineState {
     var readmissionFollowUpsHeld = false
     /// Test seam: a follow-up turn reached the hold and waits for its release.
     var readmissionFollowUpWaiting = false
+    /// A later turn is scheduled to answer the user-initiated waiters of the jobs a throttle parked, after a 429 extended
+    /// the throttle beyond their bound (`SyncEngine.throttleExtended(from:)`, at most `parksPerPump` jobs a turn, C2).
+    var throttleAnswersScheduled = false
     /// Lanes whose queued jobs a lane-wide block (offline, a policy) parks, left unfinished by a pump turn's bound and
     /// continued by every later pump (C2): the reason each lane's jobs are parked with.
     var laneParksOwed: [AssetPriority: BlockReason] = [:]
