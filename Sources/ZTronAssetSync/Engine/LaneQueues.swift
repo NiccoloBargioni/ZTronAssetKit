@@ -29,6 +29,9 @@ struct LaneQueues {
 
     private var entries: [Kind: [Entry]] = [:]
     private var heads: [Kind: Int] = [:]
+    /// Entries a scan took out of their queue for the caller (`setAside`), in the order met: the jobs of a released
+    /// group, which wait until their interests leave; `restoreAside` puts the ones still valid back.
+    private var aside: [Kind: [Entry]] = [:]
 
     /// Appends `entry` to `kind` (`front` puts it first: a preempted job resumes before newer work).
     mutating func push(_ entry: Entry, to kind: Kind, front: Bool = false) {
@@ -43,8 +46,71 @@ struct LaneQueues {
     }
 
     /// Removes and returns the first valid entry of `kind` that `accept` takes; invalid entries before it are
-    /// dropped, valid ones it skips stay in order.
-    mutating func pop(_ kind: Kind, isValid: (Entry) -> Bool, accept: (Entry) -> Bool = { _ in true }) -> Entry? {
+    /// dropped, valid ones it skips stay in order, and valid ones `setAside` claims on the way are kept aside, so no
+    /// later scan steps over them again.
+    mutating func pop(
+        _ kind: Kind,
+        isValid: (Entry) -> Bool,
+        setAside: (Entry) -> Bool = { _ in false },
+        accept: (Entry) -> Bool = { _ in true }
+    ) -> Entry? {
+        self.scan(kind, isValid: isValid, setAside: setAside, accept: accept, take: true)
+    }
+
+    /// The first valid entry of `kind` that `accept` takes, left in place; valid entries `setAside` claims on the way
+    /// are kept aside as in `pop`.
+    mutating func peek(_ kind: Kind, isValid: (Entry) -> Bool, setAside: (Entry) -> Bool, accept: (Entry) -> Bool) -> Entry? {
+        self.scan(kind, isValid: isValid, setAside: setAside, accept: accept, take: false)
+    }
+
+    /// Takes the valid entries of `kind` that `claim` takes out of the queue and keeps them aside (one pass from the
+    /// head, order kept; invalid entries are dropped on the way).
+    mutating func setAside(_ kind: Kind, isValid: (Entry) -> Bool, where claim: (Entry) -> Bool) {
+        guard let list = self.entries[kind] else {
+            return
+        }
+        var kept: [Entry] = []
+        for entry in list[min(self.heads[kind] ?? 0, list.count)...] where isValid(entry) {
+            if claim(entry) {
+                self.aside[kind, default: []].append(entry)
+            } else {
+                kept.append(entry)
+            }
+        }
+        self.entries[kind] = kept
+        self.heads[kind] = 0
+    }
+
+    /// Puts the entries set aside that are still valid back at the front of their queues, in the order they were met,
+    /// and drops the others.
+    mutating func restoreAside(isValid: (Entry) -> Bool) {
+        let aside = self.aside
+        self.aside = [:]
+        for (kind, list) in aside {
+            let valid = list.filter(isValid)
+            guard !valid.isEmpty else {
+                continue
+            }
+            let queue = self.entries[kind] ?? []
+            self.entries[kind] = valid + queue[min(self.heads[kind] ?? 0, queue.count)...]
+            self.heads[kind] = 0
+        }
+    }
+
+    /// Every entry set aside, stale ones included (the invariant check).
+    var asideEntries: [Entry] {
+        Kind.allCases.flatMap { self.aside[$0] ?? [] }
+    }
+
+    /// `pop` and `peek`: the scan from the head, which drops the invalid entries at the head and takes the entries set
+    /// aside out of the part it scanned (and the entry it found when it takes it) in one rebuild of that part.
+    private mutating func scan(
+        _ kind: Kind,
+        isValid: (Entry) -> Bool,
+        setAside: (Entry) -> Bool,
+        accept: (Entry) -> Bool,
+        take: Bool
+    ) -> Entry? {
         guard var list = self.entries[kind] else {
             return nil
         }
@@ -54,20 +120,40 @@ struct LaneQueues {
         }
         var index = head
         var found: Entry?
+        var removed: [Int] = []
         while index < list.count {
             let entry = list[index]
-            if isValid(entry), accept(entry) {
-                found = entry
-                break
+            if isValid(entry) {
+                if setAside(entry) {
+                    removed.append(index)
+                    self.aside[kind, default: []].append(entry)
+                } else if accept(entry) {
+                    found = entry
+                    break
+                }
             }
             index += 1
         }
-        if found != nil {
-            if index == head {
-                head += 1
-            } else {
-                list.remove(at: index)
+        if found != nil, take {
+            removed.append(index)
+        }
+        if removed == [head] {
+            head += 1
+        } else if removed.count == 1 {
+            list.remove(at: removed[0])
+        } else if let last = removed.last {
+            // One rebuild of the scanned part, whatever the number of entries removed from it.
+            var kept: [Entry] = []
+            kept.reserveCapacity(last + 1 - head - removed.count)
+            var next = 0
+            for position in head...last {
+                if next < removed.count, removed[next] == position {
+                    next += 1
+                } else {
+                    kept.append(list[position])
+                }
             }
+            list.replaceSubrange(head...last, with: kept)
         }
         if head > 32, head * 2 > list.count {
             list.removeFirst(head)
@@ -115,18 +201,22 @@ struct LaneQueues {
         return nil
     }
 
-    /// Drops every invalid entry, keeping order (the engine calls it when stale entries outnumber the jobs).
+    /// Drops every invalid entry, set-aside ones included, keeping order (the engine calls it when stale entries
+    /// outnumber the jobs).
     mutating func compact(isValid: (Entry) -> Bool) {
         for kind in Kind.allCases {
             let list = self.entries[kind] ?? []
             let head = self.heads[kind] ?? 0
             self.entries[kind] = list[min(head, list.count)...].filter(isValid)
             self.heads[kind] = 0
+            if let aside = self.aside[kind] {
+                self.aside[kind] = aside.filter(isValid)
+            }
         }
     }
 
-    /// Stored entries, stale ones included (the 2 × live bound).
+    /// Stored entries, stale and set-aside ones included (the 2 × live bound).
     var storedCount: Int {
-        Kind.allCases.reduce(0) { $0 + (self.entries[$1]?.count ?? 0) - (self.heads[$1] ?? 0) }
+        Kind.allCases.reduce(0) { $0 + (self.entries[$1]?.count ?? 0) - (self.heads[$1] ?? 0) + (self.aside[$1]?.count ?? 0) }
     }
 }

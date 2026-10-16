@@ -116,6 +116,9 @@ extension SyncEngine {
             return
         }
         let before = job.lane
+        // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
+        let wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
+        let ticket = job.ticket
         job.assets.insert(asset)
         if var interest = job.interests[token] {
             interest.assets.insert(asset)
@@ -127,6 +130,11 @@ extension SyncEngine {
         self.state.jobs[transfer] = job
         self.relane(transfer, from: before)
         self.failFastJoiner(token, of: transfer)
+        if wasReleasedOnly, let joined = self.state.jobs[transfer], joined.state == .queued, joined.ticket == ticket {
+            // Now that this interest wants it, it is queued again (a join at the job's own lane does not re-queue it
+            // above): at the front of its lane, where it waited; an entry left in a queue or aside is stale.
+            self.enqueue(transfer, front: true)
+        }
         self.notifyObservers()
     }
 

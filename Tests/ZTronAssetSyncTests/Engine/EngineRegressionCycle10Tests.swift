@@ -189,4 +189,42 @@ struct EngineRegressionCycle10Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: A released member another interest wants during the release (R-CAR-4; the set-aside of close-out cycle 10)
+
+    /// Since cycle 10 a scan takes the queue entries of jobs only released groups want out of their queue (each is
+    /// stepped over once, C2), so such a job waits in no queue until the release has removed its interest. An interest
+    /// that joins it meanwhile at its own lane (a second prefetch handle's join; here a system interest, the synchronous
+    /// stand-in) re-queues nothing in `relane`, so `addInterest` must queue it again, or it would wait for the release's
+    /// last turn while a live interest wants it. More members than one turn releases wait behind three running ones; in
+    /// one actor turn the handle is released (its pump sets the remaining members aside), then the last member gains an
+    /// interest and the engine pumps: that member must start in this turn.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-CAR-4: a member of a released handle that another interest wants while the release continues starts at once",
+        .timeLimit(.minutes(1))
+    )
+    func releasedMemberWantedAgainStartsAtOnce() async throws {
+        let count = SyncEngine.releasesPerTurn + 64
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: count, seed: 11_101)
+        let engine = harness.engine
+        let token = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count && $0.state.inFlight.count == 3 }
+        await engine.waitForAllHandles()
+        let last = try #require(entries.last)
+        let turn = await engine.readForTests { engine in
+            engine.performReleaseGroup(token)
+            let aside = engine.state.queues.asideEntries.contains { $0.transfer == last.transferID && engine.isValid($0) }
+            engine.addSystemInterest(entry: last, lane: .prefetch)
+            engine.pump()
+            return (aside, engine.state.releasing.isEmpty, engine.state.jobs[last.transferID]?.state)
+        }
+        #expect(turn.0, "setup: the release's pump set the member aside")
+        #expect(!turn.1, "setup: the release continues in a later turn")
+        #expect(turn.2 == .downloading, "the member starts in the turn its new interest arrived: \(String(describing: turn.2))")
+        await engine.awaitCondition { !$0.state.releaseFollowUpScheduled }
+        #expect(await engine.readForTests { $0.state.jobs.count } == 1, "only the member the new interest wants keeps a job")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }

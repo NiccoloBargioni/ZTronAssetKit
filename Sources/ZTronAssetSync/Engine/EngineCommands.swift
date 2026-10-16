@@ -326,6 +326,12 @@ extension SyncEngine {
         }
         guard !self.state.releasing.isEmpty else {
             return true
+            // No release is left: an entry a scan set aside whose job is still queued (none, unless an interest of a
+            // released group outlived its release) goes back to its queue.
+            var queues = self.state.queues
+            self.state.queues = LaneQueues()
+            queues.restoreAside { self.isValid($0) }
+            self.state.queues = queues
         }
         guard !self.state.releaseFollowUpScheduled else {
             return false
@@ -1513,6 +1519,16 @@ extension SyncEngine {
     private func strandedPendingRun() -> String? {
         guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
             return nil
+        // A job set aside waits in no queue: it must be one only released groups want.
+        let strayAside = self.state.queues.asideEntries.filter { entry in
+            guard self.isValid(entry), let job = self.state.jobs[entry.transfer] else {
+                return false
+            }
+            return !self.isReleasedOnly(job)
+        }
+        if !strayAside.isEmpty {
+            violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
+        }
         }
         switch self.pendingRunGate(pending) {
         case .open:

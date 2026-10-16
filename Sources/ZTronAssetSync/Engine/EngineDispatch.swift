@@ -123,7 +123,7 @@ extension SyncEngine {
                     }
                 }
             }
-            if self.hasQueuedUser {
+            if self.hasQueuedUser() {
                 if self.preemptForUser() {
                     continue
                 }
@@ -265,18 +265,31 @@ extension SyncEngine {
         !self.state.releasing.isEmpty && job.interests.keys.allSatisfy { self.state.releasing[$0] != nil }
     }
 
-    /// Whether a valid user-initiated entry waits.
-    private var hasQueuedUser: Bool {
-        for kind in [LaneQueues.Kind.userSingle, .userBatch] {
-            let ready: (LaneQueues.Entry) -> Bool = { entry in
-                self.isValid(entry) && self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
-                    && (self.state.releasing.isEmpty || !(self.state.jobs[entry.transfer].map { self.isReleasedOnly($0) } ?? false))
-            }
-            if self.state.queues.first(kind, isValid: ready) != nil {
-                return true
-            }
+    /// Whether a queue entry stands for a job only released groups want (`isReleasedOnly`): a scan sets it aside
+    /// (`LaneQueues.aside`), where it waits until its job is removed, wanted by another interest (`addInterest` queues it
+    /// again), or no release is left (`continueReleases` restores it).
+    func setsAside(_ entry: LaneQueues.Entry) -> Bool {
+        guard !self.state.releasing.isEmpty, let job = self.state.jobs[entry.transfer] else {
+            return false
         }
-        return false
+        return self.isReleasedOnly(job)
+    }
+
+    /// Whether a valid user-initiated entry waits that is not draining, held for a manifest catch-up or wanted only by
+    /// released groups (those are set aside on the way, so each is stepped over once, C2).
+    private func hasQueuedUser() -> Bool {
+        // The queues are taken out of the state while the closures read it (no overlapping access).
+        var queues = self.state.queues
+        self.state.queues = LaneQueues()
+        var found = false
+        for kind in [LaneQueues.Kind.userSingle, .userBatch] where !found {
+            let ready = queues.peek(kind, isValid: { self.isValid($0) }, setAside: { self.setsAside($0) }) { entry in
+                self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
+            }
+            found = ready != nil
+        }
+        self.state.queues = queues
+        return found
     }
 
     /// The next prefetch or bulk job: bulk first once its head waited `bulkAging` (sync.md §7.4).
@@ -292,12 +305,15 @@ extension SyncEngine {
         return nil
     }
 
-    /// Pops the first valid entry of `kind` whose gates do not say "wait"; a lane whose gate waits is left as is.
+    /// Pops the first valid entry of `kind` whose gates do not say "wait"; a lane whose gate waits is left as is. Entries
+    /// of jobs only released groups want are set aside on the way: a user-initiated handle's release left about 10,000
+    /// of them in the user queue, and every pump of the release scanned them all twice (here and in `hasQueuedUser`),
+    /// about 23 ms of back-to-back turns (review of close-out cycle 9, PROBE-C9C-2, C2).
     private func popDispatchable(_ kind: LaneQueues.Kind) -> TransferID? {
         // The queues are taken out of the state while the closures read it (no overlapping access).
         var queues = self.state.queues
         self.state.queues = LaneQueues()
-        let entry = queues.pop(kind, isValid: { self.isValid($0) }) { candidate in
+        let entry = queues.pop(kind, isValid: { self.isValid($0) }, setAside: { self.setsAside($0) }) { candidate in
             self.state.draining[candidate.transfer] == nil && self.gate(candidate.transfer) != .wait
         }
         self.state.queues = queues
@@ -353,8 +369,22 @@ extension SyncEngine {
             queues.dropInvalidHead(kind) { self.isValid($0) }
             let pending = queues.pending(kind)
             self.state.queues = queues
+            var aside = false
+            defer {
+                if aside {
+                    self.setAside(kind)
+                }
+            }
             for entry in pending {
-                guard self.isValid(entry), self.state.jobs[entry.transfer]?.lane == lane, self.gate(entry.transfer) == .block(reason) else {
+                guard self.isValid(entry) else {
+                    continue
+                }
+                if self.setsAside(entry) {
+                    // Never parked meanwhile (the gate waits for it): set aside, so no later pass steps over it.
+                    aside = true
+                    continue
+                }
+                guard self.state.jobs[entry.transfer]?.lane == lane, self.gate(entry.transfer) == .block(reason) else {
                     continue
                 }
                 guard parked < limit else {
@@ -367,6 +397,14 @@ extension SyncEngine {
         }
         self.state.laneParksOwed[lane] = nil
         return parked
+    }
+
+    /// Sets aside the entries of `kind` whose jobs only released groups want (one pass over the queue).
+    private func setAside(_ kind: LaneQueues.Kind) {
+        var queues = self.state.queues
+        self.state.queues = LaneQueues()
+        queues.setAside(kind, isValid: { self.isValid($0) }, where: { self.setsAside($0) })
+        self.state.queues = queues
     }
 
     /// Continues the lane-wide parks earlier turns left (`laneParksOwed`), at most `limit` parks in all; a lane whose
@@ -668,6 +706,7 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
+        job.active?.edgeSerial = self.state.networkEdgeSerial
         // A publication of a file an earlier attempt staged has no stream: nothing is left to drain if its job is
         // retired before its driver runs (`publish` then discards the file).
         job.active?.terminalReceived = adopt != nil
@@ -706,7 +745,6 @@ extension SyncEngine {
     /// One attempt: ask the store whether it already holds the content (L4-R5), start the transfer, consume its
     /// updates, apply the terminal element.
     func drive(_ transfer: TransferID, epoch: UInt64, request: TransferRequest) async {
-        job.active?.edgeSerial = self.state.networkEdgeSerial
         guard let remote = self.state.remote else {
             return
         }
