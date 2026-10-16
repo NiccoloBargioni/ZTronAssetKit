@@ -63,24 +63,6 @@ struct LaneQueues {
         self.scan(kind, isValid: isValid, setAside: setAside, accept: accept, take: false)
     }
 
-    /// Takes the valid entries of `kind` that `claim` takes out of the queue and keeps them aside (one pass from the
-    /// head, order kept; invalid entries are dropped on the way).
-    mutating func setAside(_ kind: Kind, isValid: (Entry) -> Bool, where claim: (Entry) -> Bool) {
-        guard let list = self.entries[kind] else {
-            return
-        }
-        var kept: [Entry] = []
-        for entry in list[min(self.heads[kind] ?? 0, list.count)...] where isValid(entry) {
-            if claim(entry) {
-                self.aside[kind, default: []].append(entry)
-            } else {
-                kept.append(entry)
-            }
-        }
-        self.entries[kind] = kept
-        self.heads[kind] = 0
-    }
-
     /// Puts the entries set aside that are still valid back at the front of their queues, in the order they were met,
     /// and drops the others.
     mutating func restoreAside(isValid: (Entry) -> Bool) {

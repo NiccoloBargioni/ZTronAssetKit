@@ -369,22 +369,8 @@ extension SyncEngine {
             queues.dropInvalidHead(kind) { self.isValid($0) }
             let pending = queues.pending(kind)
             self.state.queues = queues
-            var aside = false
-            defer {
-                if aside {
-                    self.setAside(kind)
-                }
-            }
             for entry in pending {
-                guard self.isValid(entry) else {
-                    continue
-                }
-                if self.setsAside(entry) {
-                    // Never parked meanwhile (the gate waits for it): set aside, so no later pass steps over it.
-                    aside = true
-                    continue
-                }
-                guard self.state.jobs[entry.transfer]?.lane == lane, self.gate(entry.transfer) == .block(reason) else {
+                guard self.isValid(entry), self.state.jobs[entry.transfer]?.lane == lane, self.gate(entry.transfer) == .block(reason) else {
                     continue
                 }
                 guard parked < limit else {
@@ -397,14 +383,6 @@ extension SyncEngine {
         }
         self.state.laneParksOwed[lane] = nil
         return parked
-    }
-
-    /// Sets aside the entries of `kind` whose jobs only released groups want (one pass over the queue).
-    private func setAside(_ kind: LaneQueues.Kind) {
-        var queues = self.state.queues
-        self.state.queues = LaneQueues()
-        queues.setAside(kind, isValid: { self.isValid($0) }, where: { self.setsAside($0) })
-        self.state.queues = queues
     }
 
     /// Continues the lane-wide parks earlier turns left (`laneParksOwed`), at most `limit` parks in all; a lane whose
