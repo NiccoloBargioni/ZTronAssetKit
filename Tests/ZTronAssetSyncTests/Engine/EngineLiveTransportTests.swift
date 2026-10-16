@@ -272,6 +272,9 @@ struct EngineLiveTransportTests {
             // The interactive backoff passes on the manual clock: every alarm sleeper is woken (until cancelled).
             while !Task.isCancelled {
                 await harness.time.waitForSleepers(atLeast: 1)
+                guard !Task.isCancelled else {
+                    return
+                }
                 if let deadline = harness.time.nextDeadline {
                     harness.time.advance(to: deadline)
                 }

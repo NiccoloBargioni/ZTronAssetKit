@@ -240,21 +240,33 @@ struct EngineHarness {
     }
 
     /// Runs `operation` while a driver wakes every sleeper on the manual clock (a purge's grace wait, a commit window,
-    /// a backoff), then stops the driver (its wait ends on cancellation).
+    /// a backoff), then stops the driver and returns once it has ended. Its wait ends on cancellation, after which it
+    /// advances nothing: a driver that outlived the call could advance the clock to a sleeper registered afterwards
+    /// (PROBE-C8C-5, close-out cycle 9).
     func withClock<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T {
         let time = self.time
         let driver = Task {
             while !Task.isCancelled {
                 await time.waitForSleepers(atLeast: 1)
+                guard !Task.isCancelled else {
+                    return
+                }
                 if let deadline = time.nextDeadline {
                     time.advance(to: deadline)
                 }
             }
         }
-        defer {
+        let value: T
+        do {
+            value = try await operation()
+        } catch {
             driver.cancel()
+            await driver.value
+            throw error
         }
-        return try await operation()
+        driver.cancel()
+        await driver.value
+        return value
     }
 
     /// Drives the clock until the engine is idle-silent and the conditions source observes nothing.

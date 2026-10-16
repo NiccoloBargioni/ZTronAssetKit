@@ -39,7 +39,9 @@ struct EngineRegressionCycle6Tests {
 
     /// Runs `operation` while a driver wakes the sleepers of `clocks`: each round moves every clock still before the
     /// earliest sleeper's deadline to it (never back), so a clock that is ahead stays put until the others reach it.
-    /// Never a wall-clock wait; the driver's own wait ends on its cancellation.
+    /// Never a wall-clock wait; the driver's own wait ends on its cancellation, after which it advances nothing, and
+    /// the call returns only once the driver has ended: a driver that outlived the call advanced the clocks to a sleeper
+    /// registered afterwards (PROBE-C8C-5, close-out cycle 9).
     @available(macOS 15.0, iOS 18.0, *)
     static func driving<T: Sendable>(_ clocks: [ManualTimeSource], _ operation: @Sendable () async -> T) async -> T {
         let driver = Task {
@@ -53,6 +55,10 @@ struct EngineRegressionCycle6Tests {
                     _ = await group.next()
                     group.cancelAll()
                 }
+                // The wait also ends on cancellation: a cancelled driver must not advance to a later sleeper.
+                guard !Task.isCancelled else {
+                    return
+                }
                 guard let next = clocks.compactMap(\.nextDeadline).min() else {
                     continue
                 }
@@ -61,10 +67,10 @@ struct EngineRegressionCycle6Tests {
                 }
             }
         }
-        defer {
-            driver.cancel()
-        }
-        return await operation()
+        let value = await operation()
+        driver.cancel()
+        await driver.value
+        return value
     }
 
     // MARK: A purge reclaims the bytes a job waits for before the engine's alarm runs (R-SYN-11; PROBE-C5-4b)
@@ -219,9 +225,21 @@ struct EngineRegressionCycle6Tests {
         await harness.serveManifest([q, y], etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
-        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count + qBytes.count), "setup: q's and x's bytes wait for reclaim")
+        // A broken setup ends the test here instead of in a wait that never holds (close-out cycle 9).
+        try #require(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count + qBytes.count), "setup: q's and x's bytes wait for reclaim")
         let ensure = Task { await engine.ensureAvailable(scope: .identifiers(["y"])) }
-        await engine.awaitCondition { $0.state.jobs[y.transferID]?.state == .blocked(.awaitingSpace) && $0.state.storeDeadline != nil }
+        await engine.awaitCondition { engine in
+            switch engine.state.jobs[y.transferID]?.state {
+            case .blocked(.awaitingSpace)?:
+                return engine.state.storeDeadline != nil
+            case .downloading?, .verifying?, .committing?, .failed?, .blocked?:
+                // Anywhere else y did not wait for the reclaim: the requirement below fails at once.
+                return true
+            case .queued?, nil:
+                return false
+            }
+        }
+        try #require(await engine.readForTests { $0.state.jobs[y.transferID]?.state } == .blocked(.awaitingSpace), "setup: y waits for space")
         // Only the store's clock passes q's grace: the purge reclaims q; x's deadline, 10 s later, is still ahead.
         let purged = await Self.driving([storeTime]) { await purge.value }
         #expect(purged.successValue?.bytesFreed == Int64(qBytes.count), "the purge freed q: \(purged)")
