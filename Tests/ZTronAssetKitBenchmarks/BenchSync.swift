@@ -222,6 +222,29 @@ extension ZTronAssetKitBenchmarks {
             #expect(median <= gapMax)
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
+
+        /// C2 at SPEC §6's reference scale for a handle registered at user-initiated priority (`AssetClient.prefetch`
+        /// accepts it; review of close-out cycle 9, PROBE-C9C-2): its four members run (every slot) and the others wait in
+        /// the user queue. The release leaves the members it has not reached yet queued and only the released group
+        /// wants them, so the gate answers `.wait` for each; every pump of the release (its own turn and one per cancelled
+        /// attempt's drain, back to back ahead of other callers) scanned all of them twice, in the user queue's pop and in
+        /// the check for waiting user work: 23 to 29 ms of heartbeat wait. Medians of three against P-9, the best of the
+        /// three against C2, after a warm-up.
+        @Test("R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func userHandleReleaseTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.handleReleaseWait(members: 1_000, lane: .userInitiated)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.handleReleaseWait(members: 10_000, lane: .userInitiated))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
     }
 }
 
@@ -564,13 +587,14 @@ enum SyncBench {
         return wait
     }
 
-    /// The heartbeat's longest wait while a prefetch handle of `count` on-demand members on a roomy volume (three start
-    /// and hold, the others wait in the queue) is released, until the engine holds no job.
+    /// The heartbeat's longest wait while a prefetch handle of `count` on-demand members at `lane` on a roomy volume
+    /// (three start and hold at prefetch priority, four at user-initiated priority; the others wait in the queue) is
+    /// released, until the engine holds no job.
     @available(macOS 15.0, iOS 18.0, *)
-    static func handleReleaseWait(members count: Int) async throws -> Double {
+    static func handleReleaseWait(members count: Int, lane: AssetPriority = .prefetch) async throws -> Double {
         let bench = try await SyncBench.scaleBench(members: count, room: nil)
         let engine = bench.engine
-        guard case .success(let token) = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+        guard case .success(let token) = await engine.registerGroup(bench.entries.map(\.identifier), lane: lane) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
         while !(await SyncBench.noneParked(engine, count: count)) {
