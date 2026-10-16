@@ -287,4 +287,138 @@ struct EngineRegressionCycle10Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: The set-aside's own behaviour (C2; close-out cycle 10)
+
+    /// The lane queues' set-aside (`LaneQueues.aside`): a scan takes the entries its caller claims out of the queue and
+    /// keeps the others in order, whether it takes the entry it finds (`pop`) or leaves it (`peek`), and a scan that
+    /// finds nothing sets aside every claimed entry of the queue; the entries set aside count toward the 2 × live bound
+    /// until compaction drops the stale ones, and `restoreAside` puts the valid ones back first, in the order they were
+    /// met, and drops the stale ones.
+    @Test("R-SYN-3: lane queues set aside the entries a scan claims, keep the others in order and restore the valid ones first")
+    func laneQueuesSetAside() {
+        var queues = LaneQueues()
+        let now = MonotonicInstant(nanoseconds: 1)
+        for ticket in UInt64(1)...8 {
+            queues.push(LaneQueues.Entry(ticket: ticket, transfer: EngineUnitTests.transfer(Int(ticket)), queuedAt: now), to: .prefetch)
+        }
+        var live = Set<UInt64>(1...8)
+        let isValid: (LaneQueues.Entry) -> Bool = { live.contains($0.ticket) }
+        // Released: 1, 3 and 6; 2 waits (refused); 4 is the one found.
+        let released: Set<UInt64> = [1, 3, 6]
+        let found = queues.peek(.prefetch, isValid: isValid, setAside: { released.contains($0.ticket) }, accept: { $0.ticket != 2 })
+        #expect(found?.ticket == 4, "peek finds the first accepted entry")
+        #expect(queues.storedCount == 8, "the entries set aside are still stored")
+        #expect(queues.asideEntries.map(\.ticket) == [1, 3], "the scan set aside what it met before the entry it found")
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 2, "peek left the refused entry and the found one in order")
+        #expect(queues.pop(.prefetch, isValid: isValid, setAside: { released.contains($0.ticket) }, accept: { $0.ticket == 7 })?.ticket == 7)
+        #expect(queues.asideEntries.map(\.ticket) == [1, 3, 6], "pop set aside the released entry it passed")
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 4, "the skipped entries keep their places")
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 5)
+        // A scan that finds nothing: 9 and 11 released, 10 refused, 12 stale.
+        for ticket in UInt64(9)...12 {
+            queues.push(LaneQueues.Entry(ticket: ticket, transfer: EngineUnitTests.transfer(Int(ticket)), queuedAt: now), to: .bulk)
+        }
+        live.formUnion([9, 10, 11])
+        #expect(queues.pop(.bulk, isValid: isValid, setAside: { $0.ticket == 9 || $0.ticket == 11 }, accept: { _ in false }) == nil)
+        #expect(queues.asideEntries.map(\.ticket) == [1, 3, 6, 9, 11])
+        // 3 left (its job was removed) and 11 was queued again elsewhere (a new ticket): both are stale.
+        live.subtract([3, 11])
+        queues.compact(isValid: isValid)
+        #expect(queues.asideEntries.map(\.ticket) == [1, 6, 9], "compaction drops the stale entries set aside")
+        queues.restoreAside(isValid: isValid)
+        #expect(queues.asideEntries.isEmpty)
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 1, "restored entries come first, in the order they were met")
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 6)
+        #expect(queues.pop(.prefetch, isValid: isValid)?.ticket == 8)
+        #expect(queues.pop(.bulk, isValid: isValid)?.ticket == 9)
+        #expect(queues.pop(.bulk, isValid: isValid)?.ticket == 10)
+        #expect(queues.pop(.bulk, isValid: isValid) == nil)
+    }
+
+    /// A lane-wide park that meets members of a released handle behind the member it dispatched: they are not parked
+    /// (only released groups want them, so their gate waits), the pump's next scan of the queue sets them aside, and
+    /// none of them starts when the lane is admitted again (R-CAR-4). A one-member handle and
+    /// a handle of 16 hold the three prefetch slots and the queue's head; more members than one turn releases wait behind
+    /// them. In one actor turn the large handle is released (64 members stay to a later turn), the network drops (no slot
+    /// is free, so nothing parks), and the one-member handle is released: its slot frees, the pump dispatches the next
+    /// member of the 16, which the lane parks offline with the rest of the queue.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-CAR-4: a lane-wide park during a handle's release parks every other queued member and neither parks nor starts the released ones",
+        .timeLimit(.minutes(1))
+    )
+    func laneParkDuringAReleaseSetsReleasedMembersAside() async throws {
+        let released = SyncEngine.releasesPerTurn + 64
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: 1 + 16 + released, seed: 11_301)
+        let engine = harness.engine
+        let single = try await engine.registerGroup([entries[0].identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.inFlight.count == 1 }
+        let kept = Array(entries[1...16])
+        _ = try await engine.registerGroup(kept.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == 17 && $0.state.inFlight.count == 3 }
+        let large = Array(entries[17...])
+        let token = try await engine.registerGroup(large.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == 17 + released }
+        await engine.waitForAllHandles()
+        let largeTransfers = Set(large.map(\.transferID))
+        let keptTransfers = Set(kept.map(\.transferID))
+        let turn = await engine.readForTests { engine in
+            engine.performReleaseGroup(token)
+            engine.apply(Self.offline)
+            engine.performReleaseGroup(single)
+            let aside = Set(engine.state.queues.asideEntries.filter { engine.isValid($0) }.map(\.transfer))
+            let left = largeTransfers.filter { engine.state.jobs[$0] != nil }
+            let parked = keptTransfers.filter { engine.state.jobs[$0]?.state == .blocked(.offline) }.count
+            return (aside, left, parked)
+        }
+        #expect(turn.1.count == 64, "setup: 64 members of the released handle wait for a later turn")
+        #expect(turn.0 == turn.1, "every one of them is set aside, none parked")
+        #expect(turn.2 == 14, "every queued member of the other handle is parked offline")
+        await engine.awaitCondition { !$0.state.releaseFollowUpScheduled }
+        #expect(await engine.readForTests { engine in largeTransfers.allSatisfy { engine.state.jobs[$0] == nil } }, "the release removed every member")
+        await harness.conditions.send(.unrestricted)
+        await engine.awaitCondition { $0.state.inFlight.count == 3 && $0.state.laneParked.isEmpty }
+        await engine.waitForAllHandles()
+        let started = Set(await harness.source.starts.map(\.id))
+        #expect(started.isDisjoint(with: largeTransfers), "no member of the released handle ever started")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    /// The two invariants close-out cycle 10 added are not vacuous: a waiter's interest outside the job it names (which
+    /// `withdraw` would leave behind) and an entry set aside for a release whose job another interest wants (which no
+    /// pump would ever dispatch) are both reported.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: the invariant check reports a waiter interest outside the waiter's job and a set-aside entry another interest wants", .timeLimit(.minutes(1)))
+    func cycle10InvariantsAreNotVacuous() async throws {
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: 5, seed: 11_401)
+        let engine = harness.engine
+        _ = try await engine.registerGroup(entries.prefix(4).map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == 4 && $0.state.inFlight.count == 3 }
+        let resolved = entries[4]
+        let caller = Task {
+            await engine.awaitAsset(resolved.identifier, lane: .userInitiated)
+        }
+        await engine.awaitCondition { $0.state.waiters.count == 1 && $0.state.jobs[resolved.transferID]?.state == .downloading }
+        #expect(await engine.invariantViolations().isEmpty, "a healthy engine")
+        let queued = try #require(await engine.readForTests { engine in
+            engine.state.jobs.values.first { $0.state == .queued }?.transfer
+        })
+        let elsewhere = entries[0].transferID
+        let misplaced = await engine.violations { state in
+            for token in state.waiters.keys {
+                state.waiters[token]?.transfer = elsewhere
+            }
+        }
+        #expect(misplaced.contains { $0.contains("names \(elsewhere) but holds an interest in \(resolved.transferID)") }, "\(misplaced)")
+        let stray = await engine.violations { state in
+            _ = state.queues.peek(.prefetch, isValid: { _ in true }, setAside: { $0.transfer == queued }, accept: { _ in false })
+        }
+        #expect(stray.contains("1 queued jobs wait set aside for a release, but other interests want them"), "\(stray)")
+        #expect(await engine.invariantViolations().isEmpty, "the check restored the state")
+        caller.cancel()
+        _ = await caller.value
+        await engine.shutdown()
+    }
 }
