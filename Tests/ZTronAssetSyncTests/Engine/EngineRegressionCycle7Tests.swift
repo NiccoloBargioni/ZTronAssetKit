@@ -21,6 +21,40 @@ struct EngineRegressionCycle7Tests {
         }
     }
 
+    /// The cycle-5 test `unscheduledReclaimFailsTyped`'s setup on a volume with `reserve + 100,000` bytes and no
+    /// ballast: `x` (300 B) was pruned by v2, which lists the on-demand `y` (300 B); the snapshot sink keeps every
+    /// install from then on, so `x`'s bytes wait for an acknowledgement nobody gives, pending reclaim with no store
+    /// deadline. Returns the harness (started, with `y` absent), `y`'s entry and its bytes.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func unscheduledReclaim(seed: UInt64) async throws -> (EngineHarness, ManifestEntry, Data) {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 100_000, opportunisticCapacity: reserve + 100_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 0), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(seed, count: 300)
+        let yBytes = EngineFixture.bytes(seed + 1, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let y = EngineHarness.onDemand("y", yBytes)
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await harness.sink.setBehaviour(.ignore)
+        await harness.serveManifest([y], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's pruned bytes wait for reclaim")
+        #expect(await harness.store.nextDeadline() == nil, "setup: the store schedules no work that would reclaim them")
+        return (harness, y, yBytes)
+    }
+
     // MARK: ENOSPC on a roomy volume while the store holds bytes it has not scheduled to reclaim (R-SYN-11, L4-R4)
 
     /// PROBE-C6R-1 (review of close-out cycle 6, blocking): an attempt that failed with ENOSPC while the store counted
@@ -38,33 +72,8 @@ struct EngineRegressionCycle7Tests {
         arguments: Caller.allCases
     )
     func enospcWithUnscheduledReclaimIsBounded(caller: Caller) async throws {
-        let time = ManualTimeSource()
-        let reserve = StoragePolicy().reserveFreeBytes
-        let fileSystem = FakeFileSystem(
-            disk: DiskImage(),
-            time: time,
-            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 100_000, opportunisticCapacity: reserve + 100_000)
-        )
-        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 0), fileSystem: fileSystem)
+        let (harness, y, yBytes) = try await Self.unscheduledReclaim(seed: 9_981)
         let engine = harness.engine
-        let xBytes = EngineFixture.bytes(9_981, count: 300)
-        let yBytes = EngineFixture.bytes(9_982, count: 300)
-        let x = EngineFixture.entry("x", xBytes)
-        let y = EngineHarness.onDemand("y", yBytes)
-        await harness.serveManifest([x])
-        await harness.scriptTransfers([(x, xBytes)])
-        try await harness.start()
-        _ = try #require(await engine.sync(.force).completeReport)
-        try await harness.store.flush(.ordered)
-        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
-        // v2 prunes x and lists the on-demand y; no install is acknowledged from now on, so x's bytes stay pending
-        // reclaim with nothing scheduled. No ballast: the volume reads roomy.
-        await harness.sink.setBehaviour(.ignore)
-        await harness.serveManifest([y], etag: "v2")
-        _ = try #require(await engine.sync(.force).completeReport)
-        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
-        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's pruned bytes wait for reclaim")
-        #expect(await harness.store.nextDeadline() == nil, "setup: the store schedules no work that would reclaim them")
         let budget = caller == .run ? RetryPolicy.background.maxAttemptsPerRun : RetryPolicy.interactive.maxAttemptsPerRun
         // Far more ENOSPC failures than the budget, then a success: an attempt past the budget consumes one, and the
         // loop the review found reached the success after every failure.
@@ -101,6 +110,37 @@ struct EngineRegressionCycle7Tests {
         await engine.awaitCondition { $0.state.jobs[y.transferID] == nil }
         let starts = await harness.source.starts.filter { $0.id == y.transferID }.count
         #expect(starts == budget, "one start per attempt of the budget (\(budget)), then none: \(starts) starts")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    // MARK: An ENOSPC's figures through the settlement (R-SYN-11, F-22; review of close-out cycle 6, L4-R12)
+
+    /// Review of close-out cycle 6 (non-blocking): a job parked `awaitingSpace` after an ENOSPC that asked for more than
+    /// its entry's size, then parked `insufficientSpace` by the settlement because nothing will reclaim on time, must
+    /// answer the bytes the ENOSPC asked for (the transport knows the attempt's need better than the manifest's size)
+    /// against the room the settlement's fresh read leaves it above the reserve (F-22's convention), and must not start
+    /// the transfer again while the volume cannot hold that much.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: an ensure whose member waits for space after an ENOSPC asking for more than the entry fails with the bytes the ENOSPC asked for and the room above the reserve",
+        .timeLimit(.minutes(1))
+    )
+    func enospcFiguresSurviveTheSettlement() async throws {
+        let (harness, y, _) = try await Self.unscheduledReclaim(seed: 9_983)
+        let engine = harness.engine
+        // Ten times the volume's room: no reclaim can make it fit.
+        await harness.source.script(y.transferID, [.fail(.insufficientSpace(requiredBytes: 1_000_000))])
+        let result = await harness.withClock { await engine.ensureAvailable(scope: .identifiers(["y"])) }
+        let space = try await harness.store.freeSpace()
+        if case .failure(.insufficientSpace(let required, let available)) = result {
+            #expect(required == 1_000_000, "the bytes the ENOSPC asked for, not the entry's 300")
+            #expect(available == space.volumeImportant - space.reserveBytes, "the room above the reserve: \(available) against \(space)")
+        } else {
+            Issue.record("expected the ENOSPC's figures, got \(result)")
+        }
+        await engine.awaitCondition { $0.state.jobs[y.transferID] == nil }
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.count == 1, "one attempt: the volume never held 1,000,000 bytes")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
