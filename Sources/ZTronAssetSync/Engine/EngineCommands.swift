@@ -200,7 +200,12 @@ extension SyncEngine {
         return .success(token)
     }
 
-    /// Adds the group's interests for the members that are not present at their current content.
+    /// Adds the group's interests for the members that are not present at their current content, at most
+    /// `materializationLimit` members per actor turn, each batch dispatched before the task yields the actor: a
+    /// 10,000-member group joined in one turn held the actor about 43 ms (C2; review of close-out cycle 7). After each
+    /// yield the batch re-validates what may have changed meanwhile: the lifecycle, the source, the group (a release drops
+    /// it), and the engine's manifest copy, whose change makes the view's records stale for the members left, so those
+    /// join on a fresh read (this function again). A binding learned meanwhile is checked per member as before (L4-R5).
     private func joinGroup(_ token: InterestToken, ids: [AssetID], lane: AssetPriority) async {
         // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
         guard await self.ensureStarted() == nil, self.state.groups[token] != nil else {
@@ -224,25 +229,50 @@ extension SyncEngine {
             return
         }
         self.followStoreView(view, readAt: mark)
-        for id in ids {
-            guard let entry = self.state.applied.entry(for: id) else {
-                continue
+        let copy = self.state.copySerial
+        let batch = self.materializationLimit
+        var next = 0
+        while next < ids.count {
+            if next > 0 {
+                // REENTRANCY: f-14 (proposed) — the lifecycle, the source, the group still registered and the engine's
+                // copy, re-checked below; a changed copy sends the members left through a fresh read.
+                await Task.yield()
+                guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
+                    return
+                }
+                guard self.state.copySerial == copy else {
+                    // REENTRANCY: f-14 (proposed) — as above: the call re-reads the store and re-validates everything.
+                    await self.joinGroup(token, ids: Array(ids[next...]), lane: lane)
+                    return
+                }
             }
-            let record = view.records[id]
-            if record?.referencedBlob != nil, record?.isStale == false {
-                continue
+            let end = min(next + batch, ids.count)
+            for id in ids[next..<end] {
+                self.joinMember(token, id: id, record: view.records[id], lane: lane)
             }
-            if self.isBound(id, to: entry.transferID) {
-                // Committed since the view was read (L4-R5).
-                continue
-            }
-            if self.heldBackError(record, entry: entry) != nil {
-                continue
-            }
-            self.state.groups[token]?.pending[id] = entry.transferID
-            self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .prefetch)
+            next = end
+            self.pump()
         }
-        self.pump()
+    }
+
+    /// Joins one prefetch member unless it is gone from the manifest, present at its current content, bound to it since
+    /// the view was read (L4-R5), or held back (T2).
+    private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
+        guard let entry = self.state.applied.entry(for: id) else {
+            return
+        }
+        if record?.referencedBlob != nil, record?.isStale == false {
+            return
+        }
+        if self.isBound(id, to: entry.transferID) {
+            // Committed since the view was read (L4-R5).
+            return
+        }
+        if self.heldBackError(record, entry: entry) != nil {
+            return
+        }
+        self.state.groups[token]?.pending[id] = entry.transferID
+        self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .prefetch)
     }
 
     /// Releases a group; unknown tokens are ignored (idempotent, sync-1 S1-05).

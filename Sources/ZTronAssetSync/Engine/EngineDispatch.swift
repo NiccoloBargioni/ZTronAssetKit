@@ -95,7 +95,11 @@ extension SyncEngine {
         let maximum = self.tuning.maxConcurrentTransfers
         let userCap = self.userCap
         var guardCount = 0
-        while guardCount < 10_000 {
+        // Parks take no slot, so a backlog of jobs that all park (the first conditions after a large join, a re-queue
+        // after a free-space read) would otherwise be gated in this one turn: past `parksPerPump`, the rest is left
+        // to a later turn (C2).
+        var parks = 0
+        rounds: while guardCount < 10_000 {
             guardCount += 1
             var started = false
             // One pass per round; a start in the round is counted in place (`SlotCounts.started(in:)`), and the next
@@ -103,12 +107,18 @@ extension SyncEngine {
             var counts = self.slotCounts
             for kind in [LaneQueues.Kind.userSingle, .userBatch] {
                 while maximum - counts.running > 0, counts.runningUser < userCap {
+                    guard parks < Self.parksPerPump else {
+                        self.schedulePumpFollowUp()
+                        break rounds
+                    }
                     guard let transfer = self.popDispatchable(kind) else {
                         break
                     }
                     if self.dispatch(transfer) {
                         started = true
                         counts.started(in: self.state.jobs[transfer]?.lane ?? .userInitiated)
+                    } else {
+                        parks += 1
                     }
                 }
             }
@@ -121,12 +131,18 @@ extension SyncEngine {
             let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
             let pipelineCap = self.tuning.pipelineDepth * maximum
             while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
+                guard parks < Self.parksPerPump else {
+                    self.schedulePumpFollowUp()
+                    break rounds
+                }
                 guard let transfer = self.nextNonUser() else {
                     break
                 }
                 if self.dispatch(transfer) {
                     started = true
                     counts.started(in: self.state.jobs[transfer]?.lane ?? .bulk)
+                } else {
+                    parks += 1
                 }
                 self.materializeRun()
             }
@@ -139,10 +155,37 @@ extension SyncEngine {
         self.notifyObservers()
     }
 
+    /// The jobs one `pump()` turn parks at most before it leaves the rest to a later turn: a park costs about 2 µs in
+    /// release (the transition, the fail-fast answers, the queue), so the turn stays near 1 ms whatever the backlog; at
+    /// 10,000 parked prefetch members one turn took 20 ms (review of close-out cycle 7, C2).
+    static let parksPerPump = 512
+
+    /// Schedules one later `pump()` for the jobs a pump left queued after `parksPerPump` parks.
+    private func schedulePumpFollowUp() {
+        guard !self.state.pumpFollowUpScheduled else {
+            return
+        }
+        self.state.pumpFollowUpScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; `pump` re-reads every queue.
+            await engine.pumpFollowUp()
+        }
+        if spawned == nil {
+            self.state.pumpFollowUpScheduled = false
+        }
+    }
+
+    /// The scheduled follow-up.
+    private func pumpFollowUp() {
+        self.state.pumpFollowUpScheduled = false
+        self.pump()
+    }
+
     // MARK: ensureAvailable materialisation (S1-15, C2)
 
-    /// The members a group materialises at most at a time (the run's bound: the pipeline plus `runLookahead`).
-    private var materializationLimit: Int {
+    /// The members a group materialises at most at a time (the run's bound: the pipeline plus `runLookahead`); also the
+    /// members a prefetch group joins per actor turn (`joinGroup`, C2).
+    var materializationLimit: Int {
         max(1, self.tuning.pipelineDepth * self.tuning.maxConcurrentTransfers + self.tuning.runLookahead)
     }
 
@@ -247,7 +290,8 @@ extension SyncEngine {
         return entry?.transfer
     }
 
-    /// Starts `transfer` or parks it; `true` when a transfer started.
+    /// Starts `transfer` or parks it; `true` when a transfer started (a job parked or left to wait counts toward the
+    /// pump's `parksPerPump`).
     private func dispatch(_ transfer: TransferID) -> Bool {
         switch self.gate(transfer) {
         case .wait:

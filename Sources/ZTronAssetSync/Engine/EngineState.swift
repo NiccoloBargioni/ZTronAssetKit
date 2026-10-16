@@ -96,6 +96,8 @@ struct EngineState {
     /// A later turn's `pump()` is scheduled to materialise `ensureAvailable` fetches (a batch that failed fast inside a
     /// pump left room nobody else would fill).
     var ensureRefillScheduled = false
+    /// A `pump()` stopped after `SyncEngine.parksPerPump` parks and owes a later turn the rest (C2).
+    var pumpFollowUpScheduled = false
     /// Callers joined to `start()`.
     var startJoiners: [InterestToken: CheckedContinuation<Result<OpenReport, AssetError>, Never>] = [:]
     /// Callers joined to `shutdown()`.
