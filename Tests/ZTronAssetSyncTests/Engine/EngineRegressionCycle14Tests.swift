@@ -31,6 +31,14 @@ struct EngineRegressionCycle14Tests {
         try await harness.start()
         // The launch run downloads the catalog through its commit windows.
         _ = try await harness.syncDriven()
+        // The drive's last clock move may have made the launch run's last store deadline due before the alarm fired it:
+        // wait until that store work is over. Otherwise the publication below could land in it (its commit then covers
+        // the publication, and no store deadline is left for the wait below), or the deadline read below could be that
+        // due one, which no clock move reaches past (close-out cycle 14's requirements verifier; L4-R17).
+        await engine.awaitCondition { engine in
+            let now = engine.environment.time.monotonicNow()
+            return engine.state.storeWorkRuns == 0 && (engine.state.heap.deadline(for: .store).map { $0 > now } ?? true)
+        }
         // A publication outside any run: the store's commit window opens on the manual clock, after `now`.
         let located = await engine.awaitAsset(viewed.identifier, lane: .userInitiated)
         #expect(try located.get().id == viewed.identifier)
@@ -54,10 +62,18 @@ struct EngineRegressionCycle14Tests {
             return
         }
         // The blocked run has ended; its pending run waits for the deadline that opens its gate, and the store's
-        // commit deadline comes first.
+        // commit deadline, still ahead of the clock with no store work under way, comes first. The engine is quiet
+        // before the clock moves: the conditions watcher the blocked run started has applied its first element, and no
+        // owned task but the alarm, the watcher and a memory-pressure observer is left. A late turn of any other (the
+        // watcher's first `apply` was seen) re-arms the alarm the window below needs cleared (`rearm` after the alarm
+        // turn cleared it), which fails the setup check and would also excuse the original defect (L4-R17).
         await engine.awaitCondition { engine in
-            engine.state.run == nil && engine.state.pendingRun?.gate == pendingGate && engine.state.heap.deadline(for: deadline) != nil
-                && engine.state.heap.deadline(for: .store) != nil
+            let now = engine.environment.time.monotonicNow()
+            let allowed = [engine.state.alarm?.task, engine.state.watcher?.task, engine.state.pressure.task].compactMap { $0 }
+            return engine.state.run == nil && engine.state.pendingRun?.gate == pendingGate && engine.state.heap.deadline(for: deadline) != nil
+                && (engine.state.heap.deadline(for: .store).map { $0 > now } ?? false) && engine.state.storeWorkRuns == 0
+                && engine.state.watcher != nil && engine.state.conditions != nil
+                && engine.state.tasks.keys.allSatisfy { allowed.contains($0) }
         }
         let (storeDeadline, gateDeadline) = await engine.readForTests { engine in
             (engine.state.heap.deadline(for: .store), engine.state.heap.deadline(for: deadline))
