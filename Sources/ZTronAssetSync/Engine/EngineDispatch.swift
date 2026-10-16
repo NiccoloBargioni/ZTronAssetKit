@@ -97,8 +97,8 @@ extension SyncEngine {
         var guardCount = 0
         // Parks take no slot, so a backlog of jobs that all park (the first conditions after a large join, a re-queue
         // after a free-space read) would otherwise be gated in this one turn: past `parksPerPump`, the rest is left
-        // to a later turn (C2).
-        var parks = 0
+        // to a later turn (C2). A lane-wide park a turn left unfinished goes first (`parkLane`).
+        var parks = self.continueLaneParks(limit: Self.parksPerPump)
         rounds: while guardCount < 10_000 {
             guardCount += 1
             var started = false
@@ -114,11 +114,12 @@ extension SyncEngine {
                     guard let transfer = self.popDispatchable(kind) else {
                         break
                     }
-                    if self.dispatch(transfer) {
+                    switch self.dispatch(transfer, parkLimit: Self.parksPerPump - parks) {
+                    case .started:
                         started = true
                         counts.started(in: self.state.jobs[transfer]?.lane ?? .userInitiated)
-                    } else {
-                        parks += 1
+                    case .parked(let count):
+                        parks += count
                     }
                 }
             }
@@ -138,17 +139,22 @@ extension SyncEngine {
                 guard let transfer = self.nextNonUser() else {
                     break
                 }
-                if self.dispatch(transfer) {
+                switch self.dispatch(transfer, parkLimit: Self.parksPerPump - parks) {
+                case .started:
                     started = true
                     counts.started(in: self.state.jobs[transfer]?.lane ?? .bulk)
-                } else {
-                    parks += 1
+                case .parked(let count):
+                    parks += count
                 }
                 self.materializeRun()
             }
             if !started {
                 break
             }
+        }
+        if !self.state.laneParksOwed.isEmpty {
+            // A lane-wide park stopped at the bound: a later turn continues it whether or not a slot frees.
+            self.schedulePumpFollowUp()
         }
         self.checkRunSettled()
         self.scheduleEnsureRefill()
@@ -207,6 +213,7 @@ extension SyncEngine {
                     continue
                 }
                 group.pending[id] = entry.transferID
+                group.joined.append(id)
                 added.append((id, entry))
             }
             if group.cursor >= group.fetches.count {
@@ -290,38 +297,113 @@ extension SyncEngine {
         return entry?.transfer
     }
 
-    /// Starts `transfer` or parks it; `true` when a transfer started (a job parked or left to wait counts toward the
-    /// pump's `parksPerPump`).
-    private func dispatch(_ transfer: TransferID) -> Bool {
+    /// What `dispatch` did with a job.
+    private enum Dispatched {
+        /// A transfer started.
+        case started
+        /// The job, and with a lane-wide block other jobs of its lane, were parked or left to wait: the count, toward
+        /// the pump's `parksPerPump`.
+        case parked(Int)
+    }
+
+    /// Starts `transfer` or parks it; a lane-wide block also parks the lane's other queued jobs, at most `parkLimit`
+    /// in all (`parkLane`).
+    private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {
         switch self.gate(transfer) {
         case .wait:
             self.enqueue(transfer, front: true)
-            return false
+            return .parked(1)
         case .block(let reason):
+            let lane = self.state.jobs[transfer]?.lane
             self.park(transfer, reason: reason)
-            if case .policy = reason {
-                self.parkLane(of: transfer, reason: reason)
-            } else if case .offline = reason {
-                self.parkLane(of: transfer, reason: reason)
+            switch reason {
+            case .offline, .policy:
+                guard let lane else {
+                    return .parked(1)
+                }
+                return .parked(1 + self.parkLane(lane, reason: reason, limit: parkLimit - 1))
+            default:
+                return .parked(1)
             }
-            return false
         case .start(let probe):
             self.start(transfer, probe: probe)
-            return true
+            return .started
         }
     }
 
-    /// Parks every other queued job of the same lane with the same lane-wide reason (so a run can settle blocked).
-    private func parkLane(of transfer: TransferID, reason: BlockReason) {
-        guard let lane = self.state.jobs[transfer]?.lane else {
-            return
+    /// Parks the queued jobs of `lane` whose gate gives the lane-wide `reason` (offline, a policy), so a run can settle
+    /// blocked, in queue order and at most `limit` of them; returns how many it parked. When it stops at the limit the
+    /// lane is owed the rest (`laneParksOwed`), which every later pump continues before it dispatches (a slot need not
+    /// free for that): one turn that parked 10,000 queued prefetch members when the network dropped held the engine's
+    /// actor about 15 ms (review of close-out cycle 8, C2). A run settles blocked only once none of its claims is queued
+    /// (`checkRunSettled`), so it waits for the last of those turns.
+    private func parkLane(_ lane: AssetPriority, reason: BlockReason, limit: Int) -> Int {
+        var parked = 0
+        for kind in self.queueKinds(of: lane) {
+            // The queue is taken out of the state while the closure reads it (no overlapping access).
+            var queues = self.state.queues
+            self.state.queues = LaneQueues()
+            queues.dropInvalidHead(kind) { self.isValid($0) }
+            let pending = queues.pending(kind)
+            self.state.queues = queues
+            for entry in pending {
+                guard self.isValid(entry), self.state.jobs[entry.transfer]?.lane == lane, self.gate(entry.transfer) == .block(reason) else {
+                    continue
+                }
+                guard parked < limit else {
+                    self.state.laneParksOwed[lane] = reason
+                    return parked
+                }
+                self.park(entry.transfer, reason: reason)
+                parked += 1
+            }
         }
-        for other in self.state.jobs.keys.sorted() where other != transfer {
-            guard let job = self.state.jobs[other], job.state == .queued, job.lane == lane, self.gate(other) == .block(reason) else {
+        self.state.laneParksOwed[lane] = nil
+        return parked
+    }
+
+    /// Continues the lane-wide parks earlier turns left (`laneParksOwed`), at most `limit` parks in all; a lane whose
+    /// block changed or cleared meanwhile is no longer owed (a dispatch parks it anew). Returns how many it parked.
+    private func continueLaneParks(limit: Int) -> Int {
+        var parked = 0
+        for lane in self.state.laneParksOwed.keys.sorted() {
+            guard let reason = self.state.laneParksOwed[lane] else {
                 continue
             }
-            self.park(other, reason: reason)
+            guard self.laneWideBlock(lane) == reason else {
+                self.state.laneParksOwed[lane] = nil
+                continue
+            }
+            guard parked < limit else {
+                break
+            }
+            parked += self.parkLane(lane, reason: reason, limit: limit - parked)
         }
+        return parked
+    }
+
+    /// The queues a lane's jobs wait in.
+    private func queueKinds(of lane: AssetPriority) -> [LaneQueues.Kind] {
+        switch lane {
+        case .userInitiated:
+            return [.userSingle, .userBatch]
+        case .prefetch:
+            return [.prefetch]
+        case .bulk:
+            return [.bulk]
+        }
+    }
+
+    /// The lane-wide block the gate gives a job of `lane` now, if any: the lane verdict, then, for the Apple tier, the
+    /// engine's own conditions (E-17).
+    private func laneWideBlock(_ lane: AssetPriority) -> BlockReason? {
+        if case .block(let reason) = self.laneVerdict(lane) {
+            return reason
+        }
+        if self.state.remote?.capabilities.tier == .appleHosted, let reason = self.appleAccessBlock(self.access(for: lane)) {
+            return reason
+        }
+        return nil
     }
 
     /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4).
@@ -348,6 +430,11 @@ extension SyncEngine {
     /// breaker and the headroom ledger (sync.md §7.3, §12.1).
     func gate(_ transfer: TransferID) -> DispatchGate {
         guard let job = self.state.jobs[transfer], let remote = self.state.remote, !self.state.heldForManifest.contains(transfer) else {
+            return .wait
+        }
+        if !self.state.releasing.isEmpty, job.interests.keys.allSatisfy({ self.state.releasing[$0] != nil }) {
+            // Only released groups still want it (their interests leave over a few turns, `continueReleases`): it
+            // never starts meanwhile (R-CAR-4).
             return .wait
         }
         let lane = job.lane

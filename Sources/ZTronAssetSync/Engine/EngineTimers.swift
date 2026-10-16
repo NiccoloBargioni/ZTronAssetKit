@@ -70,22 +70,12 @@ extension SyncEngine {
                     continue
                 }
                 self.state.throttles[origin] = nil
-                self.unblock { reason in
-                    if case .throttled = reason {
-                        return true
-                    }
-                    return false
-                }
+                self.unblockOrigin(.throttled)
             case .breaker(let origin):
                 guard self.state.breakers[origin] != nil else {
                     continue
                 }
-                self.unblock { reason in
-                    if case .circuitOpen = reason {
-                        return true
-                    }
-                    return false
-                }
+                self.unblockOrigin(.circuitOpen)
                 if self.state.pendingRun?.gate == .breaker {
                     self.fulfilPendingRun()
                 }

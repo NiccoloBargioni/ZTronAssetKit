@@ -66,7 +66,9 @@ extension SyncEngine {
     }
 
     /// Applies one conditions element: thermal hysteresis, unblocking (T17), pausing refused running work (§11.3),
-    /// re-queueing offline and transient failures on a satisfied edge (T19, R-SYN-13), pending runs, then `pump()`.
+    /// re-queueing offline and transient failures on a satisfied edge (T19, R-SYN-13), pending runs, then `pump()`. The
+    /// re-queues read the indexes of jobs parked by a lane-wide gate and of failed jobs, and at most
+    /// `readmissionsPerTurn` happen in this turn (`readmit`; C2).
     func apply(_ conditions: DeviceConditions) {
         let previous = self.state.conditions
         self.state.conditions = conditions
@@ -82,65 +84,28 @@ extension SyncEngine {
         for token in waiting.keys.sorted() {
             waiting[token]?.resume()
         }
-        for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
-                continue
-            }
-            switch reason {
-            case .offline, .policy:
-                if self.gateAdmitsAfterConditions(transfer) {
-                    if self.transition(transfer, to: .queued) {
-                        self.enqueue(transfer)
-                    }
-                }
-            default:
-                continue
-            }
-        }
         // Only a downloading job can be paused (`pauseIfRefused`): the jobs in flight, not every job (C2).
         for transfer in self.state.inFlight.sorted() {
             self.pauseIfRefused(transfer)
         }
+        var passes: Readmissions = [.conditions]
         let edge = conditions.network.satisfied && (previous.map { !$0.network.satisfied || $0.network != conditions.network } ?? false)
         if edge {
             // The edge an offline-failed pending run waits for (R-SYN-13): its debounce may start now.
             self.state.pendingRun?.awaitsNetworkEdge = false
             self.state.offlineRunsWithoutEdge = 0
-            for transfer in self.state.jobs.keys.sorted() {
-                guard let job = self.state.jobs[transfer] else {
+            for transfer in self.state.failedJobs {
+                guard let job = self.state.jobs[transfer], job.state.owedOnEdge(transient: job.transientFailure) else {
                     continue
                 }
-                switch job.state {
-                case .failed(.whenOnline):
-                    break
-                case .failed(.at) where job.transientFailure:
-                    break
-                default:
-                    continue
-                }
-                self.state.heap.remove(.retry(transfer, epoch: job.epoch))
-                if self.transition(transfer, to: .queued) {
-                    self.enqueue(transfer)
-                }
+                self.state.edgeOwed.insert(transfer)
             }
+            passes.insert(.edge)
         }
+        self.readmit(passes)
         self.considerPendingRun()
         self.pump()
         self.rearm()
         self.notifyObservers()
-    }
-
-    /// Whether a blocked job's lane gate admits it now (offline or policy blocks).
-    private func gateAdmitsAfterConditions(_ transfer: TransferID) -> Bool {
-        guard let job = self.state.jobs[transfer] else {
-            return false
-        }
-        if self.laneVerdict(job.lane) != .admit {
-            return false
-        }
-        if self.state.remote?.capabilities.tier == .appleHosted, self.appleAccessBlock(self.access(for: job.lane)) != nil {
-            return false
-        }
-        return true
     }
 }

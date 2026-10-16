@@ -550,6 +550,16 @@ extension SyncEngine {
         self.state.inFlight.removeAll()
         self.state.spaceParked.removeAll()
         self.state.spaceSweepFollowUp = nil
+        self.state.spaceAdmitted.removeAll()
+        self.state.laneParked.removeAll()
+        self.state.circuitParked.removeAll()
+        self.state.throttleParked.removeAll()
+        self.state.failedJobs.removeAll()
+        self.state.edgeOwed.removeAll()
+        self.state.originOwed.removeAll()
+        self.state.readmissionsOwed = []
+        self.state.laneParksOwed.removeAll()
+        self.state.releasing.removeAll()
         self.state.inFlightBytes = InFlightBytes()
         self.state.draining.removeAll()
         self.state.run = nil

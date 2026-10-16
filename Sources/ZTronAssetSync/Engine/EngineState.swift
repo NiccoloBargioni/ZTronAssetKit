@@ -223,8 +223,43 @@ struct EngineState {
     /// The jobs parked for lack of space (`blocked(insufficientSpace)` or `blocked(awaitingSpace)`), kept and checked as
     /// `inFlight` is: a free-space read re-checks these, not every job.
     var spaceParked: Set<TransferID> = []
-    /// A space sweep stopped after `SyncEngine.parksPerPump` parks and owes a later turn the rest, in this mode (C2).
+    /// A space sweep stopped after `SyncEngine.parksPerPump` parks or re-admissions and owes a later turn the rest, in
+    /// this mode (C2).
     var spaceSweepFollowUp: SpaceSweep?
+    /// The jobs a space sweep re-queued, by the ticket it queued them with: while one still waits in the queue with that
+    /// ticket, every later sweep counts its bytes ahead of the jobs it re-checks, so the sweeps of one read that the
+    /// bound splits over several turns, and the next read's, admit only what the room holds together (C2, T17).
+    var spaceAdmitted: [TransferID: UInt64] = [:]
+    /// The jobs parked by a lane-wide gate (`blocked(offline)`, `blocked(policy)`), kept and checked as `spaceParked`
+    /// is: a conditions element re-checks these, not every job (C2).
+    var laneParked: Set<TransferID> = []
+    /// The jobs parked by their origin's breaker (`blocked(circuitOpen)`), kept and checked as `spaceParked` is: a
+    /// closed breaker or a cooldown's end takes these as its owed re-queues in O(1), not a pass over every job (C2).
+    var circuitParked: Set<TransferID> = []
+    /// The jobs parked by their origin's throttle (`blocked(throttled)`), kept and checked as `circuitParked` is.
+    var throttleParked: Set<TransferID> = []
+    /// The failed jobs (any disposition), kept and checked as `spaceParked` is: a satisfied network edge re-queues
+    /// those of them failed `whenOnline` or transiently (T19), not a pass over every job (C2).
+    var failedJobs: Set<TransferID> = []
+    /// The failed jobs a satisfied network edge owes a re-queue that its turn left to a later one (C2); a job that
+    /// leaves `failed` meanwhile leaves the set.
+    var edgeOwed: Set<TransferID> = []
+    /// The jobs parked by their origin that a closed breaker, a cooldown's end or an ended throttle owes a re-queue
+    /// that its turn left to a later one (C2); a job that leaves `circuitParked` and `throttleParked` meanwhile leaves the
+    /// set.
+    var originOwed: Set<TransferID> = []
+    /// The re-admission passes a turn left unfinished after `SyncEngine.readmissionsPerTurn` re-queues (C2).
+    var readmissionsOwed: Readmissions = []
+    /// A later turn is scheduled for `readmissionsOwed`.
+    var readmissionFollowUpScheduled = false
+    /// Lanes whose queued jobs a lane-wide block (offline, a policy) parks, left unfinished by a pump turn's bound and
+    /// continued by every later pump (C2): the reason each lane's jobs are parked with.
+    var laneParksOwed: [AssetPriority: BlockReason] = [:]
+    /// Released groups whose interests are still being removed: at most `SyncEngine.releasesPerTurn` members per actor
+    /// turn (C2). Their jobs never start while only such interests want them.
+    var releasing: [InterestToken: Release] = [:]
+    /// A later turn is scheduled to continue `releasing`.
+    var releaseFollowUpScheduled = false
 
     // MARK: Events (R-SYN-12)
 
@@ -424,6 +459,9 @@ struct Group {
     let lane: AssetPriority
     /// Members still pending, by asset.
     var pending: [AssetID: TransferID] = [:]
+    /// Every member in the order it joined: a release removes their interests in this order over several turns (C2),
+    /// with no sort.
+    var joined: [AssetID] = []
     /// `ensureAvailable`'s planned fetches; those from `cursor` on are not members yet (S1-15: only the pipeline plus
     /// `runLookahead` become jobs at a time, as for a run).
     var fetches: [PlannedFetch] = []
@@ -439,6 +477,14 @@ struct Group {
     var isSettled: Bool {
         self.pending.isEmpty && self.cursor >= self.fetches.count
     }
+}
+
+/// A released group whose interests are still being removed (`SyncEngine.continueReleases`).
+struct Release {
+    /// The members whose interests are left to remove, in the order they joined.
+    var members: ArraySlice<AssetID>
+    /// Each member's transfer when the group was released.
+    let pending: [AssetID: TransferID]
 }
 
 /// A `waitUntil` caller.

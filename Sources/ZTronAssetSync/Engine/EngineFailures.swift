@@ -462,12 +462,7 @@ extension SyncEngine {
         self.broadcast(.circuitChanged(originID: origin, after))
         self.scheduleBreakerDeadline()
         if case .closed = after {
-            self.unblock { reason in
-                if case .circuitOpen = reason {
-                    return true
-                }
-                return false
-            }
+            self.unblockOrigin(.circuitOpen)
             if self.state.pendingRun?.gate == .breaker {
                 self.fulfilPendingRun()
             }
@@ -485,17 +480,5 @@ extension SyncEngine {
             self.state.heap.remove(.breaker(origin))
         }
         self.rearm()
-    }
-
-    /// Re-queues every blocked job whose reason `matches` (T17).
-    func unblock(where matches: (BlockReason) -> Bool) {
-        for transfer in self.state.jobs.keys.sorted() {
-            guard case .blocked(let reason)? = self.state.jobs[transfer]?.state, matches(reason) else {
-                continue
-            }
-            if self.transition(transfer, to: .queued) {
-                self.enqueue(transfer)
-            }
-        }
     }
 }

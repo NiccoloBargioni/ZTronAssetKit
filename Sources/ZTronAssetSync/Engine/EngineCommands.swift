@@ -272,17 +272,82 @@ extension SyncEngine {
             return
         }
         self.state.groups[token]?.pending[id] = entry.transferID
+        self.state.groups[token]?.joined.append(id)
         self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .prefetch)
     }
 
-    /// Releases a group; unknown tokens are ignored (idempotent, sync-1 S1-05).
+    /// Releases a group; unknown tokens are ignored (idempotent, sync-1 S1-05). The group leaves `groups` at once, so
+    /// nothing joins it again. A group with more pending members than `releasesPerTurn` loses the interests of its
+    /// members in flight in this turn, which frees their slots, and the others at most `releasesPerTurn` per actor turn,
+    /// in the order they joined (`continueReleases`); a job only released groups want never starts meanwhile (`gate`).
+    /// Removing the 10,000 interests of a prefetch handle in one turn, after sorting their transfers, held the engine's
+    /// actor about 15 ms (review of close-out cycle 8, C2).
     func performReleaseGroup(_ token: InterestToken) {
         guard let group = self.state.groups.removeValue(forKey: token) else {
             return
         }
         group.continuation?.resume(returning: false)
-        for transfer in Set(group.pending.values).sorted() {
-            self.removeInterest(token, from: transfer)
+        if group.pending.count <= Self.releasesPerTurn {
+            for transfer in Set(group.pending.values).sorted() {
+                self.removeInterest(token, from: transfer)
+            }
+        } else {
+            for transfer in self.state.inFlight.sorted() where self.state.jobs[transfer]?.interests[token] != nil {
+                self.removeInterest(token, from: transfer)
+            }
+            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending)
+            self.continueReleases()
+        }
+        self.pump()
+        self.reconcileIdle()
+    }
+
+    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 1 µs in
+    /// release (the member's transfer, the job's retirement), so the turn stays near 1 ms at SPEC §6's 10,000 (C2).
+    static let releasesPerTurn = 512
+
+    /// Removes released groups' interests, in token order and each group's join order, at most `releasesPerTurn`
+    /// members per turn; a later turn is owed the rest (`releasing`). `true` when nothing is left to release.
+    @discardableResult
+    private func continueReleases() -> Bool {
+        var budget = Self.releasesPerTurn
+        for token in self.state.releasing.keys.sorted() where budget > 0 {
+            guard var release = self.state.releasing[token] else {
+                continue
+            }
+            while budget > 0, let member = release.members.popFirst() {
+                budget -= 1
+                // A member that shares its content with an earlier one, or whose interest ended meanwhile, is a no-op.
+                if let transfer = release.pending[member] {
+                    self.removeInterest(token, from: transfer)
+                }
+            }
+            self.state.releasing[token] = release.members.isEmpty ? nil : release
+        }
+        guard !self.state.releasing.isEmpty else {
+            return true
+        }
+        guard !self.state.releaseFollowUpScheduled else {
+            return false
+        }
+        self.state.releaseFollowUpScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; `continueReleases` re-reads `releasing`.
+            await engine.releaseFollowUp()
+        }
+        if spawned == nil {
+            self.state.releaseFollowUpScheduled = false
+        }
+        return false
+    }
+
+    /// The scheduled continuation of `continueReleases`. The members it reaches wait in a queue or are parked (those in
+    /// flight left in the release's own turn, and no job only released groups want starts), so it frees no slot and
+    /// no room: the pump and the idle check follow once the last member left.
+    private func releaseFollowUp() {
+        self.state.releaseFollowUpScheduled = false
+        guard self.isRunning, self.continueReleases() else {
+            return
         }
         self.pump()
         self.reconcileIdle()
@@ -1386,8 +1451,59 @@ extension SyncEngine {
         if parkedForSpace != self.state.spaceParked {
             violations.append("the ledger's \(self.state.spaceParked.count) jobs parked for space differ from the table's \(parkedForSpace.count)")
         }
+        violations.append(contentsOf: self.indexViolations())
         if inFlight != self.state.inFlightBytes || flying != self.state.inFlight {
             violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")
+        }
+        return violations
+    }
+
+    /// The indexes of jobs parked by a lane-wide gate or by their origin and of failed jobs, against the job table, and
+    /// the owed re-queues against those indexes (C2).
+    private func indexViolations() -> [String] {
+        var violations: [String] = []
+        var laneParked: Set<TransferID> = []
+        var circuitParked: Set<TransferID> = []
+        var throttleParked: Set<TransferID> = []
+        var failed: Set<TransferID> = []
+        for job in self.state.jobs.values {
+            if job.state.isLaneParked {
+                laneParked.insert(job.transfer)
+            }
+            if job.state.isCircuitParked {
+                circuitParked.insert(job.transfer)
+            }
+            if job.state.isThrottleParked {
+                throttleParked.insert(job.transfer)
+            }
+            if job.state.kind == .failed {
+                failed.insert(job.transfer)
+            }
+        }
+        if laneParked != self.state.laneParked {
+            violations.append("the index's \(self.state.laneParked.count) jobs parked by a lane-wide gate differ from the table's \(laneParked.count)")
+        }
+        if circuitParked != self.state.circuitParked || throttleParked != self.state.throttleParked {
+            violations.append("the index's \(self.state.circuitParked.count) and \(self.state.throttleParked.count) jobs parked by the breaker and the throttle differ from the table's \(circuitParked.count) and \(throttleParked.count)")
+        }
+        if failed != self.state.failedJobs {
+            violations.append("the index's \(self.state.failedJobs.count) failed jobs differ from the table's \(failed.count)")
+        }
+        if !self.state.edgeOwed.isSubset(of: failed) {
+            violations.append("\(self.state.edgeOwed.subtracting(failed).count) jobs owed a re-queue by a network edge are not failed")
+        }
+        let originParked = circuitParked.union(throttleParked)
+        if !self.state.originOwed.isSubset(of: originParked) {
+            violations.append("\(self.state.originOwed.subtracting(originParked).count) jobs owed a re-queue by their origin are not parked by it")
+        }
+        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled {
+            violations.append("re-queues are owed but no turn is scheduled for them")
+        }
+        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
+            violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
+        }
+        for token in self.state.releasing.keys where self.state.groups[token] != nil {
+            violations.append("group \(token.rawValue) is released and registered")
         }
         return violations
     }

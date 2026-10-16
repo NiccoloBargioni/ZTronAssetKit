@@ -78,6 +78,30 @@ struct LaneQueues {
         return found
     }
 
+    /// The entries of `kind` from its head, in queue order, stale ones included (the caller checks each).
+    func pending(_ kind: Kind) -> ArraySlice<Entry> {
+        let list = self.entries[kind] ?? []
+        return list[min(self.heads[kind] ?? 0, list.count)...]
+    }
+
+    /// Drops the invalid entries at the head of `kind` (the jobs a lane-wide park just parked), so the next pass over
+    /// the queue does not step over them again.
+    mutating func dropInvalidHead(_ kind: Kind, isValid: (Entry) -> Bool) {
+        guard var list = self.entries[kind] else {
+            return
+        }
+        var head = self.heads[kind] ?? 0
+        while head < list.count, !isValid(list[head]) {
+            head += 1
+        }
+        if head > 32, head * 2 > list.count {
+            list.removeFirst(head)
+            head = 0
+        }
+        self.entries[kind] = list
+        self.heads[kind] = head
+    }
+
     /// The oldest valid entry of `kind`, without removing it (bulk aging).
     func first(_ kind: Kind, isValid: (Entry) -> Bool) -> Entry? {
         let list = self.entries[kind] ?? []
