@@ -66,7 +66,13 @@ extension SyncEngine {
                     self.enqueue(transfer)
                 }
             case .throttle(let origin):
-                guard let until = self.state.throttles[origin], until <= now else {
+                guard let until = self.state.throttles[origin] else {
+                    continue
+                }
+                guard until <= now else {
+                    // A deadline earlier than the throttle's end (a later 429 extended it): only this deadline re-admits
+                    // the jobs the throttle parked, so it is kept at the end instead of dropped (close-out cycle 15, F-35).
+                    self.state.heap.schedule(.throttle(origin), at: until)
                     continue
                 }
                 self.state.throttles[origin] = nil
