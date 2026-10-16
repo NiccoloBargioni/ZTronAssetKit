@@ -214,8 +214,8 @@ struct EngineHarness {
         case advanced
         /// The advance budget is spent while a sleeper was still due to be woken.
         case exhausted(EngineIntrospection)
-        /// Nothing may be woken now: wait for a change of these, or for one more sleeper.
-        case wait(EngineIntrospection, fence: MonotonicInstant?)
+        /// Nothing may be woken now: wait for a change of these, or for one more sleeper than `sleepers`.
+        case wait(EngineIntrospection, fence: MonotonicInstant?, sleepers: Int)
     }
 
     /// Drives the manual clock until `predicate` holds. Each step advances the clock to the earliest sleeper (the
@@ -247,10 +247,13 @@ struct EngineHarness {
                     return .done
                 }
                 let fence = engine.clockFence()
+                // Counted before the deadline is read: a sleeper registered after this count, even one the read below
+                // misses, ends the wait for one more (a count read later could include it and wait for ever).
+                let sleepers = time.pendingSleepers
                 guard let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep),
                     before.map({ deadline < $0 }) ?? true, fence.map({ deadline < $0 }) ?? true
                 else {
-                    return .wait(state, fence: fence)
+                    return .wait(state, fence: fence, sleepers: sleepers)
                 }
                 guard budgetLeft else {
                     return .exhausted(state)
@@ -265,8 +268,7 @@ struct EngineHarness {
                 advanced += 1
             case .exhausted(let state):
                 throw EngineHarnessError.neverQuiesced(state)
-            case .wait(let state, let fence):
-                let waiting = time.pendingSleepers
+            case .wait(let state, let fence, let waiting):
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask {
                         await engine.awaitCondition { engine in
@@ -302,21 +304,23 @@ struct EngineHarness {
                 guard !Task.isCancelled else {
                     return
                 }
-                // The fence check and the advance happen in one engine turn, and not once this driver is cancelled.
-                let fenced = await engine.readForTests { engine -> MonotonicInstant? in
+                // The fence check and the advance happen in one engine turn, and not once this driver is cancelled. The
+                // sleepers are counted before the deadline is read, so one registered after the count ends the wait below.
+                let fenced = await engine.readForTests { engine -> (fence: MonotonicInstant, sleepers: Int)? in
+                    let sleepers = time.pendingSleepers
                     guard !Task.isCancelled, let deadline = time.nextDeadline else {
                         return nil
                     }
                     if let fence = engine.clockFence(), deadline >= fence {
-                        return fence
+                        return (fence, sleepers)
                     }
                     time.advance(to: deadline)
                     return nil
                 }
-                guard let fence = fenced, !Task.isCancelled else {
+                guard let fenced, !Task.isCancelled else {
                     continue
                 }
-                let waiting = time.pendingSleepers
+                let (fence, waiting) = fenced
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask {
                         await engine.awaitCondition { $0.clockFence() != fence }

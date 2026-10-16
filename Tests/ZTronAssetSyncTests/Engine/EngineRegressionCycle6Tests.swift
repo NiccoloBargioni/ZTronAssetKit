@@ -78,21 +78,23 @@ struct EngineRegressionCycle6Tests {
                     Self.advance(clocks)
                     continue
                 }
-                let fence = await engine.readForTests { engine -> MonotonicInstant? in
+                // The sleepers are counted before the deadlines are read, so one registered after the count ends the wait.
+                let fenced = await engine.readForTests { engine -> (fence: MonotonicInstant, sleepers: [Int])? in
+                    let sleepers = clocks.map(\.pendingSleepers)
                     guard !Task.isCancelled else {
                         return nil
                     }
                     if let fence = engine.clockFence(), let next = clocks.compactMap(\.nextDeadline).min(), next >= fence {
-                        return fence
+                        return (fence, sleepers)
                     }
                     Self.advance(clocks)
                     return nil
                 }
-                guard let fence, !Task.isCancelled else {
+                guard let fenced, !Task.isCancelled else {
                     continue
                 }
+                let (fence, waiting) = fenced
                 // Fenced: wait for the fenced work to end, or for one more sleeper on any clock (an earlier store wait).
-                let waiting = clocks.map(\.pendingSleepers)
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask {
                         await engine.awaitCondition { $0.clockFence() != fence }
