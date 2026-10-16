@@ -647,7 +647,9 @@ extension SyncEngine {
             case .blocked(.awaitingSpace):
                 return
             case .blocked(let reason):
-                reasons.append(reason)
+                // A claim keeps the throttle end it was parked with; the run reports the origin's, which a later 429
+                // may have extended, as the pending run and the throttle's deadline do (F-36).
+                reasons.append(self.currentReason(reason))
             case .failed(.whenOnline):
                 reasons.append(.offline)
             default:
