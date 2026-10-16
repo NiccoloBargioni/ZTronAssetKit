@@ -568,7 +568,7 @@ enum SyncBench {
             guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
                 throw SyncBenchError.incomplete("the prefetch group was refused")
             }
-            while !(await SyncBench.noneQueued(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.noneQueued(engine, count: count)) {
                 await Task.yield()
             }
         }
@@ -580,7 +580,7 @@ enum SyncBench {
         }
         let read = try await SyncBench.longestWait(on: engine) {
             await source.script(first, [.fail(.insufficientSpace(requiredBytes: Int64(bench.size)))])
-            while !(await SyncBench.parkedAfterENOSPC(engine, first)) {
+            while !Task.isCancelled, !(await SyncBench.parkedAfterENOSPC(engine, first)) {
                 await Task.yield()
             }
         }
@@ -599,7 +599,7 @@ enum SyncBench {
         guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
-        while !(await SyncBench.noneParked(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
         await engine.waitForAllHandles()
@@ -609,19 +609,19 @@ enum SyncBench {
         }
         let offline = try await SyncBench.longestWait(on: engine) {
             await bench.conditions.send(DeviceConditions(network: NetworkConditions(satisfied: false, expensive: false, constrained: false), power: PowerConditions(lowPowerMode: false, thermal: .nominal)))
-            while !(await SyncBench.seesOffline(engine)) {
+            while !Task.isCancelled, !(await SyncBench.seesOffline(engine)) {
                 await Task.yield()
             }
             for transfer in running {
                 await source.script(transfer, [.fail(.offline(.noConnection))])
             }
-            while !(await SyncBench.noneQueued(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.noneQueued(engine, count: count)) {
                 await Task.yield()
             }
         }
         let online = try await SyncBench.longestWait(on: engine) {
             await bench.conditions.send(.unrestricted)
-            while !(await SyncBench.noneParked(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
                 await Task.yield()
             }
         }
@@ -640,14 +640,14 @@ enum SyncBench {
         guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
-        while !(await SyncBench.noneQueued(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneQueued(engine, count: count)) {
             await Task.yield()
         }
         await engine.waitForAllHandles()
         try bench.removeBallast()
         let wait = try await SyncBench.longestWait(on: engine) {
             await engine.refreshFreeSpace()
-            while !(await SyncBench.noneParked(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
                 await Task.yield()
             }
         }
@@ -665,13 +665,13 @@ enum SyncBench {
         guard case .success(let token) = await engine.registerGroup(bench.entries.map(\.identifier), lane: lane) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
-        while !(await SyncBench.noneParked(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
         await engine.waitForAllHandles()
         let wait = try await SyncBench.longestWait(on: engine) {
             await engine.releaseGroup(token)
-            while !(await SyncBench.noJobs(engine)) {
+            while !Task.isCancelled, !(await SyncBench.noJobs(engine)) {
                 await Task.yield()
             }
         }
@@ -691,7 +691,7 @@ enum SyncBench {
         guard case .success(let token) = await engine.registerGroup(ids, lane: lane) else {
             throw SyncBenchError.incomplete("the handle was refused")
         }
-        while !(await SyncBench.noneParked(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
         await engine.waitForAllHandles()
@@ -700,7 +700,7 @@ enum SyncBench {
             guard case .success = await engine.registerGroup(ids, lane: lane) else {
                 throw SyncBenchError.incomplete("the second handle was refused")
             }
-            while !(await SyncBench.rejoined(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.rejoined(engine, count: count)) {
                 await Task.yield()
             }
         }
@@ -725,14 +725,14 @@ enum SyncBench {
         guard case .success = await engine.registerGroup(Array(members), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
-        while !(await SyncBench.noneParked(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
         let caller = Task {
             await engine.awaitAsset(resolved.identifier, lane: .userInitiated)
         }
         let transfer = resolved.transferID
-        while !(await SyncBench.isRunning(engine, transfer)) {
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, transfer)) {
             await Task.yield()
         }
         await engine.waitForAllHandles()
@@ -741,7 +741,7 @@ enum SyncBench {
             guard case .failure(.cancelled) = await caller.value else {
                 throw SyncBenchError.incomplete("the cancelled resolve was not answered cancelled")
             }
-            while !(await SyncBench.noneParked(engine, count: count)) {
+            while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
                 await Task.yield()
             }
         }
@@ -760,25 +760,30 @@ enum SyncBench {
         guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
-        while !(await SyncBench.noneParked(engine, count: count)) {
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
-        var rounds = 0
-        while await SyncBench.cooldownEnd(engine) == nil {
-            rounds += 1
-            guard rounds <= 4 else {
+        // Each round fails the members running once one runs; how many run at a round's start depends on when the
+        // pump refilled the slots, so the loop is bounded by the failures injected, never by a number of rounds.
+        var failed = 0
+        while !Task.isCancelled, await SyncBench.cooldownEnd(engine) == nil {
+            guard failed < count else {
                 throw SyncBenchError.incomplete("the breaker did not open")
+            }
+            await engine.awaitCondition { engine in
+                !SyncBench.running(engine).isEmpty || SyncBench.cooldownEnd(engine) != nil
             }
             await engine.waitForAllHandles()
             let running = await SyncBench.running(engine)
+            failed += running.count
             for transfer in running {
                 await bench.source.script(transfer, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil))])
             }
-            while !(await SyncBench.attemptsEnded(engine, running)) {
+            while !Task.isCancelled, !(await SyncBench.attemptsEnded(engine, running)) {
                 await Task.yield()
             }
         }
-        while !(await SyncBench.originSettled(engine, probing: false)) {
+        while !Task.isCancelled, !(await SyncBench.originSettled(engine, probing: false)) {
             await Task.yield()
         }
         guard let until = await SyncBench.cooldownEnd(engine) else {
@@ -786,7 +791,7 @@ enum SyncBench {
         }
         let wait = try await SyncBench.longestWait(on: engine) {
             bench.time.advance(to: until)
-            while !(await SyncBench.originSettled(engine, probing: true)) {
+            while !Task.isCancelled, !(await SyncBench.originSettled(engine, probing: true)) {
                 await Task.yield()
             }
         }
@@ -924,34 +929,97 @@ enum SyncBench {
         )
     }
 
-    /// Drives `time` until `predicate` holds (the engine's alarm and store waits move only with the manual clock).
-    @available(macOS 15.0, iOS 18.0, *)
-    static func drive(engine: SyncEngine, time: ManualTimeSource, until predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async throws {
-        for _ in 0..<1_024 {
-            let state = await engine.introspect()
-            if predicate(state) {
-                return
-            }
-            // Steps of at most 20 s: commit windows, installs and the 10 s deletion grace pass; the 30 s manifest
-            // deadline of a fetch still at work never does.
-            if let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: 20) {
-                time.advance(to: deadline)
+    /// What one step of `drive` found, decided in one engine turn.
+    enum DriveStep: Sendable {
+        /// The predicate holds.
+        case done
+        /// The clock moved to the earliest sleeper.
+        case advanced
+        /// The advance budget is spent while a sleeper was still due to be woken.
+        case exhausted
+        /// Nothing may be woken now: wait for a change of these, or for one more sleeper than `sleepers`.
+        case wait(EngineIntrospection, fence: MonotonicInstant?, sleepers: Int)
+    }
+
+    /// The earliest deadline that would time out work the fakes finish without the clock: an in-flight manifest
+    /// fetch's deadline (`FakeRemoteSource` answers at once) or a half-open probe's watchdog (a copy of the Sync tests'
+    /// `SyncEngine.clockFence()` seam, which this target does not link).
+    static func clockFence(_ engine: isolated SyncEngine) -> MonotonicInstant? {
+        var fence: MonotonicInstant?
+        if let fetch = engine.state.manifestFetch, let at = engine.state.heap.deadline(for: .manifest(fetch.sequence)) {
+            fence = at
+        }
+        for origin in engine.state.breakers.keys.sorted() {
+            guard case .halfOpen(_, _, _?, let watchdog?)? = engine.state.breakers[origin]?.state else {
                 continue
             }
-            let waiting = time.pendingSleepers
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    await engine.waitUntil { $0 != state || predicate($0) }
-                }
-                group.addTask {
-                    await time.waitForSleepers(atLeast: waiting + 1)
-                }
-                _ = await group.next()
-                group.cancelAll()
-            }
-            try Task.checkCancellation()
+            fence = min(fence ?? watchdog, watchdog)
         }
-        throw CancellationError()
+        return fence
+    }
+
+    /// One step of `drive` in one engine turn: the predicate, the clock fence, the sleeper count (read before the
+    /// deadline: a sleeper registered after the count, even one the deadline read misses, ends the wait for one more)
+    /// and the advance, so the clock never jumps to a timeout of work the engine began a moment earlier.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func driveStep(
+        _ engine: isolated SyncEngine,
+        time: ManualTimeSource,
+        maxStep: TimeInterval,
+        budgetLeft: Bool,
+        predicate: (EngineIntrospection) -> Bool
+    ) -> DriveStep {
+        let state = engine.introspect()
+        if predicate(state) {
+            return .done
+        }
+        let fence = SyncBench.clockFence(engine)
+        let sleepers = time.pendingSleepers
+        guard let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep), fence.map({ deadline < $0 }) ?? true else {
+            return .wait(state, fence: fence, sleepers: sleepers)
+        }
+        guard budgetLeft else {
+            return .exhausted
+        }
+        time.advance(to: deadline)
+        return .advanced
+    }
+
+    /// Drives `time` until `predicate` holds (the engine's alarm and store waits move only with the manual clock), as
+    /// the Sync tests' `EngineHarness.drive` does since close-out cycle 11 (L4-R17): each step advances to the earliest
+    /// sleeper when it is at most 20 s away (commit windows, installs and the 10 s deletion grace pass) and earlier than
+    /// the engine's clock fence, deciding that in one engine turn; otherwise it waits for whichever comes first: the
+    /// predicate, a change of the engine's counters or fence, or one more sleeper. The budget bounds the clock's moves,
+    /// not the waits (how many intermediate states a wait observes depends on scheduling); every wait ends on
+    /// cancellation.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func drive(engine: SyncEngine, time: ManualTimeSource, until predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async throws {
+        var advanced = 0
+        while true {
+            switch await SyncBench.driveStep(engine, time: time, maxStep: 20, budgetLeft: advanced < 1_024, predicate: predicate) {
+            case .done:
+                return
+            case .advanced:
+                advanced += 1
+            case .exhausted:
+                throw SyncBenchError.incomplete("the clock moved 1,024 times and the predicate still does not hold")
+            case .wait(let state, let fence, let waiting):
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await engine.awaitCondition { engine in
+                            let now = engine.introspect()
+                            return now != state || predicate(now) || SyncBench.clockFence(engine) != fence
+                        }
+                    }
+                    group.addTask {
+                        await time.waitForSleepers(atLeast: waiting + 1)
+                    }
+                    _ = await group.next()
+                    group.cancelAll()
+                }
+                try Task.checkCancellation()
+            }
+        }
     }
 
     /// A directory inside this repository (`.build-tests/`, git-ignored); the caller removes it.
