@@ -1442,6 +1442,9 @@ extension SyncEngine {
         if let stranded = self.strandedPendingRun() {
             violations.append(stranded)
         }
+        if let unwakeable = self.unwakeableThrottleParks() {
+            violations.append(unwakeable)
+        }
         for (transfer, drain) in self.state.draining where self.isRunning && self.state.tasks[drain.driver] == nil {
             violations.append("\(transfer) drains an attempt whose driver ended")
         }
@@ -1559,6 +1562,22 @@ extension SyncEngine {
             return "the alarm is armed after the earliest deadline (\(first.reason))"
         }
         return nil
+    }
+
+    /// Why the jobs a throttle parked may never be re-admitted, if so. Only the origin's `.throttle` deadline re-admits
+    /// them (`unblockOrigin(.throttled)` when it fires at the throttle's end; the jobs that turn cannot re-queue are owed a
+    /// follow-up, `originOwed`), and the alarm keeps that deadline at the throttle's end while the throttle is in force.
+    /// A parked job neither owed a re-queue nor behind that deadline waits for ever: the state a manifest 429 left when
+    /// it moved the deadline before the throttle's end and the alarm dropped it (close-out cycle 15, F-35).
+    private func unwakeableThrottleParks() -> String? {
+        guard self.isRunning, let origin = self.state.remote?.originID, self.state.heap.deadline(for: .throttle(origin)) == nil else {
+            return nil
+        }
+        let waiting = self.state.throttleParked.subtracting(self.state.originOwed)
+        guard !waiting.isEmpty else {
+            return nil
+        }
+        return "nothing will re-admit the \(waiting.count) jobs the throttle parked"
     }
 
     /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,

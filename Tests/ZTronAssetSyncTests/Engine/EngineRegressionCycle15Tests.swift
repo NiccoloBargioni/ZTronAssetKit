@@ -224,6 +224,9 @@ struct EngineRegressionCycle15Tests {
         let first = try #require(after.1, "the throttle's deadline")
         time.advance(to: first)
         await engine.awaitCondition { EngineRegressionCycle15Tests.quiet($0) }
+        // A parked job that nothing would re-admit is an invariant violation (the deadline the alarm dropped).
+        let midway = await engine.invariantViolations()
+        #expect(midway.isEmpty, "\(midway)")
         let baseRuns = await engine.readForTests { $0.state.lastRunID }
         let baseRequests = await fake.manifestRequests.count
         // The clock passes the throttle's end. A run that settles blocked by a throttle whose end has passed starts the
@@ -253,7 +256,8 @@ struct EngineRegressionCycle15Tests {
     /// Only the `.throttle` deadline re-admits the jobs a throttle parked (`unblockOrigin(.throttled)` when it fires at
     /// the throttle's end). One that fired before the end, with the throttle still in force, was dropped, leaving those
     /// jobs parked for ever (the mechanism of the test above). The alarm now keeps it at the throttle's end. An earlier
-    /// deadline is put into the heap directly, the state the manifest path left until close-out cycle 15.
+    /// deadline is put into the heap directly, the state the manifest path left until close-out cycle 15; before that, the
+    /// invariant check is shown to name a parked job whose deadline is gone.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a throttle deadline that fires before the origin's throttle ends is kept at the throttle's end, where its parked job resumes", .timeLimit(.minutes(1)))
     func earlyThrottleDeadlineIsKept() async throws {
@@ -270,6 +274,9 @@ struct EngineRegressionCycle15Tests {
         let caller = Task { await engine.awaitAsset(onDemand.identifier, lane: .prefetch) }
         await engine.awaitCondition { $0.state.jobs[onDemand.transferID]?.state.isThrottleParked == true }
         await engine.awaitCondition { EngineRegressionCycle15Tests.quiet($0) }
+        // The invariant check names a parked job that nothing will re-admit: the state a dropped deadline leaves.
+        let unwakeable = await engine.violations { $0.heap.remove(.throttle(origin)) }
+        #expect(unwakeable.contains("nothing will re-admit the 1 jobs the throttle parked"), "\(unwakeable)")
         let (early, recorded) = await engine.readForTests { engine -> (MonotonicInstant, MonotonicInstant?) in
             let early = engine.environment.time.monotonicNow().adding(seconds: 1)
             engine.state.heap.schedule(.throttle(origin), at: early)
