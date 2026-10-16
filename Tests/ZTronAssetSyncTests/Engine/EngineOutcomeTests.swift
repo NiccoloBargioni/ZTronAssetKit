@@ -458,6 +458,19 @@ struct EngineOutcomeTests {
             $0.watcher = nil
         }
         #expect(unarmed == ["nothing will open the pending run's conditions gate"])
+        // A due deadline no alarm will fire: none armed, then one armed after it (close-out cycle 14, F-34).
+        let unfired = await engine.violations { state in
+            state.heap.schedule(.heal("held"), at: .zero)
+            state.alarm = nil
+        }
+        #expect(unfired.count == 1 && unfired.contains { $0.hasPrefix("no live alarm will fire the earliest deadline") }, "\(unfired)")
+        let late = await engine.violations { state in
+            state.heap.schedule(.heal("held"), at: .zero)
+            if let task = state.tasks.keys.min() {
+                state.alarm = Alarm(token: 0, task: task, deadline: MonotonicInstant.zero.adding(seconds: 1))
+            }
+        }
+        #expect(late.count == 1 && late.contains { $0.hasPrefix("the alarm is armed after the earliest deadline") }, "\(late)")
         #expect(await engine.invariantViolations().isEmpty, "the check restored the state")
         await harness.source.release(transfer, with: .progress(received: 0, expected: nil))
         await engine.releaseGroup(group)
