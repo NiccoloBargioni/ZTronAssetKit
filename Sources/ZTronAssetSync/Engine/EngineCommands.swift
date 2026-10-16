@@ -1541,7 +1541,7 @@ extension SyncEngine {
 
     /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
     /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25). A gate the clock opened is not
-    /// stranded while the deadline that starts its run is due and the alarm armed: the alarm's next turn fires it.
+    /// stranded while the deadline that starts its run is due and an alarm turn will fire it (`startsInAlarmTurn`).
     private func strandedPendingRun() -> String? {
         guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
             return nil
@@ -1559,11 +1559,17 @@ extension SyncEngine {
         }
     }
 
-    /// Whether the run of `pending` starts in the alarm's next turn: the clock reached the deadline that opens its
+    /// Whether the run of `pending` starts in an alarm turn still to come: the clock reached the deadline that opens its
     /// throttle or breaker gate (`.pendingRun` at the throttle's end, `.breaker` at the cooldown's end), which is still in
-    /// the heap with the alarm armed. A clock move resumes the alarm's sleep, but the alarm fires the deadline only once
-    /// it has the actor, so a check between the move and that turn sees the gate open and no run (close-out cycle 13,
-    /// F-33).
+    /// the heap, and an alarm will fire it. Two windows lie between the clock's move and that turn:
+    /// - An alarm is armed: the move resumes its sleep, but it fires the deadline only once it has the actor (close-out
+    ///   cycle 13, F-33). Only an alarm whose owned task is alive and whose deadline is at or before the gate's counts;
+    ///   `rearm` keeps the alarm at the heap's earliest deadline in the turn that schedules one, so any other alarm
+    ///   would never fire the gate's deadline in time.
+    /// - An alarm turn's store work is under way (`storeWorkRuns`): the alarm clears `state.alarm` before it fires what
+    ///   is due, and a due store deadline suspends its turn in `store.runDueWork()` (and in the free-space read after
+    ///   reaped bytes). The turn re-arms at the heap's earliest deadline before it returns, and that alarm starts the
+    ///   run; a run the turn still leaves pending is reported at the next check (close-out cycle 14, F-34).
     private func startsInAlarmTurn(_ pending: PendingRun) -> Bool {
         let reason: DeadlineReason
         switch pending.gate {
@@ -1578,9 +1584,15 @@ extension SyncEngine {
             // Its gate reads armed while its debounce is in the heap (`pendingRunGate`).
             return false
         }
-        guard self.state.alarm != nil, let at = self.state.heap.deadline(for: reason) else {
+        guard let at = self.state.heap.deadline(for: reason), at <= self.environment.time.monotonicNow() else {
             return false
         }
-        return at <= self.environment.time.monotonicNow()
+        if self.state.storeWorkInFlight {
+            return true
+        }
+        guard let alarm = self.state.alarm, self.state.tasks[alarm.task] != nil else {
+            return false
+        }
+        return alarm.deadline <= at
     }
 }
