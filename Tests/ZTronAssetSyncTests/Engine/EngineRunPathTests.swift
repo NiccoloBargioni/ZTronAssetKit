@@ -345,8 +345,8 @@ struct EngineRunPathTests {
         for (entry, bytes) in catalog {
             await harness.source.script(entry.transferID, [.fail(.offline(.noConnection)), .stage(bytes)])
         }
-        try await harness.start()
-        let first = await harness.engine.sync(.force)
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let first = try await harness.startAndAwaitLaunchRun()
         guard case .blocked(.offline, _) = first else {
             Issue.record("expected an offline run, got \(first)")
             return
@@ -494,8 +494,8 @@ struct EngineRunPathTests {
             (EngineFixture.entry("s1", EngineFixture.bytes(422, count: 300)), EngineFixture.bytes(422, count: 300)),
         ]
         await harness.serve(catalog)
-        try await harness.start()
-        let outcome = await harness.engine.sync(.force)
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let outcome = try await harness.startAndAwaitLaunchRun()
         guard case .completeWithFailures(let report) = outcome else {
             Issue.record("expected completeWithFailures (over budget), got \(outcome)")
             return

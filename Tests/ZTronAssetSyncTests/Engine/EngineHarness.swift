@@ -201,6 +201,33 @@ struct EngineHarness {
         return try await self.engine.start().get()
     }
 
+    /// Starts the engine and returns the outcome of the launch run `start()` begins, read from that run's
+    /// `syncFinished`: the subscription is made before the start, so the event cannot be missed, and it is released
+    /// before this returns. `start()` followed by `sync(.force)` returns that outcome only when the call joins the launch
+    /// run; a host that delays the caller until a launch run that needs no clock has ended makes `sync` start a second
+    /// run, with another outcome or with work no test scripted (close-out cycle 15, PROBE-LATEJOIN; L4-R17). The wait
+    /// ends on cancellation, and a launch run that waits for the clock never finishes here: only a test whose launch run
+    /// needs no clock calls this.
+    func startAndAwaitLaunchRun() async throws -> SyncOutcome {
+        let engine = self.engine
+        let subscribers = await engine.readForTests { $0.state.subscribers.count }
+        let probe = EventProbe(stream: try await engine.subscribe().get())
+        try await self.start()
+        let finished = await probe.next { event in
+            if case .syncFinished = event {
+                return true
+            }
+            return false
+        }
+        await probe.stop()
+        // The probe's subscription is released on its task's cancellation, in a later engine turn.
+        await engine.awaitCondition { $0.state.subscribers.count <= subscribers }
+        guard case .syncFinished(_, let outcome)? = finished else {
+            throw EngineHarnessError.launchRunNotFinished(await engine.introspect())
+        }
+        return outcome
+    }
+
     /// The store's planning view.
     func view() async throws -> StorePlanningView {
         try await self.store.planningView()
@@ -390,6 +417,8 @@ struct EngineHarness {
 enum EngineHarnessError: Error {
     /// The engine kept owning work.
     case neverQuiesced(EngineIntrospection)
+    /// No `syncFinished` of the launch run arrived (the wait was cancelled, or the engine shut down first).
+    case launchRunNotFinished(EngineIntrospection)
 }
 
 /// A factory whose `makeRemoteSource` waits until the test opens it, so a test can act while `start()` is in its

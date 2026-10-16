@@ -22,8 +22,8 @@ struct EngineSyncTests {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(3)
         await harness.serve(catalog)
-        try await harness.start()
-        let outcome = await harness.engine.sync(.force)
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let outcome = try await harness.startAndAwaitLaunchRun()
         guard case .complete(let report) = outcome else {
             Issue.record("expected complete, got \(outcome)")
             return
@@ -166,8 +166,8 @@ struct EngineSyncTests {
         // The failing asset's first attempt answers 404 (its later stage step is never consumed).
         await harness.source.script(failing.transferID, [.fail(.permanentMissing(httpStatus: 404))])
         await harness.serve(catalog)
-        try await harness.start()
-        let outcome = await harness.engine.sync(.force)
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let outcome = try await harness.startAndAwaitLaunchRun()
         guard case .completeWithFailures(let report) = outcome else {
             Issue.record("expected completeWithFailures, got \(outcome)")
             return

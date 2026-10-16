@@ -253,8 +253,8 @@ struct EngineRegressionTests {
         let entry = EngineFixture.entry("e", bytes)
         await harness.source.scriptManifest([.fail(.offline(.noConnection)), .fail(.offline(.noConnection))])
         let probe = EventProbe(stream: try await engine.subscribe().get())
-        try await harness.start()
-        #expect(await engine.sync(.force) == .failed(.offline))
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        #expect(try await harness.startAndAwaitLaunchRun() == .failed(.offline))
         // One debounced retry covers a path monitor that reported a moment early; it fails offline too. The clock moves
         // by the debounce only (never to the manifest fetch's deadline).
         await engine.awaitCondition { $0.state.heap.deadline(for: .pendingRun) != nil }

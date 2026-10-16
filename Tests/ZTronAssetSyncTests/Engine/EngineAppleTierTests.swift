@@ -43,9 +43,9 @@ struct EngineAppleTierTests {
             remote: [mediaPack: ["x.png": bytes]]
         )
         let harness = EngineHarness.make(factory: FakePackSourceFactory(backend: backend))
-        try await harness.start()
         let engine = harness.engine
-        let report = try #require(await engine.sync(.force).completeReport)
+        // The launch run's own report, whether or not a `sync` call would have joined it (L4-R17).
+        let report = try #require(try await harness.startAndAwaitLaunchRun().completeReport)
         #expect(report.fetched == 1, "the run adopted x from its pack")
         // The run's finish reports the durable adoption, and the source releases the media pack (ADR-027).
         try #require(await backend.waitFor(.remove(mediaPack)), "the source releases the media pack")

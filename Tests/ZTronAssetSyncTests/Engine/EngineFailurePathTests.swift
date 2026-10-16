@@ -92,8 +92,8 @@ struct EngineFailurePathTests {
         let entry = EngineFixture.entry("guarded", bytes)
         await harness.serveManifest([entry])
         await harness.source.script(entry.transferID, [.fail(.authentication(.forbiddenAmbiguous(EngineFailurePathTests.evidence(.asset, xml: true, bytes: 120)))), .stage(bytes)])
-        try await harness.start()
-        let first = await harness.engine.sync(.force)
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let first = try await harness.startAndAwaitLaunchRun()
         guard case .completeWithFailures(let report) = first else {
             Issue.record("expected completeWithFailures, got \(first)")
             return

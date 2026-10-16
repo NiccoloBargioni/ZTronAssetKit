@@ -169,14 +169,14 @@ struct EngineConditionsTests {
         await harness.serveManifest([first, second])
         await harness.source.script(first.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(30))), .stage(EngineFixture.bytes(44))])
         await harness.source.script(second.transferID, [.stage(EngineFixture.bytes(45))])
-        try await harness.start()
         let engine = harness.engine
-        let stream = try await engine.subscribe().get()
-        let probe = EventProbe(stream: stream)
         // The clock does not move before the 429 arrives: its Retry-After counts from now.
         let delivered = harness.time.monotonicNow()
-        // A throttle-only blocked run ends blocked and leaves a pending run at the throttle's end (sync-2 S2-03).
-        let throttled = await engine.sync(.force)
+        // A throttle-only blocked run ends blocked and leaves a pending run at the throttle's end (sync-2 S2-03). The
+        // launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let throttled = try await harness.startAndAwaitLaunchRun()
+        let stream = try await engine.subscribe().get()
+        let probe = EventProbe(stream: stream)
         guard case .blocked(.throttled, _) = throttled else {
             Issue.record("expected a throttled run, got \(throttled)")
             return

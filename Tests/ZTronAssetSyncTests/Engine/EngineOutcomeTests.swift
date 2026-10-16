@@ -52,8 +52,8 @@ struct EngineOutcomeTests {
         await harness.serveManifest(catalog.map(\.0))
         await harness.source.script(catalog[0].0.transferID, [.fail(failure.error)])
         await harness.source.script(catalog[1].0.transferID, [.stage(catalog[1].1)])
-        try await harness.start()
-        let outcome = try await harness.syncDriven()
+        // The launch run's own outcome, whether or not a `sync` call would have joined it (L4-R17).
+        let outcome = try await harness.startAndAwaitLaunchRun()
         guard case .completeWithFailures(let report) = outcome else {
             Issue.record("expected completeWithFailures, got \(outcome)")
             return
