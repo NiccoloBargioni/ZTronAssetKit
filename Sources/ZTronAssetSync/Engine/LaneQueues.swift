@@ -131,6 +131,15 @@ struct LaneQueues {
         Kind.allCases.flatMap { self.aside[$0] ?? [] }
     }
 
+    /// Every stored entry from the queues' heads, put-back and set-aside ones included, stale ones too (the invariant
+    /// check: every queued job must be reachable from one of them).
+    var storedEntries: [Entry] {
+        Kind.allCases.flatMap { kind -> [Entry] in
+            let list = self.entries[kind] ?? []
+            return Array(list[min(self.heads[kind] ?? 0, list.count)...]) + (self.reinstated[kind] ?? []) + (self.aside[kind] ?? [])
+        }
+    }
+
     /// `pop` and `peek`: the scan from the head, which drops the invalid entries at the head and takes the entries set
     /// aside out of the part it scanned (and the entry it found when it takes it) in one rebuild of that part.
     private mutating func scan(

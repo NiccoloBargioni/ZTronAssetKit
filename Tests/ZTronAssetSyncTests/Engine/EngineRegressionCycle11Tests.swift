@@ -181,4 +181,61 @@ struct EngineRegressionCycle11Tests {
         #expect(violations.isEmpty, "\(violations)")
         await engine.shutdown()
     }
+
+    /// The lane queues' places (`LaneQueues.Entry.place`): appends take ascending places and front pushes places before
+    /// every other; entries put back (`reinstate`) in any order are merged at their places in one pass, after entries of
+    /// the same place (a stale copy left in place), and `restoreAside` merges the valid set-aside entries the same way.
+    @Test("R-SYN-3: lane queues put entries back at their places, in place order, whatever the order they come back in")
+    func laneQueuesReinstateAtTheirPlaces() {
+        var queues = LaneQueues()
+        let now = MonotonicInstant(nanoseconds: 1)
+        var places: [UInt64: Int64] = [:]
+        for ticket in UInt64(1)...6 {
+            places[ticket] = queues.push(LaneQueues.Entry(ticket: ticket, transfer: EngineUnitTests.transfer(Int(ticket)), queuedAt: now), to: .prefetch)
+        }
+        let front = queues.push(LaneQueues.Entry(ticket: 7, transfer: EngineUnitTests.transfer(7), queuedAt: now), to: .prefetch, front: true)
+        #expect(places.values.allSatisfy { front < $0 } && places[1]! < places[2]!, "appends ascend, a front push precedes them")
+        var live = Set<UInt64>(1...7)
+        let isValid: (LaneQueues.Entry) -> Bool = { live.contains($0.ticket) }
+        // 2 and 4 are set aside by a scan that takes 7, then come back with new tickets (12, 14), 4 first.
+        #expect(queues.pop(.prefetch, isValid: isValid, setAside: { $0.ticket == 2 || $0.ticket == 4 }, accept: { $0.ticket == 7 || $0.ticket == 5 })?.ticket == 7)
+        #expect(queues.asideEntries.isEmpty, "the scan found 7 first, before meeting them")
+        #expect(queues.pop(.prefetch, isValid: isValid, setAside: { $0.ticket == 2 || $0.ticket == 4 }, accept: { $0.ticket == 5 })?.ticket == 5)
+        #expect(queues.asideEntries.map(\.ticket) == [2, 4])
+        live.subtract([2, 4, 5, 7])
+        live.formUnion([12, 14])
+        queues.reinstate(LaneQueues.Entry(ticket: 14, transfer: EngineUnitTests.transfer(4), queuedAt: now, place: places[4]!), to: .prefetch)
+        queues.reinstate(LaneQueues.Entry(ticket: 12, transfer: EngineUnitTests.transfer(2), queuedAt: now, place: places[2]!), to: .prefetch)
+        #expect(queues.storedCount == 7, "three queued, two aside (now stale), two put back")
+        let order = (0..<4).compactMap { _ in queues.pop(.prefetch, isValid: isValid)?.ticket }
+        #expect(order == [1, 12, 3, 14], "back at their places between 1, 3 and 6: \(order)")
+        // restoreAside: 6 is set aside and restored behind a later append.
+        #expect(queues.pop(.prefetch, isValid: isValid, setAside: { $0.ticket == 6 }, accept: { _ in false }) == nil)
+        queues.push(LaneQueues.Entry(ticket: 8, transfer: EngineUnitTests.transfer(8), queuedAt: now), to: .prefetch)
+        live.insert(8)
+        queues.restoreAside(isValid: isValid)
+        #expect((0..<2).compactMap { _ in queues.pop(.prefetch, isValid: isValid)?.ticket } == [6, 8], "6 waited before 8")
+        #expect(queues.pop(.prefetch, isValid: isValid) == nil)
+    }
+
+    /// The reachability rule added in this cycle (review of close-out cycle 10, L4-C10-13) is not vacuous: a queued job
+    /// whose entry went stale (no valid entry in any queue, put back or aside) is reported.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: the invariant check reports a queued job that waits in no queue", .timeLimit(.minutes(1)))
+    func strandedQueuedJobIsReported() async throws {
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: 4, seed: 11_501)
+        let engine = harness.engine
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == 4 && $0.state.inFlight.count == 3 }
+        #expect(await engine.invariantViolations().isEmpty, "a healthy engine")
+        let queued = try #require(await engine.readForTests { engine in
+            engine.state.jobs.values.first { $0.state == .queued }?.transfer
+        })
+        let stranded = await engine.violations { state in
+            state.jobs[queued]?.ticket += 1
+        }
+        #expect(stranded.contains("1 queued jobs wait in no queue"), "\(stranded)")
+        #expect(await engine.invariantViolations().isEmpty, "the check restored the state")
+        await engine.shutdown()
+    }
 }

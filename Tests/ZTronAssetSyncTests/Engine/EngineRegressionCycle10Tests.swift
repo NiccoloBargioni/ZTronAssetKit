@@ -293,8 +293,9 @@ struct EngineRegressionCycle10Tests {
     /// The lane queues' set-aside (`LaneQueues.aside`): a scan takes the entries its caller claims out of the queue and
     /// keeps the others in order, whether it takes the entry it finds (`pop`) or leaves it (`peek`), and a scan that
     /// finds nothing sets aside every claimed entry of the queue; the entries set aside count toward the 2 × live bound
-    /// until compaction drops the stale ones, and `restoreAside` puts the valid ones back first, in the order they were
-    /// met, and drops the stale ones.
+    /// until compaction drops the stale ones, and `restoreAside` puts the valid ones back at their places (first here:
+    /// they were queued before every entry left; since close-out cycle 11 by place, not at the front) and drops the
+    /// stale ones.
     @Test("R-SYN-3: lane queues set aside the entries a scan claims, keep the others in order and restore the valid ones first")
     func laneQueuesSetAside() {
         var queues = LaneQueues()

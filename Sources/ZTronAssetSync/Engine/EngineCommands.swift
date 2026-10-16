@@ -1529,6 +1529,13 @@ extension SyncEngine {
         if !strayAside.isEmpty {
             violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
         }
+        // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
+        // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+        let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
+        let stranded = self.state.jobs.values.filter { $0.state == .queued && !reachable.contains($0.transfer) }.count
+        if stranded > 0 {
+            violations.append("\(stranded) queued jobs wait in no queue")
+        }
         return violations
     }
 
