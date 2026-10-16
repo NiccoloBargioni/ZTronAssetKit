@@ -197,8 +197,30 @@ extension SyncEngine {
         }
     }
 
+    /// Test seam: the next re-admission follow-up turns keep their passes owed until `releaseReadmissionFollowUps()`.
+    func holdReadmissionFollowUps() {
+        self.state.readmissionFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held follow-up run in this turn, or disarms a hold nothing reached.
+    func releaseReadmissionFollowUps() {
+        self.state.readmissionFollowUpsHeld = false
+        guard self.state.readmissionFollowUpWaiting else {
+            return
+        }
+        self.state.readmissionFollowUpWaiting = false
+        self.readmissionFollowUp()
+    }
+
     /// The scheduled follow-up: the owed passes, then a pump for what they re-queued.
     private func readmissionFollowUp() {
+        if self.state.readmissionFollowUpsHeld {
+            // Test seam: the passes stay owed and the turn stays scheduled (`readmissionFollowUpScheduled`) until the
+            // release runs it; a pass owed meanwhile joins `readmissionsOwed` without a second task.
+            self.state.readmissionFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
         self.state.readmissionFollowUpScheduled = false
         let owed = self.state.readmissionsOwed
         self.state.readmissionsOwed = []

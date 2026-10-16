@@ -260,6 +260,13 @@ struct EngineState {
     var readmissionsOwed: Readmissions = []
     /// A later turn is scheduled for `readmissionsOwed`.
     var readmissionFollowUpScheduled = false
+    /// Test seam (close-out cycle 16): while set, the scheduled re-admission follow-up keeps its passes owed and stays
+    /// scheduled instead of running (`holdReadmissionFollowUps()`, `releaseReadmissionFollowUps()`), so a test decides
+    /// what the engine does while jobs are owed a re-queue, which no production path can order. No production path sets
+    /// it.
+    var readmissionFollowUpsHeld = false
+    /// Test seam: a follow-up turn reached the hold and waits for its release.
+    var readmissionFollowUpWaiting = false
     /// Lanes whose queued jobs a lane-wide block (offline, a policy) parks, left unfinished by a pump turn's bound and
     /// continued by every later pump (C2): the reason each lane's jobs are parked with.
     var laneParksOwed: [AssetPriority: BlockReason] = [:]
