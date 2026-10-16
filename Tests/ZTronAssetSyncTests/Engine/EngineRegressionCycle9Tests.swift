@@ -61,10 +61,109 @@ struct EngineRegressionCycle9Tests {
 
     // MARK: Bounded actor turns at scale (C2; review of close-out cycle 8)
 
+    /// More members than one bounded turn handles (`readmissionsPerTurn`, `releasesPerTurn`).
+    static let members = SyncEngine.readmissionsPerTurn + 64
+
+    /// No network, nominal power.
+    static let offline = DeviceConditions(network: NetworkConditions(satisfied: false, expensive: false, constrained: false), power: PowerConditions(lowPowerMode: false, thermal: .nominal))
+
     /// Every job's state.
     @available(macOS 15.0, iOS 18.0, *)
     static func states(_ engine: SyncEngine) async -> [JobState] {
         await EngineRegressionCycle8Tests.states(engine)
+    }
+
+    /// `count` on-demand 300-byte entries `m0`…, absent after a first sync on a volume with `reserve + 1,000,000` bytes
+    /// (room for every member of `members`).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func startedRoomy(count: Int, seed: UInt64) async throws -> (EngineHarness, FakeFileSystem, [ManifestEntry]) {
+        let reserve = StoragePolicy().reserveFreeBytes
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 1_000_000, opportunisticCapacity: reserve + 1_000_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let entries = (0..<count).map { index in
+            EngineHarness.onDemand("m\(index)", EngineFixture.bytes(seed + UInt64(index), count: 300))
+        }
+        await harness.serveManifest(entries)
+        try await harness.start()
+        _ = try #require(await harness.engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        return (harness, fileSystem, entries)
+    }
+
+    /// When the network returns, the jobs parked `offline` and those failed `whenOnline` are re-queued at most
+    /// `readmissionsPerTurn` per turn (one turn re-queued 10,000 in about 22 ms); the follow-up turns must reach every
+    /// one. More members than that wait behind three running ones; the network drops, the three fail offline and the
+    /// others park `offline`; the network returns on a roomy volume.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-13: when the network returns under more members parked offline than one turn re-queues, every member is re-queued",
+        .timeLimit(.minutes(1))
+    )
+    func networkReturnRequeuesEveryMember() async throws {
+        let count = Self.members
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: count, seed: 10_901)
+        let engine = harness.engine
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count && $0.state.inFlight.count == 3 }
+        await engine.waitForAllHandles()
+        let running = await harness.source.starts.map(\.id)
+        #expect(running.count == 3, "setup: three members run")
+        await harness.conditions.send(Self.offline)
+        await engine.awaitCondition { $0.state.conditions?.network.satisfied == false }
+        for transfer in running {
+            await harness.source.script(transfer, [.fail(.offline(.noConnection))])
+        }
+        await engine.awaitCondition { $0.state.inFlight.isEmpty && $0.state.laneParked.count + $0.state.failedJobs.count == count }
+        #expect(await engine.readForTests { $0.state.laneParked.count } == count - 3, "setup: the queued members are parked offline")
+        await harness.conditions.send(.unrestricted)
+        // Once no follow-up is owed: a re-queue left to a turn nobody scheduled would leave members parked.
+        await engine.awaitCondition { engine in
+            engine.state.inFlight.count == 3 && !engine.state.readmissionFollowUpScheduled && !engine.state.pumpFollowUpScheduled
+        }
+        let states = await Self.states(engine)
+        #expect(states.count == count)
+        #expect(states.filter { $0 == .queued }.count == count - 3, "every member not running waits in the queue")
+        #expect(!states.contains { $0.kind == .blocked || $0.kind == .failed }, "no member is left parked or failed")
+        await engine.waitForAllHandles()
+        #expect(await harness.source.starts.count == 6, "three members start again")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    /// A free-space read re-queues at most `readmissionsPerTurn` jobs parked for space per turn (one turn re-admitted
+    /// 10,000 in about 15 ms) and owes a follow-up sweep the rest; the follow-ups must reach every one. More members than
+    /// that are parked `insufficientSpace` on a volume with room for two (the third non-user slot stays free, so the pump
+    /// gates and parks each); the volume then gains room for all of them.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: when the volume gains room for more members parked for space than one turn re-admits, every one is re-queued",
+        .timeLimit(.minutes(1))
+    )
+    func roomReadmitsEveryParkedMember() async throws {
+        let count = Self.members
+        let (harness, fileSystem, entries) = try await Self.startedRoomy(count: count, seed: 10_911)
+        let engine = harness.engine
+        let ballast = try await EngineRegressionCycle6Tests.leaveRoom(600, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.inFlight.count == 2 && $0.state.spaceParked.count == count - 2 }
+        try fileSystem.removeItem(at: ballast)
+        await engine.refreshFreeSpace()
+        // Once no follow-up is owed: a re-admission left to a sweep nobody scheduled would leave members parked.
+        await engine.awaitCondition { engine in
+            engine.state.inFlight.count == 3 && engine.state.spaceSweepFollowUp == nil && !engine.state.pumpFollowUpScheduled
+        }
+        let states = await Self.states(engine)
+        #expect(states.count == count)
+        #expect(states.filter { $0 == .queued }.count == count - 3, "every member not running waits in the queue")
+        #expect(await engine.readForTests { $0.state.spaceParked.isEmpty }, "no member is left parked for space")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
     }
 
     /// The jobs a sweep re-queued count against the room until they start, also for a later sweep: a sweep that the
@@ -96,6 +195,36 @@ struct EngineRegressionCycle9Tests {
         let second = await Self.states(engine)
         #expect(second.filter { $0 == .queued }.count == 3, "the second read re-queues none: the three waiting take the room")
         #expect(second.filter { $0 == .blocked(.insufficientSpace) }.count == count - 6, "the others stay parked")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    /// Releasing a prefetch handle removes at most `releasesPerTurn` members' interests per turn (one turn removed
+    /// 10,000 in about 15 ms); the follow-up turns must reach every member, and a member only the released handle wants
+    /// must not start meanwhile (R-CAR-4: no transfer runs for nobody). More members than that wait behind three running
+    /// ones on a roomy volume; the release cancels the three, and no member starts.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-CAR-4: releasing a prefetch handle of more members than one turn releases leaves no job and starts none of its members meanwhile",
+        .timeLimit(.minutes(1))
+    )
+    func releaseRemovesEveryMemberAndStartsNone() async throws {
+        let count = Self.members
+        let (harness, _, entries) = try await EngineRegressionCycle8Tests.started(count: count, seed: 10_931)
+        let engine = harness.engine
+        let token = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count && $0.state.inFlight.count == 3 }
+        await engine.waitForAllHandles()
+        let running = await harness.source.starts.map(\.id)
+        #expect(running.count == 3, "setup: three members run")
+        await engine.releaseGroup(token)
+        // Once no follow-up is owed: interests left to a turn nobody scheduled would keep their jobs.
+        await engine.awaitCondition { !$0.state.releaseFollowUpScheduled }
+        #expect(await engine.readForTests { $0.state.jobs.isEmpty }, "no member keeps a job")
+        #expect(await engine.readForTests { $0.state.releasing.isEmpty }, "no interest is left to remove")
+        #expect(await harness.source.starts.count == 3, "no member started after the release")
+        let cancelled = Set(await harness.source.controlLog.filter { $0.control == .cancel }.map(\.transfer))
+        #expect(cancelled == Set(running), "the three running transfers were cancelled")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
