@@ -299,6 +299,9 @@ struct EngineCommandTests {
         await harness.source.script(gone.transferID, [.fail(.permanentMissing(httpStatus: 404))])
         let report = try await harness.start()
         _ = await harness.engine.sync(.force)
+        // The store's own work after the run (the 404's bookkeeping commit) has run, so the generation diagnostics read
+        // is the one the view below reads, not an earlier one (L4-R17: never two snapshots across pending store work).
+        try await harness.settle()
         let diagnostics = try await harness.engine.diagnostics().get()
         #expect(diagnostics.appVersion == "1.0+1")
         #expect(diagnostics.launchEpoch == report.launchEpoch)
