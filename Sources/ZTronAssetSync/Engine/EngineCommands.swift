@@ -1540,18 +1540,47 @@ extension SyncEngine {
     }
 
     /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
-    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25).
+    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25). A gate the clock opened is not
+    /// stranded while the deadline that starts its run is due and the alarm armed: the alarm's next turn fires it.
     private func strandedPendingRun() -> String? {
         guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
             return nil
         }
         switch self.pendingRunGate(pending) {
         case .open:
+            if self.startsInAlarmTurn(pending) {
+                return nil
+            }
             return "the pending run's \(pending.gate) gate is open but no run started"
         case .armed:
             return nil
         case .unarmed:
             return "nothing will open the pending run's \(pending.gate) gate"
         }
+    }
+
+    /// Whether the run of `pending` starts in the alarm's next turn: the clock reached the deadline that opens its
+    /// throttle or breaker gate (`.pendingRun` at the throttle's end, `.breaker` at the cooldown's end), which is still in
+    /// the heap with the alarm armed. A clock move resumes the alarm's sleep, but the alarm fires the deadline only once
+    /// it has the actor, so a check between the move and that turn sees the gate open and no run (close-out cycle 13,
+    /// F-33).
+    private func startsInAlarmTurn(_ pending: PendingRun) -> Bool {
+        let reason: DeadlineReason
+        switch pending.gate {
+        case .throttle:
+            reason = .pendingRun
+        case .breaker:
+            guard let origin = self.state.remote?.originID else {
+                return false
+            }
+            reason = .breaker(origin)
+        case .conditions:
+            // Its gate reads armed while its debounce is in the heap (`pendingRunGate`).
+            return false
+        }
+        guard self.state.alarm != nil, let at = self.state.heap.deadline(for: reason) else {
+            return false
+        }
+        return at <= self.environment.time.monotonicNow()
     }
 }
