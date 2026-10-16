@@ -246,6 +246,30 @@ extension ZTronAssetKitBenchmarks {
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
+        /// C2 at SPEC §6's reference scale when a released handle's members regain an interest at once (review of
+        /// close-out cycle 11, PROBE-C11C-3): a 10,000-member handle is released and the same identifiers are registered
+        /// again before the release's later turns ran, so every member the release has not reached yet is joined again
+        /// and every member it set aside or left in place gets a fresh ticket and is merged back at its place
+        /// (`reinstate`, `LaneQueues.absorb`). Prefetch and bulk handles; medians of three against P-9, the best of the
+        /// three against C2, after a warm-up.
+        @Test("R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func handleRejoinTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            for lane in [AssetPriority.prefetch, .bulk] {
+                _ = try await SyncBench.handleRejoinWait(members: 1_000, lane: lane)
+                var runs: [Double] = []
+                for _ in 0..<3 {
+                    runs.append(try await SyncBench.handleRejoinWait(members: 10_000, lane: lane))
+                }
+                let median = runs.sorted()[1]
+                print("R-SYN-3 re-join of a released 10,000-member \(lane) handle: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+                #expect(median <= gapMax, "\(lane)")
+                #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(lane): \(runs)")
+            }
+        }
+
         /// C2 at SPEC §6's reference scale when a resolve's caller cancels while 10,000 prefetch members wait (review of
         /// close-out cycle 9, PROBE-C9R-1): the withdrawal sorted every job's transfer to find the caller's interest (5.8
         /// to 6.4 ms at a load about 7.5, the least margin of the measured turns). Medians of three against P-9, the best
@@ -653,6 +677,40 @@ enum SyncBench {
         }
         await engine.shutdown()
         return wait
+    }
+
+    /// The heartbeat's longest wait while a handle of `count` on-demand members at `lane` on a roomy volume (three
+    /// start and hold, the others wait in the queue) is released and a handle over the same identifiers is registered
+    /// at once, until the release ended (nothing left to release, no follow-up turn owed) and every member is again a
+    /// job that runs or waits in its queue.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func handleRejoinWait(members count: Int, lane: AssetPriority) async throws -> Double {
+        let bench = try await SyncBench.scaleBench(members: count, room: nil)
+        let engine = bench.engine
+        let ids = bench.entries.map(\.identifier)
+        guard case .success(let token) = await engine.registerGroup(ids, lane: lane) else {
+            throw SyncBenchError.incomplete("the handle was refused")
+        }
+        while !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let wait = try await SyncBench.longestWait(on: engine) {
+            await engine.releaseGroup(token)
+            guard case .success = await engine.registerGroup(ids, lane: lane) else {
+                throw SyncBenchError.incomplete("the second handle was refused")
+            }
+            while !(await SyncBench.rejoined(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// Whether a release ended (nothing left to release, no follow-up turn owed) with `count` jobs, none parked.
+    static func rejoined(_ engine: isolated SyncEngine, count: Int) -> Bool {
+        engine.state.releasing.isEmpty && !engine.state.releaseFollowUpScheduled && SyncBench.noneParked(engine, count: count)
     }
 
     /// The heartbeat's longest wait while a user-initiated resolve's caller cancels beside a prefetch handle of `count`
