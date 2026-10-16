@@ -1341,6 +1341,17 @@ extension SyncEngine {
         if self.isRunning, self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
             violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
         }
+        var inFlight = InFlightBytes()
+        var flying: Set<TransferID> = []
+        for job in self.state.jobs.values {
+            if let bytes = job.ledgerBytes {
+                inFlight.add(bytes)
+                flying.insert(job.transfer)
+            }
+        }
+        if inFlight != self.state.inFlightBytes || flying != self.state.inFlight {
+            violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")
+        }
         return violations
     }
 

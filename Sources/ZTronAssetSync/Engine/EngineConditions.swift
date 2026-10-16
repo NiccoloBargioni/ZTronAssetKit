@@ -97,7 +97,8 @@ extension SyncEngine {
                 continue
             }
         }
-        for transfer in self.state.jobs.keys.sorted() {
+        // Only a downloading job can be paused (`pauseIfRefused`): the jobs in flight, not every job (C2).
+        for transfer in self.state.inFlight.sorted() {
             self.pauseIfRefused(transfer)
         }
         let edge = conditions.network.satisfied && (previous.map { !$0.network.satisfied || $0.network != conditions.network } ?? false)

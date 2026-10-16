@@ -212,6 +212,12 @@ struct EngineState {
     var committedSinceRead: Int64 = 0
     /// Bytes committed in this process, saturating: a read keeps the commits counted since it began (`readFreeSpace`).
     var committedTotal: Int64 = 0
+    /// The jobs in downloading ∪ verifying ∪ committing and their bytes, kept by `transition` (the only mutator of
+    /// `Job.state`; a job is created queued), `removeJob` and shutdown, and checked against the job table by
+    /// `invariantViolations()`: the headroom ledger and the slot counts read them instead of every job (C2).
+    var inFlight: Set<TransferID> = []
+    /// The bytes of `inFlight`.
+    var inFlightBytes = InFlightBytes()
 
     // MARK: Events (R-SYN-12)
 
@@ -339,8 +345,9 @@ struct DrainingAttempt: Hashable {
 struct Job {
     /// The content.
     let transfer: TransferID
-    /// A representative entry (remote path, size, extension).
-    var entry: ManifestEntry
+    /// A representative entry (remote path, size, extension). Never replaced: the headroom ledger uncounts a job with
+    /// the size it counted it with (`InFlightBytes`).
+    let entry: ManifestEntry
     /// The content identity every bound id must still have (the store's publish guard).
     var identity: ContentIdentity
     /// Every asset bound at publication.

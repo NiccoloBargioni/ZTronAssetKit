@@ -27,7 +27,18 @@ extension SyncEngine {
             self.log.log(.sync, .fault, "illegal transition \(from) → \(to)")
             return false
         }
+        let before = job.ledgerBytes
         job.state = next
+        let after = job.ledgerBytes
+        if let before {
+            self.state.inFlightBytes.remove(before)
+        }
+        if let after {
+            self.state.inFlightBytes.add(after)
+            self.state.inFlight.insert(transfer)
+        } else if before != nil {
+            self.state.inFlight.remove(transfer)
+        }
         if next.kind != .downloading {
             // Only a downloading job has a running attempt (the invariant the model test checks).
             job.active = nil
@@ -224,6 +235,10 @@ extension SyncEngine {
     func removeJob(_ transfer: TransferID) {
         guard let job = self.state.jobs.removeValue(forKey: transfer) else {
             return
+        }
+        if let bytes = job.ledgerBytes {
+            self.state.inFlightBytes.remove(bytes)
+            self.state.inFlight.remove(transfer)
         }
         if let adopt = job.adopt {
             // A drained copy nobody will publish now.

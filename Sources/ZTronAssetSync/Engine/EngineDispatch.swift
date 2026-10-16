@@ -42,10 +42,14 @@ extension SyncEngine {
         }
     }
 
-    /// The slot figures now.
+    /// The slot figures now, from the jobs in flight only (every figure counts downloading, verifying or committing
+    /// jobs): a pass over every job cost about 0.35 µs per job in release, about 4 ms per pump at 10,000 parked jobs (C2).
     var slotCounts: SlotCounts {
         var counts = SlotCounts()
-        for job in self.state.jobs.values {
+        for transfer in self.state.inFlight {
+            guard let job = self.state.jobs[transfer] else {
+                continue
+            }
             let lane = job.lane
             switch job.state {
             case .downloading:
@@ -396,18 +400,12 @@ extension SyncEngine {
 
     /// The ledger's room for `job`: its lane's volume above the reserve, less the bytes of the other jobs in flight and
     /// the bytes committed since the last read. It is also the `available` an `insufficientSpace` for the job reports,
-    /// so `required` exceeds it whenever the job was parked for lack of space (ARCHITECTURE §7.6, §7.10).
+    /// so `required` exceeds it whenever the job was parked for lack of space (ARCHITECTURE §7.6, §7.10). O(1): the
+    /// bytes in flight are a running total (`InFlightBytes`), less the job's own when it is in flight itself.
     func headroom(for job: Job, in space: FreeSpace) -> Int64 {
         let volume = job.lane == .userInitiated ? space.volumeImportant : space.volumeOpportunistic
-        var inFlight: Int64 = 0
-        for other in self.state.jobs.values where other.transfer != job.transfer {
-            switch other.state {
-            case .downloading, .verifying, .committing:
-                inFlight = PlanBuilder.adding(inFlight, max(0, other.entry.byteSize ?? 0))
-            default:
-                continue
-            }
-        }
+        let own = self.state.jobs[job.transfer]?.ledgerBytes ?? 0
+        let inFlight = self.state.inFlightBytes.clamped(excluding: own)
         return max(0, volume.subtractingClamped(max(0, space.reserveBytes)).subtractingClamped(inFlight).subtractingClamped(self.state.committedSinceRead))
     }
 
@@ -419,7 +417,7 @@ extension SyncEngine {
         guard self.tuning.preemptLowerLanes, self.tuning.maxConcurrentTransfers - self.runningCount <= 0 else {
             return false
         }
-        let victims = self.state.jobs.values.filter { job in
+        let victims = self.state.inFlight.compactMap { self.state.jobs[$0] }.filter { job in
             guard job.state == .downloading, job.lane < .userInitiated, let active = job.active else {
                 return false
             }
