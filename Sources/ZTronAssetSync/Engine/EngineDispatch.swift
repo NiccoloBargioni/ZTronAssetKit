@@ -799,6 +799,9 @@ extension SyncEngine {
             self.offerProgress(.transferProgress(asset, TransferProgress(received: received, expected: expected)))
         }
         self.offerRunProgress()
+        // A rate-limited update publishes nothing, yet it is a mutation: the test seams' conditions re-evaluate after it
+        // as after any other (`awaitCondition`, L4-R17). With no seam waiting this is one empty-table check.
+        self.notifyObservers()
     }
 
     /// Applies an attempt's terminal element (T5, T6, T7).
