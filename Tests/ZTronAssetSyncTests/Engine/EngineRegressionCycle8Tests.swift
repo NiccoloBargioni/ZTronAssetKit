@@ -13,6 +13,76 @@ import ZTronAssetTestSupport
 /// to be parked again.
 @Suite("Engine regressions, close-out cycle 8")
 struct EngineRegressionCycle8Tests {
+    /// More members than one turn parks.
+    static let members = SyncEngine.parksPerPump + 64
+
+    /// `count` on-demand 300-byte entries `m0`…, absent after a first sync on a volume with `reserve + 100,000` bytes.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func started(count: Int, seed: UInt64) async throws -> (EngineHarness, FakeFileSystem, [ManifestEntry]) {
+        let time = ManualTimeSource()
+        let (harness, fileSystem) = EngineRegressionCycle6Tests.harness(time: time)
+        let entries = (0..<count).map { index in
+            EngineHarness.onDemand("m\(index)", EngineFixture.bytes(seed + UInt64(index), count: 300))
+        }
+        await harness.serveManifest(entries)
+        try await harness.start()
+        _ = try #require(await harness.engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        return (harness, fileSystem, entries)
+    }
+
+    /// Every job's state.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func states(_ engine: SyncEngine) async -> [JobState] {
+        await engine.readForTests { engine in
+            engine.state.jobs.values.map(\.state)
+        }
+    }
+
+    // MARK: The pump's park bound (C2)
+
+    /// A pump parks at most `parksPerPump` jobs and leaves the rest to a follow-up turn; the follow-ups must reach every
+    /// queued job. More members than that wait behind three running ones; the network drops, the three fail offline, and
+    /// the others park `offline`; the volume then fills to the reserve. When the network returns, every member is
+    /// re-queued at once (the parked ones, and the failed ones on the edge, R-SYN-13), and the gate parks each
+    /// `insufficientSpace` (the store counts no pending reclaim): more than one pump's worth, and nothing starts again.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: when the network returns under more queued members than one pump turn parks, every member the volume cannot hold ends parked for lack of space",
+        .timeLimit(.minutes(1))
+    )
+    func pumpParksEveryMemberAcrossTurns() async throws {
+        let count = Self.members
+        let (harness, fileSystem, entries) = try await Self.started(count: count, seed: 10_801)
+        let engine = harness.engine
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        // Unscripted transfers wait in the fake source: three run (the non-user slots), the others wait in the queue.
+        await engine.awaitCondition { $0.state.jobs.count == count && $0.state.inFlight.count == 3 }
+        await engine.waitForAllHandles()
+        let running = await harness.source.starts.map(\.id)
+        #expect(running.count == 3, "setup: three members run")
+        // The engine watches the conditions while it has work.
+        await harness.conditions.send(DeviceConditions(network: NetworkConditions(satisfied: false, expensive: false, constrained: false), power: PowerConditions(lowPowerMode: false, thermal: .nominal)))
+        await engine.awaitCondition { $0.state.conditions?.network.satisfied == false }
+        for transfer in running {
+            await harness.source.script(transfer, [.fail(.offline(.noConnection))])
+        }
+        await engine.awaitCondition { engine in
+            engine.state.inFlight.isEmpty && !engine.state.jobs.values.contains { $0.state == .queued }
+        }
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(0, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        await harness.conditions.send(.unrestricted)
+        // The count of jobs parked for space is kept by the transition funnel: the wait reads it in O(1) per mutation.
+        await engine.awaitCondition { $0.state.spaceParked.count == count }
+        let states = await Self.states(engine)
+        #expect(states.count == count)
+        #expect(states.allSatisfy { $0 == .blocked(.insufficientSpace) }, "every member parked for lack of space")
+        #expect(await harness.source.starts.count == 3, "nothing started again: the volume holds none of them")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
     // MARK: The space sweep (C2, T17)
 
     /// A free-space read re-admits the jobs parked for space that the room holds together, in queue order, and leaves the
@@ -54,6 +124,62 @@ struct EngineRegressionCycle8Tests {
         let after = await engine.readForTests { ($0.state.jobs[third]?.state, $0.state.jobs[third]?.ticket) }
         #expect(after.0 == .blocked(.insufficientSpace), "the third stays parked")
         #expect(after.1 == ticket, "the third was never re-queued (its queue ticket is unchanged)")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+
+    /// A sweep of the jobs parked for space parks at most `parksPerPump` of them per turn and owes a follow-up sweep the
+    /// rest; the follow-ups must reach every one, whatever the engine's other wakes. More members than that wait
+    /// `awaitingSpace` for `x`'s doomed bytes on a volume with no other room above the reserve; only the store's clock
+    /// passes the grace and its due work reaps `x`, so the engine's own alarm for that deadline stays armed and never
+    /// fires. The store call that may have reclaimed bytes (the purge path) then reads 300 bytes of room and no pending
+    /// reclaim: the first member is re-admitted, and every other one is parked `insufficientSpace` (nothing is left to
+    /// reclaim for it), more than one turn's worth.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: once the store reclaimed what jobs waited for, every one the room does not hold is parked insufficientSpace, more than one turn's worth",
+        .timeLimit(.minutes(1))
+    )
+    func reclaimedSweepReachesEveryWaitingMember() async throws {
+        let count = Self.members
+        let time = ManualTimeSource()
+        let storeTime = ManualTimeSource()
+        let (harness, fileSystem) = EngineRegressionCycle6Tests.harness(time: time, storeTime: storeTime)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(10_821, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let entries = (0..<count).map { index in
+            EngineHarness.onDemand("m\(index)", EngineFixture.bytes(10_822 + UInt64(index), count: 300))
+        }
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // v2 prunes x (doomed for the 60 s grace) and lists the on-demand members.
+        await harness.serveManifest(entries, etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for reclaim")
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(0, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.spaceParked.count == count }
+        #expect(await Self.states(engine).allSatisfy { $0 == .blocked(.awaitingSpace) }, "setup: every member waits for x's bytes")
+        storeTime.advance(by: 61)
+        let reaped = await harness.store.runDueWork().reapedBytes
+        #expect(reaped == Int64(xBytes.count), "setup: the store reaped x")
+        await engine.spaceMayHaveBeenReclaimed()
+        // Cheap terms first: the scan of every parked job runs only once no follow-up sweep is owed.
+        await engine.awaitCondition { engine in
+            engine.state.spaceParked.count == count - 1 && engine.state.spaceSweepFollowUp == nil
+                && engine.state.spaceParked.allSatisfy { engine.state.jobs[$0]?.state == .blocked(.insufficientSpace) }
+        }
+        await engine.waitForAllHandles()
+        let started = await harness.source.starts.map(\.id).filter { $0 != x.transferID }
+        #expect(started == [entries[0].transferID], "the room holds one member, the first in the queue: \(started)")
+        #expect(await engine.readForTests { $0.state.storeDeadline != nil }, "the engine's alarm for x's deadline is still armed")
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }

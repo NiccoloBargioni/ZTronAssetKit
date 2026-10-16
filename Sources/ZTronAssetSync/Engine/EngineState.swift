@@ -220,6 +220,11 @@ struct EngineState {
     var inFlight: Set<TransferID> = []
     /// The bytes of `inFlight`.
     var inFlightBytes = InFlightBytes()
+    /// The jobs parked for lack of space (`blocked(insufficientSpace)` or `blocked(awaitingSpace)`), kept and checked as
+    /// `inFlight` is: a free-space read re-checks these, not every job.
+    var spaceParked: Set<TransferID> = []
+    /// A space sweep stopped after `SyncEngine.parksPerPump` parks and owes a later turn the rest, in this mode (C2).
+    var spaceSweepFollowUp: SpaceSweep?
 
     // MARK: Events (R-SYN-12)
 

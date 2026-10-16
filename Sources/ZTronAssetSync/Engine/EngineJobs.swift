@@ -28,7 +28,13 @@ extension SyncEngine {
             return false
         }
         let before = job.ledgerBytes
+        let wasSpaceParked = job.state.isSpaceParked
         job.state = next
+        if next.isSpaceParked {
+            self.state.spaceParked.insert(transfer)
+        } else if wasSpaceParked {
+            self.state.spaceParked.remove(transfer)
+        }
         let after = job.ledgerBytes
         if let before {
             self.state.inFlightBytes.remove(before)
@@ -240,6 +246,7 @@ extension SyncEngine {
             self.state.inFlightBytes.remove(bytes)
             self.state.inFlight.remove(transfer)
         }
+        self.state.spaceParked.remove(transfer)
         if let adopt = job.adopt {
             // A drained copy nobody will publish now.
             self.discardLater(adopt.name)
@@ -464,21 +471,124 @@ extension SyncEngine {
         }
     }
 
-    /// Re-queues every job parked for lack of space whose headroom the latest free-space read admits (T17).
+    /// Re-queues the jobs parked `insufficientSpace` that the latest free-space read admits (T17; `sweepSpaceParked`).
     func reconsiderSpaceBlocked() {
-        var cleared = false
-        for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer], job.state == .blocked(.insufficientSpace), self.spaceBlock(job) == nil else {
+        self.sweepSpaceParked(.read)
+    }
+
+    /// Re-checks the jobs parked for lack of space against the latest free-space read (T17), in the order the pump serves
+    /// them (user singles, user batches, prefetch, bulk; by queue ticket within a lane). Each is admitted against the room
+    /// the read leaves after the jobs re-admitted ahead of it in this sweep, which the gate counts in flight once they
+    /// start: re-queuing every job that fits on its own only for the gate to park all but the first again took 16 ms in
+    /// one turn at 10,000 parked members (review of close-out cycle 7, C2), and the jobs it re-queued while every slot was
+    /// taken waited in the queue for room the earlier ones had used. An admitted job is re-queued; an `insufficientSpace`
+    /// one that is not stays parked until a later read; an `awaitingSpace` one that is not is treated as `sweep` says. Its
+    /// figures, when it is parked `insufficientSpace`, are the bytes it needs against that room (F-22's convention). At
+    /// most `parksPerPump` jobs are parked per turn; the rest are left to a follow-up sweep.
+    func sweepSpaceParked(_ sweep: SpaceSweep) {
+        var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
+        for transfer in self.state.spaceParked {
+            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state, sweep != .read || reason == .insufficientSpace else {
                 continue
             }
-            if self.transition(transfer, to: .queued) {
-                self.enqueue(transfer)
-                cleared = true
-            }
+            candidates.append((self.queueRank(job), job.ticket, transfer))
         }
-        if cleared {
+        candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+        var ahead: Int64 = 0
+        var requeued = false
+        var parks = 0
+        var waiting = false
+        for candidate in candidates {
+            let transfer = candidate.transfer
+            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
+                continue
+            }
+            guard let verdict = self.spaceBlock(job, ahead: ahead) else {
+                if self.transition(transfer, to: .queued) {
+                    self.enqueue(transfer)
+                    ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
+                    requeued = true
+                }
+                continue
+            }
+            guard reason == .awaitingSpace else {
+                continue
+            }
+            if verdict == .awaitingSpace, sweep == .reclaimed || self.spaceWakeExpected {
+                waiting = true
+                continue
+            }
+            guard parks < Self.parksPerPump else {
+                self.scheduleSpaceSweepFollowUp(sweep)
+                break
+            }
+            if let space = self.state.freeSpace {
+                // The room is computed before the write: the right side of an optional-chained assignment runs inside
+                // the write's access to `state` (an exclusivity conflict, review of close-out cycle 6).
+                let available = max(0, self.headroom(for: job, in: space).subtractingClamped(ahead))
+                if case .insufficientSpace(let required, _)? = job.lastError {
+                    // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job.
+                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: available)
+                } else if ahead > 0 {
+                    // The fail-fast answer would report the room without the jobs admitted ahead of this one.
+                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: job.entry.byteSize ?? 0, available: available)
+                }
+            }
+            self.park(transfer, reason: .insufficientSpace)
+            parks += 1
+        }
+        if waiting {
+            // Re-parking would have asked for a wake (`park`); the jobs left waiting ask for it here.
+            self.ensureSpaceWake()
+        }
+        if parks > 0 {
+            self.checkRunSettled()
+        }
+        if requeued {
             self.pump()
         }
+    }
+
+    /// The order the pump serves a job's queue in.
+    private func queueRank(_ job: Job) -> Int {
+        switch self.queueKind(job) {
+        case .userSingle:
+            return 0
+        case .userBatch:
+            return 1
+        case .prefetch:
+            return 2
+        case .bulk:
+            return 3
+        }
+    }
+
+    /// Schedules one later sweep for the jobs a sweep left after `parksPerPump` parks (C2).
+    private func scheduleSpaceSweepFollowUp(_ sweep: SpaceSweep) {
+        let owed = self.state.spaceSweepFollowUp
+        self.state.spaceSweepFollowUp = sweep.merged(with: owed)
+        guard owed == nil else {
+            return
+        }
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the sweep re-reads every parked job.
+            await engine.spaceSweepFollowUp()
+        }
+        if spawned == nil {
+            self.state.spaceSweepFollowUp = nil
+        }
+    }
+
+    /// The scheduled follow-up sweep.
+    private func spaceSweepFollowUp() {
+        guard let sweep = self.state.spaceSweepFollowUp else {
+            return
+        }
+        self.state.spaceSweepFollowUp = nil
+        guard self.isRunning else {
+            return
+        }
+        self.sweepSpaceParked(sweep)
     }
 
     // MARK: Diagnostics

@@ -548,6 +548,8 @@ extension SyncEngine {
 
         self.state.jobs.removeAll()
         self.state.inFlight.removeAll()
+        self.state.spaceParked.removeAll()
+        self.state.spaceSweepFollowUp = nil
         self.state.inFlightBytes = InFlightBytes()
         self.state.draining.removeAll()
         self.state.run = nil

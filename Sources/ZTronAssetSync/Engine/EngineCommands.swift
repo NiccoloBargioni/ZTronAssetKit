@@ -1373,11 +1373,18 @@ extension SyncEngine {
         }
         var inFlight = InFlightBytes()
         var flying: Set<TransferID> = []
+        var parkedForSpace: Set<TransferID> = []
         for job in self.state.jobs.values {
             if let bytes = job.ledgerBytes {
                 inFlight.add(bytes)
                 flying.insert(job.transfer)
             }
+            if job.state.isSpaceParked {
+                parkedForSpace.insert(job.transfer)
+            }
+        }
+        if parkedForSpace != self.state.spaceParked {
+            violations.append("the ledger's \(self.state.spaceParked.count) jobs parked for space differ from the table's \(parkedForSpace.count)")
         }
         if inFlight != self.state.inFlightBytes || flying != self.state.inFlight {
             violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")

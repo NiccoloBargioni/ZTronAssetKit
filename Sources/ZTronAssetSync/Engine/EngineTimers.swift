@@ -118,12 +118,14 @@ extension SyncEngine {
             }
             self.setStoreDeadline(work.nextDeadline)
             if work.reapedBytes > 0 {
-                // REENTRANCY: f-4 (proposed) — the lifecycle; the ledger's base is replaced by a fresh read.
-                await self.refreshFreeSpace()
+                // REENTRANCY: f-4 (proposed) — the lifecycle; the ledger's base is replaced by a fresh read (a read that
+                // fails leaves the last figures, which then decide), and every job parked for space is re-read below.
+                _ = try? await self.readFreeSpace()
                 guard self.isRunning else {
                     return
                 }
-                self.unblock { $0 == .awaitingSpace }
+                // Reaped bytes wake the `awaitingSpace` jobs, re-checked with the `insufficientSpace` ones in one sweep.
+                self.sweepSpaceParked(.reclaimed)
             }
         }
         // The store's work is over: a job still waiting for space with no store deadline armed has no wake left, and is
@@ -196,9 +198,10 @@ extension SyncEngine {
 
     /// Whether something will run the store's due work, the only wake of a job parked `awaitingSpace`, or decide that job
     /// on a fresh read: an armed store deadline, the alarm's store work under way, a re-read of the store's deadline in
-    /// flight, or the settling read of `settleUnwakeableSpaceWaits` in flight.
+    /// flight, the settling read of `settleUnwakeableSpaceWaits` in flight, or a space sweep's follow-up owed.
     var spaceWakeExpected: Bool {
         self.state.storeDeadline != nil || self.state.storeWorkInFlight || self.state.spaceDeadlineReread || self.state.spaceSettleRead
+            || self.state.spaceSweepFollowUp != nil
     }
 
     /// A job was parked `awaitingSpace`: the bytes it waits for are reclaimed only by `runDueWork()`, which only the
@@ -239,7 +242,7 @@ extension SyncEngine {
         guard self.isRunning, !self.spaceWakeExpected else {
             return
         }
-        guard self.state.jobs.values.contains(where: { $0.state == .blocked(.awaitingSpace) }) else {
+        guard self.state.spaceParked.contains(where: { self.state.jobs[$0]?.state == .blocked(.awaitingSpace) }) else {
             return
         }
         self.state.spaceSettleRead = true
@@ -252,52 +255,22 @@ extension SyncEngine {
         }
     }
 
-    /// The read `settleUnwakeableSpaceWaits` owes, then each job still parked `awaitingSpace` is decided on it: one the
-    /// volume holds now is re-queued; one that still lacks room stays parked when something armed meanwhile will run the
-    /// store's due work, and is otherwise parked `insufficientSpace` with the figures of this read (ARCHITECTURE §7.6's
-    /// row for a shortage without pending reclaim; F-22's convention): waiters and ensures get the typed figures at
-    /// once, a run settles blocked and stays due, and the job is re-admitted at any later free-space read that holds it,
-    /// a read after reaped bytes included. A read that fails leaves the last figures in place; they decide.
+    /// The read `settleUnwakeableSpaceWaits` owes, then each job still parked `awaitingSpace` is decided on it
+    /// (`sweepSpaceParked(.settle)`, with the `insufficientSpace` ones): one the volume holds now is re-queued; one that
+    /// still lacks room stays parked when something armed meanwhile will run the store's due work, and is otherwise
+    /// parked `insufficientSpace` with the figures of this read (ARCHITECTURE §7.6's row for a shortage without pending
+    /// reclaim; F-22's convention): waiters and ensures get the typed figures at once, a run settles blocked and stays
+    /// due, and the job is re-admitted at any later free-space read that holds it, a read after reaped bytes included. A
+    /// read that fails leaves the last figures in place; they decide.
     private func settleSpaceWaitsOnFreshRead() async {
-        // REENTRANCY: f-4 (proposed) — the lifecycle, then every job's state and the wakes armed meanwhile are re-read
-        // below; the ledger's base is the read just adopted.
-        await self.refreshFreeSpace()
+        // REENTRANCY: f-4 (proposed) — the lifecycle, then every parked job's state and the wakes armed meanwhile are
+        // re-read by the sweep; the ledger's base is the read just adopted.
+        _ = try? await self.readFreeSpace()
         self.state.spaceSettleRead = false
         guard self.isRunning else {
             return
         }
-        var requeued = false
-        var settled = false
-        for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer], job.state == .blocked(.awaitingSpace) else {
-                continue
-            }
-            guard let block = self.spaceBlock(job) else {
-                if self.transition(transfer, to: .queued) {
-                    self.enqueue(transfer)
-                    requeued = true
-                }
-                continue
-            }
-            if block == .awaitingSpace, self.spaceWakeExpected {
-                continue
-            }
-            if case .insufficientSpace(let required, _)? = job.lastError, let space = self.state.freeSpace {
-                // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job. The room
-                // is computed before the write: the right side of an optional-chained assignment runs inside the write's
-                // access to `state`, and `headroom` reads `state` (an exclusivity conflict, review of close-out cycle 6).
-                let available = self.headroom(for: job, in: space)
-                self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: available)
-            }
-            self.park(transfer, reason: .insufficientSpace)
-            settled = true
-        }
-        if settled {
-            self.checkRunSettled()
-        }
-        if requeued {
-            self.pump()
-        }
+        self.sweepSpaceParked(.settle)
     }
 
     /// A store call that may have reclaimed bytes outside the alarm's own work (a purge's reaper reaps every deletable
@@ -305,19 +278,16 @@ extension SyncEngine {
     /// the alarm's reaped bytes, rather than at the store's next deadline (`awaitingSpace`) or at the next read
     /// (`insufficientSpace`) (review of close-out cycle 5). Nothing is read while no job is parked for space.
     func spaceMayHaveBeenReclaimed() async {
-        let parked = self.state.jobs.values.contains { job in
-            job.state == .blocked(.awaitingSpace) || job.state == .blocked(.insufficientSpace)
-        }
-        guard parked else {
+        guard !self.state.spaceParked.isEmpty else {
             return
         }
-        // REENTRANCY: f-4 (proposed) — the lifecycle; the ledger's base is replaced by a fresh read, which re-admits the
-        // `insufficientSpace` jobs it holds; the `awaitingSpace` ones are re-queued and gated on it below.
-        await self.refreshFreeSpace()
+        // REENTRANCY: f-4 (proposed) — the lifecycle; the ledger's base is replaced by a fresh read (a read that fails
+        // leaves the last figures, which then decide), and every job parked for space is re-read by the sweep.
+        _ = try? await self.readFreeSpace()
         guard self.isRunning else {
             return
         }
-        self.unblock { $0 == .awaitingSpace }
+        self.sweepSpaceParked(.reclaimed)
         self.pump()
     }
 

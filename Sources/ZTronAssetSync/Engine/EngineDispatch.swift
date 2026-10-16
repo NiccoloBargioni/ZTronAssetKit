@@ -427,8 +427,9 @@ extension SyncEngine {
     /// The headroom ledger (S2-09, S2-29): a fetch of known size starts only if the volume minus the reserve, the
     /// bytes in flight and the bytes committed since the last read still holds it; unknown sizes always fit. The size is
     /// the entry's, or the larger figure an earlier ENOSPC reported (the transport's `required`), so a job parked for
-    /// lack of space is re-admitted only when that much is free (T17).
-    func spaceBlock(_ job: Job) -> BlockReason? {
+    /// lack of space is re-admitted only when that much is free (T17). `ahead` is the bytes of the jobs a sweep
+    /// re-admitted before this one, which the gate will count in flight once they start (`sweepSpaceParked`).
+    func spaceBlock(_ job: Job, ahead: Int64 = 0) -> BlockReason? {
         var size = job.entry.byteSize ?? 0
         if case .insufficientSpace(let required, _)? = job.lastError {
             size = max(size, required)
@@ -436,7 +437,7 @@ extension SyncEngine {
         guard size > 0, let space = self.state.freeSpace else {
             return nil
         }
-        guard size > self.headroom(for: job, in: space) else {
+        guard size > self.headroom(for: job, in: space).subtractingClamped(ahead) else {
             return nil
         }
         return space.pendingReclaim > 0 ? .awaitingSpace : .insufficientSpace

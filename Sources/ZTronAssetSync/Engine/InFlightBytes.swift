@@ -45,6 +45,39 @@ struct InFlightBytes: Hashable {
     }
 }
 
+/// Which jobs parked for lack of space a sweep re-checks, and what becomes of an `awaitingSpace` one the read does not
+/// admit (jobs parked `insufficientSpace` are always re-checked, and stay parked until a later read when not admitted).
+enum SpaceSweep: Hashable {
+    /// A free-space read: `insufficientSpace` jobs only (an `awaitingSpace` one waits for the reaper, T17).
+    case read
+    /// The store reclaimed bytes (its reaper, a purge's): `awaitingSpace` jobs too; one the read does not admit keeps
+    /// waiting while the store still counts pending reclaim, and is parked `insufficientSpace` otherwise.
+    case reclaimed
+    /// Nothing will run the store's due work (`settleSpaceWaitsOnFreshRead`): `awaitingSpace` jobs too; one the read
+    /// does not admit keeps waiting only while the store counts pending reclaim and a wake is expected meanwhile, and is
+    /// parked `insufficientSpace` otherwise.
+    case settle
+
+    /// The sweep that covers both (a follow-up owed for each runs once).
+    func merged(with other: SpaceSweep?) -> SpaceSweep {
+        switch (self, other) {
+        case (.settle, _), (_, .settle?):
+            return .settle
+        case (.reclaimed, _), (_, .reclaimed?):
+            return .reclaimed
+        default:
+            return .read
+        }
+    }
+}
+
+extension JobState {
+    /// Whether the job is parked for lack of space.
+    var isSpaceParked: Bool {
+        self == .blocked(.insufficientSpace) || self == .blocked(.awaitingSpace)
+    }
+}
+
 extension Job {
     /// The bytes this job holds in the headroom ledger: its entry's size while it downloads, verifies or commits (an
     /// unknown size counts as 0), `nil` otherwise. `entry` never changes after creation, so a job leaves flight with the
