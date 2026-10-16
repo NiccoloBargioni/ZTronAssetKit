@@ -329,4 +329,61 @@ struct EngineRegressionCycle16Tests {
         await engine.shutdown()
         _ = await joinCancelling(callerB)
     }
+
+    /// The same extension made by a run's manifest 429: a user-initiated request parked by a 1 s transfer 429 waits,
+    /// and the held manifest fetch then answers 429 with 60 s, extending the origin's throttle (F-35 keeps the later
+    /// end): the waiting request gets the fail-fast answer for the new end at once (F-36).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a user-initiated request waiting for a short throttle fails fast once a manifest 429 extends the throttle beyond interactiveMaxWait", .timeLimit(.minutes(1)))
+    func userWaiterFailsFastOnManifestExtension() async throws {
+        let fake = FakeRemoteSource()
+        let held = HeldManifestSource(base: fake)
+        let harness = EngineHarness.make(source: fake, remote: held)
+        let bytes = EngineFixture.bytes(5_401)
+        let onDemand = EngineHarness.onDemand("asset", bytes)
+        await harness.serveManifest([onDemand])
+        let engine = harness.engine
+        let origin = fake.originID
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        await fake.scriptManifest([
+            .fail(.transient(.throttled, retryAfter: .seconds(60))),
+            .notModified,
+        ])
+        await held.holdNext()
+        let run = Task { await engine.sync(.force) }
+        await held.waitForHeldFetch()
+        await fake.script(onDemand.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(1))), .stage(bytes)])
+        let user = Task { await engine.awaitAsset(onDemand.identifier, lane: .userInitiated) }
+        await untilFinishedOrCondition(user, engine) { $0.state.jobs[onDemand.transferID]?.state.isThrottleParked == true }
+        let parked = await engine.readForTests { engine in
+            engine.state.jobs[onDemand.transferID]?.interests.values.contains { $0.lane == .userInitiated } == true
+        }
+        try #require(parked, "setup: the user request waits for the 1 s throttle, within interactiveMaxWait")
+        await held.release()
+        let outcome = await joinCancelling(run)
+        await engine.awaitCondition { EngineRegressionCycle15Tests.quiet($0) }
+        let after = await engine.readForTests { engine in
+            (
+                engine.state.jobs[onDemand.transferID]?.interests.values.contains { $0.lane == .userInitiated } == true,
+                engine.state.throttles[origin],
+                engine.environment.time.monotonicNow(),
+                engine.invariantViolations()
+            )
+        }
+        let throttleEnd = try #require(after.1, "setup: the origin is throttled")
+        if case .blocked(.throttled(let until), _) = outcome {
+            #expect(until == throttleEnd, "the run reports the throttle's end")
+        } else {
+            Issue.record("the run is blocked by the throttle: \(outcome)")
+        }
+        #expect(!after.0, "the user request is answered once the throttle ends beyond interactiveMaxWait, not at \(throttleEnd)")
+        #expect(after.3.isEmpty, "\(after.3)")
+        if after.0 {
+            await engine.shutdown()
+        }
+        let answered = await joinCancelling(user)
+        #expect(answered == .failure(.serverUnavailable(retryAfter: throttleEnd.seconds(since: after.2))), "the user request fails fast with the origin's wait: \(answered)")
+        await engine.shutdown()
+    }
 }
