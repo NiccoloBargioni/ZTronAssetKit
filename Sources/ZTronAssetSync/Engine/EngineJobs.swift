@@ -301,6 +301,7 @@ extension SyncEngine {
         for asset in job.assets {
             self.retireProgress(.transfer(asset))
         }
+        self.compactQueuesIfStale()
         self.notifyObservers()
     }
 
@@ -332,13 +333,23 @@ extension SyncEngine {
         let kind = self.queueKind(job)
         let entry = LaneQueues.Entry(ticket: job.ticket, transfer: transfer, queuedAt: job.queuedAt)
         self.state.queues.push(entry, to: kind, front: front)
-        if self.state.queues.storedCount > 2 * self.state.jobs.count + 16 {
-            // Stale entries outnumber the jobs (sync.md §7.2): keep the queues within twice the live entries.
-            var queues = self.state.queues
-            self.state.queues = LaneQueues()
-            queues.compact { self.isValid($0) }
-            self.state.queues = queues
+        self.compactQueuesIfStale()
+    }
+
+    /// Keeps the lane queues within twice their live entries (sync.md §7.2): once stored entries outnumber twice the
+    /// jobs, one pass drops the stale ones. Checked where entries are added (`enqueue`) and where jobs leave
+    /// (`removeJob`): a release of queued members left their entries stored until the next enqueue (close-out cycle 11).
+    /// The threshold halves the stored entries at each pass, so a release of 10,000 queued members compacts a few
+    /// times, not once per member (C2).
+    func compactQueuesIfStale() {
+        guard self.state.queues.storedCount > 2 * self.state.jobs.count + 16 else {
+            return
         }
+        // The queues are taken out of the state while the closure reads it (no overlapping access).
+        var queues = self.state.queues
+        self.state.queues = LaneQueues()
+        queues.compact { self.isValid($0) }
+        self.state.queues = queues
     }
 
     /// Whether a queue entry still stands for a queued job.
