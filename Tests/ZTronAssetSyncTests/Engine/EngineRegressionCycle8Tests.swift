@@ -183,4 +183,61 @@ struct EngineRegressionCycle8Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    /// A job waiting `awaitingSpace` that the room after a reclaim still does not hold keeps waiting while the store counts
+    /// more pending reclaim (the sweep leaves it parked instead of re-queuing it for the gate to park it again), and starts
+    /// once the rest is reclaimed. `x` and `z` (300 bytes each) are doomed 30 s apart; `y` (500 bytes, on demand) needs
+    /// both reclaimed on a volume with no other room above the reserve. Only the store's clock moves; the store's due
+    /// work reaps, and the purge path (`spaceMayHaveBeenReclaimed`) re-checks the engine's parked jobs.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-SYN-11: a job waiting for space keeps waiting after a reclaim that leaves it short while more is pending, and starts once the rest is reclaimed",
+        .timeLimit(.minutes(1))
+    )
+    func reclaimedSweepKeepsWaitingWhileMoreIsPending() async throws {
+        let time = ManualTimeSource()
+        let storeTime = ManualTimeSource()
+        let (harness, fileSystem) = EngineRegressionCycle6Tests.harness(time: time, storeTime: storeTime)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(10_831, count: 300)
+        let zBytes = EngineFixture.bytes(10_832, count: 300)
+        let yBytes = EngineFixture.bytes(10_833, count: 500)
+        let x = EngineFixture.entry("x", xBytes)
+        let z = EngineFixture.entry("z", zBytes)
+        let y = EngineHarness.onDemand("y", yBytes)
+        await harness.serveManifest([x, z])
+        await harness.scriptTransfers([(x, xBytes), (z, zBytes), (y, yBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // v2 prunes x (doomed for the 60 s grace); 30 s later v3 prunes z.
+        await harness.serveManifest([z, y], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        storeTime.advance(by: 30)
+        await harness.serveManifest([y], etag: "v3")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count + zBytes.count), "setup: x's and z's bytes wait for reclaim")
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(0, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        let resolve = Task { await engine.awaitAsset("y", lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[y.transferID]?.state == .blocked(.awaitingSpace) }
+        // x's grace ends: the store reaps 300 bytes and still counts z's 300 as pending; y needs 500.
+        storeTime.advance(by: 31)
+        #expect(await harness.store.runDueWork().reapedBytes == Int64(xBytes.count), "setup: the store reaped x")
+        await engine.spaceMayHaveBeenReclaimed()
+        #expect(await engine.readForTests { $0.state.jobs[y.transferID]?.state } == .blocked(.awaitingSpace), "y keeps waiting for z's bytes")
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.isEmpty, "y did not start on 300 bytes")
+        // z's grace ends: the store reaps the rest, and y fits.
+        storeTime.advance(by: 30)
+        #expect(await harness.store.runDueWork().reapedBytes == Int64(zBytes.count), "setup: the store reaped z")
+        await engine.spaceMayHaveBeenReclaimed()
+        let result = await resolve.value
+        #expect(result.successValue != nil, "y is served once x's and z's bytes are reclaimed: \(result)")
+        #expect(await harness.source.starts.filter { $0.id == y.transferID }.count == 1, "y downloaded once")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
