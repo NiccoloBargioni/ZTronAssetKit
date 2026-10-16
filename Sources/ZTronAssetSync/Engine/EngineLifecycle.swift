@@ -32,6 +32,15 @@ enum OwnedTaskKind: Sendable {
             return .utility
         }
     }
+
+    /// The priority a spawn of this kind runs at under `floor` (`EngineState.ownedTaskPriorityFloor`, `nil` in
+    /// production): the kind's own priority, raised to the floor when that is higher, never lowered by it.
+    func priority(floor: TaskPriority?) -> TaskPriority {
+        guard let floor else {
+            return self.priority
+        }
+        return max(self.priority, floor)
+    }
 }
 
 extension SyncEngine {
@@ -49,8 +58,7 @@ extension SyncEngine {
         }
         self.state.lastTaskKey += 1
         let key = self.state.lastTaskKey
-        let priority = self.state.ownedTaskPriorityFloor.map { max(kind.priority, $0) } ?? kind.priority
-        let task = Task(priority: priority) {
+        let task = Task(priority: kind.priority(floor: self.state.ownedTaskPriorityFloor)) {
             // REENTRANCY: RE-S21 — nothing: the task then removes only its own key (a successor has another key).
             await operation(self)
             self.taskEnded(key)

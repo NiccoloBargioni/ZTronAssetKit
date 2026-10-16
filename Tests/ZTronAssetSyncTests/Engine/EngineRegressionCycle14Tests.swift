@@ -137,4 +137,36 @@ struct EngineRegressionCycle14Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    // MARK: Owned-task priorities (R-SYN-3, sync-1 S1-17; cycle-13 verifier)
+
+    /// sync-1 S1-17 promises that drivers are spawned at their lane's priority. Since close-out cycle 13 every harness
+    /// engine raises its owned tasks to the default priority (`EngineHarness.ownedTaskPriorityFloor`), so no engine test
+    /// observes the production mapping any more. This pins the table `spawn` reads and the floor's rule: with no floor
+    /// (production) every kind keeps its own priority; the harnesses' floor raises a lower one to it and never lowers
+    /// a higher one.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-3: owned tasks are spawned at their lane's task priority, and the test harnesses' floor only raises it")
+    func ownedTaskPriorities() {
+        // (kind, its own priority, its priority under the harnesses' floor)
+        let table: [(OwnedTaskKind, TaskPriority, TaskPriority)] = [
+            (.driver(.userInitiated), .userInitiated, .userInitiated),
+            (.start, .userInitiated, .userInitiated),
+            (.driver(.prefetch), .medium, .medium),
+            (.entry, .medium, .medium),
+            (.manifest, .medium, .medium),
+            (.driver(.bulk), .utility, .medium),
+            (.run, .utility, .medium),
+            (.alarm, .utility, .medium),
+            (.watcher, .utility, .medium),
+            (.pressure, .utility, .medium),
+        ]
+        #expect(EngineHarness.ownedTaskPriorityFloor == .medium)
+        for (kind, own, floored) in table {
+            #expect(kind.priority == own, "\(kind)")
+            #expect(kind.priority(floor: nil) == own, "\(kind) in production")
+            #expect(kind.priority(floor: EngineHarness.ownedTaskPriorityFloor) == floored, "\(kind) under the harnesses' floor")
+            #expect(kind.priority(floor: .background) == own, "\(kind) under a floor below every kind")
+        }
+    }
 }
