@@ -145,7 +145,10 @@ struct EngineStoreTests {
         await first.serve(kept + other)
         try await first.start()
         _ = try #require(await first.engine.sync(.force).completeReport)
-        #expect(await first.source.starts.map(\.id) == kept.map(\.0.transferID), "bulk runs stay inside the retention scope")
+        // Compared as a set: the fake records each start when the attempt's driver task reaches it, and the run's two
+        // drivers race there (no order is asserted by this requirement).
+        let keptStarts = await first.source.starts.map(\.id)
+        #expect(keptStarts.count == kept.count && Set(keptStarts) == Set(kept.map(\.0.transferID)), "bulk runs stay inside the retention scope: \(keptStarts)")
         try await first.engine.setRetentionScope(.all).get()
         _ = try #require(await first.engine.sync(.force).completeReport)
         #expect(await first.source.starts.count == 4)

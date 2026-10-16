@@ -119,8 +119,14 @@ struct EngineRegressionCycle8Tests {
         #expect(try await harness.store.freeSpace().volumeOpportunistic - free.reserveBytes == 1_000, "setup: 1,000 bytes above the reserve")
         await engine.refreshFreeSpace()
         await engine.waitForAllHandles()
+        // The fake records a start when the attempt's driver task reaches it, and the two drivers race there; the queue
+        // order is the engine's own dispatch order (`startSequence`, taken in the turn that dispatched both).
         let started = await harness.source.starts.map(\.id)
-        #expect(started == [entries[0].transferID, entries[1].transferID], "the two members ahead in the queue start: \(started)")
+        #expect(started.count == 2 && Set(started) == [entries[0].transferID, entries[1].transferID], "the two members ahead in the queue start: \(started)")
+        let order = await engine.readForTests { engine in
+            entries.prefix(2).map { engine.state.jobs[$0.transferID]?.active?.startSequence }
+        }
+        #expect(order.allSatisfy { $0 != nil } && order[0]! < order[1]!, "dispatched in queue order: \(order)")
         let after = await engine.readForTests { ($0.state.jobs[third]?.state, $0.state.jobs[third]?.ticket) }
         #expect(after.0 == .blocked(.insufficientSpace), "the third stays parked")
         #expect(after.1 == ticket, "the third was never re-queued (its queue ticket is unchanged)")
