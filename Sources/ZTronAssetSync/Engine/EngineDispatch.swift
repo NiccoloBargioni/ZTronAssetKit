@@ -295,7 +295,11 @@ extension SyncEngine {
     /// The next prefetch or bulk job: bulk first once its head waited `bulkAging` (sync.md §7.4).
     private func nextNonUser() -> TransferID? {
         let now = self.environment.time.monotonicNow()
-        let agedBulk = self.state.queues.first(.bulk, isValid: { self.isValid($0) }).map { $0.queuedAt.adding(seconds: self.tuning.bulkAging) <= now } ?? false
+        // The queues are taken out of the state while the closure reads it (no overlapping access).
+        var queues = self.state.queues
+        self.state.queues = LaneQueues()
+        let agedBulk = queues.first(.bulk, isValid: { self.isValid($0) }).map { $0.queuedAt.adding(seconds: self.tuning.bulkAging) <= now } ?? false
+        self.state.queues = queues
         let order: [LaneQueues.Kind] = agedBulk ? [.bulk, .prefetch] : [.prefetch, .bulk]
         for kind in order {
             if let transfer = self.popDispatchable(kind) {

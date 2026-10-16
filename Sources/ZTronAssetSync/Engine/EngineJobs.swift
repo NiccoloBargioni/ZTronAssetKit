@@ -132,8 +132,9 @@ extension SyncEngine {
         self.failFastJoiner(token, of: transfer)
         if wasReleasedOnly, let joined = self.state.jobs[transfer], joined.state == .queued, joined.ticket == ticket {
             // Now that this interest wants it, it is queued again (a join at the job's own lane does not re-queue it
-            // above): at the front of its lane, where it waited; an entry left in a queue or aside is stale.
-            self.enqueue(transfer, front: true)
+            // above): at the place it waited, so jobs re-joined in one turn keep their order and pass no earlier work;
+            // an entry left in a queue or aside is stale.
+            self.reinstate(transfer)
         }
         self.notifyObservers()
     }
@@ -332,7 +333,24 @@ extension SyncEngine {
         self.state.jobs[transfer] = job
         let kind = self.queueKind(job)
         let entry = LaneQueues.Entry(ticket: job.ticket, transfer: transfer, queuedAt: job.queuedAt)
-        self.state.queues.push(entry, to: kind, front: front)
+        let place = self.state.queues.push(entry, to: kind, front: front)
+        self.state.jobs[transfer]?.queuePlace = place
+        self.compactQueuesIfStale()
+    }
+
+    /// Queues a job again at the place its entry had (`Job.queuePlace`), with a fresh ticket: its old entry, set aside by
+    /// a scan or still in place, goes stale. For a job only released groups wanted that an interest at its own lane
+    /// wants again (`addInterest`): pushed to the front, the jobs re-joined in one turn were dispatched in reverse order
+    /// and ahead of work queued before them (review of close-out cycle 10, PROBE-C10R-3; R-SYN-3).
+    func reinstate(_ transfer: TransferID) {
+        guard var job = self.state.jobs[transfer], job.state == .queued else {
+            return
+        }
+        self.state.lastTicket += 1
+        job.ticket = self.state.lastTicket
+        self.state.jobs[transfer] = job
+        let entry = LaneQueues.Entry(ticket: job.ticket, transfer: transfer, queuedAt: job.queuedAt, place: job.queuePlace)
+        self.state.queues.reinstate(entry, to: self.queueKind(job))
         self.compactQueuesIfStale()
     }
 

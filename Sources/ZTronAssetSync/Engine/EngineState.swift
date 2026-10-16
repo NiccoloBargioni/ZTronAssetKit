@@ -408,6 +408,8 @@ struct Job {
     var interests: [InterestToken: JobInterest] = [:]
     /// The lane-queue ticket (lazy deletion).
     var ticket: UInt64 = 0
+    /// Its entry's place in its lane queue (`LaneQueues.Entry.place`), where `reinstate` puts it back.
+    var queuePlace: Int64 = 0
     /// When it was queued (bulk aging).
     var queuedAt: MonotonicInstant
     /// Failed attempts counted toward the retry caps.
