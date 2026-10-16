@@ -86,17 +86,15 @@ extension SyncEngine {
     @discardableResult
     func readmit(_ passes: Readmissions) -> Bool {
         var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
-        if passes.contains(.conditions) {
-            // The gate of a lane-wide block reads only the lane: one verdict per lane, not per job.
-            var admits: [AssetPriority: Bool] = [:]
-            for transfer in self.state.laneParked {
-                guard let job = self.state.jobs[transfer], job.state.isLaneParked else {
-                    continue
-                }
-                let lane = job.lane
-                let admitted = admits[lane] ?? self.laneAdmitsAfterConditions(lane)
-                admits[lane] = admitted
-                if admitted {
+        if passes.contains(.conditions), !self.state.laneParked.isEmpty {
+            // The gate of a lane-wide block reads only the lane: one verdict per lane, not per job, and no pass at all
+            // while the conditions admit no lane (every element while offline).
+            let admitted = Set(AssetPriority.allCases.filter { self.laneAdmitsAfterConditions($0) })
+            if !admitted.isEmpty {
+                for transfer in self.state.laneParked {
+                    guard let job = self.state.jobs[transfer], job.state.isLaneParked, admitted.contains(job.lane) else {
+                        continue
+                    }
                     candidates.append((self.queueRank(job), job.ticket, transfer))
                 }
             }
