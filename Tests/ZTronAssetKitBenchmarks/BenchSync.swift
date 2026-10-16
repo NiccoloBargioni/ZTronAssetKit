@@ -147,7 +147,46 @@ extension ZTronAssetKitBenchmarks {
             #expect(parked <= gapMax)
             #expect(read <= gapMax)
         }
+
+        /// C2 at SPEC §6's reference scale (close-out cycle 8): with a 10,000-member prefetch group waiting in the queue
+        /// behind its running members, the network drops (every queued member parks `offline`) and returns (every one
+        /// is re-queued). The heartbeat's longest wait bounds the longest actor turn of each edge; medians of three,
+        /// after a warm-up.
+        @Test("R-SYN-13: losing and regaining the network under a 10,000-member prefetch group never holds the engine's actor longer than P-9's heartbeat_gap_ms_p99_max", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func networkEdgeTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.networkEdgeWaits(members: 1_000)
+            var offline: [Double] = []
+            var online: [Double] = []
+            for _ in 0..<3 {
+                let waits = try await SyncBench.networkEdgeWaits(members: 10_000)
+                offline.append(waits.offline)
+                online.append(waits.online)
+            }
+            let lost = offline.sorted()[1]
+            let regained = online.sorted()[1]
+            print("R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline \(lost) ms, coming back \(regained) ms (budget \(gapMax) ms); runs \(offline) and \(online)")
+            #expect(lost <= gapMax)
+            #expect(regained <= gapMax)
+        }
     }
+}
+
+/// An engine at SPEC §6's scale and its fakes (`SyncBench.scaleBench`).
+@available(macOS 15.0, iOS 18.0, *)
+struct ScaleBench {
+    /// The engine, started and synced.
+    let engine: SyncEngine
+    /// Its remote source; unscripted transfers wait.
+    let source: FakeRemoteSource
+    /// Its device conditions.
+    let conditions: FakeDeviceConditionsSource
+    /// The on-demand entries of its manifest.
+    let entries: [ManifestEntry]
+    /// Each entry's size.
+    let size: Int
 }
 
 /// Helpers of `SyncBenchmarks` (namespaced so no other package's helpers can collide).
@@ -369,16 +408,114 @@ enum SyncBench {
     /// first started member's ENOSPC reads the free space and re-checks every parked member.
     @available(macOS 15.0, iOS 18.0, *)
     static func spaceParkingWaits(members count: Int) async throws -> (parking: Double, read: Double) {
+        let bench = try await SyncBench.scaleBench(members: count, room: 1_000)
+        let engine = bench.engine
+        let source = bench.source
+        let parking = try await SyncBench.longestWait(on: engine) {
+            guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+                throw SyncBenchError.incomplete("the prefetch group was refused")
+            }
+            while !(await SyncBench.noneQueued(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        // The two started attempts reach the source in their drivers' own tasks.
+        await engine.waitForAllHandles()
+        let starts = await source.starts.map(\.id)
+        guard starts.count == 2, let first = starts.first else {
+            throw SyncBenchError.incomplete("expected two members to start, got \(starts.count)")
+        }
+        let read = try await SyncBench.longestWait(on: engine) {
+            await source.script(first, [.fail(.insufficientSpace(requiredBytes: Int64(bench.size)))])
+            while !(await SyncBench.parkedAfterENOSPC(engine, first)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return (parking, read)
+    }
+
+    /// The heartbeat's longest waits while the network drops under a prefetch group of `count` on-demand members on a
+    /// roomy volume (three start and hold, the others wait in the queue; the three then fail offline, which frees their
+    /// slots, and the queued members park `offline`), then while it returns (every member is re-queued and three start).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func networkEdgeWaits(members count: Int) async throws -> (offline: Double, online: Double) {
+        let bench = try await SyncBench.scaleBench(members: count, room: nil)
+        let engine = bench.engine
+        let source = bench.source
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let running = await source.starts.map(\.id)
+        guard running.count == 3 else {
+            throw SyncBenchError.incomplete("expected three members to start, got \(running.count)")
+        }
+        let offline = try await SyncBench.longestWait(on: engine) {
+            await bench.conditions.send(DeviceConditions(network: NetworkConditions(satisfied: false, expensive: false, constrained: false), power: PowerConditions(lowPowerMode: false, thermal: .nominal)))
+            while !(await SyncBench.seesOffline(engine)) {
+                await Task.yield()
+            }
+            for transfer in running {
+                await source.script(transfer, [.fail(.offline(.noConnection))])
+            }
+            while !(await SyncBench.noneQueued(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        let online = try await SyncBench.longestWait(on: engine) {
+            await bench.conditions.send(.unrestricted)
+            while !(await SyncBench.noneParked(engine, count: count)) {
+                await Task.yield()
+            }
+        }
+        await engine.shutdown()
+        return (offline, online)
+    }
+
+    /// Whether the engine applied conditions without a network.
+    static func seesOffline(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.conditions?.network.satisfied == false
+    }
+
+    /// Whether the engine holds `count` jobs and none is parked or failed (each runs or waits in a queue).
+    static func noneParked(_ engine: isolated SyncEngine, count: Int) -> Bool {
+        engine.state.jobs.count == count && !engine.state.jobs.values.contains { job in
+            switch job.state {
+            case .blocked, .failed:
+                return true
+            case .queued, .downloading, .verifying, .committing:
+                return false
+            }
+        }
+    }
+
+    /// An engine over a fake volume, synced to a manifest of `count` on-demand 400-byte entries (none present), whose
+    /// free-space reading leaves `room` bytes above the reserve (32 MiB when `nil`); unscripted transfers wait in the
+    /// fake source.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func scaleBench(members count: Int, room: Int64?) async throws -> ScaleBench {
         let time = ManualTimeSource()
         let source = FakeRemoteSource()
-        let fileSystem = FakeFileSystem(time: time)
+        let conditions = FakeDeviceConditionsSource()
+        // 32 MiB above the reserve hold the store's files; a ballast takes the rest but `room` (a ballast on the fake's
+        // default 64 GiB volume is a 64 GiB buffer).
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
         let environment = AssetEnvironment(
             fileSystem: fileSystem,
             metadataExecutor: InlineBlockingExecutor(),
             bulkExecutor: InlineBlockingExecutor(),
             time: time,
             random: SeededRandom(seed: 0x11),
-            conditions: FakeDeviceConditionsSource(),
+            conditions: conditions,
             remoteSources: FakeRemoteSourceFactory(source: source),
             appVersion: FakeAppVersionSource(),
             legacyDefaults: FakeLegacyDefaults()
@@ -403,33 +540,17 @@ enum SyncBench {
         guard await engine.sync(.force).isComplete else {
             throw SyncBenchError.incomplete("the setup sync did not complete")
         }
-        // 1,000 bytes above the reserve: two members fit, a third does not. Unscripted transfers wait in the fake source.
-        let free = try await store.freeSpace()
-        let ballast = URL(fileURLWithPath: "/fake-volume/Library/Application Support/ballast")
-        try fileSystem.write(Data(repeating: 1, count: Int(free.volumeOpportunistic - free.reserveBytes - 1_000)), to: ballast, mode: .truncate)
-        await engine.refreshFreeSpace()
-        let parking = try await SyncBench.longestWait(on: engine) {
-            guard case .success = await engine.registerGroup(entries.map(\.identifier), lane: .prefetch) else {
-                throw SyncBenchError.incomplete("the prefetch group was refused")
+        if let room {
+            let free = try await store.freeSpace()
+            let ballastBytes = free.volumeOpportunistic - free.reserveBytes - room
+            guard ballastBytes >= 0 else {
+                throw SyncBenchError.incomplete("the store's files left less than \(room) bytes above the reserve")
             }
-            while !(await SyncBench.noneQueued(engine, count: count)) {
-                await Task.yield()
-            }
+            let ballast = URL(fileURLWithPath: "/fake-volume/Library/Application Support/ballast")
+            try fileSystem.write(Data(repeating: 1, count: Int(ballastBytes)), to: ballast, mode: .truncate)
+            await engine.refreshFreeSpace()
         }
-        // The two started attempts reach the source in their drivers' own tasks.
-        await engine.waitForAllHandles()
-        let starts = await source.starts.map(\.id)
-        guard starts.count == 2, let first = starts.first else {
-            throw SyncBenchError.incomplete("expected two members to start, got \(starts.count)")
-        }
-        let read = try await SyncBench.longestWait(on: engine) {
-            await source.script(first, [.fail(.insufficientSpace(requiredBytes: Int64(size)))])
-            while !(await SyncBench.parkedAfterENOSPC(engine, first)) {
-                await Task.yield()
-            }
-        }
-        await engine.shutdown()
-        return (parking, read)
+        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size)
     }
 
     /// An engine configuration with defaults and `tuning`.
