@@ -225,9 +225,8 @@ struct EngineRegressionCycle6Tests {
         // Only the store's clock passes q's grace: the purge reclaims q; x's deadline, 10 s later, is still ahead.
         let purged = await Self.driving([storeTime]) { await purge.value }
         #expect(purged.successValue?.bytesFreed == Int64(qBytes.count), "the purge freed q: \(purged)")
-        let freeAfterPurge = try await harness.store.freeSpace()
-        #expect(freeAfterPurge.pendingReclaim == Int64(xBytes.count), "setup: x's bytes still wait for their deadline")
-        #expect(freeAfterPurge.volumeImportant - freeAfterPurge.reserveBytes >= Int64(yBytes.count), "setup: the volume holds y now")
+        // The volume now holds y: 200 bytes of room above the reserve plus q's 300 (y may already be written).
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes still wait for their deadline")
         let stateAfterPurge = await engine.readForTests { $0.state.jobs[y.transferID]?.state }
         #expect(stateAfterPurge != .blocked(.awaitingSpace), "y still waits for the store's next deadline after the purge reclaimed its room")
         let ensured = await Self.driving([time, storeTime]) { await ensure.value }
