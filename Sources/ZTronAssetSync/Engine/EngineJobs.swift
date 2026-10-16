@@ -745,7 +745,9 @@ extension SyncEngine {
         self.spaceSweepFollowUp()
     }
 
-    /// The scheduled follow-up sweep.
+    /// The scheduled follow-up sweep, then the run's settling check: while the sweep was owed, a run's claim parked
+    /// `insufficientSpace` counted as working (`checkRunSettled`), and a sweep that neither parks nor re-queues checks
+    /// nothing itself (close-out cycle 17, F-37).
     private func spaceSweepFollowUp() {
         if self.state.spaceSweepFollowUpsHeld {
             // Test seam: the sweep stays owed (`spaceSweepFollowUp`) until the release runs it; a sweep owed meanwhile
@@ -762,6 +764,7 @@ extension SyncEngine {
             return
         }
         self.sweepSpaceParked(sweep)
+        self.checkRunSettled()
     }
 
     // MARK: Diagnostics
