@@ -4,7 +4,7 @@ import ZTronAssetModel
 import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
-import ZTronAssetTransport
+@testable import ZTronAssetTransport
 
 /// Builds the real HTTP source over the store's staging sink against the loopback server (ARCHITECTURE §13.5 #1:
 /// Transport is a test-only dependency of these tests).
@@ -159,16 +159,22 @@ struct EngineLiveTransportTests {
         LoopbackResponse(body: EngineFixture.manifestData(entries))
     }
 
-    /// The foreground transport's smallest progress quantum (`ProgressQuantum.minimum` in
-    /// `SessionDelegate+DataTasks.swift`, transport.md §4.4). The transport reports a data task's first chunk and
-    /// then only a chunk that crosses a boundary of `max(256 KiB, expected / 64)`, so a progress event of at least
-    /// `n` bytes for a prefix that stalls at `n` exists only when the first chunk held all `n` bytes (which depends on
-    /// how the client's reads split the server's writes) or a chunk ends the prefix on a boundary. Each stalled
-    /// prefix of these tests is therefore exactly one quantum long, and each body is longer than the prefix and at
-    /// most 16 MiB (`expected / 64` stays at most 256 KiB): the chunk that completes the prefix crosses the boundary
-    /// and is reported with `received == stall` however the reads split, so no wait below depends on scheduling
-    /// (L4-R17).
-    static let progressQuantum = 256 * 1_024
+    /// The foreground transport's smallest progress quantum, read from the transport (`ProgressQuantum.minimum` in
+    /// `SessionDelegate+DataTasks.swift`, transport.md §4.4; 256 KiB), so the tests follow a change of it instead of
+    /// stalling on a stale copy (close-out cycle 13). The transport reports a data task's first chunk and then only a
+    /// chunk that crosses a boundary of `max(minimum, expected / 64)`, so a progress event of at least `n` bytes for a
+    /// prefix that stalls at `n` exists only when the first chunk held all `n` bytes (which depends on how the
+    /// client's reads split the server's writes) or a chunk ends the prefix on a boundary. Each stalled prefix of
+    /// these tests is therefore exactly one quantum long, and each body (`bodyLength`) is longer than the prefix and at
+    /// most 64 quanta (`expected / 64` stays at most one quantum): the chunk that completes the prefix crosses the
+    /// boundary and is reported with `received == stall` however the reads split, so no wait below depends on
+    /// scheduling (L4-R17).
+    static let progressQuantum = Int(ProgressQuantum.minimum)
+
+    /// A body `extra` bytes longer than one quantum (`progressQuantum`).
+    static func bodyLength(extra: Int) -> Int {
+        Self.progressQuantum + extra
+    }
 
     static func isProgress(of id: AssetID, atLeast bytes: Int64) -> @Sendable (AssetEvent) -> Bool {
         { event in
@@ -191,7 +197,7 @@ struct EngineLiveTransportTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh", .timeLimit(.minutes(1)))
     func invalidResumeStartsFresh() async throws {
-        let paused = GeneratedPayload.bytes(seed: 0xB0, offset: 0, length: 384 * 1_024)
+        let paused = GeneratedPayload.bytes(seed: 0xB0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
         let page = GeneratedPayload.bytes(seed: 0xB1, offset: 0, length: 4 * 1_024)
         let pausedEntry = ManifestEntry(identifier: "paused", fileExtension: "bin", remotePath: "media/paused.bin", byteSize: Int64(paused.count), checksum: ContentHash.sha256(of: paused), policy: .onDemand)
         let pageEntry = ManifestEntry(identifier: "page", fileExtension: "bin", remotePath: "media/page.bin", byteSize: Int64(page.count), checksum: ContentHash.sha256(of: page), policy: .onDemand)
@@ -248,9 +254,9 @@ struct EngineLiveTransportTests {
     @Test("R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the store root", .timeLimit(.minutes(1)))
     func transfersStayInsideTheRoot() async throws {
         let temporaries = LiveEngineHarness.networkTemporaries()
-        let cancelled = GeneratedPayload.bytes(seed: 0xC0, offset: 0, length: 384 * 1_024)
-        let paused = GeneratedPayload.bytes(seed: 0xC1, offset: 0, length: 384 * 1_024)
-        let failed = GeneratedPayload.bytes(seed: 0xC2, offset: 0, length: 384 * 1_024)
+        let cancelled = GeneratedPayload.bytes(seed: 0xC0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
+        let paused = GeneratedPayload.bytes(seed: 0xC1, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
+        let failed = GeneratedPayload.bytes(seed: 0xC2, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
         let page = GeneratedPayload.bytes(seed: 0xC3, offset: 0, length: 2 * 1_024)
         func entry(_ id: String, _ bytes: Data) -> ManifestEntry {
             ManifestEntry(identifier: AssetID(id), fileExtension: "bin", remotePath: "media/\(id).bin", byteSize: Int64(bytes.count), checksum: ContentHash.sha256(of: bytes), policy: .onDemand)
@@ -318,7 +324,7 @@ struct EngineLiveTransportTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: no foreground staging write lands after the store is closed", .timeLimit(.minutes(1)))
     func noStagingWriteAfterClose() async throws {
-        let body = GeneratedPayload.bytes(seed: 0xD0, offset: 0, length: 512 * 1_024)
+        let body = GeneratedPayload.bytes(seed: 0xD0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 256 * 1_024))
         let entry = ManifestEntry(identifier: "streamed", fileExtension: "bin", remotePath: "media/streamed.bin", byteSize: Int64(body.count), checksum: ContentHash.sha256(of: body), policy: .onDemand)
         // One progress quantum: the chunk that completes the prefix is always reported (`progressQuantum`).
         let stall = EngineLiveTransportTests.progressQuantum
