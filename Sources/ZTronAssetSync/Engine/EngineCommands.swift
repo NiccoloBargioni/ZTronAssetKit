@@ -1436,6 +1436,9 @@ extension SyncEngine {
         for (key, queue) in self.state.subscribers where queue.storedOrderCount > 2 * queue.liveCount + 16 {
             violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
         }
+        if let unfired = self.unfiredDeadline() {
+            violations.append(unfired)
+        }
         if let stranded = self.strandedPendingRun() {
             violations.append(stranded)
         }
@@ -1537,6 +1540,25 @@ extension SyncEngine {
             violations.append("\(stranded) queued jobs wait in no queue")
         }
         return violations
+    }
+
+    /// Why the heap's earliest deadline may never fire, if so. While running, `rearm` keeps one alarm armed at or before
+    /// it, re-armed in the very turn that schedules a deadline, whose owned task stays alive until it fires or is
+    /// replaced (ADR-022, R-SYN-14). Only an alarm turn's store work leaves the alarm cleared across an await
+    /// (`storeWorkRuns`), and that turn re-arms before it returns. An alarm that is never moved earlier, or one whose
+    /// task ended without firing, would leave every deadline after it unfired, a stall the model test could not name
+    /// (close-out cycle 14, F-34).
+    private func unfiredDeadline() -> String? {
+        guard self.isRunning, let first = self.state.heap.first, !self.state.storeWorkInFlight else {
+            return nil
+        }
+        guard let alarm = self.state.alarm, self.state.tasks[alarm.task] != nil else {
+            return "no live alarm will fire the earliest deadline (\(first.reason))"
+        }
+        guard alarm.deadline <= first.at else {
+            return "the alarm is armed after the earliest deadline (\(first.reason))"
+        }
+        return nil
     }
 
     /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,

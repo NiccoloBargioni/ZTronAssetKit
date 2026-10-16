@@ -80,12 +80,16 @@ struct EngineRegressionCycle14Tests {
             return engine.invariantViolations()
         }
         #expect(violations.isEmpty, "\(gate): \(violations)")
-        // The store's work ends, the turn re-arms at the gate's due deadline, and that alarm starts the pending run.
+        // The store's work ends, the turn re-arms at the gate's due deadline, and that alarm starts the pending run. The
+        // wait also ends if the alarm's task ends with the alarm still armed, so a broken alarm is named below instead
+        // of waiting out the time limit.
         await metadata.setHolding(false)
         await engine.awaitCondition { engine in
-            engine.state.pendingRun == nil
+            engine.state.pendingRun == nil || engine.state.alarm.map { engine.state.tasks[$0.task] == nil } == true
         }
-        #expect(await engine.invariantViolations().isEmpty)
+        #expect(await engine.readForTests { $0.state.pendingRun == nil }, "the alarm started the pending run")
+        let after = await engine.invariantViolations()
+        #expect(after.isEmpty, "\(after)")
         await engine.shutdown()
     }
 
@@ -95,9 +99,10 @@ struct EngineRegressionCycle14Tests {
     /// armed later than the gate's deadline, which a `rearm` that never moves the alarm earlier leaves) excused the open
     /// gate for ever, so the model test could not name either defect. In the turn that moves the clock to the gate's
     /// deadline, the engine's alarm is replaced by each of those two, the invariants are checked, and the engine's own
-    /// alarm is put back before the turn ends: the throttle gate is reported stranded behind an alarm whose task is
-    /// gone and behind an alarm later than the gate's deadline, and only the live alarm at the heap's earliest deadline
-    /// excuses it.
+    /// alarm is put back before the turn ends: behind an alarm whose task is gone and behind an alarm later than the
+    /// gate's deadline, the throttle gate is reported stranded and the heap's earliest deadline unfired (an invariant of
+    /// its own, checked whatever the deadline, so the model test names either defect at its next check); only the live
+    /// alarm at the heap's earliest deadline excuses the gate.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-2: an open pending-run gate is excused only by a live alarm armed at or before its deadline", .timeLimit(.minutes(1)))
     func onlyALiveTimelyAlarmExcusesAnOpenGate() async throws {
@@ -127,14 +132,21 @@ struct EngineRegressionCycle14Tests {
             return (dead, late, engine.invariantViolations())
         }
         let found = try #require(checks, "setup: the throttle's deadline and the alarm")
-        #expect(found.dead == ["the pending run's throttle gate is open but no run started"], "an alarm whose task ended: \(found.dead)")
-        #expect(found.late == ["the pending run's throttle gate is open but no run started"], "an alarm after the gate's deadline: \(found.late)")
+        let stranded = "the pending run's throttle gate is open but no run started"
+        // Each defect is named twice: the gate is stranded, and the heap's earliest deadline has no alarm to fire it.
+        #expect(found.dead.count == 2 && found.dead.contains(stranded), "an alarm whose task ended: \(found.dead)")
+        #expect(found.dead.contains { $0.hasPrefix("no live alarm will fire the earliest deadline") }, "an alarm whose task ended: \(found.dead)")
+        #expect(found.late.count == 2 && found.late.contains(stranded), "an alarm after the gate's deadline: \(found.late)")
+        #expect(found.late.contains { $0.hasPrefix("the alarm is armed after the earliest deadline") }, "an alarm after the gate's deadline: \(found.late)")
         #expect(found.live.isEmpty, "the engine's own alarm: \(found.live)")
-        // The engine's alarm, put back, starts the pending run.
+        // The engine's alarm, put back, starts the pending run. The wait also ends if the alarm's task ends with the
+        // alarm still armed, so a broken alarm is named below instead of waiting out the time limit.
         await engine.awaitCondition { engine in
-            engine.state.pendingRun == nil
+            engine.state.pendingRun == nil || engine.state.alarm.map { engine.state.tasks[$0.task] == nil } == true
         }
-        #expect(await engine.invariantViolations().isEmpty)
+        #expect(await engine.readForTests { $0.state.pendingRun == nil }, "the alarm started the pending run")
+        let after = await engine.invariantViolations()
+        #expect(after.isEmpty, "\(after)")
         await engine.shutdown()
     }
 

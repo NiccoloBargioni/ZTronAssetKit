@@ -67,11 +67,14 @@ struct EngineRegressionCycle13Tests {
             return engine.invariantViolations()
         }
         #expect(violations.isEmpty, "\(gate): \(violations)")
-        // The alarm's turn starts the pending run.
+        // The alarm's turn starts the pending run. The wait also ends if the alarm's task ends with the alarm still
+        // armed, so a broken alarm is named below instead of waiting out the time limit (close-out cycle 14).
         await engine.awaitCondition { engine in
-            engine.state.pendingRun == nil
+            engine.state.pendingRun == nil || engine.state.alarm.map { engine.state.tasks[$0.task] == nil } == true
         }
-        #expect(await engine.invariantViolations().isEmpty)
+        #expect(await engine.readForTests { $0.state.pendingRun == nil }, "the alarm started the pending run")
+        let after = await engine.invariantViolations()
+        #expect(after.isEmpty, "\(after)")
         await engine.shutdown()
     }
 }
