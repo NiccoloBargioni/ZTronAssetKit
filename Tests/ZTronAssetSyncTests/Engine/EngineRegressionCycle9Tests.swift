@@ -228,4 +228,46 @@ struct EngineRegressionCycle9Tests {
         #expect(await engine.invariantViolations().isEmpty)
         await engine.shutdown()
     }
+
+    /// A released group's members wait in the queue until their interests leave, and the pump must not take them for
+    /// user work it should preempt or wait for: a prefetch handle registered at user-initiated priority left its
+    /// released members in the user queue, so the pump of the release's own turn saw user work waiting, found nothing to
+    /// preempt and stopped before the prefetch queue, and other work started only after the release's last turn. Four
+    /// members of such a handle run (every slot); a two-member prefetch handle waits; the release, in one actor turn,
+    /// cancels the four and must start the two.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test(
+        "R-CAR-4: releasing a user-initiated handle of more members than one turn releases lets queued prefetch work start in that turn",
+        .timeLimit(.minutes(1))
+    )
+    func releasedUserMembersDoNotHoldBackOtherWork() async throws {
+        let count = Self.members
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0))
+        let engine = harness.engine
+        let users = (0..<count).map { index in
+            EngineHarness.onDemand("u\(index)", EngineFixture.bytes(10_941 + UInt64(index), count: 300))
+        }
+        let prefetched = (0..<2).map { index in
+            EngineHarness.onDemand("p\(index)", EngineFixture.bytes(10_940 - UInt64(index), count: 300))
+        }
+        await harness.serveManifest(users + prefetched)
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        let userToken = try await engine.registerGroup(users.map(\.identifier), lane: .userInitiated).get()
+        await engine.awaitCondition { $0.state.jobs.count == count && $0.state.inFlight.count == 4 }
+        _ = try await engine.registerGroup(prefetched.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count + 2 }
+        let waiting = Set(prefetched.map(\.transferID))
+        #expect(await engine.readForTests { engine in waiting.allSatisfy { engine.state.jobs[$0]?.state == .queued } }, "setup: the prefetch members wait")
+        // The release's own turn, and what it started, read in that turn (its follow-up turn has not run).
+        let started = await engine.readForTests { engine in
+            engine.performReleaseGroup(userToken)
+            return (waiting.filter { engine.state.inFlight.contains($0) }.count, engine.state.releasing.isEmpty)
+        }
+        #expect(!started.1, "setup: the release continues in a later turn")
+        #expect(started.0 == 2, "both prefetch members start in the release's turn")
+        await engine.awaitCondition { !$0.state.releaseFollowUpScheduled }
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
 }
