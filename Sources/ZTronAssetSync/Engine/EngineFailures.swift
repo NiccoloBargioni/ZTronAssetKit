@@ -142,7 +142,9 @@ extension SyncEngine {
                         self.record(ids.first, .storage, "recording a 404 failed: \(error)")
                     }
                 }
-                // An id bound during the await may have been marked failed with it (the residual window, F-22).
+                // An id bound during the await is left present: the store's guard skips a record bound to a live blob
+                // at this identity (L4-R16). The binding is forgotten so that the next resolve reads the store. This
+                // job's waiters for such an id are still answered `notFound` below (the residual of F-22 and F-31).
                 self.forgetBound(ids)
             }
             guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
