@@ -703,6 +703,9 @@ extension SyncEngine {
             // Bindings learned while the purge ran may be purged too (L4-R5).
             self.dropBindings()
             self.broadcast(.snapshotChanged(generation: self.state.generation))
+            // The purge's reaper may have reclaimed what jobs parked for space wait for, outside the alarm's work.
+            // REENTRANCY: f-4 (proposed) — nothing: the callee re-validates the lifecycle after its read.
+            await self.spaceMayHaveBeenReclaimed()
             // REENTRANCY: RE-S40 — the lifecycle.
             await self.refreshStoreDeadline()
             self.pump()
@@ -710,6 +713,9 @@ extension SyncEngine {
         } catch {
             // A purge that threw may have removed records in memory first (ADR-050), bound meanwhile too (L4-R5).
             self.storeMutationFailed()
+            // It may also have reaped before it threw (a grace wait cancelled after a round of reaping).
+            // REENTRANCY: f-4 (proposed) — nothing: the callee re-validates the lifecycle after its read.
+            await self.spaceMayHaveBeenReclaimed()
             // REENTRANCY: RE-S40 — the lifecycle.
             await self.refreshStoreDeadline()
             return .failure(self.isShuttingDown ? .shutDown : error.assetError)

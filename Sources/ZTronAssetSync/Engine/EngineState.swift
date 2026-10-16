@@ -169,12 +169,22 @@ struct EngineState {
     var lastAlarm: UInt64 = 0
     /// The store's next deadline as last read.
     var storeDeadline: MonotonicInstant?
-    /// The alarm's `store.runDueWork()` and what follows it (a free-space read after reaped bytes) are under way: the
-    /// store deadline is cleared meanwhile, yet that work may still reap.
-    var storeWorkInFlight = false
+    /// How many alarm runs have their `store.runDueWork()`, and what follows it (a free-space read after reaped bytes),
+    /// under way: the store deadline is cleared meanwhile, yet that work may still reap. A count, not a flag: a deadline
+    /// armed during one run's await starts a second alarm, and the first to end must not mark the other's work over
+    /// (review of close-out cycle 5).
+    var storeWorkRuns = 0
     /// A re-read of the store's next deadline is under way for a job parked `awaitingSpace` while none was armed
     /// (`ensureSpaceWake`).
     var spaceDeadlineReread = false
+    /// A fresh free-space read is under way that decides the jobs parked `awaitingSpace` while nothing will run the
+    /// store's due work (`settleUnwakeableSpaceWaits`).
+    var spaceSettleRead = false
+
+    /// Whether some alarm run's store work is under way (`storeWorkRuns`).
+    var storeWorkInFlight: Bool {
+        self.storeWorkRuns > 0
+    }
 
     // MARK: Conditions (R-SYN-7, R-SYN-13)
 
