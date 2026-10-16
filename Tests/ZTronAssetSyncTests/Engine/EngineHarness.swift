@@ -207,11 +207,18 @@ struct EngineHarness {
     }
 
     /// Drives the manual clock until `predicate` holds. Each round advances the clock to the earliest sleeper (the
-    /// engine's alarm, or a store wait in an engine-owned task) when it is at most `maxStep` away; otherwise it waits for
-    /// whichever comes first: the predicate, any change of the engine's counters, or one more sleeper (the other waits
-    /// end on their cancellation). A sleeper further away than `maxStep` is a timeout the test must not trigger (the
-    /// manifest fetch deadline while the fetch still works). Never a wall-clock wait.
-    func drive(rounds: Int = 1_024, maxStep: TimeInterval = .infinity, until predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async throws {
+    /// engine's alarm, or a store wait in an engine-owned task) when it is at most `maxStep` away and earlier than
+    /// `before`; otherwise it waits for whichever comes first: the predicate, any change of the engine's counters, or one
+    /// more sleeper (the other waits end on their cancellation). A sleeper further away than `maxStep`, or at `before` or
+    /// later, is a timeout the test must not trigger yet (the manifest fetch deadline while the fetch still works, a
+    /// breaker's cooldown before the run it blocks has settled). Never a wall-clock wait. A drive cancelled by the
+    /// test's time limit throws `neverQuiesced` with the engine's introspection, so the overrun says where it stopped.
+    func drive(
+        rounds: Int = 1_024,
+        maxStep: TimeInterval = .infinity,
+        before: MonotonicInstant? = nil,
+        until predicate: @escaping @Sendable (EngineIntrospection) -> Bool
+    ) async throws {
         let engine = self.engine
         let time = self.time
         for _ in 0..<rounds {
@@ -219,7 +226,7 @@ struct EngineHarness {
             if predicate(state) {
                 return
             }
-            if let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep) {
+            if let deadline = time.nextDeadline, deadline <= time.monotonicNow().adding(seconds: maxStep), before.map({ deadline < $0 }) ?? true {
                 time.advance(to: deadline)
                 continue
             }
@@ -234,7 +241,9 @@ struct EngineHarness {
                 _ = await group.next()
                 group.cancelAll()
             }
-            try Task.checkCancellation()
+            if Task.isCancelled {
+                throw EngineHarnessError.neverQuiesced(await engine.introspect())
+            }
         }
         throw EngineHarnessError.neverQuiesced(await engine.introspect())
     }

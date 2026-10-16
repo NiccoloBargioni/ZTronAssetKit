@@ -275,6 +275,22 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// When the origin's open breaker half-opens, if it is open.
+    static func cooldownEnd(of engine: isolated SyncEngine) -> MonotonicInstant? {
+        for breaker in engine.state.breakers.values {
+            if case .open(_, let until, _) = breaker.state {
+                return until
+            }
+        }
+        return nil
+    }
+
+    /// The launch run's transfers each answer 500 once: the breaker opens. The run must settle blocked by it before its
+    /// cooldown ends, so the clock is driven only to the retry deadlines until it has: driven blindly, it passed the
+    /// cooldown while attempts whose 500 the engine had not yet received still ran (under load, captured in close-out
+    /// cycle 9: two attempts still running at the cooldown's end, the breaker reopened, then closed by a probe, and the
+    /// run completed). Every 500 reaches the engine without the clock, and the open breaker starts nothing, so once no
+    /// transfer runs only the clock moves the run. Then past the cooldown: the pending run's probe closes the breaker.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it", .timeLimit(.minutes(1)))
     func serverBreakerBlocksRun() async throws {
@@ -293,7 +309,9 @@ struct EngineRunPathTests {
             return false
         }
         #expect(opened != nil)
-        try await harness.drive { $0.groups == 0 && $0.jobsByState[.blocked] == nil && $0.jobsByState[.failed] == nil && $0.lifecycle == .running }
+        await harness.engine.waitUntil { $0.running == 0 && $0.preempting == 0 }
+        let reopens = try #require(await harness.engine.readForTests { Self.cooldownEnd(of: $0) }, "the breaker is open")
+        try await harness.drive(before: reopens) { $0.groups == 0 && $0.jobsByState[.blocked] == nil && $0.jobsByState[.failed] == nil && $0.lifecycle == .running }
         let first = await probe.next { event in
             if case .syncFinished = event {
                 return true
