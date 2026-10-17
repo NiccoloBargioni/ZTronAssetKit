@@ -317,6 +317,31 @@ extension ZTronAssetKitBenchmarks {
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
+        /// The total cost of a chain of half-open probes that each end without a verdict (close-out cycle 21, F-41; the
+        /// cycle-20 requirements verifier's ProbeC20RChain): 5xx answers open the breaker under a prefetch group, the open
+        /// breaker parks every queued member, every member then answers 404, and the clock reaches the cooldown's end. Each
+        /// member probes in turn, and each exit re-admits every member the breaker still parks while the pump parks all but
+        /// the next probe again (F-40), so the chain's total actor work grows with the square of the parked members while
+        /// each turn stays within C2. 1,000 members (10,000 would take minutes: the verifier measured 160.88 s); the best of
+        /// three runs' longest actor wait against C2, the median against P-9, after a warm-up of 250. The totals are
+        /// reported for the orchestrator's ruling on the burst (F-41), not checked against a budget: none exists.
+        @Test("R-SYN-5: a chain of half-open probes ending without a verdict over 1,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func probeChainTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.probeChainWait(members: 250)
+            var runs: [(wait: Double, total: Double)] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.probeChainWait(members: 1_000))
+            }
+            let waits = runs.map(\.wait)
+            let median = waits.sorted()[1]
+            print("R-SYN-5 chain of probes without a verdict over 1,000 prefetch members parked by the breaker: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); totals \(runs.map(\.total)) s; runs \(waits)")
+            #expect(median <= gapMax)
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
+        }
+
         /// C2 at SPEC §6's reference scale when a 429 extends an origin's throttle under user-initiated waiters (close-out
         /// cycle 16, F-36): a 1 s 429 throttles the origin, 10,000 user-initiated `resolve` callers park within
         /// `interactiveMaxWait` and wait, and a running member's 60 s 429 then extends the throttle; later turns answer
@@ -869,6 +894,72 @@ enum SyncBench {
         }
         await engine.shutdown()
         return wait
+    }
+
+    /// The heartbeat's longest wait, and the chain's total time in seconds, while the clock reaches the cooldown's end of a
+    /// breaker that parked a prefetch group of `count` on-demand members on a roomy volume, every member answering 404 from
+    /// then on: the running members answer 500 until the 5xx breaker opens, as in `cooldownEndWait`, then every member is
+    /// scripted to answer 404, and the clock jumps to the cooldown's end, until no member is parked, queued, downloading or
+    /// owed a re-queue (each probed once and failed, or waits for a retry deadline the clock has not reached).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func probeChainWait(members count: Int) async throws -> (wait: Double, total: Double) {
+        let bench = try await SyncBench.scaleBench(members: count, room: nil)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        var failed = 0
+        while !Task.isCancelled, await SyncBench.cooldownEnd(engine) == nil {
+            guard failed < count else {
+                throw SyncBenchError.incomplete("the breaker did not open")
+            }
+            await engine.awaitCondition { engine in
+                !SyncBench.running(engine).isEmpty || SyncBench.cooldownEnd(engine) != nil
+            }
+            await engine.waitForAllHandles()
+            let running = await SyncBench.running(engine)
+            failed += running.count
+            for transfer in running {
+                await bench.source.script(transfer, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil))])
+            }
+            while !Task.isCancelled, !(await SyncBench.attemptsEnded(engine, running)) {
+                await Task.yield()
+            }
+        }
+        while !Task.isCancelled, !(await SyncBench.originSettled(engine, probing: false)) {
+            await Task.yield()
+        }
+        guard let until = await SyncBench.cooldownEnd(engine) else {
+            throw SyncBenchError.incomplete("the breaker closed before its cooldown ended")
+        }
+        for entry in bench.entries {
+            await bench.source.script(entry.transferID, [.fail(.permanentMissing(httpStatus: 404))])
+        }
+        let clock = ContinuousClock()
+        var total = Duration.zero
+        let wait = try await SyncBench.longestWait(on: engine) {
+            let start = clock.now
+            bench.time.advance(to: until)
+            // `advance(to:)` can stop 1 ns short of `until` (seconds as a `Double`, truncated): each step adds exactly 1 ns.
+            while bench.time.monotonicNow() < until {
+                bench.time.advance(by: 1e-9)
+            }
+            while !Task.isCancelled, !(await SyncBench.chainEnded(engine)) {
+                await Task.yield()
+            }
+            total = clock.now - start
+        }
+        await engine.shutdown()
+        return (wait, Double(total.components.seconds) + Double(total.components.attoseconds) / 1e18)
+    }
+
+    /// Whether a chain of probes ended: no job parked by the breaker, queued, downloading or owed a re-queue, and no
+    /// follow-up turn owed.
+    static func chainEnded(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.circuitParked.isEmpty && SyncBench.originSettled(engine, probing: false)
     }
 
     /// The heartbeat's longest wait while a 429 extends the origin's throttle under `count` user-initiated `resolve`
