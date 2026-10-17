@@ -6,8 +6,8 @@ import ZTronAssetTestSupport
 
 /// Pins from close-out cycle 17 of the level-4 close-out (`docs/adr-drafts/f.md`, F-37): a run that settled blocked for
 /// lack of space while a follow-up free-space sweep still owed its parked claim a re-check; the network-edge and
-/// conditions branches of the owed-claim check end to end; and the `ensureAvailable` branch of the throttle-extension
-/// answers. No test here moves the clock; every wait is a condition, a held seam or a join that ends on cancellation
+/// conditions branches of the owed-claim check end to end; the `ensureAvailable` branch of the throttle-extension
+/// answers; and the retry-after of a fetch-first `ensureAvailable` a throttle refuses. No test here moves the clock; every wait is a condition, a held seam or a join that ends on cancellation
 /// (L4-R17).
 @Suite("Engine regressions, close-out cycle 17")
 struct EngineRegressionCycle17Tests {
@@ -385,5 +385,45 @@ struct EngineRegressionCycle17Tests {
         }
         await engine.shutdown()
         _ = await joinCancelling(callerB)
+    }
+
+    // MARK: A throttled fetch-first ensureAvailable reports the throttle's end (R-SYN-10, R-SYN-5; cycle-16 verifier)
+
+    /// `ensureAvailable` fetches the manifest first; when the origin's throttle refuses that fetch and the store cannot
+    /// answer the scope, the caller gets `.serverUnavailable`. It dropped the throttle's end (`retryAfter: nil`), while
+    /// the same refusal answers an unknown-id `resolve` with the time left and ARCHITECTURE §7.6 maps a 429 to
+    /// `.serverUnavailable(retryAfter:)` (the requirements verifier's first ensure probe). F-37 records why the request
+    /// still fails at once rather than waiting.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-10: an ensureAvailable whose manifest fetch an origin throttle refuses reports the time left until the throttle ends", .timeLimit(.minutes(1)))
+    func throttledEnsureReportsRetryAfter() async throws {
+        let harness = EngineHarness.make()
+        let bytesA = EngineFixture.bytes(6_401)
+        let bytesM = EngineFixture.bytes(6_402)
+        let a = EngineHarness.onDemand("a", bytesA)
+        let m = EngineHarness.onDemand("m", bytesM)
+        await harness.serveManifest([a, m])
+        let engine = harness.engine
+        let origin = harness.source.originID
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        // A prefetch transfer's 429 throttles the origin for 30 s.
+        await harness.source.script(a.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(30))), .stage(bytesA)])
+        let token = try await engine.registerGroup([a.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state.isThrottleParked == true }
+        let throttle = await engine.readForTests { $0.state.throttles[origin] }
+        let end = try #require(throttle, "setup: the 429 throttles the origin")
+        let requests = await harness.source.manifestRequests.count
+        let result = await engine.ensureAvailable(scope: .identifiers([m.identifier]))
+        let expected = end.seconds(since: harness.time.monotonicNow())
+        if case .failure(.serverUnavailable(retryAfter: let wait)) = result {
+            #expect(wait == expected, "the caller is told when the throttle ends: \(String(describing: wait)), expected \(expected)")
+        } else {
+            Issue.record("a throttled fetch-first ensureAvailable that the store cannot answer is unavailable: \(result)")
+        }
+        let after = await harness.source.manifestRequests.count
+        #expect(after == requests, "the throttle refuses the fetch before any request: \(after - requests)")
+        await engine.releaseGroup(token)
+        await engine.shutdown()
     }
 }
