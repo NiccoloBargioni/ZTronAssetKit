@@ -437,7 +437,7 @@ extension SyncEngine {
             if report.isComplete {
                 return .success(report)
             }
-            return .failure(SyncEngine.unreachableError(outcome, now: self.environment.time.now()))
+            return .failure(SyncEngine.unreachableError(outcome, now: self.environment.time.now(), monotonicNow: self.environment.time.monotonicNow()))
         case .cancelled:
             return .failure(.cancelled)
         case .shutDown:
@@ -547,13 +547,17 @@ extension SyncEngine {
         return .success(report)
     }
 
-    /// The error of an unreachable manifest for `ensureAvailable`.
-    private static func unreachableError(_ outcome: ManifestOutcome, now: Date) -> AssetError {
+    /// The error of an unreachable manifest for `ensureAvailable`. A fetch the origin's throttle refused reports the time
+    /// left until the throttle ends, as ARCHITECTURE §7.6 maps a 429 and as the unknown-id `resolve` answers the same
+    /// refusal (close-out cycle 17, F-37).
+    private static func unreachableError(_ outcome: ManifestOutcome, now: Date, monotonicNow: MonotonicInstant) -> AssetError {
         switch outcome {
         case .failed(let error):
             return error.assetError(now: now)
         case .circuitOpen(let cause):
             return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
+        case .throttled(let until):
+            return .serverUnavailable(retryAfter: until.seconds(since: monotonicNow))
         default:
             return .serverUnavailable(retryAfter: nil)
         }
