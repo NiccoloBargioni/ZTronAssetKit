@@ -542,6 +542,24 @@ extension SyncEngine {
         .serverUnavailable(retryAfter: self.throttleEnd(after: until).seconds(since: self.environment.time.monotonicNow()))
     }
 
+    /// The origin-wide gates the clock has opened while the alarm's turn that re-admits the jobs they parked has not run.
+    /// A throttle whose end has passed is still recorded: only its `.throttle` deadline's turn clears it and re-queues the
+    /// jobs it parked (`fireDue`), and that deadline stays in the heap while the throttle is (F-35). A breaker whose
+    /// cooldown has ended still reads open: it half-opens lazily (`CircuitBreaker.admit`), and its `.breaker` deadline's
+    /// turn, scheduled at the cooldown's end when it opened, re-queues the jobs it parked. Between the clock reaching such
+    /// an end and that turn, which waits for the alarm's wake-up and for its place in the actor's queue, the gate already
+    /// admits work (`gate`), so a job parked by it waits only for that turn (close-out cycle 19, F-39).
+    func originGatesAwaitingAlarm(now: MonotonicInstant) -> (throttle: Bool, breaker: Bool) {
+        guard let origin = self.state.remote?.originID else {
+            return (false, false)
+        }
+        let throttle = self.state.throttles[origin].map { $0 <= now } ?? false
+        guard case .open(_, let until, _)? = self.state.breakers[origin]?.state else {
+            return (throttle, false)
+        }
+        return (throttle, until <= now)
+    }
+
     /// `reason` with a throttle's end read through `throttleEnd(after:)`.
     func currentReason(_ reason: BlockReason) -> BlockReason {
         if case .throttled(let until) = reason {

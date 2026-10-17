@@ -604,7 +604,13 @@ extension SyncEngine {
         // F-37). Every claim with the run's interest passes here, so this is the one check before the passes below.
         // A claim parked `insufficientSpace` that the ledger admits now (a job in flight ended without committing, which
         // re-checks nothing until the next free-space read, F-28) is noted: settling would report a lack of space the
-        // ledger denies (close-out cycle 18, F-38).
+        // ledger denies (close-out cycle 18, F-38). A claim parked by an origin-wide gate whose end the clock has passed
+        // counts as working while the alarm's turn that handles that end has not run (`originGatesAwaitingAlarm`): the
+        // gate is open, that turn re-queues the claim (or owes it a re-queue) and its pump checks the run again; settling
+        // now would report a gate that is open, retire the claim's job and start the pending run at once (close-out
+        // cycle 19, F-39).
+        let now = self.environment.time.monotonicNow()
+        let awaitingAlarm = self.originGatesAwaitingAlarm(now: now)
         var admittedBySpace = false
         for (transfer, _) in current.outstanding {
             guard let job = jobs[transfer], job.interests[current.token] != nil else {
@@ -612,6 +618,10 @@ extension SyncEngine {
             }
             switch job.state {
             case .blocked(.awaitingSpace):
+                return
+            case .blocked(.throttled(let until)) where awaitingAlarm.throttle && self.throttleEnd(after: until) <= now:
+                return
+            case .blocked(.circuitOpen) where awaitingAlarm.breaker:
                 return
             case .blocked(.insufficientSpace) where spaceSweepOwed:
                 return
