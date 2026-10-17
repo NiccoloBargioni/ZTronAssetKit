@@ -316,7 +316,7 @@ extension SyncEngine {
     /// A 429 moved the origin's throttle end later than `previous`, the end in force before it. A pending run that waits for
     /// the throttle moves to the new end: it was scheduled at the end in force when it was set, and at that end it would
     /// start a run the throttle refuses at its manifest step (close-out cycle 19, F-39). A user-initiated request waits for
-    /// a throttle only while its end is within `interactiveMaxWait` (sync.md §7.6, `RetryPolicy`), so the user-initiated
+    /// a throttle only while its end is within `interactiveMaxWait` (sync.md §8.2, `RetryPolicy`), so the user-initiated
     /// waiters of the jobs the throttle had already parked get the fail-fast answer for the new end, the one a request made
     /// now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. The answers come in a later
     /// turn of their own (`answerThrottledUsers()`), so the 429's turn stays O(1).

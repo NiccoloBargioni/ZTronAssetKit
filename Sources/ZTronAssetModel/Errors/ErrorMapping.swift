@@ -48,8 +48,9 @@ extension TransferError {
     /// `Retry-After` dates.
     ///
     /// Two cases are completed by the engine, which knows more than the transport: an `insufficientSpace` carries
-    /// the store's measured free space (here `available` is 0), and an ambiguous 403 becomes
-    /// `.authRejected(.confirmed)` only when the auth breaker opened on key-rejected evidence (ARCHITECTURE §7.7).
+    /// the bytes needed against the room above the reserve that the engine's space decision had (ARCHITECTURE §7.6,
+    /// §7.10; here `available` is 0), and an ambiguous 403 becomes `.authRejected(.confirmed)` only when the auth
+    /// breaker opened on key-rejected evidence (ARCHITECTURE §7.7).
     public func assetError(now: Date) -> AssetError {
         switch self {
         case .offline:
