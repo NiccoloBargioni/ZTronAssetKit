@@ -158,6 +158,12 @@ extension SyncEngine {
         }
         self.checkRunSettled()
         self.scheduleEnsureRefill()
+        if self.state.pendingRun?.gate == .breaker {
+            // The jobs re-admitted for a breaker that admits only a probe have had their dispatch: one of them is the
+            // probe now (the gate rejects, and the probe's outcome reconsiders), or none could start and the pending run's
+            // manifest fetch probes (F-4). Read after every follow-up this turn scheduled (`dispatchOwed`, F-41).
+            self.reconsiderPendingRun()
+        }
         self.notifyObservers()
     }
 

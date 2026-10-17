@@ -898,7 +898,7 @@ extension SyncEngine {
     enum PendingRunGateState: Equatable {
         /// The gate is open: the run may start now.
         case open
-        /// A deadline, the conditions watcher or a probe in flight will open it.
+        /// A deadline, the conditions watcher, a probe in flight or a pump still owed will open it (or decide it).
         case armed
         /// Closed with nothing to open it.
         case unarmed
@@ -921,7 +921,20 @@ extension SyncEngine {
         case .breaker:
             // The breaker's gate as the next dispatch reads it (`originGate`, F-40): open when it is closed, when its
             // cooldown has ended, or when it is half-open without a probe or with one silent past its watchdog.
-            guard let origin, !self.originGate(at: now).admitsBreakerParked else {
+            guard let origin else {
+                return .open
+            }
+            let gate = self.originGate(at: now)
+            if gate.admitsBreakerParked {
+                // A breaker that admits only a probe has one probe to give, and the jobs just re-admitted for it (a
+                // cooldown's end, a watchdog, a probe's exit without a verdict) are dispatched by a pump still owed. A run
+                // started before that pump lost the probe to the first of them before its manifest step, ended blocked
+                // and left a new pending run: one run per probe while the clock did not move (close-out cycle 21, F-41).
+                // The pending run waits for that pump, which reconsiders it once it has dispatched (`pump()`); a closed
+                // breaker admits every transfer, so nothing waits then.
+                if gate.breaker == .probe, self.dispatchOwed {
+                    return .armed
+                }
                 return .open
             }
             if self.state.heap.deadline(for: .breaker(origin)) != nil || self.state.breakers[origin]?.probe != nil {
@@ -935,6 +948,14 @@ extension SyncEngine {
             }
             return self.state.heap.deadline(for: .pendingRun) == nil ? .unarmed : .armed
         }
+    }
+
+    /// Whether a later turn owes a pump that may dispatch queued or re-admitted jobs: a pump follow-up, a re-admission
+    /// follow-up (it pumps after its re-queues), re-queues still owed to an origin's jobs, or an `ensureAvailable` refill.
+    /// Each of those turns ends in `pump()`, which reconsiders a pending run that waits for the breaker (F-41).
+    var dispatchOwed: Bool {
+        self.state.pumpFollowUpScheduled || self.state.readmissionFollowUpScheduled || self.state.ensureRefillScheduled
+            || !self.state.originOwed.isEmpty
     }
 
     /// Starts the pending run when its gate is already open, and arms whatever opens a closed one.

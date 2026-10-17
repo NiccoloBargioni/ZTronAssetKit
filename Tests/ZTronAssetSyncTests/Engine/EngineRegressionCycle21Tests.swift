@@ -28,9 +28,9 @@ struct EngineRegressionCycle21Tests {
     /// waits for the breaker. Every object answers 404 from here on, and the clock moves once, to the cooldown's end. Each
     /// member probes in turn and ends without a verdict. At `58287dc` each such exit re-admitted the parked members and
     /// started the pending run in the same turn; the next member probed before that run's manifest step, so the run ended
-    /// blocked: 11 runs after the cooldown, the clock never moving. The pending run now starts once no re-admitted job
-    /// takes the probe, so one run (two at most, if the cooldown's own run loses the probe) follows the cooldown, and it
-    /// completes.
+    /// blocked: 11 runs after the cooldown, the clock never moving. The pending run now waits for the pump that dispatches
+    /// the re-admitted jobs, at the cooldown's end as after each exit, and starts once none is left to take the probe: one
+    /// run follows the cooldown, its manifest request the only one, and it completes.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock does not move", .timeLimit(.minutes(1)))
     func prefetchProbesStartNoRunEach() async throws {
@@ -91,7 +91,7 @@ struct EngineRegressionCycle21Tests {
         let after = await engine.readForTests { engine in
             (engine.state.lastRunID, members.filter { engine.state.jobs[$0.transferID]?.state.isCircuitParked == true }.count)
         }
-        #expect(after.0 - before.0 <= 2, "at most the cooldown's run and the one that completes start, not one per probe: \(after.0 - before.0) runs")
+        #expect(after.0 - before.0 == 1, "one run starts, once no member is left to probe, not one per probe (nor one the cooldown's first probe beats): \(after.0 - before.0) runs")
         #expect(after.1 == 0, "no member stays parked: \(after.1)")
         let made = await harness.source.manifestRequests.count
         #expect(made - requests <= 1, "at most one manifest request while the clock does not move: \(made - requests)")
