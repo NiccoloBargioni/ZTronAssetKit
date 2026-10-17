@@ -320,7 +320,7 @@ extension SyncEngine {
         // REENTRANCY: RE-S10 — nothing: the body checks and registers synchronously.
         await withCheckedContinuation { (continuation: CheckedContinuation<RunSettlement, Never>) in
             if let settled = self.state.run?.settlement {
-                continuation.resume(returning: settled)
+                self.deliverRunSettlement(settled, to: continuation)
             } else if self.state.run?.token != token || !self.isRunning {
                 continuation.resume(returning: self.isShuttingDown ? .shutDown : .cancelled)
             } else {
@@ -715,8 +715,43 @@ extension SyncEngine {
         }
         run.settlement = settlement
         self.state.run = run
-        self.state.runCompletions.removeValue(forKey: run.token)?.resume(returning: settlement)
+        if let completion = self.state.runCompletions.removeValue(forKey: run.token) {
+            self.deliverRunSettlement(settlement, to: completion)
+        }
         self.notifyObservers()
+    }
+
+    /// Resumes the run task's wait with `settlement`, unless the test seam holds it (`holdRunSettlementDelivery()`).
+    private func deliverRunSettlement(_ settlement: RunSettlement, to continuation: CheckedContinuation<RunSettlement, Never>) {
+        guard self.state.runSettlementsHeld else {
+            continuation.resume(returning: settlement)
+            return
+        }
+        self.state.heldRunSettlements.append(HeldRunSettlement(settlement: settlement, continuation: continuation))
+        self.notifyObservers()
+    }
+
+    /// Test seam: the settlements runs reach from now on wait for `releaseRunSettlementDelivery()` before they reach the
+    /// run's task (close-out cycle 19), so a test can let other engine work run between a run's settling turn and its
+    /// answer, an order production leaves to the scheduler.
+    func holdRunSettlementDelivery() {
+        self.state.runSettlementsHeld = true
+    }
+
+    /// Test seam: delivers every held settlement to its run task and disarms the hold; shutdown calls it too, and then the
+    /// run task is told the engine is shutting down, as shutdown tells a run task that is still waiting.
+    func releaseRunSettlementDelivery() {
+        self.state.runSettlementsHeld = false
+        let held = self.state.heldRunSettlements
+        self.state.heldRunSettlements.removeAll()
+        for delivery in held {
+            delivery.continuation.resume(returning: self.isShuttingDown ? .shutDown : delivery.settlement)
+        }
+    }
+
+    /// Test seam: whether a run's settlement waits for `releaseRunSettlementDelivery()`.
+    var runSettlementHeld: Bool {
+        !self.state.heldRunSettlements.isEmpty
     }
 
     /// The run's report as of now.

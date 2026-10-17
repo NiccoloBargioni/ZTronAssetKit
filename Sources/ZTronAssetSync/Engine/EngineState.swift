@@ -249,6 +249,20 @@ struct EngineState {
     var manifestDeliveriesHeld = false
     /// Test seam: the outcomes the hold keeps, each with the waiters it is owed to.
     var heldManifestDeliveries: [HeldManifestDelivery] = []
+    /// Test seam (close-out cycle 19): while set, an alarm whose sleep returned waits before it fires what is due
+    /// (`heldAlarmTurns`) until a test releases it (`holdAlarmTurns()`, `releaseAlarmTurns()`), so the test can let other
+    /// engine work, such as a transfer's terminal, run after a deadline's instant and before the alarm's turn, an order
+    /// production leaves to the sleep's wake-up latency and the actor's queue. No production path sets it.
+    var alarmTurnsHeld = false
+    /// Test seam: the alarm turns the hold keeps, by alarm token; a replaced alarm's is resumed by `rearm`.
+    var heldAlarmTurns: [UInt64: CheckedContinuation<Void, Never>] = [:]
+    /// Test seam (close-out cycle 19): while set, a run's settlement waits before it reaches the run's task
+    /// (`heldRunSettlements`) until a test releases it (`holdRunSettlementDelivery()`, `releaseRunSettlementDelivery()`),
+    /// so the test can let other engine work, such as a transfer's 429, run between a run's settling turn and its answer,
+    /// an order production leaves to the scheduler. No production path sets it.
+    var runSettlementsHeld = false
+    /// Test seam: the settlements the hold keeps, each with the run task's wait it is owed to.
+    var heldRunSettlements: [HeldRunSettlement] = []
     /// The jobs a space sweep re-queued, by the ticket it queued them with: while one still waits in the queue with that
     /// ticket, every later sweep counts its bytes ahead of the jobs it re-checks, so the sweeps of one read that the
     /// bound splits over several turns, and the next read's, admit only what the room holds together (C2, T17).
@@ -650,6 +664,15 @@ struct HeldManifestDelivery {
     let outcome: ManifestOutcome
     /// The runs and `ensureAvailable` calls it is owed to; a cancelled caller is withdrawn from here.
     var waiters: [InterestToken: CheckedContinuation<ManifestOutcome, Never>]
+}
+
+/// A run's settlement that the test seam keeps from the run's task (`SyncEngine.holdRunSettlementDelivery()`): only a
+/// test orders other engine work between a run's settling turn and its answer this way.
+struct HeldRunSettlement {
+    /// The settlement the run reached.
+    let settlement: RunSettlement
+    /// The run task's wait it is owed to.
+    let continuation: CheckedContinuation<RunSettlement, Never>
 }
 
 /// What a manifest fetch produced.

@@ -551,6 +551,8 @@ extension SyncEngine {
         }
         self.releaseApplyFollow()
         self.releaseManifestOutcomeDelivery()
+        self.releaseRunSettlementDelivery()
+        self.releaseAlarmTurns()
         self.releaseApplyQueue()
         for transfer in self.state.jobs.keys.sorted() {
             self.state.jobs[transfer]?.active?.handle?.cancel()

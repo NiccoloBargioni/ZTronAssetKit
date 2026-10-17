@@ -18,6 +18,8 @@ extension SyncEngine {
             }
             self.state.alarm = nil
             self.cancelTask(alarm.task)
+            // Test seam: a replaced alarm held after its sleep ends now (it finds its token stale).
+            self.state.heldAlarmTurns.removeValue(forKey: alarm.token)?.resume()
         }
         guard let target else {
             self.notifyObservers()
@@ -42,12 +44,54 @@ extension SyncEngine {
         } catch {
             return
         }
+        if self.state.alarmTurnsHeld {
+            // REENTRANCY: RE-S16 — the lifecycle and the alarm token, re-checked right below; due entries are recomputed
+            // from `monotonicNow()`.
+            await self.awaitAlarmTurnRelease(token)
+        }
         guard self.isRunning, self.state.alarm?.token == token else {
             return
         }
         self.state.alarm = nil
         // REENTRANCY: RE-S16 — nothing here: `fireDue` recomputes due entries from `monotonicNow()`.
         await self.fireDue()
+    }
+
+    /// Test seam: the alarm turn of `token` waits for `releaseAlarmTurns()`, for shutdown, or for its alarm's replacement;
+    /// it registers synchronously, so a hold released or an alarm replaced before it registered lets it pass at once.
+    private func awaitAlarmTurnRelease(_ token: UInt64) async {
+        // REENTRANCY: RE-S16 — nothing: the body registers synchronously; the caller re-validates the lifecycle and the
+        // alarm token.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if self.state.alarmTurnsHeld, self.isRunning, self.state.alarm?.token == token {
+                self.state.heldAlarmTurns[token] = continuation
+                self.notifyObservers()
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Test seam: from now on, an alarm whose sleep returns waits before it fires what is due, until
+    /// `releaseAlarmTurns()` (close-out cycle 19). A test uses it to let other engine work run after a deadline's instant
+    /// and before the alarm's turn, an order production leaves to the scheduler.
+    func holdAlarmTurns() {
+        self.state.alarmTurnsHeld = true
+    }
+
+    /// Test seam: disarms the hold and lets every held alarm turn go on in its own turn; shutdown calls it too.
+    func releaseAlarmTurns() {
+        self.state.alarmTurnsHeld = false
+        let held = self.state.heldAlarmTurns
+        self.state.heldAlarmTurns.removeAll()
+        for token in held.keys.sorted() {
+            held[token]?.resume()
+        }
+    }
+
+    /// Test seam: whether an alarm turn waits for `releaseAlarmTurns()`.
+    var alarmTurnHeld: Bool {
+        !self.state.heldAlarmTurns.isEmpty
     }
 
     /// Drains due entries in `(deadline, seq)` order, re-validating each against epochs, then runs the store's due
