@@ -1462,6 +1462,13 @@ extension SyncEngine {
         if self.isRunning, self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
             violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
         }
+        if self.isRunning, let origin = self.state.remote?.originID, self.state.breakers[origin]?.probe == .manifest,
+           self.state.manifestFetch == nil, self.state.run == nil {
+            // A probe held for a manifest fetch is that fetch's, in flight, or the starting run's, whose first turn begins
+            // it; every fetch records its outcome on the breaker before it ends, and one that asks for nothing lets the
+            // probe go (`releaseManifestProbe`, F-42).
+            violations.append("the breaker's probe is held for a manifest fetch that is neither in flight nor about to begin")
+        }
         var inFlight = InFlightBytes()
         var flying: Set<TransferID> = []
         var parkedForSpace: Set<TransferID> = []
