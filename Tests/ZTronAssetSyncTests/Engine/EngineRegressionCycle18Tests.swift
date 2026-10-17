@@ -4,9 +4,9 @@ import ZTronAssetModel
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// Pins from close-out cycle 18 of the level-4 close-out (`docs/adr-drafts/f.md`, F-38): the throttle end a run and a
-/// fetch-first `ensureAvailable` report when a 429 extends the origin's throttle between their manifest fetch's outcome
-/// and their answer. No test here moves the clock; every wait is a condition, a held seam or a join that ends on
+/// Pins from close-out cycle 18 of the level-4 close-out (`docs/adr-drafts/f.md`, F-38): the throttle end a run, a
+/// fetch-first `ensureAvailable` and an unknown-id `resolve` report when a 429 extends the origin's throttle between
+/// their manifest fetch's outcome and their answer. No test here moves the clock; every wait is a condition, a held seam or a join that ends on
 /// cancellation (L4-R17).
 @Suite("Engine regressions, close-out cycle 18")
 struct EngineRegressionCycle18Tests {
@@ -143,5 +143,211 @@ struct EngineRegressionCycle18Tests {
             await engine.releaseGroup(token)
         }
         await engine.shutdown()
+    }
+
+    // MARK: An unknown-id resolve answered after a 429 extended the throttle (R-SYN-5, R-SYN-4; F-36's readers)
+
+    /// The unknown-id waiters of a fetch the throttle refused are answered in token order, and a waiter whose id the
+    /// newest manifest seen lists is admitted first (`store.admit`, an await). Every later waiter's answer was computed
+    /// before those awaits, from the end the fetch's outcome carried: a transfer's 429 during an admission left it short
+    /// of the origin's throttle (found by this cycle's review of F-36's readers). Here the manifest request is held at
+    /// the source until both waiters are registered, its 429 throttles the origin for 30 s, the first waiter's
+    /// admission is held at the store's metadata executor while B's 429 extends the throttle to 60 s, and then the
+    /// second waiter is answered.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: an unknown-id resolve that a throttled manifest fetch answers after an earlier waiter's admission reports the time left until the origin's extended end", .timeLimit(.minutes(1)))
+    func unknownWaiterReportsExtendedEnd() async throws {
+        let base = FakeRemoteSource()
+        let gatedSource = ManifestRequestGate(base: base)
+        let metadata = UnitHoldingGate()
+        let harness = EngineHarness.make(
+            source: base,
+            tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0),
+            metadata: metadata,
+            remote: gatedSource
+        )
+        let bytesB = EngineFixture.bytes(6_601)
+        let bytesY = EngineFixture.bytes(6_602)
+        let b = EngineHarness.onDemand("b", bytesB)
+        let y = EngineHarness.onDemand("y", bytesY)
+        await harness.serveManifest([b])
+        let engine = harness.engine
+        let origin = base.originID
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        // An unknown-id resolve fetches a newer manifest that lists Y but not its own id: the newest manifest seen lists
+        // Y, the applied one does not.
+        await harness.serveManifest([b, y], etag: "v2")
+        let absent = await engine.awaitAsset(AssetID("w"), lane: .userInitiated)
+        try #require(absent == .failure(.notFound), "setup: an id no manifest lists is not found: \(absent)")
+        // B is held in flight.
+        await base.script(b.transferID, [.hold, .stage(bytesB)])
+        let token = try await engine.registerGroup([b.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[b.transferID]?.active != nil }
+        // Y's resolve starts a manifest fetch, held at the source until the second unknown-id waiter joins it.
+        await base.scriptManifest([.fail(.transient(.throttled, retryAfter: .seconds(30)))])
+        await gatedSource.holdNext()
+        let resolveY = Task { await engine.awaitAsset(y.identifier, lane: .userInitiated) }
+        var manifestHolds = gatedSource.holds.makeAsyncIterator()
+        _ = await manifestHolds.next()
+        let resolveZ = Task { await engine.awaitAsset(AssetID("z"), lane: .userInitiated) }
+        await untilFinishedOrCondition(resolveZ, engine) { $0.state.unknownWaiters.count == 2 }
+        let registered = await engine.readForTests { $0.state.unknownWaiters.count }
+        try #require(registered == 2, "setup: both unknown-id waiters joined the held fetch")
+        // The fetch's 429 throttles the origin for 30 s; Y's admission (listed in the newest manifest) is held.
+        await metadata.holdNext()
+        await gatedSource.release()
+        var unitHolds = metadata.holds.makeAsyncIterator()
+        _ = await unitHolds.next()
+        let throttle = await engine.readForTests { $0.state.throttles[origin] }
+        let firstEnd = try #require(throttle, "setup: the manifest's 429 throttles the origin")
+        // B's 429 extends the throttle to 60 s while Y's admission is held; Z is not answered yet.
+        await base.release(b.transferID, with: .failed(.transient(.throttled, retryAfter: .seconds(60))))
+        await engine.awaitCondition { ($0.state.throttles[origin] ?? .zero) > firstEnd }
+        let during = await engine.readForTests { ($0.state.throttles[origin], $0.state.unknownWaiters.count) }
+        let extended = try #require(during.0, "setup: the origin stays throttled")
+        try #require(during.1 == 2, "setup: neither waiter was answered before the extension: \(during.1)")
+        await metadata.release()
+        let answerZ = await joinCancelling(resolveZ)
+        let expected = extended.seconds(since: harness.time.monotonicNow())
+        if case .failure(.serverUnavailable(retryAfter: let wait)) = answerZ {
+            #expect(wait == expected, "the waiter is told when the extended throttle ends: \(String(describing: wait)), expected \(expected)")
+        } else {
+            Issue.record("an unknown id that a throttled fetch cannot list is unavailable: \(answerZ)")
+        }
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+        _ = await joinCancelling(resolveY)
+    }
+}
+
+/// A `FakeRemoteSource` whose next manifest request waits until the test releases it (or the fetch is cancelled), so a
+/// test registers more unknown-id waiters on the fetch before its outcome. An actor: no lock (C1).
+@available(macOS 15.0, iOS 18.0, *)
+actor ManifestRequestGate: RemoteSource {
+    nonisolated let base: FakeRemoteSource
+    /// One element each time a manifest request is held; iterating it ends on cancellation.
+    nonisolated let holds: AsyncStream<Void>
+    private let holdSignal: AsyncStream<Void>.Continuation
+    private var armed = false
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(base: FakeRemoteSource) {
+        self.base = base
+        (self.holds, self.holdSignal) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    nonisolated var originID: String {
+        self.base.originID
+    }
+
+    nonisolated var capabilities: RemoteSourceCapabilities {
+        self.base.capabilities
+    }
+
+    /// Holds the next manifest request.
+    func holdNext() {
+        self.armed = true
+    }
+
+    /// Lets the held request go on, or disarms a hold nothing reached.
+    func release() {
+        self.armed = false
+        self.held?.resume()
+        self.held = nil
+    }
+
+    func fetchManifest(_ request: ManifestRequest) async throws(TransferError) -> ManifestFetchResult {
+        if self.armed {
+            self.armed = false
+            // REENTRANCY: nothing: resumed once by `release()`, also on the fetch's cancellation; the base fetch below
+            // reads no state of this actor.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.held = continuation
+                    self.holdSignal.yield()
+                }
+            } onCancel: {
+                Task {
+                    // REENTRANCY: nothing: `release()` is idempotent.
+                    await self.release()
+                }
+            }
+        }
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        return try await self.base.fetchManifest(request)
+    }
+
+    func transfer(_ request: TransferRequest) async -> any TransferHandle {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.transfer(request)
+    }
+
+    func reattachedTransfers() async -> [ReattachedTransfer] {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.reattachedTransfers()
+    }
+
+    func cancelTransfer(_ name: StagingFileName) async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.cancelTransfer(name)
+    }
+
+    func reclaimSourceCopies(_ report: AdoptionReport) async -> ReclaimReport {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.reclaimSourceCopies(report)
+    }
+
+    func sourceCopyBytes() async -> Int64 {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.sourceCopyBytes()
+    }
+
+    func handleBackgroundEvents(identifier: String) async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.handleBackgroundEvents(identifier: identifier)
+    }
+
+    func invalidate() async {
+        // REENTRANCY: nothing: a pass-through to the base source; no state is read afterwards.
+        await self.base.invalidate()
+    }
+}
+
+/// A blocking executor that holds the next unit it is given until the test releases it, and signals each hold through a
+/// stream whose iteration ends on cancellation; a release before the unit arrives lets it pass (L4-R17).
+actor UnitHoldingGate: BlockingExecutor {
+    /// One element each time a unit is held.
+    nonisolated let holds: AsyncStream<Void>
+    private let holdSignal: AsyncStream<Void>.Continuation
+    private var armed = false
+    private var held: CheckedContinuation<Void, Never>?
+
+    init() {
+        (self.holds, self.holdSignal) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        if self.armed {
+            self.armed = false
+            // REENTRANCY: nothing: `work` is the caller's value; only `release()` resumes the unit.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.held = continuation
+                self.holdSignal.yield()
+            }
+        }
+        return work()
+    }
+
+    /// Holds the next unit.
+    func holdNext() {
+        self.armed = true
+    }
+
+    /// Lets the held unit run, or disarms a hold nothing reached.
+    func release() {
+        self.armed = false
+        self.held?.resume()
+        self.held = nil
     }
 }
