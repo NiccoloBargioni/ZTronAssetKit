@@ -59,8 +59,8 @@ package enum JobStateKind: String, Sendable, Hashable, CaseIterable {
     /// or `present` — is not a transition and is always allowed):
     /// - `queued → downloading | blocked`
     /// - `downloading → verifying | failed | blocked | queued` (paused or preempted; a policy pause whose lane is
-    ///   admitted again; an offline failure after a satisfied-path edge passed during the attempt; the immediate
-    ///   re-queues of ARCHITECTURE §7.6; superseded)
+    ///   admitted again; an offline failure after a satisfied-path edge passed during the attempt, the path
+    ///   satisfied now; the immediate re-queues of ARCHITECTURE §7.6; superseded)
     /// - `verifying → committing | failed | queued` (superseded content)
     /// - `committing → failed | queued` (stale entry, store failure)
     /// - `failed → queued | failed` (re-armed with a new disposition)
