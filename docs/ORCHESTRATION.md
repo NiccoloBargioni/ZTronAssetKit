@@ -5,10 +5,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 ## Next session: start here (written 2026-10-17 19:15 CEST, after Level 4)
 Level 4 is **complete** (`l4-merged` = `0d3f119`, see "Level 4 — done"). Nothing is running; no worktrees; no `wp/*` branches; `feature/asset-kit` is clean. Weekly usage **68 %** (all models; Fable 0 %), resets **Thu 22 Oct 04:00 CEST**. A `caffeinate -ims -t 172800` started 17 Oct 11:30 ends by itself on 19 Oct 11:30.
 
-Before launching Level 5, settle with the owner in **one** short question (owner feedback 2026-10-17: at a stop ask only what is needed; do not re-litigate a bar or scope already set):
-1. **When and with what stop** to run Level 5 (WP-G facade): now, using this week's remaining ~32 points (unused allowance expires at the reset), or after the reset; and the weekly-usage stop.
-2. **Close-out bar for L5.** Strict was set "for L4 (ask again for L5)". The owner chose strict three times during L4. Default to strict unless the owner says otherwise.
-3. Still-open owner items (below): P-13, the NEEDS-HUMAN-REVIEW list, and the unanswered "any non-blocking bugs up to this point?".
+**Owner decision (2026-10-18): wait for the weekly reset on Thu 22 Oct, then start Level 5 (WP-G) with the strict bar.** No stop was given, so the orchestrator recorded a **default of 55 % for all of WP-G**: usageStop 50 for the main run and close-out, 55 for docs. This was the owner's first L4 stop; the owner may change it.
+- **Scheduled:** one-time task `ztron-assetkit-level5-launch` (Claude app → Scheduled; file `~/.claude/scheduled-tasks/ztron-assetkit-level5-launch/SKILL.md`) fires **Thu 22 Oct 04:20 CEST** in Auto mode.
+  - It starts a fresh session that reads this file and checks `get_usage`; it launches nothing if weekly usage is above 10 %.
+  - It then starts caffeinate, creates `.worktrees/g`, runs the level script for `wps: ["g"]` (strict, usageStop 50), and continues through the close-out, merge, gates and docs to `l5g-merged`.
+  - After that it asks the owner about WP-K. At any stop it re-forecasts and asks only for a new stop.
+  - The app must be open; if it is closed at 04:20, the task runs on next launch.
+- **Keep-awake:** `caffeinate -ims -t 367211` from 18 Oct 01:00 holds the Mac awake until Thu 22 Oct 07:00 (session `4920f51b-…`, background task).
+- Still-open owner items (below): P-13, the NEEDS-HUMAN-REVIEW list, and the unanswered "any non-blocking bugs up to this point?". A read-only survey for the last one was proposed as a session card ("Survey non-blocking bugs across Levels 1–4").
 
 ## Level 5 (WP-G facade, then WP-K shims) — prepared
 - **Script ready:** `.claude/workflows/assetkit-stage2-level.js` now has authors read ADR-049, 050, 052 and 053, and WP-G's notes carry ADR-053's assignments:
@@ -145,7 +149,7 @@ A full week holds roughly $1,400–1,500 of this workload.
 Cutting a MUST or a budget means marking it deferred in `SPEC.md` with a `DECISIONS.md` entry; never edit `Scripts/`.
 
 ## Open questions for the owner
-1. **Level 5 launch:** start now or after the 22 Oct reset; the weekly stop; the bar (default strict; see "Next session").
+1. ~~Level 5 launch~~ — answered 2026-10-18: after the 22 Oct reset, strict bar. Stop defaulted to 55 % (owner may change); scheduled task `ztron-assetkit-level5-launch`.
 2. **P-13** (ADR-050 · NEEDS-HUMAN-REVIEW): Option A (recommended) p99 per batch; Option B raise `batch_ms_max` to 15 ms. It still fails at `l4-merged` (9.27 ms vs 5 ms).
 3. **NEEDS-HUMAN-REVIEW items:**
    - ADR-050: B-3 index layout; D-10 `shutdown()` cancels background downloads; public `startDownload(…resumeData:)`; D-19.2 task-tag format.
