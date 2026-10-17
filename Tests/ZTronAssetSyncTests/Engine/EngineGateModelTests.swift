@@ -14,7 +14,11 @@ import ZTronAssetTestSupport
 /// - I2: no pending run starts while the gate it waits on is closed at `now` (checked in the starting turn);
 /// - I3: once the alarm has had its turn, no job stays parked by an origin gate that admits at `now`;
 /// - I4: a step makes at most one manifest request, and at most `runsWithoutClockMove` runs start while the clock does not
-///   move (runs never repeat without the clock moving; close-out cycle 21 added the second half).
+///   move (runs never repeat without the clock moving; close-out cycle 21 added the second half);
+/// - I5 (close-out cycle 21): once the alarm has had its turn, no pending run waits for the breaker or the throttle while
+///   that gate admits at `now` and no run is in place.
+/// Every clock move to an instant lands on it exactly (`EngineRegressionCycle21Tests.advance`), so a boundary step reaches
+/// the gate's end rather than 1 ns before it.
 /// The gates are read by `Oracle`, written from ARCHITECTURE §7.6/§7.7 rather than from the engine's helpers. A failure
 /// prints its seed and the walk so far. Every wait is a condition that ends on cancellation (L4-R17).
 @Suite("Engine gate model, close-out cycle 20")
@@ -192,15 +196,30 @@ struct EngineGateModelTests {
             + "waiting \(engine.state.run.map { engine.state.runCompletions[$0.token] != nil } ?? false) settlement \(String(describing: engine.state.run?.settlement)), jobs \(jobs)"
     }
 
-    /// I3: the jobs parked by an origin gate that admits at `now`, read once the alarm has had its turn.
+    /// I3: the jobs parked by an origin gate that admits at `now`, read once the alarm has had its turn; and I5: with no run
+    /// in place, a pending run that waits for the breaker or the throttle while that gate admits at `now`. I2 checks only
+    /// that no run starts while its gate is closed; I5 checks that a pending run starts once its gate admits, read by the
+    /// oracle rather than by the engine's own `pendingRunGate`, which `invariantViolations()` uses (close-out cycle 21:
+    /// a gate reading that left a pending run waiting for a probe abandoned at its watchdog passed every other check).
     static func staleParks(_ engine: isolated SyncEngine) -> [String] {
         let oracle = Oracle(engine)
-        return engine.state.jobs.values.compactMap { job -> String? in
+        var found = engine.state.jobs.values.compactMap { job -> String? in
             guard case .blocked(let reason) = job.state, oracle.admits(reason) == true else {
                 return nil
             }
             return "I3: \(job.transfer) stays parked \(reason) while that gate admits (\(oracle.description))"
         }
+        if engine.state.run == nil, let pending = engine.state.pendingRun {
+            switch pending.gate {
+            case .breaker where !oracle.breakerRejects:
+                found.append("I5: the pending run waits on the breaker's gate while it admits (\(oracle.description))")
+            case .throttle where !oracle.throttleInForce:
+                found.append("I5: the pending run waits on the throttle's gate while it admits (\(oracle.description))")
+            default:
+                break
+            }
+        }
+        return found
     }
 
     /// One walk; returns the first violation with the walk so far, or `nil`.
@@ -326,7 +345,7 @@ struct EngineGateModelTests {
                         holding = true
                     }
                     log.append("\(step): hold the alarm's turns and move the clock to the gate's end \(target)")
-                    time.advance(to: target)
+                    EngineRegressionCycle21Tests.advance(time, to: target)
                     runsAtClockMove = runsBefore
                     answerNext = true
                 } else if !active.isEmpty, roll < 38 {
@@ -352,7 +371,7 @@ struct EngineGateModelTests {
                     if !instants.isEmpty, random.next() % 5 != 0 {
                         let target = instants[Int(random.next() % UInt64(instants.count))]
                         log.append("\(step): clock to \(target)\(holding ? " (alarm held)" : "")")
-                        time.advance(to: target)
+                        EngineRegressionCycle21Tests.advance(time, to: target)
                         runsAtClockMove = runsBefore
                     } else {
                         let seconds = Double(1 + random.next() % 70)
