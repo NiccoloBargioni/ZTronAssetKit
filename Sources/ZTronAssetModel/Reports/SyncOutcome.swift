@@ -72,7 +72,9 @@ public struct SyncReport: Sendable, Hashable, Codable {
     public var startedAt: Date
     /// Wall-clock end.
     public var finishedAt: Date
-    /// Whether the manifest fetch succeeded (or returned 304).
+    /// Whether the manifest fetch succeeded (or returned 304). A `.complete` run with `false` (its fetch passed
+    /// `manifestFetchDeadline`, so it ran over the applied manifest) writes no sync stamp, and the sync stays due
+    /// (ARCHITECTURE §7.10).
     public var manifestFresh: Bool
     /// What was planned.
     public var planned: PlanTotals
@@ -127,7 +129,9 @@ public struct SyncReport: Sendable, Hashable, Codable {
     }
 }
 
-/// How a run ended (R-SYN-6). Only `.complete` writes the sync stamp (prior-art parity, R-SYN-9).
+/// How a run ended (R-SYN-6). Only a `.complete` run with a fresh manifest (`SyncReport.manifestFresh`) writes the
+/// sync stamp (prior-art parity, R-SYN-9); one whose manifest fetch passed its deadline leaves the sync due
+/// (ARCHITECTURE §7.10).
 public enum SyncOutcome: Sendable, Hashable {
     /// `.ifDue` and the refresh policy said no.
     case notDue(lastSyncedAt: Date?)
