@@ -85,7 +85,10 @@ extension AssetStore {
     /// Marks every id in `ids` whose record still has content identity `identity` as `failed(reason)`, persisted
     /// (`markDirty(.soon)`), so neither a later run nor a relaunch fetches it until the manifest entry's identity
     /// changes; WP-B's `apply` clears it then (ARCHITECTURE §7.6, ADR-032). Records whose identity already changed
-    /// are left alone (the failure is about content that is no longer wanted). `reason` is `.notFound` for a
+    /// are left alone (the failure is about content that is no longer wanted), and so is a record bound to a live blob
+    /// of `identity`: a failed transfer of content the store already serves never fails it (the engine re-reads
+    /// presence before the call, but a binding made during that read is only seen here; L4-R5, L4-R16). A stale
+    /// record still fails, its old blob doomed `unreferenced`. `reason` is `.notFound` for a
     /// 404/410 (R-NET-6) or `.unreadable`; integrity failures go through `recordIntegrityFailure(_:identity:)`,
     /// which backs off first.
     package func recordFailure(_ ids: [AssetID], identity: ContentIdentity, reason: FailureReason) async throws(StoreError) {
@@ -98,6 +101,12 @@ extension AssetStore {
             guard let record = self.state.core.records[id], record.entry.contentIdentity == identity,
                 record.residency != .failed(reason)
             else {
+                continue
+            }
+            // A record bound to a live blob at the failed content holds the bytes the failure says are missing: a
+            // redundant transfer of content the store already serves never fails it (L4-R5, L4-R16). A stale record's
+            // blob is not that content, so it still fails.
+            if record.referencedBlob != nil, !record.isStale {
                 continue
             }
             dropped = dropped || record.referencedBlob != nil

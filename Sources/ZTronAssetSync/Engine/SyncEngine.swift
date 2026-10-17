@@ -22,11 +22,20 @@ import ZTronAssetStorage
 ///   fails and holds nothing, and a stream made afterwards yields `clientShutDown` and finishes. Only the releases
 ///   (`releaseGroup`, `releaseLease`) and `shutdown()` itself are idempotent no-ops then.
 package actor SyncEngine {
-    private let store: AssetStore
-    private let environment: AssetEnvironment
-    private let planner: any SyncPlanning
+    /// The store this engine drives (the single writer of its root).
+    let store: AssetStore
+    /// The injected world (ADR-038).
+    let environment: AssetEnvironment
+    /// The planner, run off the actor (RE-S07).
+    let planner: any SyncPlanning
     /// The configuration (immutable).
     package nonisolated let configuration: EngineConfiguration
+    /// `configuration.tuning` inside its valid ranges (`SyncTuning.clamped()`); the clamps are in diagnostics.
+    let tuning: SyncTuning
+    /// The engine's log route (`sync` category, ADR-047).
+    let log: LogRoute
+    /// Everything the engine mutates (ARCHITECTURE §7).
+    var state = EngineState()
 
     /// Stores its collaborators with the production planner; no I/O, no task (P-12).
     package init(store: AssetStore, environment: AssetEnvironment, configuration: EngineConfiguration) {
@@ -44,6 +53,11 @@ package actor SyncEngine {
         self.environment = environment
         self.configuration = configuration
         self.planner = planner
+        let clamped = configuration.tuning.clamped()
+        self.tuning = clamped.tuning
+        self.log = environment.logRoute
+        self.state.clampedFields = clamped.clampedFields
+        self.state.retentionScope = configuration.retentionScope
     }
 
     // MARK: Lifecycle
@@ -53,14 +67,16 @@ package actor SyncEngine {
     /// (ADR-029) and the due run. Returns when the client is ready, not when the sync finished. `.failure`:
     /// `.storageUnavailable` when the store cannot be opened, `.shutDown` after shutdown began.
     package func start() async -> Result<OpenReport, AssetError> {
-        fatalError("WP-F: SyncEngine.start not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performStart()
     }
 
     /// Cancels and joins every owned task, resumes every continuation with `.shutDown`, invalidates the remote
     /// source (foreground: after its last delegate callback; background: without waiting for the OS, ADR-028),
     /// closes the store, publishes `clientShutDown` last (R-SYN-15). Idempotent.
     package func shutdown() async {
-        fatalError("WP-F: SyncEngine.shutdown not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performShutdown()
     }
 
     // MARK: Single-flight interests (R-SYN-4, R-CAR-4)
@@ -68,18 +84,19 @@ package actor SyncEngine {
     /// Awaits one asset at `lane`: joins or creates its job, promotes it, point-admits an unknown id. The caller's
     /// cancellation withdraws only its own interest (H-3).
     package func awaitAsset(_ id: AssetID, lane: AssetPriority) async -> Result<AssetLocation, AssetError> {
-        fatalError("WP-F: SyncEngine.awaitAsset not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performAwaitAsset(id, lane: lane)
     }
 
     /// Registers one group interest (a prefetch handle); `.failure(.shutDown)` after shutdown, holding nothing.
     package func registerGroup(_ ids: [AssetID], lane: AssetPriority) -> Result<InterestToken, AssetError> {
-        fatalError("WP-F: SyncEngine.registerGroup not implemented")
+        self.performRegisterGroup(ids, lane: lane)
     }
 
     /// Releases a group interest; unknown tokens are ignored (idempotent), also after shutdown. Tokens are never
     /// reused, so a second release of the same token is always a no-op (sync-1 S1-05).
     package func releaseGroup(_ token: InterestToken) {
-        fatalError("WP-F: SyncEngine.releaseGroup not implemented")
+        self.performReleaseGroup(token)
     }
 
     // MARK: Runs and availability (R-SYN-6…11)
@@ -87,84 +104,99 @@ package actor SyncEngine {
     /// A run (single-flight: a second caller joins) over the retention scope (ADR-027). `.failed(.shutDown)` after
     /// shutdown.
     package func sync(_ mode: SyncMode) async -> SyncOutcome {
-        fatalError("WP-F: SyncEngine.sync not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performSync(mode)
     }
 
     /// No network, no I/O (R-SYN-10).
     package func availability(scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
-        fatalError("WP-F: SyncEngine.availability not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performAvailability(scope: scope)
     }
 
     /// Fetch-first, then fetch what is missing at user-initiated priority (R-SYN-10).
     package func ensureAvailable(scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
-        fatalError("WP-F: SyncEngine.ensureAvailable not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performEnsureAvailable(scope: scope)
     }
 
     /// Whether a launch sync is due now (R-SYN-9).
     package func isSyncDue() async -> Result<Bool, AssetError> {
-        fatalError("WP-F: SyncEngine.isSyncDue not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performIsSyncDue()
     }
 
     /// The stamp's completion time (R-SYN-9).
     package func lastSyncedAt() async -> Result<Date?, AssetError> {
-        fatalError("WP-F: SyncEngine.lastSyncedAt not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performLastSyncedAt()
     }
 
     /// Replaces the retention scope (R-CAR-5, ADR-027): the scope of the next bulk run, pushed to the store for
     /// eviction preference and pack-release exclusions. Deletes nothing, fetches nothing and starts no run.
     package func setRetentionScope(_ scope: AssetScope) async -> Result<Void, AssetError> {
-        fatalError("WP-F: SyncEngine.setRetentionScope not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performSetRetentionScope(scope)
     }
 
     // MARK: Leases, pins, cleanup, observability
 
     /// Acquires a lease, resolving first when the asset is absent (R-CAR-8).
     package func acquireLease(_ id: AssetID) async -> Result<AssetLease, AssetError> {
-        fatalError("WP-F: SyncEngine.acquireLease not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performAcquireLease(id)
     }
 
     /// Releases a lease and re-arms the alarm with the store's new deadline; a no-op after shutdown (`close()`
     /// ended every lease).
     package func releaseLease(_ lease: AssetLease) {
-        fatalError("WP-F: SyncEngine.releaseLease not implemented")
+        self.performReleaseLease(lease)
     }
 
     /// Pins or unpins assets (R-CLN-4: pinned assets are never evicted; `purge(.all)` and `purge(.scope)` still
     /// remove them), through `AssetStore.setPinned` in an owned task (ADR-039).
     package func setPinned(_ ids: Set<AssetID>, pinned: Bool) async -> Result<Void, AssetError> {
-        fatalError("WP-F: SyncEngine.setPinned not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performSetPinned(ids, pinned: pinned)
     }
 
     /// A user purge (R-CLN-6): bumps the purge epoch first, ends the active run with `failed(.cancelled)`.
     package func purge(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
-        fatalError("WP-F: SyncEngine.purge not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performPurge(request)
     }
 
     /// GC, eviction and deep verification within a budget (R-SYN-16).
     package func performMaintenance(timeBudget: TimeInterval) async -> Result<MaintenanceReport, AssetError> {
-        fatalError("WP-F: SyncEngine.performMaintenance not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.runMaintenance(timeBudget: timeBudget)
     }
 
     /// Quarantine and heal (R-CLN-8).
     package func reportUnreadable(_ id: AssetID) async -> Result<Void, AssetError> {
-        fatalError("WP-F: SyncEngine.reportUnreadable not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performReportUnreadable(id)
     }
 
     /// `storageReport()` (R-CLN-9): the store's report with `sourceCopyBytes` filled from
     /// `RemoteSource.sourceCopyBytes()` (H-7, transport-2 T2-13); 0 before the source exists.
     package func storageReport() async -> Result<StorageReport, AssetError> {
-        fatalError("WP-F: SyncEngine.storageReport not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performStorageReport()
     }
 
     /// Engine and store counters (R-OBS-2); the facade adds the mirror's.
     package func metrics() async -> Result<MetricsSnapshot, AssetError> {
-        fatalError("WP-F: SyncEngine.metrics not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performMetrics()
     }
 
     /// Counters, the ring of recent errors (`EngineDiagnostics.recentErrorCapacity`) and the store's generation
-    /// and stamp, for `diagnosticReport()` (R-OBS-3).
+    /// and stamp, for `diagnosticReport()` (R-OBS-3). It answers while the engine is degraded or its store cannot
+    /// answer, with the last-known generation and stamp (L4-R9); after shutdown it fails `.shutDown`.
     package func diagnostics() async -> Result<EngineDiagnostics, AssetError> {
-        fatalError("WP-F: SyncEngine.diagnostics not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performDiagnostics()
     }
 
     /// R-CLN-11: starts (`handler` non-nil) or stops (`nil`) the engine-owned memory-pressure observer, which reads
@@ -176,14 +208,15 @@ package actor SyncEngine {
         epoch: UInt64,
         handler: (@Sendable (MemoryPressureLevel) async -> Void)?
     ) -> Result<Void, AssetError> {
-        fatalError("WP-F: SyncEngine.observeMemoryPressure not implemented")
+        self.performObserveMemoryPressure(epoch: epoch, handler: handler)
     }
 
     /// The app forwarded background-session events for `identifier` (R-NET-3): make sure that session exists so
     /// the OS delivers them, and return after the preceding outcomes are staged (transport.md §10.6). After shutdown
     /// it returns `.failure(.shutDown)` at once, so the facade completes UIKit's handler without waiting.
     package func backgroundSessionEventsPending(identifier: String) async -> Result<Void, AssetError> {
-        fatalError("WP-F: SyncEngine.backgroundSessionEventsPending not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performBackgroundEvents(identifier: identifier)
     }
 
     // MARK: Events (R-SYN-12, ADR-023)
@@ -191,24 +224,26 @@ package actor SyncEngine {
     /// A pull-based stream that registers asynchronously (UI use). Made after shutdown, it yields `clientShutDown`
     /// and finishes (R-SYN-15).
     package nonisolated func makeEventStream() -> AsyncStream<AssetEvent> {
-        fatalError("WP-F: SyncEngine.makeEventStream not implemented")
+        EventSubscription.stream(engine: self, registered: nil)
     }
 
     /// A stream that returns after registration and the initial replay (tests); `.failure(.shutDown)` after
     /// shutdown.
     package func subscribe() async -> Result<AsyncStream<AssetEvent>, AssetError> {
-        fatalError("WP-F: SyncEngine.subscribe not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performSubscribe()
     }
 
     // MARK: Introspection (R-SYN-14, P-14)
 
     /// The engine's counters.
     package func introspect() -> EngineIntrospection {
-        fatalError("WP-F: SyncEngine.introspect not implemented")
+        self.currentIntrospection()
     }
 
     /// Suspends until `predicate` holds; re-evaluated after every mutation, never polled.
     package func waitUntil(_ predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async {
-        fatalError("WP-F: SyncEngine.waitUntil not implemented")
+        // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
+        await self.performWaitUntil(predicate)
     }
 }

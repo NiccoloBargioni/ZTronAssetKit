@@ -234,7 +234,68 @@ package enum LaneAdmission {
         power: PowerPolicy,
         pausedForThermal: Bool
     ) -> Verdict {
-        fatalError("WP-F: LaneAdmission.evaluate not implemented")
+        // Until the first conditions element arrives, user-initiated work proceeds optimistically and the other lanes
+        // wait (sync.md §11.1); an unsatisfied path is attempted only by user-initiated work, which the transport
+        // fails fast (§11.2).
+        guard let conditions, conditions.network.satisfied else {
+            return lane == .userInitiated ? .admit : .block(.offline)
+        }
+        let expensive = conditions.network.expensive
+        let constrained = conditions.network.constrained
+        switch lane {
+        case .userInitiated:
+            if network.userInitiatedOverridesPolicy {
+                return .admit
+            }
+            // Without the override, explicit requests follow the prefetch lane's network rules; power never pauses
+            // them (R-SYN-7 "may override per policy").
+            if expensive, !network.prefetchOnExpensive {
+                return .block(.policy(.expensiveNetwork))
+            }
+            if constrained, !network.prefetchOnConstrained {
+                return .block(.policy(.constrainedNetwork))
+            }
+            return .admit
+        case .prefetch:
+            return LaneAdmission.background(
+                conditions: conditions,
+                onExpensive: network.prefetchOnExpensive,
+                onConstrained: network.prefetchOnConstrained,
+                inLowPower: power.prefetchInLowPowerMode,
+                pausedForThermal: pausedForThermal
+            )
+        case .bulk:
+            return LaneAdmission.background(
+                conditions: conditions,
+                onExpensive: network.bulkOnExpensive,
+                onConstrained: network.bulkOnConstrained,
+                inLowPower: power.bulkInLowPowerMode,
+                pausedForThermal: pausedForThermal
+            )
+        }
+    }
+
+    /// The bulk and prefetch rules: network policy first, then Low Power Mode, then the thermal pause.
+    private static func background(
+        conditions: DeviceConditions,
+        onExpensive: Bool,
+        onConstrained: Bool,
+        inLowPower: Bool,
+        pausedForThermal: Bool
+    ) -> Verdict {
+        if conditions.network.expensive, !onExpensive {
+            return .block(.policy(.expensiveNetwork))
+        }
+        if conditions.network.constrained, !onConstrained {
+            return .block(.policy(.constrainedNetwork))
+        }
+        if conditions.power.lowPowerMode, !inLowPower {
+            return .block(.policy(.lowPowerMode))
+        }
+        if pausedForThermal {
+            return .block(.policy(.thermal(conditions.power.thermal)))
+        }
+        return .admit
     }
 }
 
@@ -278,6 +339,14 @@ package struct CircuitBreaker: Sendable, Hashable {
     package private(set) var state: State
     /// Thresholds.
     package let policy: CircuitBreakerPolicy
+    /// Distinct assets with an ambiguous 403 since the last object success, in arrival order (auth suspicion).
+    private(set) var authSuspects: [AssetID] = []
+    /// The 5xx sliding window: `true` for a 5xx outcome, `false` for an object success, oldest first.
+    private(set) var serverWindow: [Bool] = []
+    /// Trips carried by a closed breaker until `objectSuccessesToReset` successes reset them (sync-2 S2-21).
+    private(set) var carriedTrips = 0
+    /// Object successes since the breaker last closed.
+    private(set) var successesSinceClose = 0
 
     /// A closed breaker.
     package init(policy: CircuitBreakerPolicy) {
@@ -286,18 +355,194 @@ package struct CircuitBreaker: Sendable, Hashable {
     }
 
     /// Records an outcome at `now`.
+    ///
+    /// Closed: ambiguous object 403s count distinct assets (an object success clears them) and a manifest 403
+    /// (`distinctAsset == nil`) opens at once; 5xx outcomes and object successes fill the sliding window. Half-open:
+    /// only the probe's outcome counts, and its resolution is total (ADR-031): success closes, a same-cause failure
+    /// re-opens with `trips + 1`, any other exit re-arms `halfOpen(probe: nil)`. Open: outcomes of transfers that
+    /// started before the trip are ignored.
     package mutating func record(_ outcome: Outcome, at now: MonotonicInstant, seed: UInt64) {
-        fatalError("WP-F: CircuitBreaker.record not implemented")
+        switch self.state {
+        case .closed:
+            self.recordClosed(outcome, at: now, seed: seed)
+        case .open:
+            return
+        case .halfOpen(let cause, let trips, let probe, _):
+            guard let probe, outcome.transfer == probe else {
+                return
+            }
+            switch outcome {
+            case .objectSuccess:
+                self.close(carrying: trips)
+                self.successesSinceClose = 1
+                self.resetCarriedTripsIfDue()
+            case .failure(_, let failureCause, _) where failureCause == cause:
+                self.open(cause, trips: trips + 1, at: now, seed: seed)
+            case .failure, .neutral, .abandoned:
+                self.state = .halfOpen(cause: cause, trips: trips, probe: nil, watchdog: nil)
+            }
+        }
     }
 
     /// Whether a transfer may start at `now`.
+    ///
+    /// Open until the cooldown ends, then exactly one probe: the first transfer admitted becomes it (with a
+    /// `probeWatchdog` deadline); a probe silent past its watchdog is abandoned and the next transfer probes
+    /// (sync-2 S2-01). The probe itself is admitted again (a re-dispatch after a pause).
     package mutating func admit(_ transfer: TransferID, at now: MonotonicInstant) -> Admission {
-        fatalError("WP-F: CircuitBreaker.admit not implemented")
+        let verdict = self.admission(of: transfer, at: now)
+        guard verdict == .probe else {
+            return verdict
+        }
+        switch self.state {
+        case .closed:
+            return verdict
+        case .open(let cause, _, let trips):
+            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
+        case .halfOpen(let cause, let trips, let probe, let watchdog):
+            if probe == transfer, let watchdog, now < watchdog {
+                return verdict
+            }
+            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
+        }
+        return verdict
+    }
+
+    /// The verdict `admit` gives `transfer` at `now`, without its effect; `nil` stands for any transfer that is not the
+    /// probe (a job the breaker parked). This pure reading is the one every decision about the breaker's gate reads (the
+    /// dispatch gate through `admit`, and `SyncEngine.originGate(at:)` for runs, pending runs, joiners and re-admission),
+    /// so no decision can read the gate otherwise than the next dispatch would (close-out cycle 20, L4-R20, F-40).
+    func admission(of transfer: TransferID?, at now: MonotonicInstant) -> Admission {
+        switch self.state {
+        case .closed:
+            return .allow
+        case .open(let cause, let until, _):
+            return now >= until ? .probe : .reject(cause, until: until)
+        case .halfOpen(let cause, _, let probe, let watchdog):
+            if let probe, probe != transfer, let watchdog, now < watchdog {
+                return .reject(cause, until: watchdog)
+            }
+            return .probe
+        }
+    }
+
+    /// The transfer probing the half-open breaker, if any.
+    var probe: TransferID? {
+        if case .halfOpen(_, _, let probe, _) = self.state {
+            return probe
+        }
+        return nil
     }
 
     /// The next instant the breaker changes by time alone (cooldown end, probe watchdog), for the engine's alarm.
     package func nextDeadline() -> MonotonicInstant? {
-        fatalError("WP-F: CircuitBreaker.nextDeadline not implemented")
+        switch self.state {
+        case .closed:
+            return nil
+        case .open(_, let until, _):
+            return until
+        case .halfOpen(_, _, let probe, let watchdog):
+            return probe == nil ? nil : watchdog
+        }
+    }
+
+    /// The public face of the state (events, diagnostics).
+    var publicState: CircuitState {
+        switch self.state {
+        case .closed:
+            return .closed
+        case .open(let cause, _, let trips):
+            return .open(cause: cause, trips: trips)
+        case .halfOpen(let cause, let trips, _, _):
+            return .halfOpen(cause: cause, trips: trips)
+        }
+    }
+
+    private mutating func recordClosed(_ outcome: Outcome, at now: MonotonicInstant, seed: UInt64) {
+        switch outcome {
+        case .objectSuccess:
+            self.authSuspects.removeAll()
+            self.appendWindow(false)
+            self.successesSinceClose += 1
+            self.resetCarriedTripsIfDue()
+        case .failure(_, .authentication, let asset):
+            guard let asset else {
+                self.open(.authentication, trips: self.carriedTrips + 1, at: now, seed: seed)
+                return
+            }
+            if !self.authSuspects.contains(asset) {
+                self.authSuspects.append(asset)
+            }
+            if self.authSuspects.count >= max(1, self.policy.authDistinctAssets) {
+                self.open(.authentication, trips: self.carriedTrips + 1, at: now, seed: seed)
+            }
+        case .failure(_, .serverErrors, _):
+            self.appendWindow(true)
+            let errors = self.serverWindow.filter { $0 }.count
+            let samples = self.serverWindow.count
+            if samples >= max(1, self.policy.serverMinimumSamples), Double(errors) >= self.policy.serverErrorRatio * Double(samples) {
+                self.open(.serverErrors, trips: self.carriedTrips + 1, at: now, seed: seed)
+            }
+        case .neutral, .abandoned:
+            return
+        }
+    }
+
+    private mutating func appendWindow(_ isServerError: Bool) {
+        self.serverWindow.append(isServerError)
+        let limit = max(1, self.policy.serverWindow)
+        if self.serverWindow.count > limit {
+            self.serverWindow.removeFirst(self.serverWindow.count - limit)
+        }
+    }
+
+    /// Opens for `cause`: cooldown `base · 2^(trips−1)` capped at the maximum; the auth cooldown is jittered to
+    /// `[0.5c, c]` with randomness keyed by cause and trip (ADR-024), the 5xx cooldown is exact.
+    private mutating func open(_ cause: BreakerCause, trips: Int, at now: MonotonicInstant, seed: UInt64) {
+        let base: TimeInterval
+        let ceiling: TimeInterval
+        switch cause {
+        case .authentication:
+            base = self.policy.authCooldownBase
+            ceiling = self.policy.authCooldownMax
+        case .serverErrors:
+            base = self.policy.serverCooldownBase
+            ceiling = self.policy.serverCooldownMax
+        }
+        let exponent = Double(min(max(trips, 1) - 1, 62))
+        var cooldown = max(0, min(ceiling, base * pow(2, exponent)))
+        if cause == .authentication {
+            let unit = KeyedRandom.unitInterval(seed: seed, key: StableHash.fnv1a64("breaker.authentication"), counter: UInt64(max(trips, 1)))
+            cooldown *= 0.5 + 0.5 * unit
+        }
+        self.state = .open(cause: cause, until: now.adding(seconds: cooldown), trips: trips)
+        self.authSuspects.removeAll()
+        self.serverWindow.removeAll()
+        self.carriedTrips = trips
+        self.successesSinceClose = 0
+    }
+
+    private mutating func close(carrying trips: Int) {
+        self.state = .closed
+        self.carriedTrips = trips
+        self.authSuspects.removeAll()
+        self.serverWindow.removeAll()
+    }
+
+    private mutating func resetCarriedTripsIfDue() {
+        if self.successesSinceClose >= max(1, self.policy.objectSuccessesToReset) {
+            self.carriedTrips = 0
+        }
+    }
+}
+
+extension CircuitBreaker.Outcome {
+    /// The transfer the outcome is about.
+    var transfer: TransferID {
+        switch self {
+        case .objectSuccess(let transfer), .failure(let transfer, _, _), .neutral(let transfer), .abandoned(let transfer):
+            return transfer
+        }
     }
 }
 
@@ -325,6 +570,56 @@ package enum TransferReconciler {
         staged: StagingInventory,
         wanted: Set<TransferID>
     ) -> [ReconcileAction] {
-        fatalError("WP-F: TransferReconciler.plan not implemented")
+        var actions: [StagingFileName: ReconcileAction] = [:]
+        // Live tasks: per wanted transfer the newest running one is joined, every other running one cancelled; a
+        // completed one is adopted (the newest per transfer) when wanted and its file is staged, else discarded.
+        var joined = Set<TransferID>()
+        for transfer in live.sorted(by: { $0.name > $1.name }) where transfer.isRunning {
+            let id = transfer.name.transfer
+            if wanted.contains(id), !joined.contains(id) {
+                joined.insert(id)
+                actions[transfer.name] = .attach(transfer.name)
+            } else {
+                actions[transfer.name] = .cancel(transfer.name)
+            }
+        }
+        var adopted = Set<TransferID>()
+        for transfer in live.sorted(by: { $0.name > $1.name }) where !transfer.isRunning {
+            let id = transfer.name.transfer
+            if wanted.contains(id), !joined.contains(id), !adopted.contains(id), staged.items[transfer.name] != nil {
+                adopted.insert(id)
+                actions[transfer.name] = .adoptStaged(transfer.name)
+            } else if staged.items[transfer.name] != nil {
+                actions[transfer.name] = .discard(transfer.name)
+            }
+        }
+        // Staging leftovers: the newest partial with a sidecar of a wanted transfer nobody joined or adopted is
+        // resumed (it keeps its sidecar); everything else of ours is garbage: other partials (a partial without a
+        // sidecar cannot be continued, and its completeness is unknown), orphan sidecars, a claim (`.verifying`) or a
+        // temporary that a dead process left.
+        var resumed = Set<TransferID>()
+        for name in staged.items.keys.sorted(by: >) where actions[name] == nil {
+            switch name.kind {
+            case .partial:
+                let id = name.transfer
+                let resumable = wanted.contains(id) && !joined.contains(id) && !adopted.contains(id) && !resumed.contains(id)
+                    && staged.items[name.with(kind: .sidecar)] != nil
+                if resumable {
+                    resumed.insert(id)
+                    actions[name] = .resume(name)
+                } else {
+                    actions[name] = .discard(name)
+                }
+            case .sidecar, .verifying, .partialTemporary, .sidecarTemporary:
+                continue
+            }
+        }
+        for name in staged.items.keys where actions[name] == nil {
+            if name.kind == .sidecar, case .resume? = actions[name.with(kind: .partial)] {
+                continue
+            }
+            actions[name] = .discard(name)
+        }
+        return actions.keys.sorted().compactMap { actions[$0] }
     }
 }

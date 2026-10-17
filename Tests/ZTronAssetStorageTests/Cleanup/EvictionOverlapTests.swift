@@ -163,8 +163,9 @@ struct EvictionOverlapTests {
     enum Release: String, CaseIterable, Sendable, CustomTestStringConvertible {
         /// `reportUnreadable(_:)`: the blob is quarantined, doomed `corrupt` (deep verification shares the path).
         case quarantine
-        /// `recordFailure(_:identity:reason:)` with `.notFound`: the record becomes `failed`, its blob doomed
-        /// `unreferenced`.
+        /// `recordFailure(_:identity:reason:)` with `.notFound` for a stale record (the entry's content changed and the
+        /// new content is gone from the server): the record becomes `failed`, its old blob doomed `unreferenced`. A record
+        /// present at the failed content is left unchanged (L4-R16), so the case uses the stale one.
         case failure
         /// `recordIntegrityFailure(_:identity:)` up to `maxIntegrityAttempts` (three): the record serves its bytes during
         /// the backoff, then becomes `failed(.integrity)`, its blob doomed `unreferenced`.
@@ -189,6 +190,15 @@ struct EvictionOverlapTests {
     func releaseWhileCandidatesRun(release: Release) async throws {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        let last = EvictionOverlapTests.assets[9]
+        // For a recorded failure, o9's entry changes first (o9 keeps serving its old bytes, stale): a failure for content
+        // the record is present at changes nothing (L4-R16); the old blob's 100 bytes still count as used.
+        let changed = CleanupFixture.asset("o9", seed: 1_399, count: 100)
+        if release == .failure {
+            let entries = EvictionOverlapTests.assets.dropLast().map(\.entry) + [changed.entry]
+            _ = try await harness.store.apply(CoreFixture.manifest(entries), etag: nil, eviction: nil)
+            #expect(await harness.record(last.id)?.isStale == true, "setup: o9 is stale")
+        }
         await bulk.setHolding(true)
         let maintenance = Task {
             try await harness.store.evictIfNeeded()
@@ -197,13 +207,12 @@ struct EvictionOverlapTests {
         try await bulk.requireHeldUnits(atLeast: 1)
         let candidates = try #require(await bulk.heldUnits.first)
         // Meanwhile the most recently used asset, o9, is found unreadable, or gone from the server: its blob is doomed.
-        let last = EvictionOverlapTests.assets[9]
         _ = try await CleanupSteps.run(bulk, keeping: [candidates]) {
             switch release {
             case .quarantine:
                 try await harness.store.reportUnreadable(last.id)
             case .failure:
-                try await harness.store.recordFailure([last.id], identity: last.entry.contentIdentity, reason: .notFound)
+                try await harness.store.recordFailure([last.id], identity: changed.entry.contentIdentity, reason: .notFound)
             case .integrityFailures:
                 for _ in 0..<harness.configuration.policy.maxIntegrityAttempts {
                     try await harness.store.recordIntegrityFailure([last.id], identity: last.entry.contentIdentity)

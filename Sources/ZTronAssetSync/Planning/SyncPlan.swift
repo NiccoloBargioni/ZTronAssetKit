@@ -112,7 +112,9 @@ package enum SpaceAssessment: Sendable, Hashable {
     case needsEviction(bytes: Int64)
     /// Over budget: the largest fitting prefix in plan order is admitted, the rest skipped (ADR-025).
     case partial(admittedFetches: Int, skippedBytes: Int64)
-    /// Nothing can be admitted without breaking the reserve: the run fails with no side effect.
+    /// Nothing can be admitted without breaking the reserve: the run fails with no side effect. `required` is the plan's
+    /// known bytes and `available` the room it had (the volume above the reserve plus pending reclaim, within the
+    /// budget; ARCHITECTURE §7.10), the convention every `insufficientSpace` the engine reports follows.
     case insufficient(required: Int64, available: Int64)
 }
 
@@ -205,7 +207,7 @@ package enum SyncPlanner {
         policy: PlanningPolicy,
         freeSpace: FreeSpace
     ) -> SyncPlan {
-        fatalError("WP-F: SyncPlanner.plan not implemented")
+        PlanBuilder.plan(manifest: manifest, snapshot: snapshot, scope: scope, policy: policy, freeSpace: freeSpace)
     }
 }
 

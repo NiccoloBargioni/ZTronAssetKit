@@ -105,6 +105,39 @@ struct IntegrityTests {
         #expect(await second.record(a.id)?.residency == .absent(.neverFetched))
     }
 
+    /// L4-R16 (orchestrator ruling, close-out cycle 11; an edit outside WP-C that the ruling authorises WP-F to make): a
+    /// failed transfer must never mark a present record failed (L4-R5's second bullet). The engine reads presence before
+    /// it records a failure (row f-10), but a binding the store makes between that read and the write is not seen; the
+    /// store's own guard closes that window: a record bound to a live blob at the failed content is left unchanged. A
+    /// stale record (its blob is not the failed content) still fails, its old blob doomed `unreferenced`.
+    @Test("R-NET-6: recordFailure leaves a record present at the failed content unchanged, and still fails a stale one", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func recordFailureSparesPresentRecord() async throws {
+        let harness = CoreHarness.cleanup()
+        let present = CleanupFixture.asset("present", seed: 325)
+        let old = CleanupFixture.asset("stale", seed: 326)
+        try await harness.seed([present, old])
+        let new = CleanupFixture.asset("stale", seed: 327)
+        _ = try await harness.store.apply(CoreFixture.manifest([present.entry, new.entry]), etag: nil, eviction: nil)
+        let before = try #require(await harness.record(present.id))
+        #expect(before.referencedBlob == present.key && !before.isStale, "setup: present is bound to its content")
+        #expect(await harness.record(new.id)?.isStale == true, "setup: stale still serves its old bytes")
+        let mutations = harness.fileSystem.mutationCount
+        try await harness.store.recordFailure([present.id], identity: present.entry.contentIdentity, reason: .notFound)
+        #expect(await harness.record(present.id) == before, "a record present at the failed content is left unchanged")
+        #expect(harness.fileSystem.mutationCount == mutations, "nothing is written for it")
+        #expect(await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil, "it is still served")
+        let presentBlob = await harness.state.core.blobTable[present.key]
+        var doomed = false
+        if case .doomed? = presentBlob {
+            doomed = true
+        }
+        #expect(presentBlob != nil && !doomed, "its blob stays live")
+        try await harness.store.recordFailure([new.id], identity: new.entry.contentIdentity, reason: .notFound)
+        #expect(await harness.record(new.id)?.residency == .failed(.notFound), "a stale record still fails")
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[old.key], .unreferenced), "its old bytes are unwanted")
+    }
+
     @Test("R-CLN-8: reportUnreadable quarantines the entry, removes the blob after grace and schedules a re-download", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func reportUnreadable() async throws {
