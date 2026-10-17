@@ -14,7 +14,7 @@ struct EngineRegressionCycle17Tests {
     /// The engine of the cycle-16 correctness verifier's PROBE-SPACEOWED, set up to the point where a free-space read that
     /// found room has re-queued `readmissionsPerTurn` members parked `insufficientSpace` and owes the rest, the run's
     /// bulk claim among them, to a follow-up sweep that the hold keeps waiting, while the run's working claim is held in
-    /// flight.
+    /// flight. A re-queued member that starts is held in flight; the others wait in the queue.
     @available(macOS 15.0, iOS 18.0, *)
     struct SpaceOwed {
         let harness: EngineHarness
@@ -26,7 +26,10 @@ struct EngineRegressionCycle17Tests {
         let run: Task<SyncOutcome, Never>
         let runID: SyncRunID
         let lastRunID: UInt64
-        let tokens: [InterestToken]
+        /// The prefetch group of `readmissionsPerTurn` + 8 members.
+        let members: InterestToken
+        /// The prefetch group of the two holders.
+        let holders: InterestToken
     }
 
     @available(macOS 15.0, iOS 18.0, *)
@@ -65,8 +68,11 @@ struct EngineRegressionCycle17Tests {
         await engine.awaitCondition { $0.state.inFlight.count == 2 }
         let ballast = try await EngineRegressionCycle6Tests.leaveRoom(700, harness: harness, fileSystem: fileSystem)
         await engine.refreshFreeSpace()
+        // Each member a sweep re-queues is held in flight once it starts, so the free slot holds one and the rest wait in
+        // the queue: none of the 520 is downloaded (the members' transfers doubled the time of other tests in the suite,
+        // close-out cycle 18, F-38), and the run's claims see the same parks and sweeps.
         for (member, bytes) in zip(members, memberBytes) {
-            await harness.source.script(member.transferID, [.stage(bytes)])
+            await harness.source.script(member.transferID, [.hold, .stage(bytes)])
         }
         // A prefetch group whose members (300 bytes each) do not fit the headroom: every member parks `insufficientSpace`.
         let token = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
@@ -99,7 +105,7 @@ struct EngineRegressionCycle17Tests {
         await engine.awaitCondition { $0.state.spaceSweepFollowUpWaiting }
         let owed = await engine.readForTests { ($0.state.jobs[second.transferID]?.state, $0.state.spaceSweepFollowUp != nil) }
         try #require(owed.0 == .blocked(.insufficientSpace) && owed.1, "setup: the run's claim waits for the follow-up sweep: \(owed)")
-        return SpaceOwed(harness: harness, fileSystem: fileSystem, first: first, second: second, run: run, runID: runID, lastRunID: setup.3, tokens: [token, holderToken])
+        return SpaceOwed(harness: harness, fileSystem: fileSystem, first: first, second: second, run: run, runID: runID, lastRunID: setup.3, members: token, holders: holderToken)
     }
 
     // MARK: A run waits for the claim a follow-up space sweep still owes a re-check (R-SYN-6, R-SYN-11; cycle-16 verifier)
@@ -125,17 +131,19 @@ struct EngineRegressionCycle17Tests {
         #expect(waiting.1 == nil, "the run waits for the claim a follow-up sweep owes a re-check instead of settling: \(String(describing: waiting.1))")
         #expect(waiting.2 == owed.lastRunID, "no run started: \(waiting.2) after \(owed.lastRunID)")
         #expect(waiting.3 == .blocked(.insufficientSpace), "the claim's job survives, waiting for the follow-up sweep: \(String(describing: waiting.3))")
-        // The follow-up sweep admits the claim; its transfer runs and the run completes.
+        // The follow-up sweep admits the claim. The bulk claim ranks after the members held in flight or queued, so the
+        // members' group is released; the claim's transfer then runs and the run completes.
         await engine.releaseSpaceSweepFollowUps()
+        let readmitted = await engine.readForTests { $0.state.jobs[owed.second.transferID]?.state }
+        #expect(readmitted != .blocked(.insufficientSpace), "the follow-up sweep admits the run's claim: \(String(describing: readmitted))")
+        await engine.releaseGroup(owed.members)
         let outcome = await joinCancelling(owed.run)
         if case .complete(let report) = outcome {
             #expect(report.fetched == 2, "the run fetched both of its assets: \(report.fetched)")
         } else {
             Issue.record("the run completes once the volume has room for its claim: \(outcome)")
         }
-        for token in owed.tokens {
-            await engine.releaseGroup(token)
-        }
+        await engine.releaseGroup(owed.holders)
         await engine.shutdown()
     }
 
@@ -148,13 +156,10 @@ struct EngineRegressionCycle17Tests {
     func runSettlesAfterSpaceSweepFollowUpAdmitsNothing() async throws {
         let owed = try await Self.spaceOwed()
         let engine = owed.harness.engine
-        // The run's working claim and every re-queued member finish: only the jobs the follow-up owes a re-check are left
-        // besides the two holders in flight.
+        // The run's working claim finishes: of the run's claims only the one the follow-up owes a re-check is left (the
+        // re-queued members are no claims of the run).
         await owed.harness.source.release(owed.first.transferID, with: .progress(received: 1, expected: nil))
-        await engine.awaitCondition { engine in
-            engine.state.jobs[owed.first.transferID] == nil && engine.state.storeWorkRuns == 0 && engine.state.inFlight.count == 2
-                && engine.state.jobs.values.allSatisfy { $0.active != nil || $0.state == .blocked(.insufficientSpace) }
-        }
+        await engine.awaitCondition { $0.state.jobs[owed.first.transferID] == nil && $0.state.storeWorkRuns == 0 }
         // The volume loses its room again before the follow-up runs; this read's own sweep stops at once (the room cannot
         // hold the smallest parked job) and leaves the owed follow-up as it is.
         _ = try await EngineRegressionCycle6Tests.leaveRoom(700, harness: owed.harness, fileSystem: owed.fileSystem)
@@ -185,9 +190,8 @@ struct EngineRegressionCycle17Tests {
             Issue.record("the sync caller is told the volume lacks space: \(outcome)")
         }
         #expect(afterSweep.2 == owed.lastRunID, "no run started: \(afterSweep.2) after \(owed.lastRunID)")
-        for token in owed.tokens {
-            await engine.releaseGroup(token)
-        }
+        await engine.releaseGroup(owed.members)
+        await engine.releaseGroup(owed.holders)
         await engine.shutdown()
     }
 
@@ -210,7 +214,9 @@ struct EngineRegressionCycle17Tests {
             let bytes = EngineFixture.bytes(UInt64(30_000 + index))
             let entry = EngineHarness.onDemand("p\(index)", bytes)
             entries.append(entry)
-            await harness.source.script(entry.transferID, [.stage(bytes)])
+            // A re-queued member that starts is held in flight and the others wait in the queue, so none of the 520 is
+            // downloaded (close-out cycle 18, F-38); the run's claims see the same parks and re-admissions.
+            await harness.source.script(entry.transferID, [.hold, .stage(bytes)])
         }
         let bytes1 = EngineFixture.bytes(7_101)
         let bytes2 = EngineFixture.bytes(7_102)
@@ -262,20 +268,22 @@ struct EngineRegressionCycle17Tests {
             try #require(!owed.0 && owed.1 && owed.3?.isLaneParked == true, "setup: a conditions pass owes the lane-parked claim its re-queue: \(owed)")
         }
         try #require(!owed.2, "setup: no origin owes the claim a re-queue")
-        // The working claim finishes, and so does every re-queued member: only the jobs the follow-up owes are left.
+        // The working claim finishes: of the run's claims only the one the follow-up owes a re-queue is left (the
+        // re-queued members are no claims of the run).
         await harness.source.release(working.transferID, with: .progress(received: 1, expected: nil))
-        await engine.awaitCondition { engine in
-            engine.state.jobs[working.transferID] == nil && engine.state.inFlight.isEmpty && engine.state.storeWorkRuns == 0
-                && engine.state.jobs.values.allSatisfy { $0.state.isLaneParked || $0.state == .failed(.whenOnline) }
-        }
+        await engine.awaitCondition { $0.state.jobs[working.transferID] == nil && $0.state.storeWorkRuns == 0 }
         let waiting = await engine.readForTests { engine in
             (engine.state.run?.id, engine.state.run?.settlement, engine.state.lastRunID)
         }
         #expect(waiting.0 == launchRun, "the launch run is still in progress: \(String(describing: waiting.0))")
         #expect(waiting.1 == nil, "the run waits for its owed claim instead of settling: \(String(describing: waiting.1))")
         #expect(waiting.2 == launch.1, "no run started: \(waiting.2) after \(launch.1)")
-        // The follow-up re-queues the owed jobs; the claim's next attempt stages its bytes and the run completes.
+        // The follow-up re-queues the owed jobs. The bulk claim ranks after the members held in flight or queued, so their
+        // group is released; the claim's next attempt then stages its bytes and the run completes.
         await engine.releaseReadmissionFollowUps()
+        let requeued = await engine.readForTests { $0.state.jobs[claim.transferID]?.state }
+        #expect(requeued == .queued, "the follow-up re-queues the run's claim: \(String(describing: requeued))")
+        await engine.releaseGroup(token)
         await engine.awaitCondition { EngineRegressionCycle15Tests.quiet($0) && $0.state.jobs.isEmpty }
         let finished = await probe.next { event in
             if case .syncFinished = event {
@@ -295,7 +303,6 @@ struct EngineRegressionCycle17Tests {
             let answer = await joinCancelling(user)
             #expect((try? answer.get()) != nil, "the user-initiated waiter gets the working claim's location: \(answer)")
         }
-        await engine.releaseGroup(token)
         await probe.stop()
         await engine.shutdown()
     }
