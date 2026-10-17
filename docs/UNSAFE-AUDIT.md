@@ -4,7 +4,7 @@ The unsafe gate (`python3 Scripts/gates.py unsafe`) scans **all** of `Sources/`,
 
 ## Current state
 
-**0 of 3 escapes are used** (contract-fix round 2, 2026-10-04: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; again on the merged Level 2 head at the Level 2 close, 2026-10-09, ADR-050; at `l3-base` after the iOS Simulator test build, whose `LoopbackHTTPServer.listenerParameters()` uses no escape, ADR-051; and on the merged Level 3 head, where WP-C added none, in the L3 documentation pass, 2026-10-10, ADR-052).
+**0 of 3 escapes are used** (contract-fix round 2, 2026-10-04: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; again on the merged Level 2 head at the Level 2 close, 2026-10-09, ADR-050; at `l3-base` after the iOS Simulator test build, whose `LoopbackHTTPServer.listenerParameters()` uses no escape, ADR-051; on the merged Level 3 head, where WP-C added none, in the L3 documentation pass, 2026-10-10, ADR-052; and on the merged Level 4 head, where WP-F added none (`ZTronAssetSync` uses no `Mutex` either), in the L4 documentation pass, 2026-10-17, ADR-053).
 
 How the design avoids them (ARCHITECTURE §2):
 - State lives in actors (`AssetStore`, `SyncEngine`; in TestSupport `SteppedBlockingExecutor`, `ScriptedSnapshotSink`, `FakeDeviceConditionsSource`, `FakeMemoryPressureSource`), `@MainActor` classes (`SnapshotMirror`, `PrefetchWindowController`, `BackgroundEventsRelay`, `PurgeableCacheRelay`) or immutable `Sendable` classes with `let`s only (`AssetClient`, `PrefetchHandle`, `SessionDelegate`, `TaskMailbox`, `HTTPRemoteSource`).
