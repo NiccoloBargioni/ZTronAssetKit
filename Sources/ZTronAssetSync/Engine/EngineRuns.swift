@@ -572,6 +572,11 @@ extension SyncEngine {
     /// Settles the run when every planned fetch ended, or when every remaining job is blocked (sync.md §12.5); a
     /// blocked run drops its interests and leaves a pending run for its gate.
     func checkRunSettled() {
+        self.checkRunSettled(spaceSwept: false)
+    }
+
+    /// `checkRunSettled()`; `spaceSwept` once this check has re-checked the space-parked jobs against the ledger.
+    private func checkRunSettled(spaceSwept: Bool) {
         guard let run = self.state.run, run.transferring, run.settlement == nil else {
             return
         }
@@ -597,6 +602,10 @@ extension SyncEngine {
         // every sweep re-checks such a job against the latest read, so the claim's verdict waits for that sweep, which a
         // read's bound on re-queues may have left it to, and the follow-up checks the run again (close-out cycle 17,
         // F-37). Every claim with the run's interest passes here, so this is the one check before the passes below.
+        // A claim parked `insufficientSpace` that the ledger admits now (a job in flight ended without committing, which
+        // re-checks nothing until the next free-space read, F-28) is noted: settling would report a lack of space the
+        // ledger denies (close-out cycle 18, F-38).
+        var admittedBySpace = false
         for (transfer, _) in current.outstanding {
             guard let job = jobs[transfer], job.interests[current.token] != nil else {
                 continue
@@ -606,6 +615,9 @@ extension SyncEngine {
                 return
             case .blocked(.insufficientSpace) where spaceSweepOwed:
                 return
+            case .blocked(.insufficientSpace) where !spaceSwept && self.spaceBlock(job) == nil:
+                admittedBySpace = true
+                continue
             case .blocked, .failed(.whenOnline):
                 if owed.contains(transfer, job) {
                     return
@@ -614,6 +626,16 @@ extension SyncEngine {
             default:
                 return
             }
+        }
+        if admittedBySpace {
+            // No claim works and the ledger admits a claim parked for space: the jobs parked `insufficientSpace` are
+            // re-checked as a free-space read re-checks them (the pump's order, the room left by those admitted ahead), so
+            // the claim is re-queued unless jobs ranked ahead of it take the room. The check then runs once more without
+            // this step: a re-queued claim works, and one still parked settles the run as before. The sweep re-queues at
+            // most `readmissionsPerTurn` jobs and parks none; it runs only when the run would otherwise settle.
+            self.sweepSpaceParked(.read)
+            self.checkRunSettled(spaceSwept: true)
+            return
         }
         let orphaned = current.outstanding.keys.filter { jobs[$0]?.interests[current.token] == nil }
         if !orphaned.isEmpty {
