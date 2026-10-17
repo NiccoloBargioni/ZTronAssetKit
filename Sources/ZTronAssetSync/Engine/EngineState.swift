@@ -241,6 +241,14 @@ struct EngineState {
     var spaceSweepFollowUpsHeld = false
     /// Test seam: a follow-up sweep reached the hold and waits for its release.
     var spaceSweepFollowUpWaiting = false
+    /// Test seam (close-out cycle 18): while set, a manifest fetch that ends keeps its outcome from the runs and
+    /// `ensureAvailable` calls waiting for it (`heldManifestDeliveries`) until a test releases it
+    /// (`holdManifestOutcomeDelivery()`, `releaseManifestOutcomeDelivery()`), so the test can let other engine work, such
+    /// as a transfer's 429, run between a fetch's outcome and its waiters' answers, an order production leaves to the
+    /// scheduler. No production path sets it.
+    var manifestDeliveriesHeld = false
+    /// Test seam: the outcomes the hold keeps, each with the waiters it is owed to.
+    var heldManifestDeliveries: [HeldManifestDelivery] = []
     /// The jobs a space sweep re-queued, by the ticket it queued them with: while one still waits in the queue with that
     /// ticket, every later sweep counts its bytes ahead of the jobs it re-checks, so the sweeps of one read that the
     /// bound splits over several turns, and the next read's, admit only what the room holds together (C2, T17).
@@ -633,6 +641,15 @@ struct ManifestFetch {
     var task: UInt64?
     /// Waiting runs and `ensureAvailable` calls.
     var waiters: [InterestToken: CheckedContinuation<ManifestOutcome, Never>] = [:]
+}
+
+/// A manifest fetch's outcome that the test seam keeps from its waiters (`SyncEngine.holdManifestOutcomeDelivery()`):
+/// only a test orders other engine work between a fetch's outcome and its waiters' answers this way.
+struct HeldManifestDelivery {
+    /// The outcome the fetch produced.
+    let outcome: ManifestOutcome
+    /// The runs and `ensureAvailable` calls it is owed to; a cancelled caller is withdrawn from here.
+    var waiters: [InterestToken: CheckedContinuation<ManifestOutcome, Never>]
 }
 
 /// What a manifest fetch produced.

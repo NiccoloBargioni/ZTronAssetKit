@@ -36,7 +36,42 @@ extension SyncEngine {
     }
 
     private func withdrawManifestWaiter(_ token: InterestToken) {
-        self.state.manifestFetch?.waiters.removeValue(forKey: token)?.resume(returning: .cancelled)
+        if let continuation = self.state.manifestFetch?.waiters.removeValue(forKey: token) {
+            continuation.resume(returning: .cancelled)
+            return
+        }
+        // Test seam: a held outcome's waiter is withdrawn the same way, so its wait still ends on cancellation.
+        for index in self.state.heldManifestDeliveries.indices {
+            if let continuation = self.state.heldManifestDeliveries[index].waiters.removeValue(forKey: token) {
+                continuation.resume(returning: .cancelled)
+                return
+            }
+        }
+    }
+
+    /// Test seam: the outcomes of the manifest fetches that end from now on wait for `releaseManifestOutcomeDelivery()`
+    /// before they reach the runs and `ensureAvailable` calls waiting for them (close-out cycle 18).
+    func holdManifestOutcomeDelivery() {
+        self.state.manifestDeliveriesHeld = true
+    }
+
+    /// Test seam: delivers every held outcome to its waiters in this turn and disarms the hold; shutdown calls it too,
+    /// and then the waiters are told the engine is shutting down, as shutdown tells a fetch's waiters.
+    func releaseManifestOutcomeDelivery() {
+        self.state.manifestDeliveriesHeld = false
+        let held = self.state.heldManifestDeliveries
+        self.state.heldManifestDeliveries.removeAll()
+        for delivery in held {
+            let outcome = self.isShuttingDown ? .shutDown : delivery.outcome
+            for token in delivery.waiters.keys.sorted() {
+                delivery.waiters[token]?.resume(returning: outcome)
+            }
+        }
+    }
+
+    /// Test seam: whether a manifest fetch's outcome waits for `releaseManifestOutcomeDelivery()`.
+    var manifestOutcomeHeld: Bool {
+        !self.state.heldManifestDeliveries.isEmpty
     }
 
     /// Starts the fetch task unless one runs.
@@ -73,8 +108,15 @@ extension SyncEngine {
         let waiting = self.state.manifestFetch?.waiters ?? [:]
         self.state.manifestFetch = nil
         self.state.heap.remove(.manifest(sequence))
-        for token in waiting.keys.sorted() {
-            waiting[token]?.resume(returning: outcome)
+        if self.state.manifestDeliveriesHeld {
+            // Test seam: the outcome waits for `releaseManifestOutcomeDelivery()` (or shutdown); the waiters re-validate
+            // after it as they do after an outcome delivered here.
+            self.state.heldManifestDeliveries.append(HeldManifestDelivery(outcome: outcome, waiters: waiting))
+            self.notifyObservers()
+        } else {
+            for token in waiting.keys.sorted() {
+                waiting[token]?.resume(returning: outcome)
+            }
         }
         self.rearm()
         // REENTRANCY: RE-S19 — every unknown-id waiter is re-checked as registered after each admission.

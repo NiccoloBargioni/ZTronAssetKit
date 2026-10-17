@@ -550,6 +550,7 @@ extension SyncEngine {
             conditionWaiters[token]?.resume()
         }
         self.releaseApplyFollow()
+        self.releaseManifestOutcomeDelivery()
         self.releaseApplyQueue()
         for transfer in self.state.jobs.keys.sorted() {
             self.state.jobs[transfer]?.active?.handle?.cancel()
