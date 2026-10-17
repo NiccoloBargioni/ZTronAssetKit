@@ -16,7 +16,13 @@ import ZTronAssetTestSupport
 /// - I4: a step makes at most one manifest request, and at most `runsWithoutClockMove` runs start while the clock does not
 ///   move (runs never repeat without the clock moving; close-out cycle 21 added the second half);
 /// - I5 (close-out cycle 21): once the alarm has had its turn, no pending run waits for the breaker or the throttle while
-///   that gate admits at `now` and no run is in place.
+///   that gate admits at `now` and no run is in place;
+/// - I6 (close-out cycle 22): in the turn a run starts, a breaker that admits only a probe already holds it for the run's
+///   manifest fetch (ARCHITECTURE §7.6/§7.7: the half-open probe is the run's manifest fetch), so no job dispatched in a
+///   later turn can take it before that fetch is admitted, unless the origin is throttled at `now` (the fetch then asks for
+///   nothing) or the run joins a manifest fetch already admitted (which no gate can reject any more).
+/// The walks run with no slot reserved for user-initiated work and, in a second test, with one (close-out cycle 22: a job
+/// that waits in the queue for a slot is not parked, which the first set never produced).
 /// Every clock move to an instant lands on it exactly (`EngineRegressionCycle21Tests.advance`), so a boundary step reaches
 /// the gate's end rather than 1 ns before it.
 /// The gates are read by `Oracle`, written from ARCHITECTURE §7.6/§7.7 rather than from the engine's helpers. A failure
@@ -52,7 +58,14 @@ struct EngineGateModelTests {
     /// watchdog has not passed, and admits the next transfer as the probe otherwise (no probe, or a silent one).
     struct Oracle: Sendable {
         let throttleInForce: Bool
+        /// The breaker rejects a transfer that is not its probe (a job it parked).
         let breakerRejects: Bool
+        /// The breaker rejects the manifest fetch: as `breakerRejects`, except that a probe that is the manifest fetch is the
+        /// fetch's own (a run started for the breaker's gate holds it, I2).
+        let breakerRejectsManifest: Bool
+        /// The breaker admits only a probe, and nothing holds it: open past its cooldown, or half-open without a probe or with
+        /// one silent past its watchdog (I6).
+        let breakerOffersProbe: Bool
         let description: String
 
         init(_ engine: isolated SyncEngine) {
@@ -60,6 +73,8 @@ struct EngineGateModelTests {
             guard let origin = engine.state.remote?.originID else {
                 self.throttleInForce = false
                 self.breakerRejects = false
+                self.breakerRejectsManifest = false
+                self.breakerOffersProbe = false
                 self.description = "no origin"
                 return
             }
@@ -69,10 +84,20 @@ struct EngineGateModelTests {
             switch breaker {
             case .open(_, let until, _)?:
                 self.breakerRejects = now < until
-            case .halfOpen(_, _, _?, let watchdog?)?:
+                self.breakerRejectsManifest = self.breakerRejects
+                self.breakerOffersProbe = !self.breakerRejects
+            case .halfOpen(_, _, let probe?, let watchdog?)?:
                 self.breakerRejects = now < watchdog
+                self.breakerRejectsManifest = self.breakerRejects && probe != .manifest
+                self.breakerOffersProbe = !self.breakerRejects
+            case .halfOpen?:
+                self.breakerRejects = false
+                self.breakerRejectsManifest = false
+                self.breakerOffersProbe = true
             default:
                 self.breakerRejects = false
+                self.breakerRejectsManifest = false
+                self.breakerOffersProbe = false
             }
             self.description = "now \(now), throttle \(String(describing: throttle)), breaker \(String(describing: breaker))"
         }
@@ -90,7 +115,7 @@ struct EngineGateModelTests {
         }
     }
 
-    /// Checks I1 and I2 in the turns that settle and start runs: a condition observer the engine evaluates in every turn
+    /// Checks I1, I2 and I6 in the turns that settle and start runs: a condition observer the engine evaluates in every turn
     /// that notifies, never satisfied, so it sees each settlement and each start before anything else changes.
     @available(macOS 15.0, iOS 18.0, *)
     final class Recorder: Sendable {
@@ -131,15 +156,20 @@ struct EngineGateModelTests {
             let id = run.id.rawValue
             let trigger = run.trigger
             let settlement = run.settlement
+            // A manifest fetch already in flight that the run joins: it may have been admitted already (I6).
+            let joinsFetch = engine.state.manifestFetch != nil
             self.seen.withLock { seen in
                 if seen.started.insert(id).inserted {
                     switch trigger {
-                    case .breakerClosed where oracle.breakerRejects:
+                    case .breakerClosed where oracle.breakerRejectsManifest:
                         seen.violations.append("I2: run \(id) started for the breaker's gate while it rejects (\(oracle.description))")
                     case .explicit where oracle.throttleInForce:
                         seen.violations.append("I2: run \(id) started for the throttle's gate while it is in force (\(oracle.description))")
                     default:
                         break
+                    }
+                    if oracle.breakerOffersProbe, !oracle.throttleInForce, !joinsFetch {
+                        seen.violations.append("I6: run \(id) started while the breaker offers its probe to any transfer, not held for the run's manifest fetch (\(oracle.description))")
                     }
                 }
                 if let settlement, seen.settled.insert(id).inserted, case .blocked(let reason) = settlement, oracle.admits(reason) == true {
@@ -224,7 +254,7 @@ struct EngineGateModelTests {
 
     /// One walk; returns the first violation with the walk so far, or `nil`.
     @available(macOS 15.0, iOS 18.0, *)
-    static func walk(seed: UInt64) async throws -> String? {
+    static func walk(seed: UInt64, reservedSlots: Int = 0) async throws -> String? {
         var random = SplitMix(state: seed &* 0x2545_F491_4F6C_DD1D &+ 1)
         let reserve = StoragePolicy().reserveFreeBytes
         let time = ManualTimeSource()
@@ -235,7 +265,7 @@ struct EngineGateModelTests {
         )
         let tuning = SyncTuning(
             maxConcurrentTransfers: 2 + Int(seed % 2),
-            reservedInteractiveSlots: 0,
+            reservedInteractiveSlots: reservedSlots,
             breaker: CircuitBreakerPolicy(authDistinctAssets: 1, authCooldownBase: 60, serverMinimumSamples: 1, serverCooldownBase: 30)
         )
         let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), seed: seed, fileSystem: fileSystem)
@@ -267,7 +297,7 @@ struct EngineGateModelTests {
         }
         await engine.awaitCondition { _ in recorder.registered }
         let ballast = EngineHarness.base.appendingPathComponent("ballast")
-        var log: [String] = ["seed \(seed), \(tuning.maxConcurrentTransfers) slots"]
+        var log: [String] = ["seed \(seed), \(tuning.maxConcurrentTransfers) slots, \(tuning.reservedInteractiveSlots) reserved"]
         var holding = false
         var full = false
         var group: InterestToken?
@@ -443,6 +473,24 @@ struct EngineGateModelTests {
         for seed in only ?? Array(Self.seeds) {
             if let violation = try await Self.walk(seed: seed) {
                 Issue.record("seed \(seed): \(violation)")
+                return
+            }
+        }
+    }
+
+    /// The reserved-slot walks' seeds: the same 160, and seed 966, where the cycle-21 correctness verifier's walk with one
+    /// reserved slot started three runs while the clock did not move (a job waiting for the slot took each probe exit's
+    /// freed slot, and the probe, from the run the exit had started).
+    static let reservedSeeds: [UInt64] = Array(Self.seeds) + [966]
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant", .timeLimit(.minutes(3)))
+    func gateModelWithReservedSlot() async throws {
+        // `GATE_MODEL_RESERVED_SEEDS=966` replays chosen walks (a failure prints its seed).
+        let only = ProcessInfo.processInfo.environment["GATE_MODEL_RESERVED_SEEDS"].map { $0.split(separator: ",").compactMap { UInt64($0) } }
+        for seed in only ?? Self.reservedSeeds {
+            if let violation = try await Self.walk(seed: seed, reservedSlots: 1) {
+                Issue.record("seed \(seed), one reserved slot: \(violation)")
                 return
             }
         }
