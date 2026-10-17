@@ -19,8 +19,8 @@ import ZTronAssetTestSupport
 @Suite("Engine gate model, close-out cycle 20")
 struct EngineGateModelTests {
     /// The walks' count and length.
-    static let seeds: Range<UInt64> = 0..<48
-    static let steps = 40
+    static let seeds: Range<UInt64> = 0..<160
+    static let steps = 60
 
     /// SplitMix64: the test's own deterministic generator (system randomness stays out of tests, C4).
     struct SplitMix: RandomNumberGenerator {
@@ -138,7 +138,7 @@ struct EngineGateModelTests {
     }
 
     /// Whether the engine has finished reacting to the last step: no store work, nothing due unless the alarm's turn is held,
-    /// no attempt between its outcome and the engine's handling of it (each in flight is held by the fake source), no
+    /// no attempt between its outcome and the engine's handling of it (each in flight waits for the fake source), no
     /// owned task but the alarm, the watchers, those attempts' drivers and a run task waiting for its settlement.
     static func settled(_ engine: isolated SyncEngine) -> Bool {
         let now = engine.environment.time.monotonicNow()
@@ -157,7 +157,9 @@ struct EngineGateModelTests {
                 break
             }
             if let active = job.active {
-                guard job.state == .downloading, active.handle != nil else {
+                // Its driver waits for the fake source, which holds every attempt until the walk scripts it (a script
+                // given before the attempt reaches the source applies when it does).
+                guard job.state == .downloading else {
                     return false
                 }
                 allowed.insert(active.driver)
@@ -168,6 +170,18 @@ struct EngineGateModelTests {
             return others == 0
         }
         return engine.state.runCompletions[run.token] != nil && others == 1
+    }
+
+    /// What `settled` waits for, for a walk the time limit stopped.
+    static func dump(_ engine: isolated SyncEngine) -> String {
+        let now = engine.environment.time.monotonicNow()
+        let jobs = engine.state.jobs.values.sorted { $0.transfer < $1.transfer }.map { job in
+            "\(job.transfer.rawValue.prefix(8)) \(job.state) active \(job.active.map { "\($0.driver) handle \($0.handle != nil)" } ?? "-")"
+        }
+        let allowed = [engine.state.alarm?.task, engine.state.watcher?.task, engine.state.pressure.task].compactMap { $0 }
+        return "now \(now), heap first \(String(describing: engine.state.heap.first)), alarm \(String(describing: engine.state.alarm?.deadline)) held \(engine.alarmTurnHeld), "
+            + "store work \(engine.state.storeWorkRuns), tasks \(engine.state.tasks.keys.sorted()) allowed \(allowed), run \(String(describing: engine.state.run?.id)) "
+            + "waiting \(engine.state.run.map { engine.state.runCompletions[$0.token] != nil } ?? false) settlement \(String(describing: engine.state.run?.settlement)), jobs \(jobs)"
     }
 
     /// I3: the jobs parked by an origin gate that admits at `now`, read once the alarm has had its turn.
@@ -230,6 +244,7 @@ struct EngineGateModelTests {
         var holding = false
         var full = false
         var group: InterestToken?
+        var answerNext = false
         var violation: String?
 
         func finish() async {
@@ -242,6 +257,11 @@ struct EngineGateModelTests {
         }
 
         try await harness.start()
+        if seed % 3 != 0 {
+            // Two walks in three start with prefetch members: transfers outside the run, one of which may probe.
+            log.append("0: register the prefetch group")
+            group = try await engine.registerGroup(members.map(\.0.identifier), lane: .prefetch).get()
+        }
         await engine.awaitCondition { Self.settled($0) }
         for step in 0...Self.steps {
             let requestsBefore = await harness.source.manifestRequests.count
@@ -265,9 +285,41 @@ struct EngineGateModelTests {
                 if case .halfOpen(_, _, let current?, _)? = breaker {
                     probe = current
                 }
-                let roll = Int(random.next() % 100)
-                if !active.isEmpty, roll < 45 {
-                    let (transfer, attempt) = active[Int(random.next() % UInt64(active.count))]
+                // The gates' ends still ahead: where a decision can read a gate the clock has just opened.
+                var instants: [MonotonicInstant] = []
+                if let throttle, throttle > now {
+                    instants.append(throttle)
+                }
+                switch breaker {
+                case .open(_, let until, _)? where until > now:
+                    instants.append(until)
+                case .halfOpen(_, _, _?, let watchdog?)? where watchdog > now:
+                    instants.append(watchdog)
+                default:
+                    break
+                }
+                let others = active.filter { $0.0 != probe }
+                var roll = Int(random.next() % 100)
+                if answerNext, !others.isEmpty {
+                    // The second half of a boundary step: an attempt other than a probe ends while the alarm's turn for
+                    // the gate's end is held.
+                    roll = 0
+                }
+                answerNext = false
+                if (70..<85).contains(roll), !instants.isEmpty, !others.isEmpty {
+                    // A boundary step: hold the alarm's turns, move the clock to a gate's end, and end an attempt next.
+                    let target = instants[Int(random.next() % UInt64(instants.count))]
+                    if !holding {
+                        await engine.holdAlarmTurns()
+                        holding = true
+                    }
+                    log.append("\(step): hold the alarm's turns and move the clock to the gate's end \(target)")
+                    time.advance(to: target)
+                    answerNext = true
+                } else if !active.isEmpty, roll < 38 {
+                    // An attempt other than the probe ends three times in four: a silent probe lets the clock pass its watchdog.
+                    let pool = !others.isEmpty && (probe == nil || random.next() % 4 != 0) ? others : active
+                    let (transfer, attempt) = pool[Int(random.next() % UInt64(pool.count))]
                     let outcomes: [(String, FakeTransferStep)] = [
                         ("success", .stage(bytes[transfer] ?? Data())),
                         ("403", .fail(EngineRegressionCycle20Tests.forbidden)),
@@ -280,23 +332,11 @@ struct EngineGateModelTests {
                     log.append("\(step): \(transfer)\(transfer == probe ? " (probe)" : "") answers \(outcome.0)")
                     await harness.source.script(transfer, [outcome.1])
                     await engine.awaitCondition { $0.state.jobs[transfer]?.active?.attempt != attempt }
-                } else if roll < 72 {
-                    var instants: [MonotonicInstant] = []
-                    if let throttle, throttle > now {
-                        instants.append(throttle)
-                    }
-                    switch breaker {
-                    case .open(_, let until, _)? where until > now:
-                        instants.append(until)
-                    case .halfOpen(_, _, _?, let watchdog?)? where watchdog > now:
-                        instants.append(watchdog)
-                    default:
-                        break
-                    }
+                } else if roll < 58 || (70..<85).contains(roll) {
                     if let nextDeadline, nextDeadline > now {
                         instants.append(nextDeadline)
                     }
-                    if !instants.isEmpty, random.next() % 4 != 0 {
+                    if !instants.isEmpty, random.next() % 5 != 0 {
                         let target = instants[Int(random.next() % UInt64(instants.count))]
                         log.append("\(step): clock to \(target)\(holding ? " (alarm held)" : "")")
                         time.advance(to: target)
@@ -305,7 +345,7 @@ struct EngineGateModelTests {
                         log.append("\(step): clock +\(seconds) s\(holding ? " (alarm held)" : "")")
                         time.advance(by: seconds)
                     }
-                } else if roll < 84 {
+                } else if roll < 70 {
                     if holding {
                         log.append("\(step): release the alarm's turns")
                         await engine.releaseAlarmTurns()
@@ -314,7 +354,7 @@ struct EngineGateModelTests {
                         await engine.holdAlarmTurns()
                     }
                     holding.toggle()
-                } else if roll < 92 {
+                } else if roll < 93 {
                     if let token = group {
                         log.append("\(step): release the prefetch group")
                         await engine.releaseGroup(token)
@@ -333,6 +373,12 @@ struct EngineGateModelTests {
                     await engine.refreshFreeSpace()
                 }
                 await engine.awaitCondition { Self.settled($0) }
+            }
+            if Task.isCancelled {
+                // The time limit cancelled a wait for the engine to settle: say where it stopped.
+                let dump = await engine.readForTests { Self.dump($0) }
+                violation = "the engine never settled: \(dump)\n" + log.joined(separator: "\n")
+                break
             }
             var found = recorder.takeViolations()
             let requests = await harness.source.manifestRequests.count
@@ -354,7 +400,9 @@ struct EngineGateModelTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving", .timeLimit(.minutes(3)))
     func gateModel() async throws {
-        for seed in Self.seeds {
+        // `GATE_MODEL_SEEDS=17,42` replays chosen walks (a failure prints its seed).
+        let only = ProcessInfo.processInfo.environment["GATE_MODEL_SEEDS"].map { $0.split(separator: ",").compactMap { UInt64($0) } }
+        for seed in only ?? Array(Self.seeds) {
             if let violation = try await Self.walk(seed: seed) {
                 Issue.record("seed \(seed): \(violation)")
                 return

@@ -92,7 +92,7 @@ struct EngineRegressionCycle20Tests {
         // the claim waits for a slot.
         harness.time.advance(to: cooldownEnd)
         await engine.awaitCondition { engine in
-            engine.state.jobs[member.transferID]?.active?.handle != nil && engine.state.jobs[parked]?.state == .queued
+            engine.state.jobs[member.transferID]?.active != nil && engine.state.jobs[parked]?.state == .queued
         }
         // `other` is rejected: its slot's dispatch parks the claim behind the silent probe until its watchdog.
         await harness.source.script(other, [.fail(Self.rejected)])
