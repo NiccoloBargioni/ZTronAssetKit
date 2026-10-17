@@ -249,7 +249,10 @@ extension SyncEngine {
         case .cancelled:
             return .failed(.cancelled)
         case .blocked(let reason):
-            return .blocked(reason, self.report(manifestFresh: run.manifestFresh))
+            // The settling turn read the throttle's end; this task resumes in a later turn, and a transfer's 429 handled
+            // in between extends the origin's throttle (which moves the pending run with it, `throttleExtended`). The run
+            // reports the end a fresh request gets, the origin's (close-out cycle 19, F-39).
+            return .blocked(self.currentReason(reason), self.report(manifestFresh: run.manifestFresh))
         case .finished:
             let summary = self.report(manifestFresh: run.manifestFresh)
             guard run.failures.isEmpty, !run.overBudget else {

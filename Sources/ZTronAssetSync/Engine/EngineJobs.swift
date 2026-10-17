@@ -526,8 +526,8 @@ extension SyncEngine {
     /// The end of the throttle a job parked with `until` waits for. A parked job keeps the end it was parked with, while
     /// a later 429 extends the origin's throttle and moves only the origin's `.throttle` deadline, which alone re-admits
     /// the job (F-35): the origin's end when it is later, else `until`. Every reader of a parked job's end, the fail-fast
-    /// answer, a run's blocked outcome and whether the block cleared, reads it here, so each tells the caller the end a
-    /// fresh request would get (close-out cycle 16, F-36).
+    /// answer, a run's blocked outcome (in the run task's answering turn, close-out cycle 19) and whether the block
+    /// cleared, reads it here, so each tells the caller the end a fresh request would get (close-out cycle 16, F-36).
     func throttleEnd(after until: MonotonicInstant) -> MonotonicInstant {
         guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
             return until

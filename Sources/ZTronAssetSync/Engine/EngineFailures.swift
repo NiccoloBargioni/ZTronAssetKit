@@ -313,13 +313,23 @@ extension SyncEngine {
         self.park(transfer, reason: .throttled(until: end))
     }
 
-    /// A 429 moved the origin's throttle end later than `previous`, the end in force before it. A user-initiated request
-    /// waits for a throttle only while its end is within `interactiveMaxWait` (sync.md §7.6, `RetryPolicy`), so the
-    /// user-initiated waiters of the jobs the throttle had already parked get the fail-fast answer for the new end, the one
-    /// a request made now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. The answers
-    /// come in a later turn of their own (`answerThrottledUsers()`), so the 429's turn stays O(1).
+    /// A 429 moved the origin's throttle end later than `previous`, the end in force before it. A pending run that waits for
+    /// the throttle moves to the new end: it was scheduled at the end in force when it was set, and at that end it would
+    /// start a run the throttle refuses at its manifest step (close-out cycle 19, F-39). A user-initiated request waits for
+    /// a throttle only while its end is within `interactiveMaxWait` (sync.md §7.6, `RetryPolicy`), so the user-initiated
+    /// waiters of the jobs the throttle had already parked get the fail-fast answer for the new end, the one a request made
+    /// now gets (close-out cycle 16, F-36); every other interest keeps waiting for the end. The answers come in a later
+    /// turn of their own (`answerThrottledUsers()`), so the 429's turn stays O(1).
     func throttleExtended(from previous: MonotonicInstant?) {
-        guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin], end > (previous ?? .zero), !self.state.throttleParked.isEmpty else {
+        guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin], end > (previous ?? .zero) else {
+            return
+        }
+        if self.state.pendingRun?.gate == .throttle {
+            self.state.heap.schedule(.pendingRun, at: end)
+            self.state.pendingRun?.scheduled = true
+            self.rearm()
+        }
+        guard !self.state.throttleParked.isEmpty else {
             return
         }
         self.scheduleThrottleAnswers()
