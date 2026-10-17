@@ -219,6 +219,80 @@ struct EngineRegressionCycle18Tests {
         await engine.shutdown()
         _ = await joinCancelling(resolveY)
     }
+
+    // MARK: A run whose claim parked for space settles only while the ledger refuses it (R-SYN-6, R-SYN-11; cycle-17 verifier)
+
+    /// A job parked `insufficientSpace` waits for the next free-space read (F-28): room another job's bytes in flight
+    /// leave when it ends without committing is used at that read. A run whose working claim then finished counted its
+    /// claim parked for space as blocked and settled `.blocked(.insufficientSpace)`, although the ledger admits the
+    /// claim: its job was retired and the caller was told the volume lacks space (the cycle-17 correctness verifier's
+    /// PROBE-C17C-INFLIGHT). Here a prefetch holder's 200 bytes are in flight with 450 bytes of room, so the gate parks the
+    /// run's 300-byte claim beside its 100-byte one; the holder then ends with a 404, and the run's other claim finishes.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: a run whose claim parked for space the ledger admits once a job in flight ended without committing fetches it instead of settling blocked for lack of space", .timeLimit(.minutes(1)))
+    func runFetchesClaimTheLedgerAdmits() async throws {
+        let reserve = StoragePolicy().reserveFreeBytes
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 4_000_000, opportunisticCapacity: reserve + 4_000_000)
+        )
+        let harness = EngineHarness.make(
+            time: time,
+            tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0),
+            storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            fileSystem: fileSystem
+        )
+        let holder = EngineHarness.onDemand("h", EngineFixture.bytes(6_701, count: 200))
+        await harness.serveManifest([holder])
+        let engine = harness.engine
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        await harness.source.script(holder.transferID, [.hold])
+        let token = try await engine.registerGroup([holder.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[holder.transferID]?.active != nil }
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(450, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        // The run plans two bundled entries that fit the read together (400 of 450 bytes); beside the holder's 200 bytes
+        // in flight the gate starts the small one and parks the large one.
+        let bytes1 = EngineFixture.bytes(6_702, count: 100)
+        let bytes2 = EngineFixture.bytes(6_703, count: 300)
+        let first = EngineFixture.entry("r1", bytes1)
+        let second = EngineFixture.entry("r2", bytes2)
+        await harness.serveManifest([holder, first, second], etag: "v2")
+        await harness.source.script(first.transferID, [.hold, .stage(bytes1)])
+        await harness.source.script(second.transferID, [.stage(bytes2)])
+        let run = Task { await engine.sync(.force) }
+        await untilFinishedOrCondition(run, engine) { engine in
+            engine.state.jobs[first.transferID]?.active != nil && engine.state.jobs[second.transferID]?.state == .blocked(.insufficientSpace)
+        }
+        let setup = await engine.readForTests { engine in
+            (engine.state.jobs[first.transferID]?.active != nil, engine.state.jobs[second.transferID]?.state, engine.state.run?.id, engine.state.lastRunID)
+        }
+        try #require(setup.0 && setup.1 == .blocked(.insufficientSpace), "setup: r1 runs and r2 is parked for space: \(setup)")
+        try #require(setup.2 != nil, "setup: the run is in progress")
+        // The holder ends with a 404: its 200 bytes leave the ledger, which now admits r2; nothing reads free space.
+        await harness.source.release(holder.transferID, with: .failed(.permanentMissing(httpStatus: 404)))
+        await engine.awaitCondition { $0.state.jobs[holder.transferID] == nil && $0.state.storeWorkRuns == 0 }
+        let fits = await engine.readForTests { engine in
+            engine.state.jobs[second.transferID].map { engine.spaceBlock($0) == nil }
+        }
+        try #require(fits == true, "setup: the ledger admits r2 once the holder's bytes left it: \(String(describing: fits))")
+        // The run's other claim finishes; the run must fetch r2 rather than report a lack of space the ledger denies.
+        await harness.source.release(first.transferID, with: .progress(received: 1, expected: nil))
+        let outcome = await joinCancelling(run)
+        if case .complete(let report) = outcome {
+            #expect(report.fetched == 2, "the run fetched both of its assets: \(report.fetched)")
+        } else {
+            Issue.record("the run fetches the claim the ledger admits instead of settling: \(outcome)")
+        }
+        let after = await engine.readForTests { ($0.state.lastRunID, $0.invariantViolations()) }
+        #expect(after.0 == setup.3, "no second run: \(after.0) after \(setup.3)")
+        #expect(after.1.isEmpty, "\(after.1)")
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+    }
 }
 
 /// A `FakeRemoteSource` whose next manifest request waits until the test releases it (or the fetch is cancelled), so a
