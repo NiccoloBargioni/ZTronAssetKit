@@ -84,13 +84,22 @@ extension SyncEngine {
             startedAt: self.environment.time.now(),
             purgeEpoch: self.state.purgeEpoch
         )
+        // A breaker that admits only a probe gives it to this run's manifest fetch in this turn, before the run is in place
+        // and before any later turn can dispatch a job (F-42); its `circuitChanged` follows `syncStarted`.
+        let held = self.reserveManifestProbe()
         self.state.run = run
         // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
         guard self.spawn(.run, { engine in await engine.performRun(token) }) != nil else {
             self.state.run = nil
+            if held != nil {
+                self.releaseManifestProbe()
+            }
             return
         }
         self.broadcast(.syncStarted(run.id, trigger))
+        if let before = held, let origin = self.state.remote?.originID {
+            self.breakerChanged(origin, from: before)
+        }
         self.ensureWatcher()
         self.notifyObservers()
     }
@@ -931,7 +940,9 @@ extension SyncEngine {
                 // started before that pump lost the probe to the first of them before its manifest step, ended blocked
                 // and left a new pending run: one run per probe while the clock did not move (close-out cycle 21, F-41).
                 // The pending run waits for that pump, which reconsiders it once it has dispatched (`pump()`); a closed
-                // breaker admits every transfer, so nothing waits then.
+                // breaker admits every transfer, so nothing waits then. Since close-out cycle 22 a run that starts holds the
+                // probe for its manifest fetch from its start turn (`reserveManifestProbe`, F-42), so it can no longer lose
+                // it; this wait keeps the order F-41 chose, the re-admitted jobs probing first.
                 if gate.breaker == .probe, self.dispatchOwed {
                     return .armed
                 }

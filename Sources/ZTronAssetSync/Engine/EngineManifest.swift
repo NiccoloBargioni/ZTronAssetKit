@@ -139,6 +139,9 @@ extension SyncEngine {
         }
         let now = self.environment.time.monotonicNow()
         if let until = self.originGate(at: now).throttledUntil {
+            // A throttle that began after a run held the probe for this fetch (`reserveManifestProbe`): the fetch asks for
+            // nothing, so the probe is let go (F-42).
+            self.releaseManifestProbe()
             return .throttled(until)
         }
         var breaker = self.state.breakers[remote.originID] ?? CircuitBreaker(policy: self.tuning.breaker)
@@ -155,6 +158,9 @@ extension SyncEngine {
         case .reject(let cause, _):
             self.scheduleBreakerDeadline()
             return .circuitOpen(cause)
+        }
+        if self.state.manifestFetch?.sequence == sequence {
+            self.state.manifestFetch?.admitted = true
         }
         let access = self.access(for: .bulk)
         let updateCheck = !isApple || self.appleAccessBlock(access) == nil
@@ -238,6 +244,49 @@ extension SyncEngine {
             }
             return .failed(error)
         }
+    }
+
+    /// Holds the breaker's probe for the manifest fetch of a run that starts now; returns the breaker's public state before
+    /// the change when it held it, for the caller to publish after `syncStarted` (`breakerChanged`), and `nil` otherwise.
+    ///
+    /// ARCHITECTURE §7.6/§7.7: while the breaker admits only a probe (open past its cooldown, half-open without a probe or
+    /// with one silent past its watchdog), that probe is the next run's manifest fetch. The fetch is admitted only in later
+    /// turns (the run task's first turn begins it, the fetch task's turn admits it), and any turn in between can dispatch a
+    /// job: a slot freed by an unrelated attempt, a pause's re-dispatch, a prefetch join's batch, a retry, a probe's exit. A
+    /// job admitted there took the probe, the gate rejected the run's manifest, and the run settled blocked with a new
+    /// pending run: the window behind close-out cycles 20 to 22's runaway runs, which the fixes that narrowed it (F-40,
+    /// F-41) each left open somewhere (close-out cycle 22, L4-R20, F-42). The probe is now admitted for the manifest fetch
+    /// (`TransferID.manifest`) in the run's start turn, so from that turn the breaker rejects every other transfer, and the
+    /// fetch's own admission finds its probe (`CircuitBreaker.admit` admits a probe again within its watchdog). Nothing is
+    /// held when the origin is throttled at `now` (the fetch then asks for nothing, and the throttle gates every job too), or
+    /// when the run joins a fetch that already passed the gates (no gate can reject it any more, and its outcome, admitted
+    /// under a closed breaker, must not count as a probe's). The probe's watchdog is scheduled here as for any probe; a fetch
+    /// that ends up asking for nothing lets it go (`releaseManifestProbe`).
+    func reserveManifestProbe() -> CircuitState? {
+        guard let origin = self.state.remote?.originID, self.state.manifestFetch?.admitted != true,
+              var breaker = self.state.breakers[origin] else {
+            return nil
+        }
+        let now = self.environment.time.monotonicNow()
+        guard self.originGate(at: now).throttledUntil == nil, breaker.admission(of: .manifest, at: now) == .probe else {
+            return nil
+        }
+        let before = breaker.publicState
+        _ = breaker.admit(.manifest, at: now)
+        self.state.breakers[origin] = breaker
+        self.scheduleBreakerDeadline()
+        return before
+    }
+
+    /// Lets go of a probe held for a manifest fetch that asks for nothing (a throttle in force at its admission, or a run
+    /// whose task could not be spawned): the probe ends abandoned, so `recordBreaker` re-admits the jobs the breaker parked
+    /// behind it (F-40) and reconsiders the pending run. A manifest probe is that fetch's: the fetch is single-flight, and
+    /// every earlier one recorded its outcome on the breaker before it ended.
+    func releaseManifestProbe() {
+        guard let origin = self.state.remote?.originID, self.state.breakers[origin]?.probe == .manifest else {
+            return
+        }
+        self.recordBreaker(.abandoned(.manifest))
     }
 
     /// The breaker input of a manifest failure: a 403 whose hint is key-rejected opens the auth breaker at once (an

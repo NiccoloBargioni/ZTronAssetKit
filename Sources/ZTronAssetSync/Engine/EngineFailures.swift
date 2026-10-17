@@ -561,13 +561,20 @@ extension SyncEngine {
     /// settled blocked by a gate that admits, and its pending run started one run and one manifest request per parked
     /// missing asset without the clock moving (close-out cycle 20, L4-R20, F-40). The first job the pump dispatches
     /// probes, and the others park again behind it, as at a cooldown's end.
+    ///
+    /// A pump is owed whether or not anything was parked (close-out cycle 22, F-42): jobs that wait in the queue for a slot
+    /// are not parked, and the exit's own caller frees a slot and pumps after this hook returns, so a pending run that read
+    /// no pump owed (`dispatchOwed`) in `recordBreaker`'s reconsideration started, and that caller's pump gave the freed slot
+    /// to the next queued job (one blocked run per queued member, PROBE-C21C-QUEUED-PROBES). With the follow-up owed the
+    /// pending run waits for the pumps that dispatch those jobs, and starts once none can start (F-41); the run then holds
+    /// the probe for its manifest fetch from its start turn (`reserveManifestProbe`).
     private func probeEndedWithoutVerdict() {
         self.scheduleBreakerDeadline()
+        self.schedulePumpFollowUp()
         guard !self.state.circuitParked.isEmpty else {
             return
         }
         self.unblockOrigin(.circuitOpen)
-        self.schedulePumpFollowUp()
     }
 
     /// Emits and schedules after a breaker change.

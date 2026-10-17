@@ -124,12 +124,11 @@ extension SyncEngine {
                 guard self.state.breakers[origin] != nil else {
                     continue
                 }
-                if !self.state.circuitParked.isEmpty {
-                    // The jobs re-queued below are dispatched by a pump before a pending run that waits for the breaker
-                    // decides (`dispatchOwed`): the first of them probes, and the run waits for its outcome (F-41). This
-                    // turn's own pump may follow an await on the store's work, so a follow-up is owed explicitly.
-                    self.schedulePumpFollowUp()
-                }
+                // The jobs re-queued below, and those this turn's other deadlines re-queue (a retry), are dispatched by a
+                // pump before a pending run that waits for the breaker decides (`dispatchOwed`): the first of them probes,
+                // and the run waits for its outcome (F-41). This turn's own pump may follow an await on the store's work, so a
+                // follow-up is owed explicitly, also with nothing parked (close-out cycle 22, F-42).
+                self.schedulePumpFollowUp()
                 self.unblockOrigin(.circuitOpen)
                 // The pending run starts only through its gate's reading at `now` (F-40).
                 self.reconsiderPendingRun()

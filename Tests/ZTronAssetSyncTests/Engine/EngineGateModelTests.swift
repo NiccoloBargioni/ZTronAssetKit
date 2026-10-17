@@ -156,8 +156,8 @@ struct EngineGateModelTests {
             let id = run.id.rawValue
             let trigger = run.trigger
             let settlement = run.settlement
-            // A manifest fetch already in flight that the run joins: it may have been admitted already (I6).
-            let joinsFetch = engine.state.manifestFetch != nil
+            // A manifest fetch in flight that already passed the gates: the run joins it, and no gate can reject it (I6).
+            let joinsFetch = engine.state.manifestFetch?.admitted == true
             self.seen.withLock { seen in
                 if seen.started.insert(id).inserted {
                     switch trigger {

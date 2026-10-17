@@ -653,6 +653,9 @@ struct ManifestFetch {
     let sequence: UInt64
     /// Its owned task.
     var task: UInt64?
+    /// Whether it passed the origin's gates (the throttle and the breaker): a run that joins it then holds no probe for
+    /// it (`SyncEngine.reserveManifestProbe()`, close-out cycle 22, F-42).
+    var admitted = false
     /// Waiting runs and `ensureAvailable` calls.
     var waiters: [InterestToken: CheckedContinuation<ManifestOutcome, Never>] = [:]
 }
