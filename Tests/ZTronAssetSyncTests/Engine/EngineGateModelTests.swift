@@ -34,9 +34,10 @@ struct EngineGateModelTests {
     static let steps = 60
     /// I4's bound on the runs that start while the clock does not move. A pending run that waits for the breaker starts
     /// only once the breaker closes, or once it admits only a probe and no job it parked or re-admitted can take that
-    /// probe first (F-41); a second run can follow without the clock moving only when a job that was not parked then (it
-    /// waited for a slot, or a step queued it) wins the probe from the first run's claims, and that job's probe must end
-    /// first. 1,000 walks reach 2 at most; the engine of `58287dc`, which started one run per probe that ended without a
+    /// probe first (F-41), and a run that starts then holds the probe for its manifest fetch from its start turn (F-42),
+    /// so no run loses its manifest probe; a second run can follow without the clock moving only when the first settles
+    /// blocked on claims parked behind a job's probe (one that was not parked when the run started: it waited for a slot,
+    /// or a step queued it) and that probe ends without a verdict. 1,000 walks reach 2 at most; the engine of `58287dc`, which started one run per probe that ended without a
     /// verdict, reaches 3 or 4 in 19 of them (seeds 24, 66 and 155 among the 160 here).
     static let runsWithoutClockMove: UInt64 = 2
 
