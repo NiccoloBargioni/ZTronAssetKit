@@ -23,9 +23,25 @@ struct EngineRegressionCycle9Tests {
     /// the clock must not have moved. Every wait is an explicit signal that also ends on cancellation, never a number of
     /// yields (L4-R17; the cycle-10 iOS Simulator run timed the earlier 10,000-yield wait out, L4-C10-07). The verifier
     /// of cycle 8 counted 7 and 6 stale advances in 2,000 rounds of the cycle-8 driver.
+    ///
+    /// The rounds run in a task at high priority, which every task they start inherits: each round is about six hops
+    /// through the cooperative pool, and at the default priority each hop queued behind the rest of the suite's work
+    /// (the cycle-17 verifier measured 3.6 s in-suite against 0.04 s alone, and a 79 s overrun of the one-minute limit at
+    /// a load of 205 to 259, L4-R8). The priority changes when a round's steps run, not what they check: the driver's
+    /// end is still awaited through its hook, and the same three counts are asserted (close-out cycle 18, F-38).
     @Test("R-SYN-11: the clock driver of the space tests has stopped when driving returns, so it never advances a clock to a sleeper registered afterwards (2,000 rounds)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func drivingStopsBeforeReturning() async {
+        let (running, stale, unseen) = await joinCancelling(Task(priority: .high) { await Self.drivingRounds() })
+        #expect(running == 0, "driving returned before its driver ended in \(running) of 2,000 rounds")
+        #expect(stale == 0, "the clock moved after driving returned in \(stale) of 2,000 rounds")
+        #expect(unseen == 0, "the sleeper never registered in \(unseen) rounds")
+    }
+
+    /// The 2,000 rounds of `drivingStopsBeforeReturning`: how many found the driver still running when `driving`
+    /// returned, the clock moved afterwards, or the sleeper never registered.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func drivingRounds() async -> (running: Int, stale: Int, unseen: Int) {
         var running = 0
         var stale = 0
         var unseen = 0
@@ -79,9 +95,7 @@ struct EngineRegressionCycle9Tests {
             ending.finish()
             signal.finish()
         }
-        #expect(running == 0, "driving returned before its driver ended in \(running) of 2,000 rounds")
-        #expect(stale == 0, "the clock moved after driving returned in \(stale) of 2,000 rounds")
-        #expect(unseen == 0, "the sleeper never registered in \(unseen) rounds")
+        return (running, stale, unseen)
     }
 
     // MARK: Bounded actor turns at scale (C2; review of close-out cycle 8)
