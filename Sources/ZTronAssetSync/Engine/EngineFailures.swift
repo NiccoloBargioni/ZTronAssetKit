@@ -543,10 +543,31 @@ extension SyncEngine {
         }
         var breaker = self.state.breakers[origin] ?? CircuitBreaker(policy: self.tuning.breaker)
         let before = breaker.publicState
+        let probing = breaker.probe != nil
         breaker.record(outcome, at: self.environment.time.monotonicNow(), seed: self.environment.random.seed)
         self.state.breakers[origin] = breaker
         self.breakerChanged(origin, from: before)
+        if probing, breaker.probe == nil, case .halfOpen = breaker.state {
+            self.probeEndedWithoutVerdict()
+        }
         self.reconsiderPendingRun()
+    }
+
+    /// The half-open probe ended without a verdict (404, 400, an integrity failure, offline, a different cause, or
+    /// abandoned: cancelled, paused, superseded): the breaker is `halfOpen(probe: nil)` and admits the next transfer as
+    /// its probe. The public state did not change, so `breakerChanged` did nothing; the jobs the breaker parked behind the
+    /// probe are re-admitted here, in the turn the gate opened, and the old probe's watchdog deadline is dropped. Without
+    /// this nothing re-admitted them before that watchdog (up to `probeWatchdog` later): a run whose claims they were
+    /// settled blocked by a gate that admits, and its pending run started one run and one manifest request per parked
+    /// missing asset without the clock moving (close-out cycle 20, L4-R20, F-40). The first job the pump dispatches
+    /// probes, and the others park again behind it, as at a cooldown's end.
+    private func probeEndedWithoutVerdict() {
+        self.scheduleBreakerDeadline()
+        guard !self.state.circuitParked.isEmpty else {
+            return
+        }
+        self.unblockOrigin(.circuitOpen)
+        self.schedulePumpFollowUp()
     }
 
     /// Emits and schedules after a breaker change.
@@ -567,9 +588,7 @@ extension SyncEngine {
         self.scheduleBreakerDeadline()
         if case .closed = after {
             self.unblockOrigin(.circuitOpen)
-            if self.state.pendingRun?.gate == .breaker {
-                self.fulfilPendingRun()
-            }
+            self.reconsiderPendingRun()
         }
     }
 

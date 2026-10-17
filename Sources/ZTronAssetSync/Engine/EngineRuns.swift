@@ -283,9 +283,12 @@ extension SyncEngine {
         }
     }
 
-    /// The cause of the origin's breaker when it is open.
+    /// The cause of the origin's breaker while it is open and its gate rejects at `now` (`originGate`): a manifest fetch
+    /// that tripped it ends the run blocked by it; one whose cooldown had already ended by its answer does not, as the
+    /// gate admits the next run's probe (F-40).
     func openBreakerCause() -> BreakerCause? {
-        guard let origin = self.state.remote?.originID, case .open(let cause, _, _)? = self.state.breakers[origin]?.state else {
+        guard let origin = self.state.remote?.originID, case .open(let cause, _, _)? = self.state.breakers[origin]?.state,
+              !self.originGateNow().admitsBreakerParked else {
             return nil
         }
         return cause
@@ -609,13 +612,13 @@ extension SyncEngine {
         // F-37). Every claim with the run's interest passes here, so this is the one check before the passes below.
         // A claim parked `insufficientSpace` that the ledger admits now (a job in flight ended without committing, which
         // re-checks nothing until the next free-space read, F-28) is noted: settling would report a lack of space the
-        // ledger denies (close-out cycle 18, F-38). A claim parked by an origin-wide gate whose end the clock has passed
-        // counts as working while the alarm's turn that handles that end has not run (`originGatesAwaitingAlarm`): the
-        // gate is open, that turn re-queues the claim (or owes it a re-queue) and its pump checks the run again; settling
-        // now would report a gate that is open, retire the claim's job and start the pending run at once (close-out
-        // cycle 19, F-39).
-        let now = self.environment.time.monotonicNow()
-        let awaitingAlarm = self.originGatesAwaitingAlarm(now: now)
+        // ledger denies (close-out cycle 18, F-38). A claim parked by an origin gate that admits at `now`, as the next
+        // dispatch reads it (`originGate`: a throttle or a cooldown the clock ended, a probe silent past its watchdog, a
+        // probe that ended without a verdict), is re-admitted in this turn and counts as working: settling would report
+        // a gate that admits, retire the claim's job and start the pending run at once. Earlier cycles waited here for
+        // the alarm's turn of each such end (F-39); the re-admission makes the check independent of any turn having
+        // run, for every gate and transition at once (close-out cycle 20, L4-R20, F-40).
+        let gate = self.originGateNow()
         var admittedBySpace = false
         for (transfer, _) in current.outstanding {
             guard let job = jobs[transfer], job.interests[current.token] != nil else {
@@ -624,9 +627,13 @@ extension SyncEngine {
             switch job.state {
             case .blocked(.awaitingSpace):
                 return
-            case .blocked(.throttled(let until)) where awaitingAlarm.throttle && self.throttleEnd(after: until) <= now:
-                return
-            case .blocked(.circuitOpen) where awaitingAlarm.breaker:
+            case .blocked(let reason) where gate.admits(reason) == true:
+                // Parked by an origin gate that admits at `now` (`originGate`): the clock or an outcome opened it and its
+                // re-admission has not run. It runs now (unless a follow-up turn already owes the claim its re-queue), so
+                // this check never depends on the alarm's turn (F-40).
+                if !owed.contains(transfer, job) {
+                    self.readmitOpenedOriginGates(gate)
+                }
                 return
             case .blocked(.insufficientSpace) where spaceSweepOwed:
                 return
@@ -912,22 +919,18 @@ extension SyncEngine {
             // Admitted with its debounce already fired, or never scheduled.
             return pending.scheduled ? .open : .unarmed
         case .breaker:
-            guard let origin, let breaker = self.state.breakers[origin] else {
+            // The breaker's gate as the next dispatch reads it (`originGate`, F-40): open when it is closed, when its
+            // cooldown has ended, or when it is half-open without a probe or with one silent past its watchdog.
+            guard let origin, !self.originGate(at: now).admitsBreakerParked else {
                 return .open
             }
-            switch breaker.state {
-            case .closed:
-                return .open
-            case .open(_, let until, _):
-                if until <= now {
-                    return .open
-                }
-                return self.state.heap.deadline(for: .breaker(origin)) == nil ? .unarmed : .armed
-            case .halfOpen(_, _, let probe, _):
-                return probe == nil ? .open : .armed
+            if self.state.heap.deadline(for: .breaker(origin)) != nil || self.state.breakers[origin]?.probe != nil {
+                // The cooldown's end or the probe's watchdog is in the heap, or the probe's outcome reconsiders it.
+                return .armed
             }
+            return .unarmed
         case .throttle:
-            guard let origin, let until = self.state.throttles[origin], until > now else {
+            guard origin != nil, self.originGate(at: now).throttledUntil != nil else {
                 return .open
             }
             return self.state.heap.deadline(for: .pendingRun) == nil ? .unarmed : .armed
@@ -965,8 +968,8 @@ extension SyncEngine {
         }
     }
 
-    /// Starts the pending run now.
-    func fulfilPendingRun() {
+    /// Starts the pending run now; only `reconsiderPendingRun` calls it, once the gate reads open at `now` (F-40).
+    private func fulfilPendingRun() {
         guard let pending = self.state.pendingRun, self.state.run == nil else {
             return
         }

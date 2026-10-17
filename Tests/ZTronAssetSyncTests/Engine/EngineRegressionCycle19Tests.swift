@@ -42,7 +42,10 @@ struct EngineRegressionCycle19Tests {
         await harness.serveManifest([held, parked])
         // `held` waits in flight until the test ends it; a later attempt (a second run's) is rejected at once.
         await harness.source.script(held.transferID, [.hold, .fail(Self.rejected)])
-        await harness.source.script(parked.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(30))), .stage(parkedBytes)])
+        // The parked claim's next attempt waits in the fake source until the test scripts it after the checks below: since
+        // close-out cycle 20 the run re-admits the claim in the turn its last working claim ends (F-40), so a scripted
+        // success could otherwise finish the run before those checks read it.
+        await harness.source.script(parked.transferID, [.fail(.transient(.throttled, retryAfter: .seconds(30)))])
         let engine = harness.engine
         let origin = harness.source.originID
         let probe = EventProbe(stream: try await engine.subscribe().get())
@@ -69,6 +72,7 @@ struct EngineRegressionCycle19Tests {
         #expect(between.2, "the parked claim keeps the run's interest")
         #expect(between.3 == setup.3, "no second run started: \(between.3)")
         await engine.releaseAlarmTurns()
+        await harness.source.script(parked.transferID, [.stage(parkedBytes)])
         let finished = await probe.next { Self.isFinish($0) }
         guard case .syncFinished(let id, .completeWithFailures(let report))? = finished else {
             // A run that settled blocked left its claim's job retired and a pending run behind: nothing below is defined.
@@ -128,8 +132,9 @@ struct EngineRegressionCycle19Tests {
         let runID = try #require(roles.2, "setup: the launch run is in place")
         let token = try #require(roles.3, "setup: the launch run is in place")
         let parkedBytes = try #require(catalog.first { $0.0.transferID == parked }?.1)
-        // The parked claim stages once it is re-queued; a later attempt of the other two (a second run's) is rejected.
-        await harness.source.script(parked, [.stage(parkedBytes)])
+        // The parked claim's next attempt waits in the fake source until the test scripts it after the checks below (the
+        // run re-admits the claim in the turn its last working claim ends, F-40); a later attempt of the other two (a
+        // second run's) is rejected.
         await harness.source.script(held, [.hold, .fail(Self.rejected)])
         let evidence = EngineFailurePathTests.evidence(.asset, xml: true, bytes: 120)
         await harness.source.script(failing, [.fail(.authentication(.forbiddenAmbiguous(evidence))), .fail(Self.rejected)])
@@ -156,6 +161,7 @@ struct EngineRegressionCycle19Tests {
         #expect(between.2, "the parked claim keeps the run's interest")
         #expect(between.3 == roles.4, "no second run started: \(between.3)")
         await engine.releaseAlarmTurns()
+        await harness.source.script(parked, [.stage(parkedBytes)])
         let finished = await probe.next { Self.isFinish($0) }
         guard case .syncFinished(let id, .completeWithFailures(let report))? = finished else {
             // A run that settled blocked left its claim's job retired and a pending run behind, whose runs probe the

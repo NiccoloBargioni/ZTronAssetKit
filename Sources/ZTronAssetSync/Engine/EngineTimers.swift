@@ -119,16 +119,14 @@ extension SyncEngine {
                     self.state.heap.schedule(.throttle(origin), at: until)
                     continue
                 }
-                self.state.throttles[origin] = nil
-                self.unblockOrigin(.throttled)
+                self.endThrottle(origin)
             case .breaker(let origin):
                 guard self.state.breakers[origin] != nil else {
                     continue
                 }
                 self.unblockOrigin(.circuitOpen)
-                if self.state.pendingRun?.gate == .breaker {
-                    self.fulfilPendingRun()
-                }
+                // The pending run starts only through its gate's reading at `now` (F-40).
+                self.reconsiderPendingRun()
                 self.scheduleBreakerDeadlineIfStillPending(origin, now: now)
             case .store:
                 storeDue = true
@@ -177,8 +175,9 @@ extension SyncEngine {
     }
 
     /// The pending run's deadline (its debounce or throttle end) fired: the run starts unless conditions refuse bulk work
-    /// now (the watcher re-arms it), or a run still in place makes `fulfilPendingRun` leave it to that run's finish
-    /// (`reconsiderPendingRun`, F-3).
+    /// now (the watcher re-arms it), or a run still in place leaves it to that run's finish (`reconsiderPendingRun`, F-3).
+    /// It starts through `reconsiderPendingRun`, which reads the gate at `now`, so no pending run starts while the gate it
+    /// waits on is closed (F-40).
     func pendingRunDeadlineFired() {
         guard let pending = self.state.pendingRun else {
             return
@@ -187,7 +186,7 @@ extension SyncEngine {
             self.state.pendingRun?.scheduled = false
             return
         }
-        self.fulfilPendingRun()
+        self.reconsiderPendingRun()
     }
 
     /// After a breaker deadline fired, keeps the next one (a watchdog of a new probe) in the heap.

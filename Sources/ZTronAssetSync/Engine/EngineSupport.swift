@@ -390,25 +390,48 @@ package struct CircuitBreaker: Sendable, Hashable {
     /// `probeWatchdog` deadline); a probe silent past its watchdog is abandoned and the next transfer probes
     /// (sync-2 S2-01). The probe itself is admitted again (a re-dispatch after a pause).
     package mutating func admit(_ transfer: TransferID, at now: MonotonicInstant) -> Admission {
+        let verdict = self.admission(of: transfer, at: now)
+        guard verdict == .probe else {
+            return verdict
+        }
+        switch self.state {
+        case .closed:
+            return verdict
+        case .open(let cause, _, let trips):
+            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
+        case .halfOpen(let cause, let trips, let probe, let watchdog):
+            if probe == transfer, let watchdog, now < watchdog {
+                return verdict
+            }
+            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
+        }
+        return verdict
+    }
+
+    /// The verdict `admit` gives `transfer` at `now`, without its effect; `nil` stands for any transfer that is not the
+    /// probe (a job the breaker parked). This pure reading is the one every decision about the breaker's gate reads (the
+    /// dispatch gate through `admit`, and `SyncEngine.originGate(at:)` for runs, pending runs, joiners and re-admission),
+    /// so no decision can read the gate otherwise than the next dispatch would (close-out cycle 20, L4-R20, F-40).
+    func admission(of transfer: TransferID?, at now: MonotonicInstant) -> Admission {
         switch self.state {
         case .closed:
             return .allow
-        case .open(let cause, let until, let trips):
-            guard now >= until else {
-                return .reject(cause, until: until)
-            }
-            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
-            return .probe
-        case .halfOpen(let cause, let trips, let probe, let watchdog):
+        case .open(let cause, let until, _):
+            return now >= until ? .probe : .reject(cause, until: until)
+        case .halfOpen(let cause, _, let probe, let watchdog):
             if let probe, probe != transfer, let watchdog, now < watchdog {
                 return .reject(cause, until: watchdog)
             }
-            if probe == transfer, let watchdog, now < watchdog {
-                return .probe
-            }
-            self.state = .halfOpen(cause: cause, trips: trips, probe: transfer, watchdog: now.adding(seconds: self.policy.probeWatchdog))
             return .probe
         }
+    }
+
+    /// The transfer probing the half-open breaker, if any.
+    var probe: TransferID? {
+        if case .halfOpen(_, _, let probe, _) = self.state {
+            return probe
+        }
+        return nil
     }
 
     /// The next instant the breaker changes by time alone (cooldown end, probe watchdog), for the engine's alarm.

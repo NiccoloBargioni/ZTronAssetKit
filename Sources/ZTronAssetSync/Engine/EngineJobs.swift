@@ -149,6 +149,15 @@ extension SyncEngine {
             }
             return
         }
+        if case .blocked(let reason)? = self.state.jobs[transfer]?.state {
+            // A job parked by an origin gate that admits at `now` (its re-admission has not run) is re-admitted, now or
+            // by an owed follow-up, rather than answered with a block that no longer holds (F-40).
+            let gate = self.originGateNow()
+            if gate.admits(reason) == true {
+                self.readmitOpenedOriginGates(gate)
+                return
+            }
+        }
         switch self.state.jobs[transfer]?.state {
         case .blocked(let reason)?:
             self.failFast(transfer, reason: reason, only: token)
@@ -209,16 +218,13 @@ extension SyncEngine {
 
     /// Whether the origin's breaker and throttle let a user-initiated request skip a backoff (T20).
     private func originAdmitsUser() -> Bool {
-        guard let origin = self.state.remote?.originID else {
+        guard self.state.remote != nil else {
             return false
         }
-        if let until = self.state.throttles[origin], until > self.environment.time.monotonicNow() {
-            return false
-        }
-        if case .open? = self.state.breakers[origin]?.state {
-            return false
-        }
-        return true
+        // The origin's gates as the next dispatch reads them (F-40): no throttle in force, and a breaker that would
+        // admit the request (closed, or open to a probe).
+        let gate = self.originGateNow()
+        return gate.admitsThrottleParked && gate.admitsBreakerParked
     }
 
     /// Removes interest `token` from `transfer` (all its assets) and retires the job when nobody is left.
@@ -542,24 +548,6 @@ extension SyncEngine {
         .serverUnavailable(retryAfter: self.throttleEnd(after: until).seconds(since: self.environment.time.monotonicNow()))
     }
 
-    /// The origin-wide gates the clock has opened while the alarm's turn that re-admits the jobs they parked has not run.
-    /// A throttle whose end has passed is still recorded: only its `.throttle` deadline's turn clears it and re-queues the
-    /// jobs it parked (`fireDue`), and that deadline stays in the heap while the throttle is (F-35). A breaker whose
-    /// cooldown has ended still reads open: it half-opens lazily (`CircuitBreaker.admit`), and its `.breaker` deadline's
-    /// turn, scheduled at the cooldown's end when it opened, re-queues the jobs it parked. Between the clock reaching such
-    /// an end and that turn, which waits for the alarm's wake-up and for its place in the actor's queue, the gate already
-    /// admits work (`gate`), so a job parked by it waits only for that turn (close-out cycle 19, F-39).
-    func originGatesAwaitingAlarm(now: MonotonicInstant) -> (throttle: Bool, breaker: Bool) {
-        guard let origin = self.state.remote?.originID else {
-            return (false, false)
-        }
-        let throttle = self.state.throttles[origin].map { $0 <= now } ?? false
-        guard case .open(_, let until, _)? = self.state.breakers[origin]?.state else {
-            return (throttle, false)
-        }
-        return (throttle, until <= now)
-    }
-
     /// `reason` with a throttle's end read through `throttleEnd(after:)`.
     func currentReason(_ reason: BlockReason) -> BlockReason {
         if case .throttled(let until) = reason {
@@ -574,16 +562,9 @@ extension SyncEngine {
         switch reason {
         case .offline, .policy:
             return self.laneVerdict(lane) == .admit
-        case .throttled(let until):
-            return self.throttleEnd(after: until) <= self.environment.time.monotonicNow()
-        case .circuitOpen:
-            guard let origin = self.state.remote?.originID, let breaker = self.state.breakers[origin] else {
-                return true
-            }
-            if case .open(_, let until, _) = breaker.state {
-                return until <= self.environment.time.monotonicNow()
-            }
-            return true
+        case .throttled, .circuitOpen:
+            // The origin's gates as the next dispatch reads them (F-40).
+            return self.originGateNow().admits(reason) ?? true
         case .insufficientSpace:
             // `job` already holds the interest that changed its lane, so the ledger reads the lane's volume.
             return self.spaceBlock(job) == nil

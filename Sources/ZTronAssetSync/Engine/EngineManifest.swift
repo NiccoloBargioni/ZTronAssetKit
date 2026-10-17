@@ -138,15 +138,20 @@ extension SyncEngine {
             }
         }
         let now = self.environment.time.monotonicNow()
-        if let until = self.state.throttles[remote.originID], until > now {
+        if let until = self.originGate(at: now).throttledUntil {
             return .throttled(until)
         }
         var breaker = self.state.breakers[remote.originID] ?? CircuitBreaker(policy: self.tuning.breaker)
         let before = breaker.publicState
         switch breaker.admit(.manifest, at: now) {
-        case .allow, .probe:
+        case .allow:
+            self.state.breakers[remote.originID] = breaker
+        case .probe:
             self.state.breakers[remote.originID] = breaker
             self.breakerChanged(remote.originID, from: before)
+            // A probe admitted from `halfOpen(probe: nil)` leaves the public state unchanged, so `breakerChanged` did not
+            // schedule its watchdog: scheduled here, as `start(_:probe:)` does for a transfer probe (L4-C19-10).
+            self.scheduleBreakerDeadline()
         case .reject(let cause, _):
             self.scheduleBreakerDeadline()
             return .circuitOpen(cause)

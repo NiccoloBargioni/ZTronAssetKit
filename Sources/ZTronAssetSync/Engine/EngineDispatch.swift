@@ -167,7 +167,7 @@ extension SyncEngine {
     static let parksPerPump = 512
 
     /// Schedules one later `pump()` for the jobs a pump left queued after `parksPerPump` parks.
-    private func schedulePumpFollowUp() {
+    func schedulePumpFollowUp() {
         guard !self.state.pumpFollowUpScheduled else {
             return
         }
@@ -473,12 +473,12 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
-        if let until = self.state.throttles[remote.originID], until > now {
+        if let until = self.originGate(at: now).throttledUntil {
             return .block(.throttled(until: until))
         }
         if let breaker = self.state.breakers[remote.originID] {
-            var probe = breaker
-            switch probe.admit(transfer, at: now) {
+            // The pure reading `admit` applies, the one every other decision reads too (F-40).
+            switch breaker.admission(of: transfer, at: now) {
             case .allow:
                 break
             case .probe:
