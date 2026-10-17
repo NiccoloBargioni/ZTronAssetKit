@@ -293,6 +293,188 @@ struct EngineRegressionCycle18Tests {
         await engine.releaseGroup(token)
         await engine.shutdown()
     }
+
+    /// The other branch of the same check: the jobs parked for space are re-checked in the pump's order, so a prefetch job
+    /// parked ahead of the run's bulk claim takes the room the ledger gained, and the claim stays parked; the run then
+    /// settles `.blocked(.insufficientSpace)` in the same turn, as before the fix, instead of waiting for an unrelated
+    /// event (here the prefetch job stays in flight, so nothing else would end the run).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: a run whose claim parked for space loses the room the ledger gained to a job ranked ahead of it settles blocked for lack of space at once", .timeLimit(.minutes(1)))
+    func runSettlesWhenRoomGoesAhead() async throws {
+        let reserve = StoragePolicy().reserveFreeBytes
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 4_000_000, opportunisticCapacity: reserve + 4_000_000)
+        )
+        let harness = EngineHarness.make(
+            time: time,
+            tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0),
+            storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            fileSystem: fileSystem
+        )
+        let holder = EngineHarness.onDemand("h", EngineFixture.bytes(6_801, count: 200))
+        let ahead = EngineHarness.onDemand("p", EngineFixture.bytes(6_802, count: 300))
+        await harness.serveManifest([holder, ahead])
+        let engine = harness.engine
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        await harness.source.script(holder.transferID, [.hold])
+        await harness.source.script(ahead.transferID, [.hold])
+        let holderToken = try await engine.registerGroup([holder.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[holder.transferID]?.active != nil }
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(450, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        // A prefetch job of 300 bytes does not fit beside the holder's 200 bytes in flight: it parks for space.
+        let aheadToken = try await engine.registerGroup([ahead.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[ahead.transferID]?.state == .blocked(.insufficientSpace) && !$0.state.pumpFollowUpScheduled }
+        let bytes1 = EngineFixture.bytes(6_803, count: 100)
+        let bytes2 = EngineFixture.bytes(6_804, count: 300)
+        let first = EngineFixture.entry("r1", bytes1)
+        let second = EngineFixture.entry("r2", bytes2)
+        await harness.serveManifest([holder, ahead, first, second], etag: "v2")
+        await harness.source.script(first.transferID, [.hold, .stage(bytes1)])
+        await harness.source.script(second.transferID, [.stage(bytes2)])
+        let run = Task { await engine.sync(.force) }
+        await untilFinishedOrCondition(run, engine) { engine in
+            engine.state.jobs[first.transferID]?.active != nil && engine.state.jobs[second.transferID]?.state == .blocked(.insufficientSpace)
+        }
+        let setup = await engine.readForTests { engine in
+            (engine.state.jobs[first.transferID]?.active != nil, engine.state.jobs[second.transferID]?.state, engine.state.run?.id, engine.state.lastRunID)
+        }
+        try #require(setup.0 && setup.1 == .blocked(.insufficientSpace) && setup.2 != nil, "setup: r1 runs and r2 is parked for space: \(setup)")
+        // The holder ends with a 404: the ledger now admits the prefetch job or r2, not both.
+        await harness.source.release(holder.transferID, with: .failed(.permanentMissing(httpStatus: 404)))
+        await engine.awaitCondition { $0.state.jobs[holder.transferID] == nil && $0.state.storeWorkRuns == 0 }
+        let fits = await engine.readForTests { engine in
+            (
+                engine.state.jobs[second.transferID].map { engine.spaceBlock($0) == nil },
+                engine.state.jobs[ahead.transferID]?.state
+            )
+        }
+        try #require(fits.0 == true && fits.1 == .blocked(.insufficientSpace), "setup: the ledger admits r2 on its own, and the prefetch job is still parked: \(fits)")
+        // r1 finishes: the re-check admits the prefetch job, ranked ahead, and the run settles in that turn.
+        await harness.source.release(first.transferID, with: .progress(received: 1, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[first.transferID] == nil && $0.state.storeWorkRuns == 0 }
+        let after = await engine.readForTests { engine in
+            (engine.state.run?.settlement, engine.state.run == nil, engine.state.jobs[ahead.transferID]?.active != nil, engine.state.lastRunID)
+        }
+        #expect(after.2, "the re-check gives the room to the prefetch job ranked ahead of r2")
+        let settled = after.1 || after.0 == .blocked(.insufficientSpace)
+        #expect(settled, "the run settles blocked for lack of space in r1's turn: \(String(describing: after.0))")
+        if !settled {
+            // Ends the run the check left open, so the join below returns.
+            await engine.shutdown()
+        }
+        let outcome = await joinCancelling(run)
+        if case .blocked(.insufficientSpace, _) = outcome {
+        } else {
+            Issue.record("the sync caller is told the volume lacks space for r2: \(outcome)")
+        }
+        #expect(after.3 == setup.3, "no second run: \(after.3) after \(setup.3)")
+        await engine.releaseGroup(aheadToken)
+        await engine.releaseGroup(holderToken)
+        await engine.shutdown()
+    }
+
+    /// The check's last step: when the re-check re-queues nothing, nothing else may check the run again. Here an earlier
+    /// read's sweep re-queued a prefetch job that waits for a slot, so its bytes count ahead of the run's claim: the
+    /// ledger admits the claim on its own, the re-check does not, and the run must settle in the same turn. Every slot
+    /// stays taken by transfers of unknown size (which hold no ledger bytes), and a user-initiated job takes the slot the
+    /// run's other claim frees, so no later dispatch checks the run.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: a run whose claim parked for space the ledger admits alone but not behind a re-queued job waiting for a slot settles blocked for lack of space at once", .timeLimit(.minutes(1)))
+    func runSettlesWhenRequeuedJobWaitsAhead() async throws {
+        let reserve = StoragePolicy().reserveFreeBytes
+        let time = ManualTimeSource()
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 4_000_000, opportunisticCapacity: reserve + 4_000_000)
+        )
+        let harness = EngineHarness.make(
+            time: time,
+            tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0, preemptLowerLanes: false),
+            storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            fileSystem: fileSystem
+        )
+        // Sizes in tens of kilobytes: this test reads free space again after the store wrote its index, which the
+        // margins absorb.
+        let holder = EngineHarness.onDemand("h", EngineFixture.bytes(6_901, count: 20_000))
+        let ahead = EngineHarness.onDemand("p", EngineFixture.bytes(6_902, count: 30_000))
+        // Transfers of unknown size: they take slots and hold no ledger bytes.
+        let unsized = (0..<4).map { EngineFixture.entry("u\($0)", EngineFixture.bytes(6_910 + UInt64($0)), policy: .onDemand, size: false) }
+        await harness.serveManifest([holder, ahead] + unsized)
+        let engine = harness.engine
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        for entry in [holder, ahead] + unsized {
+            await harness.source.script(entry.transferID, [.hold])
+        }
+        let first = try await engine.registerGroup([holder.identifier, unsized[0].identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[holder.transferID]?.active != nil && $0.state.jobs[unsized[0].transferID]?.active != nil }
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(45_000, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        let aheadToken = try await engine.registerGroup([ahead.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[ahead.transferID]?.state == .blocked(.insufficientSpace) && !$0.state.pumpFollowUpScheduled }
+        // The run takes the third slot with r1, and the gate parks r2 for space at the fourth.
+        let bytes1 = EngineFixture.bytes(6_903, count: 10_000)
+        let bytes2 = EngineFixture.bytes(6_904, count: 30_000)
+        let r1 = EngineFixture.entry("r1", bytes1)
+        let r2 = EngineFixture.entry("r2", bytes2)
+        await harness.serveManifest([holder, ahead] + unsized + [r1, r2], etag: "v2")
+        await harness.source.script(r1.transferID, [.hold, .stage(bytes1)])
+        await harness.source.script(r2.transferID, [.stage(bytes2)])
+        let run = Task { await engine.sync(.force) }
+        await untilFinishedOrCondition(run, engine) { engine in
+            engine.state.jobs[r1.transferID]?.active != nil && engine.state.jobs[r2.transferID]?.state == .blocked(.insufficientSpace)
+        }
+        let setup = await engine.readForTests { engine in
+            (engine.state.jobs[r1.transferID]?.active != nil, engine.state.jobs[r2.transferID]?.state, engine.state.run?.id, engine.state.lastRunID)
+        }
+        try #require(setup.0 && setup.1 == .blocked(.insufficientSpace) && setup.2 != nil, "setup: r1 runs and r2 is parked for space: \(setup)")
+        // The holder ends with a 404, and two more unsized transfers take the free slots.
+        await harness.source.release(holder.transferID, with: .failed(.permanentMissing(httpStatus: 404)))
+        await engine.awaitCondition { $0.state.jobs[holder.transferID] == nil && $0.state.storeWorkRuns == 0 }
+        let second = try await engine.registerGroup([unsized[1].identifier, unsized[2].identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[unsized[1].transferID]?.active != nil && $0.state.jobs[unsized[2].transferID]?.active != nil }
+        // A read re-queues the prefetch job (ranked ahead of r2), which waits for a slot; r2 does not fit behind it.
+        await engine.refreshFreeSpace()
+        let read = await engine.readForTests { engine in
+            (engine.state.jobs[ahead.transferID]?.state, engine.state.jobs[r2.transferID]?.state, engine.state.jobs[r2.transferID].map { engine.spaceBlock($0) == nil })
+        }
+        try #require(read.0 == .queued && read.1 == .blocked(.insufficientSpace), "setup: the prefetch job waits in the queue and r2 stays parked: \(read)")
+        try #require(read.2 == true, "setup: the ledger admits r2 on its own: \(read)")
+        // A user-initiated transfer of unknown size waits for a slot and takes the one r1 frees.
+        let user = Task { await engine.awaitAsset(unsized[3].identifier, lane: .userInitiated) }
+        await untilFinishedOrCondition(user, engine) { $0.state.jobs[unsized[3].transferID]?.state == .queued }
+        await harness.source.release(r1.transferID, with: .progress(received: 1, expected: nil))
+        await engine.awaitCondition { engine in
+            engine.state.jobs[r1.transferID] == nil && engine.state.storeWorkRuns == 0 && engine.state.jobs[unsized[3].transferID]?.active != nil
+        }
+        let after = await engine.readForTests { engine in
+            (engine.state.run?.settlement, engine.state.run == nil, engine.state.jobs[ahead.transferID]?.state, engine.state.lastRunID)
+        }
+        #expect(after.2 == .queued, "the prefetch job still waits for a slot: \(String(describing: after.2))")
+        let settled = after.1 || after.0 == .blocked(.insufficientSpace)
+        #expect(settled, "the run settles blocked for lack of space in r1's turn: \(String(describing: after.0))")
+        if !settled {
+            // Ends the run the check left open, so the join below returns.
+            await engine.shutdown()
+        }
+        let outcome = await joinCancelling(run)
+        if case .blocked(.insufficientSpace, _) = outcome {
+        } else {
+            Issue.record("the sync caller is told the volume lacks space for r2: \(outcome)")
+        }
+        #expect(after.3 == setup.3, "no second run: \(after.3) after \(setup.3)")
+        for token in [first, second, aheadToken] {
+            await engine.releaseGroup(token)
+        }
+        await engine.shutdown()
+        _ = await joinCancelling(user)
+    }
 }
 
 /// A `FakeRemoteSource` whose next manifest request waits until the test releases it (or the fetch is cancelled), so a
