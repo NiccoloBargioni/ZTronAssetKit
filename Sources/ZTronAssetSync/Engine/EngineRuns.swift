@@ -329,6 +329,8 @@ extension SyncEngine {
             } else {
                 self.state.runCompletions[token] = continuation
                 self.checkRunSettled()
+                // The registration is a mutation the test seams' conditions read (a run waiting for its settlement).
+                self.notifyObservers()
             }
         }
     }
