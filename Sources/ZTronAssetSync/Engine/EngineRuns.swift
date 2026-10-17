@@ -144,8 +144,10 @@ extension SyncEngine {
             self.setPendingRun(.breaker, trigger: .breakerClosed)
             return .blocked(.circuitOpen(cause), self.report(manifestFresh: false))
         case .throttled(let until):
+            // The outcome's end was read in the fetch's turn; a transfer's 429 may have extended the origin's throttle
+            // before this task resumed. The run reports the end the pending run waits for, the origin's (F-36, F-38).
             self.setPendingRun(.throttle, trigger: .explicit)
-            return .blocked(.throttled(until: until), self.report(manifestFresh: false))
+            return .blocked(.throttled(until: self.throttleEnd(after: until)), self.report(manifestFresh: false))
         case .cancelled:
             return .failed(.cancelled)
         case .shutDown:

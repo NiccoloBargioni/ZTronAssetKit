@@ -437,7 +437,7 @@ extension SyncEngine {
             if report.isComplete {
                 return .success(report)
             }
-            return .failure(SyncEngine.unreachableError(outcome, now: self.environment.time.now(), monotonicNow: self.environment.time.monotonicNow()))
+            return .failure(self.unreachableError(outcome))
         case .cancelled:
             return .failure(.cancelled)
         case .shutDown:
@@ -549,15 +549,17 @@ extension SyncEngine {
 
     /// The error of an unreachable manifest for `ensureAvailable`. A fetch the origin's throttle refused reports the time
     /// left until the throttle ends, as ARCHITECTURE §7.6 maps a 429 and as the unknown-id `resolve` answers the same
-    /// refusal (close-out cycle 17, F-37).
-    private static func unreachableError(_ outcome: ManifestOutcome, now: Date, monotonicNow: MonotonicInstant) -> AssetError {
+    /// refusal (close-out cycle 17, F-37). The end is read in the answering turn through the origin's
+    /// (`throttleEnd(after:)`): the outcome's end was read in the fetch's turn, and a transfer's 429 may have extended the
+    /// throttle in the awaits since (close-out cycle 18, F-38).
+    private func unreachableError(_ outcome: ManifestOutcome) -> AssetError {
         switch outcome {
         case .failed(let error):
-            return error.assetError(now: now)
+            return error.assetError(now: self.environment.time.now())
         case .circuitOpen(let cause):
             return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
         case .throttled(let until):
-            return .serverUnavailable(retryAfter: until.seconds(since: monotonicNow))
+            return self.throttledError(after: until)
         default:
             return .serverUnavailable(retryAfter: nil)
         }

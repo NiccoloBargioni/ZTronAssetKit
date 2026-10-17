@@ -535,6 +535,13 @@ extension SyncEngine {
         return max(end, until)
     }
 
+    /// The answer to a request the origin's throttle refuses, which a refusal ending at `until` produced: the time left
+    /// until the origin's end, read now. A manifest outcome carries the end its fetch's turn read, and its waiters answer
+    /// after awaits in which a transfer's 429 may extend the throttle (close-out cycle 18, F-38).
+    func throttledError(after until: MonotonicInstant) -> AssetError {
+        .serverUnavailable(retryAfter: self.throttleEnd(after: until).seconds(since: self.environment.time.monotonicNow()))
+    }
+
     /// `reason` with a throttle's end read through `throttleEnd(after:)`.
     func currentReason(_ reason: BlockReason) -> BlockReason {
         if case .throttled(let until) = reason {
