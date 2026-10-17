@@ -35,6 +35,15 @@ struct OriginGate: Equatable {
         return true
     }
 
+    /// The end of a throttle recorded as `end` while it is in force at `now`: the throttle half of the reading, shared with
+    /// the dispatch gate, which reads it per job without building the whole value (one dictionary read, C2).
+    static func inForce(_ end: MonotonicInstant?, at now: MonotonicInstant) -> MonotonicInstant? {
+        guard let end, end > now else {
+            return nil
+        }
+        return end
+    }
+
     /// Whether the gate behind `reason` admits now; `nil` for a reason that is not an origin gate.
     func admits(_ reason: BlockReason) -> Bool? {
         switch reason {
@@ -57,7 +66,7 @@ extension SyncEngine {
         let end = self.state.throttles[origin]
         return OriginGate(
             now: now,
-            throttledUntil: end.flatMap { $0 > now ? $0 : nil },
+            throttledUntil: OriginGate.inForce(end, at: now),
             throttleEnded: end.map { $0 <= now } ?? false,
             breaker: self.state.breakers[origin]?.admission(of: nil, at: now)
         )

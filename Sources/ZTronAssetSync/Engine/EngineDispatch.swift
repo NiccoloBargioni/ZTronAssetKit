@@ -473,11 +473,12 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
-        if let until = self.originGate(at: now).throttledUntil {
+        // The origin's gates through the pure functions every other decision reads too (`OriginGate`, F-40), each read
+        // once per job: this runs for every job a pump dispatches or parks.
+        if let until = OriginGate.inForce(self.state.throttles[remote.originID], at: now) {
             return .block(.throttled(until: until))
         }
         if let breaker = self.state.breakers[remote.originID] {
-            // The pure reading `admit` applies, the one every other decision reads too (F-40).
             switch breaker.admission(of: transfer, at: now) {
             case .allow:
                 break
