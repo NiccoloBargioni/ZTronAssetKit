@@ -13,7 +13,8 @@ import ZTronAssetTestSupport
 /// - I1: no run settles blocked by an origin gate that admits at `now` (checked in the settling turn itself);
 /// - I2: no pending run starts while the gate it waits on is closed at `now` (checked in the starting turn);
 /// - I3: once the alarm has had its turn, no job stays parked by an origin gate that admits at `now`;
-/// - I4: a step makes at most one manifest request (runs never repeat without the clock moving).
+/// - I4: a step makes at most one manifest request, and at most `runsWithoutClockMove` runs start while the clock does not
+///   move (runs never repeat without the clock moving; close-out cycle 21 added the second half).
 /// The gates are read by `Oracle`, written from ARCHITECTURE §7.6/§7.7 rather than from the engine's helpers. A failure
 /// prints its seed and the walk so far. Every wait is a condition that ends on cancellation (L4-R17).
 @Suite("Engine gate model, close-out cycle 20")
@@ -21,6 +22,13 @@ struct EngineGateModelTests {
     /// The walks' count and length.
     static let seeds: Range<UInt64> = 0..<160
     static let steps = 60
+    /// I4's bound on the runs that start while the clock does not move. A pending run that waits for the breaker starts
+    /// only once the breaker closes, or once it admits only a probe and no job it parked or re-admitted can take that
+    /// probe first (F-41); a second run can follow without the clock moving only when a job that was not parked then (it
+    /// waited for a slot, or a step queued it) wins the probe from the first run's claims, and that job's probe must end
+    /// first. 1,000 walks reach 2 at most; the engine of `58287dc`, which started one run per probe that ended without a
+    /// verdict, reaches 3 or 4 in 19 of them (seeds 24, 66 and 155 among the 160 here).
+    static let runsWithoutClockMove: UInt64 = 2
 
     /// SplitMix64: the test's own deterministic generator (system randomness stays out of tests, C4).
     struct SplitMix: RandomNumberGenerator {
@@ -245,6 +253,8 @@ struct EngineGateModelTests {
         var full = false
         var group: InterestToken?
         var answerNext = false
+        // I4: the runs started since the clock last moved (`lastRunID` when it last moved).
+        var runsAtClockMove: UInt64 = 0
         var violation: String?
 
         func finish() async {
@@ -263,6 +273,7 @@ struct EngineGateModelTests {
             group = try await engine.registerGroup(members.map(\.0.identifier), lane: .prefetch).get()
         }
         await engine.awaitCondition { Self.settled($0) }
+        runsAtClockMove = await engine.readForTests { $0.state.lastRunID }
         for step in 0...Self.steps {
             let requestsBefore = await harness.source.manifestRequests.count
             if step > 0 {
@@ -277,10 +288,11 @@ struct EngineGateModelTests {
                         engine.state.breakers[origin]?.state,
                         engine.state.throttles[origin],
                         engine.state.heap.first?.at,
-                        engine.environment.time.monotonicNow()
+                        engine.environment.time.monotonicNow(),
+                        engine.state.lastRunID
                     )
                 }
-                let (active, breaker, throttle, nextDeadline, now) = view
+                let (active, breaker, throttle, nextDeadline, now, runsBefore) = view
                 var probe: TransferID?
                 if case .halfOpen(_, _, let current?, _)? = breaker {
                     probe = current
@@ -315,6 +327,7 @@ struct EngineGateModelTests {
                     }
                     log.append("\(step): hold the alarm's turns and move the clock to the gate's end \(target)")
                     time.advance(to: target)
+                    runsAtClockMove = runsBefore
                     answerNext = true
                 } else if !active.isEmpty, roll < 38 {
                     // An attempt other than the probe ends three times in four: a silent probe lets the clock pass its watchdog.
@@ -340,10 +353,12 @@ struct EngineGateModelTests {
                         let target = instants[Int(random.next() % UInt64(instants.count))]
                         log.append("\(step): clock to \(target)\(holding ? " (alarm held)" : "")")
                         time.advance(to: target)
+                        runsAtClockMove = runsBefore
                     } else {
                         let seconds = Double(1 + random.next() % 70)
                         log.append("\(step): clock +\(seconds) s\(holding ? " (alarm held)" : "")")
                         time.advance(by: seconds)
+                        runsAtClockMove = runsBefore
                     }
                 } else if roll < 70 {
                     if holding {
@@ -384,6 +399,10 @@ struct EngineGateModelTests {
             let requests = await harness.source.manifestRequests.count
             if requests - requestsBefore > 1 {
                 found.append("I4: one step made \(requests - requestsBefore) manifest requests")
+            }
+            let runs = await engine.readForTests { $0.state.lastRunID } - runsAtClockMove
+            if runs > Self.runsWithoutClockMove {
+                found.append("I4: \(runs) runs started while the clock did not move")
             }
             if !holding {
                 found += await engine.readForTests { engine in Self.staleParks(engine) + engine.invariantViolations() }
