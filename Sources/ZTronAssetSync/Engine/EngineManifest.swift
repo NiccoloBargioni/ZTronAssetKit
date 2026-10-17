@@ -276,6 +276,9 @@ extension SyncEngine {
     private func answerUnknownWaiters(_ outcome: ManifestOutcome) async {
         let manifest: ValidatedManifest?
         let failure: AssetError?
+        // A throttle's refusal tells each waiter the time left until the origin's throttle ends, read when that waiter is
+        // answered: the admissions below await the store, and a transfer's 429 may extend the throttle meanwhile (F-38).
+        var throttledUntil: MonotonicInstant?
         switch outcome {
         case .fetched(let fetched, _, _):
             manifest = fetched
@@ -294,7 +297,8 @@ extension SyncEngine {
             failure = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
         case .throttled(let until):
             manifest = self.state.newest?.manifest
-            failure = .serverUnavailable(retryAfter: until.seconds(since: self.environment.time.monotonicNow()))
+            failure = self.throttledError(after: until)
+            throttledUntil = until
         case .timedOut, .cancelled, .shutDown:
             return
         }
@@ -311,7 +315,7 @@ extension SyncEngine {
             guard let entry = self.state.applied.entry(for: waiter.asset) ?? manifest?.entry(for: waiter.asset) else {
                 self.state.unknownWaiters[token] = nil
                 if let failure {
-                    waiter.continuation.resume(returning: .failure(failure))
+                    waiter.continuation.resume(returning: .failure(throttledUntil.map { self.throttledError(after: $0) } ?? failure))
                 } else {
                     self.state.negativeCache.insert(waiter.asset, until: now.adding(seconds: self.tuning.unknownIDRefetchInterval), capacity: self.tuning.unknownIDCacheCapacity)
                     waiter.continuation.resume(returning: .failure(.notFound))
