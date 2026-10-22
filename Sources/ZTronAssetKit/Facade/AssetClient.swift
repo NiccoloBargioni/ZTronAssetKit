@@ -344,13 +344,12 @@ public final class AssetClient: Sendable {
         }
         let metrics = await engine.metrics()
         let storage = await engine.storageReport()
-        if case .failure(.shutDown) = metrics {
+        switch (metrics, storage) {
+        case (.failure(.shutDown), _), (_, .failure(.shutDown)):
             return .failure(.shutDown)
+        default:
+            return .success((diagnostics, (try? metrics.get()) ?? MetricsSnapshot(), try? storage.get()))
         }
-        if case .failure(.shutDown) = storage {
-            return .failure(.shutDown)
-        }
-        return .success((diagnostics, (try? metrics.get()) ?? MetricsSnapshot(), try? storage.get()))
     }
 
     /// Registers a derived in-memory cache (decoded images) to purge on memory pressure (R-CLN-11, ADR-044). Held

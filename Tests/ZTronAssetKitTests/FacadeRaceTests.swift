@@ -212,7 +212,7 @@ struct FacadeRaceTests {
                 await reopenHold.arrive()
             case .pressureRecorded(let epoch):
                 record.yield(epoch)
-            case .registrationAnswered:
+            case .registrationAnswered, .shutdownWillWaitForReopen:
                 break
             }
         }
@@ -227,6 +227,9 @@ struct FacadeRaceTests {
             }
         }
         await reopenHold.waitUntilParked()
+        // A caller asking for the current pair now waits for the reopen and gets its replacement.
+        let lifecycle = client.lifecycle
+        let pairDuringReopen = Task { await lifecycle.current().generation }
         // The reopen is running and generation 0 still serves: its observer takes the event and runs the handler.
         await harness.pressure.send(.warning)
         var epochs = recorded.makeAsyncIterator()
@@ -241,6 +244,7 @@ struct FacadeRaceTests {
         let result = await purge.value
         #expect((try? result.get()) != nil, "the purge was repeated on the replacement: \(result)")
         #expect(await client.lifecycle.current().generation == 1, "setup: one reopen")
+        #expect(await pairDuringReopen.value == 1, "a caller during the reopen was handed the replacement")
         try await harness.pressure.requireObservers(equalTo: 0)
         let engine = await harness.engine()
         #expect(await engine.introspect().memoryPressureObserverActive == false, "the recorded stop holds on the replacement")
@@ -252,6 +256,69 @@ struct FacadeRaceTests {
         try await harness.pressure.requireObservers(equalTo: 1)
         #expect(await engine.introspect().memoryPressureObserverActive, "a new registration starts the replacement's observer")
         await client.shutdown()
+    }
+
+    /// `shutdown()` while a reopen runs: the shutdown waits for the reopen, which finds the client closed once the old
+    /// engine is shut down and builds nothing (G-1); the call that met the replaced root and the calls that waited for
+    /// the reopen report `.shutDown`, and generation 0 stays the last pair.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: a shutdown during a reopen builds no replacement, and the calls waiting for the reopen report shutDown", .timeLimit(.minutes(1)))
+    func shutdownDuringReopen() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        try await harness.startAndSettle()
+        let old = await harness.engine()
+        let reopenHold = SeamHold()
+        let (shutdownWaits, signal) = AsyncStream.makeStream(of: Void.self)
+        await client.lifecycle.setSeam { point in
+            switch point {
+            case .reopenWillShutDownEngine:
+                await reopenHold.arrive()
+            case .shutdownWillWaitForReopen:
+                signal.yield()
+            case .registrationAnswered, .pressureRecorded:
+                break
+            }
+        }
+        try FacadeRaceTests.wipeRoot(harness)
+        let purge = Task { () -> Result<PurgeResult, AssetError> in
+            do throws(AssetError) {
+                return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
+                    try await client.purge(.all)
+                })
+            } catch {
+                return .failure(error)
+            }
+        }
+        await reopenHold.waitUntilParked()
+        // Calls made while the reopen runs wait for it (the scope's request may also meet the shutdown at its entry).
+        let lifecycle = client.lifecycle
+        let pairDuringReopen = Task { await lifecycle.current().generation }
+        let scopeDuringReopen = Task { await lifecycle.setRetentionScope(.tags(["late"])) }
+        let shutdown = Task {
+            await client.shutdown()
+        }
+        var waits = shutdownWaits.makeAsyncIterator()
+        _ = await waits.next()
+        await reopenHold.open()
+        await shutdown.value
+        let result = await purge.value
+        var reportedShutDown = false
+        if case .failure(.shutDown) = result {
+            reportedShutDown = true
+        }
+        #expect(reportedShutDown, "the call that met the replaced root reports shutDown: \(result)")
+        var scopeShutDown = false
+        if case .failure(.shutDown) = await scopeDuringReopen.value {
+            scopeShutDown = true
+        }
+        #expect(scopeShutDown, "a scope change waiting for the reopen reports shutDown")
+        #expect(await pairDuringReopen.value == 0, "no replacement was built: the caller got the last pair")
+        #expect(await client.lifecycle.current().generation == 0, "generation 0 stays the last pair")
+        #expect(await old.introspect().lifecycle == .shutDown)
+        await #expect(throws: AssetError.shutDown) {
+            try await client.pin(["a"])
+        }
     }
 
     @available(macOS 15.0, iOS 18.0, *)
