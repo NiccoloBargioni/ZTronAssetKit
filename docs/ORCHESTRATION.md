@@ -46,6 +46,19 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Close-out: RUNNING from cycle 2:** `wf_0ec4322f-bdb` (task `w2c654soi`), launched 17:45 at weekly 8 %, with `fromCycle: 2` and `findingsFile` `.build-orchestrator/l5-close1-remaining-g.json`.
   - The other arguments are unchanged: strict, `maxCycle: 30`, `usageStop: 50`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
   - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_0ec4322f-bdb`.
+- **Close-out cycle 2:** `wf_0ec4322f-bdb`, 17:45–20:55 (3.2 h, weekly 8 % → 12 %, ~4 points).
+  - Requirements lens: **0 blocking**.
+  - Correctness lens: 1 blocking, L5-C2-00. A retired generation's `clientStarted` is lost, because it shares the engine's terminal slot with `clientShutDown`, which the facade hides.
+  - The orchestrator stopped the run 3 min into fix 3, before any change, and ruled:
+    - **L5-R19:** `clientShutDown` gets its own engine slot (authorised `SubscriberQueue.swift` edit, two WP-F tests updated to the new mapping), and the model's exemptions are audited.
+    - **L5-R20:** `AssetStore.verifyRootNow()` as a package method, plus the facade's root check after file-system-type failures.
+    - **L5-R21:** non-blocking test and doc fixes, and an `EngineDispatch.swift` guard.
+- **Close-out: RUNNING from cycle 3:** `wf_b17021d0-91c` (task `wyz8ryynw`), launched 21:07 at weekly 13 %, with `fromCycle: 3`, `findingsFile` `.build-orchestrator/l5-close2-remaining-g.json`, and the other arguments as before. Run dir: `…/subagents/workflows/wf_b17021d0-91c`.
+- **Re-forecast (22 Oct 21:10).** Measured strict cycles here cost ~3–4 points and ~3 h each, about 2× the L4 calibration, because the fixers run the Kit, Sync and Storage suites and the verifiers run stress series.
+  - The blocking count is 4 → 4 → 1, and the requirements lens passed in cycle 2, so likely 2–6 more cycles: 6–21 h and 6–24 points.
+  - **WP-G ends:** likely Fri 23 Oct ~07:00 → Sat 24 Oct ~04:00, at weekly ~22–40 %.
+  - **WP-K**, recalibrated: ~12–29 h and ~12–30 points.
+  - **Level 5 ends:** Fri ~19:00 → Sun 25 Oct ~09:00, at weekly ~34–70 %. It finishes before the 29 Oct reset in every case.
 - **Probes** are kept in `.build-orchestrator/l5-probes-r3/` (round 3) and `.build-orchestrator/l5-probes-c1/` (cycle 1, both lenses, plus the correctness verifier's `.fix` candidates).
 - **Resume cold** (if this session is gone):
   1. Read the close-out's `journal.jsonl`; the last `verify:g:*:cN` results are the findings.
