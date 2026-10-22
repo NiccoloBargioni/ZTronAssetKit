@@ -101,7 +101,7 @@ struct FacadeRaceTests {
         let engine = await harness.engine()
         let hold = SeamHold()
         await client.lifecycle.setSeam { point in
-            if point == .registrationAnswered {
+            if case .registrationAnswered = point {
                 await hold.arrive()
             }
         }
@@ -133,7 +133,7 @@ struct FacadeRaceTests {
         try await second.awaitRegistration()
         let hold = SeamHold()
         await client.lifecycle.setSeam { point in
-            if point == .registrationAnswered {
+            if case .registrationAnswered = point {
                 await hold.arrive()
             }
         }
@@ -312,6 +312,61 @@ struct FacadeRaceTests {
         await #expect(throws: AssetError.shutDown) {
             try await client.pin(["a"])
         }
+    }
+
+    /// L5-R13 (G-16): an `events` stream registers on its first pull and becomes a follower in that turn. A first pull
+    /// made while a reopen is parked after building its replacement registers with the retired engine, which answers
+    /// `.shutDown`, so the registration waits for the reopen, whose hand-over covers the follower. The consumer is
+    /// cancelled meanwhile: the forwarder drops the stream it is handed, and gives its follower entry back once the
+    /// registration returns, so neither the lifecycle nor the replacement keeps anything for it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: an events stream cancelled while its first registration waits for a reopen leaves no follower and no subscriber", .timeLimit(.minutes(1)))
+    func eventsStreamCancelledDuringItsRegistration() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        try await harness.startAndSettle()
+        let followers = FollowerGauge()
+        await client.lifecycle.setFollowerObserver { count in
+            followers.set(count)
+        }
+        let hold = SeamHold()
+        await client.lifecycle.setSeam { point in
+            if case .replacementBuilt = point {
+                await hold.arrive()
+            }
+        }
+        try harness.vanishRoot()
+        let purge = Task { () -> Result<PurgeResult, AssetError> in
+            do throws(AssetError) {
+                return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
+                    try await client.purge(.all)
+                })
+            } catch {
+                return .failure(error)
+            }
+        }
+        await hold.waitUntilParked()
+        let consumer = Task { () -> Int in
+            var received = 0
+            for await _ in client.events {
+                received += 1
+            }
+            return received
+        }
+        // The first pull recorded the follower; its registration waits for the parked reopen.
+        await followers.wait(atLeast: 1)
+        consumer.cancel()
+        await hold.open()
+        let received = await consumer.value
+        let result = await purge.value
+        #expect((try? result.get()) != nil, "setup: the purge was repeated on the replacement: \(result)")
+        #expect(received == 0, "the cancelled consumer received nothing: \(received)")
+        #expect(followers.count == 0, "the follower entry was given back once the registration returned")
+        let replacement = await client.lifecycle.current()
+        #expect(replacement.generation == 1, "setup: one reopen")
+        await replacement.engine.waitUntil { $0.subscribers == 0 }
+        #expect(await replacement.engine.introspect().subscribers == 0, "the stream handed to the stopped forwarder was released")
+        await client.shutdown()
     }
 
     /// L5-R2's reopen path (L5-V3-05, PROBE-2): the reopen applies the newest memory-pressure request to its replacement

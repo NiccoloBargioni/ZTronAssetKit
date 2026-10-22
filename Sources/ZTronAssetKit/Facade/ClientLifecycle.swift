@@ -4,29 +4,20 @@ import ZTronAssetStorage
 import ZTronAssetSync
 
 /// One store and the engine over it: the pair a client serves from, replaced as a whole by a reopen (B-15, B-17).
-/// Two values are equal when they hold the same actors, so a seam point can carry one (`LifecycleSeamPoint`).
-struct ClientCore: Sendable, Hashable {
+struct ClientCore: Sendable {
     /// 0 for the pair `AssetClient.init` built, one more for each reopen.
     let generation: UInt64
     /// The store.
     let store: AssetStore
     /// The engine over `store`.
     let engine: SyncEngine
-
-    static func == (lhs: ClientCore, rhs: ClientCore) -> Bool {
-        lhs.generation == rhs.generation && lhs.store === rhs.store && lhs.engine === rhs.engine
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(self.generation)
-        hasher.combine(ObjectIdentifier(self.engine))
-    }
 }
 
 /// The places where a test can hold or observe `ClientLifecycle` through its seam (`docs/adr-drafts/g.md` G-10). The
 /// seam is `nil` in production; each point exists because an interleaving there was a bug no test could otherwise
-/// reach deterministically (CLAUDE.md G4).
-enum LifecycleSeamPoint: Sendable, Hashable {
+/// reach deterministically (CLAUDE.md G4), or because the L5-R13 model needs it (`replacementBuilt`). Tests match points
+/// by pattern.
+enum LifecycleSeamPoint: Sendable {
     /// `bind(_:)`: the engine answered a registration; the group, `closed` and the generation are re-read next.
     case registrationAnswered
     /// `performReopen`: the reopen of `generation` is running (`reopening` set, the generation retiring) and the old

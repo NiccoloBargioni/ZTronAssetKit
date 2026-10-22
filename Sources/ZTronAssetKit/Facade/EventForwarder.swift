@@ -252,10 +252,8 @@ actor EventForwarder {
         }
     }
 
+    /// Starts the pump; `next()` calls it once, with no pump started and no registration in flight.
     private func startPump() {
-        guard self.pump == nil else {
-            return
-        }
         let lifecycle = self.lifecycle
         let first = self.first
         self.first = nil

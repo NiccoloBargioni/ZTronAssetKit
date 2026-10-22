@@ -185,12 +185,12 @@ final class ModelRecord: Sendable {
     }
 }
 
-/// The lifecycle's follower count, fed by its test hook; `wait(atMost:)` is a condition wait that ends on cancellation.
+/// The lifecycle's follower count, fed by its test hook; its waits are conditions that end on cancellation.
 @available(macOS 15.0, iOS 18.0, *)
 final class FollowerGauge: Sendable {
     private struct State {
         var count = 0
-        var waiters: [UInt64: (target: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
+        var waiters: [UInt64: (met: @Sendable (Int) -> Bool, continuation: CheckedContinuation<Void, Never>)] = [:]
         var lastWaiter: UInt64 = 0
     }
 
@@ -200,7 +200,7 @@ final class FollowerGauge: Sendable {
     func set(_ count: Int) {
         let ready = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
             state.count = count
-            let ready = state.waiters.filter { count <= $0.value.target }
+            let ready = state.waiters.filter { $0.value.met(count) }
             for id in ready.keys {
                 state.waiters[id] = nil
             }
@@ -216,6 +216,15 @@ final class FollowerGauge: Sendable {
 
     /// Suspends until at most `target` followers are left, or until the caller is cancelled.
     func wait(atMost target: Int) async {
+        await self.wait { $0 <= target }
+    }
+
+    /// Suspends until at least `target` followers are recorded, or until the caller is cancelled.
+    func wait(atLeast target: Int) async {
+        await self.wait { $0 >= target }
+    }
+
+    private func wait(until met: @escaping @Sendable (Int) -> Bool) async {
         let id = self.state.withLock { state -> UInt64 in
             state.lastWaiter += 1
             return state.lastWaiter
@@ -223,10 +232,10 @@ final class FollowerGauge: Sendable {
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 let now = self.state.withLock { state -> Bool in
-                    if state.count <= target || Task.isCancelled {
+                    if met(state.count) || Task.isCancelled {
                         return true
                     }
-                    state.waiters[id] = (target, continuation)
+                    state.waiters[id] = (met, continuation)
                     return false
                 }
                 if now {
