@@ -108,9 +108,32 @@ package actor AssetStore {
         self.state.core.unavailable
     }
 
-    /// The commit's root check on demand (orchestrator ruling L5-R20); not implemented yet: answers the recorded reason.
+    /// Checks the root now, with the check every commit makes first (`StoreLock.verifyRoot`: the lock file still has the
+    /// identity the lock recorded), so a root replaced while no commit has run since is detected without waiting for one
+    /// (orchestrator ruling L5-R20, B-15). A root that no longer verifies is recorded as `.rootVanished`, the state a
+    /// commit's detection leaves: every commit and mutating call is refused from then on, reads keep working. The check
+    /// is one `itemInfo` of the lock file in one unit on the metadata executor; it writes nothing. Returns
+    /// `unavailableReason`, at once and with no I/O when a reason is already recorded or the store is not open; a check
+    /// that cannot tell (the stat itself failed) records nothing. The facade calls it after a failure that can stem from
+    /// the file system, to decide whether to reopen.
     package func verifyRootNow() async -> StorageUnavailableReason? {
-        self.state.core.unavailable
+        guard self.state.core.unavailable == nil, self.state.core.phase == .open, let layout = self.state.core.layout,
+            let lock = self.state.core.lock
+        else {
+            return self.state.core.unavailable
+        }
+        let fileSystem = self.environment.fileSystem
+        // REENTRANCY: g-12 (proposed) — `unavailable`, re-read below: a commit's detection meanwhile recorded the same
+        // reason; the answer is about the root this store locked, so a close begun meanwhile changes nothing (the reason
+        // outlives the close, and `close()` drains this unit first).
+        let verified = await self.runUnit(on: self.environment.metadataExecutor) {
+            StoreLock.verifyRoot(fileSystem: fileSystem, layout: layout, token: lock)
+        }
+        if case .failure(.storageUnavailable(.rootVanished)) = verified, self.state.core.unavailable == nil {
+            self.state.core.unavailable = .rootVanished
+            self.environment.log.log(.store, .error, "root check failed: storageUnavailable(rootVanished); every commit is refused from now on")
+        }
+        return self.state.core.unavailable
     }
 
     /// One free-space read through `FileSystem`, plus usage, pending reclaim and the resolved budget (R-SYN-11).
