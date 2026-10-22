@@ -7,8 +7,9 @@ import ZTronAssetSync
 /// engine and the store already answered, so the report is testable without a client.
 ///
 /// Secrets (R-SEC-1): the configuration is summarised field by field, never dumped, so a new field cannot leak by
-/// accident; the app key is reported only as present or absent, and URLs lose any user, password, query and
-/// fragment. `AppKey` is not `Codable`, so the encoder could not write it even by mistake.
+/// accident; the app key is reported only as present or absent, URLs lose any user, password, query and fragment,
+/// and configured paths any query and fragment. `AppKey` is not `Codable`, so the encoder could not write it even by
+/// mistake.
 enum DiagnosticReportBuilder {
     /// The module's version string (no build tool writes one; bumped with the package's releases).
     static let moduleVersion = "1.0.0"
@@ -63,7 +64,7 @@ enum DiagnosticReportBuilder {
         ]
         if let http = configuration.remote.http {
             summary["remote.http.baseURL"] = DiagnosticReportBuilder.sanitized(http.baseURL)
-            summary["remote.http.manifestPath"] = http.manifestPath
+            summary["remote.http.manifestPath"] = DiagnosticReportBuilder.sanitizedPath(http.manifestPath)
             summary["remote.http.appKey"] = http.appKey == nil ? "none" : "<redacted>"
             summary["remote.http.keyHeaderName"] = http.keyHeaderName
             summary["remote.http.additionalAllowedHosts"] = http.additionalAllowedHosts.sorted().joined(separator: ",")
@@ -84,7 +85,7 @@ enum DiagnosticReportBuilder {
         }
         if let apple = configuration.remote.appleHosted {
             summary["remote.appleHosted.catalogPackID"] = apple.catalogPackID
-            summary["remote.appleHosted.catalogPath"] = apple.catalogPath
+            summary["remote.appleHosted.catalogPath"] = DiagnosticReportBuilder.sanitizedPath(apple.catalogPath)
             summary["remote.appleHosted.retention"] = String(describing: apple.retention)
             summary["remote.appleHosted.updateCheckOnManifestFetch"] = String(apple.updateCheckOnManifestFetch)
         } else {
@@ -103,6 +104,12 @@ enum DiagnosticReportBuilder {
         components.query = nil
         components.fragment = nil
         return components.string ?? "<unparseable>"
+    }
+
+    /// A configured path without anything from its first `?` or `#` on: a query can carry a token as well as a URL's
+    /// can (R-SEC-1).
+    static func sanitizedPath(_ path: String) -> String {
+        String(path.prefix { $0 != "?" && $0 != "#" })
     }
 
     /// The engine's counters by name: lifecycle, jobs by state, queued work by lane, tasks, timers, subscribers.
