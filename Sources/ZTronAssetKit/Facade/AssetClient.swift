@@ -21,9 +21,9 @@ public final class AssetClient: Sendable {
     /// The configuration.
     public let configuration: AssetClientConfiguration
     private let environment: AssetEnvironment
-    private let mirror: SnapshotMirror
-    private let store: AssetStore
-    private let engine: SyncEngine
+    let mirror: SnapshotMirror
+    /// The current store and engine, replaced as a pair by a reopen after a replaced root (B-15, B-17).
+    let lifecycle: ClientLifecycle
     private let backgroundRelay: BackgroundEventsRelay
     private let cacheRelay: PurgeableCacheRelay
 
@@ -35,34 +35,16 @@ public final class AssetClient: Sendable {
         self.configuration = configuration
         self.environment = environment
         let mirror = SnapshotMirror(time: environment.time)
-        let store = AssetStore(
-            configuration: AssetClient.storeConfiguration(for: configuration),
-            environment: StoreEnvironment(environment: environment, snapshotSink: mirror)
-        )
         self.mirror = mirror
-        self.store = store
-        self.engine = SyncEngine(
-            store: store,
-            environment: environment,
-            configuration: EngineConfiguration(
-                tuning: configuration.tuning.clamped().tuning,
-                storage: configuration.storage,
-                network: configuration.network,
-                power: configuration.power,
-                refresh: configuration.refresh,
-                remote: configuration.remote,
-                limits: configuration.limits,
-                retentionScope: configuration.retentionScope
-            )
-        )
+        self.lifecycle = ClientLifecycle(configuration: configuration, environment: environment, mirror: mirror)
         self.backgroundRelay = BackgroundEventsRelay()
         self.cacheRelay = PurgeableCacheRelay()
     }
 
     deinit {
-        let engine = self.engine
+        let lifecycle = self.lifecycle
         Task {
-            await engine.shutdown()
+            await lifecycle.shutdown()
         }
     }
 
@@ -89,7 +71,24 @@ public final class AssetClient: Sendable {
 
     /// The engine serving the client now (a test seam of the facade tests).
     func currentEngine() async -> SyncEngine {
-        self.engine
+        await self.lifecycle.current().engine
+    }
+
+    /// Runs one engine call on the current pair. A pair whose root was replaced (`rootVanished`, B-15) is reopened
+    /// once and the call repeated on the replacement, so callers see the failure only when the replacement fails
+    /// too; any other result is returned as the engine gave it (L4-R23: `ensureAvailable` stays faithful).
+    private func perform<T: Sendable>(
+        _ operation: @Sendable (SyncEngine) async -> Result<T, AssetError>
+    ) async throws(AssetError) -> T {
+        let core = await self.lifecycle.current()
+        let result = await operation(core.engine)
+        guard case .failure(.storageUnavailable(.rootVanished)) = result else {
+            return try result.get()
+        }
+        guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
+            throw .shutDown
+        }
+        return try await operation(replacement.engine).get()
     }
 
     /// The executor for bounded blocking units off the cooperative pool (ADR-003, C2), shared with the fallback
@@ -103,7 +102,9 @@ public final class AssetClient: Sendable {
     /// `.storageUnavailable` when the store cannot be opened (every async API then throws it too) and `.shutDown`
     /// after shutdown.
     public func start() async throws(AssetError) {
-        _ = try await self.engine.start().get()
+        _ = try await self.perform { engine in
+            await engine.start()
+        }
     }
 
     /// The local step of the fallback chain: O(1), zero I/O, main actor only (R-CAR-1, P-1, P-8). `extensions`
@@ -116,35 +117,51 @@ public final class AssetClient: Sendable {
     /// The network step: single-flight, at `priority`, fetch-first for unknown ids (R-CAR-1, R-SYN-4). The
     /// caller's cancellation affects only this caller (H-3).
     public func resolve(_ id: AssetID, priority: AssetPriority = .userInitiated) async throws(AssetError) -> URL {
-        try await self.engine.awaitAsset(id, lane: priority).get().url
+        try await self.perform { engine in
+            await engine.awaitAsset(id, lane: priority)
+        }.url
     }
 
     /// Keeps `ids` warm at `priority` until the handle is cancelled or released (R-CAR-1, R-CAR-4). Synchronous:
     /// one handle and one registration task (P-8); `awaitRegistration()` reports a shut-down client.
     public func prefetch(_ ids: [AssetID], priority: AssetPriority = .prefetch) -> PrefetchHandle {
-        PrefetchHandle(registry: self.engine, ids: ids, priority: priority)
+        PrefetchHandle(registry: self.lifecycle, ids: ids, priority: priority)
     }
 
     /// Present, missing, stale and failed counts; no network, no I/O (R-SYN-10).
     public func availability(scope: AssetScope) async throws(AssetError) -> AvailabilityReport {
-        try await self.engine.availability(scope: scope).get()
+        try await self.perform { engine in
+            await engine.availability(scope: scope)
+        }
     }
 
     /// Fetch-first, then fetches what is missing in scope at user-initiated priority (R-SYN-10).
     public func ensureAvailable(scope: AssetScope) async throws(AssetError) -> AvailabilityReport {
-        try await self.engine.ensureAvailable(scope: scope).get()
+        try await self.perform { engine in
+            await engine.ensureAvailable(scope: scope)
+        }
     }
 
     /// Runs `body` with the asset's URL while a lease keeps eviction, prune and purge away from it (R-CAR-8).
     /// Untyped because the body is the caller's (ADR-004); the lease is released on every path.
     public func withAsset<T: Sendable>(_ id: AssetID, _ body: @Sendable (URL) async throws -> T) async throws -> T {
-        let lease = try await self.engine.acquireLease(id).get()
+        let core = await self.lifecycle.current()
+        var engine = core.engine
+        var leased = await engine.acquireLease(id)
+        if case .failure(.storageUnavailable(.rootVanished)) = leased {
+            guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
+                throw AssetError.shutDown
+            }
+            engine = replacement.engine
+            leased = await engine.acquireLease(id)
+        }
+        let lease = try leased.get()
         do {
             let value = try await body(lease.url)
-            await self.engine.releaseLease(lease)
+            await engine.releaseLease(lease)
             return value
         } catch {
-            await self.engine.releaseLease(lease)
+            await engine.releaseLease(lease)
             throw error
         }
     }
@@ -152,28 +169,43 @@ public final class AssetClient: Sendable {
     /// A multi-subscriber, bounded event stream (R-SYN-12); registers asynchronously. Made after shutdown, it
     /// yields `clientShutDown` and finishes.
     public var events: AsyncStream<AssetEvent> {
-        self.engine.makeEventStream()
+        EventForwarder.stream(lifecycle: self.lifecycle, first: nil)
     }
 
     /// A stream that returns after registration and the initial replay.
     public func subscribe() async throws(AssetError) -> AsyncStream<AssetEvent> {
-        try await self.engine.subscribe().get()
+        try await self.start()
+        let core = await self.lifecycle.current()
+        let stream = try await core.engine.subscribe().get()
+        return EventForwarder.stream(lifecycle: self.lifecycle, first: (stream, core.generation))
     }
 
     /// Runs a sync of the retention scope now (`.force`) or when due (`.ifDue`); single-flight. The outcome carries
     /// failures, `.failed(.shutDown)` after shutdown included.
     public func sync(_ mode: SyncMode = .ifDue) async -> SyncOutcome {
-        await self.engine.sync(mode)
+        let core = await self.lifecycle.current()
+        let outcome = await core.engine.sync(mode)
+        guard case .failed(.storageUnavailable(.rootVanished)) = outcome else {
+            return outcome
+        }
+        guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
+            return .failed(.shutDown)
+        }
+        return await replacement.engine.sync(mode)
     }
 
     /// Whether a launch sync is due (R-SYN-9).
     public func isSyncDue() async throws(AssetError) -> Bool {
-        try await self.engine.isSyncDue().get()
+        try await self.perform { engine in
+            await engine.isSyncDue()
+        }
     }
 
     /// When the last complete sync finished (R-SYN-9).
     public func lastSyncedAt() async throws(AssetError) -> Date? {
-        try await self.engine.lastSyncedAt().get()
+        try await self.perform { engine in
+            await engine.lastSyncedAt()
+        }
     }
 
     /// Replaces the retention scope (R-CAR-5, ADR-027), e.g. when the paywall state changes: bulk runs fetch only
@@ -181,46 +213,70 @@ public final class AssetClient: Sendable {
     /// excludes may be released. Deletes nothing and starts nothing by itself; use `ensureAvailable(scope:)` or
     /// `sync(.force)` to fetch newly retained entries now, and `purge(.scope(_:))` to delete excluded ones.
     public func setRetentionScope(_ scope: AssetScope) async throws(AssetError) {
-        try await self.engine.setRetentionScope(scope).get()
+        try await self.start()
+        try await self.perform { engine in
+            await engine.setRetentionScope(scope)
+        }
+        await self.lifecycle.recordRetentionScope(scope)
     }
 
     /// Pins assets so eviction never removes them (R-CLN-4); `purge(.all)` and `purge(.scope(_:))` still do.
     public func pin(_ ids: Set<AssetID>) async throws(AssetError) {
-        try await self.engine.setPinned(ids, pinned: true).get()
+        try await self.perform { engine in
+            await engine.setPinned(ids, pinned: true)
+        }
     }
 
     /// Removes pins; unknown or unpinned ids are ignored.
     public func unpin(_ ids: Set<AssetID>) async throws(AssetError) {
-        try await self.engine.setPinned(ids, pinned: false).get()
+        try await self.perform { engine in
+            await engine.setPinned(ids, pinned: false)
+        }
     }
 
     /// Bytes by kind and state, pinned, evictable, staging, orphan, source-held, free space, last cleanup
     /// (R-CLN-9).
     public func storageReport() async throws(AssetError) -> StorageReport {
-        try await self.engine.storageReport().get()
+        try await self.perform { engine in
+            await engine.storageReport()
+        }
     }
 
     /// A user purge (R-CLN-6); typed, a deliberate narrowing of SPEC §4.5's sketch (ADR-004).
     public func purge(_ request: PurgeRequest) async throws(AssetError) -> PurgeResult {
-        try await self.engine.purge(request).get()
+        try await self.perform { engine in
+            await engine.purge(request)
+        }
     }
 
     /// GC, eviction and deep verification within a time budget, for a `BGProcessingTask` handler (R-SYN-16).
     @discardableResult
     public func performMaintenance(timeBudget: TimeInterval) async throws(AssetError) -> MaintenanceReport {
-        try await self.engine.performMaintenance(timeBudget: timeBudget).get()
+        try await self.perform { engine in
+            await engine.performMaintenance(timeBudget: timeBudget)
+        }
     }
 
     /// The UI could not decode the file: quarantine, delete after grace, re-download with backoff (R-CLN-8).
     public func reportUnreadable(_ id: AssetID) async throws(AssetError) {
-        try await self.engine.reportUnreadable(id).get()
+        try await self.perform { engine in
+            await engine.reportUnreadable(id)
+        }
     }
 
     /// In-memory metrics (R-OBS-2): engine and store counters plus the mirror's lookup hits and misses.
     public func metrics() async throws(AssetError) -> MetricsSnapshot {
-        var snapshot = try await self.engine.metrics().get()
+        let snapshot = try await self.perform { engine in
+            await engine.metrics()
+        }
+        return await self.withLookupCounts(snapshot)
+    }
+
+    /// `snapshot` with the mirror's lookup hits and misses, read on the main actor.
+    private func withLookupCounts(_ snapshot: MetricsSnapshot) async -> MetricsSnapshot {
         let mirror = self.mirror
         let (hits, misses) = await MainActor.run { (mirror.hits, mirror.misses) }
+        var snapshot = snapshot
         snapshot.lookupHits = hits
         snapshot.lookupMisses = misses
         return snapshot
@@ -252,7 +308,7 @@ public final class AssetClient: Sendable {
     /// Cancels every task, finishes every stream, flushes the index; every API fails with `.shutDown` afterwards
     /// and `lookup` returns `nil` (R-SYN-15, ADR-042). Idempotent.
     public func shutdown() async {
-        await self.engine.shutdown()
+        await self.lifecycle.shutdown()
         let mirror = self.mirror
         let cacheRelay = self.cacheRelay
         await MainActor.run {
@@ -269,9 +325,12 @@ public final class AssetClient: Sendable {
         guard self.backgroundRelay.accept(identifier: identifier, completionHandler: completionHandler) else {
             return false
         }
-        let engine = self.engine
+        let lifecycle = self.lifecycle
         let relay = self.backgroundRelay
         Task {
+            // The engine opens the store (start) before it reaches the remote source, and launches a run only when
+            // one is due (T2-11, ADR-028).
+            let engine = await lifecycle.current().engine
             _ = await engine.backgroundSessionEventsPending(identifier: identifier)
             await MainActor.run {
                 relay.complete(identifier: identifier)
@@ -283,23 +342,23 @@ public final class AssetClient: Sendable {
     /// Turns a relay change into one ordered engine call (the epoch orders unordered tasks).
     @MainActor
     private func apply(_ change: ObserverChange) {
-        let engine = self.engine
+        let lifecycle = self.lifecycle
         let relay = self.cacheRelay
         switch change {
         case .unchanged:
             return
         case .start(let epoch):
             Task {
-                _ = await engine.observeMemoryPressure(epoch: epoch) { level in
+                await lifecycle.observeMemoryPressure(epoch: epoch) { level in
                     let next = await relay.purge(level: level)
                     if case .stop(let stopEpoch) = next {
-                        _ = await engine.observeMemoryPressure(epoch: stopEpoch, handler: nil)
+                        await lifecycle.observeMemoryPressure(epoch: stopEpoch, handler: nil)
                     }
                 }
             }
         case .stop(let epoch):
             Task {
-                _ = await engine.observeMemoryPressure(epoch: epoch, handler: nil)
+                await lifecycle.observeMemoryPressure(epoch: epoch, handler: nil)
             }
         }
     }
