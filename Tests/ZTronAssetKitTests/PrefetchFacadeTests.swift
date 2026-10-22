@@ -56,7 +56,10 @@ struct PrefetchFacadeTests {
         let cancels = await source.controlLog.dropFirst(controlsBefore).filter { $0.control == .cancel }.map(\.transfer)
         #expect(starts.contains(entries[5].transferID), "the entering asset started: \(starts)")
         #expect(cancels.contains(left), "the leaving asset was cancelled: \(cancels)")
-        withKnownIssue("CCR-G2: SyncEngine.registerGroup returns before the group's interests exist, so the re-laned assets 2 and 3 lose every interest in between and restart") {
+        // Intermittent: whether the old handle's release lands before the successor's join is a race the engine
+        // usually loses, not always (2 of 30 consecutive runs joined first on the reference host), so this test cannot
+        // be CCR-G2's tripwire; `promotionNeverRestarts` repeats the re-lane 1,000 times and is.
+        withKnownIssue("CCR-G2: SyncEngine.registerGroup returns before the group's interests exist, so the re-laned assets 2 and 3 lose every interest in between and restart", isIntermittent: true) {
             #expect(starts == [entries[5].transferID], "exactly the entering asset started: \(starts)")
             #expect(cancels == [left], "exactly the leaving asset was cancelled: \(cancels)")
         }
@@ -98,6 +101,8 @@ struct PrefetchFacadeTests {
         let restarted = startsByTransfer.filter { $0.value > 1 }
         let promotions = await source.controlLog.filter { $0.control == .setPriority(.userInitiated) }.count
         #expect(startsByTransfer[entries[1_000].transferID] != nil, "the final current page is in flight")
+        // Not intermittent: 1,000 re-lanes always lose the race somewhere, so this wrapper fails ("known issue was not
+        // recorded") the run after the engine fix, which is the signal to remove both wrappers (CCR-G2).
         withKnownIssue("CCR-G2: SyncEngine.registerGroup returns before the group's interests exist, so each re-lane drops the asset's last interest and restarts its transfer") {
             #expect(restarted.isEmpty, "\(restarted.count) transfers started more than once")
             #expect(promotions == 1_000, "every promotion reached the transport as a priority change: \(promotions)")

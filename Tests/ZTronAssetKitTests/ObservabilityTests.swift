@@ -82,7 +82,12 @@ struct ObservabilityTests {
         let report = try decoder.decode(DiagnosticReport.self, from: try await client.diagnosticReport())
         #expect(report.engineCounts["lifecycle.degraded"] == 1)
         #expect(report.storage.budgetBytes == 0 && report.storage.bytesByState.present == 0 && report.storage.lastCleanupAt == nil)
-        #expect(report.recentErrors.isEmpty || report.recentErrors.allSatisfy { !$0.detail.isEmpty })
+        // The ring holds the store's failed open (a storage failure naming no asset), so support sees why the client
+        // is degraded.
+        #expect(
+            report.recentErrors.contains { $0.failureClass == .storage && $0.id == nil && $0.detail.hasPrefix("store open failed") },
+            "the lock failure is in the ring of recent errors: \(report.recentErrors)"
+        )
         await client.shutdown()
     }
 

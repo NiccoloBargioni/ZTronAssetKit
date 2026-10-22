@@ -97,19 +97,35 @@ struct FacadeLifecycleTests {
         #expect(resolving.fileSystem.operations.contains { $0.kind == .rename }, "the asset was published into the store")
         await client.shutdown()
 
-        let calls: [(String, @Sendable (AssetClient) async throws(AssetError) -> Void)] = [
-            ("availability", { client throws(AssetError) in _ = try await client.availability(scope: .all) }),
-            ("isSyncDue", { client throws(AssetError) in _ = try await client.isSyncDue() }),
-            ("lastSyncedAt", { client throws(AssetError) in _ = try await client.lastSyncedAt() }),
-            ("storageReport", { client throws(AssetError) in _ = try await client.storageReport() }),
-            ("metrics", { client throws(AssetError) in _ = try await client.metrics() }),
-            ("setRetentionScope", { client throws(AssetError) in try await client.setRetentionScope(.all) }),
-            ("pin", { client throws(AssetError) in try await client.pin([]) }),
-            ("unpin", { client throws(AssetError) in try await client.unpin([]) }),
-            ("subscribe", { client throws(AssetError) in _ = try await client.subscribe() }),
+        // Every other async API, `withAsset` and `sync` included (untyped here because `withAsset`'s body is).
+        let id = entry.identifier
+        let calls: [(String, @Sendable (AssetClient) async throws -> Void)] = [
+            ("availability", { client in _ = try await client.availability(scope: .all) }),
+            ("ensureAvailable", { client in _ = try await client.ensureAvailable(scope: .all) }),
+            ("withAsset", { client in _ = try await client.withAsset(id) { url in url } }),
+            ("sync", { client in _ = await client.sync(.ifDue) }),
+            ("isSyncDue", { client in _ = try await client.isSyncDue() }),
+            ("lastSyncedAt", { client in _ = try await client.lastSyncedAt() }),
+            ("storageReport", { client in _ = try await client.storageReport() }),
+            ("purge", { client in _ = try await client.purge(.all) }),
+            ("performMaintenance", { client in _ = try await client.performMaintenance(timeBudget: 1) }),
+            ("reportUnreadable", { client in
+                do throws(AssetError) {
+                    try await client.reportUnreadable(id)
+                } catch .notFound {
+                    // The launch run has not downloaded the asset yet: the started store's answer for an absent one.
+                }
+            }),
+            ("metrics", { client in _ = try await client.metrics() }),
+            ("diagnosticReport", { client in _ = try await client.diagnosticReport() }),
+            ("setRetentionScope", { client in try await client.setRetentionScope(.all) }),
+            ("pin", { client in try await client.pin([]) }),
+            ("unpin", { client in try await client.unpin([]) }),
+            ("subscribe", { client in _ = try await client.subscribe() }),
         ]
         for (name, call) in calls {
             let harness = KitHarness.make()
+            await harness.serve([(entry, bytes)])
             let client = harness.client
             do {
                 try await harness.withClock {

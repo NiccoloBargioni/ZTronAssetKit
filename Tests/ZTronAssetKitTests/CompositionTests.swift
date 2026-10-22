@@ -124,13 +124,25 @@ struct CompositionTests {
     }
 
     /// `init` over the live environment builds the conformers and the actors only; shutting the client down before
-    /// it started opens nothing (P-12, R-CAR-1).
+    /// it started opens nothing (P-12, R-CAR-1). The environment is the one `init` resolves when the app passes none,
+    /// with the unified-log sink swapped for the tap-only one (ADR-047). The test relies on a shutdown in `created`
+    /// never opening the store (no directory under Caches, no lock file) and never logging, and the tap shows that no
+    /// line was emitted, so a change that made it log, which opening the store does, fails here rather than writing
+    /// outside this repository unnoticed.
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-1: the live environment builds an AssetClient without starting anything", .timeLimit(.minutes(1)))
     func liveClientStartsNothing() async {
-        let client = AssetClient(configuration: AssetClientConfiguration(remote: RemoteConfiguration(), location: .caches))
+        let configuration = AssetClientConfiguration(remote: RemoteConfiguration(), location: .caches)
+        var environment = AssetClient.resolvedEnvironment(nil, for: configuration)
+        #expect(environment.fileSystem is LiveFileSystem && environment.logSink is OSLogSink, "setup: the live conformers")
+        let tap = RecordingLogTap()
+        environment.logSink = TapOnlyLogSink()
+        environment.logTap = tap
+        let client = AssetClient(configuration: configuration, environment: environment)
         let state = await client.currentEngine().introspect()
         #expect(state.lifecycle == .created && state.ownedTasks == 0 && state.armedTimers == 0)
         await client.shutdown()
         #expect(await client.currentEngine().introspect().lifecycle == .shutDown)
+        #expect(tap.lines.isEmpty, "the created client logged, so it did work: \(tap.lines)")
     }
 }

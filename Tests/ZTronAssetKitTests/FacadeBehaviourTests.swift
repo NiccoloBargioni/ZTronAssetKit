@@ -51,6 +51,9 @@ struct FacadeBehaviourTests {
         await harness.source.script(onDemand.transferID, [.stage(onDemandBytes)])
         await harness.serveManifest([present, onDemand], etag: "v1")
         try await harness.startAndSettle()
+        // The launch run's trailing snapshot install is a store deadline on the engine's alarm: settle it, so the
+        // mirror holds the downloaded asset before the UI calls below.
+        try await harness.drive(until: { $0.isIdleSilent })
         let client = harness.client
         let mainCallsBefore = harness.fileSystem.mainThreadCalls
         let operationsBefore = harness.fileSystem.operations.count
@@ -253,6 +256,9 @@ struct FacadeBehaviourTests {
         let harness = KitHarness.make()
         await harness.serve([(entry, bytes)])
         try await harness.startAndSettle()
+        // The launch run's trailing snapshot install is a store deadline on the engine's alarm: settle it, so the
+        // mirror already holds the asset the resolve below finds locally.
+        try await harness.drive(until: { $0.isIdleSilent })
         let client = harness.client
         let requests = (await harness.source.manifestRequests.count, await harness.source.starts.count)
         var offline = DeviceConditions.unrestricted

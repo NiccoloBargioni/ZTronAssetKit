@@ -137,6 +137,32 @@ struct FacadeUnitTests {
         await client.shutdown()
     }
 
+    /// Two iterators of one stream pulling at once (which the engine's own streams do not support either): the pulls
+    /// are served in turn and end with the stream, so neither consumer waits for good.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: two iterators of one client event stream pulling at once both finish when the client shuts down", .timeLimit(.minutes(1)))
+    func concurrentPullsBothFinish() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        let engine = await harness.engine()
+        let stream = client.events
+        let pulls = (0..<2).map { _ in
+            Task { () -> AssetEvent? in
+                var iterator = stream.makeAsyncIterator()
+                return await iterator.next()
+            }
+        }
+        // A created engine replays nothing, so the first pull waits until the shutdown's last event.
+        await engine.waitUntil { $0.subscribers == 1 }
+        await client.shutdown()
+        var received: [AssetEvent?] = []
+        for pull in pulls {
+            received.append(await pull.value)
+        }
+        #expect(received.compactMap { $0 } == [.clientShutDown], "one pull received the shutdown, once: \(received)")
+        #expect(received.contains { $0 == nil }, "the other pull ended with the stream: \(received)")
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-4: a prefetch on a client whose store cannot open reports storageUnavailable and holds nothing", .timeLimit(.minutes(1)))
     func prefetchOnDegradedClient() async throws {
@@ -165,6 +191,8 @@ struct FacadeUnitTests {
         let harness = KitHarness.make()
         await harness.serve([(entry, bytes)])
         try await harness.startAndSettle()
+        // The launch run's trailing snapshot install is a store deadline on the engine's alarm: settle it first.
+        try await harness.drive(until: { $0.isIdleSilent })
         let client = harness.client
         #expect(await MainActor.run { client.lookup(entry.identifier) } != nil)
         try await harness.withClock { () throws(AssetError) in
