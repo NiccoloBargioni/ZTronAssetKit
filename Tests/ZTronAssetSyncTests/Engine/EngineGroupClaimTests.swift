@@ -427,6 +427,43 @@ extension EngineGroupClaimTests {
         await engine.shutdown()
     }
 
+    /// Orchestrator ruling L5-R21 (L5-C2-02): a give-up's leftover claims wait in `releasing` under a token that is still
+    /// registered, so the release gate must never read that token as released. Through the split seam: the group's claims
+    /// are recorded for every member, its join is spawned for the first member only, which it joins (the group's interest
+    /// on that member's job), and its remaining claims, more than `releasesPerTurn`, are then given up in one turn. The
+    /// joined member's job is still wanted by a registered group, so it is not "released only" and no scan sets it aside.
+    /// No running engine's join gives up after joining members (G-13), so this pins the gate's rule, not a reachable loss.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a registered group whose give-up leaves claims to the release follow-up never makes its joined members' jobs released-only", .timeLimit(.minutes(1)))
+    func giveUpLeftoversNeverMakeAJoinedJobReleasedOnly() async throws {
+        let count = SyncEngine.releasesPerTurn + 88
+        let entries = (0..<count).map { EngineHarness.onDemand(String(format: "r%04d", $0), EngineFixture.bytes(UInt64(7_100 + $0), count: 32)) }
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 1))
+        try await EngineSingleFlightTests.applied(entries, harness: harness)
+        let engine = harness.engine
+        let ids = entries.map(\.identifier)
+        let joined = entries[0].transferID
+        let token = await engine.inOneTurn { engine -> InterestToken in
+            let recorded = engine.recordGroup(ids, lane: .prefetch)
+            engine.spawnJoin(recorded.token, members: [ids[0]], lane: .prefetch)
+            return recorded.token
+        }
+        await engine.awaitCondition { engine in
+            engine.state.jobs[joined]?.interests[token] != nil && engine.state.groups[token]?.claimCursor == 1
+        }
+        let (parked, releasedOnly) = await engine.inOneTurn { engine -> (Int?, Bool?) in
+            engine.endClaims(of: token)
+            return (engine.state.releasing[token]?.claims.count, engine.state.jobs[joined].map { engine.isReleasedOnly($0) })
+        }
+        #expect(parked == count - 1 - SyncEngine.releasesPerTurn, "setup: the give-up left claims to the release follow-up: \(String(describing: parked))")
+        #expect(releasedOnly == false, "the joined member's job is wanted by a registered group, never released-only")
+        await engine.awaitCondition { $0.state.releasing.isEmpty }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+    }
+
     /// Orchestrator ruling L5-R15 (L5-C1-06, L5-C1-08), the reachable form: a running engine whose remote source could
     /// not be built gives a prefetch group's join up after its store read (`missingSourceError`). Such an engine never
     /// adopts the store's manifest (its launch reconciliation needs a source), so the members' claims name no content; a
