@@ -75,14 +75,15 @@ public final class AssetClient: Sendable {
     }
 
     /// Runs one engine call on the current pair. A pair whose root was replaced (B-15) is reopened and the call
-    /// repeated on the replacement: after a `.storageUnavailable` failure that names the replaced root, or any other
-    /// `.storageUnavailable` failure while the store reports it (`AssetStore.unavailableReason`, orchestrator ruling
-    /// L5-R4: a sync's staging listing fails with `.ioFailure` on a vanished root); with `reopensVanishedRootFirst`,
-    /// also before the call when the store reports it (a lease is a read, which a replaced root still grants). A call
-    /// that a reopen's shutdown of the old engine answered with `.shutDown` is repeated on the replacement too. Any other
-    /// result is returned as the engine gave it, other storage failures included (L4-R23: `ensureAvailable` stays
-    /// faithful). At most `AssetClient.reopenAttempts` reopens and repetitions, so a store that vanishes again and again
-    /// reports the failure instead of looping.
+    /// repeated on the replacement: after a `.storageUnavailable` failure that names the replaced root, or after any
+    /// other failure that can stem from the file system (`mayStemFromFileSystem`) when the store's root check finds the
+    /// root replaced (`AssetStore.verifyRootNow()`, orchestrator rulings L5-R4 and L5-R20: a replaced root no commit has
+    /// detected yet fails a sync's staging listing with `.ioFailure` and a resolve's staging with `.serverUnavailable`);
+    /// with `reopensVanishedRootFirst`, also before the call when the store reports it (a lease is a read, which a
+    /// replaced root still grants). A call that a reopen's shutdown of the old engine answered with `.shutDown` is
+    /// repeated on the replacement too. Any other result is returned as the engine gave it, other storage failures
+    /// included (L4-R23: `ensureAvailable` stays faithful). At most `AssetClient.reopenAttempts` reopens and repetitions,
+    /// so a store that vanishes again and again reports the failure instead of looping.
     private func perform<T: Sendable>(
         reopensVanishedRootFirst: Bool = false,
         _ operation: @Sendable (SyncEngine) async -> Result<T, AssetError>
@@ -101,10 +102,11 @@ public final class AssetClient: Sendable {
     }
 
     /// The reopen path on `lifecycle`'s current pair. Static, so a task that must not keep the client alive (the
-    /// background-events hand-off) can take it without capturing the client. The store's reason is read only where it
-    /// decides something: before a call with `reopensVanishedRootFirst`, and after a `.storageUnavailable` failure that
-    /// does not name the replaced root. A root that vanishes between the read and the call is met by the call, as before
-    /// (a lease taken then is a read under B-15).
+    /// background-events hand-off) can take it without capturing the client. The store is asked only where its answer
+    /// decides something: its recorded reason before a call with `reopensVanishedRootFirst` (no I/O), and its root
+    /// checked after a failure that can stem from the file system and does not name the replaced root (one stat on the
+    /// store's metadata executor, never on the main actor; at once when a reason is already recorded). A root that
+    /// vanishes between the read and the call is met by the call, as before (a lease taken then is a read under B-15).
     private static func performOnCore<T: Sendable>(
         lifecycle: ClientLifecycle,
         reopensVanishedRootFirst: Bool = false,
@@ -121,10 +123,10 @@ public final class AssetClient: Sendable {
             }
             let result = await operation(core)
             switch result {
-            case .failure(.storageUnavailable(let reason)):
-                var vanished = reason == .rootVanished
+            case .failure(let error) where AssetClient.mayStemFromFileSystem(error):
+                var vanished = error == .storageUnavailable(.rootVanished)
                 if !vanished {
-                    vanished = await core.store.unavailableReason == .rootVanished
+                    vanished = await core.store.verifyRootNow() == .rootVanished
                 }
                 guard vanished else {
                     return try result.get()
@@ -151,6 +153,21 @@ public final class AssetClient: Sendable {
 
     /// How many times one call is repeated on a replacement pair.
     static let reopenAttempts = 3
+
+    /// Whether a failure can stem from the store's file system, so a replaced root that no commit has detected yet may be
+    /// its cause and the facade checks the root before returning it (orchestrator ruling L5-R20, G-5): a storage failure,
+    /// and every failure a transfer or its staging can end with because of the volume (`.serverUnavailable`: a staging
+    /// write that failed, classified transient; `.insufficientSpace`: ENOSPC while staging; `.integrityFailure`: staged
+    /// bytes that did not verify). Never the caller's cancellation, a shutdown, the catalog's or the origin's
+    /// `.notFound`, the network (`.offline`) or the origin's refusal (`.authRejected`): none of them involves the volume.
+    static func mayStemFromFileSystem(_ error: AssetError) -> Bool {
+        switch error {
+        case .storageUnavailable, .serverUnavailable, .insufficientSpace, .integrityFailure:
+            return true
+        case .offline, .authRejected, .notFound, .cancelled, .shutDown:
+            return false
+        }
+    }
 
     /// The executor for bounded blocking units off the cooperative pool (ADR-003, C2), shared with the fallback
     /// chain's bundle enumeration (sync-2 S2-13).
@@ -243,15 +260,11 @@ public final class AssetClient: Sendable {
         do throws(AssetError) {
             return try await self.perform { engine in
                 let outcome = await engine.sync(mode)
-                if case .failed(let error) = outcome {
-                    switch error {
-                    case .shutDown, .storageUnavailable:
-                        // Handed to `perform`, which reopens a replaced root (by the store's own reason, L5-R4) or
-                        // follows the replacement before reporting it; any other failure comes back as given.
-                        return .failure(error)
-                    default:
-                        break
-                    }
+                if case .failed(let error) = outcome, error == .shutDown || AssetClient.mayStemFromFileSystem(error) {
+                    // Handed to `perform`, which reopens a replaced root (the store's reason, or its root checked now:
+                    // L5-R4, L5-R20) or follows the replacement before reporting it; any other failure comes back as
+                    // given, and so does a handed one that `perform` does not repeat (`sync` returns it as `.failed`).
+                    return .failure(error)
                 }
                 return .success(outcome)
             }
