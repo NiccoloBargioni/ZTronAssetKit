@@ -119,11 +119,13 @@ struct PrefetchFacadeTests {
         do {
             let handle = client.prefetch([entries[0].identifier])
             try await handle.awaitRegistration()
-            await engine.waitUntil { $0.running == 1 }
+            let transfer = entries[0].transferID
+            await engine.awaitCondition { PrefetchFacadeTests.inFlight(transfer, $0) }
             #expect(await engine.introspect().groups == 1)
         }
         // The handle is gone without cancel(): its deinit releases the group, and the transfer wanted by nobody stops.
-        await engine.waitUntil { $0.groups == 0 && $0.running == 0 }
+        let transfer = entries[0].transferID
+        await engine.awaitCondition { $0.state.groups.isEmpty && $0.state.jobs[transfer] == nil }
         let cancels = await harness.source.controlLog.filter { $0.control == .cancel }.map(\.transfer)
         #expect(cancels == [entries[0].transferID])
         await client.shutdown()
