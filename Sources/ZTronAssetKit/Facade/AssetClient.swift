@@ -87,6 +87,11 @@ public final class AssetClient: Sendable {
         )
     }
 
+    /// The engine serving the client now (a test seam of the facade tests).
+    func currentEngine() async -> SyncEngine {
+        self.engine
+    }
+
     /// The executor for bounded blocking units off the cooperative pool (ADR-003, C2), shared with the fallback
     /// chain's bundle enumeration (sync-2 S2-13).
     var bulkExecutor: any BlockingExecutor {
