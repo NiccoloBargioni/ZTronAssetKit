@@ -159,6 +159,7 @@ actor ClientLifecycle: PrefetchRegistry {
         let old = self.core
         self.retiring = old.generation
         let task = Task {
+            // REENTRANCY: g-2 (proposed) — nothing here: `performReopen` re-checks `closed` after each of its awaits.
             await self.performReopen(old)
         }
         self.reopening = task
@@ -285,19 +286,28 @@ actor ClientLifecycle: PrefetchRegistry {
 
     /// Starts (`handler` non-nil) or stops the memory-pressure observer of the current engine, remembering the
     /// newest request for a replacement engine. Requests come from unordered tasks: only a newer epoch counts.
+    ///
+    /// Never waits for a running reopen. The facade's handler calls this from inside the engine-owned observer task,
+    /// and a reopen's first step, the old engine's shutdown, joins that task: a wait here would leave the observer
+    /// waiting for the reopen, the reopen for the shutdown and the shutdown for the observer, for good (round 2,
+    /// correctness lens). Nor does it need to wait: the request is recorded first, a running reopen applies the newest
+    /// recorded request to its replacement once that is installed, and the old engine's shutdown stops its observer.
     func observeMemoryPressure(epoch: UInt64, handler: (@Sendable (MemoryPressureLevel) async -> Void)?) async {
         guard !self.closed, epoch > (self.pressure?.epoch ?? 0) else {
             return
         }
         self.pressure = PressureRequest(epoch: epoch, handler: handler)
         if let seam = self.seam {
-            // REENTRANCY: g-9 (proposed) — nothing else is read below (a test seam; `nil` in production).
+            // REENTRANCY: g-9 (proposed) — `closed` and `reopening`, re-read right below (a test seam; `nil` in
+            // production).
             await seam(.pressureRecorded(epoch: epoch))
         }
-        // REENTRANCY: g-1 (proposed) — nothing else is read: a reopen meanwhile applies the newest request itself.
-        let engine = await self.current().engine
-        // REENTRANCY: g-3 (proposed) — nothing: the engine orders requests by epoch.
-        _ = await engine.observeMemoryPressure(epoch: epoch, handler: handler)
+        guard !self.closed, self.reopening == nil else {
+            return
+        }
+        // REENTRANCY: g-3 (proposed) — nothing: the engine orders requests by epoch, and a reopen that begins meanwhile
+        // applies the newest recorded request to its replacement.
+        _ = await self.core.engine.observeMemoryPressure(epoch: epoch, handler: handler)
     }
 
     /// Installs or removes the test seam (tests only; see `seam`).
