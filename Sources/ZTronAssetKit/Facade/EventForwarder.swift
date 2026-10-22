@@ -1,32 +1,49 @@
 import ZTronAssetModel
 import ZTronAssetSync
 
-/// One consumer's event stream across reopens (R-SYN-12, B-15; WP-G, `docs/adr-drafts/g.md` G-2).
+/// One consumer's event stream across reopens (R-SYN-12, B-15; WP-G, `docs/adr-drafts/g.md` G-2 and G-16).
 ///
 /// The engine's streams are bound to their engine, and a reopen replaces the engine, whose shutdown ends its streams
-/// with `clientShutDown`. The forwarder reads the current engine's stream in one pump task and hands each event to the
-/// consumer pull by pull, so the engine's backpressure still holds (at most one event waits here, R-SYN-12); when the
-/// engine it reads was retired by a reopen, it drops that engine's `clientShutDown`, drains that stream to its end and
-/// continues with the replacement's stream. A real shutdown ends the stream with `clientShutDown`, the last event
-/// (R-SYN-12, R-SYN-15).
+/// with `clientShutDown`. The forwarder reads engine streams in one pump task and hands each event to the consumer pull
+/// by pull, so the engine's backpressure still holds (at most one event waits here, R-SYN-12); when the engine it reads
+/// was retired by a reopen, it drops that engine's `clientShutDown`, drains that stream to its end and continues with the
+/// replacement's stream. A real shutdown ends the stream with `clientShutDown`, the last event (R-SYN-12, R-SYN-15).
 ///
-/// The pump registers with the lifecycle before it reads (`ClientLifecycle.follow`), and a reopen subscribes every
-/// registered forwarder to the replacement before installing it (orchestrator ruling L5-R3): the pump switches to the
-/// stream it was handed, so a consumer whose stream is live when a reopen installs a replacement receives every event
-/// the replacement publishes, from its first one on, its `clientStarted` included (G-2), except what the engine's own
-/// queue coalesces (one slot per progress key and per subject, H-9). Without a stream handed over (a forwarder that
-/// registered after the reopen's hand-over) it registers with the engine serving then; it has no history to lose.
+/// **Followership precedes registration** (orchestrator ruling L5-R13, G-16). The forwarder becomes a follower of the
+/// lifecycle in the same lifecycle turn that chooses the engine it registers with, before the registration's await
+/// (`ClientLifecycle.register(_:)`): a `subscribe()` stream before `subscribe()` returns, an `events` stream on its first
+/// pull. Every reopen hands every follower its replacement's stream before installing it, so a stream receives every
+/// event of its registration's generation from that registration on, and every event of each later generation from that
+/// generation's first one on (`clientStarted` included), except what the engine's own queue coalesces (one slot per
+/// progress key and per subject, H-9). The pump never registers or follows by itself: it reads the registered stream,
+/// then, after each retired one, the stream handed over for the next generation; only when the client was shut down
+/// while that reopen ran is nothing handed over, and the last engine's stream, which yields its `clientShutDown`, ends
+/// this one. A handed stream not newer than the one the forwarder holds is dropped.
 ///
 /// The pump starts on the first pull and ends with the stream. The consumer's stream holds the forwarder through a
-/// `Consumer` that the pump never retains, so the pump stops when the consumer's task is cancelled (`onCancel`) and
+/// `Consumer` that the pump never retains, so the forwarder stops when the consumer's task is cancelled (`onCancel`) and
 /// also when the consumer drops the stream without cancelling it (the usual `break` out of a `for await`, after which
-/// `AsyncStream(unfolding:onCancel:)` calls no handler): the `Consumer`'s deinit stops the forwarder. Either way the
-/// pump's last pull runs under cancellation, so the engine stream's own cancellation handler releases its
-/// subscription; nothing outlives the consumer's stream (R-SYN-12).
+/// `AsyncStream(unfolding:onCancel:)` calls no handler): the `Consumer`'s deinit stops it. Either way the pump's last
+/// pull runs under cancellation, so the engine stream's own cancellation handler releases its subscription. The follower
+/// entry goes when the pump ends (`end()`), or at once when no pump ever started (`stop()`: a `subscribe()` stream
+/// dropped before its first pull), so it outlives neither the pump nor the consumer's stream (R-SYN-12).
 actor EventForwarder {
     private let lifecycle: ClientLifecycle
-    /// A stream already registered (`subscribe()`) and the generation of its engine; read first.
+    /// Whether the forwarder registers on its first pull (an `events` stream); a `subscribe()` stream's forwarder was
+    /// registered before `subscribe()` returned.
+    private var registersOnFirstPull: Bool
+    /// An `events` stream's first pull is registering; a pull meanwhile waits for the pump that registration starts.
+    private var registering = false
+    /// The lifecycle's key for this forwarder while it is a follower (L5-R13): received with the registration, given
+    /// back once, by `end()` or by `stop()`.
+    private var followKey: UInt64?
+    /// The registered stream and the generation of its engine, which the pump reads first; `nil` when that engine was
+    /// retired before it answered (the streams the reopens handed over since carry the registration), or once the pump
+    /// took it.
     private var first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
+    /// The newest generation whose stream the forwarder holds or reads: a stream handed over for it or an older one is
+    /// dropped (L5-R13).
+    private var held: UInt64?
     private var pump: Task<Void, Never>?
     /// Consumers waiting for an event, in arrival order: two iterators of one stream that pull at once are served one
     /// event each, in turn, and neither waits for good.
@@ -41,24 +58,33 @@ actor EventForwarder {
     /// asked for yet, so a test can drop the consumer's stream exactly then (`stop()` must end that wait; CLAUDE.md G4).
     private let offerParked: (@Sendable () -> Void)?
 
-    /// A forwarder that reads `first` before any other engine stream.
-    init(
-        lifecycle: ClientLifecycle,
-        first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?,
-        offerParked: (@Sendable () -> Void)? = nil
-    ) {
+    private init(lifecycle: ClientLifecycle, registersOnFirstPull: Bool, offerParked: (@Sendable () -> Void)?) {
         self.lifecycle = lifecycle
-        self.first = first
+        self.registersOnFirstPull = registersOnFirstPull
         self.offerParked = offerParked
     }
 
-    /// The consumer's stream: pulls through the forwarder. `offerParked` is the test seam (`nil` in production).
+    /// An `events` stream: it registers, and becomes a follower, on its first pull. `offerParked` is the test seam
+    /// (`nil` in production).
     nonisolated static func stream(
         lifecycle: ClientLifecycle,
-        first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?,
         offerParked: (@Sendable () -> Void)? = nil
     ) -> AsyncStream<AssetEvent> {
-        let consumer = Consumer(EventForwarder(lifecycle: lifecycle, first: first, offerParked: offerParked))
+        EventForwarder.stream(of: EventForwarder(lifecycle: lifecycle, registersOnFirstPull: true, offerParked: offerParked))
+    }
+
+    /// A `subscribe()` stream: registered with the engine serving now, and a follower, before it is returned;
+    /// `.shutDown` after shutdown.
+    static func subscribed(lifecycle: ClientLifecycle) async throws(AssetError) -> AsyncStream<AssetEvent> {
+        let forwarder = EventForwarder(lifecycle: lifecycle, registersOnFirstPull: false, offerParked: nil)
+        let registration = try await lifecycle.register(forwarder).get()
+        await forwarder.registered(registration)
+        return EventForwarder.stream(of: forwarder)
+    }
+
+    /// The consumer's stream: pulls through `forwarder`.
+    private nonisolated static func stream(of forwarder: EventForwarder) -> AsyncStream<AssetEvent> {
+        let consumer = Consumer(forwarder)
         return AsyncStream(unfolding: {
             // REENTRANCY: g-7 (proposed) — nothing: `next()` re-reads its own state after every await.
             await consumer.forwarder.next()
@@ -87,6 +113,18 @@ actor EventForwarder {
         self.offered == nil ? 0 : 1
     }
 
+    /// Takes a registration: its follower key and its stream, which the pump reads first. Streams handed over for the
+    /// registration's generation or an older one are dropped; newer ones stay, for the reopens that ran meanwhile.
+    private func registered(_ registration: ClientLifecycle.ForwarderRegistration) {
+        self.followKey = registration.key
+        guard let first = registration.first else {
+            return
+        }
+        self.first = first
+        self.held = max(self.held ?? first.generation, first.generation)
+        self.handovers.removeAll { $0.generation <= first.generation }
+    }
+
     /// The next event, or `nil` once the stream ended.
     func next() async -> AssetEvent? {
         if let offered = self.offered {
@@ -97,7 +135,25 @@ actor EventForwarder {
         guard !self.finished else {
             return nil
         }
-        self.startPump()
+        if self.pump == nil, !self.registering {
+            if self.registersOnFirstPull {
+                self.registering = true
+                // REENTRANCY: g-7 (proposed) — `finished`, re-read right below: a consumer that stopped meanwhile leaves
+                // the registration unused (its stream is released with it) and gives its follower entry back here.
+                let registration = await self.lifecycle.registerEvents(self)
+                self.registering = false
+                self.registersOnFirstPull = false
+                guard !self.finished else {
+                    if let key = registration.key {
+                        // REENTRANCY: g-7 (proposed) — nothing: terminal for this forwarder.
+                        await self.lifecycle.unfollow(key)
+                    }
+                    return nil
+                }
+                self.registered(registration)
+            }
+            self.startPump()
+        }
         // REENTRANCY: g-7 (proposed) — nothing: a terminal wait, resumed once by `offer`, `end` or `stop`.
         return await withCheckedContinuation { (continuation: CheckedContinuation<AssetEvent?, Never>) in
             self.consumers.append(continuation)
@@ -112,7 +168,7 @@ actor EventForwarder {
         }
     }
 
-    private func stop() {
+    private func stop() async {
         self.finished = true
         // Registered streams the pump never read are released here rather than with the forwarder.
         self.first = nil
@@ -121,6 +177,13 @@ actor EventForwarder {
         self.offered?.taken.resume(returning: false)
         self.offered = nil
         self.resumeConsumers()
+        // A pump that started gives the follower entry back when it ends (`end()`), so the entry outlives no pump; with
+        // none, nobody else will (a `subscribe()` stream dropped before its first pull).
+        if self.pump == nil, let key = self.followKey {
+            self.followKey = nil
+            // REENTRANCY: g-7 (proposed) — nothing: terminal; the key was taken before the await, so it is given back once.
+            await self.lifecycle.unfollow(key)
+        }
     }
 
     /// Hands `event` to a waiting consumer, or waits for one; `false` when the consumer is gone.
@@ -139,17 +202,27 @@ actor EventForwarder {
         }
     }
 
-    /// The pump ended: a waiting consumer gets the end of the stream.
-    private func end() {
+    /// The pump ended: a waiting consumer gets the end of the stream, and the follower entry is given back.
+    private func end() async {
         self.finished = true
+        self.first = nil
         self.handovers = []
         self.resumeConsumers()
+        if let key = self.followKey {
+            self.followKey = nil
+            // REENTRANCY: g-7 (proposed) — nothing: terminal; the key was taken before the await, so it is given back once.
+            await self.lifecycle.unfollow(key)
+        }
     }
 
-    /// A reopen subscribed this forwarder to the replacement engine of `generation` before installing it (L5-R3). A
-    /// forwarder that already finished drops the stream at once, which releases its subscription.
+    /// A reopen subscribed this forwarder to the replacement engine of `generation` before installing it (L5-R3,
+    /// L5-R13). A forwarder that already finished, or that holds a stream of that generation or a newer one, drops the
+    /// stream at once, which releases its subscription.
     func handOver(_ stream: AsyncStream<AssetEvent>, generation: UInt64) {
         guard !self.finished else {
+            return
+        }
+        if let held = self.held, generation <= held {
             return
         }
         self.handovers.append((stream, generation))
@@ -165,7 +238,9 @@ actor EventForwarder {
         guard let index = self.handovers.firstIndex(where: { $0.generation <= installed }) else {
             return nil
         }
-        return self.handovers.remove(at: index)
+        let handed = self.handovers.remove(at: index)
+        self.held = max(self.held ?? handed.generation, handed.generation)
+        return handed
     }
 
     /// Ends every waiting consumer's pull with the end of the stream.
@@ -185,27 +260,25 @@ actor EventForwarder {
         let first = self.first
         self.first = nil
         self.pump = Task {
-            // REENTRANCY: g-7 (proposed) — nothing: the pump runs off the actor and re-enters only through `offer` and
-            // `end`, which re-read the state.
+            // REENTRANCY: g-7 (proposed) — nothing: the pump runs off the actor and re-enters only through `offer`,
+            // `takeHandover` and `end`, which re-read the state.
             await EventForwarder.pump(into: self, lifecycle: lifecycle, first: first)
         }
     }
 
-    /// Registers the forwarder as a follower of the lifecycle's engines (L5-R3), reads their streams (`forward`) and
-    /// unregisters it. Off the actor, so the streams' iterators never cross an isolation boundary.
+    /// Reads the forwarder's engine streams (`forward`), then ends the forwarder, which gives its follower entry back.
+    /// Off the actor, so the streams' iterators never cross an isolation boundary.
     private nonisolated static func pump(
         into forwarder: EventForwarder,
         lifecycle: ClientLifecycle,
         first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
     ) async {
-        let key = await lifecycle.follow(forwarder)
         await EventForwarder.forward(into: forwarder, lifecycle: lifecycle, first: first)
-        await lifecycle.unfollow(key)
+        await forwarder.end()
     }
 
-    /// Reads engine streams until one ends without having been retired, or the consumer is gone: `first`, then after
-    /// each retired stream the stream a reopen handed over for the next generation, or else the stream of the engine
-    /// serving then.
+    /// Reads engine streams until one ends without having been retired, or the consumer is gone: the registered stream,
+    /// then after each retired one the stream a reopen handed over for the next generation.
     private nonisolated static func forward(
         into forwarder: EventForwarder,
         lifecycle: ClientLifecycle,
@@ -219,10 +292,16 @@ actor EventForwarder {
                 source = given
                 pending = nil
             } else {
+                // After a retired stream, or when the registration's engine was retired before it answered: the reopen
+                // that retired it handed this follower its replacement's stream before installing it, and `current()`
+                // waits for that reopen.
                 let core = await lifecycle.current()
                 if let handed = await forwarder.takeHandover(after: ended, through: core.generation) {
                     source = handed
                 } else {
+                    // Nothing handed over: the client was shut down while that reopen ran, so it installed nothing (L5-R13
+                    // makes this the only case). The last engine's stream, made after its shutdown, yields only its
+                    // `clientShutDown`, the real shutdown's, which ends this stream.
                     source = (core.engine.makeEventStream(), core.generation)
                 }
             }
@@ -248,6 +327,5 @@ actor EventForwarder {
             }
             ended = source.generation
         }
-        await forwarder.end()
     }
 }

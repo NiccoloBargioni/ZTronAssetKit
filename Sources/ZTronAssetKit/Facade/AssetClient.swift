@@ -221,20 +221,20 @@ public final class AssetClient: Sendable {
         }
     }
 
-    /// A multi-subscriber, bounded event stream (R-SYN-12); registers asynchronously. Made after shutdown, it
-    /// yields `clientShutDown` and finishes.
+    /// A multi-subscriber, bounded event stream (R-SYN-12); registers asynchronously, on its first pull, and from then
+    /// on follows every reopen from the replacement's first event on. Made after shutdown, it yields `clientShutDown` and
+    /// finishes.
     public var events: AsyncStream<AssetEvent> {
-        EventForwarder.stream(lifecycle: self.lifecycle, first: nil)
+        EventForwarder.stream(lifecycle: self.lifecycle)
     }
 
-    /// A stream that returns after registration and the initial replay. The registration runs through the reopen
-    /// path, so an engine a reopen retired meanwhile is replaced rather than reported as `.shutDown`.
+    /// A stream that returns after registration and the initial replay, and from its registration on follows every
+    /// reopen from the replacement's first event on, whether or not it was pulled yet (orchestrator ruling L5-R13). An
+    /// engine a reopen retired before the registration answered is not reported as `.shutDown`: the stream that reopen
+    /// handed over carries the registration.
     public func subscribe() async throws(AssetError) -> AsyncStream<AssetEvent> {
         try await self.start()
-        let registered = try await self.performOnCore { core in
-            await core.engine.subscribe().map { (stream: $0, generation: core.generation) }
-        }
-        return EventForwarder.stream(lifecycle: self.lifecycle, first: registered)
+        return try await EventForwarder.subscribed(lifecycle: self.lifecycle)
     }
 
     /// Runs a sync of the retention scope now (`.force`) or when due (`.ifDue`); single-flight. The outcome carries

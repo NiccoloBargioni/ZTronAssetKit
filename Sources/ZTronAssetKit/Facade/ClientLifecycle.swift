@@ -58,8 +58,9 @@ enum LifecycleSeamPoint: Sendable, Hashable {
 /// from the index files alone and can be smaller than the mirror's). What the caller registered through the facade
 /// survives the reopen: prefetch groups are registered again with the new engine, the memory-pressure observer is
 /// started again, and the run-time retention scope is the new engine's. Event streams follow through
-/// `EventForwarder`: every live forwarder is subscribed to the replacement before it is installed (L5-R3), so a
-/// consumer misses none of the replacement's events.
+/// `EventForwarder`: a forwarder becomes a follower in the turn that chooses the engine it registers with
+/// (`register(_:)`), and every follower is subscribed to the replacement before it is installed (L5-R3, L5-R13), so a
+/// stream misses none of the replacement's events.
 ///
 /// Prefetch registrations go through here (`PrefetchRegistry`): the tokens handed to handles are the facade's own,
 /// each bound to the engine token of the generation it was registered with, so a handle released after a reopen
@@ -75,8 +76,8 @@ actor ClientLifecycle: PrefetchRegistry {
         var bindInFlight = false
     }
 
-    /// A live event forwarder (G-2, L5-R3), held weakly: the consumer's stream and the forwarder's pump hold it, and the
-    /// pump unregisters it when it ends.
+    /// A live event forwarder (G-2, L5-R3, L5-R13), held weakly: the consumer's stream and the forwarder's pump hold it,
+    /// and the forwarder gives its entry back when its pump ends, or when it stops before any pump started.
     private struct Follower {
         weak var forwarder: EventForwarder?
     }
@@ -102,8 +103,8 @@ actor ClientLifecycle: PrefetchRegistry {
     private var groups: [InterestToken: PrefetchGroup] = [:]
     private var lastToken: UInt64 = 0
     private var pressure: PressureRequest?
-    /// The event forwarders whose pumps read this client's engines, by key; a reopen hands each the replacement's
-    /// stream before installing it (L5-R3).
+    /// The event forwarders registered with this client's engines, by key, each recorded in the turn that chose its
+    /// engine (L5-R13); a reopen hands each the replacement's stream before installing it (L5-R3).
     private var followers: [UInt64: Follower] = [:]
     private var lastFollower: UInt64 = 0
     /// Test seam, `nil` in production: awaited at each `LifecycleSeamPoint`, so a test can place a shutdown, a reopen or
@@ -230,15 +231,38 @@ actor ClientLifecycle: PrefetchRegistry {
             retentionScope: self.retentionScope
         )
         if let seam = self.seam {
-            // REENTRANCY: g-9 (proposed) — nothing here: the hand-over below re-reads the followers, and `closed` is
-            // re-read after it (a test seam; `nil` in production).
+            // REENTRANCY: g-9 (proposed) — nothing here: the hand-over below re-reads the followers and `closed` (a test
+            // seam; `nil` in production).
             await seam(.replacementBuilt(next))
         }
-        // REENTRANCY: g-10 (proposed) — `closed`, re-read right below: a shutdown meanwhile installs nothing (the
-        // forwarders take only a stream of an installed generation, so the ones handed `next` never read it).
-        await self.handOverFollowers(to: next)
-        guard !self.closed else {
-            return self.endReopen(nil)
+        // The hand-over (L5-R3, L5-R13, g-10): every follower is subscribed to `next` through its eager-registering
+        // `subscribe()` and handed that stream. `next` is `created` and unreachable by callers, so it publishes nothing
+        // until it is installed. The last look at the followers, the check of `closed` and the installation happen in one
+        // turn, so every follower recorded before the installation holds a stream of `next` from its first event on.
+        var handed: Set<UInt64> = []
+        while true {
+            guard !self.closed else {
+                // A shutdown meanwhile installs nothing: the forwarders take only a stream of an installed generation, so
+                // the ones handed `next` never read it.
+                return self.endReopen(nil)
+            }
+            guard let key = self.followers.keys.filter({ !handed.contains($0) }).min() else {
+                break
+            }
+            handed.insert(key)
+            guard let forwarder = self.followers[key]?.forwarder else {
+                self.followers[key] = nil
+                self.followerObserver?(self.followers.count)
+                continue
+            }
+            // REENTRANCY: g-10 (proposed) — the followers and `closed`, re-read at the loop's top (a follower recorded
+            // meanwhile is handed a stream too); `next` cannot publish meanwhile.
+            guard case .success(let stream) = await next.engine.subscribe() else {
+                continue
+            }
+            // REENTRANCY: g-10 (proposed) — as above; a forwarder that finished meanwhile, or that holds a stream of this
+            // generation already, drops the stream at once.
+            await forwarder.handOver(stream, generation: next.generation)
         }
         self.core = next
         _ = self.endReopen(next)
@@ -280,43 +304,68 @@ actor ClientLifecycle: PrefetchRegistry {
         return result
     }
 
-    /// Subscribes every live forwarder to `next` through its eager-registering `subscribe()` and hands it the stream,
-    /// before `next` is installed (L5-R3): `next` is `created` and unreachable by callers, so it publishes nothing until
-    /// every forwarder holds its stream, and a forwarder reads the replacement from its first event on, after its old
-    /// engine's stream ended (`EventForwarder`). A forwarder that registers while this runs is handed one as well: the
-    /// followers are re-read after each await; one that registers after the install has no history to lose, and the
-    /// replay of its own registration covers the state.
-    private func handOverFollowers(to next: ClientCore) async {
-        var handled: Set<UInt64> = []
-        while let key = self.followers.keys.filter({ !handled.contains($0) }).min() {
-            handled.insert(key)
-            guard let forwarder = self.followers[key]?.forwarder else {
-                self.followers[key] = nil
-                self.followerObserver?(self.followers.count)
-                continue
+    // MARK: Event forwarders (L5-R3, L5-R13)
+
+    /// A forwarder's registration (L5-R13): its follower key and the stream it registered.
+    struct ForwarderRegistration: Sendable {
+        /// The key `unfollow(_:)` takes; `nil` when the forwarder was not made a follower (an `events` stream made after
+        /// shutdown).
+        let key: UInt64?
+        /// The registered stream and its engine's generation; `nil` when that engine was retired by a reopen before it
+        /// answered, so the streams the reopens handed over since carry the registration.
+        let first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
+    }
+
+    /// Makes `forwarder` a follower and registers it with the engine serving now, choosing that engine in the same turn
+    /// (orchestrator ruling L5-R13: followership precedes registration). Every reopen from this turn on hands the
+    /// forwarder its replacement's stream before installing it (`performReopen`), so no reopen can fall between the
+    /// followership and the registration. When the chosen engine was retired by a reopen before it answered (`.shutDown`,
+    /// G-5), nothing is registered again: once that reopen installed its replacement, the stream it handed over carries
+    /// the registration. After shutdown, `.shutDown` and no follower entry.
+    func register(_ forwarder: EventForwarder) async -> Result<ForwarderRegistration, AssetError> {
+        guard !self.closed else {
+            return .failure(.shutDown)
+        }
+        self.lastFollower += 1
+        let key = self.lastFollower
+        self.followers[key] = Follower(forwarder: forwarder)
+        self.followerObserver?(self.followers.count)
+        let core = self.core
+        // REENTRANCY: g-11 (proposed) — `closed`, `core` and `retiring`, re-read below: a reopen meanwhile hands this
+        // follower its replacement's stream (the follower was recorded first), so only `core.engine`'s answer is used.
+        let answer = await core.engine.subscribe()
+        switch answer {
+        case .success(let stream):
+            return .success(ForwarderRegistration(key: key, first: (stream, core.generation)))
+        case .failure(.shutDown) where self.hasRetired(core.generation):
+            if let reopening = self.reopening {
+                // REENTRANCY: g-11 (proposed) — `closed` and `core`, re-read right below: the reopen installed its
+                // replacement, whose stream it handed this follower, or the client was shut down.
+                _ = await reopening.value
             }
-            // REENTRANCY: g-10 (proposed) — the followers, re-read at the loop's top (one registered meanwhile is handed a
-            // stream too); `next` cannot publish meanwhile (`created`, not installed); `closed` is re-read by the caller.
-            guard case .success(let stream) = await next.engine.subscribe() else {
-                continue
+            guard !self.closed, self.core.generation > core.generation else {
+                self.unfollow(key)
+                return .failure(.shutDown)
             }
-            // REENTRANCY: g-10 (proposed) — as above; a forwarder that finished meanwhile drops the stream at once.
-            await forwarder.handOver(stream, generation: next.generation)
+            return .success(ForwarderRegistration(key: key, first: nil))
+        case .failure(let error):
+            self.unfollow(key)
+            return .failure(error)
         }
     }
 
-    // MARK: Event forwarders (L5-R3)
-
-    /// Registers a forwarder whose pump reads this client's engines: every reopen from now on hands it the replacement's
-    /// stream before installing the replacement. Returns the key `unfollow(_:)` takes.
-    func follow(_ forwarder: EventForwarder) -> UInt64 {
-        self.lastFollower += 1
-        self.followers[self.lastFollower] = Follower(forwarder: forwarder)
-        self.followerObserver?(self.followers.count)
-        return self.lastFollower
+    /// An `events` stream's registration on its first pull (L5-R13): `register(_:)`, or after shutdown the last engine's
+    /// stream, which yields only its `clientShutDown` (R-SYN-15), with no follower entry.
+    func registerEvents(_ forwarder: EventForwarder) async -> ForwarderRegistration {
+        // REENTRANCY: g-11 (proposed) — `core`, read after the registration only when it failed (the client is shut down).
+        if case .success(let registration) = await self.register(forwarder) {
+            return registration
+        }
+        return ForwarderRegistration(key: nil, first: (self.core.engine.makeEventStream(), self.core.generation))
     }
 
-    /// Unregisters a forwarder whose pump ended.
+    /// Removes a follower entry: its forwarder's pump ended, or it stopped before any pump started, or its registration
+    /// failed.
     func unfollow(_ key: UInt64) {
         self.followers[key] = nil
         self.followerObserver?(self.followers.count)

@@ -158,7 +158,7 @@ struct FacadeUnitTests {
         let (parkedOffers, offerParked) = AsyncStream.makeStream(of: Void.self)
         let lifecycle = client.lifecycle
         let consumer = Task { () -> AssetEvent? in
-            var iterator = EventForwarder.stream(lifecycle: lifecycle, first: nil) {
+            var iterator = EventForwarder.stream(lifecycle: lifecycle) {
                 offerParked.yield()
             }.makeAsyncIterator()
             let taken = await iterator.next()
