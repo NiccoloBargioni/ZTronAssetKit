@@ -105,7 +105,7 @@ package actor AssetStore {
     /// name the replaced root (a sync's staging listing fails with `.ioFailure`) and a lease, which is a read, cannot
     /// tell it, so the facade reads this.
     package var unavailableReason: StorageUnavailableReason? {
-        nil
+        self.state.core.unavailable
     }
 
     /// One free-space read through `FileSystem`, plus usage, pending reclaim and the resolved budget (R-SYN-11).
