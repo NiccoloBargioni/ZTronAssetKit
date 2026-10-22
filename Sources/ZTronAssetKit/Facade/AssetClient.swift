@@ -142,6 +142,10 @@ public final class AssetClient: Sendable {
                 return try result.get()
             }
         }
+        if reopensVanishedRootFirst, await core.store.unavailableReason == .rootVanished {
+            // The root vanished again after every reopen allowed: the failure is reported, never a lease under it.
+            throw .storageUnavailable(.rootVanished)
+        }
         return try await operation(core).get()
     }
 
