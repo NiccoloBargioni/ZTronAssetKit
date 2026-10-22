@@ -190,15 +190,28 @@ extension SyncEngine {
         if case .degraded(let reason) = self.state.lifecycle {
             return .failure(.storageUnavailable(reason))
         }
-        let token = self.nextToken()
-        self.state.groups[token] = Group(kind: .prefetch, lane: lane)
-        let unique = Array(Set(ids)).sorted()
-        self.spawn(.entry) { engine in
-            // REENTRANCY: RE-S30 — nothing: the owned task hops onto the actor; `joinGroup` re-validates the group and the lifecycle.
-            await engine.joinGroup(token, ids: unique, lane: lane)
-        }
+        let (token, members) = self.recordGroup(ids, lane: lane)
+        self.spawnJoin(token, members: members, lane: lane)
         self.notifyObservers()
         return .success(token)
+    }
+
+    /// The registering turn's bookkeeping: a token and the group, whose members are `ids` de-duplicated and sorted, the
+    /// order its join reaches them in. Kept apart from the join's spawn (`spawnJoin`) so a test can hold a registered
+    /// group's join before its store read: that read is a synchronous `AssetStore` call, which no test-target type can
+    /// hold (L5-R1).
+    func recordGroup(_ ids: [AssetID], lane: AssetPriority) -> (token: InterestToken, members: [AssetID]) {
+        let token = self.nextToken()
+        self.state.groups[token] = Group(kind: .prefetch, lane: lane)
+        return (token, Array(Set(ids)).sorted())
+    }
+
+    /// Spawns the join of the group `recordGroup` registered under `token` (one owned task, RE-S30).
+    func spawnJoin(_ token: InterestToken, members: [AssetID], lane: AssetPriority) {
+        self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S30 — nothing: the owned task hops onto the actor; `joinGroup` re-validates the group and the lifecycle.
+            await engine.joinGroup(token, ids: members, lane: lane)
+        }
     }
 
     /// Adds the group's interests for the members that are not present at their current content, at most
