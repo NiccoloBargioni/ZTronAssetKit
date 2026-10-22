@@ -74,37 +74,61 @@ public final class AssetClient: Sendable {
         await self.lifecycle.current().engine
     }
 
-    /// Runs one engine call on the current pair. A pair whose root was replaced (`rootVanished`, B-15) is reopened
-    /// and the call repeated on the replacement; a call that a reopen's shutdown of the old engine answered with
-    /// `.shutDown` is repeated on the replacement too. Any other result is returned as the engine gave it (L4-R23:
-    /// `ensureAvailable` stays faithful). At most `AssetClient.reopenAttempts` repetitions, so a store that vanishes
-    /// again and again reports the failure instead of looping.
+    /// Runs one engine call on the current pair. A pair whose root was replaced (B-15) is reopened and the call
+    /// repeated on the replacement: after a `.storageUnavailable` failure that names the replaced root, or any other
+    /// `.storageUnavailable` failure while the store reports it (`AssetStore.unavailableReason`, orchestrator ruling
+    /// L5-R4: a sync's staging listing fails with `.ioFailure` on a vanished root); with `reopensVanishedRootFirst`,
+    /// also before the call when the store reports it (a lease is a read, which a replaced root still grants). A call
+    /// that a reopen's shutdown of the old engine answered with `.shutDown` is repeated on the replacement too. Any other
+    /// result is returned as the engine gave it, other storage failures included (L4-R23: `ensureAvailable` stays
+    /// faithful). At most `AssetClient.reopenAttempts` reopens and repetitions, so a store that vanishes again and again
+    /// reports the failure instead of looping.
     private func perform<T: Sendable>(
+        reopensVanishedRootFirst: Bool = false,
         _ operation: @Sendable (SyncEngine) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
-        try await self.performOnCore { core in
+        try await self.performOnCore(reopensVanishedRootFirst: reopensVanishedRootFirst) { core in
             await operation(core.engine)
         }
     }
 
     /// `perform` for an operation that also needs the generation of the engine it runs on.
     private func performOnCore<T: Sendable>(
+        reopensVanishedRootFirst: Bool = false,
         _ operation: @Sendable (ClientCore) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
-        try await AssetClient.performOnCore(lifecycle: self.lifecycle, operation)
+        try await AssetClient.performOnCore(lifecycle: self.lifecycle, reopensVanishedRootFirst: reopensVanishedRootFirst, operation)
     }
 
     /// The reopen path on `lifecycle`'s current pair. Static, so a task that must not keep the client alive (the
-    /// background-events hand-off) can take it without capturing the client.
+    /// background-events hand-off) can take it without capturing the client. The store's reason is read only where it
+    /// decides something: before a call with `reopensVanishedRootFirst`, and after a `.storageUnavailable` failure that
+    /// does not name the replaced root. A root that vanishes between the read and the call is met by the call, as before
+    /// (a lease taken then is a read under B-15).
     private static func performOnCore<T: Sendable>(
         lifecycle: ClientLifecycle,
+        reopensVanishedRootFirst: Bool = false,
         _ operation: @Sendable (ClientCore) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
         var core = await lifecycle.current()
         for _ in 0..<AssetClient.reopenAttempts {
+            if reopensVanishedRootFirst, await core.store.unavailableReason == .rootVanished {
+                guard let replacement = await lifecycle.reopen(replacing: core.generation) else {
+                    throw .shutDown
+                }
+                core = replacement
+                continue
+            }
             let result = await operation(core)
             switch result {
-            case .failure(.storageUnavailable(.rootVanished)):
+            case .failure(.storageUnavailable(let reason)):
+                var vanished = reason == .rootVanished
+                if !vanished {
+                    vanished = await core.store.unavailableReason == .rootVanished
+                }
+                guard vanished else {
+                    return try result.get()
+                }
                 guard let replacement = await lifecycle.reopen(replacing: core.generation) else {
                     throw .shutDown
                 }
@@ -176,9 +200,11 @@ public final class AssetClient: Sendable {
     }
 
     /// Runs `body` with the asset's URL while a lease keeps eviction, prune and purge away from it (R-CAR-8).
-    /// Untyped because the body is the caller's (ADR-004); the lease is released on every path.
+    /// Untyped because the body is the caller's (ADR-004); the lease is released on every path. A store whose root was
+    /// replaced still grants leases (they are reads), so the store is asked first and a vanished root reopened before
+    /// the lease (L5-R4): the body never gets a URL under the vanished root.
     public func withAsset<T: Sendable>(_ id: AssetID, _ body: @Sendable (URL) async throws -> T) async throws -> T {
-        let (engine, lease) = try await self.perform { engine in
+        let (engine, lease) = try await self.perform(reopensVanishedRootFirst: true) { engine in
             await engine.acquireLease(id).map { (engine, $0) }
         }
         do {
@@ -213,13 +239,17 @@ public final class AssetClient: Sendable {
         do throws(AssetError) {
             return try await self.perform { engine in
                 let outcome = await engine.sync(mode)
-                switch outcome {
-                case .failed(let error) where error == .storageUnavailable(.rootVanished) || error == .shutDown:
-                    // Handed to `perform`, which reopens or follows the replacement before reporting it.
-                    return .failure(error)
-                default:
-                    return .success(outcome)
+                if case .failed(let error) = outcome {
+                    switch error {
+                    case .shutDown, .storageUnavailable:
+                        // Handed to `perform`, which reopens a replaced root (by the store's own reason, L5-R4) or
+                        // follows the replacement before reporting it; any other failure comes back as given.
+                        return .failure(error)
+                    default:
+                        break
+                    }
                 }
+                return .success(outcome)
             }
         } catch {
             return .failed(error)
