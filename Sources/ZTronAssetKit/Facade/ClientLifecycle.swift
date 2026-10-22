@@ -153,8 +153,8 @@ actor ClientLifecycle: PrefetchRegistry {
 
     // MARK: The current pair
 
-    /// The pair serving now; waits for a running reopen. After shutdown, the last pair (its engine answers
-    /// `.shutDown`).
+    /// The pair serving now: waits for a running reopen's whole task, but a call made after it installed its
+    /// replacement gets that pair at once (L5-R22 (5)). After shutdown, the last pair (its engine answers `.shutDown`).
     func current() async -> ClientCore {
         if let reopening = self.reopening {
             // REENTRANCY: g-1 (proposed) — nothing but `core`, read after the wait: the reopen installed it.

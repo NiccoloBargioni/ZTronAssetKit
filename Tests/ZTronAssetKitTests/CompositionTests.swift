@@ -36,12 +36,12 @@ final class OrderRecordingFactory: RemoteSourceFactory {
 struct CompositionTests {
     private static let identifier = "com.ztron.assetkit.bg.test.v1"
 
-    /// The attestation half of the fallback (ADR-026 option E, transport.md §10.7): the background session exists only
+    /// The attestation half of the fallback (ADR-026 (c), transport.md §10.7): the background session exists only
     /// when the app attests, through `BackgroundTransferPolicy.enabled`, that it forwards the AppDelegate hook to
     /// `handleBackgroundEvents`. Without the attestation the composition root builds a source with no background
     /// session, and the engine routes every bulk transfer to the foreground. The run-time detection of a hook that was
-    /// attested but not wired (transport.md F-26: `didFinishEvents` with no handler stored) needs a transport change
-    /// (`docs/adr-drafts/g.md` CCR-G1).
+    /// attested but not wired (transport.md F-26) is not detected: CCR-G1 was declined, the attestation is what
+    /// "wired" means in Stage 2 (ruling L5-R5, ADR-054).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-3: background falls back to foreground when the background-events hook is not wired", .timeLimit(.minutes(1)))
     func foregroundWithoutHook() async throws {

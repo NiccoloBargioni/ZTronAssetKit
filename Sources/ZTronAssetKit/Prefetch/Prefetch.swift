@@ -3,8 +3,11 @@ import ZTronAssetSync
 
 /// The engine side of a prefetch handle (R-CAR-4): group interests registered and released by token.
 ///
-/// `SyncEngine` conforms; handle tests use a fake whose registration can be held back, which is how the sync-1 S1-05
-/// regression (a re-lane must never let the asset's interest drop to zero) is tested without the engine.
+/// `SyncEngine` conforms, and so does the facade's `ClientLifecycle`, through which every `AssetClient` handle
+/// registers: it binds each facade token to the engine token of the generation it was registered with, so a release
+/// after a reopen never reaches another engine's token (G-1). Handle tests use a fake whose registration can be held
+/// back, which is how the sync-1 S1-05 regression (a re-lane must never let the asset's interest drop to zero) is
+/// tested without the engine; end to end, the re-lane also relies on the engine's pending claims (L5-R1).
 package protocol PrefetchRegistry: Sendable {
     /// Registers one group interest; `.failure(.shutDown)` after shutdown, holding nothing (R-SYN-15).
     func registerGroup(_ ids: [AssetID], lane: AssetPriority) async -> Result<InterestToken, AssetError>

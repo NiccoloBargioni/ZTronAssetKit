@@ -14,7 +14,8 @@ public enum StorageUnavailableReason: Sendable, Hashable, Codable {
     case locked
     /// File protection makes the root unreadable before first unlock (R-STO-8).
     case protectedDataUnavailable
-    /// The root vanished or was replaced while running (store-1 S1-08).
+    /// The root vanished or was replaced while running (store-1 S1-08). `AssetClient` reopens the store and repeats
+    /// a call that fails with it, at most three reopens per call (B-15; ARCHITECTURE §8).
     case rootVanished
     /// Index commits keep failing (for example a full disk); lookups still work from the last snapshot.
     case degradedReadOnly
