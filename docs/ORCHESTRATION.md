@@ -2,6 +2,17 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
+## Level 5 WP-G — RUNNING (launched 2026-10-22 09:49 CEST)
+- **Launched by** the scheduled task `ztron-assetkit-level5-launch`, which fired at ~09:48 CEST instead of 04:20; the app was probably closed at 04:20.
+- **Session:** `d8335845-1285-454d-9185-a6519bd816cc`. **Main run:** `wf_6593085d-170` (task `w9gtxnvf1`), via `assetkit-stage2-level.js` with `{level: "L5", base: "l4-merged", wps: ["g"], bar: "strict", usageStop: 50}`.
+  - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_6593085d-170`.
+- **Usage at launch:** weekly all models **0 %**, Fable 0 %, 5-hour 0 %. The week resets Thu 29 Oct 04:00 CEST.
+- **Worktree:** `.worktrees/g` on `wp/g`, from `l4-merged` (`0d3f119`).
+- **Keep-awake:** `caffeinate -ims -t 259200` from 22 Oct 09:48 runs to 25 Oct 09:48 (a background task of this session).
+- **Stops:** 50 for the main run and close-out, 55 for docs: the 55 % WP-G default recorded on 18 Oct.
+- **Forecast (strict):** 19–38 weekly points and 22–43 h for all of WP-G, i.e. 6–15 close-out cycles at ~1.75 points and ~2.1 h each. WP-G should land around 23–24 Oct. If it hits 50 % first, the run stops and asks the owner for a new stop.
+- **Next:** when the main run ends, write `.build-orchestrator/l5-rulings.md`, dump `.build-orchestrator/l5-remaining-g.json`, and launch the close-out (Level 5 section below).
+
 ## Next session: start here (written 2026-10-17 19:15 CEST, after Level 4)
 Level 4 is **complete** (`l4-merged` = `0d3f119`, see "Level 4 — done"). Nothing is running; no worktrees; no `wp/*` branches; `feature/asset-kit` is clean. Weekly usage **68 %** (all models; Fable 0 %), resets **Thu 22 Oct 04:00 CEST**. A `caffeinate -ims -t 172800` started 17 Oct 11:30 ends by itself on 19 Oct 11:30.
 
