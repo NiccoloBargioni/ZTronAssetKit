@@ -108,6 +108,11 @@ package actor AssetStore {
         self.state.core.unavailable
     }
 
+    /// The commit's root check on demand (orchestrator ruling L5-R20); not implemented yet: answers the recorded reason.
+    package func verifyRootNow() async -> StorageUnavailableReason? {
+        self.state.core.unavailable
+    }
+
     /// One free-space read through `FileSystem`, plus usage, pending reclaim and the resolved budget (R-SYN-11).
     package func freeSpace() async throws(StoreError) -> FreeSpace {
         // REENTRANCY: R13 — `measureFreeSpace` re-checks the phase after its unit.
