@@ -285,6 +285,37 @@ extension EngineGroupClaimTests {
         await engine.shutdown()
     }
 
+    /// A group of more than `releasesPerTurn` members released before `start()` drops its first claims in the release
+    /// turn and the rest in follow-up turns, which may run before the engine is running (its join, spawned with it,
+    /// starts the engine through `ensureStarted()`), so no release is left behind for the running engine to find (found
+    /// by the L5-R2 enumeration of spawn sites reachable in `created`).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a large group released before start drops every claim without the engine starting", .timeLimit(.minutes(1)))
+    func largeGroupReleasedBeforeStart() async throws {
+        let harness = EngineHarness.make()
+        let engine = harness.engine
+        let ids = (0..<(SyncEngine.releasesPerTurn + 88)).map { AssetID(String(format: "u%04d", $0)) }
+        let (chunked, spawned) = await engine.inOneTurn { engine -> (Bool, Int) in
+            guard let token = try? engine.performRegisterGroup(ids, lane: .prefetch).get() else {
+                return (false, 0)
+            }
+            engine.performReleaseGroup(token)
+            return (engine.state.releasing[token] != nil, engine.state.tasks.count)
+        }
+        #expect(chunked, "setup: the release left claims for later turns")
+        #expect(spawned == 2, "setup: the group's join and a release follow-up were spawned while created")
+        await engine.waitUntil { $0.ownedTasks == 0 }
+        let (releasing, counts) = await engine.inOneTurn { engine in
+            (engine.state.releasing.count, EngineGroupClaimTests.claimCounts(engine))
+        }
+        #expect(releasing == 0, "the follow-ups dropped every claim before the engine was running")
+        #expect(counts == (0, 0, 0), "no claim is left: \(counts)")
+        try await harness.start()
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.shutdown()
+    }
+
     /// Shutdown ends every claim, a job a claim alone kept included.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: shutdown ends every pending claim", .timeLimit(.minutes(1)))

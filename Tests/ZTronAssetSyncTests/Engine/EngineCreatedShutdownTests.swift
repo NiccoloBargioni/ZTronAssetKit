@@ -62,7 +62,39 @@ struct EngineCreatedShutdownTests {
     }
 }
 
+extension EngineCreatedShutdownTests {
+    /// Since L5-R1 a group of more than `releasesPerTurn` members released before start chunks its claims and spawns a
+    /// release follow-up while the engine is `created`.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: shutdown in created cancels and joins a release follow-up", .timeLimit(.minutes(1)))
+    func releaseFollowUpSpawnedInCreated() async throws {
+        let harness = EngineHarness.make()
+        let engine = harness.engine
+        let ids = (0..<(SyncEngine.releasesPerTurn + 1)).map { AssetID(String(format: "r%04d", $0)) }
+        let outcome = await engine.releaseAndShutDown(ids)
+        #expect(outcome.spawned, "setup: the release follow-up was spawned while the engine was created")
+        #expect(outcome.ownedTasks == 0, "no owned task outlives shutdown: \(outcome.ownedTasks)")
+        #expect(outcome.releasing == 0 && outcome.claims == 0, "no release and no claim outlives shutdown")
+        #expect(harness.fileSystem.operations.isEmpty, "a shutdown in created never touches the volume")
+        #expect(harness.tap.lines.isEmpty, "a shutdown in created never logs: \(harness.tap.lines)")
+    }
+}
+
 extension SyncEngine {
+    /// Test seam: registers a group of more than `releasesPerTurn` members and releases it, which spawns its join and a
+    /// release follow-up, then begins `shutdown()`, all in one turn; reports what was left in the turn the shutdown
+    /// returned in.
+    func releaseAndShutDown(_ ids: [AssetID]) async -> (spawned: Bool, ownedTasks: Int, releasing: Int, claims: Int) {
+        let created = self.state.lifecycle == .created
+        if let token = try? self.performRegisterGroup(ids, lane: .prefetch).get() {
+            self.performReleaseGroup(token)
+        }
+        let spawned = created && !self.state.releasing.isEmpty && self.state.releaseFollowUpScheduled
+        // REENTRANCY: the owned tasks, releases and claims are read right after the shutdown returns (a test seam).
+        await self.performShutdown()
+        return (spawned, self.state.tasks.count, self.state.releasing.count, self.state.claims.count + self.state.unlistedClaims)
+    }
+
     /// Test seam: registers a group, which spawns its join, and begins `shutdown()` in the same turn; reports whether
     /// the engine was `created` with the join spawned, and the owned tasks and groups left in the turn the shutdown
     /// returned in.
