@@ -31,9 +31,22 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **L5-R4** approves CCR-G3: `AssetStore.unavailableReason` as a package read, plus the facade's reopen trigger.
   - **L5-R5** declines CCR-G1, because it would misfire on WP-D's tolerated early finish. The attestation counts as "wired", and the run-time half is Not verified.
   - **L5-R6** leaves P-13, P-11 and R-SYN-5 C2 as non-blocking `outside-wp` (load-related), to be re-run at merge.
-- **Close-out: RUNNING** `wf_a049b89c-afb` (task `wp9tf73fa`), launched 14:39 at weekly 5 %. Arguments: strict, `maxCycle: 30`, `usageStop: 50`, `findingsFile` `.build-orchestrator/l5-remaining-g.json`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
-  - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_a049b89c-afb`.
-- **Probes** from the round-3 correctness verifier are kept in `.build-orchestrator/l5-probes-r3/`.
+- **Close-out cycle 1:** `wf_a049b89c-afb`, 14:39–17:34 (2.9 h, weekly 5 % → 8 %, i.e. ~3 points, heavier than the 1.75 forecast).
+  - It fixed all four original blockers, and the verifiers confirmed each against mutants and probes.
+  - It left 4 blocking items, 3 distinct, in `.build-orchestrator/l5-close1-remaining-g.json` (`L5-C1-nn`):
+    - a `subscribe()` stream not yet pulled loses the replacement's events after a reopen (the same class as L5-V3-06);
+    - two load-dependent Kit test flakes.
+  - The orchestrator stopped the run 2 min into fix 2, before any change, and added the class rulings:
+    - **L5-R13:** followership precedes registration, with a path enumeration and a seeded model test with invariants I1–I4.
+    - **L5-R14:** an enumeration and conversion of every scheduling-dependent Kit test, plus stress runs under load.
+    - **L5-R15:** `endClaims` gets a test and the C2 chunking; `heldLane` gets the same-lane test; g.md line fixes.
+    - **L5-R16:** a claimed-only job's failure goes to Stage 3.
+    - **L5-R17:** the cycle-1 deviations are accepted.
+    - **L5-R18:** verifiers run only WP-G's five benchmarks.
+- **Close-out: RUNNING from cycle 2:** `wf_0ec4322f-bdb` (task `w2c654soi`), launched 17:45 at weekly 8 %, with `fromCycle: 2` and `findingsFile` `.build-orchestrator/l5-close1-remaining-g.json`.
+  - The other arguments are unchanged: strict, `maxCycle: 30`, `usageStop: 50`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
+  - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_0ec4322f-bdb`.
+- **Probes** are kept in `.build-orchestrator/l5-probes-r3/` (round 3) and `.build-orchestrator/l5-probes-c1/` (cycle 1, both lenses, plus the correctness verifier's `.fix` candidates).
 - **Resume cold** (if this session is gone):
   1. Read the close-out's `journal.jsonl`; the last `verify:g:*:cN` results are the findings.
   2. Dump them to `.build-orchestrator/l5-closeN-remaining-g.json`.
