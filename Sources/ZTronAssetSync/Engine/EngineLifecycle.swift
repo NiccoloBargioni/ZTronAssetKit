@@ -516,10 +516,14 @@ extension SyncEngine {
             self.state.groups[token]?.continuation = nil
         }
         self.state.groups.removeAll()
-        // Every pending claim ends with the engine (L5-R1).
+        // Every pending claim ends with the engine (L5-R1), those a release or a join's give-up left for later turns
+        // included (L5-R15).
         self.state.claims.removeAll()
         self.state.claimHeld.removeAll()
         self.state.unlistedClaims = 0
+        for token in self.state.releasing.keys.sorted() {
+            self.state.releasing[token]?.claims = []
+        }
         let starts = self.state.startJoiners
         self.state.startJoiners.removeAll()
         for token in starts.keys.sorted() {

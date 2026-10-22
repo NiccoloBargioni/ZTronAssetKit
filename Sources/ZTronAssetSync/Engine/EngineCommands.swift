@@ -351,7 +351,9 @@ extension SyncEngine {
             for transfer in self.state.inFlight.sorted() where self.state.jobs[transfer]?.interests[token] != nil {
                 self.removeInterest(token, from: transfer)
             }
-            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending, claims: claims)
+            // Claims a large give-up of the group's join left for later turns (`endClaims(of:)`) are dropped first.
+            let leftover = self.state.releasing[token]?.claims ?? []
+            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending, claims: leftover + claims)
             self.continueReleases()
         }
         self.pump()
@@ -440,16 +442,33 @@ extension SyncEngine {
 
     /// The group's join gave up before reaching every member (start failed, the store read failed, the source is
     /// missing, shutdown began): every claim it still holds ends, so no claim waits for a join that will not come.
-    /// Internal so a test can give a registered group's claims up in one turn.
+    ///
+    /// More than `releasesPerTurn` claims end the way a large release's do (orchestrator ruling L5-R15, C2): at most that
+    /// many in this turn and the rest in the release follow-up's turns (`releasing`, `continueReleases`), so a give-up
+    /// retires at most `releasesPerTurn` jobs that claims alone kept in one turn, whatever the group's size; a later
+    /// release of the group drops what is left first. A degraded engine cannot spawn that follow-up, and its start failed
+    /// before any job existed, so no claim drop can retire one there: it drops them all in this turn (one table update
+    /// each). Internal so a test can give a registered group's claims up in one turn.
     func endClaims(of token: InterestToken) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
             return
         }
+        let claims = group.claimed[group.claimCursor...]
         self.state.groups[token]?.claimCursor = group.claimed.count
         self.state.groups[token]?.unlistedClaims = 0
         self.state.unlistedClaims -= group.unlistedClaims
-        for claim in group.claimed[group.claimCursor...] {
-            self.dropClaim(claim)
+        var degraded = false
+        if case .degraded = self.state.lifecycle {
+            degraded = true
+        }
+        if claims.count > Self.releasesPerTurn, !degraded {
+            // No release of this registered group exists: `performReleaseGroup` removes the group, and a join gives up once.
+            self.state.releasing[token] = Release(members: [], pending: [:], claims: claims)
+            self.continueReleases()
+        } else {
+            for claim in claims {
+                self.dropClaim(claim)
+            }
         }
         if self.isRunning {
             self.pump()
