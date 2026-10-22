@@ -7,7 +7,9 @@ import ZTronAssetStorage
 import ZTronAssetTestSupport
 
 /// L5-R13's seeded, randomized model of event-stream continuity across reopens (orchestrator ruling L5-R13, findings
-/// L5-C1-00, L5-C1-03 and L5-C1-04; `docs/adr-drafts/g.md` G-2 and G-16), in the shape of L4-R20's gate model.
+/// L5-C1-00, L5-C1-03 and L5-C1-04; its oracle tightened by ruling L5-R19, finding L5-C2-00; `docs/adr-drafts/g.md`
+/// G-2 and G-16, whose exemption table lists every tolerance of the checks below and the ruling that grants it), in the
+/// shape of L4-R20's gate model.
 ///
 /// A walk builds a client over the harness's fakes, starts it and, from its seed, interleaves consumer actions
 /// (`subscribe()`; `events` and a first pull; pulls; dropping a stream; cancelling a consumer), reopens (a wiped root and
@@ -19,18 +21,21 @@ import ZTronAssetTestSupport
 /// replacement at `LifecycleSeamPoint.replacementBuilt`, before it is installed. Every consumer still live at the
 /// shutdown then drains its stream, and the walk checks:
 /// - **I1 no loss.** A consumer receives every marker whose call began after its registration (or a later event of the
-///   marker's subject: the engine's coalescing), and, from every generation built by a reopen that began after its
-///   registration, every terminal event the oracle saw or a later one of the same subject. That generation's
-///   `clientStarted` itself is required once the consumer received one of its markers before its shutdown began: only
-///   that generation's `clientShutDown` can supersede it, and only while it waits undelivered. Progress events coalesce in
-///   place and are not checked.
+///   marker's subject: the engine's per-subject coalescing), and, from every generation built by a reopen that began
+///   after its registration, that generation's `clientStarted` whenever the oracle saw one (client lifecycle events are
+///   never coalesced with each other, L5-R19) and every other terminal event the oracle saw, or a later one of the same
+///   subject, inside that generation's own part of the stream: the parts are delimited by the received markers and the
+///   generations' `clientStarted`, counted rather than looked up by value, because replacements announce equal values.
+///   Progress events coalesce in place and are not checked.
 /// - **I2 order.** The markers a consumer receives never go back a generation and none arrives twice; no
 ///   `clientShutDown` arrives before the real shutdown began (a retired engine's is never forwarded), at most one arrives,
-///   and it is the last event; every consumer live at the shutdown ends with it.
+///   and it is the last event; every consumer live at the shutdown ends with it; no more `clientStarted` events arrive
+///   between two received markers than the generations between them published.
 /// - **I3 no leak.** At idle, after every stream ended: the lifecycle has no follower entry (a forwarder whose pump
 ///   started is removed only when that pump ends, so none also means no pump task is left), and no engine the walk saw has
 ///   a subscriber.
-/// - **I4 bounded.** After every step, at most one event waits in each forwarder (R-SYN-12).
+/// - **I4 bounded.** After every step, and after every action made while a reopen is parked, at most one event waits in
+///   each forwarder (R-SYN-12).
 /// Every wait is a condition that ends on cancellation (L5-R14). A violation prints its seed and the walk so far; a walk
 /// cut short by the time limit prints the walk it stopped in. `EVENT_MODEL_SEEDS=3,17` replays chosen walks;
 /// `EVENT_MODEL_SEED_COUNT=5000` runs seeds 0 to 4,999; `EVENT_MODEL_TRACE=<file>` appends every walk's actions to that
@@ -617,8 +622,6 @@ private final class ModelWalk {
     var markers: [Marker] = []
     var nextMarker = 0
     var pending: [Pending] = []
-    /// The action in which each generation's shutdown began (a reopen retiring it, or the client's shutdown).
-    var retiredAt: [UInt64: Int] = [:]
     /// The action in which the reopen that built each replacement began.
     var builtAt: [UInt64: Int] = [:]
     /// The generations installed at some point.
@@ -952,7 +955,6 @@ private final class ModelWalk {
         self.reopens += 1
         let began = self.clock.tick()
         let retiring = await self.client.lifecycle.current().generation
-        self.retiredAt[retiring] = began
         self.builtAt[retiring + 1] = began
         // One operation of the fake volume (`KitHarness.vanishRoot()`): the walk does not wait for the engine to fall idle.
         try self.harness.vanishRoot()
@@ -981,6 +983,10 @@ private final class ModelWalk {
             self.parked = park
             for _ in 0..<self.random.below(4) {
                 await self.innerAction()
+                // I4 after every action, the ones made while parked included.
+                if let violation = await self.bufferedViolation() {
+                    self.violation(violation)
+                }
             }
             if thenShutDown {
                 self.shutdownAt = self.clock.tick()
@@ -1054,11 +1060,7 @@ private final class ModelWalk {
             self.note("shutdown")
             await self.client.shutdown()
         }
-        let final = await self.client.lifecycle.current().generation
-        if self.retiredAt[final] == nil || !self.installed.contains(final) {
-            self.retiredAt[final] = self.shutdownAt
-        }
-        self.installed.insert(final)
+        self.installed.insert(await self.client.lifecycle.current().generation)
         // After the shutdown no stream registers: subscribe() throws and a new `events` stream yields only clientShutDown.
         do throws(AssetError) {
             _ = try await self.client.subscribe()
@@ -1104,7 +1106,7 @@ private final class ModelWalk {
         }
     }
 
-    /// I4 after a step.
+    /// I4 after a step, and after each action made while a reopen is parked.
     private func bufferedViolation() async -> String? {
         for forwarder in await self.client.lifecycle.liveFollowers {
             let buffered = await forwarder.bufferedEvents
@@ -1132,16 +1134,29 @@ private final class ModelWalk {
         let taps = self.oracles.all
         var logs: [UInt64: [AssetEvent]] = [:]
         var markerGeneration: [AssetID: UInt64] = [:]
+        var markerFallback: [AssetID: UInt64] = [:]
         for tap in taps {
             let events = tap.record.entries.map(\.event)
             logs[tap.generation] = events
             for event in events {
-                if case .assetAvailable = event, let id = self.markerID(event) {
+                guard let id = self.markerID(event) else {
+                    continue
+                }
+                if case .assetAvailable = event {
                     markerGeneration[id] = tap.generation
+                } else if markerFallback[id] == nil {
+                    markerFallback[id] = tap.generation
                 }
             }
         }
-        let final = self.installed.max() ?? 0
+        // A marker no generation made available is owed as the first generation's other event of its subject (its
+        // failure), not skipped.
+        for (id, generation) in markerFallback where markerGeneration[id] == nil {
+            markerGeneration[id] = generation
+        }
+        for generation in self.installed.sorted() where logs[generation] == nil {
+            self.violation("I1: the oracle holds no log of generation \(generation), which was installed")
+        }
         let shutdownAt = self.shutdownAt ?? Int.max
         for state in self.consumers {
             let entries = state.consumer.record.entries
@@ -1194,61 +1209,109 @@ private final class ModelWalk {
                 self.violation("I1: \(name) never received marker \(marker.id) (generation \(generation), call began at t\(marker.startedAt))")
             }
             // I1: every generation built by a reopen that began after the registration, from its first event.
-            for generation in self.installed.sorted() {
+            let owed = self.installed.sorted().compactMap { generation -> (generation: UInt64, log: [AssetEvent])? in
                 guard let began = self.builtAt[generation], began > registeredAt, let log = logs[generation] else {
-                    continue
+                    return nil
                 }
-                self.checkGeneration(generation, log: log, final: final, entries: entries, markerGeneration: markerGeneration, name: name)
+                return (generation, log)
             }
+            self.checkGenerations(owed, events: events, markerGeneration: markerGeneration, name: name)
         }
     }
 
-    /// I1 for one generation a consumer followed from its first event: in the part of the consumer's stream between the
-    /// last marker of an older generation and the first marker of a newer one, each terminal event the oracle saw, or a
-    /// later one of the same subject; `clientStarted` itself once one of the generation's markers arrived before its
-    /// shutdown began.
-    private func checkGeneration(
-        _ generation: UInt64,
-        log: [AssetEvent],
-        final: UInt64,
-        entries: [ModelRecord.Entry],
+    private static func isClientStarted(_ event: AssetEvent) -> Bool {
+        if case .clientStarted = event {
+            return true
+        }
+        return false
+    }
+
+    /// I1 for the generations a consumer was handed from their first events (`owed`, oldest first). The forwarder reads
+    /// one engine stream to its end before the next, so each generation's events form one part of the consumer's stream,
+    /// in generation order, and the markers the consumer received anchor those parts: between two received markers of
+    /// generations `a` and `b` only the `clientStarted` of generations after `a`, up to `b`, can arrive.
+    /// - Every owed generation whose oracle saw its `clientStarted` delivered it, in the gap between the received markers
+    ///   that enclose it: client lifecycle events are never coalesced with each other (orchestrator ruling L5-R19). The
+    ///   first gap may also hold the `clientStarted` of the engine the consumer registered with, which it was not handed;
+    ///   any other `clientStarted` is one more than the generations the consumer read published (I2). Counted, not looked
+    ///   up by value: replacements announce equal values (`clientStarted(generation: 1)`).
+    /// - Each owed generation's part runs from its `clientStarted` to the next owed generation's `clientStarted` (or the
+    ///   end); every other terminal event its oracle saw, or a later one of the same subject (H-9's per-subject coalescing,
+    ///   L5-R19 (ii)), arrives inside that part, so an equal event of a neighbouring generation (a launch run's
+    ///   `syncFinished`, a `maintenanceFinished` with the same report) never stands in for a lost one. Terminal events an
+    ///   engine published before its `clientStarted` are looked for from the previous part's start on.
+    private func checkGenerations(
+        _ owed: [(generation: UInt64, log: [AssetEvent])],
+        events: [AssetEvent],
         markerGeneration: [AssetID: UInt64],
         name: String
     ) {
-        let events = entries.map(\.event)
-        var lower = -1
-        var upper = events.count
+        var cuts: [(index: Int, generation: UInt64?)] = [(-1, nil)]
         for (index, event) in events.enumerated() {
-            guard let id = self.markerID(event), let owner = markerGeneration[id] else {
+            if let id = self.markerID(event), let generation = markerGeneration[id] {
+                cuts.append((index, generation))
+            }
+        }
+        cuts.append((events.count, nil))
+        let started = owed.filter { $0.log.contains(where: ModelWalk.isClientStarted) }.map(\.generation)
+        var startIndex: [UInt64: Int] = [:]
+        for gap in 0..<(cuts.count - 1) {
+            let low = cuts[gap]
+            let high = cuts[gap + 1]
+            let expected = started.filter { generation in
+                (low.generation.map { generation > $0 } ?? true) && (high.generation.map { generation <= $0 } ?? true)
+            }
+            let found = ((low.index + 1)..<high.index).filter { ModelWalk.isClientStarted(events[$0]) }
+            let place: String
+            switch (low.generation, high.generation) {
+            case (nil, let next?):
+                place = "before its first marker (generation \(next))"
+            case (let previous?, let next?):
+                place = "between its markers of generations \(previous) and \(next)"
+            case (let previous?, nil):
+                place = "after its last marker (generation \(previous))"
+            case (nil, nil):
+                place = "with no marker"
+            }
+            if found.count < expected.count {
+                self.violation("I1: \(name) lost a clientStarted: generations \(expected) each published one, and \(found.count) arrived \(place): \(found.map { events[$0] })")
                 continue
             }
-            if owner < generation {
+            if found.count - expected.count > (gap == 0 ? 1 : 0) {
+                self.violation("I2: \(name) received \(found.count) clientStarted events \(place), where only generations \(expected) published one: \(found.map { events[$0] })")
+            }
+            for (generation, index) in zip(expected, found.suffix(expected.count)) {
+                startIndex[generation] = index
+            }
+        }
+        for (position, item) in owed.enumerated() {
+            let previousStart = owed[..<position].reversed().lazy.compactMap { startIndex[$0.generation] }.first ?? 0
+            let lower: Int
+            if let index = startIndex[item.generation] {
                 lower = index
-            }
-            if owner > generation, upper == events.count {
-                upper = index
-            }
-        }
-        let window = Set(lower + 1 < upper ? Array(events[(lower + 1)..<upper]) : [])
-        let retiredAt = self.retiredAt[generation] ?? Int.max
-        let markerBeforeShutdown = entries.contains { entry in
-            self.markerID(entry.event).flatMap { markerGeneration[$0] } == generation && entry.at < retiredAt
-        }
-        let terminal = log.filter { !EventSlot($0).isProgress }
-        for (index, event) in terminal.enumerated() {
-            switch event {
-            case .clientShutDown:
-                // A retired generation's is hidden; the final one is I2's.
+            } else if started.contains(item.generation) {
+                // Its clientStarted was lost (reported above): its part cannot be delimited.
                 continue
-            case .clientStarted:
-                if markerBeforeShutdown, !window.contains(event) {
-                    self.violation("I1: \(name) lost \(event) of generation \(generation) (\(generation == final ? "final" : "retired")), although it received one of that generation's markers before its shutdown began")
-                }
-            default:
-                let slot = EventSlot(event)
-                let covered = terminal[index...].contains { EventSlot($0) == slot && window.contains($0) }
-                if !covered {
-                    self.violation("I1: \(name) lost \(event) of generation \(generation), and no later event of its subject")
+            } else {
+                // Never started (a final generation the shutdown met before its start): it published only its shutdown's
+                // clientShutDown, which I2 checks.
+                lower = previousStart
+            }
+            let upper = owed[(position + 1)...].lazy.compactMap { startIndex[$0.generation] }.first ?? events.count
+            let terminal = item.log.filter { !EventSlot($0).isProgress }
+            let announced = terminal.firstIndex(where: ModelWalk.isClientStarted) ?? 0
+            for (index, event) in terminal.enumerated() {
+                switch event {
+                case .clientStarted, .clientShutDown:
+                    // clientStarted is counted above; a retired generation's clientShutDown is hidden (G-2) and the final
+                    // one is I2's.
+                    continue
+                default:
+                    let part = events[(index < announced ? previousStart : lower)..<upper]
+                    let slot = EventSlot(event)
+                    if !terminal[index...].contains(where: { EventSlot($0) == slot && part.contains($0) }) {
+                        self.violation("I1: \(name) lost \(event) of generation \(item.generation), and no later event of its subject arrived in that generation's part of its stream")
+                    }
                 }
             }
         }
