@@ -212,7 +212,7 @@ struct FacadeRaceTests {
                 await reopenHold.arrive()
             case .pressureRecorded(let epoch):
                 record.yield(epoch)
-            case .registrationAnswered, .shutdownWillWaitForReopen, .replacementObservesPressure:
+            case .registrationAnswered, .shutdownWillWaitForReopen, .replacementObservesPressure, .replacementBuilt:
                 break
             }
         }
@@ -276,7 +276,7 @@ struct FacadeRaceTests {
                 await reopenHold.arrive()
             case .shutdownWillWaitForReopen:
                 signal.yield()
-            case .registrationAnswered, .pressureRecorded, .replacementObservesPressure:
+            case .registrationAnswered, .pressureRecorded, .replacementObservesPressure, .replacementBuilt:
                 break
             }
         }

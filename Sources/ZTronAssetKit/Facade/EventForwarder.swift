@@ -81,6 +81,12 @@ actor EventForwarder {
         }
     }
 
+    /// How many events wait in the forwarder for a consumer: 0 or 1, R-SYN-12's bound (a test read: the L5-R13 model's
+    /// I4).
+    var bufferedEvents: Int {
+        self.offered == nil ? 0 : 1
+    }
+
     /// The next event, or `nil` once the stream ended.
     func next() async -> AssetEvent? {
         if let offered = self.offered {

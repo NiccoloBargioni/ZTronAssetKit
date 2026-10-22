@@ -4,13 +4,23 @@ import ZTronAssetStorage
 import ZTronAssetSync
 
 /// One store and the engine over it: the pair a client serves from, replaced as a whole by a reopen (B-15, B-17).
-struct ClientCore: Sendable {
+/// Two values are equal when they hold the same actors, so a seam point can carry one (`LifecycleSeamPoint`).
+struct ClientCore: Sendable, Hashable {
     /// 0 for the pair `AssetClient.init` built, one more for each reopen.
     let generation: UInt64
     /// The store.
     let store: AssetStore
     /// The engine over `store`.
     let engine: SyncEngine
+
+    static func == (lhs: ClientCore, rhs: ClientCore) -> Bool {
+        lhs.generation == rhs.generation && lhs.store === rhs.store && lhs.engine === rhs.engine
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(self.generation)
+        hasher.combine(ObjectIdentifier(self.engine))
+    }
 }
 
 /// The places where a test can hold or observe `ClientLifecycle` through its seam (`docs/adr-drafts/g.md` G-10). The
@@ -30,6 +40,11 @@ enum LifecycleSeamPoint: Sendable, Hashable {
     /// it while it is still `created`; its prefetch groups and its start come next (L5-R2: a shutdown here shuts a
     /// `created` engine down that owns an observer).
     case replacementObservesPressure(generation: UInt64)
+    /// `performReopen`: the replacement was built and is not installed yet (`created`, unreachable by callers, so it
+    /// has published nothing); the hand-over to the event forwarders and the installation come next. The L5-R13 model
+    /// subscribes its oracle to the replacement here, and parks reopens here (orchestrator ruling L5-R13: a seam point
+    /// the model needs).
+    case replacementBuilt(ClientCore)
 }
 
 /// Owns the client's current store and engine, and the reopen after a replaced root (ARCHITECTURE §8, B-15, B-17;
@@ -94,6 +109,9 @@ actor ClientLifecycle: PrefetchRegistry {
     /// Test seam, `nil` in production: awaited at each `LifecycleSeamPoint`, so a test can place a shutdown, a reopen or
     /// a pressure event exactly there (CLAUDE.md G4: interleavings no test could otherwise reach deterministically).
     private var seam: (@Sendable (LifecycleSeamPoint) async -> Void)?
+    /// Test seam, `nil` in production: called on the actor with the number of follower entries after each change, so
+    /// the L5-R13 model can wait for none to be left (its I3) without polling.
+    private var followerObserver: (@Sendable (Int) -> Void)?
 
     /// Builds the first pair: actors only, no I/O, no task (P-12).
     init(configuration: AssetClientConfiguration, environment: AssetEnvironment, mirror: SnapshotMirror) {
@@ -211,6 +229,11 @@ actor ClientLifecycle: PrefetchRegistry {
             mirror: mirror,
             retentionScope: self.retentionScope
         )
+        if let seam = self.seam {
+            // REENTRANCY: g-9 (proposed) — nothing here: the hand-over below re-reads the followers, and `closed` is
+            // re-read after it (a test seam; `nil` in production).
+            await seam(.replacementBuilt(next))
+        }
         // REENTRANCY: g-10 (proposed) — `closed`, re-read right below: a shutdown meanwhile installs nothing (the
         // forwarders take only a stream of an installed generation, so the ones handed `next` never read it).
         await self.handOverFollowers(to: next)
@@ -269,6 +292,7 @@ actor ClientLifecycle: PrefetchRegistry {
             handled.insert(key)
             guard let forwarder = self.followers[key]?.forwarder else {
                 self.followers[key] = nil
+                self.followerObserver?(self.followers.count)
                 continue
             }
             // REENTRANCY: g-10 (proposed) — the followers, re-read at the loop's top (one registered meanwhile is handed a
@@ -288,12 +312,27 @@ actor ClientLifecycle: PrefetchRegistry {
     func follow(_ forwarder: EventForwarder) -> UInt64 {
         self.lastFollower += 1
         self.followers[self.lastFollower] = Follower(forwarder: forwarder)
+        self.followerObserver?(self.followers.count)
         return self.lastFollower
     }
 
     /// Unregisters a forwarder whose pump ended.
     func unfollow(_ key: UInt64) {
         self.followers[key] = nil
+        self.followerObserver?(self.followers.count)
+    }
+
+    /// The followers' forwarders that are still alive (a test read: the L5-R13 model asks each how many events wait
+    /// in it, its I4).
+    var liveFollowers: [EventForwarder] {
+        self.followers.keys.sorted().compactMap { self.followers[$0]?.forwarder }
+    }
+
+    /// Installs or removes the follower-count observer (tests only; see `followerObserver`), and reports the current
+    /// count to a new one at once.
+    func setFollowerObserver(_ observer: (@Sendable (Int) -> Void)?) {
+        self.followerObserver = observer
+        observer?(self.followers.count)
     }
 
     // MARK: Shutdown
