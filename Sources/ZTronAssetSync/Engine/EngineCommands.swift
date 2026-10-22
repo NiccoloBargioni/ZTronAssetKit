@@ -410,10 +410,12 @@ extension SyncEngine {
 
     /// The scheduled continuation of `continueReleases`. The members it reaches wait in a queue or are parked (those in
     /// flight left in the release's own turn, and no job only released groups want starts), so it frees no slot and
-    /// no room: the pump and the idle check follow once the last member left.
+    /// no room: the pump and the idle check follow once the last member left. It continues in any state but shutdown:
+    /// a group released before the engine runs leaves claims to drop (L5-R1), and a release left for later would stay
+    /// for good.
     private func releaseFollowUp() {
         self.state.releaseFollowUpScheduled = false
-        guard self.isRunning, self.continueReleases() else {
+        guard !self.isShuttingDown, self.continueReleases() else {
             return
         }
         self.pump()
