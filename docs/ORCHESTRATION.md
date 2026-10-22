@@ -2,71 +2,41 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
-## Level 5 WP-G — RUNNING (launched 2026-10-22 09:49 CEST)
-- **Launched by** the scheduled task `ztron-assetkit-level5-launch`, which fired at ~09:48 CEST instead of 04:20; the app was probably closed at 04:20.
-- **Session:** `d8335845-1285-454d-9185-a6519bd816cc`. **Main run:** `wf_6593085d-170` (task `w9gtxnvf1`), via `assetkit-stage2-level.js` with `{level: "L5", base: "l4-merged", wps: ["g"], bar: "strict", usageStop: 50}`.
-  - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_6593085d-170`.
-- **Usage at launch:** weekly all models **0 %**, Fable 0 %, 5-hour 0 %. The week resets Thu 29 Oct 04:00 CEST.
-- **Worktree:** `.worktrees/g` on `wp/g`, from `l4-merged` (`0d3f119`).
-- **Keep-awake:** `caffeinate -ims -t 259200` from 22 Oct 09:48 runs to 25 Oct 09:48 (a background task of this session).
-- **Stops:** 50 for the main run and close-out, 55 for docs: the 55 % WP-G default recorded on 18 Oct.
-- **Forecast (strict; re-estimated 22 Oct 15:35, during close-out cycle 1).**
-  - Measured in the main run: a fix round takes 42–66 min and a verification round 32–39 min; a cycle costs ~1.75 weekly points, the same as L4.
-  - Close-out cycles with engine edits run longer (Sync ×3 + TSan): about 1.6–2.1 h each, and cycle 1 is 2–3 h.
-  - Likely 6–12 cycles: 11–24 h and 10–23 points. Best case 4 cycles: ~8 h. Tail case 18 cycles: ~36 h.
-  - Merge, gates and docs then add 4–6 h and ~3 points.
-  - **WP-G ends:** likely Fri 23 Oct between ~07:00 and ~22:00, at weekly ~19–33 %. Best case Fri ~03:30 at ~14 %; tail case Sat 24 Oct ~09:30 at ~43 %.
-  - The 50 % close-out stop triggers only past ~24 cycles.
-- **Whole of Level 5 (WP-G, then WP-K), re-estimated 22 Oct 15:40.**
-  - WP-K costs 10–24 h and ~8–17 points: a main run of 3–4.5 h, then 3–8 lighter cycles of 1.3–1.8 h each (no engine suites), then merge, gates and docs. Count from the moment the owner says go after `l5g-merged`.
-  - **Level 5 ends:** likely between Fri 23 Oct ~17:00 and Sat 24 Oct ~22:00, at weekly ~30–47 %. Best case Fri ~13:30 at ~22 %; tail case Sun 25 Oct ~09:30 at ~60 %.
-  - Every case fits before the 29 Oct reset. Renew caffeinate when WP-K starts (the current one ends 25 Oct 09:48).
-  - WP-K needs the owner's go-ahead and its own stop.
-- **Main run: done** at 14:30 (4.7 h, weekly 0 % → 5 %, no stop). Blocking went 2 → 3 → 4, out of 16, 12 and 9 issues in total. The author reported `VERIFY: PASS` (`--quick`) and Kit coverage 96.94 %.
-- **The four blocking items left by round 3**, all ruled in `.build-orchestrator/l5-rulings.md` (local, gitignored):
-  - **L5-R1** (CCR-G2): R-CAR-3 / S1-05 fail end to end. A release can overtake a registered group's join in the engine. Ruled as an authorised edit in WP-F's `EngineCommands`/`EngineJobs`/`EngineState`: pending claims at registration, checked by `retire(_:)`, covering both windows. Then the two `withKnownIssue` wrappers come out.
-  - **L5-R2:** a shutdown from `created` leaked owned tasks (R-SYN-15). Ruled as an authorised edit in `EngineLifecycle.swift`, with a spawn-site enumeration.
-  - **L5-R3:** the event forwarder lost the replacement's events (R-SYN-12). Ruled: subscribe the live forwarders before install, and forward the replacement's `clientStarted`.
-- **The three cross-package requests:**
-  - **L5-R4** approves CCR-G3: `AssetStore.unavailableReason` as a package read, plus the facade's reopen trigger.
-  - **L5-R5** declines CCR-G1, because it would misfire on WP-D's tolerated early finish. The attestation counts as "wired", and the run-time half is Not verified.
-  - **L5-R6** leaves P-13, P-11 and R-SYN-5 C2 as non-blocking `outside-wp` (load-related), to be re-run at merge.
-- **Close-out cycle 1:** `wf_a049b89c-afb`, 14:39–17:34 (2.9 h, weekly 5 % → 8 %, i.e. ~3 points, heavier than the 1.75 forecast).
-  - It fixed all four original blockers, and the verifiers confirmed each against mutants and probes.
-  - It left 4 blocking items, 3 distinct, in `.build-orchestrator/l5-close1-remaining-g.json` (`L5-C1-nn`):
-    - a `subscribe()` stream not yet pulled loses the replacement's events after a reopen (the same class as L5-V3-06);
-    - two load-dependent Kit test flakes.
-  - The orchestrator stopped the run 2 min into fix 2, before any change, and added the class rulings:
-    - **L5-R13:** followership precedes registration, with a path enumeration and a seeded model test with invariants I1–I4.
-    - **L5-R14:** an enumeration and conversion of every scheduling-dependent Kit test, plus stress runs under load.
-    - **L5-R15:** `endClaims` gets a test and the C2 chunking; `heldLane` gets the same-lane test; g.md line fixes.
-    - **L5-R16:** a claimed-only job's failure goes to Stage 3.
-    - **L5-R17:** the cycle-1 deviations are accepted.
-    - **L5-R18:** verifiers run only WP-G's five benchmarks.
-- **Close-out: RUNNING from cycle 2:** `wf_0ec4322f-bdb` (task `w2c654soi`), launched 17:45 at weekly 8 %, with `fromCycle: 2` and `findingsFile` `.build-orchestrator/l5-close1-remaining-g.json`.
-  - The other arguments are unchanged: strict, `maxCycle: 30`, `usageStop: 50`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
-  - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_0ec4322f-bdb`.
-- **Close-out cycle 2:** `wf_0ec4322f-bdb`, 17:45–20:55 (3.2 h, weekly 8 % → 12 %, ~4 points).
-  - Requirements lens: **0 blocking**.
-  - Correctness lens: 1 blocking, L5-C2-00. A retired generation's `clientStarted` is lost, because it shares the engine's terminal slot with `clientShutDown`, which the facade hides.
-  - The orchestrator stopped the run 3 min into fix 3, before any change, and ruled:
-    - **L5-R19:** `clientShutDown` gets its own engine slot (authorised `SubscriberQueue.swift` edit, two WP-F tests updated to the new mapping), and the model's exemptions are audited.
-    - **L5-R20:** `AssetStore.verifyRootNow()` as a package method, plus the facade's root check after file-system-type failures.
-    - **L5-R21:** non-blocking test and doc fixes, and an `EngineDispatch.swift` guard.
-- **Close-out: RUNNING from cycle 3:** `wf_b17021d0-91c` (task `wyz8ryynw`), launched 21:07 at weekly 13 %, with `fromCycle: 3`, `findingsFile` `.build-orchestrator/l5-close2-remaining-g.json`, and the other arguments as before. Run dir: `…/subagents/workflows/wf_b17021d0-91c`.
-- **Re-forecast (22 Oct 21:10).** Measured strict cycles here cost ~3–4 points and ~3 h each, about 2× the L4 calibration, because the fixers run the Kit, Sync and Storage suites and the verifiers run stress series.
-  - The blocking count is 4 → 4 → 1, and the requirements lens passed in cycle 2, so likely 2–6 more cycles: 6–21 h and 6–24 points.
-  - **WP-G ends:** likely Fri 23 Oct ~07:00 → Sat 24 Oct ~04:00, at weekly ~22–40 %.
-  - **WP-K**, recalibrated: ~12–29 h and ~12–30 points.
-  - **Level 5 ends:** Fri ~19:00 → Sun 25 Oct ~09:00, at weekly ~34–70 %. It finishes before the 29 Oct reset in every case.
-- **Probes** are kept in `.build-orchestrator/l5-probes-r3/` (round 3) and `.build-orchestrator/l5-probes-c1/` (cycle 1, both lenses, plus the correctness verifier's `.fix` candidates).
-- **Resume cold** (if this session is gone):
-  1. Read the close-out's `journal.jsonl`; the last `verify:g:*:cN` results are the findings.
-  2. Dump them to `.build-orchestrator/l5-closeN-remaining-g.json`.
-  3. Add any class ruling to `l5-rulings.md` (a defect class repeating over two cycles gets an enumeration and one design fix).
-  4. Relaunch `assetkit-closeout.js` with the same arguments, plus `fromCycle: N+1` and the new `findingsFile`.
-  5. Delete `.worktrees/g/.build-verify-*` between runs.
-- **After 0 blocking in both lenses:** follow steps 8–10 of the scheduled task. That is: merge `--no-ff`; the post-merge gates under `.build-orch`; docs with `assetkit-level-docs.js` (ADR-054, `usageStop: 55`); tag `l5g-merged`; then prepare WP-K and ask the owner.
+## Level 5 WP-G — MERGED; docs running (updated 2026-10-22 23:10 CEST)
+- **Session:** `d8335845-1285-454d-9185-a6519bd816cc`, launched by the scheduled task `ztron-assetkit-level5-launch`. It fired at 09:48 rather than 04:20.
+- **Runs:**
+
+  | Run | What | Time | Weekly |
+  |---|---|---|---|
+  | `wf_6593085d-170` | main run: author + 3 verification rounds; blocking 2 → 3 → 4 | 09:49–14:30 | 0 → 5 % |
+  | `wf_a049b89c-afb` | close-out cycle 1; blocking 4 left (3 distinct) | 14:39–17:34 | 5 → 8 % |
+  | `wf_0ec4322f-bdb` | cycle 2; reqs 0, correct 1 blocking | 17:45–20:55 | 8 → 12 % |
+  | `wf_b17021d0-91c` | cycle 3; **0 blocking in both lenses** | 21:07–22:47 | 13 → 15 % |
+  | `wf_bdef0756-da0` | docs: ADR-054, worktree `.worktrees/l5gdocs` on `wp/l5gdocs` from `6d1e0cc`, usageStop 55 | started 23:05 | 15 % → … |
+
+- **Rulings:** L5-R1…R23 in `.build-orchestrator/l5-rulings.md`, which is local and gitignored. The class rulings were:
+  - L5-R1: engine pending claims, for R-CAR-3.
+  - L5-R2: shutdown from `created`.
+  - L5-R13/R19: event continuity, with the model test and the `.clientEnd` slot.
+  - L5-R14: scheduling-dependent tests.
+  - L5-R20: `verifyRootNow()`.
+
+  L5-R22 sends the five remaining non-blocking items to the docs level or Stage 3, and L5-R23 is the docs brief.
+- **Findings files:** `l5-remaining-g.json`, `l5-close1-remaining-g.json`, `l5-close2-remaining-g.json`. Probes are in `l5-probes-r3/`, `l5-probes-c1/` and `l5-probes-c2/`.
+- **Merge:** `wp/g` merged `--no-ff` into `feature/asset-kit` as `3de588e`; `6d1e0cc` regenerated `docs/TRACEABILITY.md`.
+- **Post-merge phase A (orchestrator, `.build-orch`, logs in `.build-orch/l5/summary.txt`):**
+  - `--quick` gave `VERIFY: PASS` (Model 151, Sync 323, Storage 445, Transport 84, Kit 85, Compat 3, AppleHosted 104).
+  - Coverage: `COVERAGE: PASS`, with Kit 97.83 %, Sync 93.54 % and Storage 97.41 %.
+  - `--gates-only` gave `VERIFY: PASS`. TRACE now passes: P-1, P-8 and P-12 have benchmarks.
+  - The release build completed, and the iOS generic build exited 0 with no error or warning lines.
+  - On simulator 897F9D8D, `** TEST SUCCEEDED **`, 1,195 of 1,195.
+- **Still to do, in order:**
+  1. **TSan (whole package, `--scratch-path .build-orch-tsan`) and `verify.sh --perf` on a near-idle machine.** They were deferred because at 23:03 the load was ~40 from three simulators that are not ours plus Xcode. Run them after the docs workflow, when `sysctl vm.loadavg` is low. P-5, P-11, P-13 and R-SYN-5 C2 must be judged at near-idle (L5-R6/R18).
+  2. When docs end: confirm or rule on every "Acknowledged at merge" item, and apply the verifier's last notes. Also fix the `FacadeReopenTests.swift:534` comment myself (L5-R22 (5)).
+  3. Merge `wp/l5gdocs`, re-run `--quick` and `--gates-only`, then tag `l5g-merged`.
+  4. Remove `.worktrees/g` and `.worktrees/l5gdocs`, and the branches `wp/g` and `wp/l5gdocs`.
+  5. Rewrite this file for WP-K, and ask the owner whether to run it now. Give its forecast, and ask for a WP-K stop, because 55 % covered WP-G only.
+- **Keep-awake:** `caffeinate -ims -t 259200` runs until 25 Oct 09:48.
 
 ## Next session: start here (written 2026-10-17 19:15 CEST, after Level 4)
 Level 4 is **complete** (`l4-merged` = `0d3f119`, see "Level 4 — done"). Nothing is running; no worktrees; no `wp/*` branches; `feature/asset-kit` is clean. Weekly usage **68 %** (all models; Fable 0 %), resets **Thu 22 Oct 04:00 CEST**. A `caffeinate -ims -t 172800` started 17 Oct 11:30 ends by itself on 19 Oct 11:30.
