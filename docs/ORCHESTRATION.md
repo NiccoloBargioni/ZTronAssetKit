@@ -17,6 +17,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - Merge, gates and docs then add 4–6 h and ~3 points.
   - **WP-G ends:** likely Fri 23 Oct between ~07:00 and ~22:00, at weekly ~19–33 %. Best case Fri ~03:30 at ~14 %; tail case Sat 24 Oct ~09:30 at ~43 %.
   - The 50 % close-out stop triggers only past ~24 cycles.
+- **Whole of Level 5 (WP-G, then WP-K), re-estimated 22 Oct 15:40.**
+  - WP-K costs 10–24 h and ~8–17 points: a main run of 3–4.5 h, then 3–8 lighter cycles of 1.3–1.8 h each (no engine suites), then merge, gates and docs. Count from the moment the owner says go after `l5g-merged`.
+  - **Level 5 ends:** likely between Fri 23 Oct ~17:00 and Sat 24 Oct ~22:00, at weekly ~30–47 %. Best case Fri ~13:30 at ~22 %; tail case Sun 25 Oct ~09:30 at ~60 %.
+  - Every case fits before the 29 Oct reset. Renew caffeinate when WP-K starts (the current one ends 25 Oct 09:48).
+  - WP-K needs the owner's go-ahead and its own stop.
 - **Main run: done** at 14:30 (4.7 h, weekly 0 % → 5 %, no stop). Blocking went 2 → 3 → 4, out of 16, 12 and 9 issues in total. The author reported `VERIFY: PASS` (`--quick`) and Kit coverage 96.94 %.
 - **The four blocking items left by round 3**, all ruled in `.build-orchestrator/l5-rulings.md` (local, gitignored):
   - **L5-R1** (CCR-G2): R-CAR-3 / S1-05 fail end to end. A release can overtake a registered group's join in the engine. Ruled as an authorised edit in WP-F's `EngineCommands`/`EngineJobs`/`EngineState`: pending claims at registration, checked by `retire(_:)`, covering both windows. Then the two `withKnownIssue` wrappers come out.
