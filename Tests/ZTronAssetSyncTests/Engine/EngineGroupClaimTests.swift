@@ -225,14 +225,14 @@ struct EngineGroupClaimTests {
         let harness = EngineHarness.make(fileSystem: first.fileSystem)
         let engine = harness.engine
         await engine.setOwnedTaskPriorityFloor(EngineHarness.ownedTaskPriorityFloor)
-        let (predecessor, successor, listed) = await engine.inOneTurn { engine -> (InterestToken?, InterestToken, Bool) in
+        let (predecessor, successor, listed, counts) = await engine.inOneTurn { engine -> (InterestToken?, InterestToken, Bool, (claims: Int, held: Int, unlisted: Int)) in
             let predecessor = try? engine.performRegisterGroup(["x"], lane: .prefetch).get()
             let successor = engine.recordGroup(["x"], lane: .userInitiated).token
-            return (predecessor, successor, engine.state.applied.entry(for: "x") != nil)
+            return (predecessor, successor, engine.state.applied.entry(for: "x") != nil, EngineGroupClaimTests.claimCounts(engine))
         }
         let firstGroup = try #require(predecessor)
         #expect(!listed, "setup: the engine's copy listed nothing when both groups registered")
-        #expect(await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) } == (0, 0, 2), "setup: both members claimed unlisted")
+        #expect(counts == (0, 0, 2), "setup: both members claimed unlisted: \(counts)")
         try await harness.start()
         let claimedAtStart = await engine.inOneTurn { $0.state.unlistedClaims == 0 && $0.state.claims[ClaimKey(x)] != nil }
         #expect(claimedAtStart, "the launch's adoption of the store's manifest claimed the members' content")
