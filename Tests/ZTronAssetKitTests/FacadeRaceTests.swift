@@ -5,11 +5,10 @@ import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// Parks `ClientLifecycle.bind` at its registration seam (after the engine answered, before the lifecycle re-reads
-/// the group, `closed` and the generation): the first `count` arrivals wait until `open()`, later ones pass. The
-/// test's own waits end on its cancellation (the `CensusWaiting` pattern, ADR-050); a parked bind runs in the
-/// registration's task, so a test always opens the hold before it can fail.
-actor RegistrationHold {
+/// Parks `ClientLifecycle` at a point of its test seam (`LifecycleSeamPoint`): the first `count` arrivals wait until
+/// `open()`, later ones pass. The test's own waits end on its cancellation (the `CensusWaiting` pattern, ADR-050); a
+/// parked arrival runs in the lifecycle's call, so a test always opens the hold before it can fail.
+actor SeamHold {
     private var remaining: Int
     private var isOpen = false
     private var parked: [CheckedContinuation<Void, Never>] = []
@@ -34,7 +33,7 @@ actor RegistrationHold {
         }
     }
 
-    /// Suspends until `count` binds are parked, or until the caller is cancelled.
+    /// Suspends until `count` arrivals are parked, or until the caller is cancelled.
     func waitUntilParked(_ count: Int = 1) async {
         if self.parked.count >= count {
             return
@@ -59,7 +58,7 @@ actor RegistrationHold {
         }
     }
 
-    /// Resumes every parked bind; later arrivals pass.
+    /// Resumes every parked arrival; later arrivals pass.
     func open() {
         self.isOpen = true
         let parked = self.parked
@@ -81,8 +80,9 @@ actor RegistrationHold {
     }
 }
 
-/// Interleavings of the facade's lifecycle placed deterministically through the registration seam: a registration
-/// that lands during shutdown, two reopens in a row, and retention-scope changes racing each other and a reopen.
+/// Interleavings of the facade's lifecycle placed deterministically through its test seam: a registration that lands
+/// during shutdown, two reopens in a row, a memory-pressure stop during a reopen, and retention-scope changes racing
+/// each other and a reopen.
 @Suite("Facade races")
 struct FacadeRaceTests {
     /// The prefetch groups the engine holds.
@@ -106,9 +106,11 @@ struct FacadeRaceTests {
         try await harness.startAndSettle()
         let client = harness.client
         let engine = await harness.engine()
-        let hold = RegistrationHold()
-        await client.lifecycle.setRegistrationSeam {
-            await hold.arrive()
+        let hold = SeamHold()
+        await client.lifecycle.setSeam { point in
+            if point == .registrationAnswered {
+                await hold.arrive()
+            }
         }
         let handle = client.prefetch(["a"])
         await hold.waitUntilParked()
@@ -136,9 +138,11 @@ struct FacadeRaceTests {
         let second = client.prefetch(["g2"])
         try await first.awaitRegistration()
         try await second.awaitRegistration()
-        let hold = RegistrationHold()
-        await client.lifecycle.setRegistrationSeam {
-            await hold.arrive()
+        let hold = SeamHold()
+        await client.lifecycle.setSeam { point in
+            if point == .registrationAnswered {
+                await hold.arrive()
+            }
         }
         try await harness.withClock { () async throws -> Void in
             try FacadeRaceTests.wipeRoot(harness)
@@ -178,6 +182,75 @@ struct FacadeRaceTests {
         second.cancel()
         await engine.awaitCondition { FacadeRaceTests.prefetchGroups($0) == 0 }
         #expect(await engine.kitRead { FacadeRaceTests.prefetchGroups($0) } == 0, "releasing both handles leaves no group behind")
+        await client.shutdown()
+    }
+
+    /// A memory warning while a reopen is about to shut the old engine down: the old engine's observer runs the facade's
+    /// handler, which finds the only cache gone and stops the observer through the lifecycle. The reopen's first step,
+    /// the old engine's shutdown, joins that observer, so the lifecycle must not make the handler wait for the reopen;
+    /// before round 2 it did (in `current()`), and the observer waited for the reopen, the reopen for the shutdown and the
+    /// shutdown for the observer, for good. The purge that met the replaced root is awaited only once generation 0 is
+    /// shut down, so the test fails at its time limit instead of hanging.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-11: a pressure event whose handler stops the observer while a reopen shuts that engine down leaves neither waiting for the other", .timeLimit(.minutes(1)))
+    func pressureStopDuringReopen() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        try await harness.startAndSettle()
+        // A cache registered (epoch 1) and gone without unregistering: the next event's handler stops the observer.
+        try await MainActor.run {
+            let cache = RecordingCache()
+            try client.register(cache)
+        }
+        try await harness.pressure.requireObservers(equalTo: 1)
+        let old = await harness.engine()
+        let reopenHold = SeamHold()
+        let (recorded, record) = AsyncStream.makeStream(of: UInt64.self)
+        await client.lifecycle.setSeam { point in
+            switch point {
+            case .reopenWillShutDownEngine:
+                await reopenHold.arrive()
+            case .pressureRecorded(let epoch):
+                record.yield(epoch)
+            case .registrationAnswered:
+                break
+            }
+        }
+        try FacadeRaceTests.wipeRoot(harness)
+        let purge = Task { () -> Result<PurgeResult, AssetError> in
+            do throws(AssetError) {
+                return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
+                    try await client.purge(.all)
+                })
+            } catch {
+                return .failure(error)
+            }
+        }
+        await reopenHold.waitUntilParked()
+        // The reopen is running and generation 0 still serves: its observer takes the event and runs the handler.
+        await harness.pressure.send(.warning)
+        var epochs = recorded.makeAsyncIterator()
+        let stopEpoch = await epochs.next()
+        #expect(stopEpoch == 2, "the handler's stop was recorded with epoch 2, got \(String(describing: stopEpoch))")
+        await reopenHold.open()
+        await old.waitUntil { $0.lifecycle == .shutDown }
+        guard await old.introspect().lifecycle == .shutDown else {
+            Issue.record("the reopen's shutdown of generation 0 never finished: its pressure observer waits for the reopen")
+            return
+        }
+        let result = await purge.value
+        #expect((try? result.get()) != nil, "the purge was repeated on the replacement: \(result)")
+        #expect(await client.lifecycle.current().generation == 1, "setup: one reopen")
+        try await harness.pressure.requireObservers(equalTo: 0)
+        let engine = await harness.engine()
+        #expect(await engine.introspect().memoryPressureObserverActive == false, "the recorded stop holds on the replacement")
+        // The relay and the lifecycle still agree: a cache registered now starts the replacement's observer.
+        let kept = await MainActor.run { RecordingCache() }
+        try await MainActor.run {
+            try client.register(kept)
+        }
+        try await harness.pressure.requireObservers(equalTo: 1)
+        #expect(await engine.introspect().memoryPressureObserverActive, "a new registration starts the replacement's observer")
         await client.shutdown()
     }
 

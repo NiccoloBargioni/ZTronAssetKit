@@ -26,16 +26,28 @@ actor EventForwarder {
     /// An event waiting for a consumer, and the pump waiting for it to be taken (`false`: stop).
     private var offered: (event: AssetEvent, taken: CheckedContinuation<Bool, Never>)?
     private var finished = false
+    /// Test seam, `nil` in production: called on the actor once the pump waits in `offer` with an event no consumer
+    /// asked for yet, so a test can drop the consumer's stream exactly then (`stop()` must end that wait; CLAUDE.md G4).
+    private let offerParked: (@Sendable () -> Void)?
 
     /// A forwarder that reads `first` before any other engine stream.
-    init(lifecycle: ClientLifecycle, first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?) {
+    init(
+        lifecycle: ClientLifecycle,
+        first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?,
+        offerParked: (@Sendable () -> Void)? = nil
+    ) {
         self.lifecycle = lifecycle
         self.first = first
+        self.offerParked = offerParked
     }
 
-    /// The consumer's stream: pulls through the forwarder.
-    nonisolated static func stream(lifecycle: ClientLifecycle, first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?) -> AsyncStream<AssetEvent> {
-        let consumer = Consumer(EventForwarder(lifecycle: lifecycle, first: first))
+    /// The consumer's stream: pulls through the forwarder. `offerParked` is the test seam (`nil` in production).
+    nonisolated static func stream(
+        lifecycle: ClientLifecycle,
+        first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?,
+        offerParked: (@Sendable () -> Void)? = nil
+    ) -> AsyncStream<AssetEvent> {
+        let consumer = Consumer(EventForwarder(lifecycle: lifecycle, first: first, offerParked: offerParked))
         return AsyncStream(unfolding: {
             // REENTRANCY: g-7 (proposed) — nothing: `next()` re-reads its own state after every await.
             await consumer.forwarder.next()
@@ -105,6 +117,7 @@ actor EventForwarder {
         // REENTRANCY: g-7 (proposed) — nothing: a terminal wait, resumed once by `next` or `stop`.
         return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             self.offered = (event, continuation)
+            self.offerParked?()
         }
     }
 

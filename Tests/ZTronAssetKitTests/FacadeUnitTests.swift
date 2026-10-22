@@ -137,6 +137,71 @@ struct FacadeUnitTests {
         await client.shutdown()
     }
 
+    /// The consumer takes one event and drops its stream while the pump holds the next one in `offer` (a `break` out of
+    /// `for await` while events are still queued): `stop()` has to end that wait, so the pump's last pull, under
+    /// cancellation, releases the engine subscription; a wait left pending would keep the pump and the subscriber until
+    /// shutdown. The stream is built with the forwarder's test seam, which reports the pump waiting in `offer`.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a consumer that drops the client's event stream while the next event waits in the forwarder releases its engine subscription", .timeLimit(.minutes(1)))
+    func droppedConsumerWithOfferedEventReleasesSubscription() async throws {
+        let parked = KitFixture.entry("p", KitFixture.bytes(165), policy: .onDemand)
+        let harness = KitHarness.make()
+        let client = harness.client
+        await harness.serveManifest([parked])
+        try await harness.startAndSettle()
+        let engine = await harness.engine()
+        // A transfer in flight keeps the conditions watcher running, so a new subscriber's replay holds two events,
+        // `snapshotChanged` and `conditionsChanged`: the pump offers the second while the consumer does not pull.
+        let handle = client.prefetch([parked.identifier])
+        try await handle.awaitRegistration()
+        await engine.awaitCondition { $0.state.conditions != nil && PrefetchFacadeTests.inFlight(parked.transferID, $0) }
+        let (parkedOffers, offerParked) = AsyncStream.makeStream(of: Void.self)
+        let lifecycle = client.lifecycle
+        let consumer = Task { () -> AssetEvent? in
+            var iterator = EventForwarder.stream(lifecycle: lifecycle, first: nil) {
+                offerParked.yield()
+            }.makeAsyncIterator()
+            let taken = await iterator.next()
+            // The stream lives until the pump waits in `offer` with the next event; then the task ends and drops it
+            // without cancelling.
+            var offers = parkedOffers.makeAsyncIterator()
+            _ = await offers.next()
+            extendLifetime(iterator)
+            return taken
+        }
+        let taken = await consumer.value
+        var tookReplay = false
+        if case .snapshotChanged = taken {
+            tookReplay = true
+        }
+        #expect(tookReplay, "the consumer took the replay's first event, got \(String(describing: taken))")
+        await engine.waitUntil { $0.subscribers == 0 }
+        #expect(await engine.introspect().subscribers == 0, "the dropped stream released its subscription")
+        handle.cancel()
+        await client.shutdown()
+    }
+
+    /// A stream from `subscribe()` that the caller drops before its first pull: the engine registered it before
+    /// `subscribe()` returned, and the forwarder holds that registration only as long as the consumer's stream.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a stream from subscribe() dropped before its first pull releases its engine subscription", .timeLimit(.minutes(1)))
+    func droppedSubscribeStreamReleasesSubscription() async throws {
+        let harness = KitHarness.make()
+        try await harness.startAndSettle()
+        let client = harness.client
+        let engine = await harness.engine()
+        let registered = Task { () async throws -> Int in
+            let stream = try await client.subscribe()
+            let subscribers = await engine.introspect().subscribers
+            extendLifetime(stream)
+            return subscribers
+        }
+        #expect(try await registered.value == 1, "subscribe() registered before it returned")
+        await engine.waitUntil { $0.subscribers == 0 }
+        #expect(await engine.introspect().subscribers == 0, "the dropped stream released its registration")
+        await client.shutdown()
+    }
+
     /// Two iterators of one stream pulling at once (which the engine's own streams do not support either): the pulls
     /// are served in turn and end with the stream, so neither consumer waits for good.
     @available(macOS 15.0, iOS 18.0, *)
