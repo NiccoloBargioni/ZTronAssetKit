@@ -212,7 +212,7 @@ struct FacadeRaceTests {
                 await reopenHold.arrive()
             case .pressureRecorded(let epoch):
                 record.yield(epoch)
-            case .registrationAnswered, .shutdownWillWaitForReopen:
+            case .registrationAnswered, .shutdownWillWaitForReopen, .replacementObservesPressure:
                 break
             }
         }
@@ -276,7 +276,7 @@ struct FacadeRaceTests {
                 await reopenHold.arrive()
             case .shutdownWillWaitForReopen:
                 signal.yield()
-            case .registrationAnswered, .pressureRecorded:
+            case .registrationAnswered, .pressureRecorded, .replacementObservesPressure:
                 break
             }
         }
@@ -319,6 +319,64 @@ struct FacadeRaceTests {
         await #expect(throws: AssetError.shutDown) {
             try await client.pin(["a"])
         }
+    }
+
+    /// L5-R2's reopen path (L5-V3-05, PROBE-2): the reopen applies the newest memory-pressure request to its replacement
+    /// while it is still `created`, so a `shutdown()` before the replacement's start shuts a `created` engine down that
+    /// owns an observer. The reopen parks right after that request (`replacementObservesPressure`); the shutdown must
+    /// still cancel and join the replacement's observer before it returns.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: a shutdown after a reopen applied the memory-pressure request to its unstarted replacement leaves no owned task and no observation", .timeLimit(.minutes(1)))
+    func shutdownBeforeReplacementStart() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        try await harness.startAndSettle()
+        let cache = await MainActor.run { RecordingCache() }
+        try await MainActor.run {
+            try client.register(cache)
+        }
+        try await harness.pressure.requireObservers(equalTo: 1)
+        let hold = SeamHold()
+        await client.lifecycle.setSeam { point in
+            if case .replacementObservesPressure = point {
+                await hold.arrive()
+            }
+        }
+        try FacadeRaceTests.wipeRoot(harness)
+        let purge = Task { () -> Result<PurgeResult, AssetError> in
+            do throws(AssetError) {
+                return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
+                    try await client.purge(.all)
+                })
+            } catch {
+                return .failure(error)
+            }
+        }
+        await hold.waitUntilParked()
+        let replacement = await client.lifecycle.current()
+        let before = await replacement.engine.introspect()
+        #expect(replacement.generation == 1, "setup: the reopen installed generation 1")
+        #expect(before.lifecycle == .created && before.memoryPressureObserverActive, "setup: the unstarted replacement observes memory pressure: \(before)")
+        try await harness.pressure.requireObservers(equalTo: 1)
+        await client.shutdown()
+        let after = await replacement.engine.introspect()
+        await hold.open()
+        let result = await purge.value
+        #expect(after.lifecycle == .shutDown)
+        #expect(after.ownedTasks == 0, "no owned task of the replacement outlives shutdown: \(after.ownedTasks)")
+        #expect(!after.memoryPressureObserverActive, "the replacement's observer was stopped")
+        var reportedShutDown = false
+        if case .failure(.shutDown) = result {
+            reportedShutDown = true
+        }
+        #expect(reportedShutDown, "the call that met the replaced root reports shutDown: \(result)")
+        guard after.ownedTasks == 0 else {
+            // The leftover observer ends only at the next event; end it so nothing outlives the test.
+            await harness.pressure.send(.warning)
+            return
+        }
+        try await harness.pressure.requireObservers(equalTo: 0)
+        withExtendedLifetime(cache) {}
     }
 
     @available(macOS 15.0, iOS 18.0, *)

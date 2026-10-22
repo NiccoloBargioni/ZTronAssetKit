@@ -218,6 +218,36 @@ struct FacadeLifecycleTests {
         #expect(await engine.introspect().lifecycle == .shutDown)
     }
 
+    /// L5-R2 (L5-V3-05, PROBE-1): `register(_:)` needs no `start()`, so a cache registered first starts the engine's
+    /// memory-pressure observer while the engine is still `created`; `shutdown()` must cancel and join it before it
+    /// returns, as it does from every other state.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: a cache registered before start, then shutdown, leaves no owned task and no memory-pressure observation", .timeLimit(.minutes(1)))
+    func registerBeforeStartThenShutdown() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        let cache = await MainActor.run { RecordingCache() }
+        try await MainActor.run {
+            try client.register(cache)
+        }
+        try await harness.pressure.requireObservers(equalTo: 1)
+        let engine = await harness.engine()
+        let before = await engine.introspect()
+        #expect(before.lifecycle == .created && before.memoryPressureObserverActive, "setup: the unstarted engine observes memory pressure: \(before)")
+        await client.shutdown()
+        let after = await engine.introspect()
+        #expect(after.lifecycle == .shutDown)
+        #expect(after.ownedTasks == 0, "no owned task outlives shutdown: \(after.ownedTasks)")
+        #expect(!after.memoryPressureObserverActive, "the observer was stopped")
+        guard after.ownedTasks == 0 else {
+            // The leftover observer ends only at the next event; end it so nothing outlives the test.
+            await harness.pressure.send(.warning)
+            return
+        }
+        try await harness.pressure.requireObservers(equalTo: 0)
+        withExtendedLifetime(cache) {}
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-6: every public async API of AssetClient except withAsset, sync and shutdown throws AssetError typed", .timeLimit(.minutes(1)))
     func asyncAPIsThrowTyped() async throws {

@@ -26,6 +26,10 @@ enum LifecycleSeamPoint: Sendable, Hashable {
     case pressureRecorded(epoch: UInt64)
     /// `shutdown()`: `closed` is set and a reopen is running, which the shutdown waits for next.
     case shutdownWillWaitForReopen
+    /// `performReopen`: the replacement of `generation` is installed and the newest memory-pressure request applied to
+    /// it while it is still `created`; its prefetch groups and its start come next (L5-R2: a shutdown here shuts a
+    /// `created` engine down that owns an observer).
+    case replacementObservesPressure(generation: UInt64)
 }
 
 /// Owns the client's current store and engine, and the reopen after a replaced root (ARCHITECTURE §8, B-15, B-17;
@@ -202,6 +206,11 @@ actor ClientLifecycle: PrefetchRegistry {
             // REENTRANCY: g-3 (proposed) — nothing: the engine ignores a request whose epoch is not newer, so a
             // concurrent call with the same or a newer epoch wins either way.
             _ = await next.engine.observeMemoryPressure(epoch: pressure.epoch, handler: pressure.handler)
+        }
+        if let seam = self.seam {
+            // REENTRANCY: g-9 (proposed) — nothing here: the loop below re-reads the generation, `bind` re-reads `closed`,
+            // and the start answers `.shutDown` after a shutdown (a test seam; `nil` in production).
+            await seam(.replacementObservesPressure(generation: next.generation))
         }
         for token in self.groups.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
             // A newer reopen replaced `next` meanwhile (its root vanished too): that reopen's loop re-registers what
