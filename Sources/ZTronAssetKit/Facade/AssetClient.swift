@@ -91,20 +91,29 @@ public final class AssetClient: Sendable {
     private func performOnCore<T: Sendable>(
         _ operation: @Sendable (ClientCore) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
-        var core = await self.lifecycle.current()
+        try await AssetClient.performOnCore(lifecycle: self.lifecycle, operation)
+    }
+
+    /// The reopen path on `lifecycle`'s current pair. Static, so a task that must not keep the client alive (the
+    /// background-events hand-off) can take it without capturing the client.
+    private static func performOnCore<T: Sendable>(
+        lifecycle: ClientLifecycle,
+        _ operation: @Sendable (ClientCore) async -> Result<T, AssetError>
+    ) async throws(AssetError) -> T {
+        var core = await lifecycle.current()
         for _ in 0..<AssetClient.reopenAttempts {
             let result = await operation(core)
             switch result {
             case .failure(.storageUnavailable(.rootVanished)):
-                guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
+                guard let replacement = await lifecycle.reopen(replacing: core.generation) else {
                     throw .shutDown
                 }
                 core = replacement
             case .failure(.shutDown):
-                guard await self.lifecycle.hasRetired(core.generation) else {
+                guard await lifecycle.hasRetired(core.generation) else {
                     throw .shutDown
                 }
-                core = await self.lifecycle.current()
+                core = await lifecycle.current()
             default:
                 return try result.get()
             }
@@ -307,14 +316,9 @@ public final class AssetClient: Sendable {
     /// JSON for support (R-OBS-3): versions, configuration minus secrets, state counts, last errors; built from
     /// `SyncEngine.diagnostics()`, `metrics()` and `storageReport()`.
     public func diagnosticReport() async throws(AssetError) -> Data {
-        let diagnostics = try await self.perform { engine in
-            await engine.diagnostics()
+        let (diagnostics, metrics, storage) = try await self.perform { engine in
+            await AssetClient.reportFigures(of: engine)
         }
-        let engine = await self.lifecycle.current().engine
-        // A degraded store answers neither metrics nor storage (L4-R9): empty figures stand in, the mirror's counts
-        // are still read.
-        let metrics = (try? await engine.metrics().get()) ?? MetricsSnapshot()
-        let storage = try? await engine.storageReport().get()
         let report = DiagnosticReportBuilder.report(
             configuration: self.configuration,
             diagnostics: diagnostics,
@@ -322,6 +326,31 @@ public final class AssetClient: Sendable {
             storage: storage
         )
         return DiagnosticReportBuilder.encode(report)
+    }
+
+    /// The report's figures, all from `engine`, so they never mix generations across a reopen. A degraded store
+    /// answers neither metrics nor storage (L4-R9): empty figures stand in, and the mirror's counts are still read. A
+    /// `.shutDown` from any of the three goes back to `perform`, which repeats the whole read on the replacement when a
+    /// reopen retired `engine` meanwhile, and reports `.shutDown` after a real shutdown.
+    private static func reportFigures(
+        of engine: SyncEngine
+    ) async -> Result<(EngineDiagnostics, MetricsSnapshot, StorageReport?), AssetError> {
+        let diagnostics: EngineDiagnostics
+        switch await engine.diagnostics() {
+        case .success(let value):
+            diagnostics = value
+        case .failure(let error):
+            return .failure(error)
+        }
+        let metrics = await engine.metrics()
+        let storage = await engine.storageReport()
+        if case .failure(.shutDown) = metrics {
+            return .failure(.shutDown)
+        }
+        if case .failure(.shutDown) = storage {
+            return .failure(.shutDown)
+        }
+        return .success((diagnostics, (try? metrics.get()) ?? MetricsSnapshot(), try? storage.get()))
     }
 
     /// Registers a derived in-memory cache (decoded images) to purge on memory pressure (R-CLN-11, ADR-044). Held
@@ -365,9 +394,12 @@ public final class AssetClient: Sendable {
         let relay = self.backgroundRelay
         Task {
             // The engine opens the store (start) before it reaches the remote source, and launches a run only when
-            // one is due (T2-11, ADR-028).
-            let engine = await lifecycle.current().engine
-            _ = await engine.backgroundSessionEventsPending(identifier: identifier)
+            // one is due (T2-11, ADR-028). Through the reopen path, so an engine a reopen retires meanwhile is replaced
+            // rather than answering `.shutDown` before its replacement made the session; every outcome completes the
+            // handler, at once after shutdown.
+            _ = try? await AssetClient.performOnCore(lifecycle: lifecycle) { core in
+                await core.engine.backgroundSessionEventsPending(identifier: identifier)
+            }
             await MainActor.run {
                 relay.complete(identifier: identifier)
             }
