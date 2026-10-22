@@ -37,6 +37,10 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   4. Remove `.worktrees/g` and `.worktrees/l5gdocs`, and the branches `wp/g` and `wp/l5gdocs`.
   5. Rewrite this file for WP-K, and ask the owner whether to run it now. Give its forecast, and ask for a WP-K stop, because 55 % covered WP-G only.
 - **Keep-awake:** `caffeinate -ims -t 259200` runs until 25 Oct 09:48.
+- **Forecast (23:10).**
+  - WP-G's remaining docs, TSan, perf and final gates take ~2–3 h and ~2–3 points, so `l5g-merged` lands around Fri 23 Oct 01:00–02:00 at weekly ~17–18 %.
+  - All of WP-G then cost ~17–18 points and ~16 h, against the 17 Oct forecast of 19–38 points and 22–43 h.
+  - **WP-K**, from the owner's go-ahead, at the measured L5 cycle cost of ~3 points and ~3 h per strict cycle: a main run of 3–4.5 h and 3–5 points, then 2–6 cycles, then merge and docs. Total **~12–26 h and ~12–25 points**, so Level 5 would end at weekly ~30–43 %.
 
 ## Next session: start here (written 2026-10-17 19:15 CEST, after Level 4)
 Level 4 is **complete** (`l4-merged` = `0d3f119`, see "Level 4 — done"). Nothing is running; no worktrees; no `wp/*` branches; `feature/asset-kit` is clean. Weekly usage **68 %** (all models; Fable 0 %), resets **Thu 22 Oct 04:00 CEST**. A `caffeinate -ims -t 172800` started 17 Oct 11:30 ends by itself on 19 Oct 11:30.
