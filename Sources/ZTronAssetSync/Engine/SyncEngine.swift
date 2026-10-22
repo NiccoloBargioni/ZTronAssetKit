@@ -7,8 +7,8 @@ import ZTronAssetStorage
 /// Contract rules every implementation keeps (ARCHITECTURE §7, §10):
 /// - One `Job` per **transfer** (content), with ref-counted interests per asset (ADR-020). A job is removed through
 ///   one synchronous funnel (sync-1 S1-01) once it has no interest, is not verifying or committing, and no pending
-///   claim of a registered prefetch group names its content (orchestrator ruling L5-R1: a claim lasts from
-///   `registerGroup` until the group's join reaches the member, the group is released, the join gives up or the
+///   claim names its content (orchestrator ruling L5-R1: a claim lasts from `registerGroup` until the group's join
+///   reaches the member, the group's release or the join's give-up drops it, at most `releasesPerTurn` a turn, or the
 ///   engine shuts down; ADR-054).
 /// - Every continuation (waiters, groups, runs, `start`/`sync` joiners, `waitUntil`) is resumed only through
 ///   `removeValue` on its table, and every table is settled at registration, on each transition, on withdrawal,

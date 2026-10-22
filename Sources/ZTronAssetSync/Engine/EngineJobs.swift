@@ -228,7 +228,7 @@ extension SyncEngine {
     }
 
     /// Removes interest `token` from `transfer` (all its assets) and retires the job when nobody is left: no interest
-    /// and no pending claim of a registered group whose join has not reached the content yet (orchestrator ruling L5-R1,
+    /// and no pending claim on its content, from a registered group or a release still dropping claims (ruling L5-R1,
     /// CCR-G2). Every release, waiter withdrawal and caller cancellation removes interests here, so none of them retires
     /// a job such a registration named; the job keeps its state, its place and its lane (`Job.heldLane`) until that join
     /// adds its interest (a promotion or a demotion of a running transfer reaches the transport as a priority change)
