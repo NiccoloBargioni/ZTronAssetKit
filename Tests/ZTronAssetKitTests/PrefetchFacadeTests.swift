@@ -12,6 +12,17 @@ struct PrefetchFacadeTests {
         engine.state.jobs[transfer]?.state.kind == .downloading && engine.state.jobs[transfer]?.active?.handle != nil
     }
 
+    /// Whether a group's interest at `lane` holds `transfer`'s job (a join reached it).
+    static func joined(_ transfer: TransferID, at lane: AssetPriority, _ engine: isolated SyncEngine) -> Bool {
+        engine.state.jobs[transfer]?.interests.values.contains { $0.lane == lane } == true
+    }
+
+    /// Whether every registration and release of the window has landed: no pending claim (each join reached its members,
+    /// L5-R1) and no release in progress.
+    static func settled(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.claims.isEmpty && engine.state.releasing.isEmpty
+    }
+
     /// On-demand entries whose transfers park in the fake source (unscripted), so a started transfer stays in flight
     /// until the engine cancels it.
     @available(macOS 15.0, iOS 18.0, *)
@@ -45,12 +56,18 @@ struct PrefetchFacadeTests {
         await MainActor.run {
             controller.update(ids: ids, current: 3)
         }
-        // 0 left, 5 entered; 2 and 3 swapped lanes in place.
+        // 0 left, 5 entered; 2 and 3 swapped lanes in place. The move has settled once 3 is joined at the user-initiated
+        // lane, 2 no longer is, and no claim or release is pending (L5-R14 (a): five groups and the window in flight
+        // already held before the re-lanes landed, so the assertions below could pass before the move they check).
         let moved = Set(entries[1...5].map(\.transferID))
         let left = entries[0].transferID
+        let promoted = entries[3].transferID
+        let demoted = entries[2].transferID
         await engine.awaitCondition { engine in
-            engine.state.jobs[left] == nil && engine.state.groups.count == 5
+            engine.state.jobs[left] == nil && engine.state.groups.count == 5 && PrefetchFacadeTests.settled(engine)
                 && moved.allSatisfy { PrefetchFacadeTests.inFlight($0, engine) }
+                && PrefetchFacadeTests.joined(promoted, at: .userInitiated, engine)
+                && !PrefetchFacadeTests.joined(demoted, at: .userInitiated, engine)
         }
         let starts = await source.starts.dropFirst(startsBefore).map(\.id)
         let cancels = await source.controlLog.dropFirst(controlsBefore).filter { $0.control == .cancel }.map(\.transfer)
@@ -84,11 +101,16 @@ struct PrefetchFacadeTests {
             await MainActor.run {
                 controller.update(ids: ids, current: current)
             }
+            // The page made current is joined at the user-initiated lane before the window moves on (L5-R14 (a),
+            // L5-C1-02): a move that released its handle before that join promoted nothing, while the claim correctly kept
+            // the transfer, so waiting for "in flight" alone failed 7 of 50 runs under load.
+            let page = entries[current].transferID
+            await engine.awaitCondition { PrefetchFacadeTests.joined(page, at: .userInitiated, $0) }
             // The next neighbour is in flight at the prefetch lane before the window moves onto it.
             let next = entries[current + 1].transferID
             await engine.awaitCondition { PrefetchFacadeTests.inFlight(next, $0) }
         }
-        await engine.awaitCondition { $0.state.groups.count == 3 }
+        await engine.awaitCondition { $0.state.groups.count == 3 && PrefetchFacadeTests.settled($0) }
         let starts = await source.starts.map(\.id)
         var startsByTransfer: [TransferID: Int] = [:]
         for id in starts {

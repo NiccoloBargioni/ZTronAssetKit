@@ -90,13 +90,6 @@ struct FacadeRaceTests {
         engine.state.groups.values.filter { $0.kind == .prefetch }.count
     }
 
-    /// Removes the current store root from the fake volume, the lock file included (an OS purge of Caches).
-    @available(macOS 15.0, iOS 18.0, *)
-    static func wipeRoot(_ harness: KitHarness) throws {
-        let lock = try #require(harness.fileSystem.operations.last { $0.kind == .acquireExclusiveLock }?.url)
-        try wipe(lock.deletingLastPathComponent(), in: harness.fileSystem)
-    }
-
     /// The engine registered the group, then `shutdown()` ran before the lifecycle re-validated: the client never
     /// holds that group, so `awaitRegistration()` reports `.shutDown` (ARCHITECTURE §8), not a success.
     @available(macOS 15.0, iOS 18.0, *)
@@ -145,7 +138,7 @@ struct FacadeRaceTests {
             }
         }
         try await harness.withClock { () async throws -> Void in
-            try FacadeRaceTests.wipeRoot(harness)
+            try harness.vanishRoot()
             let reopenA = Task { () -> Result<PurgeResult, AssetError> in
                 do throws(AssetError) {
                     return .success(try await client.purge(.all))
@@ -162,7 +155,7 @@ struct FacadeRaceTests {
             } catch {
                 failuresB.append(error)
             }
-            try FacadeRaceTests.wipeRoot(harness)
+            try harness.vanishRoot()
             do throws(AssetError) {
                 _ = try await client.purge(.all)
             } catch {
@@ -216,7 +209,7 @@ struct FacadeRaceTests {
                 break
             }
         }
-        try FacadeRaceTests.wipeRoot(harness)
+        try harness.vanishRoot()
         let purge = Task { () -> Result<PurgeResult, AssetError> in
             do throws(AssetError) {
                 return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
@@ -280,7 +273,7 @@ struct FacadeRaceTests {
                 break
             }
         }
-        try FacadeRaceTests.wipeRoot(harness)
+        try harness.vanishRoot()
         let purge = Task { () -> Result<PurgeResult, AssetError> in
             do throws(AssetError) {
                 return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
@@ -342,7 +335,7 @@ struct FacadeRaceTests {
                 await hold.arrive()
             }
         }
-        try FacadeRaceTests.wipeRoot(harness)
+        try harness.vanishRoot()
         let purge = Task { () -> Result<PurgeResult, AssetError> in
             do throws(AssetError) {
                 return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
@@ -388,7 +381,7 @@ struct FacadeRaceTests {
         let scope = AssetScope.tags(["paid"])
         try await client.setRetentionScope(scope)
         #expect(await harness.engine().kitRead { $0.state.retentionScope } == scope)
-        try FacadeRaceTests.wipeRoot(harness)
+        try harness.vanishRoot()
         _ = try await harness.withClock { () throws(AssetError) -> PurgeResult in
             try await client.purge(.all)
         }
@@ -429,7 +422,7 @@ struct FacadeRaceTests {
         let applied = await harness.engine().kitRead { $0.state.retentionScope }
         let recorded = await client.lifecycle.recordedRetentionScope
         #expect(applied == recorded, "the engine serves the newest recorded scope: \(applied) vs \(recorded)")
-        try FacadeRaceTests.wipeRoot(harness)
+        try harness.vanishRoot()
         _ = try await harness.withClock { () throws(AssetError) -> PurgeResult in
             try await client.purge(.all)
         }

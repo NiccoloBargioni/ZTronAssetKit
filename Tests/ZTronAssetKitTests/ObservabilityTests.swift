@@ -124,7 +124,24 @@ struct ObservabilityTests {
         // An orphan blob older than the orphan grace: maintenance's GC dooms it and counts its bytes.
         let orphan = KitFixture.bytes(70, count: 250)
         try plantOrphan(orphan, in: harness.fileSystem)
-        harness.time.advance(by: storage.orphanGrace + 1)
+        // One clock move past the orphan grace, made in an engine turn that finds no clock fence (an in-flight manifest
+        // fetch's deadline or a probe's watchdog), as the harness's drivers move it (L4-R17; L5-R14 (f)).
+        let engine = await harness.engine()
+        let time = harness.time
+        let grace = storage.orphanGrace + 1
+        while true {
+            let moved = await engine.kitRead { engine -> Bool in
+                guard KitHarness.clockFence(engine) == nil else {
+                    return false
+                }
+                time.advance(by: grace)
+                return true
+            }
+            if moved || Task.isCancelled {
+                break
+            }
+            await engine.awaitCondition { KitHarness.clockFence($0) == nil }
+        }
         _ = try await harness.withClock { () throws(AssetError) -> MaintenanceReport in
             try await client.performMaintenance(timeBudget: 60)
         }

@@ -945,7 +945,8 @@ private final class ModelWalk {
         let retiring = await self.client.lifecycle.current().generation
         self.retiredAt[retiring] = began
         self.builtAt[retiring + 1] = began
-        try self.vanishRoot()
+        // One operation of the fake volume (`KitHarness.vanishRoot()`): the walk does not wait for the engine to fall idle.
+        try self.harness.vanishRoot()
         var hold: SeamHold?
         if let park {
             hold = await self.parking.arm(park)
@@ -994,16 +995,6 @@ private final class ModelWalk {
             }
             await self.publishMarker()
         }
-    }
-
-    /// Moves the current store root aside in one operation of the fake volume, so nothing is left at its path, as after
-    /// an OS purge of Caches. A recursive removal would race the store's own writes, since the walk does not wait for the
-    /// engine to fall idle before a reopen.
-    private func vanishRoot() throws {
-        let lock = try #require(self.harness.fileSystem.operations.last { $0.kind == .acquireExclusiveLock }?.url)
-        let root = lock.deletingLastPathComponent()
-        let aside = root.deletingLastPathComponent().appendingPathComponent("vanished-\(self.reopens)", isDirectory: true)
-        try self.harness.fileSystem.rename(from: root, to: aside, mode: .exclusive)
     }
 
     /// Whether the reopen parked at the armed point (`false`: the purge finished without reaching it).

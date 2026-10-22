@@ -161,21 +161,44 @@ struct KitHarness {
                     return
                 }
                 let engine = await client.currentEngine()
-                let fenced = await engine.kitRead { engine -> (fence: MonotonicInstant, sleepers: Int)? in
+                let step = await engine.kitRead { engine -> DriverStep in
                     let sleepers = time.pendingSleepers
                     guard !Task.isCancelled, let deadline = time.nextDeadline else {
-                        return nil
+                        return .moved
+                    }
+                    switch engine.state.lifecycle {
+                    case .shuttingDown, .shutDown:
+                        // A reopen or the client's shutdown retired this engine: its fence says nothing about a
+                        // replacement's in-flight manifest fetch, so the clock does not move on its reading (L5-R14, f).
+                        return .retired(sleepers: sleepers)
+                    default:
+                        break
                     }
                     if let fence = KitHarness.clockFence(engine), deadline >= fence {
-                        return (fence, sleepers)
+                        return .fenced(fence, sleepers: sleepers)
                     }
                     time.advance(to: deadline)
-                    return nil
+                    return .moved
                 }
-                guard let fenced, !Task.isCancelled else {
+                guard !Task.isCancelled else {
+                    return
+                }
+                let fence: MonotonicInstant
+                let waiting: Int
+                switch step {
+                case .moved:
                     continue
+                case .retired(let sleepers):
+                    // A reopen hands the next pass its replacement (`currentEngine()` waits for a running one); after a
+                    // shutdown no clock move can help, so wait for one more sleeper, or for the end of the operation.
+                    if await client.currentEngine() === engine {
+                        await time.waitForSleepers(atLeast: sleepers + 1)
+                    }
+                    continue
+                case .fenced(let at, let sleepers):
+                    fence = at
+                    waiting = sleepers
                 }
-                let (fence, waiting) = fenced
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask {
                         await engine.awaitCondition { KitHarness.clockFence($0) != fence }
@@ -261,6 +284,21 @@ struct KitHarness {
         }
     }
 
+    /// Replaces the store root under the client: moves the root the store locked last aside in one operation of the
+    /// fake volume, so nothing is left at its path, as after an OS purge of Caches. One operation, because a removal file
+    /// by file can meet a store write between listing a directory and removing it (`notEmpty`; L5-R14, pattern g).
+    func vanishRoot() throws {
+        let lock = try #require(self.fileSystem.operations.last { $0.kind == .acquireExclusiveLock }?.url)
+        let root = lock.deletingLastPathComponent()
+        var index = 0
+        var aside: URL
+        repeat {
+            index += 1
+            aside = root.deletingLastPathComponent().appendingPathComponent("\(root.lastPathComponent)-vanished-\(index)", isDirectory: true)
+        } while try self.fileSystem.itemInfo(at: aside) != nil
+        try self.fileSystem.rename(from: root, to: aside, mode: .exclusive)
+    }
+
     /// Runs `sync(.force)` through the client while the clock is driven.
     func syncDriven(_ mode: SyncMode = .force) async -> SyncOutcome {
         let client = self.client
@@ -284,6 +322,16 @@ struct KitHarness {
         }
         return fence
     }
+}
+
+/// One pass of `KitHarness.withClock`'s driver, decided in one engine turn.
+enum DriverStep: Sendable {
+    /// The clock moved to the earliest sleeper, or there was none.
+    case moved
+    /// The engine read was retired by a reopen or a shutdown: no clock move on its reading.
+    case retired(sleepers: Int)
+    /// The earliest sleeper is at or past the engine's clock fence.
+    case fenced(MonotonicInstant, sleepers: Int)
 }
 
 /// Harness failures.

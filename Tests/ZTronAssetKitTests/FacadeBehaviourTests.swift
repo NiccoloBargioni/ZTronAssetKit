@@ -302,6 +302,9 @@ struct FacadeBehaviourTests {
         let harness = KitHarness.make()
         let client = harness.client
         let probe = EventProbe(stream: client.events)
+        // The client starts only once the probe's first pull registered, so the stream holds the launch run from its
+        // start (L5-R14 (a): a registration that came after the run finished would never see its syncFinished).
+        await harness.engine().waitUntil { $0.subscribers == 1 }
         await harness.serve([(entry, bytes)])
         try await harness.startAndSettle()
         let finished = await probe.next { event in
