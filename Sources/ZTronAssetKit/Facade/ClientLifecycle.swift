@@ -157,7 +157,7 @@ actor ClientLifecycle: PrefetchRegistry {
         let mirror = self.mirror
         // REENTRANCY: g-2 (proposed) — `closed`, re-read right below.
         await MainActor.run {
-            _ = mirror
+            mirror.reset()
         }
         guard !self.closed else {
             return self.endReopen(nil)
