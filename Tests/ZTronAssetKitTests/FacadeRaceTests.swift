@@ -318,7 +318,11 @@ struct FacadeRaceTests {
     /// made while a reopen is parked after building its replacement registers with the retired engine, which answers
     /// `.shutDown`, so the registration waits for the reopen, whose hand-over covers the follower. The consumer is
     /// cancelled meanwhile: the forwarder drops the stream it is handed, and gives its follower entry back once the
-    /// registration returns, so neither the lifecycle nor the replacement keeps anything for it.
+    /// registration returns, so neither the lifecycle nor the replacement keeps anything for it. `cancel()` runs the
+    /// forwarder's `stop()` in a task of its own, so the test waits for its end (the forwarder's `stopped` seam) before it
+    /// lets the reopen go on: the registration then returns to a stopped forwarder in every schedule, and the consumer
+    /// receives nothing (L5-R21, L5-C2-05; before, a late stop let the pump hand the replacement's first event to the
+    /// cancelled pull).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-12: an events stream cancelled while its first registration waits for a reopen leaves no follower and no subscriber", .timeLimit(.minutes(1)))
     func eventsStreamCancelledDuringItsRegistration() async throws {
@@ -346,9 +350,12 @@ struct FacadeRaceTests {
             }
         }
         await hold.waitUntilParked()
+        // `client.events` with the forwarder's `stopped` seam.
+        let (stops, stopped) = AsyncStream<Void>.makeStream()
+        let stream = EventForwarder.stream(lifecycle: client.lifecycle, stopped: { stopped.yield() })
         let consumer = Task { () -> Int in
             var received = 0
-            for await _ in client.events {
+            for await _ in stream {
                 received += 1
             }
             return received
@@ -356,6 +363,9 @@ struct FacadeRaceTests {
         // The first pull recorded the follower; its registration waits for the parked reopen.
         await followers.wait(atLeast: 1)
         consumer.cancel()
+        for await _ in stops {
+            break
+        }
         await hold.open()
         let received = await consumer.value
         let result = await purge.value

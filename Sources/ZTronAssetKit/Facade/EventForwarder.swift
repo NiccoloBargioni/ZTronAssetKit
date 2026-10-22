@@ -60,26 +60,36 @@ actor EventForwarder {
     /// Test seam, `nil` in production: called on the actor once the pump waits in `offer` with an event no consumer
     /// asked for yet, so a test can drop the consumer's stream exactly then (`stop()` must end that wait; CLAUDE.md G4).
     private let offerParked: (@Sendable () -> Void)?
+    /// Test seam, `nil` in production: called on the actor at the end of `stop()`, which `cancel()` runs in a task of its
+    /// own, so a test can order its next step after the stop (orchestrator ruling L5-R21, L5-C2-05).
+    private let stopped: (@Sendable () -> Void)?
 
-    private init(lifecycle: ClientLifecycle, registersOnFirstPull: Bool, offerParked: (@Sendable () -> Void)?) {
+    private init(
+        lifecycle: ClientLifecycle,
+        registersOnFirstPull: Bool,
+        offerParked: (@Sendable () -> Void)?,
+        stopped: (@Sendable () -> Void)?
+    ) {
         self.lifecycle = lifecycle
         self.registersOnFirstPull = registersOnFirstPull
         self.offerParked = offerParked
+        self.stopped = stopped
     }
 
-    /// An `events` stream: it registers, and becomes a follower, on its first pull. `offerParked` is the test seam
-    /// (`nil` in production).
+    /// An `events` stream: it registers, and becomes a follower, on its first pull. `offerParked` and `stopped` are the
+    /// test seams (`nil` in production).
     nonisolated static func stream(
         lifecycle: ClientLifecycle,
-        offerParked: (@Sendable () -> Void)? = nil
+        offerParked: (@Sendable () -> Void)? = nil,
+        stopped: (@Sendable () -> Void)? = nil
     ) -> AsyncStream<AssetEvent> {
-        EventForwarder.stream(of: EventForwarder(lifecycle: lifecycle, registersOnFirstPull: true, offerParked: offerParked))
+        EventForwarder.stream(of: EventForwarder(lifecycle: lifecycle, registersOnFirstPull: true, offerParked: offerParked, stopped: stopped))
     }
 
     /// A `subscribe()` stream: registered with the engine serving now, and a follower, before it is returned;
     /// `.shutDown` after shutdown.
     static func subscribed(lifecycle: ClientLifecycle) async throws(AssetError) -> AsyncStream<AssetEvent> {
-        let forwarder = EventForwarder(lifecycle: lifecycle, registersOnFirstPull: false, offerParked: nil)
+        let forwarder = EventForwarder(lifecycle: lifecycle, registersOnFirstPull: false, offerParked: nil, stopped: nil)
         let registration = try await lifecycle.register(forwarder).get()
         await forwarder.registered(registration)
         return EventForwarder.stream(of: forwarder)
@@ -187,6 +197,7 @@ actor EventForwarder {
             // REENTRANCY: g-7 (proposed) — nothing: terminal; the key was taken before the await, so it is given back once.
             await self.lifecycle.unfollow(key)
         }
+        self.stopped?()
     }
 
     /// Hands `event` to a waiting consumer, or waits for one; `false` when the consumer is gone.
