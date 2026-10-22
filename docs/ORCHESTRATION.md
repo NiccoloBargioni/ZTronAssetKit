@@ -10,7 +10,13 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Worktree:** `.worktrees/g` on `wp/g`, from `l4-merged` (`0d3f119`).
 - **Keep-awake:** `caffeinate -ims -t 259200` from 22 Oct 09:48 runs to 25 Oct 09:48 (a background task of this session).
 - **Stops:** 50 for the main run and close-out, 55 for docs: the 55 % WP-G default recorded on 18 Oct.
-- **Forecast (strict):** 19–38 weekly points and 22–43 h for all of WP-G, i.e. 6–15 close-out cycles at ~1.75 points and ~2.1 h each. WP-G should land around 23–24 Oct. If it hits 50 % first, the run stops and asks the owner for a new stop.
+- **Forecast (strict; re-estimated 22 Oct 15:35, during close-out cycle 1).**
+  - Measured in the main run: a fix round takes 42–66 min and a verification round 32–39 min; a cycle costs ~1.75 weekly points, the same as L4.
+  - Close-out cycles with engine edits run longer (Sync ×3 + TSan): about 1.6–2.1 h each, and cycle 1 is 2–3 h.
+  - Likely 6–12 cycles: 11–24 h and 10–23 points. Best case 4 cycles: ~8 h. Tail case 18 cycles: ~36 h.
+  - Merge, gates and docs then add 4–6 h and ~3 points.
+  - **WP-G ends:** likely Fri 23 Oct between ~07:00 and ~22:00, at weekly ~19–33 %. Best case Fri ~03:30 at ~14 %; tail case Sat 24 Oct ~09:30 at ~43 %.
+  - The 50 % close-out stop triggers only past ~24 cycles.
 - **Main run: done** at 14:30 (4.7 h, weekly 0 % → 5 %, no stop). Blocking went 2 → 3 → 4, out of 16, 12 and 9 issues in total. The author reported `VERIFY: PASS` (`--quick`) and Kit coverage 96.94 %.
 - **The four blocking items left by round 3**, all ruled in `.build-orchestrator/l5-rulings.md` (local, gitignored):
   - **L5-R1** (CCR-G2): R-CAR-3 / S1-05 fail end to end. A release can overtake a registered group's join in the engine. Ruled as an authorised edit in WP-F's `EngineCommands`/`EngineJobs`/`EngineState`: pending claims at registration, checked by `retire(_:)`, covering both windows. Then the two `withKnownIssue` wrappers come out.
