@@ -9,15 +9,20 @@ import ZTronAssetSync
 /// engine it reads was retired by a reopen, it drops that engine's `clientShutDown` and continues with the
 /// replacement's stream. A real shutdown ends the stream with `clientShutDown`, the last event (R-SYN-12, R-SYN-15).
 ///
-/// The pump starts on the first pull and ends with the stream; the consumer's cancellation stops it, and the
-/// engine's stream it was reading is released by its own cancellation handler.
+/// The pump starts on the first pull and ends with the stream. The consumer's stream holds the forwarder through a
+/// `Consumer` that the pump never retains, so the pump stops when the consumer's task is cancelled (`onCancel`) and
+/// also when the consumer drops the stream without cancelling it (the usual `break` out of a `for await`, after which
+/// `AsyncStream(unfolding:onCancel:)` calls no handler): the `Consumer`'s deinit stops the forwarder. Either way the
+/// pump's last pull runs under cancellation, so the engine stream's own cancellation handler releases its
+/// subscription; nothing outlives the consumer's stream (R-SYN-12).
 actor EventForwarder {
     private let lifecycle: ClientLifecycle
     /// A stream already registered (`subscribe()`) and the generation of its engine; read first.
     private var first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
     private var pump: Task<Void, Never>?
-    /// A consumer waiting for an event.
-    private var consumer: CheckedContinuation<AssetEvent?, Never>?
+    /// Consumers waiting for an event, in arrival order: two iterators of one stream that pull at once are served one
+    /// event each, in turn, and neither waits for good.
+    private var consumers: [CheckedContinuation<AssetEvent?, Never>] = []
     /// An event waiting for a consumer, and the pump waiting for it to be taken (`false`: stop).
     private var offered: (event: AssetEvent, taken: CheckedContinuation<Bool, Never>)?
     private var finished = false
@@ -30,13 +35,27 @@ actor EventForwarder {
 
     /// The consumer's stream: pulls through the forwarder.
     nonisolated static func stream(lifecycle: ClientLifecycle, first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?) -> AsyncStream<AssetEvent> {
-        let forwarder = EventForwarder(lifecycle: lifecycle, first: first)
+        let consumer = Consumer(EventForwarder(lifecycle: lifecycle, first: first))
         return AsyncStream(unfolding: {
             // REENTRANCY: g-7 (proposed) — nothing: `next()` re-reads its own state after every await.
-            await forwarder.next()
+            await consumer.forwarder.next()
         }, onCancel: {
-            forwarder.cancel()
+            consumer.forwarder.cancel()
         })
+    }
+
+    /// The consumer's hold on its forwarder: captured by the consumer's stream only, never by the pump, so it is
+    /// released with that stream and its deinit stops the forwarder (release on drop as well as on cancellation).
+    private final class Consumer: Sendable {
+        let forwarder: EventForwarder
+
+        init(_ forwarder: EventForwarder) {
+            self.forwarder = forwarder
+        }
+
+        deinit {
+            self.forwarder.cancel()
+        }
     }
 
     /// The next event, or `nil` once the stream ended.
@@ -52,11 +71,11 @@ actor EventForwarder {
         self.startPump()
         // REENTRANCY: g-7 (proposed) — nothing: a terminal wait, resumed once by `offer`, `end` or `stop`.
         return await withCheckedContinuation { (continuation: CheckedContinuation<AssetEvent?, Never>) in
-            self.consumer = continuation
+            self.consumers.append(continuation)
         }
     }
 
-    /// The consumer was cancelled: stop the pump (one hop).
+    /// The consumer was cancelled or dropped its stream: stop the pump (one hop).
     nonisolated func cancel() {
         Task {
             // REENTRANCY: g-7 (proposed) — nothing: `stop` re-reads the state on the actor.
@@ -66,11 +85,12 @@ actor EventForwarder {
 
     private func stop() {
         self.finished = true
+        // A registered stream the pump never read is released here rather than with the forwarder.
+        self.first = nil
         self.pump?.cancel()
         self.offered?.taken.resume(returning: false)
         self.offered = nil
-        self.consumer?.resume(returning: nil)
-        self.consumer = nil
+        self.resumeConsumers()
     }
 
     /// Hands `event` to a waiting consumer, or waits for one; `false` when the consumer is gone.
@@ -78,9 +98,8 @@ actor EventForwarder {
         guard !self.finished else {
             return false
         }
-        if let consumer = self.consumer {
-            self.consumer = nil
-            consumer.resume(returning: event)
+        if !self.consumers.isEmpty {
+            self.consumers.removeFirst().resume(returning: event)
             return true
         }
         // REENTRANCY: g-7 (proposed) — nothing: a terminal wait, resumed once by `next` or `stop`.
@@ -92,8 +111,16 @@ actor EventForwarder {
     /// The pump ended: a waiting consumer gets the end of the stream.
     private func end() {
         self.finished = true
-        self.consumer?.resume(returning: nil)
-        self.consumer = nil
+        self.resumeConsumers()
+    }
+
+    /// Ends every waiting consumer's pull with the end of the stream.
+    private func resumeConsumers() {
+        let waiting = self.consumers
+        self.consumers = []
+        for consumer in waiting {
+            consumer.resume(returning: nil)
+        }
     }
 
     private func startPump() {
@@ -135,8 +162,8 @@ actor EventForwarder {
                     break
                 }
                 guard await forwarder.offer(event) else {
-                    // The consumer is gone and this task cancelled: one more pull runs the engine stream's
-                    // cancellation handler, which releases its subscription.
+                    // The consumer cancelled or dropped its stream, and this task is cancelled: one more pull runs
+                    // the engine stream's cancellation handler, which releases its subscription.
                     _ = await iterator.next()
                     return
                 }
