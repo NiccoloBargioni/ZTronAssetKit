@@ -20,7 +20,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **L5-R4** approves CCR-G3: `AssetStore.unavailableReason` as a package read, plus the facade's reopen trigger.
   - **L5-R5** declines CCR-G1, because it would misfire on WP-D's tolerated early finish. The attestation counts as "wired", and the run-time half is Not verified.
   - **L5-R6** leaves P-13, P-11 and R-SYN-5 C2 as non-blocking `outside-wp` (load-related), to be re-run at merge.
-- **Close-out: RUNNING** `wf_a049b89c-afb` (task `wp9tf73fa`), launched 14:42 at weekly 5 %. Arguments: strict, `maxCycle: 30`, `usageStop: 50`, `findingsFile` `.build-orchestrator/l5-remaining-g.json`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
+- **Close-out: RUNNING** `wf_a049b89c-afb` (task `wp9tf73fa`), launched 14:39 at weekly 5 %. Arguments: strict, `maxCycle: 30`, `usageStop: 50`, `findingsFile` `.build-orchestrator/l5-remaining-g.json`, `rulingsFile` `.build-orchestrator/l5-rulings.md`, sims fix `897F9D8D…`, reqs `6BE15CAF…`, correct `5B940E6E…`.
   - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_a049b89c-afb`.
 - **Probes** from the round-3 correctness verifier are kept in `.build-orchestrator/l5-probes-r3/`.
 - **Resume cold** (if this session is gone):
