@@ -8,10 +8,11 @@ import ZTronAssetTestSupport
 /// Orchestrator ruling L5-R2 (level 5 close-out; L5-V3-05, R-SYN-15): `shutdown()` returns only once every
 /// engine-owned task is cancelled and joined and every continuation resumed with `.shutDown`, whatever lifecycle state
 /// it began in, `created` included; from `created` it still never opens the store and never logs. `spawn` allows owned
-/// tasks in `created`, and exactly two spawn sites are reachable there (`docs/adr-drafts/g.md`, the L5-R2 table): the
-/// memory-pressure observer (`performObserveMemoryPressure`) and a group's join (`performRegisterGroup`). Each test
-/// spawns one of them in `created`, shuts the engine down, and checks right after `shutdown()` returns that no owned
-/// task is left and that the site's resource is released, with no further event.
+/// tasks in `created`, and three spawn sites are reachable there (`docs/adr-drafts/g.md`, the L5-R2 table): the
+/// memory-pressure observer (`performObserveMemoryPressure`), a group's join (`performRegisterGroup`) and, since the
+/// claims of L5-R1, a release follow-up (`continueReleases`). Each test spawns one of them in `created`, shuts the engine
+/// down, and checks right after `shutdown()` returns that no owned task is left and that the site's resource is
+/// released, with no further event.
 @Suite("Engine shutdown from created")
 struct EngineCreatedShutdownTests {
     @available(macOS 15.0, iOS 18.0, *)
