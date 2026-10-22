@@ -6,8 +6,16 @@ import ZTronAssetSync
 /// The engine's streams are bound to their engine, and a reopen replaces the engine, whose shutdown ends its streams
 /// with `clientShutDown`. The forwarder reads the current engine's stream in one pump task and hands each event to the
 /// consumer pull by pull, so the engine's backpressure still holds (at most one event waits here, R-SYN-12); when the
-/// engine it reads was retired by a reopen, it drops that engine's `clientShutDown` and continues with the
-/// replacement's stream. A real shutdown ends the stream with `clientShutDown`, the last event (R-SYN-12, R-SYN-15).
+/// engine it reads was retired by a reopen, it drops that engine's `clientShutDown`, drains that stream to its end and
+/// continues with the replacement's stream. A real shutdown ends the stream with `clientShutDown`, the last event
+/// (R-SYN-12, R-SYN-15).
+///
+/// The pump registers with the lifecycle before it reads (`ClientLifecycle.follow`), and a reopen subscribes every
+/// registered forwarder to the replacement before installing it (orchestrator ruling L5-R3): the pump switches to the
+/// stream it was handed, so a consumer whose stream is live when a reopen installs a replacement receives every event
+/// the replacement publishes, from its first one on, its `clientStarted` included (G-2), except what the engine's own
+/// queue coalesces (one slot per progress key and per subject, H-9). Without a stream handed over (a forwarder that
+/// registered after the reopen's hand-over) it registers with the engine serving then; it has no history to lose.
 ///
 /// The pump starts on the first pull and ends with the stream. The consumer's stream holds the forwarder through a
 /// `Consumer` that the pump never retains, so the pump stops when the consumer's task is cancelled (`onCancel`) and
@@ -25,6 +33,9 @@ actor EventForwarder {
     private var consumers: [CheckedContinuation<AssetEvent?, Never>] = []
     /// An event waiting for a consumer, and the pump waiting for it to be taken (`false`: stop).
     private var offered: (event: AssetEvent, taken: CheckedContinuation<Bool, Never>)?
+    /// Streams of replacement engines that reopens subscribed this forwarder to before installing them (L5-R3), in
+    /// generation order; the pump reads each once the stream before it ended with its retired engine's `clientShutDown`.
+    private var handovers: [(stream: AsyncStream<AssetEvent>, generation: UInt64)] = []
     private var finished = false
     /// Test seam, `nil` in production: called on the actor once the pump waits in `offer` with an event no consumer
     /// asked for yet, so a test can drop the consumer's stream exactly then (`stop()` must end that wait; CLAUDE.md G4).
@@ -97,8 +108,9 @@ actor EventForwarder {
 
     private func stop() {
         self.finished = true
-        // A registered stream the pump never read is released here rather than with the forwarder.
+        // Registered streams the pump never read are released here rather than with the forwarder.
         self.first = nil
+        self.handovers = []
         self.pump?.cancel()
         self.offered?.taken.resume(returning: false)
         self.offered = nil
@@ -124,7 +136,30 @@ actor EventForwarder {
     /// The pump ended: a waiting consumer gets the end of the stream.
     private func end() {
         self.finished = true
+        self.handovers = []
         self.resumeConsumers()
+    }
+
+    /// A reopen subscribed this forwarder to the replacement engine of `generation` before installing it (L5-R3). A
+    /// forwarder that already finished drops the stream at once, which releases its subscription.
+    func handOver(_ stream: AsyncStream<AssetEvent>, generation: UInt64) {
+        guard !self.finished else {
+            return
+        }
+        self.handovers.append((stream, generation))
+    }
+
+    /// The oldest stream handed over for a generation after `previous` (the one whose stream just ended, retired) and up
+    /// to `installed` (the generation serving now). Older ones are dropped; later ones belong to a reopen that has not
+    /// installed its replacement and stay, and a reopen that never installs (the client shut down) leaves them unread.
+    private func takeHandover(after previous: UInt64?, through installed: UInt64) -> (stream: AsyncStream<AssetEvent>, generation: UInt64)? {
+        if let previous {
+            self.handovers.removeAll { $0.generation <= previous }
+        }
+        guard let index = self.handovers.firstIndex(where: { $0.generation <= installed }) else {
+            return nil
+        }
+        return self.handovers.remove(at: index)
     }
 
     /// Ends every waiting consumer's pull with the end of the stream.
@@ -150,14 +185,28 @@ actor EventForwarder {
         }
     }
 
-    /// Reads engine streams until one ends without having been retired, or the consumer is gone. Off the actor, so
-    /// the streams' iterators never cross an isolation boundary.
+    /// Registers the forwarder as a follower of the lifecycle's engines (L5-R3), reads their streams (`forward`) and
+    /// unregisters it. Off the actor, so the streams' iterators never cross an isolation boundary.
     private nonisolated static func pump(
         into forwarder: EventForwarder,
         lifecycle: ClientLifecycle,
         first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
     ) async {
+        let key = await lifecycle.follow(forwarder)
+        await EventForwarder.forward(into: forwarder, lifecycle: lifecycle, first: first)
+        await lifecycle.unfollow(key)
+    }
+
+    /// Reads engine streams until one ends without having been retired, or the consumer is gone: `first`, then after
+    /// each retired stream the stream a reopen handed over for the next generation, or else the stream of the engine
+    /// serving then.
+    private nonisolated static func forward(
+        into forwarder: EventForwarder,
+        lifecycle: ClientLifecycle,
+        first: (stream: AsyncStream<AssetEvent>, generation: UInt64)?
+    ) async {
         var pending = first
+        var ended: UInt64?
         while !Task.isCancelled {
             let source: (stream: AsyncStream<AssetEvent>, generation: UInt64)
             if let given = pending {
@@ -165,12 +214,19 @@ actor EventForwarder {
                 pending = nil
             } else {
                 let core = await lifecycle.current()
-                source = (core.engine.makeEventStream(), core.generation)
+                if let handed = await forwarder.takeHandover(after: ended, through: core.generation) {
+                    source = handed
+                } else {
+                    source = (core.engine.makeEventStream(), core.generation)
+                }
             }
             var iterator = source.stream.makeAsyncIterator()
             var retired = false
             while let event = await iterator.next() {
                 if event == .clientShutDown, await lifecycle.hasRetired(source.generation) {
+                    // The retired engine's last event: its stream is drained to its end, so its events all precede the
+                    // replacement's.
+                    while await iterator.next() != nil {}
                     retired = true
                     break
                 }
@@ -184,6 +240,7 @@ actor EventForwarder {
             guard retired else {
                 break
             }
+            ended = source.generation
         }
         await forwarder.end()
     }

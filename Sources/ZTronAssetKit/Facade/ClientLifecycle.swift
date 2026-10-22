@@ -43,7 +43,8 @@ enum LifecycleSeamPoint: Sendable, Hashable {
 /// from the index files alone and can be smaller than the mirror's). What the caller registered through the facade
 /// survives the reopen: prefetch groups are registered again with the new engine, the memory-pressure observer is
 /// started again, and the run-time retention scope is the new engine's. Event streams follow through
-/// `EventForwarder`.
+/// `EventForwarder`: every live forwarder is subscribed to the replacement before it is installed (L5-R3), so a
+/// consumer misses none of the replacement's events.
 ///
 /// Prefetch registrations go through here (`PrefetchRegistry`): the tokens handed to handles are the facade's own,
 /// each bound to the engine token of the generation it was registered with, so a handle released after a reopen
@@ -57,6 +58,12 @@ actor ClientLifecycle: PrefetchRegistry {
         var binding: (generation: UInt64, token: InterestToken)?
         /// A `bind(_:)` for this group is running (a reopen leaves it to that call).
         var bindInFlight = false
+    }
+
+    /// A live event forwarder (G-2, L5-R3), held weakly: the consumer's stream and the forwarder's pump hold it, and the
+    /// pump unregisters it when it ends.
+    private struct Follower {
+        weak var forwarder: EventForwarder?
     }
 
     /// The newest memory-pressure request (R-CLN-11), applied again to a replacement engine.
@@ -80,6 +87,10 @@ actor ClientLifecycle: PrefetchRegistry {
     private var groups: [InterestToken: PrefetchGroup] = [:]
     private var lastToken: UInt64 = 0
     private var pressure: PressureRequest?
+    /// The event forwarders whose pumps read this client's engines, by key; a reopen hands each the replacement's
+    /// stream before installing it (L5-R3).
+    private var followers: [UInt64: Follower] = [:]
+    private var lastFollower: UInt64 = 0
     /// Test seam, `nil` in production: awaited at each `LifecycleSeamPoint`, so a test can place a shutdown, a reopen or
     /// a pressure event exactly there (CLAUDE.md G4: interleavings no test could otherwise reach deterministically).
     private var seam: (@Sendable (LifecycleSeamPoint) async -> Void)?
@@ -200,6 +211,12 @@ actor ClientLifecycle: PrefetchRegistry {
             mirror: mirror,
             retentionScope: self.retentionScope
         )
+        // REENTRANCY: g-10 (proposed) — `closed`, re-read right below: a shutdown meanwhile installs nothing (the
+        // forwarders take only a stream of an installed generation, so the ones handed `next` never read it).
+        await self.handOverFollowers(to: next)
+        guard !self.closed else {
+            return self.endReopen(nil)
+        }
         self.core = next
         _ = self.endReopen(next)
         if let pressure = self.pressure, pressure.handler != nil {
@@ -238,6 +255,45 @@ actor ClientLifecycle: PrefetchRegistry {
         self.reopening = nil
         self.retiring = nil
         return result
+    }
+
+    /// Subscribes every live forwarder to `next` through its eager-registering `subscribe()` and hands it the stream,
+    /// before `next` is installed (L5-R3): `next` is `created` and unreachable by callers, so it publishes nothing until
+    /// every forwarder holds its stream, and a forwarder reads the replacement from its first event on, after its old
+    /// engine's stream ended (`EventForwarder`). A forwarder that registers while this runs is handed one as well: the
+    /// followers are re-read after each await; one that registers after the install has no history to lose, and the
+    /// replay of its own registration covers the state.
+    private func handOverFollowers(to next: ClientCore) async {
+        var handled: Set<UInt64> = []
+        while let key = self.followers.keys.filter({ !handled.contains($0) }).min() {
+            handled.insert(key)
+            guard let forwarder = self.followers[key]?.forwarder else {
+                self.followers[key] = nil
+                continue
+            }
+            // REENTRANCY: g-10 (proposed) — the followers, re-read at the loop's top (one registered meanwhile is handed a
+            // stream too); `next` cannot publish meanwhile (`created`, not installed); `closed` is re-read by the caller.
+            guard case .success(let stream) = await next.engine.subscribe() else {
+                continue
+            }
+            // REENTRANCY: g-10 (proposed) — as above; a forwarder that finished meanwhile drops the stream at once.
+            await forwarder.handOver(stream, generation: next.generation)
+        }
+    }
+
+    // MARK: Event forwarders (L5-R3)
+
+    /// Registers a forwarder whose pump reads this client's engines: every reopen from now on hands it the replacement's
+    /// stream before installing the replacement. Returns the key `unfollow(_:)` takes.
+    func follow(_ forwarder: EventForwarder) -> UInt64 {
+        self.lastFollower += 1
+        self.followers[self.lastFollower] = Follower(forwarder: forwarder)
+        return self.lastFollower
+    }
+
+    /// Unregisters a forwarder whose pump ended.
+    func unfollow(_ key: UInt64) {
+        self.followers[key] = nil
     }
 
     // MARK: Shutdown
