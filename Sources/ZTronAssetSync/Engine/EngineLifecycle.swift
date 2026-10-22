@@ -448,6 +448,12 @@ extension SyncEngine {
 
     /// Single-flight and idempotent: cancel and join every owned task, resume every continuation with `.shutDown`,
     /// invalidate the source, close the store, publish `clientShutDown` last.
+    ///
+    /// Whatever state it begins in, `created` included, it returns only once every owned task is cancelled and joined
+    /// (orchestrator ruling L5-R2, R-SYN-15): `spawn` allows owned tasks in `created`, and two spawn sites are reachable
+    /// there, the memory-pressure observer and a group's join. From `created` it still never opens the store and never
+    /// logs: there is no source to invalidate and no store to close (`launch` and `startTask` are `nil`), and a joined
+    /// group join's `ensureStarted()` refuses once `shuttingDown`, so it cannot start the engine.
     func performShutdown() async {
         switch self.state.lifecycle {
         case .shutDown:
@@ -463,12 +469,7 @@ extension SyncEngine {
                 }
             }
             return
-        case .created:
-            // Shutdown in `created` never opens the store.
-            self.state.lifecycle = .shuttingDown
-            self.finishShutdown()
-            return
-        case .starting, .running, .degraded:
+        case .created, .starting, .running, .degraded:
             break
         }
         self.state.lifecycle = .shuttingDown
