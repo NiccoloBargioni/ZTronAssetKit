@@ -159,7 +159,10 @@ struct StoreCoreState: Sendable {
     /// first one's durable commit and lock release are done (phase `closed`), so a caller may reopen the root right
     /// after (proposed REENTRANCY row b-9).
     var closeWaiters: [CheckedContinuation<Void, Never>] = []
-    /// The root was replaced or vanished while running: no further commit (store-1 S1-08).
+    /// Why no further commit is made: `.rootVanished` once the root was replaced or vanished while running (store-1
+    /// S1-08), recorded by a commit's root check or on demand by `verifyRootNow()` (orchestrator ruling L5-R20), or
+    /// the read-only `.ioFailure` of a launch that could not read an index file (B-34, set by `open()`). The facade
+    /// reads it through `unavailableReason` and `verifyRootNow()` (L5-R4, L5-R20).
     var unavailable: StorageUnavailableReason?
     /// The staging sequence of the next extra-extension copy (`bindCopy`): allocated by the store, counting down
     /// from `UInt32.max` so it never meets the engine's start counter, and never shared by two copies.

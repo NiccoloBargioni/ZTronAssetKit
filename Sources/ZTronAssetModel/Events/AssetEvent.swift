@@ -116,6 +116,10 @@ public struct MaintenanceReport: Sendable, Hashable, Codable {
 /// *Terminal* events are never dropped: the latest terminal event of every subject is delivered, in publication
 /// order. Per-asset terminal events of **bulk** work are folded into `syncProgress`/`syncFinished` instead of being
 /// broadcast one by one (sync-2 S2-17), so a 10,000-asset sync cannot flood the UI. `clientShutDown` is always last.
+/// The two client lifecycle events have a subject each and never coalesce with each other, so a `clientShutDown`
+/// never replaces an unread `clientStarted` (ADR-054). Across the facade's reopen after a replaced root, a stream
+/// receives each replacement's `clientStarted(generation:)` (values may repeat) and never a retired engine's
+/// `clientShutDown` (ARCHITECTURE §8).
 public enum AssetEvent: Sendable, Hashable {
     /// Progress class (key `.snapshot`): a new snapshot was installed on the main actor.
     case snapshotChanged(generation: UInt64)
@@ -141,6 +145,7 @@ public enum AssetEvent: Sendable, Hashable {
     case circuitChanged(originID: String, CircuitState)
     /// Terminal (subject `.maintenance`).
     indirect case maintenanceFinished(MaintenanceReport)
-    /// Terminal (subject `.client`): always the last event of every stream (R-SYN-15).
+    /// Terminal (subject `.clientEnd`, apart from `clientStarted`'s, so it never replaces an unread `clientStarted`;
+    /// ADR-054): always the last event of every stream (R-SYN-15).
     case clientShutDown
 }

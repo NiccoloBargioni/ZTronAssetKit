@@ -13,8 +13,11 @@ package enum ObserverChange: Sendable, Hashable {
 /// The carousel's purgeable caches, held weakly on the main actor (R-CLN-11, MAY; ADR-044).
 ///
 /// Main-actor bookkeeping only: no I/O, no task. The facade turns each `ObserverChange` into one
-/// `SyncEngine.observeMemoryPressure(epoch:handler:)` call; epochs are allocated here, on the main actor, in call
-/// order, so the engine applies only the newest of calls that reach it out of order. A cache that deallocates
+/// `ClientLifecycle.observeMemoryPressure(epoch:handler:)` call, which records the newest request (applied again to
+/// every replacement engine after a reopen) and passes it to the current engine's
+/// `SyncEngine.observeMemoryPressure(epoch:handler:)` while no reopen runs, never waiting for one (G-12); epochs are
+/// allocated here, on the main actor, in call order, so the lifecycle and the engine apply only the newest of calls
+/// that reach them out of order. A cache that deallocates
 /// without unregistering is dropped at the next registration change or pressure event, and the observer stops when
 /// none remains, so the engine can become idle-silent again (R-SYN-14). `close()` (shutdown) refuses further
 /// registrations (R-SYN-15).

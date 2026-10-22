@@ -5,8 +5,11 @@ import ZTronAssetStorage
 /// The scheduler (R-SYN-*, H-3, H-4, H-5, H-8, H-9; WP-F).
 ///
 /// Contract rules every implementation keeps (ARCHITECTURE §7, §10):
-/// - One `Job` per **transfer** (content), with ref-counted interests per asset (ADR-020). A job is removed the
-///   moment it has no interest and is not verifying or committing, through one synchronous funnel (sync-1 S1-01).
+/// - One `Job` per **transfer** (content), with ref-counted interests per asset (ADR-020). A job is removed through
+///   one synchronous funnel (sync-1 S1-01) once it has no interest, is not verifying or committing, and no pending
+///   claim of a registered prefetch group names its content (orchestrator ruling L5-R1: a claim lasts from
+///   `registerGroup` until the group's join reaches the member, the group is released, the join gives up or the
+///   engine shuts down; ADR-054).
 /// - Every continuation (waiters, groups, runs, `start`/`sync` joiners, `waitUntil`) is resumed only through
 ///   `removeValue` on its table, and every table is settled at registration, on each transition, on withdrawal,
 ///   on purge and on shutdown (sync-1 S1-02).
@@ -88,7 +91,10 @@ package actor SyncEngine {
         await self.performAwaitAsset(id, lane: lane)
     }
 
-    /// Registers one group interest (a prefetch handle); `.failure(.shutDown)` after shutdown, holding nothing.
+    /// Registers one group interest (a prefetch handle); `.failure(.shutDown)` after shutdown and
+    /// `.failure(.storageUnavailable)` while degraded, holding nothing. The registering turn records a pending claim
+    /// for every member (orchestrator ruling L5-R1), so no other group's release, waiter withdrawal or caller
+    /// cancellation retires those members' jobs before this group's join reaches them.
     package func registerGroup(_ ids: [AssetID], lane: AssetPriority) -> Result<InterestToken, AssetError> {
         self.performRegisterGroup(ids, lane: lane)
     }
@@ -221,14 +227,16 @@ package actor SyncEngine {
 
     // MARK: Events (R-SYN-12, ADR-023)
 
-    /// A pull-based stream that registers asynchronously (UI use). Made after shutdown, it yields `clientShutDown`
-    /// and finishes (R-SYN-15).
+    /// A pull-based stream that registers asynchronously, on its first pull. Made after shutdown, it yields
+    /// `clientShutDown` and finishes (R-SYN-15); that is the facade's only use of it, once the client is shut down
+    /// (its client streams register through `subscribe()`, G-16).
     package nonisolated func makeEventStream() -> AsyncStream<AssetEvent> {
         EventSubscription.stream(engine: self, registered: nil)
     }
 
-    /// A stream that returns after registration and the initial replay (tests); `.failure(.shutDown)` after
-    /// shutdown.
+    /// A stream that returns after registration and the initial replay; `.failure(.shutDown)` after shutdown. The
+    /// facade registers every client stream, and hands every follower its replacement's stream at a reopen, through
+    /// it (G-16: followership precedes registration); tests use it too.
     package func subscribe() async -> Result<AsyncStream<AssetEvent>, AssetError> {
         // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.
         await self.performSubscribe()
