@@ -440,7 +440,8 @@ extension SyncEngine {
 
     /// The group's join gave up before reaching every member (start failed, the store read failed, the source is
     /// missing, shutdown began): every claim it still holds ends, so no claim waits for a join that will not come.
-    private func endClaims(of token: InterestToken) {
+    /// Internal so a test can give a registered group's claims up in one turn.
+    func endClaims(of token: InterestToken) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
             return
         }

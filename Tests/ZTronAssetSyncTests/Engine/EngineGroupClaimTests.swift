@@ -316,6 +316,152 @@ extension EngineGroupClaimTests {
         await engine.shutdown()
     }
 
+    /// Orchestrator ruling L5-R15 (L5-C1-09): window 1 at one lane, the predecessor and the successor both at `.prefetch`.
+    /// The claim keeps the job at its lane (`Job.heldLane`), so the successor's join adds an interest at the lane the
+    /// transfer already runs at, and the transport gets no priority change. Without `heldLane` (mutant M12) the job a claim
+    /// alone kept fell to the `.bulk` lane, and the join sent `setPriority(.prefetch)`.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-3: a successor at the lane of the transfer a claim kept joins it with no priority change", .timeLimit(.minutes(1)))
+    func sameLaneSuccessorChangesNoPriority() async throws {
+        let x = EngineHarness.onDemand("x", EngineFixture.bytes(5_191))
+        let harness = try await EngineGroupClaimTests.started([x])
+        let engine = harness.engine
+        let predecessor = try await engine.registerGroup(["x"], lane: .prefetch).get()
+        await engine.awaitCondition { EngineGroupClaimTests.inFlight(x.transferID, $0) }
+        let (successor, kept) = await engine.inOneTurn { engine -> (InterestToken?, Bool) in
+            let successor = try? engine.performRegisterGroup(["x"], lane: .prefetch).get()
+            engine.performReleaseGroup(predecessor)
+            return (successor, engine.state.jobs[x.transferID] != nil)
+        }
+        let token = try #require(successor)
+        #expect(kept, "the predecessor's release left the job the successor named")
+        await engine.awaitCondition { $0.state.jobs[x.transferID]?.interests[token] != nil }
+        #expect(await EngineGroupClaimTests.starts(of: x.transferID, harness) == 1, "the transfer started once")
+        let controls = await EngineGroupClaimTests.controls(of: x.transferID, harness)
+        #expect(controls.isEmpty, "a successor at the transfer's own lane changes no priority: \(controls)")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.releaseGroup(token)
+        await engine.waitForJobEnd(x.transferID)
+        await engine.shutdown()
+    }
+
+    /// Orchestrator ruling L5-R15 (L5-C1-08): a group registered before `start()` whose join gives up because the start
+    /// failed (the store's lock is held elsewhere, so the engine is degraded) ends every claim it held. Its members were
+    /// unlisted (the engine's copy is empty before the launch), and the join's give-up (`endClaims(of:)`) uncounts them:
+    /// the claim table is empty while the group stays registered. With `endClaims` a no-op (mutant M11) the unlisted claims
+    /// stay.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a group whose join gives up because the start failed ends every pending claim", .timeLimit(.minutes(1)))
+    func joinGivingUpAtAFailedStartEndsItsClaims() async throws {
+        let harness = EngineHarness.make()
+        harness.fileSystem.addFault(FaultRule(operation: .acquireExclusiveLock, occurrence: .every, error: .wouldBlock))
+        let engine = harness.engine
+        let (registered, claims) = await engine.inOneTurn { engine -> (InterestToken?, (claims: Int, held: Int, unlisted: Int)) in
+            let token = try? engine.performRegisterGroup(["a", "b", "c"], lane: .prefetch).get()
+            return (token, EngineGroupClaimTests.claimCounts(engine))
+        }
+        let token = try #require(registered)
+        #expect(claims == (0, 0, 3), "setup: three unlisted claims while the engine's copy is empty: \(claims)")
+        // The group's join starts the engine, whose store cannot take its lock, and gives up.
+        await engine.waitUntil { $0.ownedTasks == 0 }
+        let (lifecycle, counts, cursorAtEnd) = await engine.inOneTurn { engine -> (EngineLifecycle, (claims: Int, held: Int, unlisted: Int), Bool?) in
+            (engine.state.lifecycle, EngineGroupClaimTests.claimCounts(engine), engine.state.groups[token].map { $0.claimCursor == $0.claimed.count })
+        }
+        #expect(lifecycle == .degraded(.locked), "setup: the start failed: \(lifecycle)")
+        #expect(counts == (0, 0, 0), "the join's give-up ended every claim: \(counts)")
+        #expect(cursorAtEnd == true, "the group stays registered with no claim left")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+    }
+
+    /// Orchestrator ruling L5-R15 (L5-C1-06): a give-up of more than `releasesPerTurn` claims ends them the way a large
+    /// release does, so its turn retires at most `releasesPerTurn` jobs that claims alone kept (C2) and the release
+    /// follow-up the rest. A predecessor's jobs for every member are left to a successor's claims by the predecessor's
+    /// release; the successor's claims are then given up in one engine turn (`endClaims(of:)`, what a join that gives up
+    /// after its read does: no running engine reaches that exit today, the next test's missing source aside, where no job
+    /// exists). Before the change the turn retired every job at once.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerTurn jobs a turn", .timeLimit(.minutes(1)))
+    func largeGiveUpRetiresJobsOverSeveralTurns() async throws {
+        let count = SyncEngine.releasesPerTurn + 88
+        let entries = (0..<count).map { EngineHarness.onDemand(String(format: "q%04d", $0), EngineFixture.bytes(UInt64(5_700 + $0), count: 32)) }
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 1))
+        try await EngineSingleFlightTests.applied(entries, harness: harness)
+        let engine = harness.engine
+        let ids = entries.map(\.identifier)
+        let predecessor = try await engine.registerGroup(ids, lane: .prefetch).get()
+        await engine.awaitCondition { engine in
+            entries.allSatisfy { engine.state.jobs[$0.transferID]?.interests[predecessor] != nil }
+        }
+        let successor = await engine.inOneTurn { engine -> InterestToken in
+            let successor = engine.recordGroup(ids, lane: .prefetch).token
+            engine.performReleaseGroup(predecessor)
+            return successor
+        }
+        await engine.awaitCondition { $0.state.releasing.isEmpty }
+        let (heldBefore, heldAfter, routed) = await engine.inOneTurn { engine -> (Int, Int, Int?) in
+            let before = engine.state.claimHeld.count
+            engine.endClaims(of: successor)
+            return (before, engine.state.claimHeld.count, engine.state.releasing[successor]?.claims.count)
+        }
+        #expect(heldBefore == count, "setup: the successor's claims alone keep every job: \(heldBefore)")
+        #expect(heldBefore - heldAfter == SyncEngine.releasesPerTurn, "the give-up's turn retired releasesPerTurn jobs, got \(heldBefore - heldAfter)")
+        #expect(routed == count - SyncEngine.releasesPerTurn, "the rest wait for the release follow-up: \(String(describing: routed))")
+        guard heldAfter < heldBefore else {
+            await engine.shutdown()
+            return
+        }
+        await engine.awaitCondition { $0.state.releasing.isEmpty && $0.state.claimHeld.isEmpty }
+        let (counts, jobs, cursorAtEnd) = await engine.inOneTurn { engine -> ((claims: Int, held: Int, unlisted: Int), Int, Bool?) in
+            (EngineGroupClaimTests.claimCounts(engine), engine.state.jobs.count, engine.state.groups[successor].map { $0.claimCursor == $0.claimed.count })
+        }
+        #expect(counts == (0, 0, 0), "every claim was dropped: \(counts)")
+        #expect(jobs == 0, "every job the claims alone kept retired: \(jobs)")
+        #expect(cursorAtEnd == true, "the successor stays registered with no claim left")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.releaseGroup(successor)
+        await engine.shutdown()
+    }
+
+    /// Orchestrator ruling L5-R15 (L5-C1-06, L5-C1-08), the reachable form: a running engine whose remote source could
+    /// not be built gives a prefetch group's join up after its store read (`missingSourceError`). Such an engine never
+    /// adopts the store's manifest (its launch reconciliation needs a source), so the members' claims name no content; a
+    /// group of more than `releasesPerTurn` of them ends every claim, the last through the release follow-up, and stays
+    /// registered with none left. With `endClaims` a no-op (mutant M11) the unlisted claims stay.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a join that gives up after its read for a missing source ends every claim of a large group", .timeLimit(.minutes(1)))
+    func joinGivingUpForAMissingSourceEndsEveryClaim() async throws {
+        let count = SyncEngine.releasesPerTurn + 88
+        let entries = (0..<count).map { EngineHarness.onDemand(String(format: "s%04d", $0), EngineFixture.bytes(UInt64(6_400 + $0), count: 32)) }
+        let time = ManualTimeSource()
+        let first = EngineHarness.make(time: time)
+        try await EngineSingleFlightTests.applied(entries, harness: first)
+        await first.engine.shutdown()
+        let error = AssetError.serverUnavailable(retryAfter: nil)
+        let harness = EngineHarness.make(disk: first.fileSystem.survivingDisk(), time: time, remote: nil, factory: FailingSourceFactory(error: error))
+        try await harness.start()
+        let engine = harness.engine
+        let (registered, claims) = await engine.inOneTurn { engine -> (InterestToken?, (claims: Int, held: Int, unlisted: Int)) in
+            let token = try? engine.performRegisterGroup(entries.map(\.identifier), lane: .prefetch).get()
+            return (token, EngineGroupClaimTests.claimCounts(engine))
+        }
+        let token = try #require(registered)
+        #expect(claims == (0, 0, count), "setup: a claim for every member, naming no content: \(claims)")
+        await engine.awaitCondition { engine in
+            engine.state.groups[token].map { $0.claimCursor == $0.claimed.count } == true && engine.state.releasing.isEmpty
+        }
+        let counts = await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) }
+        #expect(counts == (0, 0, 0), "every claim was dropped: \(counts)")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+    }
+
     /// Shutdown ends every claim, a job a claim alone kept included.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: shutdown ends every pending claim", .timeLimit(.minutes(1)))
