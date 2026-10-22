@@ -58,6 +58,10 @@ actor ClientLifecycle: PrefetchRegistry {
     private var groups: [InterestToken: PrefetchGroup] = [:]
     private var lastToken: UInt64 = 0
     private var pressure: PressureRequest?
+    /// Test seam, `nil` in production: awaited by `bind(_:)` after the engine answered a registration and before the
+    /// group, `closed` and the generation are re-read, so a test can place a shutdown or a reopen exactly there
+    /// (CLAUDE.md G4: an interleaving no test could otherwise reach deterministically).
+    private var registrationSeam: (@Sendable () async -> Void)?
 
     /// Builds the first pair: actors only, no I/O, no task (P-12).
     init(configuration: AssetClientConfiguration, environment: AssetEnvironment, mirror: SnapshotMirror) {
@@ -217,6 +221,11 @@ actor ClientLifecycle: PrefetchRegistry {
         self.retentionScope = scope
     }
 
+    /// The retention scope a replacement engine would be built with (a test seam of the facade tests).
+    var recordedRetentionScope: AssetScope {
+        self.retentionScope
+    }
+
     /// Starts (`handler` non-nil) or stops the memory-pressure observer of the current engine, remembering the
     /// newest request for a replacement engine. Requests come from unordered tasks: only a newer epoch counts.
     func observeMemoryPressure(epoch: UInt64, handler: (@Sendable (MemoryPressureLevel) async -> Void)?) async {
@@ -228,6 +237,11 @@ actor ClientLifecycle: PrefetchRegistry {
         let engine = await self.current().engine
         // REENTRANCY: g-3 (proposed) — nothing: the engine orders requests by epoch.
         _ = await engine.observeMemoryPressure(epoch: epoch, handler: handler)
+    }
+
+    /// Installs or removes the registration seam (tests only; see `registrationSeam`).
+    func setRegistrationSeam(_ seam: (@Sendable () async -> Void)?) {
+        self.registrationSeam = seam
     }
 
     // MARK: PrefetchRegistry
@@ -276,6 +290,10 @@ actor ClientLifecycle: PrefetchRegistry {
             let core = await self.current()
             // REENTRANCY: g-4 (proposed) — as above.
             let result = await core.engine.registerGroup(group.ids, lane: group.lane)
+            if let seam = self.registrationSeam {
+                // REENTRANCY: g-4 (proposed) — as above (a test seam; `nil` in production).
+                await seam()
+            }
             let replaced = core.generation != self.core.generation || self.retiring == core.generation
             switch result {
             case .success(let engineToken):

@@ -14,6 +14,7 @@ struct FacadeUnitTests {
             remote: RemoteConfiguration(
                 http: HTTPSourceConfiguration(
                     baseURL: url,
+                    manifestPath: "v2/manifest.json?token=\(canaryKey)#frag",
                     appKey: AppKey(canaryKey),
                     additionalAllowedHosts: ["b.example.com", "a.example.com"],
                     background: .enabled(BackgroundTransferOptions(namespace: "tests", maxTasks: 4))
@@ -25,6 +26,7 @@ struct FacadeUnitTests {
         configuration.prefetchRadius = 3
         let summary = DiagnosticReportBuilder.summary(of: configuration)
         #expect(summary["remote.http.baseURL"] == "https://cdn.example.com:8443/assets/")
+        #expect(summary["remote.http.manifestPath"] == "v2/manifest.json", "the manifest path loses its query and fragment")
         #expect(summary["remote.http.appKey"] == "<redacted>")
         #expect(summary["remote.http.additionalAllowedHosts"] == "a.example.com,b.example.com")
         #expect(summary["remote.http.background"] == "enabled")
@@ -102,6 +104,36 @@ struct FacadeUnitTests {
         _ = await consumer.value
         await engine.waitUntil { $0.subscribers == 0 }
         #expect(await engine.introspect().subscribers == 0)
+        await client.shutdown()
+    }
+
+    /// The usual `for await event in client.events { … break }`: the consumer's task ends without being cancelled, so
+    /// `AsyncStream(unfolding:onCancel:)` never calls `onCancel`; dropping the stream has to release the forwarder's
+    /// pump and its engine subscription as well, or every abandoned stream would hold one of each until shutdown.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a consumer that breaks out of the client's event stream releases its engine subscription when the stream is dropped", .timeLimit(.minutes(1)))
+    func droppedConsumerReleasesSubscription() async throws {
+        let harness = KitHarness.make()
+        try await harness.startAndSettle()
+        let client = harness.client
+        let engine = await harness.engine()
+        for round in 0..<3 {
+            // The first pull registers the subscription, whose replay of a started engine begins with
+            // `snapshotChanged`: the consumer takes it and leaves the loop.
+            let consumer = Task { () -> AssetEvent? in
+                for await event in client.events {
+                    return event
+                }
+                return nil
+            }
+            let taken = await consumer.value
+            guard case .snapshotChanged = taken else {
+                Issue.record("round \(round): the consumer took the subscription's replay, got \(String(describing: taken))")
+                break
+            }
+            await engine.waitUntil { $0.subscribers == 0 }
+            #expect(await engine.introspect().subscribers == 0, "round \(round): the dropped stream released its subscription")
+        }
         await client.shutdown()
     }
 
