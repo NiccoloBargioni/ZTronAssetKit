@@ -82,9 +82,18 @@ public final class AssetClient: Sendable {
     private func perform<T: Sendable>(
         _ operation: @Sendable (SyncEngine) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
+        try await self.performOnCore { core in
+            await operation(core.engine)
+        }
+    }
+
+    /// `perform` for an operation that also needs the generation of the engine it runs on.
+    private func performOnCore<T: Sendable>(
+        _ operation: @Sendable (ClientCore) async -> Result<T, AssetError>
+    ) async throws(AssetError) -> T {
         var core = await self.lifecycle.current()
         for _ in 0..<AssetClient.reopenAttempts {
-            let result = await operation(core.engine)
+            let result = await operation(core)
             switch result {
             case .failure(.storageUnavailable(.rootVanished)):
                 guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
@@ -100,7 +109,7 @@ public final class AssetClient: Sendable {
                 return try result.get()
             }
         }
-        return try await operation(core.engine).get()
+        return try await operation(core).get()
     }
 
     /// How many times one call is repeated on a replacement pair.
@@ -179,12 +188,14 @@ public final class AssetClient: Sendable {
         EventForwarder.stream(lifecycle: self.lifecycle, first: nil)
     }
 
-    /// A stream that returns after registration and the initial replay.
+    /// A stream that returns after registration and the initial replay. The registration runs through the reopen
+    /// path, so an engine a reopen retired meanwhile is replaced rather than reported as `.shutDown`.
     public func subscribe() async throws(AssetError) -> AsyncStream<AssetEvent> {
         try await self.start()
-        let core = await self.lifecycle.current()
-        let stream = try await core.engine.subscribe().get()
-        return EventForwarder.stream(lifecycle: self.lifecycle, first: (stream, core.generation))
+        let registered = try await self.performOnCore { core in
+            await core.engine.subscribe().map { (stream: $0, generation: core.generation) }
+        }
+        return EventForwarder.stream(lifecycle: self.lifecycle, first: registered)
     }
 
     /// Runs a sync of the retention scope now (`.force`) or when due (`.ifDue`); single-flight. The outcome carries
@@ -226,10 +237,9 @@ public final class AssetClient: Sendable {
     /// `sync(.force)` to fetch newly retained entries now, and `purge(.scope(_:))` to delete excluded ones.
     public func setRetentionScope(_ scope: AssetScope) async throws(AssetError) {
         try await self.start()
-        try await self.perform { engine in
-            await engine.setRetentionScope(scope)
-        }
-        await self.lifecycle.recordRetentionScope(scope)
+        // The lifecycle records the scope before applying it, so a reopen meanwhile builds its replacement with it,
+        // and leaves the engine on the newest of concurrent requests.
+        try await self.lifecycle.setRetentionScope(scope).get()
     }
 
     /// Pins assets so eviction never removes them (R-CLN-4); `purge(.all)` and `purge(.scope(_:))` still do.

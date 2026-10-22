@@ -54,7 +54,10 @@ actor ClientLifecycle: PrefetchRegistry {
     private var retiring: UInt64?
     private var reopening: Task<ClientCore?, Never>?
     private var closed = false
+    /// The newest retention-scope request (R-CAR-5), the scope a replacement engine is built with.
     private var retentionScope: AssetScope
+    /// Counts retention-scope requests, so an apply can tell whether a newer one arrived meanwhile.
+    private var retentionEpoch: UInt64 = 0
     private var groups: [InterestToken: PrefetchGroup] = [:]
     private var lastToken: UInt64 = 0
     private var pressure: PressureRequest?
@@ -181,11 +184,21 @@ actor ClientLifecycle: PrefetchRegistry {
             _ = await next.engine.observeMemoryPressure(epoch: pressure.epoch, handler: pressure.handler)
         }
         for token in self.groups.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+            // A newer reopen replaced `next` meanwhile (its root vanished too): that reopen's loop re-registers what
+            // is left, so this one stops rather than binding groups a second time.
+            guard self.core.generation == next.generation else {
+                break
+            }
             guard let group = self.groups[token], !group.bindInFlight, group.binding?.generation != next.generation else {
                 continue
             }
-            // REENTRANCY: g-4 (proposed) — `bind` re-reads the group and the generation after each of its awaits.
+            // REENTRANCY: g-4 (proposed) — `bind` re-reads the group and the generation after each of its awaits; the
+            // generation is re-read at the top of the next iteration.
             _ = await self.bind(token)
+        }
+        guard self.core.generation == next.generation else {
+            // The callers get the newest pair rather than one already retired.
+            return self.closed ? nil : self.core
         }
         // REENTRANCY: g-3 (proposed) — nothing: the result is left to the callers, whose calls start it too.
         _ = await next.engine.start()
@@ -216,9 +229,36 @@ actor ClientLifecycle: PrefetchRegistry {
 
     // MARK: Run-time state carried across a reopen
 
-    /// Records the retention scope the caller set, for a replacement engine.
-    func recordRetentionScope(_ scope: AssetScope) {
+    /// Replaces the retention scope (R-CAR-5). The request is recorded first, so a reopen from now on builds its
+    /// replacement with it; then the newest recorded scope is applied to the current engine, and applied again when a
+    /// newer request was recorded or a reopen replaced the engine during the apply. Calls come from unordered tasks
+    /// and can reach the engine in any order, so this is what leaves the engine on the newest request, the one a
+    /// replacement would be built with. The engine records a scope on entry, whatever the caller's cancellation.
+    func setRetentionScope(_ scope: AssetScope) async -> Result<Void, AssetError> {
+        guard !self.closed else {
+            return .failure(.shutDown)
+        }
+        self.retentionEpoch += 1
         self.retentionScope = scope
+        while true {
+            // REENTRANCY: g-8 (proposed) — `closed`, then the newest request, read right below.
+            let core = await self.current()
+            guard !self.closed else {
+                return .failure(.shutDown)
+            }
+            let epoch = self.retentionEpoch
+            // REENTRANCY: g-8 (proposed) — `closed`, the epoch and the generation, re-read below: a newer request or
+            // a replacement engine means another pass.
+            let result = await core.engine.setRetentionScope(self.retentionScope)
+            let replaced = core.generation != self.core.generation || self.retiring == core.generation
+            if case .failure(.shutDown) = result, !replaced || self.closed {
+                return result
+            }
+            if !self.closed, replaced || self.retentionEpoch != epoch {
+                continue
+            }
+            return result
+        }
     }
 
     /// The retention scope a replacement engine would be built with (a test seam of the facade tests).
@@ -272,7 +312,9 @@ actor ClientLifecycle: PrefetchRegistry {
     }
 
     /// Registers the group with the current engine; repeats when a reopen replaced that engine meanwhile, and gives a
-    /// registration back when the group was released meanwhile.
+    /// registration back when the group was released or the client shut down meanwhile. A group already bound to the
+    /// current engine is left as it is: an older reopen's loop can reach a group a newer reopen has bound, and a
+    /// second registration would hold the group's interest for the engine's life (no release would name its token).
     private func bind(_ token: InterestToken) async -> Result<InterestToken, AssetError> {
         self.groups[token]?.bindInFlight = true
         defer {
@@ -284,6 +326,9 @@ actor ClientLifecycle: PrefetchRegistry {
                 return .failure(.shutDown)
             }
             guard let group = self.groups[token] else {
+                return .success(token)
+            }
+            if let bound = group.binding?.generation, bound == self.core.generation, self.retiring != bound {
                 return .success(token)
             }
             // REENTRANCY: g-4 (proposed) — the group, `closed` and the generation, re-read below.
@@ -302,7 +347,9 @@ actor ClientLifecycle: PrefetchRegistry {
                     if self.groups[token] == nil, !replaced {
                         // REENTRANCY: g-6 (proposed) — nothing: terminal for this registration.
                         await core.engine.releaseGroup(engineToken)
-                        return .success(token)
+                        // A shutdown cleared the groups: the client holds nothing, which `awaitRegistration()`
+                        // reports as `.shutDown` (ARCHITECTURE §8); otherwise the caller released the group.
+                        return self.closed ? .failure(.shutDown) : .success(token)
                     }
                     continue
                 }
