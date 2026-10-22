@@ -27,6 +27,7 @@ actor RegistrationHold {
             return
         }
         self.remaining -= 1
+        // REENTRANCY: nothing is re-read — a terminal wait, resumed once by `open()`.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.parked.append(continuation)
             self.notify()
@@ -40,7 +41,10 @@ actor RegistrationHold {
         }
         self.nextWaiterID += 1
         let id = self.nextWaiterID
+        // REENTRANCY: nothing is re-read — a terminal wait registered synchronously, resumed once by `notify()` or by
+        // the cancellation hop (a no-op once resumed).
         await withTaskCancellationHandler {
+            // REENTRANCY: as above.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 if self.parked.count >= count || Task.isCancelled {
                     continuation.resume()
