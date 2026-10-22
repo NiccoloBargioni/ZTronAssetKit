@@ -196,14 +196,38 @@ extension SyncEngine {
         return .success(token)
     }
 
-    /// The registering turn's bookkeeping: a token and the group, whose members are `ids` de-duplicated and sorted, the
-    /// order its join reaches them in. Kept apart from the join's spawn (`spawnJoin`) so a test can hold a registered
-    /// group's join before its store read: that read is a synchronous `AssetStore` call, which no test-target type can
-    /// hold (L5-R1).
+    /// The registering turn's bookkeeping: a token, the group, whose members are `ids` de-duplicated and sorted (the
+    /// order its join reaches them in), and a pending claim for every member (orchestrator ruling L5-R1): from this turn
+    /// until the group's join reaches a member or the group is released, no release, waiter withdrawal or caller
+    /// cancellation retires the job of the content the member names (`removeInterest`), whether that job exists yet or
+    /// not. A member the engine's copy does not list yet is claimed once the copy lists it (`claimNewlyListed`). One
+    /// manifest probe and one counter update per member: at SPEC §6's 10,000 members the turn stays within C2
+    /// (`docs/adr-drafts/g.md`, L5-R1 figures). Kept apart from the join's spawn (`spawnJoin`) so a test can hold a
+    /// registered group's join before its store read, a synchronous `AssetStore` call no test-target type can hold.
     func recordGroup(_ ids: [AssetID], lane: AssetPriority) -> (token: InterestToken, members: [AssetID]) {
         let token = self.nextToken()
-        self.state.groups[token] = Group(kind: .prefetch, lane: lane)
-        return (token, Array(Set(ids)).sorted())
+        var group = Group(kind: .prefetch, lane: lane)
+        group.members = Array(Set(ids)).sorted()
+        group.claimed.reserveCapacity(group.members.count)
+        let applied = self.state.applied
+        // The table is taken out of the state while it is counted, so it is updated in place.
+        var claims = self.state.claims
+        self.state.claims = [:]
+        claims.reserveCapacity(claims.count + group.members.count)
+        for id in group.members {
+            guard let position = applied.position(of: id) else {
+                group.claimed.append(nil)
+                group.unlistedClaims += 1
+                continue
+            }
+            let key = ClaimKey(applied.entries[position])
+            claims[key, default: 0] += 1
+            group.claimed.append(key)
+        }
+        self.state.claims = claims
+        self.state.unlistedClaims += group.unlistedClaims
+        self.state.groups[token] = group
+        return (token, group.members)
     }
 
     /// Spawns the join of the group `recordGroup` registered under `token` (one owned task, RE-S30).
@@ -220,9 +244,13 @@ extension SyncEngine {
     /// yield the batch re-validates what may have changed meanwhile: the lifecycle, the source, the group (a release drops
     /// it), and the engine's manifest copy, whose change makes the view's records stale for the members left, so those
     /// join on a fresh read (this function again). A binding learned meanwhile is checked per member as before (L4-R5).
+    ///
+    /// The join ends each member's pending claim once it joined or skipped it (`joinMember`), and every claim left when
+    /// it gives up early (`endClaims(of:)`), so a claim never outlives the join it waits for (L5-R1).
     private func joinGroup(_ token: InterestToken, ids: [AssetID], lane: AssetPriority) async {
         // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
         guard await self.ensureStarted() == nil, self.state.groups[token] != nil else {
+            self.endClaims(of: token)
             return
         }
         let view: StorePlanningView
@@ -237,9 +265,11 @@ extension SyncEngine {
             // the read cannot predate the copy (`followStoreView`).
             view = try await self.store.planningView()
         } catch {
+            self.endClaims(of: token)
             return
         }
         guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
+            self.endClaims(of: token)
             return
         }
         self.followStoreView(view, readAt: mark)
@@ -252,6 +282,7 @@ extension SyncEngine {
                 // copy, re-checked below; a changed copy sends the members left through a fresh read.
                 await Task.yield()
                 guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
+                    self.endClaims(of: token)
                     return
                 }
                 guard self.state.copySerial == copy else {
@@ -270,8 +301,12 @@ extension SyncEngine {
     }
 
     /// Joins one prefetch member unless it is gone from the manifest, present at its current content, bound to it since
-    /// the view was read (L4-R5), or held back (T2).
+    /// the view was read (L4-R5), or held back (T2). Its pending claim ends afterwards, once its interest, if any, is
+    /// in place (L5-R1).
     private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
+        defer {
+            self.endClaim(token, member: id)
+        }
         guard let entry = self.state.applied.entry(for: id) else {
             return
         }
@@ -291,17 +326,24 @@ extension SyncEngine {
     }
 
     /// Releases a group; unknown tokens are ignored (idempotent, sync-1 S1-05). The group leaves `groups` at once, so
-    /// nothing joins it again. A group with more pending members than `releasesPerTurn` loses the interests of its
-    /// members in flight in this turn, which frees their slots, and the others at most `releasesPerTurn` per actor turn,
-    /// in the order they joined (`continueReleases`); a job only released groups want never starts meanwhile (`gate`).
-    /// Removing the 10,000 interests of a prefetch handle in one turn, after sorting their transfers, held the engine's
-    /// actor about 15 ms (review of close-out cycle 8, C2).
+    /// nothing joins it again. Its pending claims end with it (L5-R1), before its members' interests leave, so a job only
+    /// this group claimed and wanted retires. A group with more pending members and claims than `releasesPerTurn` loses
+    /// the interests of its members in flight in this turn, which frees their slots, and the rest at most
+    /// `releasesPerTurn` per actor turn, its claims first, then its members in the order they joined
+    /// (`continueReleases`); a job only released groups want never starts meanwhile (`gate`). Removing the 10,000
+    /// interests of a prefetch handle in one turn, after sorting their transfers, held the engine's actor about 15 ms
+    /// (review of close-out cycle 8, C2).
     func performReleaseGroup(_ token: InterestToken) {
         guard let group = self.state.groups.removeValue(forKey: token) else {
             return
         }
         group.continuation?.resume(returning: false)
-        if group.pending.count <= Self.releasesPerTurn {
+        let claims = group.claimed[group.claimCursor...]
+        self.state.unlistedClaims -= group.unlistedClaims
+        if group.pending.count + claims.count <= Self.releasesPerTurn {
+            for claim in claims {
+                self.dropClaim(claim)
+            }
             for transfer in Set(group.pending.values).sorted() {
                 self.removeInterest(token, from: transfer)
             }
@@ -309,7 +351,7 @@ extension SyncEngine {
             for transfer in self.state.inFlight.sorted() where self.state.jobs[transfer]?.interests[token] != nil {
                 self.removeInterest(token, from: transfer)
             }
-            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending)
+            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending, claims: claims)
             self.continueReleases()
         }
         self.pump()
@@ -320,14 +362,19 @@ extension SyncEngine {
     /// release (the member's transfer, the job's retirement), so the turn stays near 1 ms at SPEC §6's 10,000 (C2).
     static let releasesPerTurn = 512
 
-    /// Removes released groups' interests, in token order and each group's join order, at most `releasesPerTurn`
-    /// members per turn; a later turn is owed the rest (`releasing`). `true` when nothing is left to release.
+    /// Removes released groups' pending claims and then their interests, in token order and each group's member and
+    /// join order, at most `releasesPerTurn` claims and members per turn; a later turn is owed the rest (`releasing`).
+    /// `true` when nothing is left to release.
     @discardableResult
     private func continueReleases() -> Bool {
         var budget = Self.releasesPerTurn
         for token in self.state.releasing.keys.sorted() where budget > 0 {
             guard var release = self.state.releasing[token] else {
                 continue
+            }
+            while budget > 0, let claim = release.claims.popFirst() {
+                budget -= 1
+                self.dropClaim(claim)
             }
             while budget > 0, let member = release.members.popFirst() {
                 budget -= 1
@@ -336,7 +383,7 @@ extension SyncEngine {
                     self.removeInterest(token, from: transfer)
                 }
             }
-            self.state.releasing[token] = release.members.isEmpty ? nil : release
+            self.state.releasing[token] = release.members.isEmpty && release.claims.isEmpty ? nil : release
         }
         guard !self.state.releasing.isEmpty else {
             // No release is left: an entry a scan set aside whose job is still queued (none, unless an interest of a
@@ -371,6 +418,92 @@ extension SyncEngine {
         }
         self.pump()
         self.reconcileIdle()
+    }
+
+    // MARK: Pending claims (L5-R1, CCR-G2)
+
+    /// The group's join reached `id`, its next member in order, and joined or skipped it: the member's claim ends.
+    private func endClaim(_ token: InterestToken, member id: AssetID) {
+        guard let group = self.state.groups[token], group.claimCursor < group.claimed.count, group.members[group.claimCursor] == id else {
+            return
+        }
+        let claim = group.claimed[group.claimCursor]
+        self.state.groups[token]?.claimCursor += 1
+        if claim == nil {
+            self.state.groups[token]?.unlistedClaims -= 1
+            self.state.unlistedClaims -= 1
+        }
+        self.dropClaim(claim)
+    }
+
+    /// The group's join gave up before reaching every member (start failed, the store read failed, the source is
+    /// missing, shutdown began): every claim it still holds ends, so no claim waits for a join that will not come.
+    private func endClaims(of token: InterestToken) {
+        guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
+            return
+        }
+        self.state.groups[token]?.claimCursor = group.claimed.count
+        self.state.groups[token]?.unlistedClaims = 0
+        self.state.unlistedClaims -= group.unlistedClaims
+        for claim in group.claimed[group.claimCursor...] {
+            self.dropClaim(claim)
+        }
+        if self.isRunning {
+            self.pump()
+            self.reconcileIdle()
+        }
+    }
+
+    /// Uncounts one claim of a content; a job the claims alone kept (`claimHeld`: no interest, and now no claim left)
+    /// retires in this turn. A claim that names no content counts only toward `unlistedClaims`, which its caller adjusts.
+    private func dropClaim(_ claim: ClaimKey?) {
+        guard let key = claim, let count = self.state.claims[key] else {
+            return
+        }
+        guard count == 1 else {
+            self.state.claims[key] = count - 1
+            return
+        }
+        self.state.claims[key] = nil
+        if let transfer = self.state.claimHeld.removeValue(forKey: key), self.state.jobs[transfer]?.interests.isEmpty == true {
+            self.retire(transfer)
+        }
+    }
+
+    /// Claims the content of registered groups' pending members that the engine's copy did not list when they were
+    /// claimed and lists now (L5-R1): a group registered before `start()` claims its members' content when the launch
+    /// adopts the store's manifest, before any join runs. Called whenever the copy changes (`adoptApplied`); a pass over
+    /// those members only, and nothing while there are none.
+    func claimNewlyListed() {
+        guard self.state.unlistedClaims > 0 else {
+            return
+        }
+        let applied = self.state.applied
+        // The table is taken out of the state while it is counted, so it is updated in place.
+        var claims = self.state.claims
+        self.state.claims = [:]
+        for token in self.state.groups.keys.sorted() where (self.state.groups[token]?.unlistedClaims ?? 0) > 0 {
+            guard let group = self.state.groups[token] else {
+                continue
+            }
+            var claimed = group.claimed
+            // Taken out of the group while it is updated, so the array is not copied.
+            self.state.groups[token]?.claimed = []
+            var listed = 0
+            for index in group.claimCursor..<claimed.count where claimed[index] == nil {
+                guard let position = applied.position(of: group.members[index]) else {
+                    continue
+                }
+                let key = ClaimKey(applied.entries[position])
+                claimed[index] = key
+                claims[key, default: 0] += 1
+                listed += 1
+            }
+            self.state.groups[token]?.claimed = claimed
+            self.state.groups[token]?.unlistedClaims -= listed
+            self.state.unlistedClaims -= listed
+        }
+        self.state.claims = claims
     }
 
     // MARK: Availability (R-SYN-10)
@@ -1262,6 +1395,11 @@ extension SyncEngine {
             self.cancelTask(self.state.entryTasks[token])
             if let group = self.state.groups.removeValue(forKey: token) {
                 group.continuation?.resume(returning: false)
+                // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
+                self.state.unlistedClaims -= group.unlistedClaims
+                for claim in group.claimed[group.claimCursor...] {
+                    self.dropClaim(claim)
+                }
                 for transfer in Set(group.pending.values).sorted() {
                     self.removeInterest(token, from: transfer)
                 }
@@ -1422,7 +1560,12 @@ extension SyncEngine {
         }
         for (transfer, job) in self.state.jobs {
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
-                violations.append("job \(transfer) has no interest in \(job.state.kind.rawValue)")
+                let key = ClaimKey(job: job)
+                if self.state.claims[key] == nil {
+                    violations.append("job \(transfer) has no interest and no claim in \(job.state.kind.rawValue)")
+                } else if self.state.claimHeld[key] != transfer {
+                    violations.append("job \(transfer) is kept by a claim that would not retire it")
+                }
             }
             if (job.state == .downloading) != (job.active != nil) {
                 violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
@@ -1446,6 +1589,7 @@ extension SyncEngine {
                 violations.append("group \(token.rawValue) member \(asset) without an interest")
             }
         }
+        violations.append(contentsOf: self.claimViolations())
         if self.state.queues.storedCount > 2 * self.state.jobs.count + 16 {
             violations.append("lane queues hold \(self.state.queues.storedCount) entries for \(self.state.jobs.count) jobs")
         }
@@ -1500,6 +1644,39 @@ extension SyncEngine {
         violations.append(contentsOf: self.indexViolations())
         if inFlight != self.state.inFlightBytes || flying != self.state.inFlight {
             violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")
+        }
+        return violations
+    }
+
+    /// The claim counters against the groups' pending claims and the released groups' claims left to drop (L5-R1).
+    private func claimViolations() -> [String] {
+        var violations: [String] = []
+        var tally: [ClaimKey: Int] = [:]
+        var unlisted = 0
+        for (token, group) in self.state.groups {
+            if group.claimed.count != group.members.count {
+                violations.append("group \(token.rawValue) claims \(group.claimed.count) contents for \(group.members.count) members")
+            }
+            let pending = group.claimed[min(group.claimCursor, group.claimed.count)...]
+            let groupUnlisted = pending.filter { $0 == nil }.count
+            if groupUnlisted != group.unlistedClaims {
+                violations.append("group \(token.rawValue) counts \(group.unlistedClaims) unlisted claims for \(groupUnlisted)")
+            }
+            unlisted += groupUnlisted
+            for case let key? in pending {
+                tally[key, default: 0] += 1
+            }
+        }
+        for release in self.state.releasing.values {
+            for case let key? in release.claims {
+                tally[key, default: 0] += 1
+            }
+        }
+        if tally != self.state.claims {
+            violations.append("the claim table's \(self.state.claims.count) contents differ from the groups' \(tally.count)")
+        }
+        if unlisted != self.state.unlistedClaims {
+            violations.append("\(self.state.unlistedClaims) unlisted claims counted for \(unlisted)")
         }
         return violations
     }

@@ -38,6 +38,11 @@ struct EngineGroupClaimTests {
         await harness.source.controlLog.filter { $0.transfer == transfer }.map(\.control)
     }
 
+    /// The claim bookkeeping's sizes: pending claims by content, jobs a claim alone keeps, unlisted claims.
+    static func claimCounts(_ engine: isolated SyncEngine) -> (claims: Int, held: Int, unlisted: Int) {
+        (engine.state.claims.values.reduce(0, +), engine.state.claimHeld.count, engine.state.unlistedClaims)
+    }
+
     /// A started engine whose manifest lists `entries` on demand; their transfers are unscripted, so a started one
     /// parks in the fake source until the engine cancels it.
     @available(macOS 15.0, iOS 18.0, *)
@@ -131,6 +136,8 @@ struct EngineGroupClaimTests {
         await engine.waitUntil { $0.jobsByState.isEmpty && $0.groups == 0 && $0.ownedTasks == 0 }
         let state = await engine.introspect()
         #expect(state.jobsByState.isEmpty && state.groups == 0 && state.interests == 0 && state.ownedTasks == 0, "nothing leaks: \(state)")
+        let counts = await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) }
+        #expect(counts == (0, 0, 0), "no claim is left: \(counts)")
         #expect(await EngineGroupClaimTests.starts(of: x.transferID, harness) == 1)
         let controls = await EngineGroupClaimTests.controls(of: x.transferID, harness)
         #expect(controls == [.cancel], "the transfer was cancelled once, by the last release: \(controls)")
@@ -225,7 +232,10 @@ struct EngineGroupClaimTests {
         }
         let firstGroup = try #require(predecessor)
         #expect(!listed, "setup: the engine's copy listed nothing when both groups registered")
+        #expect(await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) } == (0, 0, 2), "setup: both members claimed unlisted")
         try await harness.start()
+        let claimedAtStart = await engine.inOneTurn { $0.state.unlistedClaims == 0 && $0.state.claims[ClaimKey(x)] != nil }
+        #expect(claimedAtStart, "the launch's adoption of the store's manifest claimed the members' content")
         await engine.awaitCondition { EngineGroupClaimTests.inFlight(x.transferID, $0) }
         await engine.releaseGroup(firstGroup)
         #expect(await engine.inOneTurn { $0.state.jobs[x.transferID] != nil }, "the predecessor's release left the job the successor named")
@@ -239,6 +249,61 @@ struct EngineGroupClaimTests {
         await engine.releaseGroup(successor)
         await engine.waitForJobEnd(x.transferID)
         await engine.shutdown()
+    }
+}
+
+extension EngineGroupClaimTests {
+    /// A release of a group holding more pending claims than one turn drops (`SyncEngine.releasesPerTurn`) drops them
+    /// over several turns (C2); a job only those claims keep retires once its last claim is dropped, and nothing is left.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a released group's pending claims are dropped at most releasesPerTurn a turn, and the job they kept then retires", .timeLimit(.minutes(1)))
+    func claimsOfALargeGroupAreDroppedOverSeveralTurns() async throws {
+        let count = SyncEngine.releasesPerTurn + 88
+        let entries = (0..<count).map { EngineHarness.onDemand(String(format: "c%04d", $0), EngineFixture.bytes(UInt64(5_300 + $0), count: 32)) }
+        let harness = try await EngineGroupClaimTests.started(entries)
+        let engine = harness.engine
+        let kept = entries[count - 1]
+        let predecessor = try await engine.registerGroup([kept.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { EngineGroupClaimTests.inFlight(kept.transferID, $0) }
+        let (afterRelease, keptAfterPredecessor) = await engine.inOneTurn { engine -> (Int, Bool) in
+            // A successor naming every entry, its join held; the predecessor's release leaves the job to its claim.
+            let successor = engine.recordGroup(entries.map(\.identifier), lane: .prefetch).token
+            engine.performReleaseGroup(predecessor)
+            let kept = engine.state.jobs[kept.transferID] != nil
+            engine.performReleaseGroup(successor)
+            return (EngineGroupClaimTests.claimCounts(engine).claims, kept)
+        }
+        #expect(keptAfterPredecessor, "the successor's claim kept the job through the predecessor's release")
+        #expect(afterRelease == count - SyncEngine.releasesPerTurn, "the release turn dropped releasesPerTurn claims, got \(count - afterRelease)")
+        await engine.waitForJobEnd(kept.transferID)
+        await engine.waitUntil { $0.jobsByState.isEmpty && $0.ownedTasks == 0 }
+        let counts = await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) }
+        #expect(counts == (0, 0, 0), "every claim was dropped: \(counts)")
+        #expect(await EngineGroupClaimTests.controls(of: kept.transferID, harness) == [.cancel], "the kept job retired with its last claim")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations)")
+        await engine.shutdown()
+    }
+
+    /// Shutdown ends every claim, a job a claim alone kept included.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: shutdown ends every pending claim", .timeLimit(.minutes(1)))
+    func shutdownEndsEveryClaim() async throws {
+        let x = EngineHarness.onDemand("x", EngineFixture.bytes(5_161))
+        let harness = try await EngineGroupClaimTests.started([x])
+        let engine = harness.engine
+        let predecessor = try await engine.registerGroup(["x"], lane: .prefetch).get()
+        await engine.awaitCondition { EngineGroupClaimTests.inFlight(x.transferID, $0) }
+        let before = await engine.inOneTurn { engine -> (claims: Int, held: Int, unlisted: Int) in
+            _ = engine.recordGroup(["x", "unlisted"], lane: .userInitiated)
+            engine.performReleaseGroup(predecessor)
+            return EngineGroupClaimTests.claimCounts(engine)
+        }
+        #expect(before == (1, 1, 1), "setup: a listed and an unlisted claim, and the job the claim keeps: \(before)")
+        await engine.shutdown()
+        let after = await engine.inOneTurn { EngineGroupClaimTests.claimCounts($0) }
+        #expect(after == (0, 0, 0), "no claim outlives shutdown: \(after)")
+        #expect(await engine.introspect().ownedTasks == 0)
     }
 }
 
