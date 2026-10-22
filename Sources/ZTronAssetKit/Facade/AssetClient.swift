@@ -285,7 +285,21 @@ public final class AssetClient: Sendable {
     /// JSON for support (R-OBS-3): versions, configuration minus secrets, state counts, last errors; built from
     /// `SyncEngine.diagnostics()`, `metrics()` and `storageReport()`.
     public func diagnosticReport() async throws(AssetError) -> Data {
-        fatalError("WP-G: AssetClient.diagnosticReport not implemented")
+        let diagnostics = try await self.perform { engine in
+            await engine.diagnostics()
+        }
+        let engine = await self.lifecycle.current().engine
+        // A degraded store answers neither metrics nor storage (L4-R9): empty figures stand in, the mirror's counts
+        // are still read.
+        let metrics = (try? await engine.metrics().get()) ?? MetricsSnapshot()
+        let storage = try? await engine.storageReport().get()
+        let report = DiagnosticReportBuilder.report(
+            configuration: self.configuration,
+            diagnostics: diagnostics,
+            metrics: await self.withLookupCounts(metrics),
+            storage: storage
+        )
+        return DiagnosticReportBuilder.encode(report)
     }
 
     /// Registers a derived in-memory cache (decoded images) to purge on memory pressure (R-CLN-11, ADR-044). Held
