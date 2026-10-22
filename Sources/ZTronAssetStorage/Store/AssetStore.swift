@@ -99,6 +99,15 @@ package actor AssetStore {
         self.currentAvailability(of: scope)
     }
 
+    /// Why this store refuses every commit and mutating call for the rest of its life, or `nil` while it can write:
+    /// `.rootVanished` once a replaced root was detected (B-15), the read-only reason of a launch that could not read an
+    /// index file (B-34). The facade owns the B-15 reopen (orchestrator ruling L5-R4, CCR-G3): a failure that does not
+    /// name the replaced root (a sync's staging listing fails with `.ioFailure`) and a lease, which is a read, cannot
+    /// tell it, so the facade reads this.
+    package var unavailableReason: StorageUnavailableReason? {
+        nil
+    }
+
     /// One free-space read through `FileSystem`, plus usage, pending reclaim and the resolved budget (R-SYN-11).
     package func freeSpace() async throws(StoreError) -> FreeSpace {
         // REENTRANCY: R13 — `measureFreeSpace` re-checks the phase after its unit.
