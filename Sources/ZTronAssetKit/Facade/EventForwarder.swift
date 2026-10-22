@@ -14,11 +14,14 @@ import ZTronAssetSync
 /// (`ClientLifecycle.register(_:)`): a `subscribe()` stream before `subscribe()` returns, an `events` stream on its first
 /// pull. Every reopen hands every follower its replacement's stream before installing it, so a stream receives every
 /// event of its registration's generation from that registration on, and every event of each later generation from that
-/// generation's first one on (`clientStarted` included), except what the engine's own queue coalesces (one slot per
-/// progress key and per subject, H-9). The pump never registers or follows by itself: it reads the registered stream,
-/// then, after each retired one, the stream handed over for the next generation; only when the client was shut down
-/// while that reopen ran is nothing handed over, and the last engine's stream, which yields its `clientShutDown`, ends
-/// this one. A handed stream not newer than the one the forwarder holds is dropped.
+/// generation's first one on, subject only to the engine's own coalescing: progress per progress key, and the other
+/// terminal events per subject (asset, breaker, maintenance, run; H-9). Client lifecycle events are never coalesced with
+/// each other (orchestrator ruling L5-R19: `clientShutDown` has a queue slot of its own), so every generation whose
+/// `start()` finished announces itself with its `clientStarted` before its later events, also when this forwarder read
+/// none of them before that generation was retired. The pump never registers or follows by itself: it reads the
+/// registered stream, then, after each retired one, the stream handed over for the next generation; only when the client
+/// was shut down while that reopen ran is nothing handed over, and the last engine's stream, which yields its
+/// `clientShutDown`, ends this one. A handed stream not newer than the one the forwarder holds is dropped.
 ///
 /// The pump starts on the first pull and ends with the stream. The consumer's stream holds the forwarder through a
 /// `Consumer` that the pump never retains, so the forwarder stops when the consumer's task is cancelled (`onCancel`) and
