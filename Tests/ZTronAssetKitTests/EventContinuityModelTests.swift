@@ -21,12 +21,14 @@ import ZTronAssetTestSupport
 /// replacement at `LifecycleSeamPoint.replacementBuilt`, before it is installed. Every consumer still live at the
 /// shutdown then drains its stream, and the walk checks:
 /// - **I1 no loss.** A consumer receives every marker whose call began after its registration (or a later event of the
-///   marker's subject: the engine's per-subject coalescing), and, from every generation built by a reopen that began
-///   after its registration, that generation's `clientStarted` whenever the oracle saw one (client lifecycle events are
-///   never coalesced with each other, L5-R19) and every other terminal event the oracle saw, or a later one of the same
-///   subject, inside that generation's own part of the stream: the parts are delimited by the received markers and the
-///   generations' `clientStarted`, counted rather than looked up by value, because replacements announce equal values.
-///   Progress events coalesce in place and are not checked.
+///   marker's subject: the engine's per-subject coalescing), and, from every generation installed after its follow turn
+///   (the lifecycle turn that recorded it as a follower: within `subscribe()`, or an `events` stream's first pull, which
+///   the walk waits for and stamps through the lifecycle's follower hook, also while a reopen is parked; L5-R21), that
+///   generation's `clientStarted` whenever the oracle saw one (client lifecycle events are never coalesced with each
+///   other, L5-R19) and every other terminal event the oracle saw, or a later one of the same subject, inside that
+///   generation's own part of the stream: the parts are delimited by the received markers and the generations'
+///   `clientStarted`, counted rather than looked up by value, because replacements announce equal values. Progress
+///   events coalesce in place and are not checked.
 /// - **I2 order.** The markers a consumer receives never go back a generation and none arrives twice; no
 ///   `clientShutDown` arrives before the real shutdown began (a retired engine's is never forwarded), at most one arrives,
 ///   and it is the last event; every consumer live at the shutdown ends with it; no more `clientStarted` events arrive
@@ -190,22 +192,25 @@ final class ModelRecord: Sendable {
     }
 }
 
-/// The lifecycle's follower count, fed by its test hook; its waits are conditions that end on cancellation.
+/// The lifecycle's follower counts, fed by its test hook: the follower entries now, and the followers ever recorded (one
+/// per follow turn). Its waits are conditions that end on cancellation.
 @available(macOS 15.0, iOS 18.0, *)
 final class FollowerGauge: Sendable {
     private struct State {
         var count = 0
-        var waiters: [UInt64: (met: @Sendable (Int) -> Bool, continuation: CheckedContinuation<Void, Never>)] = [:]
+        var recorded: UInt64 = 0
+        var waiters: [UInt64: (met: @Sendable (Int, UInt64) -> Bool, continuation: CheckedContinuation<Void, Never>)] = [:]
         var lastWaiter: UInt64 = 0
     }
 
     private let state = Mutex(State())
 
-    /// The lifecycle reports its follower count.
-    func set(_ count: Int) {
+    /// The lifecycle reports its counts.
+    func set(_ count: Int, recorded: UInt64) {
         let ready = self.state.withLock { state -> [CheckedContinuation<Void, Never>] in
             state.count = count
-            let ready = state.waiters.filter { $0.value.met(count) }
+            state.recorded = recorded
+            let ready = state.waiters.filter { $0.value.met(count, recorded) }
             for id in ready.keys {
                 state.waiters[id] = nil
             }
@@ -214,22 +219,33 @@ final class FollowerGauge: Sendable {
         ready.forEach { $0.resume() }
     }
 
-    /// The last count reported.
+    /// The last count of follower entries reported.
     var count: Int {
         self.state.withLock { $0.count }
     }
 
+    /// The followers recorded so far, as last reported.
+    var recorded: UInt64 {
+        self.state.withLock { $0.recorded }
+    }
+
     /// Suspends until at most `target` followers are left, or until the caller is cancelled.
     func wait(atMost target: Int) async {
-        await self.wait { $0 <= target }
+        await self.wait { count, _ in count <= target }
     }
 
-    /// Suspends until at least `target` followers are recorded, or until the caller is cancelled.
+    /// Suspends until at least `target` followers are recorded at once, or until the caller is cancelled.
     func wait(atLeast target: Int) async {
-        await self.wait { $0 >= target }
+        await self.wait { count, _ in count >= target }
     }
 
-    private func wait(until met: @escaping @Sendable (Int) -> Bool) async {
+    /// Suspends until at least `target` followers were ever recorded (that many follow turns ran), or until the caller is
+    /// cancelled.
+    func wait(recordedAtLeast target: UInt64) async {
+        await self.wait { _, recorded in recorded >= target }
+    }
+
+    private func wait(until met: @escaping @Sendable (Int, UInt64) -> Bool) async {
         let id = self.state.withLock { state -> UInt64 in
             state.lastWaiter += 1
             return state.lastWaiter
@@ -237,7 +253,7 @@ final class FollowerGauge: Sendable {
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 let now = self.state.withLock { state -> Bool in
-                    if met(state.count) || Task.isCancelled {
+                    if met(state.count, state.recorded) || Task.isCancelled {
                         return true
                     }
                     state.waiters[id] = (met, continuation)
@@ -578,6 +594,10 @@ private final class ModelWalk {
         let consumer: ModelConsumer
         /// The action after which its registration is known to have completed (`nil` until then).
         var registeredAt: Int?
+        /// The action stamped right after its follow turn, the lifecycle turn that recorded it as a follower (`nil` until
+        /// then): every generation installed after it was handed to it from its first event (orchestrator rulings L5-R13,
+        /// L5-R19; L5-R21 stamps an `events` stream here rather than at its first event, L5-C2-04).
+        var followedAt: Int?
         var status = Status.live
     }
 
@@ -622,8 +642,9 @@ private final class ModelWalk {
     var markers: [Marker] = []
     var nextMarker = 0
     var pending: [Pending] = []
-    /// The action in which the reopen that built each replacement began.
-    var builtAt: [UInt64: Int] = [:]
+    /// The action stamped no later than each replacement's installation: its reopen's first action, or, for a reopen
+    /// parked before its install, the action that releases it (L5-R21: generations are owed by installation).
+    var installedAt: [UInt64: Int] = [:]
     /// The generations installed at some point.
     var installed: Set<UInt64> = [0]
     var shutdownAt: Int?
@@ -712,8 +733,8 @@ private final class ModelWalk {
         let gauge = self.gauge
         let oracles = self.oracles
         let parking = self.parking
-        await self.client.lifecycle.setFollowerObserver { count in
-            gauge.set(count)
+        await self.client.lifecycle.setFollowerObserver { count, recorded in
+            gauge.set(count, recorded: recorded)
         }
         let trace = self.trace
         await self.client.lifecycle.setSeam { point in
@@ -806,7 +827,9 @@ private final class ModelWalk {
     private func addConsumer(_ kind: ModelConsumer.Kind, _ stream: AsyncStream<AssetEvent>, registered: Bool) -> Int {
         let consumer = ModelConsumer(id: self.consumers.count, kind: kind, stream: stream, clock: self.clock)
         let registeredAt = registered ? self.clock.tick() : nil
-        self.consumers.append(Consumer(consumer: consumer, registeredAt: registeredAt))
+        // A `subscribe()` stream follows in its call, before it returns (or, started while a reopen was parked before its
+        // install, after that reopen, once the call settled): its registration stamp is its follow stamp too.
+        self.consumers.append(Consumer(consumer: consumer, registeredAt: registeredAt, followedAt: registeredAt))
         self.note("consumer \(consumer.id) (\(kind)) added, registered \(registeredAt.map(String.init) ?? "later")")
         return self.consumers.count - 1
     }
@@ -845,8 +868,15 @@ private final class ModelWalk {
             return self.pull()
         }
         self.clock.tick()
+        let recorded = self.gauge.recorded
         let index = self.addConsumer(.events, self.client.events, registered: false)
         self.consumers[index].consumer.send(.pull(1))
+        // Its first pull makes it a follower, in a lifecycle turn that also runs while a reopen is parked (the walk's
+        // other follows have all happened): the walk waits for that turn and stamps it, so the generations installed after
+        // it are owed from their first events, path 5 of G-16 included (L5-R21, L5-C2-04).
+        await self.gauge.wait(recordedAtLeast: recorded + 1)
+        self.consumers[index].followedAt = self.clock.tick()
+        self.note("consumer \(index) followed")
         if self.parked != nil {
             // Its first event may need the parked reopen to finish.
             self.pending.append(.firstEvent(index))
@@ -955,7 +985,7 @@ private final class ModelWalk {
         self.reopens += 1
         let began = self.clock.tick()
         let retiring = await self.client.lifecycle.current().generation
-        self.builtAt[retiring + 1] = began
+        self.installedAt[retiring + 1] = began
         // One operation of the fake volume (`KitHarness.vanishRoot()`): the walk does not wait for the engine to fall idle.
         try self.harness.vanishRoot()
         var hold: SeamHold?
@@ -994,6 +1024,9 @@ private final class ModelWalk {
                     await client.shutdown()
                 }
                 self.note("shutdown started while parked")
+            } else if park?.beforeInstall == true {
+                // The replacement is installed only after the hold opens: followers recorded while parked are owed it.
+                self.installedAt[retiring + 1] = self.clock.tick()
             }
             await hold.open()
             self.parked = nil
@@ -1208,9 +1241,13 @@ private final class ModelWalk {
                 }
                 self.violation("I1: \(name) never received marker \(marker.id) (generation \(generation), call began at t\(marker.startedAt))")
             }
-            // I1: every generation built by a reopen that began after the registration, from its first event.
+            // I1: every generation installed after the follow turn, from its first event (the hand-over).
+            guard let followedAt = state.followedAt else {
+                self.violation("I1: \(name) was live at the shutdown but its follow turn was never observed")
+                continue
+            }
             let owed = self.installed.sorted().compactMap { generation -> (generation: UInt64, log: [AssetEvent])? in
-                guard let began = self.builtAt[generation], began > registeredAt, let log = logs[generation] else {
+                guard let installedAt = self.installedAt[generation], installedAt > followedAt, let log = logs[generation] else {
                     return nil
                 }
                 return (generation, log)

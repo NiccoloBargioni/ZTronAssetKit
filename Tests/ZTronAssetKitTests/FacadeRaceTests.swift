@@ -326,8 +326,8 @@ struct FacadeRaceTests {
         let client = harness.client
         try await harness.startAndSettle()
         let followers = FollowerGauge()
-        await client.lifecycle.setFollowerObserver { count in
-            followers.set(count)
+        await client.lifecycle.setFollowerObserver { count, recorded in
+            followers.set(count, recorded: recorded)
         }
         let hold = SeamHold()
         await client.lifecycle.setSeam { point in

@@ -101,9 +101,10 @@ actor ClientLifecycle: PrefetchRegistry {
     /// Test seam, `nil` in production: awaited at each `LifecycleSeamPoint`, so a test can place a shutdown, a reopen or
     /// a pressure event exactly there (CLAUDE.md G4: interleavings no test could otherwise reach deterministically).
     private var seam: (@Sendable (LifecycleSeamPoint) async -> Void)?
-    /// Test seam, `nil` in production: called on the actor with the number of follower entries after each change, so
-    /// the L5-R13 model can wait for none to be left (its I3) without polling.
-    private var followerObserver: (@Sendable (Int) -> Void)?
+    /// Test seam, `nil` in production: called on the actor after each change of the follower entries with their number
+    /// and the number of followers ever recorded (`lastFollower`), so the L5-R13 model can wait, without polling, for none
+    /// to be left (its I3) and for a stream's follow turn, which it stamps (orchestrator ruling L5-R21, L5-C2-04).
+    private var followerObserver: (@Sendable (_ followers: Int, _ recorded: UInt64) -> Void)?
 
     /// Builds the first pair: actors only, no I/O, no task (P-12).
     init(configuration: AssetClientConfiguration, environment: AssetEnvironment, mirror: SnapshotMirror) {
@@ -243,7 +244,7 @@ actor ClientLifecycle: PrefetchRegistry {
             handed.insert(key)
             guard let forwarder = self.followers[key]?.forwarder else {
                 self.followers[key] = nil
-                self.followerObserver?(self.followers.count)
+                self.followerObserver?(self.followers.count, self.lastFollower)
                 continue
             }
             // REENTRANCY: g-10 (proposed) — the followers and `closed`, re-read at the loop's top (a follower recorded
@@ -320,7 +321,7 @@ actor ClientLifecycle: PrefetchRegistry {
         self.lastFollower += 1
         let key = self.lastFollower
         self.followers[key] = Follower(forwarder: forwarder)
-        self.followerObserver?(self.followers.count)
+        self.followerObserver?(self.followers.count, self.lastFollower)
         let core = self.core
         // REENTRANCY: g-11 (proposed) — `closed`, `core` and `retiring`, re-read below: a reopen meanwhile hands this
         // follower its replacement's stream (the follower was recorded first), so only `core.engine`'s answer is used.
@@ -359,7 +360,7 @@ actor ClientLifecycle: PrefetchRegistry {
     /// failed.
     func unfollow(_ key: UInt64) {
         self.followers[key] = nil
-        self.followerObserver?(self.followers.count)
+        self.followerObserver?(self.followers.count, self.lastFollower)
     }
 
     /// The followers' forwarders that are still alive (a test read: the L5-R13 model asks each how many events wait
@@ -368,11 +369,11 @@ actor ClientLifecycle: PrefetchRegistry {
         self.followers.keys.sorted().compactMap { self.followers[$0]?.forwarder }
     }
 
-    /// Installs or removes the follower-count observer (tests only; see `followerObserver`), and reports the current
-    /// count to a new one at once.
-    func setFollowerObserver(_ observer: (@Sendable (Int) -> Void)?) {
+    /// Installs or removes the follower observer (tests only; see `followerObserver`), and reports the current counts to
+    /// a new one at once.
+    func setFollowerObserver(_ observer: (@Sendable (_ followers: Int, _ recorded: UInt64) -> Void)?) {
         self.followerObserver = observer
-        observer?(self.followers.count)
+        observer?(self.followers.count, self.lastFollower)
     }
 
     // MARK: Shutdown
