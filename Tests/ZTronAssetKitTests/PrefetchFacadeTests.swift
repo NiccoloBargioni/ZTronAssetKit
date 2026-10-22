@@ -54,15 +54,10 @@ struct PrefetchFacadeTests {
         }
         let starts = await source.starts.dropFirst(startsBefore).map(\.id)
         let cancels = await source.controlLog.dropFirst(controlsBefore).filter { $0.control == .cancel }.map(\.transfer)
-        #expect(starts.contains(entries[5].transferID), "the entering asset started: \(starts)")
-        #expect(cancels.contains(left), "the leaving asset was cancelled: \(cancels)")
-        // Intermittent: whether the old handle's release lands before the successor's join is a race the engine
-        // usually loses, not always (2 of 30 consecutive runs joined first on the reference host), so this test cannot
-        // be CCR-G2's tripwire; `promotionNeverRestarts` repeats the re-lane 1,000 times and is.
-        withKnownIssue("CCR-G2: SyncEngine.registerGroup returns before the group's interests exist, so the re-laned assets 2 and 3 lose every interest in between and restart", isIntermittent: true) {
-            #expect(starts == [entries[5].transferID], "exactly the entering asset started: \(starts)")
-            #expect(cancels == [left], "exactly the leaving asset was cancelled: \(cancels)")
-        }
+        // The re-laned assets 2 and 3 keep their transfers: each successor's registration claims its asset before the
+        // old handle's release (L5-R1, CCR-G2), whichever of the release and the successor's join comes first.
+        #expect(starts == [entries[5].transferID], "exactly the entering asset started: \(starts)")
+        #expect(cancels == [left], "exactly the leaving asset was cancelled: \(cancels)")
         await MainActor.run {
             controller.cancelAll()
         }
@@ -73,7 +68,8 @@ struct PrefetchFacadeTests {
     /// sync-1 S1-05's regression at load: 1,000 window moves, each turning the +1 neighbour, already in flight at the
     /// prefetch lane, into the current page. A re-lane that let an asset's interest drop to zero in between would
     /// cancel its transfer and start it again; every promotion must reach the transport as a priority change instead,
-    /// and no transfer may start twice.
+    /// and no transfer may start twice. Before the engine's claims (L5-R1) 995 to 1,001 of 1,002 transfers started more
+    /// than once in every run.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-3: a neighbour that becomes current is promoted without a second transfer", .timeLimit(.minutes(1)))
     func promotionNeverRestarts() async throws {
@@ -101,12 +97,8 @@ struct PrefetchFacadeTests {
         let restarted = startsByTransfer.filter { $0.value > 1 }
         let promotions = await source.controlLog.filter { $0.control == .setPriority(.userInitiated) }.count
         #expect(startsByTransfer[entries[1_000].transferID] != nil, "the final current page is in flight")
-        // Not intermittent: 1,000 re-lanes always lose the race somewhere, so this wrapper fails ("known issue was not
-        // recorded") the run after the engine fix, which is the signal to remove both wrappers (CCR-G2).
-        withKnownIssue("CCR-G2: SyncEngine.registerGroup returns before the group's interests exist, so each re-lane drops the asset's last interest and restarts its transfer") {
-            #expect(restarted.isEmpty, "\(restarted.count) transfers started more than once")
-            #expect(promotions == 1_000, "every promotion reached the transport as a priority change: \(promotions)")
-        }
+        #expect(restarted.isEmpty, "\(restarted.count) transfers started more than once")
+        #expect(promotions == 1_000, "every promotion reached the transport as a priority change: \(promotions)")
         await MainActor.run {
             controller.cancelAll()
         }
