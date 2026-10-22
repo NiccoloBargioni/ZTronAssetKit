@@ -155,7 +155,7 @@ struct EngineUnitTests {
             (.assetRemoved("a", .pruned), .asset("a")),
             (.circuitChanged(originID: "o", .closed), .breaker("o")),
             (.maintenanceFinished(report), .maintenance),
-            (.clientShutDown, .client),
+            (.clientShutDown, .clientEnd),
         ]
         for (event, slot) in cases {
             #expect(EventSlot(event) == slot)

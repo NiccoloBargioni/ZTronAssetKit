@@ -266,9 +266,12 @@ extension SyncEngine {
     }
 
     /// Whether only released groups still want `job` (their interests leave over a few turns, `continueReleases`): it
-    /// never starts meanwhile (R-CAR-4), and it is no user work to preempt for.
+    /// never starts meanwhile (R-CAR-4), and it is no user work to preempt for. A token still registered in `groups` is
+    /// never released, even while the claims its join gave up wait in `releasing` (L5-R15), so a job such a group wants
+    /// is never set aside (orchestrator ruling L5-R21, L5-C2-02).
     func isReleasedOnly(_ job: Job) -> Bool {
-        !self.state.releasing.isEmpty && job.interests.keys.allSatisfy { self.state.releasing[$0] != nil }
+        !self.state.releasing.isEmpty
+            && job.interests.keys.allSatisfy { self.state.releasing[$0] != nil && self.state.groups[$0] == nil }
     }
 
     /// Whether a queue entry stands for a job only released groups want (`isReleasedOnly`): a scan sets it aside

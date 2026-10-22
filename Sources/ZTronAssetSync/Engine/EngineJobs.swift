@@ -227,16 +227,32 @@ extension SyncEngine {
         return gate.admitsThrottleParked && gate.admitsBreakerParked
     }
 
-    /// Removes interest `token` from `transfer` (all its assets) and retires the job when nobody is left.
+    /// Removes interest `token` from `transfer` (all its assets) and retires the job when nobody is left: no interest
+    /// and no pending claim of a registered group whose join has not reached the content yet (orchestrator ruling L5-R1,
+    /// CCR-G2). Every release, waiter withdrawal and caller cancellation removes interests here, so none of them retires
+    /// a job such a registration named; the job keeps its state, its place and its lane (`Job.heldLane`) until that join
+    /// adds its interest (a promotion or a demotion of a running transfer reaches the transport as a priority change)
+    /// or the claim ends (`dropClaim` retires it then). The engine's other exits do not pass here and are unchanged
+    /// (L5-R1): a content left the manifest or changed (`followApplied`, `supersede`), became present (the pre-transfer
+    /// read retires its job directly), failed or was held back (`EngineFailures`), or committed (`resolveAll`).
     func removeInterest(_ token: InterestToken, from transfer: TransferID) {
         guard var job = self.state.jobs[transfer], job.interests[token] != nil else {
             return
         }
         let before = job.lane
         job.interests[token] = nil
+        if job.interests.isEmpty {
+            job.heldLane = before
+        }
         self.state.jobs[transfer] = job
         if job.interests.isEmpty {
-            self.retire(transfer)
+            let key = ClaimKey(job: job)
+            if self.state.claims[key] != nil {
+                // Kept for the claim: its last end retires the job (`dropClaim`).
+                self.state.claimHeld[key] = transfer
+            } else {
+                self.retire(transfer)
+            }
         } else {
             self.relane(transfer, from: before)
         }
@@ -800,5 +816,7 @@ extension SyncEngine {
         if (self.state.newest?.sequence ?? 0) == 0 {
             self.state.newest = (manifest, 0)
         }
+        // Members registered while the copy did not list them are claimed once it does (L5-R1).
+        self.claimNewlyListed()
     }
 }

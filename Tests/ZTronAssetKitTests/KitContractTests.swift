@@ -24,7 +24,8 @@ private actor GatedRegistry: PrefetchRegistry {
     private var live: [InterestToken: [AssetID]] = [:]
     private var gateOpen = false
     private var gate: [CheckedContinuation<Void, Never>] = []
-    private var waiters: [(predicate: @Sendable (Counts) -> Bool, continuation: CheckedContinuation<Void, Never>)] = []
+    private var nextWaiterID: UInt64 = 0
+    private var waiters: [UInt64: (predicate: @Sendable (Counts) -> Bool, continuation: CheckedContinuation<Void, Never>)] = [:]
     private(set) var counts = Counts()
     private(set) var log: [String] = []
     /// The fewest holders each asset had right after any release (0 would mean its transfer was cancelled).
@@ -86,27 +87,41 @@ private actor GatedRegistry: PrefetchRegistry {
         }
     }
 
+    /// Suspends until `predicate` holds, or until the caller is cancelled (the `CensusWaiting` pattern of
+    /// `ZTronAssetTestSupport`, ADR-050): a regression that never meets the predicate fails within the test's time
+    /// limit instead of hanging the run. The predicate is checked, and the wait registered, synchronously in the
+    /// continuation body, so no change can fall between the check and the registration.
     func waitUntil(_ predicate: @escaping @Sendable (Counts) -> Bool) async {
         if predicate(self.counts) {
             return
         }
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            self.waiters.append((predicate, continuation))
+        self.nextWaiterID += 1
+        let id = self.nextWaiterID
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                if predicate(self.counts) || Task.isCancelled {
+                    continuation.resume()
+                } else {
+                    self.waiters[id] = (predicate, continuation)
+                }
+            }
+        } onCancel: {
+            Task {
+                await self.cancelWait(id)
+            }
         }
+    }
+
+    /// Ends a cancelled caller's wait; a no-op for a wait the predicate already resumed.
+    private func cancelWait(_ id: UInt64) {
+        self.waiters.removeValue(forKey: id)?.continuation.resume()
     }
 
     private func notify() {
         let counts = self.counts
-        var ready: [CheckedContinuation<Void, Never>] = []
-        self.waiters.removeAll { waiter in
-            if waiter.predicate(counts) {
-                ready.append(waiter.continuation)
-                return true
-            }
-            return false
-        }
-        for continuation in ready {
-            continuation.resume()
+        let ready = self.waiters.filter { $0.value.predicate(counts) }
+        for id in ready.keys {
+            self.waiters.removeValue(forKey: id)?.continuation.resume()
         }
     }
 }

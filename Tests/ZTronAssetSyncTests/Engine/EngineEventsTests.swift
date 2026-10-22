@@ -42,7 +42,8 @@ struct EngineEventsTests {
         try await harness.drive(maxStep: 3_600) { $0.groups == 0 }
         let peak = await engine.peakSubscriberBacklogForTests()
         // Progress keys: at most one transfer key per running non-bulk transfer (none here) plus run, snapshot and
-        // conditions; subjects: client, run started, run finished, breaker, maintenance (bulk outcomes fold).
+        // conditions; subjects: client (`clientStarted`; `clientShutDown`'s own slot fills only at the shutdown, after
+        // this read, L5-R19), run started, run finished, breaker, maintenance (bulk outcomes fold).
         let bound = (concurrency + 3) + 5
         #expect(peak <= bound, "peak backlog \(peak)")
         #expect(peak >= 3, "the stalled subscriber did accumulate a backlog")
@@ -57,7 +58,7 @@ struct EngineEventsTests {
         }
         #expect(fetched == 10_000, "the launch run fetched the whole catalog")
         #expect(Set(slots).count == slots.count, "one event per key or subject: \(slots)")
-        #expect(slots.last == .client)
+        #expect(slots.last == .clientEnd)
     }
 
     @available(macOS 15.0, iOS 18.0, *)

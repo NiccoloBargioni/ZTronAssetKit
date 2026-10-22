@@ -98,6 +98,21 @@ struct EngineState {
     var unknownWaiters: [InterestToken: UnknownWaiter] = [:]
     /// Prefetch handles and `ensureAvailable` groups.
     var groups: [InterestToken: Group] = [:]
+    /// Pending claims (orchestrator ruling L5-R1, CCR-G2): for each content, how many members of registered prefetch
+    /// groups, and of released ones whose claims are still being dropped, named it in the engine's copy of the manifest
+    /// when they were claimed and are not reached yet by their group's join. A job whose last interest leaves while its
+    /// content is claimed stays (`removeInterest`): `registerGroup` answers before the group holds any interest, and a
+    /// re-lane orders the old handle's release after the successor's registration only, so without the claim that
+    /// release retired the job and the successor's join started its transfer again (R-CAR-3, sync-1 S1-05).
+    var claims: [ClaimKey: Int] = [:]
+    /// The jobs a pending claim alone keeps (no interest left), by the content claimed: when the content's last claim
+    /// ends, `dropClaim` retires the job it finds here. An entry whose job gained an interest or left since is stale and
+    /// harmless; the content's last claim drops it.
+    var claimHeld: [ClaimKey: TransferID] = [:]
+    /// The pending claims of registered groups' members the engine's copy did not list when they were claimed (a
+    /// registration before `start()`, or ahead of a catch-up): `adoptApplied` claims their content once the copy lists
+    /// them (`claimNewlyListed`).
+    var unlistedClaims = 0
     /// A later turn's `pump()` is scheduled to materialise `ensureAvailable` fetches (a batch that failed fast inside a
     /// pump left room nobody else would fill).
     var ensureRefillScheduled = false
@@ -469,9 +484,14 @@ struct Job {
     /// The error interests will receive if the job ends now.
     var lastError: AssetError?
 
-    /// The maximum over its interests (ADR-020).
+    /// The lane its interests had when the last one left while a pending claim kept the job (L5-R1): until the
+    /// claim's join adds an interest or the claim ends, the job keeps its place and its transfer's priority, as if the
+    /// released interest were still there. Read only while the job has no interest.
+    var heldLane: AssetPriority?
+
+    /// The maximum over its interests (ADR-020); for a job only a pending claim keeps, the lane it had (`heldLane`).
     var lane: AssetPriority {
-        self.interests.values.map(\.lane).max() ?? .bulk
+        self.interests.values.map(\.lane).max() ?? self.heldLane ?? .bulk
     }
 
     /// Whether a user-initiated interest is a single request (served before batches, sync.md §7.2).
@@ -511,6 +531,16 @@ struct Group {
     let lane: AssetPriority
     /// Members still pending, by asset.
     var pending: [AssetID: TransferID] = [:]
+    /// A prefetch group's members in the order its join reaches them (the array the join is given). Empty for
+    /// `ensureAvailable` groups.
+    var members: [AssetID] = []
+    /// The content each of `members` named in the engine's copy when it was claimed (`nil`: not listed then); the
+    /// members from `claimCursor` on hold a pending claim (`EngineState.claims`, L5-R1).
+    var claimed: [ClaimKey?] = []
+    /// The first member whose claim is still pending: the join ends the claims in member order.
+    var claimCursor = 0
+    /// How many pending claims name no content yet (`EngineState.unlistedClaims`).
+    var unlistedClaims = 0
     /// Every member in the order it joined: a release removes their interests in this order over several turns (C2),
     /// with no sort.
     var joined: [AssetID] = []
@@ -537,6 +567,37 @@ struct Release {
     var members: ArraySlice<AssetID>
     /// Each member's transfer when the group was released.
     let pending: [AssetID: TransferID]
+    /// The contents of the group's pending claims left to drop (L5-R1), before its members' interests; those naming no
+    /// content were already uncounted at the release.
+    var claims: ArraySlice<ClaimKey?> = []
+}
+
+/// The content a pending claim names (L5-R1): a checksummed entry's checksum, whose transfer is `TransferID.content` of
+/// it, kept as its four words, because formatting that transfer's text for every member of a 10,000-id group held the
+/// registering turn about 3 ms; a checksum-less (legacy, R-MAN-5) entry's transfer.
+enum ClaimKey: Hashable, Sendable {
+    /// `TransferID.content(hash)`.
+    case content(ContentHash)
+    /// A checksum-less entry's transfer.
+    case legacy(TransferID)
+
+    /// The content `entry` names.
+    init(_ entry: ManifestEntry) {
+        if let checksum = entry.checksum {
+            self = .content(checksum)
+        } else {
+            self = .legacy(entry.transferID)
+        }
+    }
+
+    /// The content `job` transfers: a job is keyed by its representative entry's transfer.
+    init(job: Job) {
+        if let checksum = job.entry.checksum {
+            self = .content(checksum)
+        } else {
+            self = .legacy(job.transfer)
+        }
+    }
 }
 
 /// A `waitUntil` caller.

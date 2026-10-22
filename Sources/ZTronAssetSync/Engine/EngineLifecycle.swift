@@ -448,6 +448,12 @@ extension SyncEngine {
 
     /// Single-flight and idempotent: cancel and join every owned task, resume every continuation with `.shutDown`,
     /// invalidate the source, close the store, publish `clientShutDown` last.
+    ///
+    /// Whatever state it begins in, `created` included, it returns only once every owned task is cancelled and joined
+    /// (orchestrator ruling L5-R2, R-SYN-15): `spawn` allows owned tasks in `created`, and two spawn sites are reachable
+    /// there, the memory-pressure observer and a group's join. From `created` it still never opens the store and never
+    /// logs: there is no source to invalidate and no store to close (`launch` and `startTask` are `nil`), and a joined
+    /// group join's `ensureStarted()` refuses once `shuttingDown`, so it cannot start the engine.
     func performShutdown() async {
         switch self.state.lifecycle {
         case .shutDown:
@@ -463,12 +469,7 @@ extension SyncEngine {
                 }
             }
             return
-        case .created:
-            // Shutdown in `created` never opens the store.
-            self.state.lifecycle = .shuttingDown
-            self.finishShutdown()
-            return
-        case .starting, .running, .degraded:
+        case .created, .starting, .running, .degraded:
             break
         }
         self.state.lifecycle = .shuttingDown
@@ -515,6 +516,14 @@ extension SyncEngine {
             self.state.groups[token]?.continuation = nil
         }
         self.state.groups.removeAll()
+        // Every pending claim ends with the engine (L5-R1), those a release or a join's give-up left for later turns
+        // included (L5-R15).
+        self.state.claims.removeAll()
+        self.state.claimHeld.removeAll()
+        self.state.unlistedClaims = 0
+        for token in self.state.releasing.keys.sorted() {
+            self.state.releasing[token]?.claims = []
+        }
         let starts = self.state.startJoiners
         self.state.startJoiners.removeAll()
         for token in starts.keys.sorted() {

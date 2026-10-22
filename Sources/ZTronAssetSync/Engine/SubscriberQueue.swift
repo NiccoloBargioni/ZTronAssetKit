@@ -1,6 +1,9 @@
 import ZTronAssetModel
 
-/// The key an event coalesces under (ADR-023): progress events per key, terminal events per subject.
+/// The key an event coalesces under (ADR-023): progress events per key, terminal events per subject. The client's two
+/// lifecycle events have a slot each and never coalesce with each other (orchestrator ruling L5-R19): a shutdown's
+/// `clientShutDown` never replaces a `clientStarted` its subscriber has not read yet, which the facade relies on when it
+/// hides a retired engine's `clientShutDown`.
 enum EventSlot: Hashable, Sendable {
     /// `snapshotChanged` (progress).
     case snapshot
@@ -10,8 +13,10 @@ enum EventSlot: Hashable, Sendable {
     case run
     /// `transferProgress` of one asset (progress); retired with its transfer.
     case transfer(AssetID)
-    /// `clientStarted`, `clientShutDown`.
+    /// `clientStarted`.
     case client
+    /// `clientShutDown`, always the last event (L5-R19: apart from `clientStarted`'s slot).
+    case clientEnd
     /// `syncStarted`.
     case runStarted
     /// `syncFinished`.
@@ -28,7 +33,7 @@ enum EventSlot: Hashable, Sendable {
         switch self {
         case .snapshot, .conditions, .run, .transfer:
             return true
-        case .client, .runStarted, .runFinished, .asset, .breaker, .maintenance:
+        case .client, .clientEnd, .runStarted, .runFinished, .asset, .breaker, .maintenance:
             return false
         }
     }
@@ -44,8 +49,10 @@ enum EventSlot: Hashable, Sendable {
             self = .run
         case .transferProgress(let id, _):
             self = .transfer(id)
-        case .clientStarted, .clientShutDown:
+        case .clientStarted:
             self = .client
+        case .clientShutDown:
+            self = .clientEnd
         case .syncStarted:
             self = .runStarted
         case .syncFinished:
@@ -60,9 +67,10 @@ enum EventSlot: Hashable, Sendable {
     }
 }
 
-/// One subscriber's bounded queue (sync.md §10.3, H-9): at most one live slot per progress key and per subject, so a
-/// stalled subscriber costs memory bounded by keys and subjects, never by time or event volume. Delivery order is
-/// the publication order of each slot's latest occurrence; `clientShutDown` is always last.
+/// One subscriber's bounded queue (sync.md §10.3, H-9): at most one live slot per progress key and per subject, and one
+/// for each of the two client lifecycle events (L5-R19), so a stalled subscriber costs memory bounded by keys and
+/// subjects, never by time or event volume. Delivery order is the publication order of each slot's latest occurrence;
+/// `clientShutDown` is always last (nothing is published after it).
 struct SubscriberQueue {
     /// A live slot.
     private struct Live {
