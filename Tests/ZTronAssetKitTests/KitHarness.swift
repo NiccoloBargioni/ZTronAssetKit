@@ -71,6 +71,7 @@ struct KitHarness {
         remote: RemoteConfiguration = RemoteConfiguration(),
         conditions: DeviceConditions = .unrestricted,
         tuning: SyncTuning = SyncTuning(),
+        storage: StoragePolicy = StoragePolicy(),
         refresh: RefreshPolicy = .oncePerAppVersion,
         prefetchRadius: Int = 2,
         appVersion: String = "1.0+1",
@@ -98,6 +99,7 @@ struct KitHarness {
         )
         let configuration = AssetClientConfiguration(
             remote: remote,
+            storage: storage,
             legacy: LegacyMigrationPolicy(enabled: false),
             refresh: refresh,
             tuning: tuning,
