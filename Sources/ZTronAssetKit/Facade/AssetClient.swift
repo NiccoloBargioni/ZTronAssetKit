@@ -75,21 +75,36 @@ public final class AssetClient: Sendable {
     }
 
     /// Runs one engine call on the current pair. A pair whose root was replaced (`rootVanished`, B-15) is reopened
-    /// once and the call repeated on the replacement, so callers see the failure only when the replacement fails
-    /// too; any other result is returned as the engine gave it (L4-R23: `ensureAvailable` stays faithful).
+    /// and the call repeated on the replacement; a call that a reopen's shutdown of the old engine answered with
+    /// `.shutDown` is repeated on the replacement too. Any other result is returned as the engine gave it (L4-R23:
+    /// `ensureAvailable` stays faithful). At most `AssetClient.reopenAttempts` repetitions, so a store that vanishes
+    /// again and again reports the failure instead of looping.
     private func perform<T: Sendable>(
         _ operation: @Sendable (SyncEngine) async -> Result<T, AssetError>
     ) async throws(AssetError) -> T {
-        let core = await self.lifecycle.current()
-        let result = await operation(core.engine)
-        guard case .failure(.storageUnavailable(.rootVanished)) = result else {
-            return try result.get()
+        var core = await self.lifecycle.current()
+        for _ in 0..<AssetClient.reopenAttempts {
+            let result = await operation(core.engine)
+            switch result {
+            case .failure(.storageUnavailable(.rootVanished)):
+                guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
+                    throw .shutDown
+                }
+                core = replacement
+            case .failure(.shutDown):
+                guard await self.lifecycle.hasRetired(core.generation) else {
+                    throw .shutDown
+                }
+                core = await self.lifecycle.current()
+            default:
+                return try result.get()
+            }
         }
-        guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
-            throw .shutDown
-        }
-        return try await operation(replacement.engine).get()
+        return try await operation(core.engine).get()
     }
+
+    /// How many times one call is repeated on a replacement pair.
+    static let reopenAttempts = 3
 
     /// The executor for bounded blocking units off the cooperative pool (ADR-003, C2), shared with the fallback
     /// chain's bundle enumeration (sync-2 S2-13).
@@ -145,17 +160,9 @@ public final class AssetClient: Sendable {
     /// Runs `body` with the asset's URL while a lease keeps eviction, prune and purge away from it (R-CAR-8).
     /// Untyped because the body is the caller's (ADR-004); the lease is released on every path.
     public func withAsset<T: Sendable>(_ id: AssetID, _ body: @Sendable (URL) async throws -> T) async throws -> T {
-        let core = await self.lifecycle.current()
-        var engine = core.engine
-        var leased = await engine.acquireLease(id)
-        if case .failure(.storageUnavailable(.rootVanished)) = leased {
-            guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
-                throw AssetError.shutDown
-            }
-            engine = replacement.engine
-            leased = await engine.acquireLease(id)
+        let (engine, lease) = try await self.perform { engine in
+            await engine.acquireLease(id).map { (engine, $0) }
         }
-        let lease = try leased.get()
         do {
             let value = try await body(lease.url)
             await engine.releaseLease(lease)
@@ -183,15 +190,20 @@ public final class AssetClient: Sendable {
     /// Runs a sync of the retention scope now (`.force`) or when due (`.ifDue`); single-flight. The outcome carries
     /// failures, `.failed(.shutDown)` after shutdown included.
     public func sync(_ mode: SyncMode = .ifDue) async -> SyncOutcome {
-        let core = await self.lifecycle.current()
-        let outcome = await core.engine.sync(mode)
-        guard case .failed(.storageUnavailable(.rootVanished)) = outcome else {
-            return outcome
+        do throws(AssetError) {
+            return try await self.perform { engine in
+                let outcome = await engine.sync(mode)
+                switch outcome {
+                case .failed(let error) where error == .storageUnavailable(.rootVanished) || error == .shutDown:
+                    // Handed to `perform`, which reopens or follows the replacement before reporting it.
+                    return .failure(error)
+                default:
+                    return .success(outcome)
+                }
+            }
+        } catch {
+            return .failed(error)
         }
-        guard let replacement = await self.lifecycle.reopen(replacing: core.generation) else {
-            return .failed(.shutDown)
-        }
-        return await replacement.engine.sync(mode)
     }
 
     /// Whether a launch sync is due (R-SYN-9).

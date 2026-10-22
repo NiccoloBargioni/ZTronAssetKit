@@ -210,11 +210,6 @@ actor ClientLifecycle: PrefetchRegistry {
         await self.core.engine.shutdown()
     }
 
-    /// Whether `shutdown()` began.
-    var isClosed: Bool {
-        self.closed
-    }
-
     // MARK: Run-time state carried across a reopen
 
     /// Records the retention scope the caller set, for a replacement engine.
