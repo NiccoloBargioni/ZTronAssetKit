@@ -106,17 +106,26 @@ struct MigrationLaunchShimTests {
     @MainActor
     @Test("R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes and downloads none of the prior art's files (CCR-K1)", .timeLimit(.minutes(1)))
     func launchSyncDuringLegacyMigration() async throws {
-        let launch = try await MigrationLaunchShimTests.adoptionLaunch(count: 150, size: 65_536)
+        // The migration is held at a unit of its first file across the coordinator's call (L5K-R2, L5K-C1-03): the sync
+        // provably overlaps migration, and its outcome cannot depend on whether migration and the launch run it holds
+        // back ended before the call reached the client.
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let launch = try await MigrationLaunchShimTests.adoptionLaunch(count: 150, size: 65_536, bulk: bulk)
         let coordinator = CDNSyncCoordinator(client: launch.client, cdn: ScriptedCDNProvider(manifest: .success(launch.assets.map(\.0))))
 
         // MIGRATION.md steps 3 and 4 in one launch task: start, then the prior art's launch sync, while migration adopts.
-        try await launch.client.start()
+        let migration = try await CompatHarness.startHoldingMigration(launch.client, bulk: bulk)
+        let releaser = CompatHarness.releaser(bulk, keeping: migration)
         await coordinator.syncIfNeeded()
         let progress = coordinator.progress
         let downloaded = await launch.fakes.starts(after: 0)
         let legacyLeft = try launch.legacyFilesLeft()
         let availability = try await launch.client.availability(scope: .all)
+        releaser.cancel()
+        await releaser.value
+        let overlapped = Set(await bulk.heldUnits).isSuperset(of: migration)
 
+        #expect(overlapped, "the migration was held at its file throughout the coordinator's sync")
         #expect(progress == .complete)
         #expect(downloaded.isEmpty, "R-STO-11: moved, not downloaded again; \(downloaded.count) of \(launch.assets.count) prior-art files were (CCR-K1)")
         // Every file the run planned was adopted before its job ended (the engine's pre-transfer read, L5K-R1), and every file
@@ -125,6 +134,7 @@ struct MigrationLaunchShimTests {
         // The store's state, which the sync's completion orders. The lookups' snapshot shows a migration batch's adoptions
         // only once that batch ends (K-15), and no public event marks the end of migration here (K-13).
         #expect(availability.present == launch.assets.count && availability.missing == 0, "every prior-art asset is stored: \(availability)")
+        await bulk.setHolding(false)
         await launch.client.shutdown()
     }
 
@@ -167,32 +177,41 @@ struct MigrationLaunchShimTests {
         let launchOneStarts = await first.fakes.source.starts.count
         let leftForLaunchTwo = try first.legacyFilesLeft()
 
-        // Launch 2 on the same volume and origin, with inline executors: start, then the coordinator's sync right away.
+        // Launch 2 on the same volume and origin: start, then the coordinator's sync right away, with the resumed migration
+        // held at a unit of its first file across the call (L5K-R2, L5K-C1-01), so the sync provably overlaps it.
+        let secondBulk = SteppedBlockingExecutor(holding: true)
         let environment = CompatHarness.environment(
             time: first.fakes.clock,
             fileSystem: first.fakes.fileSystem,
             source: first.fakes.source,
             conditions: first.fakes.conditions,
-            appVersion: "1.0+1"
+            appVersion: "1.0+1",
+            bulk: secondBulk
         )
         let client = CDNProviderFactory.install(MigrationLaunchShimTests.configuration, into: CDNInstallPoint(), environment: environment)
         let coordinator = CDNSyncCoordinator(client: client, cdn: ScriptedCDNProvider(manifest: .success(first.assets.map(\.0))))
         await first.fakes.serveManifest(first.assets.map(\.0))
-        try await client.start()
+        let migration = try await CompatHarness.startHoldingMigration(client, bulk: secondBulk)
+        let releaser = CompatHarness.releaser(secondBulk, keeping: migration)
         await coordinator.syncIfNeeded()
         let progress = coordinator.progress
         let downloaded = await first.fakes.starts(after: launchOneStarts)
         let legacyLeft = try first.legacyFilesLeft()
         let availability = try await client.availability(scope: .all)
+        releaser.cancel()
+        await releaser.value
+        let overlapped = Set(await secondBulk.heldUnits).isSuperset(of: migration)
 
         #expect(started != nil, "launch 1's sync started while migration ran")
         #expect(interruptedProgress == .failed(reason: String(describing: SyncOutcome.failed(.shutDown))), "launch 1's sync ended with the shutdown")
         #expect(launchOneStarts == 0, "launch 1 downloaded nothing either")
         #expect(leftForLaunchTwo > 0, "launch 1 left prior-art files to a resumed migration: \(leftForLaunchTwo) of \(first.assets.count)")
+        #expect(overlapped, "launch 2's resumed migration was held at its file throughout the coordinator's sync")
         #expect(progress == .complete)
         #expect(downloaded.isEmpty, "R-STO-11 on the resumed launch: \(downloaded.count) of the \(leftForLaunchTwo) files left were downloaded")
         #expect(legacyLeft == 0, "every prior-art file left the prior art's tree by the time the sync returned")
         #expect(availability.present == first.assets.count && availability.missing == 0, "every prior-art asset is stored: \(availability)")
+        await secondBulk.setHolding(false)
         await client.shutdown()
     }
 }

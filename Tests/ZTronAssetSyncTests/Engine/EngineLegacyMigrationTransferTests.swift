@@ -258,12 +258,16 @@ struct EngineLegacyMigrationTransferTests {
             await firstEngine.awaitAsset("legacy0", lane: .userInitiated)
         }
         _ = try resolved.get()
+        let waitingBeforeStop = await firstEngine.readForTests { $0.state.migration.launchRunWaiting }
         let stopping = Task { await firstEngine.shutdown() }
         await firstEngine.waitUntil { $0.lifecycle != .running }
         await first.bulk.setHolding(false)
         await stopping.value
         await resolveTask.value
+        let waitingAfterStop = await firstEngine.readForTests { $0.state.migration.launchRunWaiting }
         #expect(await first.harness.source.starts.isEmpty)
+        #expect(waitingBeforeStop, "a sync was due at launch 1, so its launch run waited for migration")
+        #expect(!waitingAfterStop, "the migration loop's end clears the flag at shutdown too: no flag is left behind (L5K-C1-05)")
 
         // Launch 2 over what survived: open finds the persisted phase in progress, rebuilds the plan and reports the
         // migration pending again (StoreMigration's open hook), and the engine resumes it.
