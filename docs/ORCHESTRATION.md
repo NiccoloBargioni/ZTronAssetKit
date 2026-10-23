@@ -35,7 +35,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **L5K-R14:** `adoptLegacyNow(_:urgency:)`, so bulk-lane adoptions keep §5's install-rate bound. This corrects L5K-R1's wrong limiter claim.
     - **L5K-R15:** three small test and doc items.
   - Findings: `l5k-close1-remaining-k.json`. Probes: `l5k-probes-c1/`.
-- **Close-out: RUNNING from cycle 2** `wf_d80dd07d-5cd` (task `wg23mi3wx`), launched 19:22 at weekly 28 %, with `fromCycle: 2`, `findingsFile` `l5k-close1-remaining-k.json` and `usageStop: 40`.
+- **Close-out cycle 2:** `wf_d80dd07d-5cd`, 19:22–21:22, weekly 28 % → 30 %. L5K-C1-00 is fixed. 2 distinct blocking defects remained:
+  - **(A)** Coalesced `.bulk` publications whose trailing install the engine never schedules: the funnel's adoptions under L5K-R14, and migration batches after a run took the parked launch run's place.
+  - **(B)** `migrateLoop` busy-spins while an on-demand adoption holds the last claimed file.
+  - The orchestrator stopped the run 1 min into fix 3 and ruled:
+    - **L5K-R16:** the trailing-install class. Enumerate every publishing store call, add the RE-S40 re-arm where it is missing, add an idle tripwire to `invariantViolations()`, and add a compatibility test at the production install interval.
+    - **L5K-R17:** no hot loop. `performMigrateLegacy` awaits the on-demand flight, with an enumeration of the engine's store loops.
+    - **L5K-R18:** re-read the lane after an adoption.
+    - **L5K-R19:** small items.
+  - Findings: `l5k-close2-remaining-k.json`.
+- **Close-out: RUNNING from cycle 3** `wf_cfb1c56d-e3f` (task `wt4zd3hh8`), launched 21:31 at weekly 30 %, with `fromCycle: 3`, `findingsFile` `l5k-close2-remaining-k.json` and `usageStop: 40`.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
