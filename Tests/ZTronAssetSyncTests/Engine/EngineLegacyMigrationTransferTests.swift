@@ -1025,6 +1025,136 @@ struct EngineLegacyMigrationTransferTests {
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
+
+    // MARK: A store call returns right after a coalesced publication (L5K-R20)
+
+    /// Whether the store logged that a migration call waits for an adopt-on-demand of the last claimed legacy files
+    /// (row k-7).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func batchWaitLogged(_ harness: EngineHarness) -> Bool {
+        harness.tap.lines.contains { $0.message.contains("a migration batch waits for an adopt-on-demand") }
+    }
+
+    /// Releases every unit of `bulk` outside `kept` as it arrives until the store logs that a migration call waits for an
+    /// adopt-on-demand of the last claimed legacy files, or until the migration loop made `calls` more calls than `before`
+    /// (a loop that no longer waits calls again instead), and returns whether the line was logged. While `kept` holds that
+    /// adoption the line is guaranteed, so this waits for a condition, not for a number of rounds; it ends on
+    /// cancellation (orchestrator ruling L5K-R22).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func releaseUntilTheBatchWaits(
+        _ harness: EngineHarness,
+        bulk: SteppedBlockingExecutor,
+        keeping kept: Set<Int>,
+        callsBefore before: Int,
+        calls: Int = 2
+    ) async throws -> Bool {
+        let engine = harness.engine
+        while !EngineLegacyMigrationTransferTests.batchWaitLogged(harness) {
+            if await engine.readForTests({ $0.state.migration.batchCalls }) - before >= calls {
+                return EngineLegacyMigrationTransferTests.batchWaitLogged(harness)
+            }
+            for unit in await bulk.heldUnits where !kept.contains(unit) {
+                await bulk.release(unit)
+            }
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+        return true
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: the prior-art files a migration batch adopted reach the readers' snapshot within about two install intervals while the migration waits for an adopt-on-demand of the last claimed file (L5K-R20, KC3-WAITWINDOW)", .timeLimit(.minutes(1)))
+    func batchAdoptionsReachTheReadersWhileTheMigrationWaits() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 9_600)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let pending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        try #require(pending.count >= catalog.count - 1, "premise: the held batch's file and every file after it are pending: \(pending.count)")
+        // A prefetch job adopts the last pending file before any bytes; that file is still queued whichever file the batch
+        // holds (a batch takes the files in path order). Its hash unit is held.
+        let jobAsset = try #require(catalog.map(\.0).last { pending.contains($0.identifier) })
+        let token = try await engine.registerGroup([jobAsset.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        let batchIDs = pending.subtracting([jobAsset.identifier])
+        let callsBefore = await engine.readForTests { $0.state.migration.batchCalls }
+        // The batch adopts every other pending file and publishes them at bulk urgency inside the install window (the clock
+        // stands still after open's install); the migration then waits for the job's adoption of the last claimed file.
+        let waited = try await EngineLegacyMigrationTransferTests.releaseUntilTheBatchWaits(harness, bulk: bulk, keeping: jobHash, callsBefore: callsBefore)
+        let stillPending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        let unseenAtTheWait = await EngineLegacyMigrationTransferTests.unseen(harness, batchIDs)
+        let from = time.monotonicNow()
+        // The clock passes the install window while the job's adoption still holds the last file: only the engine's alarm
+        // can run the trailing install the batch's publication left due.
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, batchIDs)
+        let elapsed = time.monotonicNow().seconds(since: from)
+        let held = Set(await bulk.heldUnits).isSuperset(of: jobHash)
+
+        #expect(waited, "premise: the migration waited for the job's adoption of the last claimed file (L5K-R17)")
+        #expect(stillPending.isDisjoint(with: batchIDs), "premise: the batch adopted its files before the wait")
+        #expect(!unseenAtTheWait.isEmpty, "premise: the batch published at bulk urgency inside the install window")
+        #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(batchIDs.count) files the batch adopted stayed out of the readers' snapshot past the install window while the migration waited (L5K-C3-01)")
+        #expect(elapsed <= 2 * 0.1 + 1e-6, "within about two install intervals of the publication: \(elapsed) s")
+        #expect(held, "the job's adoption held the last claimed file throughout")
+        for unit in jobHash {
+            await bulk.release(unit)
+        }
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.releaseGroup(token)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: the prior-art files the last migration batch adopted reach the readers' snapshot within about two install intervals while phases 3 and 4 still run (L5K-R20)", .timeLimit(.minutes(1)))
+    func lastBatchAdoptionsReachTheReadersDuringPhasesThreeAndFour() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(3, seed: 9_650)
+        let ids = catalog.map(\.0.identifier)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
+        let engine = harness.engine
+        _ = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        // Every bulk unit is let through until every prior-art file is in the store: the batch's hashes (its placements run
+        // on the metadata executor). Phase 3 runs no bulk unit at this size, so the next held unit is phase 4's (its
+        // removal): nothing else submits one now (no job, no run: the launch run waits for the migration).
+        while true {
+            if try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog) {
+                break
+            }
+            try await bulk.requireHeldUnits(atLeast: 1)
+            if try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog) {
+                break
+            }
+            for unit in await bulk.heldUnits {
+                await bulk.release(unit)
+            }
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let phaseFour = Set(await bulk.heldUnits)
+        let running = await engine.readForTests { $0.state.migration.running && $0.state.migration.pending }
+        let unseenAtTheHold = await EngineLegacyMigrationTransferTests.unseen(harness, ids)
+        let from = time.monotonicNow()
+        // The clock passes the install window while phase 4 is held: only the engine's alarm can run the trailing install
+        // the last batch's publication left due.
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, ids)
+        let elapsed = time.monotonicNow().seconds(since: from)
+        let held = Set(await bulk.heldUnits).isSuperset(of: phaseFour)
+
+        #expect(running, "premise: the migration had not finished (phase 4 held)")
+        #expect(!unseenAtTheHold.isEmpty, "premise: the last batch published at bulk urgency inside the install window")
+        #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(ids.count) files the last batch adopted stayed out of the readers' snapshot past the install window while phases 3 and 4 ran (L5K-C3-01)")
+        #expect(elapsed <= 2 * 0.1 + 1e-6, "within about two install intervals of the publication: \(elapsed) s")
+        #expect(held, "phase 4 stayed held throughout")
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
 }
 
 /// What L5K-R16's tripwire compares before and after it reads the store (`EngineHarness.idleViolations()`): whether the

@@ -335,6 +335,74 @@ extension LegacyOnDemandRaceTests {
 }
 
 extension LegacyOnDemandRaceTests {
+    @Test("R-STO-13: a migration batch whose publication is coalesced returns right after it instead of waiting for the adopt-on-demand of the last claimed legacy file, so its caller can schedule the trailing install; the next call waits for that adoption and finishes (L5K-R20)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func coalescedBatchReturnsBeforeItWaits() async throws {
+        // ARCHITECTURE §5's interval; the clock never moves, so after open's install the window stays closed.
+        let race = try await LegacyRace.open(installInterval: 0.1)
+        await race.bulk.setHolding(true)
+        // An adopt-on-demand takes the next file from the queue and its hash unit is held.
+        let onDemand = LegacyRace.tracked {
+            try await race.harness.store.adoptLegacyNow(race.id)
+        }
+        try await race.bulk.requireHeldUnits(atLeast: 1)
+        let onDemandHash = Set(await race.bulk.heldUnits)
+        // A batch adopts every other file and publishes them inside the install window.
+        let first = LegacyRace.tracked {
+            try await race.harness.store.migrateLegacy(maxFiles: 64)
+        }
+        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
+                await race.bulk.release(unit)
+            }
+            return await race.settled(first.finished)
+        }
+        let returned = await first.finished.value
+        let installDue = await race.harness.state.core.snapshots.installDue
+        let claimed = await race.harness.state.migration.claimed
+        // A second call finds the queue empty and the one claimed file held by the adopt-on-demand: it waits for it.
+        let second = LegacyRace.tracked {
+            try await race.harness.store.migrateLegacy(maxFiles: 64)
+        }
+        try await CorePoll.until("the second call returned or waits for the adopt-on-demand") {
+            await race.settled(second.finished)
+        }
+        let secondWaited = await !second.finished.value
+        await race.releaseAll()
+        let progress = try await first.task.value
+        let finished = try await second.task.value
+        _ = try await onDemand.task.value
+
+        #expect(returned, "migrateLegacy waited for the adopt-on-demand after a coalesced publication: its caller could not schedule the trailing install meanwhile (L5K-C3-01)")
+        #expect(installDue, "premise: the batch's publication left the trailing install due")
+        #expect(claimed == [race.file], "premise: the adopt-on-demand held the one claimed file")
+        #expect(!progress.finished && progress.remaining == 1 && progress.adopted > 0, "the first call returned with the adopt-on-demand's file left: \(progress)")
+        #expect(secondWaited, "the next call, which published nothing, waits for the adoption rather than returning at once (L5K-R17)")
+        #expect(finished.finished && finished.remaining == 0, "and finishes the migration once it ended: \(finished)")
+        #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
+    }
+
+    @Test("R-STO-13: the last migration batch whose publication is coalesced returns right after it, before phases 3 and 4, so its caller can schedule the trailing install; the next call finishes (L5K-R20)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func coalescedLastBatchReturnsBeforePhasesThreeAndFour() async throws {
+        // ARCHITECTURE §5's interval; the clock never moves, so after open's install the window stays closed.
+        let race = try await LegacyRace.open(installInterval: 0.1)
+        let files = await race.harness.state.migration.queue.count
+        let first = try await race.harness.store.migrateLegacy(maxFiles: 64)
+        let phase = await race.harness.state.migration.phase
+        let installDue = await race.harness.state.core.snapshots.installDue
+        let second = try await race.harness.store.migrateLegacy(maxFiles: 64)
+
+        #expect(files > 0 && files <= 64, "premise: one batch takes every file: \(files)")
+        #expect(installDue, "premise: the last batch's publication left the trailing install due")
+        #expect(first == LegacyMigrationProgress(adopted: files, remaining: 0, dropped: 0, finished: false), "the first call returned right after its publication: \(first)")
+        #expect(phase == .inProgress, "phases 3 and 4 did not run in the call that published (L5K-C3-01)")
+        #expect(second.finished && second.adopted == files, "the next call ran phases 3 and 4: \(second)")
+        #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
+    }
+}
+
+extension LegacyOnDemandRaceTests {
     @Test("R-STO-13: an adopt-on-demand publishes at its urgency: bulk adoptions wait for the install window, a user-initiated one installs at once and carries them (L5K-R14)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func adoptionPublishesAtItsUrgency() async throws {
