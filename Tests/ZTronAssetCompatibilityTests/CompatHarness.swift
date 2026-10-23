@@ -176,18 +176,20 @@ struct CompatHarness {
         )
     }
 
-    /// The environment the harness's clients run in, built from its fakes.
+    /// The environment the harness's clients run in, built from its fakes. `bulk` is the store's bulk executor (hashing,
+    /// legacy migration's units): inline unless a test holds those units (`SteppedBlockingExecutor`).
     static func environment(
         time: AutoAdvancingClock,
         fileSystem: FakeFileSystem,
         source: FakeRemoteSource,
         conditions: FakeDeviceConditionsSource,
-        appVersion: String
+        appVersion: String,
+        bulk: any BlockingExecutor = InlineBlockingExecutor()
     ) -> AssetEnvironment {
         AssetEnvironment(
             fileSystem: fileSystem,
             metadataExecutor: InlineBlockingExecutor(),
-            bulkExecutor: InlineBlockingExecutor(),
+            bulkExecutor: bulk,
             time: time,
             random: SeededRandom(seed: 0xC0_4E),
             conditions: conditions,
@@ -197,12 +199,13 @@ struct CompatHarness {
         )
     }
 
-    /// Builds a client; nothing is started.
+    /// Builds a client; nothing is started. `bulk` replaces the inline bulk executor (see `environment(…)`).
     static func make(
         refresh: RefreshPolicy = .oncePerAppVersion,
         conditions: DeviceConditions = .unrestricted,
         appVersion: String = "1.0+1",
-        tuning: SyncTuning = CompatHarness.tuning
+        tuning: SyncTuning = CompatHarness.tuning,
+        bulk: any BlockingExecutor = InlineBlockingExecutor()
     ) -> CompatHarness {
         let time = ManualTimeSource()
         let clock = AutoAdvancingClock(manual: time)
@@ -214,7 +217,8 @@ struct CompatHarness {
             fileSystem: fileSystem,
             source: source,
             conditions: conditionsSource,
-            appVersion: appVersion
+            appVersion: appVersion,
+            bulk: bulk
         )
         let configuration = AssetClientConfiguration(
             remote: RemoteConfiguration(),
@@ -263,6 +267,67 @@ struct CompatHarness {
     /// The transfers started from now on: the source's start log after `baseline` entries.
     func starts(after baseline: Int) async -> [TransferID] {
         await self.source.starts.dropFirst(baseline).map(\.id)
+    }
+
+    /// Starts `client` while `bulk` holds every unit, for a launch whose legacy migration is pending: releases each unit
+    /// the start submits until `start()` has returned, then returns the units held from then on, the migration's (its first
+    /// file's, or the next one's when the loop's last release met the first, so at most one file is adopted before the
+    /// hold). The start's own completion is awaited by a second, cancellable caller of the single-flight `start()`, so
+    /// every wait ends on cancellation and nothing polls.
+    static func startHoldingMigration(_ client: AssetClient, bulk: SteppedBlockingExecutor) async throws -> Set<Int> {
+        enum Wake: Sendable {
+            case started
+            case failed
+            case held
+        }
+        let starting = Task { () async throws -> Void in
+            try await client.start()
+        }
+        var wake = Wake.held
+        while wake == .held {
+            wake = await withTaskGroup(of: Wake.self) { group in
+                group.addTask {
+                    do throws(AssetError) {
+                        try await client.start()
+                        return .started
+                    } catch .cancelled {
+                        return .held
+                    } catch {
+                        return .failed
+                    }
+                }
+                group.addTask {
+                    await bulk.waitForHeldUnits(atLeast: 1)
+                    return .held
+                }
+                let first = await group.next() ?? .held
+                group.cancelAll()
+                return first
+            }
+            for unit in await bulk.heldUnits {
+                await bulk.release(unit)
+            }
+            try Task.checkCancellation()
+        }
+        try await starting.value
+        try await bulk.requireHeldUnits(atLeast: 1)
+        return Set(await bulk.heldUnits)
+    }
+
+    /// A task that releases every unit `bulk` holds outside `kept` as it arrives, until it is cancelled (its wait ends on
+    /// cancellation): a test performs its calls while the migration stays held at `kept`.
+    static func releaser(_ bulk: SteppedBlockingExecutor, keeping kept: Set<Int>) -> Task<Void, Never> {
+        Task {
+            while !Task.isCancelled {
+                await bulk.waitForHeldUnits(atLeast: kept.count + 1)
+                guard !Task.isCancelled else {
+                    return
+                }
+                for unit in await bulk.heldUnits where !kept.contains(unit) {
+                    await bulk.release(unit)
+                }
+            }
+        }
     }
 
     /// A client of a later launch: the same configuration, volume, origin, clock and conditions, reporting
