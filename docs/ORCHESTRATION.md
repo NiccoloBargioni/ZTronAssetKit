@@ -28,6 +28,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Close-out: RUNNING** `wf_d5c59efd-6db` (task `wzgzwm1jw`), launched 16:52 at weekly 25 %, with `usageStop: 40`, the sections and focus as in the rulings, and the same sims.
   - Run dir: `…/subagents/workflows/wf_d5c59efd-6db`.
   - Resume cold from its `journal.jsonl` with `fromCycle` and the last verification's issues.
+- **Close-out cycle 1:** `wf_d5c59efd-6db`, 16:52–19:16, weekly 25 % → 28 %.
+  - Both original blockers are fixed. Requirements lens: 0 blocking. Correctness lens: 1 blocking, **L5K-C1-00**, a second shape of CCR-K1: a race between an on-demand adoption and a migration batch adopting the same file in the store, so a user-initiated job still downloads it.
+  - The orchestrator stopped the run 1 min into fix 2, before any change, and ruled:
+    - **L5K-R13:** one adoption per prior-art file. Authorised edits in `LegacyPhases.swift`, `MigrationState.swift` and `StoreMigration.swift`, with an interleaving enumeration and new store race tests.
+    - **L5K-R14:** `adoptLegacyNow(_:urgency:)`, so bulk-lane adoptions keep §5's install-rate bound. This corrects L5K-R1's wrong limiter claim.
+    - **L5K-R15:** three small test and doc items.
+  - Findings: `l5k-close1-remaining-k.json`. Probes: `l5k-probes-c1/`.
+- **Close-out: RUNNING from cycle 2** `wf_d80dd07d-5cd` (task `wg23mi3wx`), launched 19:22 at weekly 28 %, with `fromCycle: 2`, `findingsFile` `l5k-close1-remaining-k.json` and `usageStop: 40`.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
