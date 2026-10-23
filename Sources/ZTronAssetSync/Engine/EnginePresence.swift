@@ -220,15 +220,21 @@ extension SyncEngine {
     /// main actor, and only for the ids of a job about to transfer (C2). The adoption's snapshot is published at
     /// `.userInitiated` for a job of `lane` `.userInitiated` (installed at once, as a resolve's) and at `.bulk` otherwise,
     /// which the store's install-rate limiter coalesces, so ARCHITECTURE §5's bound (at most one bulk install per
-    /// `snapshotInstallInterval`) holds while a sync adopts (L5K-R14). `nil` when the store holds nothing for `id`: no
-    /// prior-art file to adopt, or one that cannot be adopted (it did not verify, it was kept, or the store refused),
-    /// which is then downloaded, as on the resolve path; never because a migration batch or another call is adopting the
-    /// same file at that moment (the store's single flight per prior-art file, orchestrator ruling L5K-R13).
+    /// `snapshotInstallInterval`) holds while a sync adopts (L5K-R14). A bulk-urgency adoption inside the install window
+    /// leaves its trailing install due, which only the engine's alarm runs: the store's deadline is re-read into the heap
+    /// after it (RE-S40, orchestrator ruling L5K-R16), in O(1) while the alarm already wakes within about two install
+    /// intervals (F-12), so the asset reaches the readers' snapshot within one install interval. `nil` when the store
+    /// holds nothing for `id`: no prior-art file to adopt, or one that cannot be adopted (it did not verify, it was kept,
+    /// or the store refused), which is then downloaded, as on the resolve path; never because a migration batch or another
+    /// call is adopting the same file at that moment (the store's single flight per prior-art file, orchestrator ruling
+    /// L5K-R13).
     func storedLocation(of id: AssetID, lane: AssetPriority) async -> AssetLocation? {
         guard self.state.migration.pending else {
             // REENTRANCY: f-11 (proposed) — nothing here: the caller re-validates after its reads.
             return await self.store.location(for: id, extensions: [], recordingAccess: false)
         }
+        let urgency: AssetPriority = lane == .userInitiated ? .userInitiated : .bulk
+        let location: AssetLocation?
         do {
             // REENTRANCY: k-4 (proposed) — nothing here: the caller re-validates after its reads. The store runs one
             // adoption per prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch
@@ -236,10 +242,17 @@ extension SyncEngine {
             // for that processing and reads the location it bound; when a batch has not finished hashing the file, both may
             // hash it, and the one whose bytes verify second waits out the other's adoption before it decides. So the
             // answer is that one adoption's outcome, never a failure the other adopter caused.
-            return try await self.store.adoptLegacyNow(id, urgency: lane == .userInitiated ? .userInitiated : .bulk)
+            location = try await self.store.adoptLegacyNow(id, urgency: urgency)
         } catch {
-            return nil
+            location = nil
         }
+        if urgency != .userInitiated {
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline, so the
+            // trailing install this adoption may have left due runs on the alarm (L5K-R16). The caller re-validates after
+            // its reads.
+            await self.refreshStoreDeadlineAfterPublish()
+        }
+        return location
     }
 
     /// Takes the interests in `present` out of `transfer`'s job and answers them from the store, so that an outcome of

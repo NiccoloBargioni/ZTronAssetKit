@@ -151,6 +151,12 @@ extension SyncEngine {
                 if self.isRunning {
                     self.pump()
                     self.reconcileIdle()
+                    if !ids.isEmpty {
+                        // `recordFailure` dooms a failed stale record's blob and publishes at bulk urgency: its trailing
+                        // install runs on the alarm whatever became of the job (orchestrator ruling L5K-R16).
+                        // REENTRANCY: RE-S40 — the lifecycle (inside); the store entry of the heap is replaced.
+                        await self.refreshStoreDeadline()
+                    }
                 }
                 return
             }
@@ -427,6 +433,12 @@ extension SyncEngine {
             if self.isRunning {
                 // Every interest may have been answered from the store: the job's pipeline place is free.
                 self.pump()
+                if !absent.isEmpty {
+                    // `recordIntegrityFailure` dooms a blob at the cap and publishes at bulk urgency: its trailing install
+                    // runs on the alarm whatever became of the job (orchestrator ruling L5K-R16).
+                    // REENTRANCY: RE-S40 — the lifecycle (inside); the store entry of the heap is replaced.
+                    await self.refreshStoreDeadline()
+                }
             }
             return
         }

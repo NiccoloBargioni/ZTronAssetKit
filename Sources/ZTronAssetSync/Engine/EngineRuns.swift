@@ -1057,6 +1057,12 @@ extension SyncEngine {
     /// nothing remaining yet is not finished (RE-S29). When the loop ends, the launch run that waited for it starts,
     /// unless a run took its place meanwhile (`startRun` cleared the flag, so no run can be active here with the flag
     /// set) or the engine no longer runs; the flag is cleared either way.
+    ///
+    /// After every call, returned or thrown, the store's deadline is re-read into the heap (RE-S40, orchestrator ruling
+    /// L5K-R16): a batch publishes its adoptions at bulk urgency, which inside the install window leaves the trailing
+    /// install to the engine's alarm (ARCHITECTURE §5), and since L5K-R1's parked-run decision no launch run's apply need
+    /// follow migration to install them; a call that threw may have published first (phase 3's commit throws after the
+    /// batch's publication). The re-read is O(1) while the alarm already wakes within about two install intervals (F-12).
     private func migrateLoop() async {
         defer {
             self.state.migration.running = false
@@ -1073,8 +1079,18 @@ extension SyncEngine {
                 progress = try await self.store.migrateLegacy(maxFiles: 64)
             } catch {
                 self.state.migration.deferred = true
+                if self.isRunning {
+                    // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+                    await self.refreshStoreDeadlineAfterPublish()
+                }
                 return
             }
+            guard self.isRunning else {
+                return
+            }
+            // REENTRANCY: RE-S40 — the lifecycle, re-checked below; the heap's store entry is replaced by the newest
+            // deadline, so the trailing install of this batch's publication runs on the alarm (L5K-R16).
+            await self.refreshStoreDeadlineAfterPublish()
             guard self.isRunning else {
                 return
             }

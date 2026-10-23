@@ -362,6 +362,7 @@ extension SyncEngine {
         defer {
             self.state.presenceReaders -= 1
         }
+        var admitted = false
         for token in self.state.unknownWaiters.keys.sorted() {
             guard let waiter = self.state.unknownWaiters[token] else {
                 continue
@@ -379,6 +380,7 @@ extension SyncEngine {
             if self.state.applied.entry(for: waiter.asset) == nil {
                 let mark = self.state.copySerial
                 let serial = self.state.ledgerForgets
+                admitted = true
                 do {
                     // REENTRANCY: RE-S37 — the waiter is re-checked as still registered right below.
                     try await self.store.admit(entry)
@@ -403,6 +405,13 @@ extension SyncEngine {
             }
             self.state.negativeCache.remove(pending.asset)
             self.join(token, waiter: pending, entry: entry)
+        }
+        if admitted, self.isRunning {
+            // An admission that changes a known record's content dooms its old blob, which leaves a snapshot install due
+            // that `admit` publishes only when it adopted a known blob, and one that threw may have written in memory
+            // first (ADR-050): the store's deadline is re-read into the heap (orchestrator ruling L5K-R16).
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+            await self.refreshStoreDeadline()
         }
         self.pump()
         self.notifyObservers()

@@ -1080,6 +1080,10 @@ extension SyncEngine {
         } catch {
             // As above.
             self.storeMutationFailed()
+            // That step may also have doomed blobs, which leaves a snapshot install due and a reap to schedule
+            // (orchestrator ruling L5K-R16).
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+            await self.refreshStoreDeadline()
             return .failure(self.isShuttingDown ? .shutDown : error.assetError)
         }
         // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
@@ -1117,6 +1121,9 @@ extension SyncEngine {
                 // (ADR-050): no binding is trusted (L4-R5).
                 // REENTRANCY: RE-S21 — nothing: a synchronous drop on the actor.
                 await engine.storeMutationFailed()
+                // The quarantine dooms the blob, whose snapshot install and reap the alarm runs (L5K-R16).
+                // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+                await engine.refreshStoreDeadline()
                 return .done(.failure(error.assetError))
             }
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
