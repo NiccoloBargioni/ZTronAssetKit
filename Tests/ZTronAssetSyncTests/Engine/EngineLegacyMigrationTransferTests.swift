@@ -1153,6 +1153,233 @@ struct EngineLegacyMigrationTransferTests {
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
+
+    // MARK: User-initiated answers come after the install (L5K-R21)
+
+    /// A launch over `entries`' prior-art tree with ARCHITECTURE §5's install interval (0.1 s), a bulk executor that holds
+    /// every unit and `gate`'s planner. The origin answers every manifest request "not modified", so `ensureAvailable`
+    /// plans against the applied (legacy) manifest and applies nothing, and it serves the bytes of `served`. Nothing is
+    /// started.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func gatedLaunch(
+        _ entries: [(ManifestEntry, Data)],
+        served: [(ManifestEntry, Data)],
+        time: ManualTimeSource,
+        gate: MigrationPlannerGate
+    ) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor) {
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let harness = EngineHarness.make(
+            disk: try EngineRunPathTests.legacyDisk(entries, time: time),
+            time: time,
+            bulk: bulk,
+            planner: MigrationGatedPlanner(gate: gate),
+            installInterval: 0.1,
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot)
+        )
+        await harness.scriptTransfers(served)
+        return (harness, bulk)
+    }
+
+    /// Releases every unit of `bulk` outside `kept` as it arrives until `gate`'s planner holds a plan. The gate's entry is
+    /// guaranteed once the operation it holds runs, so this waits for a condition, not for a number of rounds; it ends
+    /// on cancellation.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func releaseUntilPlanned(_ bulk: SteppedBlockingExecutor, keeping kept: Set<Int>, gate: MigrationPlannerGate) async throws {
+        while !gate.entered {
+            for unit in await bulk.heldUnits where !kept.contains(unit) {
+                await bulk.release(unit)
+            }
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: ensureAvailable that joins a prefetch job while the job's pre-transfer read re-arms the store's deadline after a bulk adoption returns only once the readers' snapshot holds the asset (L5K-R21, PE5)", .timeLimit(.minutes(1)))
+    func promotionDuringTheReArmInstallsBeforeTheAnswer() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_700)
+        let asset = catalog[1].0
+        let gate = MigrationPlannerGate()
+        defer {
+            gate.open()
+        }
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.gatedLaunch(catalog, served: catalog, time: time, gate: gate)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        // A prefetch job adopts the asset's prior-art file before any bytes, at bulk urgency; its hash unit is held.
+        let token = try await engine.registerGroup([asset.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        // ensureAvailable reads its planning view while the asset is absent, and its plan is held there.
+        gate.arm()
+        let ensure = Task {
+            await engine.ensureAvailable(scope: .identifiers([asset.identifier]))
+        }
+        try await EngineLegacyMigrationTransferTests.releaseUntilPlanned(bulk, keeping: migration.union(jobHash), gate: gate)
+        let plannedAbsent = try await EngineLegacyMigrationTransferTests.pending(harness, catalog).contains(asset.identifier)
+        // The job's adoption ends; its re-read of the store's deadline (RE-S40) is held once the store answered.
+        await engine.holdNextStoreDeadlineRead()
+        for unit in jobHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.storeDeadlineReadHeld || engine.state.jobs[asset.transferID] == nil
+        }
+        let heldRead = await engine.readForTests { $0.storeDeadlineReadHeld }
+        let laneAtTheHold = await engine.readForTests { $0.state.jobs[asset.transferID]?.lane }
+        // ensureAvailable registers its group during that read: it joins the job, which becomes user-initiated.
+        gate.open()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[asset.transferID]?.lane == .userInitiated || engine.state.jobs[asset.transferID] == nil
+        }
+        let promoted = await engine.readForTests { $0.state.jobs[asset.transferID]?.lane == .userInitiated }
+        await engine.releaseStoreDeadlineRead()
+        let (result, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await ensure.value
+        }
+        let report = try result.get()
+        // Read before the clock moves: a bulk-urgency publication would reach the readers only at the trailing install.
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [asset.identifier])
+
+        #expect(plannedAbsent, "premise: ensureAvailable planned while the asset was absent")
+        #expect(heldRead, "premise: the job's re-read of the store's deadline awaited the store")
+        #expect(laneAtTheHold == .prefetch, "premise: the job was still a prefetch job when its read ended")
+        #expect(promoted, "premise: ensureAvailable joined the job during that re-read")
+        #expect(report.present == 1 && report.missing == 0, "ensureAvailable reports the asset available: \(report)")
+        #expect(unseen.isEmpty, "R-STO-13: ensureAvailable, a user-initiated asker, returned before the readers' snapshot held the asset its job adopted (L5K-C3-00)")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: a job of two ids promoted while its read of the second id runs answers its user-initiated asker of the first id, adopted at bulk urgency, only once the readers' snapshot holds it (L5K-R21)", .timeLimit(.minutes(1)))
+    func promotionDuringALaterReadInstallsBeforeTheAnswer() async throws {
+        let time = ManualTimeSource()
+        let bytes = EngineFixture.bytes(9_800)
+        // A file the held batch takes first, then one content under two ids: `first`'s prior-art file holds that content,
+        // `second`'s does not verify (other bytes under the same checksum), so its read answers nothing, and the job then
+        // downloads the content for it.
+        let other = EngineLegacyMigrationTransferTests.catalog(1, seed: 9_810)[0]
+        let first = EngineFixture.entry("legacy1", bytes)
+        let second = EngineFixture.entry("legacy2", bytes)
+        let gate = MigrationPlannerGate()
+        defer {
+            gate.open()
+        }
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.gatedLaunch(
+            [other, (first, bytes), (second, EngineFixture.bytes(9_801))],
+            served: [other, (first, bytes), (second, bytes)],
+            time: time,
+            gate: gate
+        )
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let pendingAtStart = try await harness.view().records[first.identifier]?.referencedBlob == nil
+        try #require(first.transferID == second.transferID, "premise: one content, one job")
+        // A prefetch job of both ids reads `first` first: its adoption's hash unit is held.
+        let token = try await engine.registerGroup([first.identifier, second.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let firstHash = Set(await bulk.heldUnits).subtracting(migration)
+        // ensureAvailable of `first` reads its planning view while `first` is absent, and its plan is held there.
+        gate.arm()
+        let ensure = Task {
+            await engine.ensureAvailable(scope: .identifiers([first.identifier]))
+        }
+        try await EngineLegacyMigrationTransferTests.releaseUntilPlanned(bulk, keeping: migration.union(firstHash), gate: gate)
+        // `first` is adopted at bulk urgency; the job's read of `second` then hashes its file, and that unit is held.
+        for unit in firstHash {
+            await bulk.release(unit)
+        }
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let secondHash = Set(await bulk.heldUnits).subtracting(migration)
+        let firstStored = try await harness.view().records[first.identifier]?.referencedBlob != nil
+        // ensureAvailable registers its group meanwhile: it joins the job, which becomes user-initiated.
+        gate.open()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration.union(secondHash), on: engine) { engine in
+            engine.state.jobs[first.transferID]?.lane == .userInitiated || engine.state.jobs[first.transferID] == nil
+        }
+        let promoted = await engine.readForTests { $0.state.jobs[first.transferID]?.lane == .userInitiated }
+        // The read of `second` ends without a location; the job answers `first` from the store.
+        let (result, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await ensure.value
+        }
+        let report = try result.get()
+        // Read before the clock moves: a bulk-urgency adoption would reach the readers only at the trailing install.
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [first.identifier])
+
+        #expect(pendingAtStart, "premise: `first` was still to adopt after the start")
+        #expect(firstStored, "premise: the job adopted `first` before its read of `second`")
+        #expect(promoted, "premise: ensureAvailable joined the job during the read of `second`")
+        #expect(report.present == 1 && report.missing == 0, "ensureAvailable reports `first` available: \(report)")
+        #expect(unseen.isEmpty, "R-STO-13: ensureAvailable, a user-initiated asker, returned before the readers' snapshot held the id its job adopted at bulk urgency (L5K-R21)")
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        #expect(await harness.source.starts.count <= 1, "only the content `second`'s file did not hold is downloaded, once")
+        await engine.shutdown()
+    }
+}
+
+/// A planner whose next `plan` call, once armed, blocks its thread until the test opens the gate (the verifier's probe
+/// PE5): a test holds `ensureAvailable` between its planning view and its group's registration. The plan is the
+/// production planner's. A test opens the gate on every exit (`defer`), so no planning thread stays blocked; the hold
+/// lasts a few actor hops of the test.
+@available(macOS 15.0, iOS 18.0, *)
+final class MigrationPlannerGate: Sendable {
+    private struct State {
+        var armed = false
+        var entered = false
+    }
+
+    private let state = Mutex(State())
+    private let semaphore = DispatchSemaphore(value: 0)
+
+    /// Makes the next `plan` call block until `open()`.
+    func arm() {
+        self.state.withLock { $0.armed = true }
+    }
+
+    /// Whether the armed call reached the planner.
+    var entered: Bool {
+        self.state.withLock { $0.entered }
+    }
+
+    /// Lets the blocked call go on.
+    func open() {
+        self.semaphore.signal()
+    }
+
+    /// Called by the planner: blocks the armed call until `open()`.
+    func pass() {
+        let blocks = self.state.withLock { state -> Bool in
+            guard state.armed else {
+                return false
+            }
+            state.armed = false
+            state.entered = true
+            return true
+        }
+        if blocks {
+            self.semaphore.wait()
+        }
+    }
+}
+
+/// The production planner behind a `MigrationPlannerGate`.
+@available(macOS 15.0, iOS 18.0, *)
+struct MigrationGatedPlanner: SyncPlanning {
+    let gate: MigrationPlannerGate
+
+    func plan(manifest: ValidatedManifest, snapshot: StorePlanningView, scope: AssetScope, policy: PlanningPolicy, freeSpace: FreeSpace) -> SyncPlan {
+        self.gate.pass()
+        return StandardSyncPlanner().plan(manifest: manifest, snapshot: snapshot, scope: scope, policy: policy, freeSpace: freeSpace)
+    }
 }
 
 /// What L5K-R16's tripwire compares before and after it reads the store (`EngineHarness.idleViolations()`): whether the
