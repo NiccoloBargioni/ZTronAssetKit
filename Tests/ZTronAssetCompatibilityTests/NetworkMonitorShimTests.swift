@@ -30,8 +30,8 @@ final class RetryLog: Sendable {
     }
 }
 
-/// R-CAR-6: `NetworkAvailabilityMonitor` over a real client's connectivity reports (RECON §5: connectivity retry for
-/// failed on-demand fetches; `ZTronSVGView.swift:168-183`).
+/// R-CAR-6: `NetworkAvailabilityMonitor` over the module's reachability seam (RECON §5: connectivity retry for failed
+/// on-demand fetches; `ZTronSVGView.swift:168-183`).
 @Suite("Compatibility shims: network availability monitor")
 struct NetworkMonitorShimTests {
     /// No usable path.
@@ -40,51 +40,37 @@ struct NetworkMonitorShimTests {
         power: DeviceConditions.unrestricted.power
     )
 
-    /// A started client whose engine observes the fake conditions source, offline from the start.
-    @available(macOS 15.0, iOS 18.0, *)
-    static func offlineClient() async throws -> CompatHarness {
-        let harness = CompatHarness.make(conditions: NetworkMonitorShimTests.offline)
-        try await harness.client.start()
-        try await harness.conditions.requireObservers(equalTo: 1)
-        return harness
-    }
-
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-6: a retry registered while offline runs once connectivity returns, and only once", .timeLimit(.minutes(1)))
     func retryRunsWhenConnectivityReturns() async throws {
-        let harness = try await NetworkMonitorShimTests.offlineClient()
-        let monitor = NetworkAvailabilityMonitor(client: harness.client)
+        let conditions = FakeDeviceConditionsSource(initial: NetworkMonitorShimTests.offline)
+        let monitor = NetworkAvailabilityMonitor(conditions: conditions)
         let log = RetryLog()
         var runs = log.ran.makeAsyncIterator()
 
         let first = monitor.retryWhenAvailable(log.retry(1))
         #expect(await monitor.flush() == 1)
+        try await conditions.requireObservers(equalTo: 1)
         #expect(log.recorded.isEmpty, "every report so far said offline")
 
-        await harness.conditions.send(.unrestricted)
+        await conditions.send(.unrestricted)
         #expect(await runs.next() == 1)
         #expect(await monitor.flush() == 0, "a retry that ran is cleared")
 
         let second = monitor.retryWhenAvailable(log.retry(2))
         #expect(await monitor.flush() == 1)
-        // The conditions source keeps only its newest value: the engine must report the drop before connectivity
-        // returns, or the two changes collapse into none.
-        let probe = EventProbe(stream: try await harness.client.subscribe())
-        await harness.conditions.send(NetworkMonitorShimTests.offline)
-        _ = await probe.next { $0 == .conditionsChanged(NetworkMonitorShimTests.offline) }
-        await probe.stop()
-        await harness.conditions.send(.unrestricted)
+        await conditions.send(NetworkMonitorShimTests.offline)
+        await conditions.send(.unrestricted)
         #expect(await runs.next() == 2)
         #expect(log.recorded == [1, 2], "the first retry did not run again")
         #expect(first != second)
-        await harness.client.shutdown()
     }
 
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-CAR-6: a cancelled retry never runs, and cancelling a token that already ran or was cancelled changes nothing", .timeLimit(.minutes(1)))
     func cancelledRetryNeverRuns() async throws {
-        let harness = try await NetworkMonitorShimTests.offlineClient()
-        let monitor = NetworkAvailabilityMonitor(client: harness.client)
+        let conditions = FakeDeviceConditionsSource(initial: NetworkMonitorShimTests.offline)
+        let monitor = NetworkAvailabilityMonitor(conditions: conditions)
         let log = RetryLog()
         var runs = log.ran.makeAsyncIterator()
 
@@ -92,8 +78,9 @@ struct NetworkMonitorShimTests {
         let kept = monitor.retryWhenAvailable(log.retry(2))
         monitor.cancelRetry(cancelled)
         #expect(await monitor.flush() == 1)
+        try await conditions.requireObservers(equalTo: 1)
 
-        await harness.conditions.send(.unrestricted)
+        await conditions.send(.unrestricted)
         #expect(await runs.next() == 2)
         // Pending retries run together, in registration order: had the cancelled one been pending, it would be first.
         #expect(log.recorded == [2])
@@ -101,7 +88,6 @@ struct NetworkMonitorShimTests {
         monitor.cancelRetry(kept)
         monitor.cancelRetry(cancelled)
         #expect(await monitor.flush() == 0)
-        await harness.client.shutdown()
     }
 
     @available(macOS 15.0, iOS 18.0, *)
@@ -114,13 +100,16 @@ struct NetworkMonitorShimTests {
         try await harness.settleLaunch()
         // The launch run is over: the client has no work, so its engine observes nothing (R-SYN-14). This is the prior
         // art's moment: an on-demand fetch failed and the view registers a retry for when the network comes back.
-        let monitor = NetworkAvailabilityMonitor(client: harness.client)
+        try await harness.conditions.requireObservers(equalTo: 0)
+        await harness.conditions.send(NetworkMonitorShimTests.offline)
+        let monitor = NetworkAvailabilityMonitor(conditions: harness.conditions)
         let log = RetryLog()
         var runs = log.ran.makeAsyncIterator()
         monitor.retryWhenAvailable(log.retry(1))
         #expect(await monitor.flush() == 1)
+        try await harness.conditions.requireObservers(equalTo: 1)
+        #expect(log.recorded.isEmpty)
 
-        await harness.conditions.send(NetworkMonitorShimTests.offline)
         await harness.conditions.send(.unrestricted)
 
         #expect(await runs.next() == 1)
@@ -128,24 +117,38 @@ struct NetworkMonitorShimTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CAR-6: a monitor that follows an install point runs its retries once a client is installed and reports connectivity", .timeLimit(.minutes(1)))
-    func monitorFollowsItsInstallPoint() async throws {
-        let point = CDNInstallPoint()
-        let monitor = NetworkAvailabilityMonitor(installPoint: point)
+    @Test("R-CAR-6: a monitor observes nothing until a retry is registered, and its first report counts as the prior art's initial path update", .timeLimit(.minutes(1)))
+    func firstReportCounts() async throws {
+        let conditions = FakeDeviceConditionsSource(initial: .unrestricted)
+        let monitor = NetworkAvailabilityMonitor(conditions: conditions)
         let log = RetryLog()
         var runs = log.ran.makeAsyncIterator()
-        monitor.retryWhenAvailable(log.retry(1))
-        #expect(await monitor.flush() == 1)
-        #expect(log.recorded.isEmpty, "no client, no connectivity report")
-
-        let harness = CompatHarness.make()
-        try await harness.client.start()
-        await MainActor.run {
-            _ = point.install(harness.client)
-        }
-
-        #expect(await runs.next() == 1, "the installed client's online report runs the retry")
         #expect(await monitor.flush() == 0)
-        await harness.client.shutdown()
+        #expect(await conditions.activeObservers == 0, "inert until used")
+
+        monitor.retryWhenAvailable(log.retry(1))
+        #expect(await runs.next() == 1, "the first report says satisfied")
+
+        monitor.retryWhenAvailable(log.retry(2))
+        #expect(await monitor.flush() == 1)
+        #expect(log.recorded == [1], "a later retry waits for the next report")
+        await conditions.send(.unrestricted)
+        #expect(await runs.next() == 2)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-6: releasing a monitor ends its observation", .timeLimit(.minutes(1)))
+    func releasedMonitorStopsObserving() async throws {
+        let conditions = FakeDeviceConditionsSource(initial: NetworkMonitorShimTests.offline)
+        var monitor: NetworkAvailabilityMonitor? = NetworkAvailabilityMonitor(conditions: conditions)
+        let log = RetryLog()
+        monitor?.retryWhenAvailable(log.retry(1))
+        #expect(await monitor?.flush() == 1)
+        try await conditions.requireObservers(equalTo: 1)
+
+        monitor = nil
+
+        try await conditions.requireObservers(equalTo: 0)
+        #expect(log.recorded.isEmpty)
     }
 }

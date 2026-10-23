@@ -1,8 +1,8 @@
 import Foundation
 import ZTronAssetKit
 
-/// R-CAR-6 shim: where the prior art's process-wide entry points (`CDNAssetResolver.installed`,
-/// `CDNLocalStore.shared`, `NetworkAvailabilityMonitor.shared`) find the one `AssetClient` they adapt.
+/// R-CAR-6 shim: where the prior art's process-wide entry points (`CDNAssetResolver.installed`, `CDNLocalStore.shared`)
+/// find the one `AssetClient` they adapt.
 ///
 /// The prior art kept `CDNAssetResolver.installed` in a `nonisolated(unsafe) static var` (RECON D-19), which SPEC §4.2
 /// forbids. An install point is not mutable global state: it is reached through a `static let`, its single slot is
@@ -24,9 +24,6 @@ public final class CDNInstallPoint {
     nonisolated private let initial: AssetClient?
     /// The client installed later, at most once, when there was no initial one.
     private var installed: AssetClient?
-    /// Tasks waiting in `waitForClient()`, resumed by the installation or by their cancellation.
-    private var waiters: [UInt64: CheckedContinuation<AssetClient?, Never>] = [:]
-    private var lastWaiter: UInt64 = 0
 
     /// An empty point whose clients are built from `configuration` and `environment`.
     nonisolated public init(configuration: CDNConfiguration = CDNConfiguration(), environment: AssetEnvironment? = nil) {
@@ -54,11 +51,6 @@ public final class CDNInstallPoint {
             return current
         }
         self.installed = client
-        let waiting = self.waiters
-        self.waiters = [:]
-        for continuation in waiting.values {
-            continuation.resume(returning: client)
-        }
         return client
     }
 
@@ -70,41 +62,5 @@ public final class CDNInstallPoint {
             return current
         }
         return self.install(CDNProviderFactory.makeClient(for: provider, base: self.configuration, environment: self.environment))
-    }
-
-    /// Suspends until a client is installed and returns it; `nil` when the calling task is cancelled first.
-    public func waitForClient() async -> AssetClient? {
-        if let current = self.client {
-            return current
-        }
-        self.lastWaiter += 1
-        let key = self.lastWaiter
-        // REENTRANCY: k-1 (proposed) — nothing is read after the wait: the continuation carries the installed client
-        // (written once, so it cannot change afterwards) or nil, and only one of `install` and `cancelWaiter` finds the
-        // key, so the wait resumes exactly once.
-        return await withTaskCancellationHandler {
-            // REENTRANCY: k-1 (proposed) — as above; the body registers synchronously, after re-reading the slot and
-            // the cancellation flag on the main actor.
-            await withCheckedContinuation { (continuation: CheckedContinuation<AssetClient?, Never>) in
-                if let current = self.client {
-                    continuation.resume(returning: current)
-                } else if Task.isCancelled {
-                    continuation.resume(returning: nil)
-                } else {
-                    self.waiters[key] = continuation
-                }
-            }
-        } onCancel: {
-            // The handler runs on the cancelling thread; the slot is the main actor's, so the withdrawal hops there.
-            // A cancellation that lands before the registration finds no key here, and the body sees the flag.
-            Task { @MainActor in
-                self.cancelWaiter(key)
-            }
-        }
-    }
-
-    /// Resumes a cancelled waiter with `nil`, unless the installation resumed it already.
-    private func cancelWaiter(_ key: UInt64) {
-        self.waiters.removeValue(forKey: key)?.resume(returning: nil)
     }
 }
