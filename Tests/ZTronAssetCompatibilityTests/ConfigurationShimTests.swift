@@ -139,6 +139,22 @@ struct ConfigurationShimTests {
         #expect(later == client.identity)
     }
 
+    @Test("R-CAR-6: the factory compares origins as the transport does: case, a trailing dot and a written default port do not matter")
+    func originsCompareAsTheTransportDoes() throws {
+        let cases: [(String, String?)] = [
+            ("https://CDN.Example.com/media/a.png", "https://cdn.example.com:443"),
+            ("https://cdn.example.com.:443/", "https://cdn.example.com:443"),
+            ("http://cdn.example.com/", "http://cdn.example.com:80"),
+            ("https://cdn.example.com:8443/", "https://cdn.example.com:8443"),
+            ("file:///var/assets/", nil),
+            ("https://./", nil),
+        ]
+        for (string, expected) in cases {
+            let url = try #require(URL(string: string))
+            #expect(CDNProviderFactory.origin(of: url) == expected, "\(string)")
+        }
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
     @Test("R-CAR-6: a prior-art provider at the configured origin keeps the configuration's app key and HTTP settings, and one at another origin gets neither")

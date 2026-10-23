@@ -5,7 +5,10 @@ Stage 2, level L5 after WP-G, branch `wp/k` (based on `l5g-merged`). One entry p
 new file under `Tests/ZTronAssetCompatibilityTests/` (not `CompatibilityShimTests.swift`), bodies and doc comments in
 the two Stage 1 shim files (`Shims/CDNAsset.swift` unchanged, `Shims/CDNSyncProgress.swift`: the `CDNProviding` doc
 comment only), `docs/MIGRATION.md`, this draft. No production source, no contract signature and no other WP's file
-changed.
+changed. `docs/MIGRATION.md` lies in WP-I's `docs/**`; the WP-K launch notes allow it ("You may also write
+docs/MIGRATION.md") and ADR-006 and ADR-037 expect the shims to document their differences there. **For the orchestrator
+at merge:** record it as WP-K's file in ARCHITECTURE §1.2 (a "Files WP-K added" paragraph like WP-F's and WP-G's), so
+WP-I does not treat it as unowned (fix round 1, reqs issue 2).
 
 **Proposed REENTRANCY rows** (the code cites them as "k-n (proposed)"; all are main-actor awaits of
 `CDNSyncCoordinator`, a test-target type, so ARCHITECTURE §10 may list them under a new "compatibility shims"
@@ -72,15 +75,25 @@ heading or by reference to this draft):
   none means any, and the filter applies to manifest-known assets too (ADR-037's deviation, as `AssetFallbackChain.locate`).
 - **Consequences.** Prior-art parity where it was sound (a republished checksum is missing, a stale asset keeps serving
   its old bytes while its new content downloads). Where it was not: the prior art compared an ETag-style checksum with its
-  own SHA-256 and re-downloaded such an asset on every sync (D-16); the shims trust it on presence.
+  own SHA-256 and re-downloaded such an asset on every sync (D-16); `hasAsset` trusts such a checksum on presence, but
+  the client's own manifest validator quarantines an entry whose checksum is present and not a SHA-256 (R-MAN-2), so
+  the client never stores it under that entry (K-11). Both lookups answer `nil`/`false` until the installed client has
+  started (ADR-037, K-11); the doc comments say so.
 
 ## K-5 — The two prior-art providers describe a client tier and serve a manifest; they no longer download · **NEEDS-HUMAN-REVIEW** (shim behaviour)
 - **Context.** In the prior art the providers were the transport (D-1, D-3, D-4, D-7, D-9, D-11). The client has its own
   transport and Apple tier; the shims cannot reach `ZTronAssetTransport` or `ZTronAssetAppleHosted` (K-1).
 - **Decision.** Both keep their initialisers and `CDNProviding` conformance. `StaticManifestCDNProvider` maps to the HTTP
-  tier at its base URL and manifest path (no app key: the prior art sent none); `fetchManifest()` is one GET with
-  `.reloadIgnoringLocalCacheData` on the injected session, a 2xx check (`badResponse` otherwise) and the module's
-  validating `ManifestDecoder` on a `DispatchBlockingExecutor` (C2, D-9). `BackgroundAssetsCDNProvider` keeps
+  tier at its base URL and manifest path (no app key of its own: the prior art sent none; a point configured with that
+  origin and its key keeps the key, K-6); `fetchManifest()` is one GET with `.reloadIgnoringLocalCacheData` on the
+  injected session, a 2xx check (`badResponse` otherwise) and the module's validating `ManifestDecoder` on a
+  `DispatchBlockingExecutor` (C2, D-9). It answers the validated manifest (`CDNAsset(entry:)` per entry), not the raw
+  decoded array the prior art returned: checksums come back in lowercase hex, and entries the validator quarantines are
+  left out (an invalid identifier, extension or remote path, and a checksum that is present but not 64 hex characters,
+  R-MAN-2). `verifyFullyAvailable` is unaffected (it compares through `hasAsset`); a direct caller sees the normalised
+  values. Pinned by `R-CAR-6: StaticManifestCDNProvider answers the validated manifest: checksums in lowercase hex,
+  quarantined entries left out` (fix round 1: the reqs verifier expected a non-SHA-256 checksum to come back `nil`; the
+  validator quarantines the entry instead, which the test shows). `BackgroundAssetsCDNProvider` keeps
   `@available(iOS 26.0, *)`, maps to the Apple-hosted tier with SPEC §2.3's layout (the client reads its catalog from the
   essential pack; the app-supplied catalog is what `fetchManifest()` answers, as before). `downloadAsset` is deprecated on
   both and throws `CDNShimError.downloadsGoThroughTheClient` (the Apple provider still reports a malformed `remotePath`
@@ -90,7 +103,7 @@ heading or by reference to this draft):
   calls it.
 - **Consequences.** A direct caller of `provider.downloadAsset` gets a deprecation warning and a typed error at run time.
 
-## K-6 — The prior-art initialisers share one client per install point · **NEEDS-HUMAN-REVIEW** (shim behaviour)
+## K-6 — The prior-art initialisers share one client per install point · **NEEDS-HUMAN-REVIEW** (shim behaviour; storage location)
 - **Context.** The prior art's object graph is a provider plus `CDNLocalStore.shared`, wired separately into
   `CDNAssetResolver(cdn:)` and `CDNSyncCoordinator(cdn:)`. One root admits one client (R-STO-9), and the client's
   transport is fixed when it is built.
@@ -98,11 +111,39 @@ heading or by reference to this draft):
   `CDNSyncCoordinator(cdn:localStore:defaults:appVersionProvider:)` use the client of their store's point, built there on
   first use from the provider (`CDNInstallPoint.installClient(for:)`: K-5's tier for the two prior-art providers, the
   point's configured tiers for a custom provider, which is never used as a transport). `CDNLocalStore()` binds the process
-  point (a second default store must not build a second client); `CDNLocalStore(baseDirectory:)` gets a point of its own
-  whose client keeps its root in that directory (`StorageLocation.custom`) and migrates the prior art's files found there
-  (legacy removal only unlinks listed files and empty directories, so the nested store root is safe). `computeChecksum`,
-  `defaults` and `appVersionProvider` are ignored (the client verifies SHA-256, keeps its stamp in its index and migrates
-  the `UserDefaults` stamp once, R-STO-11). The coordinator's new initialiser is `init(client:cdn:)`.
+  point (a second default store must not build a second client). `computeChecksum`, `defaults` and `appVersionProvider`
+  are ignored (the client verifies SHA-256, keeps its stamp in its index and migrates the `UserDefaults` stamp once,
+  R-STO-11). The coordinator's new initialiser is `init(client:cdn:)`.
+- **`CDNLocalStore(baseDirectory: X)` (storage location; fix round 1).** The prior art's `X` is the legacy root
+  (`LegacyMigrationPolicy(root: X)`), and the store's base is `X`'s parent: `StorageLocation.custom(X.deletingLastPathComponent())`,
+  root `<parent>/ZTronAssetKit/v1`, beside `X`. Options: (a) `.custom(X)`, the first implementation, which nests the store
+  inside the legacy root: WP-C refuses to migrate a legacy root that is, contains or lies inside the store's directory
+  (`LegacyPlacement.swift`, pinned by WP-C's R-STO-11 test), so nothing was adopted, the prior art's files and stamp stayed
+  for good, every asset was downloaded again and an error was logged on every launch; and `open()` creates only
+  `<base>/ZTronAssetKit`, so on a fresh install (no `X` yet; the prior art created it) `start()` threw
+  `storageUnavailable`. Both verifier lenses proved it with probes. (b) The default `.applicationSupport`: it moves the
+  store out of the durability class the app chose (`Caches` or `Documents`), may lie on another volume than a custom `X`
+  (migration then drops the root, C-14), and overlaps an `X` that is an ancestor of Application Support. (c) The parent, chosen: the same volume as `X` (migration renames,
+  C-14), the app's durability class, an existing directory on a fresh install (`Caches`, `Documents`), never overlapping
+  `X`. Residuals, documented on the initialiser and in MIGRATION.md: a missing parent still fails `start()`; two
+  directories with one parent share one root, which admits one client (R-STO-9: the second `start()` throws
+  `storageUnavailable(.locked)`), so one store per parent directory (sharing one point per directory would need a
+  main-actor registry, global mutable state under SPEC §4.2: the owner's call, not taken); an `X` named `ZTronAssetKit`
+  is the store's own directory, which WP-C refuses to migrate. Pinned by `R-CAR-6: the prior-art local store
+  initialiser's client adopts the prior art's files found in its directory and downloads nothing` (seeded prior-art tree:
+  the resolve answers the adopted blob under `<parent>/ZTronAssetKit/v1/`, no transfer starts, the legacy file is renamed
+  away, no "overlaps the store" line is logged), `…starts on a fresh install, before its directory exists` and `two
+  prior-art stores in one parent directory share one root, which admits one client (R-STO-9)`; all three failed on the
+  first implementation (`82490e7`).
+- **The app key (fix round 1).** For a prior-art provider the provider's tier replaces the base remote, which dropped a
+  configured key: a point built with `CDNConfiguration(baseURL: origin, appKey: key)` gave `StaticManifestCDNProvider`
+  at `origin` a client without it, and SPEC §2.3's origin answers 403 without `x-zombietron-app-key`. Now
+  `CDNProviderFactory.configuration(for:base:)` keeps `base`'s HTTP settings (key, key header, allowed hosts, connection
+  cap, timeout, background policy) with the provider's base URL and manifest path when both name the same origin
+  (scheme, host and port, normalised as the transport's `Origin`), and never carries the key to another origin (R-NET-4).
+  The process install point's configuration names no origin, so the prior-art idiom there still builds a client without
+  a key: MIGRATION.md step 3 says to install a configured client first. Pinned by `R-CAR-6: a prior-art provider at the
+  configured origin keeps the configuration's app key and HTTP settings, and one at another origin gets neither`.
 - **Consequences.** The prior-art launch idiom (`CDNAssetResolver.installed = CDNAssetResolver(cdn: provider)`, then
   `CDNSyncCoordinator(cdn: provider)`) runs one client in either order (the losing side's unstarted client is dropped
   without I/O, P-12). Pinned by `R-CAR-6: prior-art resolvers and coordinators on one store share the one client its
@@ -121,7 +162,20 @@ heading or by reference to this draft):
   fetches, not every manifest entry (stored assets are not counted as completed). `.upToDate` means "no sync was due when
   this call asked": the client's own launch run (R-SYN-9) may have synced moments earlier in the same launch, and a call
   that finds that run active joins it and reports its outcome. A complete `verifyAndRepair` also writes the stamp
-  (sync.md §12.3). A partial run (`completeWithFailures`) is `.failed(reason:)` and leaves the sync due, as before.
+  (sync.md §12.3). A partial run (`completeWithFailures`) is `.failed(reason:)` and leaves the sync due, as before. A
+  blocked run (`SyncOutcome.blocked`: every remaining job waits on a gate: offline, an open breaker, a throttle, space,
+  and under ADR-036's defaults Low Power Mode, Low Data Mode or serious thermal pressure for bulk work, where the prior
+  art downloaded regardless) is `.failed(reason: "blocked(…)")`, fills `lastReconciliation` from its report (the run
+  reconciled before its downloads waited) and leaves the sync due. The engine keeps a pending run and starts it by itself
+  once the gate opens (sync-2 S2-03, after `pendingRunDebounce`); the coordinator does not observe it, so `progress`
+  keeps the call's outcome while those assets arrive in the same launch. Pinned by `R-CAR-6: a run blocked by Low Power
+  Mode reports failed with blocked and stays due, and the client finishes it unobserved once the gate opens` (fix
+  round 1). Once per app version: `R-CAR-6: once per app version: a later launch of the same version reports upToDate
+  without a manifest request, and a new version syncs at launch` runs three launches on one volume. On a new version the
+  client's own launch run performs the sync, so the coordinator's answer is `.complete` only if its call joins that run;
+  no public API tells a test when a call has joined, so the test settles the launch run first and pins `.upToDate`
+  afterwards, plus one manifest request and only the new catalog's asset fetched (the reqs verifier asked for
+  `.complete`; MIGRATION.md §3's row now says what is pinned).
   Observation for the orchestrator: a `.complete` run whose manifest fetch passed its deadline maps to `.complete` (the
   Stage 1 mapping in `CDNSyncProgress.swift`) while the stamp is not written; the next launch retries, which keeps the
   prior art's retry semantics, so the mapping was left as it is.
@@ -169,7 +223,9 @@ heading or by reference to this draft):
   fence: the harness's tuning sets `manifestFetchDeadline` to 10^6 s, beyond anything the auto-moves add up to, so only
   short store windows (the commit window, a commit retry, a trailing progress emission) pass by themselves. Also:
   `snapshotInstallInterval` 0 (a run's snapshots are installed when `sync` returns) and `maxAttemptsPerRun` 1 (a failure
-  is final within its run; a retry would wait for an unscripted step).
+  is final within its run; a retry would wait for an unscripted step). `make(tuning:)` lets a test bring one more delay
+  inside the horizon (the blocked-run test's `pendingRunDebounce`, 0.5 s instead of 5 s, so no explicit clock move races
+  the engine's scheduling of it); `relaunch(appVersion:)` builds a later launch's client over the same fakes (fix round 1).
 - **L5-R14 patterns.** No run races the call under test: launches settle first (`settleLaunch()`: `sync(.ifDue)` joins
   the launch run or answers `notDue` after its stamp); coordinator tests use `.atMostEvery(3600)` and move the clock past
   the interval explicitly while the client is idle, so the run a call reports is the one it starts. Mid-flight states
@@ -183,12 +239,19 @@ heading or by reference to this draft):
   cause. Wall times in reports advance with the auto-moves; no test asserts them.
 
 ## K-11 — Deviations inherited from the module, pinned through the shims
-- **Decision.** Three behaviours differ from the prior art because the module decided them, and a shim test pins each so a
+- **Decision.** Five behaviours differ from the prior art because the module decided them, and a shim test pins each so a
   later module change shows up here: a 404 for an asset's new content fails the record until its entry changes, so its old
   bytes are no longer served (ADR-032; ADR-053, L4-R16; the prior art kept the old file and re-requested it on every sync,
   D-16), while a transient failure keeps the old bytes until a later sync fetches the new ones; the extension filter at the
-  local step (ADR-037); and an on-demand resolve that downloads before its candidate check (as `AssetFallbackChain.fetch`;
-  the prior art checked the manifest entry first).
+  local step (ADR-037); an on-demand resolve that downloads before its candidate check (as `AssetFallbackChain.fetch`;
+  the prior art checked the manifest entry first); the synchronous lookups answer only after `start()` installed the
+  first snapshot (ADR-037; the prior art read the disk from launch on, RECON §5); and an entry whose checksum is present
+  but not a SHA-256 is quarantined (R-MAN-2), never downloaded, where the prior art downloaded it on every sync (D-16).
+  Fix round 1 completed the 404 pin (a changed entry is then requested once and stored) and added the lookup pin
+  (`R-CAR-6: the lookups answer nil for an asset stored in an earlier launch until the installed client has started, and
+  its file right after`) and the quarantine pin (K-5's provider test). MIGRATION.md step 3 now starts the client before
+  carousel content is created; the doc comments of `CDNLocalStore`, `existingLocalURL`, `hasAsset` and
+  `CDNProviderFactory.install` say the lookups wait for `start()`.
 
 ## K-12 — Test-first with compiling skeletons
 - **Decision.** Each component landed as a commit of failing tests with a compiling skeleton (the final signatures and
@@ -201,12 +264,53 @@ heading or by reference to this draft):
   stale asset observed while its new content is in flight; the transient and 404 cases of K-11; a wait cancelled after
   it registered). Two later commits change no behaviour under test: `066b0a5` drops a progress guard the engine makes
   unreachable and covers the default legacy root, `35c9f8f` pins the carousel's call sites (K-3), tests of shims that
-  already existed.
+  already existed. Fix round 1, test first again: `82490e7` (12 issues on the round-0 shims: the store's placement, the
+  fresh install, one root per parent, the app key, `localURL` confinement) → `e81449c` (all pass), then `9150501`
+  (pins of module behaviour that passed on arrival: lookups before `start()`, the blocked run, once per app version, the
+  validated manifest, the changed entry after a 404, the app-version seam).
 
 ## K-13 — An optional future API (not a contract change request)
 - A public read of the client's applied manifest (for example `AssetClient.manifestEntries(scope:)`, no network) would
   let `cachedAsset(forIdentifier:)` reflect the client's manifest and `verifyFullyAvailable()` work without a provider.
   The shims work without it (K-6, K-7); recorded for the owner, not requested.
+
+## K-14 — The deprecated `localURL(for:)` stays inside the legacy root (fix round 1)
+- **Context.** For an asset the client does not hold, `localURL(for:)` builds the prior art's pretty path from
+  manifest-supplied `localPathComponents` and `resolvedFileName`. A crafted entry (`..`, or a component containing `/`)
+  named a path outside the legacy root, which app code might read or write (R-SEC-2's spirit; the prior art joined them as
+  given).
+- **Decision.** Directory components that are empty, `.` or `..`, or that contain `/`, are dropped; in the file name
+  every `/` becomes `_`, and a name that would be `.` or `..` is `_`. The identifier's segments (`split(".")`) never
+  yield `.`, `..` or empty components, so only a `/` in them is affected.
+- **Consequences.** Valid entries keep the prior art's path (the layout test is unchanged); crafted ones stay under the
+  root. Pinned by `R-CAR-6: localURL keeps a crafted entry's path inside the legacy root` (failing at `82490e7`, before the fix).
+
+## Fix round 1 — the verifiers' issues and what became of them
+- reqs 1 / correct 1 (blocking, `CDNLocalStore(baseDirectory:)` nests the store in the legacy root; fresh install):
+  fixed (K-6), test first.
+- correct 2 (blocking, cold-launch lookups answer nil until `start()`): fixed in MIGRATION.md step 3 and §4, the doc
+  comments, K-11; pinned by a new test (K-11).
+- reqs 2 (ownership of `docs/MIGRATION.md`): authorised by the launch notes; recorded in this draft's header for the
+  orchestrator, who owns ARCHITECTURE §1.2.
+- reqs 3 (blocked outcome): test added, documented in K-7, MIGRATION.md §4 and `syncIfNeeded()`'s doc comment.
+- reqs 4 (once per app version): test added in the deterministic form K-7 describes; the MIGRATION.md §3 row says what it
+  pins. A coordinator `.complete` on a version change is not pinned: it depends on the call joining the client's own
+  launch run, which no public API lets a test order.
+- reqs 5 (the 404 pin's second half): done (K-11).
+- reqs 6 (`defaultAppVersion`): an `appVersion(from:)` seam is tested with synthetic Info dictionaries (order, missing
+  keys) and `defaultAppVersion()` against the main bundle directly.
+- reqs 7 / correct 6 (`hasAsset` doc said "not stale"): fixed; K-4 already said staleness is not consulted.
+- reqs 8 (`fetchManifest()` normalisation undocumented): documented in K-5 and MIGRATION.md §2 and pinned; a checksum
+  that is not a SHA-256 quarantines its entry rather than coming back `nil`.
+- reqs 9 (MIGRATION.md floors sentence): fixed.
+- correct 3 (app key dropped for a prior-art provider): fixed at the same origin, documented for the process point (K-6).
+- correct 4 (two stores over one directory): the new placement makes it "one store per parent directory"; documented
+  (K-6, the initialiser, MIGRATION.md) and pinned. **Declined:** sharing one install point per directory, which needs a
+  main-actor registry (global mutable state, SPEC §4.2); the owner's call.
+- correct 5 (REENTRANCY comments on `run(.ifDue)` and `run(.force)`): added (k-1).
+- correct 7 (`localURL(for:)` sanitising): fixed (K-14).
+- correct 8 (stale line citation in a test message): now cites k-2 and `CDNSyncCoordinator.run(_:)`.
+- correct 9 (P-13 benchmark overrun): not WP-K's (no source or benchmark file changed); see the evidence below.
 
 ## Not verified here
 - The shims at the iOS 15 floor at run time: the test target builds at iOS 17 / macOS 14 (ADR-051), the shims run on the
