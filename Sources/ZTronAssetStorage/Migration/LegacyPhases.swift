@@ -394,6 +394,22 @@ extension AssetStore {
             // REENTRANCY: R17 — nothing but the phase: the adoptions were bound before the await.
             await self.publishSnapshot(urgency: .bulk)
         }
+        // With the queue empty and every claimed file an adopt-on-demand's (from its claim to its snapshot), this call can
+        // only wait: returning would make its caller call again at once, a hot loop for as long as that adoption hashes
+        // (orchestrator ruling L5K-R17). It waits for one such processing at a time, then re-reads the queue, the claims
+        // and the phase, so it finishes the migration itself once the last one ended. Each wait is bounded by one
+        // adoption, and `close()` resumes it through that adoption (row k-5).
+        while self.state.migration.queue.isEmpty, self.state.migration.phase == .inProgress,
+              let held = self.state.migration.claimed.first,
+              self.state.migration.claimed.allSatisfy({ self.state.migration.onDemand[$0.components] != nil })
+        {
+            self.environment.log.log(.store, .debug, "a migration batch waits for an adopt-on-demand of the last claimed legacy files")
+            // REENTRANCY: k-7 (proposed) — the queue, the claims and the phase are re-read once that processing ended
+            // (adopted, dropped or kept: no longer claimed; deferred or cancelled: back in the queue, which ends the wait);
+            // `checkLive` answers a closing store.
+            await self.awaitLegacyFlight(of: held)
+            try self.checkLive()
+        }
         if self.state.migration.queue.isEmpty, self.state.migration.claimed.isEmpty, self.state.migration.phase == .inProgress {
             // REENTRANCY: R17, c-4 (proposed) — see `finishLegacyMigration`.
             try await self.finishLegacyMigration(root)
