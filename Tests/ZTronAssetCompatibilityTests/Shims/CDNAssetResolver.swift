@@ -57,9 +57,17 @@ public struct CDNAssetResolver: Sendable {
             CDNInstallPoint.process.resolver
         }
         set {
-            if let newValue {
-                CDNInstallPoint.process.installResolver(newValue)
-            }
+            CDNAssetResolver.setInstalled(newValue, on: .process)
+        }
+    }
+
+    /// What setting `installed` does, on any install point: `value`'s client is installed unless `point` holds one
+    /// already, and `nil` changes nothing (there is no uninstallation, K-2). The setter passes the process point; tests
+    /// pass local points, because none may fill the process point (it lasts as long as the test process).
+    @MainActor
+    static func setInstalled(_ value: CDNAssetResolver?, on point: CDNInstallPoint) {
+        if let value {
+            point.installResolver(value)
         }
     }
 

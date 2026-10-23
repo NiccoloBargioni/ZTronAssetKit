@@ -130,4 +130,30 @@ struct ResolverShimTests {
         #expect(later == first.identity, "the first installation wins")
         #expect(current == first.identity)
     }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: setting CDNAssetResolver.installed installs the value's client, a later value keeps the first client and nil changes nothing")
+    func settingInstalled() {
+        let harness = CompatHarness.make()
+        let point = CDNInstallPoint()
+        let first = AssetClient(configuration: harness.configuration, environment: harness.environment)
+        let second = AssetClient(configuration: harness.configuration, environment: harness.environment)
+
+        // The setter's body on a local point (the setter passes `.process`, which no test may fill, K-2): the prior
+        // art's launch idiom `CDNAssetResolver.installed = CDNAssetResolver(…)`, then later assignments.
+        CDNAssetResolver.setInstalled(nil, on: point)
+        let afterNilOnEmpty = point.client?.identity
+        CDNAssetResolver.setInstalled(CDNAssetResolver(client: first), on: point)
+        let afterFirst = point.resolver?.client.identity
+        CDNAssetResolver.setInstalled(CDNAssetResolver(client: second), on: point)
+        let afterSecond = point.resolver?.client.identity
+        CDNAssetResolver.setInstalled(nil, on: point)
+        let afterNil = point.resolver?.client.identity
+
+        #expect(afterNilOnEmpty == nil, "nil installs nothing")
+        #expect(afterFirst == first.identity, "a value installs its client")
+        #expect(afterSecond == first.identity, "the first installation wins")
+        #expect(afterNil == first.identity, "nil uninstalls nothing")
+    }
 }
