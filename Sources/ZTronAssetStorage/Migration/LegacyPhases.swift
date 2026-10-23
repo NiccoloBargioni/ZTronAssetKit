@@ -556,9 +556,11 @@ extension AssetStore {
     // MARK: Adopt on demand
 
     /// `adoptLegacyNow(_:urgency:)`: the current location when the asset is present; otherwise, while migration runs,
-    /// adopts its legacy file now and publishes the snapshot at `urgency` (at once for `.userInitiated`, L5K-R14). Each
-    /// adoption is counted once, by the call that adopted the file; a drop only by the call that took the file from the
-    /// queue.
+    /// adopts its legacy file now and publishes the snapshot at `urgency` (at once for `.userInitiated`, L5K-R14). A
+    /// `.userInitiated` call installs the snapshot before it answers an asset that is present already too, since the
+    /// adoption that made it present may be in a coalesced snapshot only (orchestrator ruling L5K-R18); a `.bulk` or
+    /// `.prefetch` call answers it at once. Each adoption is counted once, by the call that adopted the file; a drop only by
+    /// the call that took the file from the queue.
     ///
     /// One adoption per legacy file, whoever asks (orchestrator ruling L5K-R13). A call that finds the file being
     /// processed by another adopt-on-demand (`MigrationState.onDemand`, from its claim to its snapshot) or being adopted by
@@ -575,11 +577,13 @@ extension AssetStore {
             // `awaitOpen` re-reads the phase itself.
             try await self.awaitOpen()
             if let location = self.location(for: id, extensions: [], recordingAccess: false) {
-                guard joined else {
+                guard joined || urgency == .userInitiated else {
                     return location
                 }
-                // The adoption this call waited for may be in a coalesced snapshot only (a batch's): this call publishes
-                // at its own urgency, so a user-initiated one installs its answer at once, whoever adopted the file.
+                // The adoption this call waited for, or one that ended before it asked (a batch's, a bulk-lane call's), may
+                // be in a coalesced snapshot only: this call publishes at its own urgency, so a user-initiated one installs
+                // its answer at once, whoever adopted the file (L5K-R14; orchestrator ruling L5K-R18: a job promoted to the
+                // user-initiated lane during its bulk adoption asks again at this urgency).
                 // REENTRANCY: R17 — nothing but the phase: the location is read from the record afterwards.
                 await self.publishSnapshot(urgency: urgency)
                 return self.location(for: id, extensions: [], recordingAccess: false)

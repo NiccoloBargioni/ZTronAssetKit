@@ -359,6 +359,31 @@ extension LegacyOnDemandRaceTests {
         #expect(userInstalls == 1, "the user-initiated adoption installed its snapshot before it returned")
         #expect((bulkIDs + [userID]).allSatisfy { installed.location(for: $0, extensions: []) != nil }, "that install carries the coalesced bulk adoptions too")
     }
+
+    @Test("R-STO-13: a user-initiated adopt-on-demand of an asset a bulk adoption made present, so far in a coalesced snapshot only, installs it before it answers (L5K-R18)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func userInitiatedAskOfACoalescedAdoptionInstalls() async throws {
+        // ARCHITECTURE §5's interval; the clock never moves, so after one install the window stays closed.
+        let race = try await LegacyRace.open(installInterval: 0.1)
+        let queue = await race.harness.state.migration.queue
+        try #require(queue.count >= 2, "the fixture queues enough files")
+        let opener = try #require(queue.last?.ids.first)
+        let id = try #require(queue.first?.ids.first)
+        // The first bulk adoption installs (the window was open) and closes the window; the second publishes inside it.
+        _ = try await race.harness.store.adoptLegacyNow(opener, urgency: .bulk)
+        let coalesced = try await race.harness.store.adoptLegacyNow(id, urgency: .bulk)
+        let before = await race.harness.sink.installed.location(for: id, extensions: [])
+        let installsBefore = await race.harness.sink.offeredKeys.count
+        // What the engine's funnel does for a job promoted to the user-initiated lane during that adoption (L5K-R18).
+        let answer = try await race.harness.store.adoptLegacyNow(id)
+        let installs = await race.harness.sink.offeredKeys.count - installsBefore
+        let after = await race.harness.sink.installed.location(for: id, extensions: [])
+
+        #expect(coalesced != nil && answer == coalesced, "both calls answer the adopted asset's location")
+        #expect(before == nil, "premise: the bulk adoption was in a coalesced snapshot only")
+        #expect(installs == 1, "the user-initiated call installed the snapshot before it answered: \(installs) installs")
+        #expect(after != nil, "R-STO-13: the readers' snapshot holds the asset when the user-initiated call returns")
+    }
 }
 
 /// A store over a legacy tree, opened, with stepped executors that let every unit through until a test holds them, and
