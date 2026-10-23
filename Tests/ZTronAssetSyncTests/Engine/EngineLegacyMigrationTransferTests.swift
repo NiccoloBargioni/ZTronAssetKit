@@ -460,7 +460,7 @@ struct EngineLegacyMigrationTransferTests {
     // MARK: The install rate during migration (L5K-R14)
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("ARCHITECTURE §5 during legacy migration: a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows, and a user-initiated job's adoption installs at once (L5K-R14)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows (ARCHITECTURE §5), and a user-initiated job's adoption installs at once (L5K-R14)", .timeLimit(.minutes(1)))
     func adoptionsKeepTheInstallRate() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(100, seed: 8_100)
