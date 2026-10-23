@@ -22,7 +22,8 @@ public final class CDNSyncCoordinator: ObservableObject {
 
     /// The client this coordinator drives.
     nonisolated public let client: AssetClient
-    /// The manifest source of `verifyFullyAvailable()`: the client applies manifests internally and hands no entries out.
+    /// The manifest source of `verifyFullyAvailable()`: the client applies manifests internally and hands no entries
+    /// out. Its fetch must reach the origin on its own (an app key included, SPEC §2.3).
     private let cdn: any CDNProviding
     /// The client's lookups, for `verifyFullyAvailable()`.
     private let localStore: CDNLocalStore
@@ -83,6 +84,12 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// pressure) is `.failed(reason: "blocked(…)")` and leaves the sync due; the client then finishes it by itself once
     /// the gate opens, which this coordinator does not observe, so `progress` keeps the call's outcome while those
     /// assets arrive.
+    ///
+    /// On the first launch after adoption, a call made while legacy migration is still adopting the prior art's files
+    /// (which it does after `start()` has returned) does not wait for it: it starts a run at once, and that run downloads
+    /// again every prior-art file migration has not adopted yet, where R-STO-11 wants them moved (CCR-K1, an engine
+    /// defect reported for WP-F; K-15). The client's own launch run waits for migration, so until the engine is fixed,
+    /// leave that launch's sync to it (MIGRATION.md step 4).
     public func syncIfNeeded() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.ifDue)
@@ -90,6 +97,10 @@ public final class CDNSyncCoordinator: ObservableObject {
 
     /// Fetches a fresh manifest from `cdn` and returns every asset in it that is not stored at its content
     /// (`CDNLocalStore.missingOrStaleAssets`), downloading nothing. Throws only when the manifest fetch throws.
+    ///
+    /// The fetch is `cdn`'s own request. `StaticManifestCDNProvider` sends no app key, so at SPEC §2.3's origin, which
+    /// answers 403 without one, this throws `StaticManifestCDNProviderError.badResponse` on every call: pass a manifest
+    /// source that sends the key to that origin and no other (MIGRATION.md step 4, K-5).
     public func verifyFullyAvailable() async throws -> [CDNAsset] {
         // REENTRANCY: k-3 (proposed) — nothing of the coordinator is read across the fetch; the client's snapshot is
         // read after it, so the comparison uses what is stored when the manifest arrived.
@@ -99,7 +110,9 @@ public final class CDNSyncCoordinator: ObservableObject {
 
     /// A repair pass regardless of the refresh policy: `AssetClient.sync(.force)`, publishing progress as
     /// `syncIfNeeded()` does. Unlike the prior art, a complete repair also writes the sync stamp, which is true and
-    /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version").
+    /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version"). A repair
+    /// while legacy migration is still adopting downloads the files it has not adopted yet, as `syncIfNeeded()` does
+    /// (CCR-K1).
     public func verifyAndRepair() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.force)

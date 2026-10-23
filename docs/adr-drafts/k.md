@@ -20,7 +20,25 @@ heading or by reference to this draft):
 | k-2 | the follower's `for await event in events` (a main-actor task) | Each event is applied in the turn it arrives, after `self` is re-read (weak: a released coordinator publishes nothing). Progress never moves backwards within a run by construction (sync.md §10.6: the engine's completed count is monotone and one subscription delivers a run's progress in order, newest-wins), so no guard is needed. |
 | k-3 | `CDNSyncCoordinator.verifyFullyAvailable()`: `cdn.fetchManifest()` | Nothing of the coordinator; the client's snapshot is read after the fetch, so the comparison uses what is stored when the manifest arrived. |
 
-**Contract change requests:** none. (K-13 notes an optional future API; the shims do not need it.)
+**Contract change requests:** no signature change. One behaviour change in another WP's code (fix round 2):
+
+- **CCR-K1 (WP-F engine, behaviour only; blocking R-STO-11 for a sync requested during legacy migration).**
+  `SyncEngine.performSync` starts an explicit run while legacy migration is running: `EngineRuns.swift:10-39`
+  reaches `startRun(trigger: .explicit, mode:)` at :39 and never reads `state.migration.running`, while `start()`
+  (`EngineLifecycle.swift:317-331`) settles at :317, spawns the migration at :320 and parks only the launch run
+  (`launchRunWaiting`, :331). Bulk jobs never try `store.adoptLegacyNow` (`EngineCommands.swift:56` is on the resolve
+  path only). So `CDNSyncCoordinator.syncIfNeeded()` (`sync(.ifDue)`) or `verifyAndRepair()` right after `start()` on
+  the first launch after adoption downloads every prior-art file phase 2 has not adopted yet, where R-STO-11 wants it
+  moved (K-15: 6 to 41 of 150 files in 15 of 15 runs). Minimal change, WP-F's choice: (a) while
+  `state.migration.running` (or pending and not deferred), `performSync` sets `launchRunWaiting` and joins the run the
+  migration loop's `defer` starts (`EngineRuns.swift:1055-1058`) instead of starting one; or (b) before a bulk job
+  starts a transfer for a record whose legacy file is still pending, it tries `store.adoptLegacyNow`, as `awaitAsset`
+  does. Tripwire: `R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes
+  and downloads none of the prior art's files (CCR-K1)`, whose download count sits in `withKnownIssue(…,
+  isIntermittent: true)`; remove the wrapper with the fix. WP-F's F-8 pins only the launch run, so WP-F's own tests
+  need the direct case too. Until then MIGRATION.md step 4 keeps the coordinator out of the launch task.
+
+(K-13 notes optional future APIs; the shims do not need them.)
 
 ---
 
@@ -46,7 +64,11 @@ heading or by reference to this draft):
   installation wins and every later one returns the installed client. `CDNAssetResolver.installed` is a `@MainActor`
   computed property over it (`get`: a resolver over the installed client; `set`: installs the new value's client;
   `installed = nil` changes nothing); `CDNLocalStore.shared` is `CDNLocalStore(installPoint: .process)`.
-  `CDNProviderFactory.install(_:into:environment:)` installs into it. Every shim also takes an explicit client.
+  `CDNProviderFactory.install(_:into:environment:)` installs into it. Every shim also takes an explicit client. The
+  setter's body is `setInstalled(_:on:)`, an internal seam that takes the point, called with `.process` (fix round 2),
+  so the prior art's assignment is tested on local points: `R-CAR-6: setting CDNAssetResolver.installed installs the
+  value's client, a later value keeps the first client and nil changes nothing` (a seam that drops its value fails it
+  with 3 issues).
 - **Consequences.** After launch the slot is as immutable as a lazily initialised `static let`, only with a value the
   app supplies; there is no `static var` with storage. Deviation from the prior art: no re-installation or
   uninstallation (the prior art documented one installation at launch). Tests never fill the process point (they use
@@ -101,6 +123,21 @@ heading or by reference to this draft):
 - **Options considered.** Keeping a working download path in the providers (a per-download session or a temp-file
   staging sink) would keep the defects the module removes alive and write outside the store (D-7); nothing in the shims
   calls it.
+- **The provider's own fetch has no app key (fix round 2) · NEEDS-HUMAN-REVIEW (shim API).** `fetchManifest()` sends no
+  `x-zombietron-app-key`, so SPEC §2.3's origin answers it 403 and `CDNSyncCoordinator.verifyFullyAvailable()` through
+  `StaticManifestCDNProvider` throws `badResponse` on every call there (MIGRATION.md step 4 handed it that provider
+  before this round). Options: (a) keep the provider keyless, say so, and recommend a manifest source that reaches the
+  origin: an app-defined `CDNProviding` that sends the key to the configured origin and to no other, or the module's
+  `client.availability(scope:)` (counts against the manifest the client fetched with its key, no network); (b) an
+  additive initialiser that takes the key for the provider's own request and refuses a redirect to another origin
+  (R-NET-4). (b) needs the key as a plain `String`, because the shims cannot read `AppKey.secret` (K-1): a second copy
+  outside `AppKey`'s redaction (R-SEC-1), plus a task delegate for redirects, which is new secret-handling code in a
+  compatibility layer for a call nothing in ZTronCarouselCore or ZTronCarousel makes. Chosen: (a), the owner's call;
+  (b) stays available as an additive change. Documented in MIGRATION.md step 4, §2 and §4 and the doc comments of
+  `fetchManifest()`, `verifyFullyAvailable()` and the coordinator's `cdn`; pinned by `R-CAR-6: StaticManifestCDNProvider
+  sends no app key, so verifyFullyAvailable through it fails with the 403 of an origin that requires one, while a
+  manifest source that sends the key reaches it` (a loopback origin that answers 403 without the header and 200 with
+  it).
 - **Consequences.** A direct caller of `provider.downloadAsset` gets a deprecation warning and a typed error at run time.
 
 ## K-6 — The prior-art initialisers share one client per install point · **NEEDS-HUMAN-REVIEW** (shim behaviour; storage location)
@@ -125,16 +162,23 @@ heading or by reference to this draft):
   store out of the durability class the app chose (`Caches` or `Documents`), may lie on another volume than a custom `X`
   (migration then drops the root, C-14), and overlaps an `X` that is an ancestor of Application Support. (c) The parent, chosen: the same volume as `X` (migration renames,
   C-14), the app's durability class, an existing directory on a fresh install (`Caches`, `Documents`), never overlapping
-  `X`. Residuals, documented on the initialiser and in MIGRATION.md: a missing parent still fails `start()`; two
-  directories with one parent share one root, which admits one client (R-STO-9: the second `start()` throws
-  `storageUnavailable(.locked)`), so one store per parent directory (sharing one point per directory would need a
-  main-actor registry, global mutable state under SPEC §4.2: the owner's call, not taken); an `X` named `ZTronAssetKit`
-  is the store's own directory, which WP-C refuses to migrate. Pinned by `R-CAR-6: the prior-art local store
+  `X`. Residuals, documented on the initialiser and in MIGRATION.md: a missing parent still fails `start()`; one client
+  per resolved base directory (R-STO-9: the second `start()` throws `storageUnavailable(.locked)`), counting every
+  client of the process: two directories with one parent share one root (sharing one point per directory would need a
+  main-actor registry, global mutable state under SPEC §4.2: the owner's call, not taken), and `.custom(<Caches>)` or
+  `.custom(<Application Support>)` is the root of a client at `StorageLocation.caches` or `.applicationSupport`, the
+  process install point's for example (`OpenUnits.base` returns a custom URL as it is; fix round 2); one legacy root per
+  process: a store over the prior art's default `<Caches>/CDNAssets` and an installed process client with the default
+  `LegacyMigrationPolicy()` would both migrate that tree, so they must not run together; an `X` named `ZTronAssetKit` is
+  the store's own directory, which WP-C refuses to migrate. ZTronCarousel uses only `CDNLocalStore.shared`, so these
+  bite only an app that adds a `baseDirectory` store. Pinned by `R-CAR-6: the prior-art local store
   initialiser's client adopts the prior art's files found in its directory and downloads nothing` (seeded prior-art tree:
   the resolve answers the adopted blob under `<parent>/ZTronAssetKit/v1/`, no transfer starts, the legacy file is renamed
   away, no "overlaps the store" line is logged), `…starts on a fresh install, before its directory exists` and `two
   prior-art stores in one parent directory share one root, which admits one client (R-STO-9)`; all three failed on the
-  first implementation (`82490e7`).
+  first implementation (`82490e7`). Fix round 2 added `a prior-art store whose directory lies in Caches shares its root
+  with a client at StorageLocation.caches, which admits one client (R-STO-9)`, which passed on arrival (it pins the
+  module's resolution).
 - **The app key (fix round 1).** For a prior-art provider the provider's tier replaces the base remote, which dropped a
   configured key: a point built with `CDNConfiguration(baseURL: origin, appKey: key)` gave `StaticManifestCDNProvider`
   at `origin` a client without it, and SPEC §2.3's origin answers 403 without `x-zombietron-app-key`. Now
@@ -176,6 +220,9 @@ heading or by reference to this draft):
   no public API tells a test when a call has joined, so the test settles the launch run first and pins `.upToDate`
   afterwards, plus one manifest request and only the new catalog's asset fetched (the reqs verifier asked for
   `.complete`; MIGRATION.md §3's row now says what is pinned).
+  On the first launch after adoption a call made while legacy migration is still adopting does not join anything: it
+  starts a run that downloads every prior-art file not adopted yet (CCR-K1, K-15), so MIGRATION.md step 4 no longer
+  calls `syncIfNeeded()` from the launch task; the doc comments of `syncIfNeeded()` and `verifyAndRepair()` say so.
   Observation for the orchestrator: a `.complete` run whose manifest fetch passed its deadline maps to `.complete` (the
   Stage 1 mapping in `CDNSyncProgress.swift`) while the stamp is not written; the next launch retries, which keeps the
   prior art's retry semantics, so the mapping was left as it is.
@@ -245,7 +292,9 @@ heading or by reference to this draft):
   D-16), while a transient failure keeps the old bytes until a later sync fetches the new ones; the extension filter at the
   local step (ADR-037); an on-demand resolve that downloads before its candidate check (as `AssetFallbackChain.fetch`;
   the prior art checked the manifest entry first); the synchronous lookups answer only after `start()` installed the
-  first snapshot (ADR-037; the prior art read the disk from launch on, RECON §5); and an entry whose checksum is present
+  first snapshot (ADR-037; the prior art read the disk from launch on, RECON §5), and on the first launch after adoption
+  a prior-art file only once legacy migration or a resolve adopted it, after `start()` returned (fix round 2, K-15:
+  starting the client before carousel content exists is not enough on that launch); and an entry whose checksum is present
   but not a SHA-256 is quarantined (R-MAN-2), never downloaded, where the prior art downloaded it on every sync (D-16).
   Fix round 1 completed the 404 pin (a changed entry is then requested once and stored) and added the lookup pin
   (`R-CAR-6: the lookups answer nil for an asset stored in an earlier launch until the installed client has started, and
@@ -267,12 +316,20 @@ heading or by reference to this draft):
   already existed. Fix round 1, test first again: `82490e7` (12 issues on the round-0 shims: the store's placement, the
   fresh install, one root per parent, the app key, `localURL` confinement) → `e81449c` (all pass), then `9150501`
   (pins of module behaviour that passed on arrival: lookups before `start()`, the blocked run, once per app version, the
-  validated manifest, the changed entry after a 404, the app-version seam).
+  validated manifest, the changed entry after a 404, the app-version seam). Fix round 2: `d512f03` (the first launch
+  after adoption: the lookups pin passed on arrival; the CCR-K1 test failed in 15 of 15 runs before its download count
+  was wrapped in `withKnownIssue`, K-15), `8e0854a` (the `installed` seam with its test, refactor-only: the setter's
+  behaviour is unchanged, and a mutant seam fails the test), `1a3e94b` (pins that passed on arrival: the keyless
+  provider's 403, the Caches root shared with `.caches`).
 
-## K-13 — An optional future API (not a contract change request)
+## K-13 — Optional future APIs (not contract change requests)
 - A public read of the client's applied manifest (for example `AssetClient.manifestEntries(scope:)`, no network) would
-  let `cachedAsset(forIdentifier:)` reflect the client's manifest and `verifyFullyAvailable()` work without a provider.
-  The shims work without it (K-6, K-7); recorded for the owner, not requested.
+  let `cachedAsset(forIdentifier:)` reflect the client's manifest and `verifyFullyAvailable()` work without a provider
+  (and without the provider's keyless fetch, K-5). The shims work without it (K-6, K-7); recorded for the owner, not
+  requested.
+- A way to await legacy migration (fix round 2), for example a start option that returns once the prior art's tree is
+  adopted, or an awaitable migration report: MIGRATION.md step 3 could then hold carousel content until the prior art's
+  files answer the lookups on the first launch after adoption (K-15). Recorded for the owner, not requested.
 
 ## K-14 — The deprecated `localURL(for:)` stays inside the legacy root (fix round 1)
 - **Context.** For an asset the client does not hold, `localURL(for:)` builds the prior art's pretty path from
@@ -284,6 +341,41 @@ heading or by reference to this draft):
   yield `.`, `..` or empty components, so only a `/` in them is affected.
 - **Consequences.** Valid entries keep the prior art's path (the layout test is unchanged); crafted ones stay under the
   root. Pinned by `R-CAR-6: localURL keeps a crafted entry's path inside the legacy root` (failing at `82490e7`, before the fix).
+
+## K-15 — The first launch after adoption: lookups and syncs during legacy migration (fix round 2) · **NEEDS-HUMAN-REVIEW** (shim behaviour)
+- **Context.** On the first launch after adoption the client adopts the prior art's files (R-STO-11, phase 2) in
+  engine-owned batches (`migrateLegacy(maxFiles: 64)` per call of the migration loop) that start only after `start()`
+  has settled: `EngineLifecycle.swift` settles the start at :317, spawns the migration at :320 and parks the due launch
+  run behind it (:331). The `UserDefaults` stamp migrates in phase 3, after every entry. Both round-2 verifier lenses
+  probed what the shims see in that window.
+- **The lookups.** Until a prior-art file's batch is committed and its snapshot installed, `existingLocalURL` answers
+  `nil`, `hasAsset` `false`, and `missingOrStaleAssets` lists the file; a resolve adopts a pending file on demand
+  (store-2 S2-09) without a transfer. The shims cannot close the window: their lookups read the main-actor snapshot
+  with no I/O (K-3, C2), and reading the prior art's tree from the main thread would be file-system I/O there and
+  would hand out paths that migration is about to rename. Decision: say it (MIGRATION.md step 3 and §4; the doc
+  comments of `CDNLocalStore`, `existingLocalURL`, `hasAsset`, `missingOrStaleAssets` and `CDNProviderFactory.install`)
+  and pin it: `R-CAR-6: on the first launch after adoption the lookups miss a prior-art file until legacy migration
+  adopted it, after start() returned, and a resolve adopts it without a download` (MIGRATION.md step 3's configuration,
+  320 prior-art files of 256 B: in the turn `start()` returned fewer than all answer and the three lookups agree; after
+  a `resolveViaNetwork` per file all 320 answer, no transfer started and the prior art's tree is empty). The test
+  asserts "fewer than all", not "none": a first batch of 64 may be installed before the test's continuation runs, and
+  320 files take five. `ZTronSVGView` adopts through its `resolveViaNetwork` fallback; `BasicVideoPage` has no network step,
+  so a prior-art video appears in a page created after its adoption. An API that awaits migration is K-13's.
+- **The syncs (CCR-K1).** A sync requested during migration starts an explicit run at once, and its bulk jobs download
+  every prior-art file phase 2 has not adopted yet (the header's CCR-K1 has the engine's lines). Through the shims:
+  `R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes and downloads
+  none of the prior art's files (CCR-K1)`, MIGRATION.md steps 3 and 4 in one launch task over 150 prior-art files of
+  64 KiB, failed without its wrapper in 15 of 15 runs (6, 13, 15, 15, 21, 23, 25, 26, 31, 35, 36, 36, 40, 40 and 41
+  files downloaded); progress `.complete`, every file stored afterwards and the prior art's tree empty held in all 15.
+  The fix is the engine's: no public API tells the shims that migration is running, so the coordinator cannot hold its
+  call. Decision: the download count is asserted inside `withKnownIssue("CCR-K1: …", isIntermittent: true)`
+  (intermittent because the count is a race that a fast enough migration could win), CCR-K1 goes to the orchestrator,
+  and MIGRATION.md step 4 keeps `syncIfNeeded()` and `verifyAndRepair()` out of the launch task (the client's own
+  launch run waits for migration), with the residual in §4, K-7 and the two doc comments.
+- **Consequences.** Until CCR-K1 lands, an app that follows the prior art's `.task { await coordinator.syncIfNeeded() }`
+  downloads part of the prior art's tree again on the first launch after adoption (no data is lost: every file ends up
+  stored, the prior art's copies are removed either way). The lookups' window lasts as long as migration, which on a
+  device grows with the prior art's bytes (phase 2 hashes them); not measured here.
 
 ## Fix round 1 — the verifiers' issues and what became of them
 - reqs 1 / correct 1 (blocking, `CDNLocalStore(baseDirectory:)` nests the store in the legacy root; fresh install):
@@ -312,6 +404,26 @@ heading or by reference to this draft):
 - correct 8 (stale line citation in a test message): now cites k-2 and `CDNSyncCoordinator.run(_:)`.
 - correct 9 (P-13 benchmark overrun): not WP-K's (no source or benchmark file changed); see the evidence below.
 
+## Fix round 2 — the verifiers' issues and what became of them
+- correct 1 (blocking, an explicit sync races legacy migration): an engine defect in WP-F's files, so CCR-K1 for the
+  orchestrator; the failing test first (15 of 15 failing runs), kept as a known issue; MIGRATION.md step 4, §4, K-7,
+  K-15 and the doc comments of `syncIfNeeded()` and `verifyAndRepair()` state the residual.
+- correct 2 (blocking, lookups on the migration launch): documented in MIGRATION.md step 3 and §4, K-11, K-15 and the
+  doc comments of `CDNLocalStore`, `existingLocalURL`, `hasAsset`, `missingOrStaleAssets`, `CDNProviderFactory.install`;
+  pinned by a new test. A migration-awaiting API is recorded in K-13 (not requested).
+- reqs 2 / correct 3 (the provider's fetch has no app key): documented in K-5, MIGRATION.md step 4, §2 and §4, and the
+  doc comments of `fetchManifest()`, `verifyFullyAvailable()` and the coordinator's `cdn`; pinned by a loopback test
+  (403 without the header, 200 with it). Option (a) chosen, NEEDS-HUMAN-REVIEW; (b), a key-taking initialiser, is
+  **declined for now** for the reasons in K-5 (a plain-`String` key outside `AppKey`'s redaction and redirect handling
+  in the shims, for a call nothing in the carousel makes); it stays available as an additive change.
+- reqs 3 (storage-location residuals): the initialiser's doc comment, K-6 and MIGRATION.md §2 and §4 now say one client
+  per resolved base directory, counting the process point's client, and one legacy root per process; pinned (the
+  `.caches` collision).
+- reqs 4 (the `installed` setter untested): `setInstalled(_:on:)` seam, tested on a local point (K-2).
+- reqs 5 (MIGRATION.md cited K-1…K-13): now K-1…K-15.
+- reqs 1 (ownership of `docs/MIGRATION.md`): unchanged, for the orchestrator at merge (this draft's header).
+- reqs 6 / correct 4 (P-13): not WP-K's (no source or benchmark file changed); one run recorded in the evidence.
+
 ## Not verified here
 - The shims at the iOS 15 floor at run time: the test target builds at iOS 17 / macOS 14 (ADR-051), the shims run on the
   iOS 27 simulator and macOS 27 only; their iOS 15 compile is the typecheck recorded in the evidence below.
@@ -321,6 +433,9 @@ heading or by reference to this draft):
   them on `FakeFileSystem`), and the 403 a keyless client gets from the real origin (SPEC §2.3, not exercised here).
 - Adoption inside ZTronCarouselCore (Q-10, ADR-006): MIGRATION.md describes it; nothing outside this repository was
   built or written.
+- The first launch after adoption on a device (K-15): how long legacy migration takes over a real prior-art tree, hence
+  how long the lookups miss its files and how many a sync during it would download (CCR-K1); the tests run it on
+  `FakeFileSystem` with an inline executor.
 
 ## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; fix round 1, code at `05c1a41`)
 - Test first: the round-1 tests on the round-0 shims (`82490e7`), `swift test --filter ZTronAssetCompatibilityTests`:

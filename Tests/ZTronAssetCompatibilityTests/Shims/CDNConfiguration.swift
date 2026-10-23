@@ -117,7 +117,9 @@ public enum CDNProviderFactory {
     /// Installs a client for `configuration` into `point` (the process-wide one by default) unless one is installed
     /// already, and returns the installed client: the first installation wins (`CDNInstallPoint`). No I/O and no task
     /// (P-12), so the client is not started: start it at launch (`try await client.start()`), before carousel content
-    /// is created, because `CDNLocalStore`'s synchronous lookups answer `nil` until it has (ADR-037).
+    /// is created, because `CDNLocalStore`'s synchronous lookups answer `nil` until it has (ADR-037). On the first launch
+    /// after adoption, the prior art's files answer only once legacy migration adopted them, after `start()` has returned
+    /// (K-15).
     @MainActor
     @discardableResult
     public static func install(

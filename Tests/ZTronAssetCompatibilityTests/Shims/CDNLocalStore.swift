@@ -12,7 +12,11 @@ import ZTronAssetKit
 ///
 /// The snapshot is the client's, installed by `AssetClient.start()` (ADR-037): until the installed client has started,
 /// the lookups answer `nil` and `false` even for assets stored in an earlier launch, where the prior art read the disk
-/// from launch on. Start the client at launch, before carousel content is created (MIGRATION.md, step 3).
+/// from launch on. Start the client at launch, before carousel content is created (MIGRATION.md, step 3). On the first
+/// launch after adoption that is not enough for the prior art's own files: legacy migration adopts them in batches that
+/// start only after `start()` has returned, and a file answers once its batch is committed and in the snapshot, or once
+/// a resolve adopted it on demand (`CDNAssetResolver.resolveViaNetwork`, no download). Until then a lookup misses it, so
+/// `BasicVideoPage`, which has no network step, finds a prior-art video only once it is adopted (K-15).
 public final class CDNLocalStore: Sendable {
     /// The prior art's shared store: it follows `CDNInstallPoint.process`, so it answers for the client the app
     /// installed (`CDNProviderFactory.install`, `CDNAssetResolver.installed`), and like an empty cache before that.
@@ -43,11 +47,15 @@ public final class CDNLocalStore: Sendable {
     /// inside it: the module refuses to migrate a legacy root that contains the store (R-STO-11), and the prior art's
     /// directory need not exist on a fresh install, where its parent (`Caches`, `Documents`) does.
     ///
-    /// One store per parent directory: two directories with one parent map to one root, which admits one client
-    /// (R-STO-9; the second client's `start()` throws `storageUnavailable(.locked)`). A parent that does not exist makes
-    /// `start()` throw `storageUnavailable`, and a `baseDirectory` named `ZTronAssetKit` is the store's own directory,
-    /// whose migration the module refuses. `computeChecksum` is ignored: the client verifies SHA-256 checksums itself
-    /// (R-INT-*).
+    /// One client per resolved base directory (R-STO-9; the second client's `start()` throws
+    /// `storageUnavailable(.locked)`), counting every client of the process: two directories with one parent map to one
+    /// root, and a directory in Caches or Application Support maps to the root of a client at `StorageLocation.caches` or
+    /// `.applicationSupport`, such as the process install point's. And one legacy root per process: a store whose
+    /// directory is the prior art's default (`<Caches>/CDNAssets`) migrates the tree that an installed process client
+    /// with the default `LegacyMigrationPolicy()` migrates too, so do not run both over one prior-art directory. A
+    /// parent that does not exist makes `start()` throw `storageUnavailable`, and a `baseDirectory` named
+    /// `ZTronAssetKit` is the store's own directory, whose migration the module refuses. `computeChecksum` is ignored:
+    /// the client verifies SHA-256 checksums itself (R-INT-*).
     @available(*, deprecated, message: "Bind the store to a client: CDNLocalStore(client:), or CDNLocalStore.shared after CDNProviderFactory.install(_:)")
     public convenience init(
         baseDirectory: URL? = nil,
@@ -169,7 +177,8 @@ public final class CDNLocalStore: Sendable {
     /// applies to an asset the manifest knows (ADR-037, as `AssetFallbackChain.locate`), so an image page is never handed
     /// a video. A stale asset (new content announced, not yet stored) still answers with its old bytes, as before.
     /// `nil` until the installed client has started (`AssetClient.start()` installs the first snapshot, ADR-037), even
-    /// for an asset stored in an earlier launch.
+    /// for an asset stored in an earlier launch, and, on the first launch after adoption, for a prior-art file until
+    /// legacy migration or a resolve adopted it, after `start()` has returned (K-15).
     @MainActor
     public func existingLocalURL(identifier: String, candidateExtensions: [String]) -> URL? {
         self.client?.lookup(AssetID(identifier), extensions: candidateExtensions)?.url
@@ -180,7 +189,8 @@ public final class CDNLocalStore: Sendable {
     /// bytes, I-1). The answer is relative to the asset given, as the prior art's comparison was: the client's own view
     /// of staleness (`AssetLocation.isStale`, relative to its applied manifest) is not consulted. A checksum that is not
     /// a SHA-256 cannot be compared, so such an asset is trusted on presence (R-MAN-5), where the prior art compared it
-    /// with its own hash of the file and never matched. `false` until the installed client has started (ADR-037).
+    /// with its own hash of the file and never matched. `false` until the installed client has started (ADR-037) and,
+    /// on the first launch after adoption, for a prior-art file until it is adopted (K-15).
     @MainActor
     public func hasAsset(_ asset: CDNAsset) -> Bool {
         guard let location = self.client?.lookup(AssetID(asset.identifier), extensions: [asset.fileExtension]) else {
@@ -198,7 +208,8 @@ public final class CDNLocalStore: Sendable {
     }
 
     /// Every asset of `manifest` that is not stored at the content it describes (`hasAsset`), in manifest order, with
-    /// no network: the prior art's availability guarantee. One snapshot read per asset on the main actor.
+    /// no network: the prior art's availability guarantee. One snapshot read per asset on the main actor. On the first
+    /// launch after adoption it also lists the prior-art files legacy migration has not adopted yet (K-15).
     @MainActor
     public func missingOrStaleAssets(against manifest: [CDNAsset]) -> [CDNAsset] {
         manifest.filter { !self.hasAsset($0) }

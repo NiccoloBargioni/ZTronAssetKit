@@ -8,7 +8,8 @@ import ZTronAssetKit
 /// key, redirect rules; R-NET-*), so the prior art's per-download `URLSession` (D-1, D-3, D-7) is gone and
 /// `downloadAsset` is deprecated. `fetchManifest()` still answers, because `CDNSyncCoordinator.verifyFullyAvailable()`
 /// compares a fresh manifest with the store: one GET that bypasses the URL cache, then the module's validating decoder
-/// (D-9) on a blocking executor, never on the main thread or the cooperative pool (C2).
+/// (D-9) on a blocking executor, never on the main thread or the cooperative pool (C2). That GET carries no app key, as
+/// the prior art's did not, so an origin that requires one (SPEC §2.3) refuses it (`fetchManifest()`).
 public struct StaticManifestCDNProvider: CDNProviding {
     private let baseURL: URL
     private let manifestPath: String
@@ -35,6 +36,11 @@ public struct StaticManifestCDNProvider: CDNProviding {
 
     /// Everything the origin advertises, validated (unknown fields ignored, invalid entries quarantined, structural
     /// violations rejected with a `ManifestError`); a non-2xx answer throws `StaticManifestCDNProviderError.badResponse`.
+    ///
+    /// The request carries no `x-zombietron-app-key`: the prior art sent none, and the shims cannot read an `AppKey`'s
+    /// secret (K-1). SPEC §2.3's origin answers such a request 403, so there this throws `badResponse` on every call;
+    /// `CDNSyncCoordinator.verifyFullyAvailable()` then needs a manifest source that sends the key to that origin and no
+    /// other (MIGRATION.md step 4, K-5). The client's own manifest fetches carry the key it was configured with (K-6).
     public func fetchManifest() async throws -> [CDNAsset] {
         let url = self.baseURL.appendingPathComponent(self.manifestPath)
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
@@ -56,7 +62,8 @@ public struct StaticManifestCDNProvider: CDNProviding {
 }
 
 extension StaticManifestCDNProvider: CDNRemoteConfigurable {
-    /// The HTTP tier at this provider's base URL and manifest path (no app key: the prior art sent none).
+    /// The HTTP tier at this provider's base URL and manifest path (no app key of its own: the prior art sent none; a
+    /// point configured with this origin and its key keeps the key, `CDNProviderFactory.makeClient(for:base:environment:)`).
     var remoteConfiguration: RemoteConfiguration {
         RemoteConfiguration(http: HTTPSourceConfiguration(baseURL: self.baseURL, manifestPath: self.manifestPath))
     }
