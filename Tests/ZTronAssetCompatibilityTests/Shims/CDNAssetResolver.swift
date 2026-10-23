@@ -43,22 +43,32 @@ public struct CDNAssetResolver: Sendable {
     /// not one of `candidateExtensions` (any extension when empty) or anything fails. The extension is checked once the
     /// client resolved the asset, as `AssetFallbackChain.fetch` does (ADR-037), because only then is the entry known.
     public func resolveViaNetwork(identifier: String, candidateExtensions: [String]) async -> URL? {
-        // WP-K skeleton: nothing is resolved yet.
-        nil
+        let url: URL
+        do {
+            url = try await self.resolvedClient.resolve(AssetID(identifier), priority: .userInitiated)
+        } catch {
+            return nil
+        }
+        return CDNAssetResolver.matches(url, candidateExtensions) ? url : nil
+    }
+
+    /// Whether `url`'s extension is one of `candidates` (any when empty), ignoring case: the client stores lowercased
+    /// extensions (R-SEC-2), the prior art compared the manifest's spelling.
+    static func matches(_ url: URL, _ candidates: [String]) -> Bool {
+        let fileExtension = url.pathExtension.lowercased()
+        return candidates.isEmpty || candidates.contains { $0.lowercased() == fileExtension }
     }
 }
 
 extension CDNInstallPoint {
     /// A resolver over the installed client, if any (`CDNAssetResolver.installed` of this point).
     public var resolver: CDNAssetResolver? {
-        // WP-K skeleton: no resolver is made yet.
-        nil
+        self.client.map { CDNAssetResolver(client: $0) }
     }
 
     /// Installs `resolver`'s client unless a client is installed already; returns the resolver over the installed client.
     @discardableResult
     public func installResolver(_ resolver: CDNAssetResolver) -> CDNAssetResolver {
-        // WP-K skeleton: nothing is installed yet.
-        resolver
+        CDNAssetResolver(client: self.install(resolver.client))
     }
 }

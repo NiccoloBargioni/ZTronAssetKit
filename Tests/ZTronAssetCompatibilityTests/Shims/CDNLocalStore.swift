@@ -30,8 +30,7 @@ public final class CDNLocalStore: Sendable {
     /// The client this store adapts, once one is installed.
     @MainActor
     public var client: AssetClient? {
-        // WP-K skeleton: no client is read yet.
-        nil
+        self.installPoint.client
     }
 
     /// The local file for `identifier` in one of `candidateExtensions` (any extension when empty): the client's
@@ -40,8 +39,7 @@ public final class CDNLocalStore: Sendable {
     /// a video. A stale asset (new content announced, not yet stored) still answers with its old bytes, as before.
     @MainActor
     public func existingLocalURL(identifier: String, candidateExtensions: [String]) -> URL? {
-        // WP-K skeleton: nothing is looked up yet.
-        nil
+        self.client?.lookup(AssetID(identifier), extensions: candidateExtensions)?.url
     }
 
     /// Whether `asset` is stored at the content it describes: present in the client's snapshot with its extension, not
@@ -50,23 +48,31 @@ public final class CDNLocalStore: Sendable {
     /// presence (R-MAN-5), where the prior art compared it with its own hash of the file and never matched.
     @MainActor
     public func hasAsset(_ asset: CDNAsset) -> Bool {
-        // WP-K skeleton: nothing is looked up yet.
-        false
+        guard let location = self.client?.lookup(AssetID(asset.identifier), extensions: [asset.fileExtension]) else {
+            return false
+        }
+        guard let expected = asset.checksum.flatMap({ ContentHash(hex: $0) }) else {
+            return true
+        }
+        return CDNLocalStore.storedDigest(of: location) == expected
+    }
+
+    /// The SHA-256 of a stored blob's bytes, read from its name (`…/blobs/<aa>/<sha256>.<ext>`, I-1): no I/O.
+    static func storedDigest(of location: AssetLocation) -> ContentHash? {
+        ContentHash(hex: location.url.deletingPathExtension().lastPathComponent)
     }
 
     /// Every asset of `manifest` that is not stored at the content it describes (`hasAsset`), in manifest order, with
     /// no network: the prior art's availability guarantee. One snapshot read per asset on the main actor.
     @MainActor
     public func missingOrStaleAssets(against manifest: [CDNAsset]) -> [CDNAsset] {
-        // WP-K skeleton: nothing is compared yet.
-        []
+        manifest.filter { !self.hasAsset($0) }
     }
 
     /// Whether every asset of `manifest` is stored at its content.
     @MainActor
     public func isFullyAvailable(against manifest: [CDNAsset]) -> Bool {
-        // WP-K skeleton: nothing is compared yet.
-        true
+        manifest.allSatisfy { self.hasAsset($0) }
     }
 }
 
