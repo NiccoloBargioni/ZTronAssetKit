@@ -811,6 +811,9 @@ struct MigrationProgress {
     /// run that starts meanwhile, which takes the launch run's place (orchestrator ruling L5K-R1), or when the loop ends,
     /// which then starts the launch run if the engine still runs.
     var launchRunWaiting = false
+    /// Test seam: the `migrateLegacy` calls the loop has made in this lifetime, so a test bounds them while a job's
+    /// adoption holds the last claimed prior-art file (orchestrator ruling L5K-R17: no hot loop around a store call).
+    var batchCalls = 0
 }
 
 /// The negative cache of unknown identifiers (LRU-bounded).

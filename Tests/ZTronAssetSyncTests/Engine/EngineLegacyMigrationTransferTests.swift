@@ -540,6 +540,49 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    // MARK: No hot loop around a store call (L5K-R17)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, PSPIN)", .timeLimit(.minutes(1)))
+    func migrationLoopWaitsForTheLastAdoption() async throws {
+        let time = ManualTimeSource()
+        // The batch takes legacy0 first; a prefetch job adopts legacy1, the last file, before any bytes.
+        let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_100)
+        let (harness, bulk) = await EngineLegacyMigrationTransferTests.launch(disk: try EngineRunPathTests.legacyDisk(catalog, time: time), time: time, served: catalog)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let token = try await engine.registerGroup([catalog[1].0.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        let callsBefore = await engine.readForTests { $0.state.migration.batchCalls }
+        // The batch adopts legacy0 and publishes it (installed at once at the harness's interval of 0), then finds the
+        // queue empty and the one claimed file held by the job's adoption.
+        let installsBefore = await harness.sink.offeredKeys.count
+        for unit in migration {
+            await bulk.release(unit)
+        }
+        try await harness.sink.requireInstalls(atLeast: installsBefore + 1)
+        // Round trips through the engine's actor, each of which lets a loop that returned at once make another call: the
+        // fixed loop makes none whatever their number, so the bound below never depends on them.
+        for _ in 0..<64 {
+            _ = await engine.readForTests { $0.state.migration.batchCalls }
+        }
+        let callsWhileHeld = await engine.readForTests { $0.state.migration.batchCalls } - callsBefore
+        for unit in jobHash {
+            await bulk.release(unit)
+        }
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        let calls = await engine.readForTests { $0.state.migration.batchCalls } - callsBefore
+
+        #expect(callsWhileHeld <= 1, "R-SYN-14: \(callsWhileHeld) migrateLegacy calls while the job's adoption held the last file: a hot loop (L5K-C2-01)")
+        #expect(calls <= 2, "\(calls) calls to finish the migration once that adoption ended")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog))
+        await engine.releaseGroup(token)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
     // MARK: Every coalesced publication reaches the readers (L5K-R16)
 
     /// The ids of `ids` the readers' snapshot (the sink's installed snapshot, what `lookup` reads) does not hold.

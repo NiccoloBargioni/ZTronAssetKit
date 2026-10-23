@@ -1074,6 +1074,7 @@ extension SyncEngine {
         }
         while self.isRunning, !Task.isCancelled {
             let progress: LegacyMigrationProgress
+            self.state.migration.batchCalls += 1
             do {
                 // REENTRANCY: RE-S29 — the lifecycle; calls again while not finished and the engine runs.
                 progress = try await self.store.migrateLegacy(maxFiles: 64)

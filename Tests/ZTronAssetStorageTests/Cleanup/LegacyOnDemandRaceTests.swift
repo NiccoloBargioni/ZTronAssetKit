@@ -298,6 +298,43 @@ struct LegacyOnDemandRaceTests {
 }
 
 extension LegacyOnDemandRaceTests {
+    @Test("R-STO-11: a migration batch that finds the queue empty while an adopt-on-demand holds the last claimed legacy file waits for that adoption and finishes the migration in the same call, so its caller never calls again at once (L5K-R17, PS3)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func batchWaitsForTheLastOnDemandAdoption() async throws {
+        let race = try await LegacyRace.open()
+        await race.bulk.setHolding(true)
+        // An adopt-on-demand takes the next file from the queue and its hash unit is held.
+        let onDemand = LegacyRace.tracked {
+            try await race.harness.store.adoptLegacyNow(race.id)
+        }
+        try await race.bulk.requireHeldUnits(atLeast: 1)
+        let onDemandHash = Set(await race.bulk.heldUnits)
+        // A batch adopts every other file, then finds the queue empty and the one claimed file held by that call.
+        let batch = LegacyRace.tracked {
+            try await race.harness.store.migrateLegacy(maxFiles: 64)
+        }
+        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
+                await race.bulk.release(unit)
+            }
+            return await race.settled(batch.finished)
+        }
+        let returnedEarly = await batch.finished.value
+        let held = await race.harness.state.migration
+        await race.releaseAll()
+        let progress = try await batch.task.value
+        let answer = try await onDemand.task.value
+        let location = await race.harness.store.location(for: race.id, extensions: [], recordingAccess: false)
+
+        #expect(held.queue.isEmpty && held.claimed == [race.file], "premise: the queue is empty and the adopt-on-demand holds the one claimed file")
+        #expect(!returnedEarly, "migrateLegacy returned while that adoption ran, with nothing it could do: its caller calls again at once, a hot loop (L5K-C2-01)")
+        #expect(progress.finished && progress.remaining == 0, "the same call finished the migration once that adoption ended: \(progress)")
+        #expect(answer != nil && answer == location, "the adopt-on-demand answers its location")
+        #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
+    }
+}
+
+extension LegacyOnDemandRaceTests {
     @Test("R-STO-13: an adopt-on-demand publishes at its urgency: bulk adoptions wait for the install window, a user-initiated one installs at once and carries them (L5K-R14)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func adoptionPublishesAtItsUrgency() async throws {
