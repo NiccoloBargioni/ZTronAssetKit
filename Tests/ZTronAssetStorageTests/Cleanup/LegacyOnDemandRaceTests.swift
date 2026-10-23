@@ -297,6 +297,33 @@ struct LegacyOnDemandRaceTests {
     }
 }
 
+extension LegacyOnDemandRaceTests {
+    @Test("R-STO-13: an adopt-on-demand publishes at its urgency: bulk adoptions wait for the install window, a user-initiated one installs at once and carries them (L5K-R14)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func adoptionPublishesAtItsUrgency() async throws {
+        // ARCHITECTURE §5's interval; the clock never moves, so after one install the window stays closed.
+        let race = try await LegacyRace.open(installInterval: 0.1)
+        let queue = await race.harness.state.migration.queue
+        try #require(queue.count >= 4, "the fixture queues enough files")
+        let bulkIDs = queue.suffix(3).compactMap(\.ids.first)
+        let userID = try #require(queue.first?.ids.first)
+        let before = await race.harness.sink.offeredKeys.count
+        var bulkLocations: [AssetLocation?] = []
+        for id in bulkIDs {
+            bulkLocations.append(try await race.harness.store.adoptLegacyNow(id, urgency: .bulk))
+        }
+        let bulkInstalls = await race.harness.sink.offeredKeys.count - before
+        let userLocation = try await race.harness.store.adoptLegacyNow(userID)
+        let userInstalls = await race.harness.sink.offeredKeys.count - before - bulkInstalls
+        let installed = await race.harness.sink.installed
+
+        #expect(bulkLocations.allSatisfy { $0 != nil } && userLocation != nil, "every call adopted its file")
+        #expect(bulkInstalls <= 1, "\(bulkInstalls) installs for three bulk adoptions: at most one per install window")
+        #expect(userInstalls == 1, "the user-initiated adoption installed its snapshot before it returned")
+        #expect((bulkIDs + [userID]).allSatisfy { installed.location(for: $0, extensions: []) != nil }, "that install carries the coalesced bulk adoptions too")
+    }
+}
+
 /// A store over a legacy tree, opened, with stepped executors that let every unit through until a test holds them, and
 /// the next file a batch takes (the queue's last).
 @available(macOS 15.0, iOS 18.0, *)
@@ -311,13 +338,21 @@ struct LegacyRace {
     /// `file`'s bytes.
     let bytes: Data
 
-    /// Opens a store over `files` (the repository's `legacy-v0` fixture when `nil`) with the prior art's key set.
-    static func open(files: [String: Data]? = nil) async throws -> LegacyRace {
+    /// Opens a store over `files` (the repository's `legacy-v0` fixture when `nil`) with the prior art's key set and the
+    /// given snapshot install interval.
+    static func open(files: [String: Data]? = nil, installInterval: TimeInterval = 0) async throws -> LegacyRace {
         let tree = try files ?? LegacyFixture.fixtureFiles()
         let bulk = SteppedBlockingExecutor(holding: false)
         let metadata = SteppedBlockingExecutor(holding: false)
         let defaults = FakeLegacyDefaults(values: [CleanupFixture.legacyKey: "1.4+77"])
-        let harness = CoreHarness.cleanup(disk: try LegacyFixture.disk(tree), legacy: CleanupFixture.legacyPolicy, defaults: defaults, metadata: metadata, bulk: bulk)
+        let harness = CoreHarness.cleanup(
+            disk: try LegacyFixture.disk(tree),
+            legacy: CleanupFixture.legacyPolicy,
+            defaults: defaults,
+            installInterval: installInterval,
+            metadata: metadata,
+            bulk: bulk
+        )
         _ = try await harness.store.open()
         let file = try #require(await harness.state.migration.queue.last, "a legacy file is queued")
         let id = try #require(file.ids.first)
