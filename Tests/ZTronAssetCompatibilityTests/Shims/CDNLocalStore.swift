@@ -113,7 +113,6 @@ public struct CDNReconciliationSummary: Sendable, Hashable {
 
     /// What a client run reconciled: `relocated` as migrated, `pruned` as pruned.
     public init(report: SyncReport) {
-        // WP-K skeleton: the report is not read yet.
-        self.init()
+        self.init(migratedCount: report.relocated, prunedCount: report.pruned)
     }
 }

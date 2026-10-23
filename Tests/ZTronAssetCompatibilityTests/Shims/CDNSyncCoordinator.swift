@@ -39,8 +39,10 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// the app version through its environment (`LiveAppVersionSource`, the same format), so the shims use this only
     /// for the prior-art initialiser's default.
     nonisolated public static func defaultAppVersion() -> String {
-        // WP-K skeleton: no version is read yet.
-        ""
+        let info = Bundle.main.infoDictionary
+        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "0"
+        let buildNumber = info?["CFBundleVersion"] as? String ?? "0"
+        return "\(shortVersion)+\(buildNumber)"
     }
 
     /// The launch sync: `AssetClient.sync(.ifDue)`, safe on every launch. `.upToDate` without network when the refresh
@@ -48,20 +50,75 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// transfers, then `.complete` or `.failed(reason:)`. A failed or partial run leaves the sync due, so the next launch
     /// retries and downloads only what is still missing.
     public func syncIfNeeded() async {
-        // WP-K skeleton: nothing is synced yet.
+        await self.run(.ifDue)
     }
 
     /// Fetches a fresh manifest from `cdn` and returns every asset in it that is not stored at its content
     /// (`CDNLocalStore.missingOrStaleAssets`), downloading nothing. Throws only when the manifest fetch throws.
     public func verifyFullyAvailable() async throws -> [CDNAsset] {
-        // WP-K skeleton: nothing is fetched yet.
-        []
+        // REENTRANCY: k-4 (proposed) — nothing of the coordinator is read across the fetch; the client's snapshot is
+        // read after it, so the comparison uses what is stored when the manifest arrived.
+        let manifest = try await self.cdn.fetchManifest()
+        return self.localStore.missingOrStaleAssets(against: manifest)
     }
 
     /// A repair pass regardless of the refresh policy: `AssetClient.sync(.force)`, publishing progress as
     /// `syncIfNeeded()` does. Unlike the prior art, a complete repair also writes the sync stamp, which is true and
     /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version").
     public func verifyAndRepair() async {
-        // WP-K skeleton: nothing is repaired yet.
+        await self.run(.force)
+    }
+
+    /// One sync through the client, with its progress published as it arrives.
+    ///
+    /// The stream is subscribed before the run is requested, so the run this call starts, or the active run it joins
+    /// (whose latest progress the subscription replays), reports into `progress`. Once the outcome is in, the follower
+    /// is cancelled and awaited, so no progress event can overwrite the final state. Concurrent calls join the same
+    /// single-flight run and publish the same outcome.
+    private func run(_ mode: SyncMode) async {
+        let events: AsyncStream<AssetEvent>
+        do {
+            // REENTRANCY: k-2 (proposed) — nothing of the coordinator is read across the subscription; `progress` is
+            // written afterwards only by this call's follower and its final outcome.
+            events = try await self.client.subscribe()
+        } catch {
+            self.finish(.failed(error))
+            return
+        }
+        let follower = Task { @MainActor [weak self] in
+            var lastRun: SyncRunID?
+            var lastCompleted = 0
+            // REENTRANCY: k-3 (proposed) — each event is applied in the turn it arrives: `self` is re-checked (weak) and
+            // a count below the run's last one is dropped, so progress never moves backwards within a run.
+            for await event in events {
+                guard case .syncProgress(let run, let progress) = event else {
+                    continue
+                }
+                if run == lastRun, progress.completedCount < lastCompleted {
+                    continue
+                }
+                lastRun = run
+                lastCompleted = progress.completedCount
+                self?.progress = CDNSyncProgress(progress: progress)
+            }
+        }
+        // REENTRANCY: k-2 (proposed) — the follower publishes progress meanwhile; the outcome is applied only after the
+        // follower ended (below).
+        let outcome = await self.client.sync(mode)
+        follower.cancel()
+        // REENTRANCY: k-2 (proposed) — the follower has ended, so the outcome is the last value this call publishes.
+        await follower.value
+        self.finish(outcome)
+    }
+
+    /// Publishes a run's outcome (sync.md §10.6) and what it reconciled.
+    private func finish(_ outcome: SyncOutcome) {
+        self.progress = CDNSyncProgress(outcome: outcome)
+        switch outcome {
+        case .complete(let report), .completeWithFailures(let report), .blocked(_, let report):
+            self.lastReconciliation = CDNReconciliationSummary(report: report)
+        case .notDue, .failed:
+            break
+        }
     }
 }
