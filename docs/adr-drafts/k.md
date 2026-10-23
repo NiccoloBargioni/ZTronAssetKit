@@ -29,7 +29,8 @@ heading or by reference to this draft):
   (`launchRunWaiting`, :331). Bulk jobs never try `store.adoptLegacyNow` (`EngineCommands.swift:56` is on the resolve
   path only). So `CDNSyncCoordinator.syncIfNeeded()` (`sync(.ifDue)`) or `verifyAndRepair()` right after `start()` on
   the first launch after adoption downloads every prior-art file phase 2 has not adopted yet, where R-STO-11 wants it
-  moved (K-15: 6 to 41 of 150 files in 15 of 15 runs). Minimal change, WP-F's choice: (a) while
+  moved (K-15: 6 to 41 of 150 files in 15 of 15 runs on a quiet host; on a loaded one migration can win). Minimal
+  change, WP-F's choice: (a) while
   `state.migration.running` (or pending and not deferred), `performSync` sets `launchRunWaiting` and joins the run the
   migration loop's `defer` starts (`EngineRuns.swift:1055-1058`) instead of starting one; or (b) before a bulk job
   starts a transfer for a record whose legacy file is still pending, it tries `store.adoptLegacyNow`, as `awaitAsset`
@@ -201,7 +202,9 @@ heading or by reference to this draft):
   outcome with the contract's mapping (sync.md §10.6). `lastReconciliation` (new) maps the run's relocations and prunes
   (`CDNReconciliationSummary(report:)`). `verifyFullyAvailable()` fetches `cdn`'s manifest and returns
   `missingOrStaleAssets`, downloading nothing; the client hands no manifest entries out, so `init(client:cdn:)` takes the
-  provider as the manifest source.
+  provider as the manifest source. That fetch is the provider's own request: `StaticManifestCDNProvider` sends no app
+  key, so at SPEC §2.3's origin `verifyFullyAvailable()` through it throws `badResponse` (403) on every call, and the
+  manifest source must send the key (fix round 2, K-5; MIGRATION.md step 4).
 - **Consequences (differences from the prior art, all recorded in MIGRATION.md).** `.syncing` counts the run's planned
   fetches, not every manifest entry (stored assets are not counted as completed). `.upToDate` means "no sync was due when
   this call asked": the client's own launch run (R-SYN-9) may have synced moments earlier in the same launch, and a call
@@ -365,11 +368,13 @@ heading or by reference to this draft):
   every prior-art file phase 2 has not adopted yet (the header's CCR-K1 has the engine's lines). Through the shims:
   `R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes and downloads
   none of the prior art's files (CCR-K1)`, MIGRATION.md steps 3 and 4 in one launch task over 150 prior-art files of
-  64 KiB, failed without its wrapper in 15 of 15 runs (6, 13, 15, 15, 21, 23, 25, 26, 31, 35, 36, 36, 40, 40 and 41
-  files downloaded); progress `.complete`, every file stored afterwards and the prior art's tree empty held in all 15.
+  64 KiB, failed without its wrapper in 15 of 15 runs at a load average of about 5 (6, 13, 15, 15, 21, 23, 25, 26, 31,
+  35, 36, 36, 40, 40 and 41 files downloaded); progress `.complete`, every file stored afterwards and the prior art's
+  tree empty held in all 15. With the wrapper, 10 runs while the simulator run loaded the host (load average up to 139)
+  recorded no known issue: there migration won the race every time.
   The fix is the engine's: no public API tells the shims that migration is running, so the coordinator cannot hold its
   call. Decision: the download count is asserted inside `withKnownIssue("CCR-K1: …", isIntermittent: true)`
-  (intermittent because the count is a race that a fast enough migration could win), CCR-K1 goes to the orchestrator,
+  (intermittent because the count is a race that migration wins on a loaded host), CCR-K1 goes to the orchestrator,
   and MIGRATION.md step 4 keeps `syncIfNeeded()` and `verifyAndRepair()` out of the launch task (the client's own
   launch run waits for migration), with the residual in §4, K-7 and the two doc comments.
 - **Consequences.** Until CCR-K1 lands, an app that follows the prior art's `.task { await coordinator.syncIfNeeded() }`

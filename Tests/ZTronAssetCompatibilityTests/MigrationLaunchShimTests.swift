@@ -91,7 +91,8 @@ struct MigrationLaunchShimTests {
         #expect(legacyLeft == 0, "every prior-art file left the prior art's tree")
         // CCR-K1 (WP-F's engine, k.md K-15): `sync` starts an explicit run at once while migration still adopts, and its
         // bulk jobs never adopt on demand, so they download every prior-art file phase 2 has not reached. The wrapper
-        // goes with the engine fix; intermittent because the count is a race (6 to 41 of 150 in 15 of 15 runs).
+        // goes with the engine fix; intermittent because the count is a race (6 to 41 of 150 in 15 of 15 runs on a quiet
+        // host, none in 10 runs on a loaded one).
         withKnownIssue("CCR-K1: an explicit sync during legacy migration downloads the prior-art files not adopted yet", isIntermittent: true) {
             #expect(downloaded == 0, "R-STO-11: moved, not downloaded again; \(downloaded) of \(launch.assets.count) prior-art files were")
         }
