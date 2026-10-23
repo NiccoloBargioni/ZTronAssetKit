@@ -13,7 +13,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - Run dir: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/d8335845-1285-454d-9185-a6519bd816cc/subagents/workflows/wf_5feaaf72-e33`.
 - **Owner:** "continue" (23 Oct), taken as the go-ahead for WP-K.
   - Strict bar and the session model, as for WP-G.
-  - The owner gave no stop, so the orchestrator applied its suggested default of **45 % for all of WP-K**: 40 for the main run and the close-out, 45 for docs. The owner may change it.
+  - The owner gave no stop, so the orchestrator applied its suggested default of **45 % for all of WP-K**: 40 for the main run and the close-out, 45 for docs. **Changed by the owner on 24 Oct to 65 %** (close-out 60, docs 65).
 - **Usage at launch:** weekly all models 18 %, Fable 0 %, 5-hour 0 %. The week resets Thu 29 Oct 04:00 CEST.
 - **Worktree:** `.worktrees/k` on `wp/k`, from `l5g-merged`.
 - **Keep-awake:** a new `caffeinate -ims -t 172800` from 23 Oct 11:42 runs to 25 Oct 11:42. The earlier one ends 25 Oct 09:48.
@@ -53,7 +53,9 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **L5K-R21:** the check of the job's interests at the answer site, after the last await, then one user-initiated publication.
     - **L5K-R22:** the test premise, liveness tests, records, and ratifications.
   - Findings: `l5k-close3-remaining-k.json`. Probes: `l5k-probes-c3/`.
-- **Close-out: RUNNING from cycle 4** `wf_da30f4d9-921` (task `wle5pdlf9`), launched 00:58 at weekly 34 %, with `fromCycle: 4`, `findingsFile` `l5k-close3-remaining-k.json` and `usageStop: 40`. The 40 % stop may come during cycle 5; at the stop: re-forecast, rewrite this section, and ask the owner only for a new stop.
+- **Close-out: RUNNING from cycle 4** `wf_da30f4d9-921` (task `wle5pdlf9`), launched 00:58 at weekly 34 %, with `fromCycle: 4`, `findingsFile` `l5k-close3-remaining-k.json` and `usageStop: 40`. **Owner, 24 Oct 01:25: "move usage target to 65%".** The WP-K stop is now 65 % (close-out 60, docs 65). The run above still has 40 built in.
+  - At the next clean boundary (cycle 4's verification, or the old gate halting the run), relaunch `assetkit-closeout.js` with `usageStop: 60`, `fromCycle` set to the next cycle, and `findingsFile` set to the last verification's issues (`verifyFirst: true` if fix 4 finished but was not verified).
+  - Docs then run with `usageStop: 65`.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
