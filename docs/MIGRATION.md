@@ -191,11 +191,16 @@ Recorded in `docs/adr-drafts/k.md`; the ones tagged **NEEDS-HUMAN-REVIEW** there
   in the same launch. A sync requested during legacy migration adopts the prior-art files migration has not reached
   yet instead of downloading them, a file a migration batch is adopting at that moment included, and takes the place of
   the launch run that waited for migration (L5K-R1, L5K-R13, K-15). Like the files a sync downloads, the files it adopts,
-  and those a prefetch adopts or a migration batch adopts after it, reach the lookups within
-  `SyncTuning.snapshotInstallInterval` (0.1 s by default) of their adoption: the client coalesces bulk and prefetch
+  and those a prefetch adopts or a migration batch adopts after it, reach the lookups within about two
+  `SyncTuning.snapshotInstallInterval`s (0.2 s by default) of their adoption: the client coalesces bulk and prefetch
   snapshot installs (ARCHITECTURE §5, L5K-R14) and its alarm runs the trailing install, which the client schedules after
-  every such adoption (L5K-R16). A resolve's adoption, and that of a job a user-initiated request joined, is installed
-  before the call returns (L5K-R18).
+  every such adoption (L5K-R16), skipping the re-read while its alarm already wakes within about two intervals (RE-S40's
+  shortcut, F-12); a migration batch returns to the client right after such a publication instead of waiting behind it,
+  and the last batch installs at once (L5K-R20). A resolve's adoption is installed before the call returns, and so is
+  every prior-art file a job answers a user-initiated request with (`resolve`, `ensureAvailable`, a user-initiated
+  prefetch), whenever that request joined it (L5K-R18, L5K-R21). Outside these adoptions, a user-initiated request that
+  joins a prefetch or bulk download while the client is verifying it returns up to about two intervals before the lookups
+  see the asset (the location it returns is valid at once); recorded for the owner in k.md (L5K-R21 enumeration).
 - **Inherited from the module** (K-11): an asset whose new content the origin reports missing (404) is no longer served
   until its manifest entry changes, where the prior art kept the old file and asked again on every sync; the candidate
   extensions also filter manifest-known assets (ADR-037); an on-demand resolve downloads before its extension check; a

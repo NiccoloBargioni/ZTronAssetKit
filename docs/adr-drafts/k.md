@@ -11,8 +11,8 @@ package signature in WP-C's contract file `Migration/StoreMigration.swift` chang
 shims to document their differences there, and orchestrator ruling L5K-R10 makes it WP-K's file. **For the orchestrator
 at merge:** record it as WP-K's file in ARCHITECTURE §1.2 (a "Files WP-K added" paragraph like WP-F's and WP-G's), so
 WP-I does not treat it as unowned (fix round 1, reqs issue 2; L5K-R10). The close-out's authorised edits in WP-F's
-engine (orchestrator rulings L5K-R1, L5K-R14, L5K-R16, L5K-R17, L5K-R18) and in WP-C's legacy migration (L5K-R13,
-L5K-R14, L5K-R17, L5K-R18) are listed under "Authorised edits outside WP-K (close-out)" below.
+engine (orchestrator rulings L5K-R1, L5K-R14, L5K-R16, L5K-R17, L5K-R18, L5K-R21) and in WP-C's legacy migration
+(L5K-R13, L5K-R14, L5K-R17, L5K-R18, L5K-R20) are listed under "Authorised edits outside WP-K (close-out)" below.
 
 **Proposed REENTRANCY rows** (the code cites them as "k-n (proposed)"; all are main-actor awaits of
 `CDNSyncCoordinator`, a test-target type, so ARCHITECTURE §10 may list them under a new "compatibility shims"
@@ -23,14 +23,14 @@ heading or by reference to this draft):
 | k-1 | `CDNSyncCoordinator.run(_:)`: `client.subscribe()`, `client.sync(mode)`, then `follower.value`; and the `await self.run(_:)` of `syncIfNeeded()` and `verifyAndRepair()`, after which nothing is read (fix round 1) | Nothing of the coordinator is read across them. `progress` is written only by this call's follower while the run is in flight and by the outcome once the follower was cancelled **and awaited**, so no progress event lands after the outcome. A concurrent call joins the same single-flight run and publishes the same outcome (its follower may republish a `.syncing` value until its own outcome lands). |
 | k-2 | the follower's `for await event in events` (a main-actor task) | Each event is applied in the turn it arrives, after `self` is re-read (weak: a released coordinator publishes nothing). Progress never moves backwards within a run by construction (sync.md §10.6: the engine's completed count is monotone and one subscription delivers a run's progress in order, newest-wins), so no guard is needed. |
 | k-3 | `CDNSyncCoordinator.verifyFullyAvailable()`: `cdn.fetchManifest()` | Nothing of the coordinator; the client's snapshot is read after the fetch, so the comparison uses what is stored when the manifest arrived. |
-| k-4 | `SyncEngine.storedLocation(of:in:lane:)` (`EnginePresence.swift`, WP-F's file, close-out rulings L5K-R1, L5K-R14, L5K-R16, L5K-R18; `storedLocation(of:lane:)` until cycle 3): `store.adoptLegacyNow(id, urgency:)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes, at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). After a `.bulk` adoption the caller's own awaits follow, each re-validated as f-11 says: the lane is re-read, and a job promoted to the user-initiated lane meanwhile asks the store once more at `.userInitiated`, which installs the snapshot at once (L5K-R18); then the store's deadline is re-read into the heap (RE-S40, O(1) while the alarm already wakes within about two install intervals), so the adoption's trailing install runs on the alarm (L5K-R16). The answer is the outcome of the store's one adoption of the prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits for that processing and reads the location it bound; when a batch has not finished hashing the file, both may hash it and the one whose bytes verify second waits out the other's adoption. So `nil` means no prior-art file to adopt, or one dropped or kept, never a failure the other adopter caused (the round-1 text of this row claimed the first placement always bound before the other call decided; L5K-C1-00 showed it did not). |
+| k-4 | `SyncEngine.storedLocation(of:lane:)` (`EnginePresence.swift`, WP-F's file, close-out rulings L5K-R1, L5K-R14, L5K-R16, L5K-R18, L5K-R21; `storedLocation(of:in:lane:)` in cycle 3): `store.adoptLegacyNow(id, urgency:)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes, at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise; and, since L5K-R21, `answeredFromStore`'s answer-site `store.adoptLegacyNow(id, urgency: .userInitiated)` | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). After the reads, when any was a `.bulk` adoption, the store's deadline is re-read into the heap once (RE-S40, O(1) while the alarm already wakes within about two install intervals), so the adoptions' trailing install runs on the alarm (L5K-R16). That is the last ordinary await: the answer site then checks the job's interests (L5K-R21), and when the job holds a user-initiated interest and an id was answered by a read that installed nothing at once (a `.bulk` adoption, a present asset whose trailing install may still be due, a plain location read), one `adoptLegacyNow(id, urgency: .userInitiated)` installs the whole state at once, after which nothing is awaited before the synchronous answer: a promotion during any read or during the re-read is seen by the check, one during that publication finds the snapshot it installs (every answered id was bound before it), one after the check cannot interleave. L5K-R18's per-read second ask is folded into that check. The answer of each read is the outcome of the store's one adoption of the prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits for that processing and reads the location it bound; when a batch has not finished hashing the file, both may hash it and the one whose bytes verify second waits out the other's adoption. So `nil` means no prior-art file to adopt, or one dropped or kept, never a failure the other adopter caused (the round-1 text of this row claimed the first placement always bound before the other call decided; L5K-C1-00 showed it did not). |
 | k-5 | `AssetStore.performAdoptLegacyNow(_:urgency:)` (`Migration/LegacyPhases.swift`, WP-C's file, close-out ruling L5K-R13): the wait for the processing of the same prior-art file in flight, another adopt-on-demand's (`MigrationState.onDemand`, from its claim to its installed snapshot) or another call's adoption (`MigrationState.adopting`), `awaitLegacyFlight(of:)`; and the loop's `awaitOpen()` after it | Nothing is carried across the wait: the call starts again and reads the location, the phase, the plan commit, the queue, the claims and the flights anew. The processing it waited for has ended: adopted (the location is present: the call installs a snapshot at its urgency and answers the location read after that install), dropped or kept (the file is neither queued nor claimed: `nil`), or ended without an outcome for the file (its caller was cancelled, or a transient failure deferred it back to the queue: this call takes the file and processes it itself, as a call arriving then would). `close()` resumes it: it drains the units and resumes the key and commit waiters, so the processing it waits for returns from its await, throws `.closed` at its next phase check, and ends its mark (every exit path of `processLegacyFile` and `processLegacyFileOnDemand` does), which resumes this call; its `awaitOpen()` then throws `.closed`. |
 | k-6 | `AssetStore.processLegacyFile(_:)` (`Migration/LegacyPhases.swift`, L5K-R13): after its hash, whether it succeeded or failed, the wait until no other call's adoption of the file is in flight, `awaitLegacyAdoption(of:)` | The loop re-reads `adopting[file]` and the phase (`checkLive`, so a closing store answers `.closed`); it returns in the turn in which no adoption is in flight, and the caller then reads the records as that adoption left them: bound (`.alreadyAdopted`; for a failed hash, `legacyFailureOutcome` sees the binding), no longer wanted (`.dropped`), or still wanted (the other adoption failed: this call adopts with its own verified hash, marking `adopting` in that same turn, so at most one adoption runs at a time). A `notFound` read caused by the other call's rename, or a key in `publishing`, is therefore never classified before that call's binding. `close()` resumes it as for k-5. |
-| k-7 | `AssetStore.performMigrateLegacy(maxFiles:)` (`Migration/LegacyPhases.swift`, close-out ruling L5K-R17): with the queue empty and every claimed file an adopt-on-demand's (`MigrationState.onDemand`), the wait for one such processing, `awaitLegacyFlight(of:)`, then `checkLive()` | The queue, the claims and the phase, re-read by the loop in the turn the wait returns: the processing it waited for has ended, adopted, dropped or kept (the file is no longer claimed), or deferred or cancelled (the file is back in the queue, which ends the wait); while every claimed file still is an adopt-on-demand's the call waits for the next one, so it never returns with nothing it could do, and once the claims are empty it goes on to phases 3 and 4 itself (the finish check that follows the loop). A closing store answers `.closed` (`checkLive`); `close()` resumes the wait through the processing it waits for, as for k-5. Each wait is bounded by one adoption. |
+| k-7 | `AssetStore.performMigrateLegacy(maxFiles:)` (`Migration/LegacyPhases.swift`, close-out ruling L5K-R17): with the queue empty and every claimed file an adopt-on-demand's (`MigrationState.onDemand`), the wait for one such processing, `awaitLegacyFlight(of:)`, then `checkLive()` | The queue, the claims and the phase, re-read by the loop in the turn the wait returns: the processing it waited for has ended, adopted, dropped or kept (the file is no longer claimed), or deferred or cancelled (the file is back in the queue, which ends the wait); while every claimed file still is an adopt-on-demand's the call waits for the next one, so it never returns with nothing it could do, and once the claims are empty it goes on to phases 3 and 4 itself (the finish check that follows the loop). A closing store answers `.closed` (`checkLive`); `close()` resumes the wait through the processing it waits for, as for k-5. Each wait is bounded by one adoption. Since L5K-R20 a call reaches this wait only with no install of its own left due: a batch that leaves files to process returns right after a coalesced publication (`remaining > 0`), so the wait is made by the next call, which published nothing; the last batch installs at once. |
 
-**Proposed amendment of row f-11** (ARCHITECTURE §10.2, the orchestrator's file): in its "Await" column, "`store.location(for:extensions:recordingAccess:)` per id of the job" becomes "`store.location(for:extensions:recordingAccess:)` per id of the job, or, while legacy migration is pending, `store.adoptLegacyNow(id, urgency:)` at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise, after a `.bulk` adoption a second `store.adoptLegacyNow(id, urgency: .userInitiated)` when the job was promoted meanwhile and the RE-S40 re-read of `store.nextDeadline()` (row k-4, L5K-R1, L5K-R14, L5K-R16, L5K-R18)"; its re-validation column is unchanged.
+**Proposed amendment of row f-11** (ARCHITECTURE §10.2, the orchestrator's file): in its "Await" column, "`store.location(for:extensions:recordingAccess:)` per id of the job" becomes "`store.location(for:extensions:recordingAccess:)` per id of the job, or, while legacy migration is pending, `store.adoptLegacyNow(id, urgency:)` at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise; after the reads, the RE-S40 re-read of `store.nextDeadline()` when any read was a `.bulk` adoption; then, when the job holds a user-initiated interest and an id was answered by a read that installed nothing at once, one `store.adoptLegacyNow(id, urgency: .userInitiated)` (row k-4, L5K-R1, L5K-R14, L5K-R16, L5K-R21)"; its re-validation column gains "the job's interests are checked for a user-initiated one after the last ordinary await, and nothing is awaited between the publication that check may make and the answer (L5K-R21)".
 
-**Proposed amendments of rows RE-S40 and RE-S27** (ARCHITECTURE §10.2; close-out ruling L5K-R16): RE-S40's "Await" column becomes "re-arming outside the alarm: `store.nextDeadline()` after a lease release, publish, apply or purge, and after every other store call that can leave an install due: a bulk-urgency adoption (k-4), each `migrateLegacy` call (RE-S29), point admission's `admit`, launch reconciliation's publication, a failed maintenance step, a failed `reportUnreadable`, and `recordFailure`/`recordIntegrityFailure` or `publish` when the job ended meanwhile"; its re-validation column gains "an answer applied after another update of the store's deadline landed while it was in flight keeps the earlier of the two deadlines (`applyStoreDeadline`): the store answers in its order and the engine resumes in priority order, so the two may have crossed". RE-S27 gains the same sentence for the alarm's `runDueWork()` report.
+**Proposed amendments of rows RE-S40 and RE-S27** (ARCHITECTURE §10.2; close-out ruling L5K-R16): RE-S40's "Await" column becomes "re-arming outside the alarm: `store.nextDeadline()` after a lease release, publish, apply or purge, and after every other store call that can leave an install due: the funnel's reads, once after them when one was a bulk-urgency adoption (k-4), each `migrateLegacy` call (RE-S29), point admission's `admit`, launch reconciliation's publication, a failed maintenance step, a failed `reportUnreadable`, and `recordFailure`/`recordIntegrityFailure` or `publish` when the job ended meanwhile"; its re-validation column gains "an answer applied after another update of the store's deadline landed while it was in flight keeps the earlier of the two deadlines (`applyStoreDeadline`): the store answers in its order and the engine resumes in priority order, so the two may have crossed". RE-S27 gains the same sentence for the alarm's `runDueWork()` report.
 
 **Contract change requests:** none by WP-K; the one package signature change, `adoptLegacyNow(_:urgency:)` in WP-C's
 contract file `Migration/StoreMigration.swift` (defaulted to `.userInitiated`), is orchestrator ruling L5K-R14's (L5K-C2-06).
@@ -599,7 +599,8 @@ made; where a ruling and an earlier entry of this draft disagree, the ruling win
 - **Orchestrator ruling (close-out), L5K-R16 (every coalesced publication gets its trailing install scheduled, as a
   class; L5K-C2-00, -02, -03, blocking).** At the end of every engine turn in which the store may have marked an install
   due, the heap holds a store deadline no later than the store's `nextDeadline()`, so no adopted, committed or published
-  asset stays out of the readers' snapshot longer than one install interval unless a commit is still pending. Done: every
+  asset stays out of the readers' snapshot longer than one install interval unless a commit is still pending (about two
+  install intervals with RE-S40's O(1) shortcut, F-12, as recorded under L5K-R22). Done: every
   engine call of a store method is enumerated with how its deadline is re-read; the RE-S40 re-arm (O(1) shortcut kept,
   F-12) is added after the funnel's bulk adoptions, after every `migrateLegacy` call, and at the seven other call sites
   (eight exits) the enumeration found without one; a crossed answer of the store's deadline keeps the earlier deadline
@@ -617,11 +618,44 @@ made; where a ruling and an earlier entry of this draft disagree, the ruling win
 - **Orchestrator ruling (close-out), L5K-R18 (a job promoted during its adoption; L5K-C2-05).** After the funnel's
   bulk-urgency adoption the lane is re-read; a job promoted to the user-initiated lane meanwhile asks the store once more
   at `.userInitiated`, and the store's present path installs at that urgency too. A seam reaches it: failing test first
-  (`94b55a3`), fix `09afc28` with a store pin: "L5K-R18: a job promoted during its adoption".
+  (`94b55a3`), fix `09afc28` with a store pin: "L5K-R18: a job promoted during its adoption". Since L5K-R21 the second
+  ask is the answer site's one publication, made after the last ordinary await.
 - **Orchestrator ruling (close-out), L5K-R19 (the cycle-2 non-blocking items).** L5K-C2-04: two held variants reach the
   race in every run (`cb9faef`), and the stochastic tests' premise is recorded in the L5K-R2 table as pattern (a) with
   its measured margin; L5K-C2-06: the header and the contract-change line name L5K-R14's package signature; L5K-C2-07: the
   four defensive branches are recorded as unreachable by construction and deliberately untested ("L5K-R19").
+- **Orchestrator ruling (close-out), L5K-R20 (a store call never suspends after a coalesced publication, as a class;
+  L5K-C3-01, blocking).** A store method the engine calls that publishes at a coalesced urgency returns right after that
+  publication. Done for `performMigrateLegacy` with option (b) where it applies: a batch that leaves files to process
+  returns right after a publication that left the trailing install due (`remaining > 0`, `finished == false`), and the
+  engine's loop re-arms and calls again; a call that published nothing waits (L5K-R17) or runs phases 3 and 4. The last
+  batch, which phases 3 and 4 follow, installs at once instead: a return there would read "nothing remaining, not
+  finished", the engine's back-off signal (RE-S29, ARCHITECTURE §4.7 (8)), and a variant that returned anyway, with an
+  engine that called again after any counted adoption, made WP-F's `deferredMigrationFinishesInMaintenance` time out.
+  Every publishing store call is enumerated (the L5K-R16 table's last column); the one "yes" left is a doom's
+  removal-only install, not changed, with the reason. Failing tests first (`a8eadc8`, `4b84327`), fix `8d858af`: "L5K-R20:
+  no store call suspends after a coalesced publication".
+- **Orchestrator ruling (close-out), L5K-R21 (user-initiated answers come after the install, enforced at the answer site,
+  as a class; L5K-C3-00, blocking).** In `answeredFromStore`, after the reads loop: the RE-S40 re-arm (moved out of the
+  per-id read, once per attempt), then a check of the job's interests made after that last ordinary await; when it finds
+  a user-initiated interest and an answered id came from a read that installed nothing at once, exactly one
+  `adoptLegacyNow(id, urgency: .userInitiated)` follows, then the synchronous answer. L5K-R18's per-read second ask is
+  folded into it. Failing tests first (`694583a`: PE5's shape; a two-id job promoted during its second read), fix
+  `dfc16e8`. Every other site that answers a user-initiated asker from the store is enumerated with a verdict ("L5K-R21:
+  user-initiated answers come after the install"): the commit path does not meet the rule (a job promoted while the
+  store publishes its own transfer, outside the migration window; probe K4-COMMITPROMO, 5 of 5), and the read-only sites
+  can answer within the trailing-install window of another lane's publication; both are recorded for a ruling, outside
+  the files this close-out may edit.
+- **Orchestrator ruling (close-out), L5K-R22 (the other cycle-3 items).** L5K-C3-02/03: `migrationLoopWaitsForTheLastAdoption`
+  establishes and asserts its premise and fails against M17 in 4 of 4 whole-file runs and a full-suite run; the premise
+  is in the L5K-R2 table. L5K-C3-08: the close and shutdown liveness tests exist. L5K-C3-04/-07/-05/-06/-09: the records
+  are corrected, and PR14a now pins the funnel's re-arm by itself. L5K-C3-11: PS3 is retired, PSPIN runs filtered to
+  itself (`4aea9a6` and the docs commit): "L5K-R22: the cycle-3 items".
+- **Orchestrator ruling (close-out), L5K-C3-10 ratified (cycle 4, L5K-R22).** The cycle-3 edits that went slightly beyond
+  L5K-R16's and L5K-R18's wording are ratified, each serving L5K-R16, R18 or R21 and changing no signature:
+  `EngineTimers.swift`'s `fireDue`/`applyStoreDeadline` change and its test seam; `EngineCommands.swift`'s lease release
+  restructured into a private `releaseLease`; `LegacyPhases.swift`'s L5K-R18 present path; `EngineLifecycle.swift`'s
+  `reconcileLaunch` returning `Bool`, and the shutdown seam release.
 
 ## Authorised edits outside WP-K (close-out)
 Under L5K-R1 only, internal state and bodies, no public or package signature changed; ownership unchanged (WP-F's):
@@ -693,6 +727,25 @@ Cycle 3, bodies and internal state; no public or package signature changed:
 Not changed in cycle 3: `StoreMigration.swift`, `MigrationState.swift`, any Kit source, any WP-B file, WP-F's other test
 files (`EngineHarness.swift` included: the tripwire's helper is an extension in the L5K-R1 test file).
 
+Cycle 4, bodies and internal state; no public or package signature changed:
+- Under L5K-R20 (`Migration/LegacyPhases.swift`, authorised under L5K-R13 and L5K-R17): `performMigrateLegacy` returns
+  right after a coalesced publication when files remain and publishes the last batch at `.userInitiated`; its doc
+  comment and the wait's comment.
+- Under L5K-R21 (`EnginePresence.swift`, authorised under L5K-R1, L5K-R14, L5K-R16 and L5K-R18): `answeredFromStore`
+  re-reads the store's deadline once after its reads and makes the answer site's one user-initiated publication;
+  `storedLocation(of:lane:)` returns the read's urgency and no longer re-reads the lane, asks again or re-arms (its
+  `in transfer:` parameter removed, an internal signature); both doc comments.
+- Tests: `EngineLegacyMigrationTransferTests.swift` (the L5K-R20, L5K-R21 and L5K-R22 tests; the gated planner
+  `MigrationPlannerGate`/`MigrationGatedPlanner`; the helpers `batchWaitLogged`, `releaseUntilTheBatchWaits`,
+  `gatedLaunch`, `releaseUntilPlanned`; PR14a's read while migration is held; the L5K-R17 test rewritten) and
+  `LegacyOnDemandRaceTests.swift` (the L5K-R20 store pins, the close liveness test).
+- WP-K's own: `docs/MIGRATION.md` §4 and this draft.
+
+Not changed in cycle 4: `EngineRuns.swift` (an early return carries `remaining > 0`, which the loop already calls again
+on), `EngineState.swift`, `EngineTimers.swift`, `EngineDispatch.swift` and `EngineCommands.swift` (the L5K-R21 sites that
+do not meet the rule are recorded for a ruling), `IntegrityBookkeeping.swift` (L5K-R20's dooms note),
+`StoreMigration.swift`, any Kit source, any WP-B file.
+
 ## L5K-R1: every transfer path during legacy migration
 - **The funnel.** Every transfer the engine starts goes through one place: `EngineDispatch.start(_:probe:)` spawns the
   attempt's driver, and the driver either publishes a file an earlier attempt already staged (`publishDrained`: no
@@ -736,7 +789,10 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   while the run that took the launch run's place is active, no launch run follows it and no flag is left` (a held
   transfer keeps the run active across the end of migration). With no run started during migration, the launch run
   still starts when the loop ends (`R-STO-11: the launch run waits for legacy migration and downloads nothing it
-  adopted`, F-8; the shim lookups test waits for exactly that run).
+  adopted`, F-8; the shim lookups test waits for exactly that run). Since L5K-R16 the migration loop re-reads the store's
+  deadline after every call, so migration's later adoptions reach the readers through that re-arm whether or not a
+  launch run follows migration (PR14c; L5K-C3-09); since L5K-R20 a batch that leaves files to process returns to the
+  loop right after a coalesced publication, and the last batch installs at once.
 - **Store serialisation (row k-4), corrected in cycle 2.** Cycle 1 wrote here that the store already ordered an
   on-demand adoption against the migration loop's: a file a batch had claimed hashed by both, the first placement
   binding before the other call decided. It did not: the other call could decide between the placement's rename and its
@@ -870,9 +926,9 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   alarm never ran that install and the adopted assets stayed out of the readers' snapshot until an unrelated install
   (L5K-C2-00, -02, -03; the compatibility harness's interval of 0 hid it). Since L5K-R16 the engine re-reads the store's
   deadline after every such call, so the statement holds: like the files a sync downloads, the files a sync, a prefetch or
-  a migration batch adopts reach the lookups within one install interval (0.1 s by default). A resolve's adoption, a
-  user-initiated job's, and since L5K-R18 that of a job promoted to the user-initiated lane during its adoption, is
-  installed before the call returns. MIGRATION.md §4 says so; `prefetchedNeighboursDuringLegacyMigration` pins it through
+  a migration batch adopts reach the lookups within about two install intervals (0.2 s by default; RE-S40's shortcut,
+  F-12; L5K-C3-05). A resolve's adoption, a user-initiated job's, and since L5K-R18 and L5K-R21 every id a job answers a
+  user-initiated asker with, whenever that asker joined, is installed before the call returns. MIGRATION.md §4 says so; `prefetchedNeighboursDuringLegacyMigration` pins it through
   the shims at the production interval.
 - **For the docs level.** ARCHITECTURE §5's bound holds during migration again, so L5K-C1-02's alternative (qualifying
   §5 and ADR-016) is moot. Its sentence "`apply`, `purge`, `reportUnreadable` and `adoptLegacyNow` install at once"
@@ -887,56 +943,73 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   parked-run decision no launch run's apply follows migration to install them. The adopted assets were stored but missed
   by `lookup`, `existingLocalURL` and `hasAsset` until an unrelated install (PR14a, PR14b, probes I and J, PK-R14b).
 - **Invariant.** At the end of every engine turn in which the store may have marked an install due, the heap holds a
-  store deadline no later than the store's `nextDeadline()`, so nothing published stays out of the readers' snapshot for
-  longer than one install interval unless a commit is still pending. Two ways to break it exist: a store call after which
-  nothing re-reads the deadline (the enumeration below), and an older answer of the deadline applied after a newer one
-  (crossed answers, below).
+  store deadline no later than the store's `nextDeadline()`, or one within about two install intervals of now when RE-S40's
+  O(1) shortcut skipped the re-read (F-12: the alarm already wakes for the store that soon, and its `runDueWork()` report
+  re-arms from the newest deadline), so nothing published stays out of the readers' snapshot for longer than about two
+  install intervals (0.2 s by default) unless a commit is still pending (L5K-C3-05, L5K-C3-09). Two ways to break it exist:
+  a store call after which nothing re-reads the deadline (the enumeration below), and an older answer of the deadline
+  applied after a newer one (crossed answers, below). Since L5K-R20 the store calls themselves keep their part: none
+  suspends behind a coalesced publication of its own, so the engine's re-read follows every such publication without
+  waiting on another flight, a wait or a later phase (the last column).
 - **The enumeration: every engine call of a store method**, with what it can leave due and how the deadline is re-read.
   "Install due" means a coalesced publication or a doomed key (`scheduleDoomedKey` marks an install due without
   publishing); "added" marks a re-arm this close-out added (RE-S40 through `refreshStoreDeadline`, or
   `refreshStoreDeadlineAfterPublish`, which skips the read in O(1) while the alarm already wakes for the store within about
   two install intervals, so a bulk sync never reads `nextDeadline()` once per asset, F-12).
 
-  | Engine call site | Store method | Can it leave an install due? | How the deadline is re-read afterwards |
-  |---|---|---|---|
-  | `runStart` | `open()` | No: open ends with `installSnapshot()`. A failed launch commit leaves its backed-off window, not an install | The first RE-S40 re-read or alarm turn (outside the class) |
-  | `runStart` (twice), `pushRetentionScope` | `setRetentionScope` | No: an in-memory field | Nothing to re-read |
-  | `runStart` | `makeStagingSink()` | No | Nothing |
-  | `reconcileLaunch` | `stagingInventory()`, `planningView()` | No: reads | Nothing |
-  | `reconcileLaunch` (`.adoptStaged`) | `publish(…, urgency: .bulk)` | Yes, while the engine starts (no re-read applies before `running`) | **Added:** `runStart` re-reads once running when it published (`refreshStoreDeadlineAfterPublish`); pinned by `reconciledAdoptionReachesTheReaders` (a mutant without it fails) |
-  | `reconcileLaunch`; maintenance | `collectStaging(keeping:)` | No: staging files only | Maintenance: `finishMaintenance` (RE-S40); launch: nothing |
-  | `releaseSourceCopies` | `adoptionReport()` | No: a read | Nothing |
-  | `performShutdown` | `close()` | Terminal | Nothing |
-  | `performSync`, `runSteps`, `catchUpWithStore`, `performAwaitAsset`, `joinGroup`, `ensureTask`, `isSyncDue`, `lastSyncedAt`, `diagnostics`, `blobHolders`, `scheduleHeals`, point admission | `planningView()` | No: a read | Nothing |
-  | `runSteps`, `ensureTask` | `evictionPlan(toFree:protecting:)` | No: a dry run | Nothing |
-  | `applyAndFollow` (a run's, `ensureAvailable`'s) | `apply` | Its dooms mark an install due; it installs at once (`.userInitiated`) when it changed anything | RE-S40 after it in `runSteps` (current run or not) and `ensureTask`; after a failed `apply` the catch-up's RE-S40 (`catchUpWithStore(afterFailedApply:)`) |
-  | `runSteps` | `markSynced` | No: an ordered commit inside the call | Nothing left due |
-  | `migrateLoop` | `migrateLegacy(maxFiles:)` | Yes: a batch publishes at `.bulk`; phase 3's commit can throw after the publication | **Added:** after every call, returned or thrown (`refreshStoreDeadlineAfterPublish`); pinned by `migrationAdoptionsReachTheReaders` (probes I and J) |
-  | `publish` (the commit path) | `publish(…, urgency: lane)` | Yes for the bulk and prefetch lanes | RE-S40 after `committed` (existing); **added** when the job ended during the call and when the call threw (it publishes before its last re-validation, `stillBound`; a failed placement dooms its provisional reference). Both added exits are defensive: neither is known to be reached with an install left due |
-  | `permanentMissing` | `recordFailure` | Yes: a failed stale record's blob is doomed and `persistBookkeeping` publishes at `.bulk` | RE-S40 when the job is still current (existing); **added** when the job ended (defensive, as above) |
-  | `integrityFailed` | `recordIntegrityFailure` | Yes, at the cap (as above) | As for `recordFailure` |
-  | `sparePresent`, `storedLocation` (no migration) | `location(…, recordingAccess: false)` | No | Nothing |
-  | `readPresentLocation`, `performAwaitAsset` | `location(…, recordingAccess: true)` | No: a lazy access stamp | Nothing |
-  | `storedLocation` (migration pending) | `adoptLegacyNow(id, urgency: .bulk)` | Yes | **Added:** after every such adoption (`refreshStoreDeadlineAfterPublish`); pinned by `syncAdoptionsReachTheReaders` (PR14a), `prefetchedNeighboursReachTheReaders` (PR14b), the shim test (PK-R14b) and the L5K-R14 test's tripwire |
-  | `storedLocation` (user-initiated lane, or the L5K-R18 second ask) | `adoptLegacyNow(id, urgency: .userInitiated)` | No: it installs before it returns, a present asset included since L5K-R18 | Nothing left due by it |
-  | `performAwaitAsset` (the resolve path) | `adoptLegacyNow(id)` (`.userInitiated`) | No (as above) | Nothing left due by it |
-  | `readFreeSpace` (`refreshFreeSpace`, `spaceFailed`, the settling and reclaim reads) | `freeSpace()` | No: a read | Nothing |
-  | `fireDue` | `runDueWork()` | Its report carries the store's next deadline | RE-S27: the report re-arms, through `applyStoreDeadline` (crossed answers) |
-  | `refreshStoreDeadline` | `nextDeadline()` | — | The re-read itself, through `applyStoreDeadline` |
-  | point admission (`answerUnknownWaiters`) | `admit(entry)` | Yes: a content change of a known record dooms its blob, and `admit` publishes only when it adopted a known blob; it may throw after in-memory writes | **Added:** one RE-S40 re-read after the answering pass when it admitted |
-  | `performSetPinned` | `setPinned` | No: an ordered commit | RE-S40 (existing) |
-  | `performAcquireLease` | `acquireLease` | No: a lease only postpones deletions | Nothing; a lease acquired after shutdown began is released at once (terminal) |
-  | `releaseLease(_:)` (`performReleaseLease`) | `releaseLease` | Its answer is the store's new deadline | Applied through `applyStoreDeadline` (RE-S40; it called `setStoreDeadline`) |
-  | `purgeTask` | `purge` | Its dooms; it installs at once (`.userInitiated`) | RE-S40 on both paths (existing) |
-  | maintenance | `collectGarbage` (orphans doomed with a grace, no install), `evictIfNeeded`, `verifyIntegrity` (install at once) | Their dooms | `finishMaintenance`'s RE-S40 on every exit (existing); **added** on the failed-step exit (a step that threw may have doomed blobs in memory first, ADR-050) |
-  | `performReportUnreadable` | `reportUnreadable` | Its doom; it installs at once | RE-S40 in `quarantined` (existing); **added** when it threw |
-  | `performStorageReport`, `performMetrics` | `storageReport()`, `metrics()` | No: reads | Nothing |
-  | the facade (`AssetClient.perform`) | `verifyRootNow()` | No: a read | Nothing |
-  | `publish`'s early exits, `publicationFailed`, `failed`'s resume reads, launch reconciliation | the store's staging sink (`StoreStagingSink.discard`, `readSidecar`) | No: staging files, not the records or the snapshot | Nothing |
+  | Engine call site | Store method | Can it leave an install due? | How the deadline is re-read afterwards | Suspends after publishing? (L5K-R20) |
+  |---|---|---|---|---|
+  | `runStart` | `open()` | No: open ends with `installSnapshot()`. A failed launch commit leaves its backed-off window, not an install | The first RE-S40 re-read or alarm turn (outside the class) | No: its install is at once |
+  | `runStart` (twice), `pushRetentionScope` | `setRetentionScope` | No: an in-memory field | Nothing to re-read | No publication |
+  | `runStart` | `makeStagingSink()` | No | Nothing | No publication |
+  | `reconcileLaunch` | `stagingInventory()`, `planningView()` | No: reads | Nothing | No publication |
+  | `reconcileLaunch` (`.adoptStaged`) | `publish(…, urgency: .bulk)` | Yes, while the engine starts (no re-read applies before `running`) | **Added:** `runStart` re-reads once running when it published (`refreshStoreDeadlineAfterPublish`); pinned by `reconciledAdoptionReachesTheReaders` (a mutant without it fails) | No: `publish` publishes last (its `stillBound` after the install is synchronous) |
+  | `reconcileLaunch`; maintenance | `collectStaging(keeping:)` | No: staging files only | Maintenance: `finishMaintenance` (RE-S40); launch: nothing | No publication |
+  | `releaseSourceCopies` | `adoptionReport()` | No: a read | Nothing | No publication |
+  | `performShutdown` | `close()` | Terminal | Nothing | No publication |
+  | `performSync`, `runSteps`, `catchUpWithStore`, `performAwaitAsset`, `joinGroup`, `ensureTask`, `isSyncDue`, `lastSyncedAt`, `diagnostics`, `blobHolders`, `scheduleHeals`, point admission | `planningView()` | No: a read | Nothing | No publication |
+  | `performAvailability`, `ensureTask` (its unreachable-manifest answer and its report) | `availability(of:)` | No: a synchronous read | Nothing | No publication |
+  | `runSteps`, `ensureTask` | `evictionPlan(toFree:protecting:)` | No: a dry run | Nothing | No publication |
+  | `applyAndFollow` (a run's, `ensureAvailable`'s) | `apply` | Its dooms mark an install due; it installs at once (`.userInitiated`) when it changed anything | RE-S40 after it in `runSteps` (current run or not) and `ensureTask`; after a failed `apply` the catch-up's RE-S40 (`catchUpWithStore(afterFailedApply:)`) | No coalesced publication (at once); a doom before its commit is a removal (note below) |
+  | `runSteps` | `markSynced` | No: an ordered commit inside the call | Nothing left due | No publication |
+  | `migrateLoop` | `migrateLegacy(maxFiles:)` | Yes: a batch publishes at `.bulk`; phase 3's commit can throw after the publication | **Added:** after every call, returned or thrown (`refreshStoreDeadlineAfterPublish`); pinned by `migrationAdoptionsReachTheReaders` (PR14c, probes I and J) | **Was yes** (L5K-C3-01: the L5K-R17 wait, then phases 3 and 4, followed the batch's coalesced publication in the same call). **Since L5K-R20 no:** a batch that leaves files to process returns right after a coalesced publication (`remaining > 0`), and the last batch installs at once before phases 3 and 4, which publish nothing; pinned by `batchAdoptionsReachTheReadersWhileTheMigrationWaits`, `lastBatchAdoptionsReachTheReadersDuringPhasesThreeAndFour` and the store's `coalescedBatchReturnsBeforeItWaits`, `lastBatchInstallsBeforePhasesThreeAndFour` |
+  | `publish` (the commit path) | `publish(…, urgency: lane)` | Yes for the bulk and prefetch lanes | RE-S40 after `committed` (existing); **added** when the job ended during the call and when the call threw (it publishes before its last re-validation, `stillBound`; a failed placement dooms its provisional reference). Both added exits are defensive: neither is known to be reached with an install left due | No: it publishes last (as above) |
+  | `permanentMissing` | `recordFailure` | Yes: a failed stale record's blob is doomed and `persistBookkeeping` publishes at `.bulk` | RE-S40 when the job is still current (existing); **added** when the job ended (defensive, as above) | Its `.bulk` publication follows the doom that already marked the install due, then its ordered commit is awaited: a removal only, not changed (note below) |
+  | `integrityFailed` | `recordIntegrityFailure` | Yes, at the cap (as above) | As for `recordFailure` | As for `recordFailure` |
+  | `sparePresent`, `storedLocation` (no migration) | `location(…, recordingAccess: false)` | No | Nothing | No publication |
+  | `readPresentLocation`, `performAwaitAsset` | `location(…, recordingAccess: true)` | No: a lazy access stamp | Nothing | No publication |
+  | `storedLocation` (migration pending, a job not of the user-initiated lane) | `adoptLegacyNow(id, urgency: .bulk)` | Yes | **Added:** once after the reads in `answeredFromStore` when any read was a bulk-urgency adoption (`refreshStoreDeadlineAfterPublish`; since L5K-R21 once per attempt, after the reads, where it ran after each such read); pinned by `syncAdoptionsReachTheReaders` (PR14a, which since cycle 4 reads the readers while migration is still held), `prefetchedNeighboursReachTheReaders` (PR14b), `promotionDuringTheReArmInstallsBeforeTheAnswer` (PE5) and the shim test (PK-R14b): the mutant without it (M16a) fails PR14a, PR14b and PE5 in cycle 4's run and PK-R14b in the cycle-3 verifier's; the L5K-R14 test and its tripwire do not pin it (they read after `finishMigration`, whose batches and re-arm install the state; L5K-C3-04, L5K-C3-07) | No: its flight wait (k-5) precedes its publication, and after the publication it only reads the record (the present path; `processLegacyFileOnDemand`'s `endLegacyOnDemand` is synchronous) |
+  | `storedLocation` (migration pending, a job of the user-initiated lane) | `adoptLegacyNow(id, urgency: .userInitiated)` | No: it installs before it returns, a present asset included since L5K-R18 | Nothing left due by it | No coalesced publication (at once) |
+  | `answeredFromStore`'s answer site (L5K-R21), when the job holds a user-initiated interest and an id was answered by a read that installed nothing at once | `adoptLegacyNow(id, urgency: .userInitiated)` | No: it installs at once (L5K-R18's present path) | Nothing left due by it | No coalesced publication (at once) |
+  | `performAwaitAsset` (the resolve path) | `adoptLegacyNow(id)` (`.userInitiated`) | No (as above) | Nothing left due by it | No coalesced publication (at once) |
+  | `readFreeSpace` (`refreshFreeSpace`, `spaceFailed`, the settling and reclaim reads) | `freeSpace()` | No: a read | Nothing | No publication |
+  | `fireDue` | `runDueWork()` | Its report carries the store's next deadline | RE-S27: the report re-arms, through `applyStoreDeadline` (crossed answers) | No: it is the trailing install itself |
+  | `refreshStoreDeadline` | `nextDeadline()` | — | The re-read itself, through `applyStoreDeadline` | No publication |
+  | point admission (`answerUnknownWaiters`) | `admit(entry)` | Yes: a content change of a known record dooms its blob, and `admit` publishes only when it adopted a known blob; it may throw after in-memory writes | **Added:** one RE-S40 re-read after the answering pass when it admitted. Defensive and unpinned (L5K-C3-07: with it removed, the cycle-3 requirements verifier's mutant M16e, `ZTronAssetSyncTests` passed 341 of 341): the doom's install only removes the old content from the readers' snapshot, and the next re-read or alarm turn would schedule it | No coalesced publication: it installs at once when it adopted; a doom is a removal (note below) |
+  | `performSetPinned` | `setPinned` | No: an ordered commit | RE-S40 (existing) | No publication |
+  | `performAcquireLease` | `acquireLease` | No: a lease only postpones deletions | Nothing; a lease acquired after shutdown began is released at once (terminal) | No publication |
+  | `releaseLease(_:)` (`performReleaseLease`) | `releaseLease` | Its answer is the store's new deadline | Applied through `applyStoreDeadline` (RE-S40; it called `setStoreDeadline`) | No publication |
+  | `purgeTask` | `purge` | Its dooms; it installs at once (`.userInitiated`) | RE-S40 on both paths (existing) | No coalesced publication (at once) |
+  | maintenance | `collectGarbage` (orphans doomed with a grace, no install), `evictIfNeeded`, `verifyIntegrity` (install at once) | Their dooms | `finishMaintenance`'s RE-S40 on every exit (existing); **added** on the failed-step exit (a step that threw may have doomed blobs in memory first, ADR-050) | No coalesced publication: eviction and verification install at once, garbage collection installs nothing |
+  | `performReportUnreadable` | `reportUnreadable` | Its doom; it installs at once | RE-S40 in `quarantined` (existing); **added** when it threw | No coalesced publication: it installs at once, then commits |
+  | `performStorageReport`, `performMetrics` | `storageReport()`, `metrics()` | No: reads | Nothing | No publication |
+  | the facade (`AssetClient.perform`) | `verifyRootNow()` | No: a read | Nothing | No publication |
+  | `publish`'s early exits, `publicationFailed`, `failed`'s resume reads, launch reconciliation | the store's staging sink (`StoreStagingSink.discard`, `readSidecar`) | No: staging files, not the records or the snapshot | Nothing | No publication |
 
   The two calls the ruling named (the funnel's adoption, `migrateLegacy`) and the commit path's re-read keep the O(1)
   shortcut; the other added re-arms are on rare paths (a failure, a job that ended during its publication, a launch with a
   staged download, an admission): those after a publication use the same shortcut, the rest read the deadline in full.
+
+  **Dooms (the "suspends after publishing?" column, L5K-R20).** A doom (`scheduleDoomedKey`, `AssetStore+References.swift`)
+  marks an install due without publishing, in the turn it dooms, before any await of the call: `recordFailure` and
+  `recordIntegrityFailure` then publish at `.bulk` and await their ordered commit (`persistBookkeeping`), `apply` and
+  `admit` commit after dooming. That install only removes a doomed asset from the readers' snapshot; its bytes stay on disk
+  until its doom is committed and a snapshot without it is acknowledged, whichever comes last (I-3, ADR-017), so no reader
+  loses a location it was given, and the engine re-reads the deadline right after each such call (every exit, L5K-R16).
+  Moving `persistBookkeeping`'s publication after its commit was tried and dropped: the doom has marked the install due
+  before either await, so the order changes nothing a reader or the engine can observe, and `IntegrityBookkeeping.swift`
+  is not a file any ruling authorises. The rule's harm, an adopted or committed asset kept out of the readers' snapshot,
+  cannot come from a removal; recorded for the orchestrator as the one "yes" left, with this reason.
 - **Crossed answers (found while enumerating).** The store answers the engine's deadline reads in its own order, and the
   engine resumes their awaits in priority order (the alarm runs at `.utility`, a prefetch driver or the migration loop at
   `.medium`). So an older answer can be applied after a newer one: for example the alarm's `runDueWork()` report ("nothing
@@ -992,7 +1065,7 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
 
   | Loop | Store call | Each iteration |
   |---|---|---|
-  | `migrateLoop` (RE-S29) | `migrateLegacy(maxFiles: 64)` | Processes at least one file (adopted, dropped, deferred with its attempt counted: the third deferral keeps the file, so a file is retried at most three times in a row), or waits for an adopt-on-demand (k-7), or finishes, or returns `remaining == 0 && !finished` and backs off to the next maintenance window; never returns at once with nothing done (pinned by `migrationLoopWaitsForTheLastAdoption`: no call while the job's adoption holds the last file, and by the store's `batchWaitsForTheLastOnDemandAdoption`) |
+  | `migrateLoop` (RE-S29) | `migrateLegacy(maxFiles: 64)` | Processes at least one file (adopted, dropped, deferred with its attempt counted: the third deferral keeps the file, so a file is retried at most three times in a row), or, since L5K-R20, returns right after a coalesced publication of the files it adopted (`remaining > 0`; the next call waits or goes on), or waits for an adopt-on-demand (k-7), or finishes, or returns `remaining == 0 && !finished` and backs off to the next maintenance window; never returns at once with nothing done (pinned by `migrationLoopWaitsForTheLastAdoption`: at most one call while the job's adoption holds the last file, and by the store's `batchWaitsForTheLastOnDemandAdoption` and `coalescedBatchReturnsBeforeItWaits`) |
   | `runStart`'s retention loop | `setRetentionScope` | Repeats only when the app set a newer scope during the previous push (the sequence moved): bounded by the app's own calls |
   | the catch-up chain (`manifestCaughtUp` → `catchUpWithStore`) | `planningView()`, then RE-S40 | A view that may predate the copy is not followed and owes one more re-read, made only when the last `apply` or catch-up in flight ends: each repeat follows a real change of the copy or the end of an `apply` |
   | `joinGroup`'s batches (f-14) | `planningView()` only when the copy changed | Each batch registers up to a pipeline's worth of members (progress), with one yield between batches |
@@ -1010,6 +1083,16 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   returns only after that adoption, with `finished == true`; the engine makes no call while the unit is held. The
   engine test's round trips only give a regression the chance to show: the fixed loop makes no call whatever their
   number, so the bound never depends on them.
+- **The engine test's premise (cycle 4, L5K-R22; L5K-C3-02, L5K-C3-03).** The cycle-3 test assumed the held batch was at
+  legacy0, so the job took legacy1 from the queue. When the start's last release met legacy0's unit the batch held
+  legacy1 itself, joined the job's file and finished alone, and the test checked nothing: its premise held in 0 of 6
+  whole-file runs, and it passed against M17 in 6 of 6 (the requirements verifier's measurement). Now it uses three files
+  with the job on the last pending file (queued whichever file the batch holds), `#require`s the pending count after the
+  start, waits (ending on cancellation) until the store logs the batch's wait or the call count rises by 2, expects that
+  line as its premise, and counts the calls over a 2,000-round window that releases every other unit (PSPIN-c3's shape);
+  the bound is at most one call while held (the call after a coalesced publication's early return, L5K-R20; none at the
+  harness's interval of 0) and at most two to finish. Against M17 (the wait removed) it fails in 4 of 4 whole-file runs
+  and in a full `ZTronAssetSyncTests` run (`waited`, `callsWhileHeld <= 1`, `calls <= 2`; load 5.4–5.9).
 
 ## L5K-R18: a job promoted during its adoption
 - **The defect (L5K-C2-05).** The funnel reads the job's lane before its `adoptLegacyNow` await. A bulk job promoted to the
@@ -1027,6 +1110,10 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   (a user-initiated ask of an asset a bulk adoption made present installs before it answers). With the fix (`09afc28`)
   both pass; with the engine change alone the engine test still fails, and a mutant whose present path installs only after
   a join fails both.
+- **Since L5K-R21 (cycle 4).** The per-read second ask is gone: the answer site's check after the last ordinary await
+  covers a promotion during the adoption (this test), during a later read and during the re-read, with at most one
+  publication per attempt. `promotedAdoptionInstallsAtOnce` still passes, and the mutant without the answer site's
+  publication (M21) fails it.
 
 ## L5K-R19: the cycle-2 non-blocking items
 - **L5K-C2-04.** Two held variants reach the race in every run (`cb9faef`): `userInitiatedPrefetchReachesTheJoin` and
@@ -1045,6 +1132,130 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   and `endLegacyOnDemand` (every caller sets the mark before it can end it). `awaitLegacyFlight`'s `else` branch now has
   one more caller, L5K-R17's wait, which also checks the mark first.
 
+## L5K-R20: no store call suspends after a coalesced publication
+- **The defect (L5K-C3-01).** Since L5K-R17, `performMigrateLegacy` published a batch's adoptions at `.bulk` and then, in
+  the same call, waited for an adopt-on-demand of the last claimed file (row k-7) or ran phases 3 and 4. Inside the
+  install window that publication only marks the trailing install due, and the engine re-reads the store's deadline only
+  once the call has returned (the migration loop's re-arm, L5K-R16), so while the call waited the batch's adoptions stayed
+  out of the readers' snapshot (the requirements verifier's probe KC3-WAITWINDOW: 3 of 3 unseen 1 s after their
+  publication, no store deadline on the heap). By reading, the same held for the last batch, whose phases 3 and 4 (a
+  durable commit, the tree's removal) followed its publication.
+- **The fix: option (b) of L5K-C3-01 where it applies.** A batch that leaves files to process (queued, or claimed by an
+  adopt-on-demand) publishes at `.bulk` and, when that left the trailing install due (`installDue` after the
+  publication: the window was closed), returns right after it with `remaining > 0` and `finished == false`; the engine's
+  loop re-arms (RE-S40) and calls again, and that call, which published nothing, waits for the adopt-on-demand (L5K-R17)
+  or goes on. A publication that installed at once (the window was open) leaves nothing to schedule, and the call goes on
+  as one that published nothing; the store tests' install interval of 0 is that case, so no pre-existing store test
+  changes. No hot loop: every early return follows a batch that adopted at least one file, and the call after it waits.
+- **Decision: the last batch installs at once (option (a) for that batch only).** With nothing left after the batch,
+  option (b)'s premise (`remaining > 0`) does not hold: the call would return `remaining == 0 && !finished`, the engine's
+  signal to back off to the next maintenance window when phase 3's check or phase 4 could not complete (RE-S29;
+  ARCHITECTURE §4.7 (8); the doc comment of `migrateLegacy`). Tried first: that return, with an engine that called
+  again after any counted adoption; WP-F's `R-STO-11: a migration call that leaves nothing remaining but cannot finish
+  defers to the next maintenance window, which finishes it` (`EngineRecoveryTests`) then timed out, since a call that
+  adopted files and then failed phase 4 looks the same to the engine, and that test may not change (G3). So the last batch
+  publishes at `.userInitiated`: installed before phases 3 and 4 run, nothing coalesced behind them, the engine's loop,
+  RE-S29 and the contract unchanged. Cost: one install per migration, at its end (none extra when the window was open).
+- **"Suspends after publishing?" (the enumeration).** The L5K-R16 table's last column covers every engine call of a store
+  method: `adoptLegacyNow` (its flight wait precedes its publication; after it, only reads), `publish` (its last await is
+  the publication; `stillBound` is synchronous), `apply`, `admit`, `purge`, `reportUnreadable`, eviction and verification
+  (each installs at once), `runDueWork()` (the install itself), the reads (no publication). The one "yes" left is the
+  doom's removal-only install ahead of `recordFailure`'s and `recordIntegrityFailure`'s ordered commit (the table's dooms
+  note): not changed, with the reason, for the orchestrator.
+- **Tests, failing first** (`a8eadc8`, updated for the last batch by `4b84327`; each failed on the unfixed code, the engine
+  tests on the readers' assertion only): `batchAdoptionsReachTheReadersWhileTheMigrationWaits` (KC3-WAITWINDOW's shape:
+  four files, a prefetch job's hash holds the last claimed file, the store logs the migration's wait, the clock passes
+  the window: every batch-adopted id is in `harness.sink.installed`, within about two install intervals),
+  `lastBatchAdoptionsReachTheReadersDuringPhasesThreeAndFour` (three files, phase 4's first bulk unit held after the last
+  batch: every adopted id is seen within the bound), the store's `coalescedBatchReturnsBeforeItWaits` (a coalesced batch
+  returns before the wait with `remaining == 1`; the next call waits and finishes) and
+  `lastBatchInstallsBeforePhasesThreeAndFour` (one call: one install, no install left due, every adopted file in the
+  readers' snapshot). With the fix (`8d858af`) all pass; the mutant that restores the old call (M20: `.bulk` always, no
+  return) fails all four.
+- **For the docs level.** ARCHITECTURE §5's "migration batches at bulk urgency" becomes "migration batches at bulk
+  urgency, a batch returning right after a publication that left the trailing install due while files remain; the last
+  batch, which phases 3 and 4 follow in the same call, installs at once (L5K-R20)". The doc comment of `migrateLegacy`
+  (`Migration/StoreMigration.swift`, WP-C's contract file, not edited here: L5K-R13 authorised it for L5K-R14's parameter
+  only) gains "A call whose bulk publication left the trailing install due returns right after it while files remain; the
+  last batch installs at once (L5K-R20)". RE-S29 and §4.7 (8) are unchanged.
+
+## L5K-R21: user-initiated answers come after the install
+- **The defect (L5K-C3-00).** L5K-R18's lane re-read in `storedLocation` ran before the RE-S40 re-arm, the read's last
+  await. An `ensureAvailable` that planned before the adoption bound the asset and registered during that re-arm joined
+  the job, promoting it, and was answered from the store with the bulk-urgency adoption still in a coalesced snapshot (the
+  correctness verifier's probe PE5: 9 of 9). By reading, the same held for a promotion during a later id's read that
+  answered nothing (so no second ask), and when migration ended mid-loop.
+- **The fix (the ruling's design).** `answeredFromStore` reads every id (one await each: `storedLocation(of:lane:)` now only
+  reads, and returns the adoption's urgency), then re-reads the store's deadline once when any read was a `.bulk`
+  adoption (RE-S40, moved out of the per-id read), then checks the job's interests: when the job holds a user-initiated
+  interest (`Job.lane`, the maximum over its interests) and an id was answered by a read that installed nothing at once,
+  exactly one `adoptLegacyNow(id, urgency: .userInitiated)` follows, which installs the whole state at once (L5K-R18's
+  present path), and the answer follows synchronously. A promotion before the check is seen by it; one during that
+  publication finds the snapshot it installs, which holds every answered id (each bound before it); one after the check
+  cannot interleave. The reads that "installed nothing at once": a `.bulk` adoption (its own coalesced publication, or a
+  present asset a batch adopted, whose trailing install may still be due) and a plain location read with no migration
+  pending (rare: the binding ledger missed a binding, and the engine cannot tell whether that binding's install is still
+  due). A `.userInitiated` adoption installed at once and covers the earlier ids too (a whole-state snapshot). L5K-R18's
+  per-read second ask is folded into the check: at most one extra publication per attempt, where L5K-R18 could add one
+  per promoted id. Cost: one O(1) install when a user-initiated asker is answered from the store after such a read (not
+  measured, L5K-R11).
+- **Tests, failing first** (`694583a`; both failed on the readers' assertion only, 2 of 2 runs, on the unfixed code):
+  `promotionDuringTheReArmInstallsBeforeTheAnswer` (PE5's shape: a gated planner, `MigrationGatedPlanner`, holds
+  `ensureAvailable` between its planning view and its registration, and `holdNextStoreDeadlineRead()` holds the job's
+  re-read after a prefetch job's bulk adoption; the ensure registers and promotes the job during it; when
+  `ensureAvailable` returns, `harness.sink.installed` holds the asset) and `promotionDuringALaterReadInstallsBeforeTheAnswer`
+  (one content under two ids, the second id's prior-art file not verifying: the job adopts the first at bulk urgency,
+  `ensureAvailable` joins during the second read, which answers nothing; the first id is in the readers' snapshot when
+  `ensureAvailable` returns). With the fix (`dfc16e8`) both pass, and so does L5K-R18's `promotedAdoptionInstallsAtOnce`.
+  Mutants: without the answer site's publication (M21) all three fail; without the re-arm (M16a) PE5, PR14a and PR14b
+  fail.
+- **The answer sites (the enumeration).** Every place where the engine answers a user-initiated asker (a waiter, an
+  `.ensure` group, a user-initiated join) with what the store gave it:
+
+  | Site | The answer comes from | Can it come from a publication still coalesced? | Verdict |
+  |---|---|---|---|
+  | `answeredFromStore` (the pre-transfer read, f-11) | this attempt's reads | Yes: a `.bulk` adoption, a present asset whose install is due, a plain read | **Meets the rule** (this fix): the check after the last ordinary await, then one user-initiated publication |
+  | The resolve path's adoption (`performAwaitAsset` while migration is pending) | `adoptLegacyNow(id)` at `.userInitiated` | No: it installs before it returns, a present asset included (L5K-R18) | Meets the rule |
+  | Point admission (`answerUnknownWaiters` → `join` → `answerWaiterFromStore`) | `admit`, which installs at once when it adopted a known blob, then a fresh location read | No for the admission's own binding | Meets the rule |
+  | The resolve path's fast hit (`performAwaitAsset`'s first `location(for:recordingAccess: true)`) | the store's actor state (ADR-016) | Yes, when another lane's coalesced publication (a bulk or prefetch commit, a batch's or a bulk-lane job's adoption) made the asset present less than about two install intervals earlier | **Not by the rule's letter** in that window: the asker gets a valid location at once and the readers' snapshot follows at the trailing install, which L5K-R16 schedules; the site has no job to check and makes no publication of its own (ADR-016's design since Stage 1) |
+  | Joins answered from the ledger (`isBound` at a waiter's registration or a `reroute` → `answerWaiterFromStore` → `readPresentLocation`; an `.ensure` member → `dropGroupMember`) | a binding learned from a commit, a funnel answer or a planning view, then a fresh location read for a waiter | Yes, as for the fast hit (a binding of a bulk or prefetch commit, or of a bulk-lane adoption, read within the window) | As for the fast hit |
+  | `ensureAvailable`'s present members (its plan's view shows them present; the report is `availability(of:)`) | the store's actor state | Yes, as for the fast hit | As for the fast hit |
+  | The commit path (`publish` → `committed`): a user-initiated asker that joined while the store published the job's transfer at the lane read before the call | the store's `publish` answer | **Yes**: the job's own publication, coalesced at the old lane | **Does not meet the rule**: probe K4-COMMITPROMO (a prefetch job of an on-demand page, its publication held at its hash unit, `awaitAsset(_, .userInitiated)` joins and promotes it): the resolve returned with the asset out of the readers' snapshot in 5 of 5 runs, outside any migration |
+
+  The last four rows lie outside the migration window this close-out's rulings address and outside the files they
+  authorise (`EngineCommands.swift`, `EngineDispatch.swift`), so they are recorded, not changed. The commit path is
+  L5K-R18's shape for a transfer: its fix would be the same answer-site check after `store.publish` (the lane read before
+  the call not user-initiated, the job's lane after it user-initiated: one `adoptLegacyNow(id, urgency: .userInitiated)`,
+  then the lifecycle and the epoch re-checked), but that await would sit between the locations the store validated and
+  `committed`, which hands them to waiters, so a store mutation landing in it (an eviction, a quarantine) could hand out a
+  location the store no longer binds, and `committed` treats an id that lost its binding as refused (held for a newer
+  manifest), which does not fit that case. **For the orchestrator:** a ruling on the commit path (authorise
+  `EngineDispatch.swift` and decide how a binding lost during the extra await is answered), and on whether the fast hit,
+  the ledger joins and `ensureAvailable`'s present members must install a pending trailing install before a
+  user-initiated answer, which needs either a store read of whether an install is due (a package API) or one install per
+  user-initiated hit. The probe's source is kept at `.build-k/tmp/probes/ProbeK4CommitPromotion.swift` (never committed).
+
+## L5K-R22: the cycle-3 items
+- **L5K-C3-02, L5K-C3-03 (the L5K-R17 engine test's premise).** See "L5K-R17" (the engine test's premise) and the L5K-R2
+  table: three files, the job on the last pending file, the pending count required, a wait for the store's line of the
+  migration's wait or two more calls, a 2,000-round release window; fails against M17 in 4 of 4 whole-file runs and in a
+  full `ZTronAssetSyncTests` run.
+- **L5K-C3-08 (liveness of the k-7 wait).** `closeWhileTheBatchWaits` (store: `close()` while a batch waits ends both calls
+  with `.closed` and leaves no `adopting` or `onDemand` mark) and `shutdownWhileTheMigrationWaits` (engine: shutdown while
+  the migration waits returns with `running` and `launchRunWaiting` both false and nothing downloaded); both pass, and
+  M17 fails the engine one on its premise.
+- **L5K-C3-04, -07, -05, -06, -09 (records).** The L5K-R16 table names the pins each re-arm really has, adds
+  `availability(of:)`, and records the admission re-arm as defensive and unpinned; PR14a reads the readers while
+  migration is still held, so it pins the funnel's re-arm by itself (M16a fails it); the bound reads "about two install
+  intervals (RE-S40's shortcut, F-12)" in the L5K-R16 invariant (the heap's deadline qualified the same way), the L5K-R14
+  section, the L5K-R16 ruling entry, MIGRATION.md §4 and `answeredFromStore`'s doc comment; the parked-run paragraph says
+  that the loop's re-arm installs migration's later adoptions.
+- **L5K-C3-10.** Ratified (see "Orchestrator rulings (close-out)").
+- **L5K-C3-11.** PS3 (`l5k-probes-c2`) calls `migrateLegacy` in a loop while it holds the on-demand's hash unit, so since
+  L5K-R17 its first call waits for that adoption and the probe deadlocks itself until its time limit, as intended:
+  retired in favour of the store's `batchWaitsForTheLastOnDemandAdoption`. PSPIN measures a CPU share, so it is run
+  filtered to itself (beside other suites it reads their load).
+
 ## L5K-R2: the compatibility tests' timing dependence
 Every test of `Tests/ZTronAssetCompatibilityTests` (71 in 10 suites since cycle 3, the orchestrator's
 `CompatibilityShimTests.swift` included, read only) and every harness helper was read against L5-R14's patterns: (a) a wait on a weaker condition than
@@ -1062,6 +1273,8 @@ store's own writes; and L5K-R2's addition, an outcome that depends on whether th
 | `MigrationLaunchShimTests: launchSyncDuringResumedMigration` (new) | written against the patterns | Launch 1's interruption is ordered by events, not timing: the sync's run has started (`EventProbe`), and its joiner is answered in the shutdown turn that cancels the migration; launch 2's post-conditions are the strict ones of the first row. Cycle 2 (L5K-R15, L5K-C1-01): launch 2 ran on inline executors, so its overlap with the resumed migration was a race (the verifier's probe: `.upToDate` in 5 of 10 runs with a 100 ms stall); it now holds the resumed migration across the call as the first row does, with `heldUnits ⊇ migration` afterwards |
 | `MigrationLaunchShimTests: prefetchedNeighboursDuringLegacyMigration` (cycle 3, L5K-R16) | written against the patterns, with the production install interval | Migration is held at a unit of its first file across the resolve and the prefetch (`startHoldingMigration`, a `releaser`), so every neighbour is adopted by a prefetch job's pre-transfer read at bulk urgency. The page's visibility is read after `resolveViaNetwork` returned (a user-initiated install precedes the return). The neighbours' visibility is read only once a public condition holds (`waitUntil`, a re-read of the client's answers, never a clock move, L5K-R3): every neighbour stored (`availability`), no job interest, no engine timer or deadline, and no owned task but the held migration loop (the diagnostic report's `engineCounts`). That last clause is what (a) would miss: the alarm takes its entry off the heap before its `runDueWork()` installs, but its task stays owned until that turn ends. The auto-advancing clock passes the alarm's sleep as it registers (K-10), so whether the clock moved before the read is not what the assertion depends on; what it depends on is that a trailing install the engine scheduled has run, which the condition establishes |
 | `EngineLegacyMigrationTransferTests: ensureAvailableBesideARunningMigration`, `userInitiatedPrefetchBesideARunningMigration` (engine, recorded here by L5K-R19) | (a), on their premise only: `joins > 0` needs at least one launch out of 20 in which a job's adoption met a batch's processing of the same file, which scheduling decides | Kept as stochastic tests beside the two held variants, which reach the race by construction (L5K-R19). Measured margin this cycle (three runs of both tests, 1-minute load 4.8, a temporary print not committed): 436 to 507 joins per run over the 40 launches, 0 to 3 of 40 launches without a join, 0 to 23 per launch; the premise fails only if all 20 launches of a test meet no join. The per-launch zero-transfer assertions do not depend on scheduling |
+| `EngineLegacyMigrationTransferTests: migrationLoopWaitsForTheLastAdoption` (engine, L5K-R22) | (a) on its premise until cycle 4: it assumed the held batch was at legacy0, so the job took legacy1 from the queue; when the start's last release met legacy0's unit the batch held legacy1, joined the job's file and finished alone, so the test checked nothing (0 of 6 whole-file runs reached the premise, L5K-C3-02; 4 of 40 launches, DIAG-R17); (d): 64 round trips decided whether a hot loop showed | Three files, the job on the last pending file (queued whichever file the batch holds); `#require(pending.count >= catalog.count - 1)`; a wait that ends when the store logs the migration's wait or the call count rises by 2, or on cancellation, with that line expected as the premise; the count read after a 2,000-round release window, which only gives a regression room to show (the fixed loop makes no further call however long it is). Fails against M17 in 4 of 4 whole-file runs and in a full-suite run |
+| The cycle-4 waits on a store log line or a planner gate (`releaseUntilTheBatchWaits`, `releaseUntilPlanned`, engine) | (d)'s shape, on a condition | Each loop releases the units it does not keep and yields until a condition the held units guarantee holds (the store's line of the migration's wait while the job's hash unit is held; the gated planner's entry once `ensureAvailable` runs), and ends on cancellation; neither bounds rounds. The L5K-R20 and L5K-R21 tests read the readers before the clock moves, or after `runStoreWork` (L5K-R16's helper), never after a number of rounds |
 
 Checked, no pattern:
 - `CompatibilityShimTests` (3, the orchestrator's file): pure.
@@ -1156,6 +1369,25 @@ Checked, no pattern:
 - L5K-C2-05 (a job promoted during its adoption): ruled (L5K-R18) and fixed with a test (`94b55a3` → `09afc28`).
 - L5K-C2-04, L5K-C2-06, L5K-C2-07: L5K-R19 (`cb9faef` and this draft).
 
+## Close-out cycle 4 — the cycle-3 issues and what became of them
+Findings `.build-orchestrator/l5k-close3-remaining-k.json` (`L5K-C3-nn`); rulings L5K-R20…R22.
+- L5K-C3-00 (blocking: a job promoted during the funnel's re-read answered its user-initiated asker before the readers'
+  snapshot held the asset): fixed under L5K-R21, failing tests first (`694583a` → `dfc16e8`), and every other answer site
+  enumerated with a verdict; two are recorded for a ruling (the commit path, probe K4-COMMITPROMO; the read-only sites'
+  trailing-install window): "L5K-R21: user-initiated answers come after the install".
+- L5K-C3-01 (blocking: a migration call waited, or ran phases 3 and 4, behind its own coalesced publication): fixed under
+  L5K-R20, failing tests first (`a8eadc8`, `4b84327` → `8d858af`), with the last batch installing at once (the decision in
+  "L5K-R20") and every publishing store call enumerated (the L5K-R16 table's last column).
+- L5K-C3-02 (blocking) and L5K-C3-03: `migrationLoopWaitsForTheLastAdoption` establishes and asserts its premise and fails
+  against M17 in whole-file and full-suite runs (`4aea9a6`; "L5K-R17", the L5K-R2 table).
+- L5K-C3-04, L5K-C3-07: the L5K-R16 table names the real pins; PR14a reads the readers while migration is still held
+  (`4aea9a6`), and M16a fails it; the admission re-arm is recorded as defensive and unpinned.
+- L5K-C3-05, L5K-C3-06, L5K-C3-09: the "about two install intervals" bound in every place listed, the `availability(of:)`
+  row, the parked-run sentence (this draft, MIGRATION.md §4, `answeredFromStore`'s doc comment).
+- L5K-C3-08: `closeWhileTheBatchWaits` and `shutdownWhileTheMigrationWaits` (`4aea9a6`).
+- L5K-C3-10: ratified by the orchestrator (L5K-R22); recorded under "Orchestrator rulings (close-out)".
+- L5K-C3-11: PS3 retired, PSPIN run filtered to itself ("L5K-R22"); no code change.
+
 ## Not verified here
 - The shims at the iOS 15 floor at run time: the test target builds at iOS 17 / macOS 14 (ADR-051), the shims run on the
   iOS 27 simulator and macOS 27 only; their iOS 15 compile is the typecheck recorded in the evidence below.
@@ -1181,6 +1413,12 @@ Checked, no pattern:
   full read, which the O(1) shortcut keeps to about one per install interval on the funnel's and the migration loop's
   paths; L5K-R18 adds one O(1) install per user-initiated read of an already present asset during migration. Neither was
   measured (no benchmark, L5K-R11).
+- Cycle 4: the cost of L5K-R20's install of the last batch (one per migration) and of L5K-R21's answer-site install (one
+  per attempt that answers a user-initiated asker from the store after a read that installed nothing at once) on a
+  device; neither was measured (L5K-R11). The L5K-R21 tests' gated planner blocks one cooperative thread for a few actor
+  hops (a host with a single cooperative thread would deadlock it; none of the supported hosts has one). The commit-path
+  window of the L5K-R21 enumeration was shown by a probe on macOS 27 only, and how often a device produces it (a
+  user-initiated request joining a download while it is verified) was not measured.
 
 ## Evidence (close-out cycle 3; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
 - **Failing first (L5K-R16).** On `30be1bf` (`1901e91`'s code plus the tripwire and the tests): `--filter
