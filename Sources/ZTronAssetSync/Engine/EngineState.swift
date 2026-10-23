@@ -69,6 +69,11 @@ struct EngineState {
     /// releases it (`holdNextApplyFollow()`, `releaseApplyFollow()`), so the test decides what the engine does in
     /// between. No production path arms it.
     var applyFollowHold: ApplyFollowHold = .idle
+    /// Test seam (orchestrator ruling L5K-R16): the next re-read of the store's deadline (`refreshStoreDeadline()`) waits
+    /// after the store answered and before the engine applies the answer, until a test releases it
+    /// (`holdNextStoreDeadlineRead()`, `releaseStoreDeadlineRead()`), so the test can land a newer read first, an order
+    /// the tasks' priorities can produce. No production path arms it.
+    var storeDeadlineReadHold: StoreDeadlineReadHold = .idle
     /// Bumped whenever the engine's copy of the applied manifest changes (`adoptApplied`). A store view read before a
     /// change the engine made meanwhile may be older than the copy: it is not followed (close-out cycle 3, F-23).
     var copySerial: UInt64 = 0
@@ -837,6 +842,17 @@ struct NegativeCache {
             self.order.removeAll { $0 == id }
         }
     }
+}
+
+/// The store-deadline read test seam (`SyncEngine.holdNextStoreDeadlineRead()`): a test holds one re-read's answer
+/// before the engine applies it, to order it after a newer read (L5K-R16), which no production path can do.
+enum StoreDeadlineReadHold {
+    /// Nothing armed (always, outside tests).
+    case idle
+    /// The next re-read waits once the store answered.
+    case armed
+    /// That re-read waits for `releaseStoreDeadlineRead()` or for shutdown.
+    case holding(CheckedContinuation<Void, Never>)
 }
 
 /// The apply follow-up test seam (`SyncEngine.holdNextApplyFollow()`): a test holds the engine's side of one committed

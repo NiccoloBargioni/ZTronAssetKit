@@ -205,10 +205,41 @@ extension SyncEngine {
     func refreshStoreDeadline() async {
         // REENTRANCY: RE-S40 — the lifecycle; a stale entry is replaced by the newest deadline.
         let deadline = await self.store.nextDeadline()
+        if case .armed = self.state.storeDeadlineReadHold {
+            // REENTRANCY: f-8 (proposed) — nothing: a test seam no production path arms, resumed once by
+            // `releaseStoreDeadlineRead()` or by shutdown; the lifecycle is re-read below as without it.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.state.storeDeadlineReadHold = .holding(continuation)
+                self.notifyObservers()
+            }
+        }
         guard self.isRunning else {
             return
         }
         self.setStoreDeadline(deadline)
+    }
+
+    /// Test seam: the next `refreshStoreDeadline()` waits once the store answered, until `releaseStoreDeadlineRead()`
+    /// (orchestrator ruling L5K-R16): a test lands a newer read meanwhile.
+    func holdNextStoreDeadlineRead() {
+        self.state.storeDeadlineReadHold = .armed
+    }
+
+    /// Test seam: lets a held re-read apply its answer, or disarms a hold nothing reached; shutdown calls it too.
+    func releaseStoreDeadlineRead() {
+        let hold = self.state.storeDeadlineReadHold
+        self.state.storeDeadlineReadHold = .idle
+        if case .holding(let continuation) = hold {
+            continuation.resume()
+        }
+    }
+
+    /// Test seam: whether a re-read of the store's deadline waits for `releaseStoreDeadlineRead()`.
+    var storeDeadlineReadHeld: Bool {
+        if case .holding = self.state.storeDeadlineReadHold {
+            return true
+        }
+        return false
     }
 
     /// After a publication (RE-S40): a publication only adds work due within the store's coalescing windows (a commit,

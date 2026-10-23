@@ -701,6 +701,49 @@ struct EngineLegacyMigrationTransferTests {
         #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
         await engine.shutdown()
     }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)", .timeLimit(.minutes(1)))
+    func crossedDeadlineReadsKeepTheTrailingInstall() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 8_900)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        try #require(await harness.store.nextDeadline() == nil, "premise: the store has nothing due before the reads")
+
+        // Re-read A answers "nothing due" and waits before the engine applies that answer, as the answer of a task of
+        // lower priority can wait behind other engine turns.
+        await engine.holdNextStoreDeadlineRead()
+        let older = Task {
+            await engine.refreshStoreDeadline()
+        }
+        await engine.awaitCondition { $0.storeDeadlineReadHeld }
+        // Meanwhile a bulk-urgency adoption inside the install window leaves the trailing install due, and re-read B
+        // answers it and is applied first.
+        let id = catalog[3].0.identifier
+        let (adopted, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            (try? await harness.store.adoptLegacyNow(id, urgency: .bulk)) ?? nil
+        }
+        let due = try #require(await harness.store.nextDeadline(), "premise: the adoption left the trailing install due")
+        await engine.refreshStoreDeadline()
+        let afterNewer = await engine.readForTests { $0.state.heap.deadline(for: .store) }
+        // Re-read A applies its older answer last.
+        await engine.releaseStoreDeadlineRead()
+        await older.value
+        let afterOlder = await engine.readForTests { $0.state.heap.deadline(for: .store) }
+        try await harness.drive { $0.scheduledDeadlines == 0 }
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [id])
+
+        #expect(adopted != nil, "the adoption bound the asset")
+        #expect(afterNewer == due, "the newer answer scheduled the trailing install")
+        #expect(afterOlder.map { $0 <= due } == true, "R-STO-13: the older answer took the trailing install off the heap: \(String(describing: afterOlder))")
+        #expect(unseen.isEmpty, "the trailing install ran, so the readers see the adopted asset")
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
 }
 
 /// What L5K-R16's tripwire compares before and after it reads the store (`EngineHarness.idleViolations()`): whether the

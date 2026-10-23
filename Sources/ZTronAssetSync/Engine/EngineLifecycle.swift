@@ -572,6 +572,7 @@ extension SyncEngine {
             conditionWaiters[token]?.resume()
         }
         self.releaseApplyFollow()
+        self.releaseStoreDeadlineRead()
         self.releaseManifestOutcomeDelivery()
         self.releaseRunSettlementDelivery()
         self.releaseAlarmTurns()
