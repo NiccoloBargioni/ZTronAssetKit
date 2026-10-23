@@ -44,7 +44,9 @@ was changed. Adoption is the owner's follow-up, described here. Decisions and th
 6. **Call sites stay as they are.** `BasicVideoPage` (`CDNLocalStore.shared.existingLocalURL(identifier:candidateExtensions:)`)
    and `ZTronSVGView` (`CDNLocalStore.shared.existingLocalURL`, `CDNAssetResolver.installed`, `resolveViaNetwork`,
    `NetworkAvailabilityMonitor.shared.retryWhenAvailable` and `.cancelRetry` from `deinit`) compile unchanged: the
-   lookups are `@MainActor` (K-3), and both call sites are main-actor isolated; `cancelRetry` stays nonisolated.
+   lookups are `@MainActor` (K-3), and both call sites are main-actor isolated; `cancelRetry` stays nonisolated. Both
+   call sites are copied, with their isolation, into `Tests/ZTronAssetCompatibilityTests/PriorArtCallSiteTests.swift`, so
+   a shim change that would break them fails this repository's build.
 7. **Tests.** ZTronCarouselCore has no pre-existing CDN test to keep passing or to port (`docs/BASELINE.md`: 0, the only
    test is the template `example()`), so §3's table is empty. The shim suites of this repository can be copied along as a
    characterization suite; they need `ZTronAssetTestSupport` (an internal target of this package, not a product), so they
@@ -105,6 +107,7 @@ are re-expressed as tests of the shims instead:
 | `existingLocalURL` offline, candidate extensions in order | `existingLocalURL answers from the client's snapshot with no file-system call on the main thread and no network request`; `existingLocalURL matches the candidate extensions case-insensitively and answers nil for an asset in none of them` |
 | Checksum-aware `hasAsset`; the availability guarantee | `hasAsset is true for stored content and false for an absent asset, another extension or another checksum`; `missingOrStaleAssets lists absent and republished assets in manifest order, and isFullyAvailable is true only without any`; `verifyFullyAvailable lists what the provider's fresh manifest names that is missing or stale, downloading nothing`; `an asset whose new content is downloading keeps serving its old bytes while hasAsset reports the new content missing` |
 | Connectivity retry for failed on-demand fetches | `a retry registered while offline runs once connectivity returns, and only once`; `a cancelled retry never runs, and cancelling a token that already ran or was cancelled changes nothing`; `a retry registered while the client is idle still runs when connectivity returns`; `a monitor observes nothing until a retry is registered, and its first report counts as the prior art's initial path update` |
+| The carousel's call sites (`BasicVideoPage`, `ZTronSVGView`) unchanged; no cost without an installed resolver | `the carousel's call sites compile unchanged and find nothing and start nothing while no client is installed` |
 | Progress `idle / upToDate / syncing / complete / failed(reason)` | `progress reports syncing with a monotone completed count while assets transfer, then complete`; `sync outcomes and refresh policies map to the prior-art cases`; `a coordinator over a shut-down client reports failed with shutDown` |
 
 ## 4. What behaves differently (owner review)

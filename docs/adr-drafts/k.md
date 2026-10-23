@@ -56,7 +56,10 @@ heading or by reference to this draft):
 - **Decision.** `CDNLocalStore.client`, `existingLocalURL`, `hasAsset`, `missingOrStaleAssets`, `isFullyAvailable`,
   `localURL(for:)`, `cacheManifest`, `cachedAsset(forIdentifier:)` and `reconcile(newManifest:)` are `@MainActor`.
 - **Consequences.** Every prior-art call site compiles unchanged: `BasicVideoPage.init?` (a `UIViewController`) and
-  `ZTronSVGView.resolveSVGURL` (a static member of a `UIView`) are main-actor isolated. A nonisolated caller would need
+  `ZTronSVGView.resolveSVGURL` (a static member of a `UIView`) are main-actor isolated. Both call sites, `ZTronSVGView`'s
+  nonisolated `deinit` calling `cancelRetry` included, are copied with their isolation into `PriorArtCallSiteTests.swift`
+  (`R-CAR-6: the carousel's call sites compile unchanged and find nothing and start nothing while no client is
+  installed`), so a shim change that breaks one fails the build. A nonisolated caller would need
   `await MainActor.run`. `missingOrStaleAssets` reads the snapshot once per asset on the main actor (O(n), no I/O).
 
 ## K-4 — `hasAsset` and `existingLocalURL` semantics
