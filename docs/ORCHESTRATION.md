@@ -44,7 +44,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **L5K-R18:** re-read the lane after an adoption.
     - **L5K-R19:** small items.
   - Findings: `l5k-close2-remaining-k.json`.
-- **Close-out: RUNNING from cycle 3** `wf_cfb1c56d-e3f` (task `wt4zd3hh8`), launched 21:31 at weekly 30 %, with `fromCycle: 3`, `findingsFile` `l5k-close2-remaining-k.json` and `usageStop: 40`.
+- **Close-out cycle 3:** `wf_cfb1c56d-e3f`, 21:31–00:43, weekly 30 % → 34 %. Every cycle-2 blocker is fixed. 3 blocking items in two repeating classes remained:
+  - a coalesced publication followed by a wait inside the same store call (L5K-R17's wait);
+  - a user-initiated asker answered before the install, by a promotion during the re-arm's await;
+  - plus a test premise.
+  - The orchestrator stopped the run 3 min into fix 4 and ruled:
+    - **L5K-R20:** a store call returns right after a coalesced publication; `migrateLegacy` follows option (b).
+    - **L5K-R21:** the check of the job's interests at the answer site, after the last await, then one user-initiated publication.
+    - **L5K-R22:** the test premise, liveness tests, records, and ratifications.
+  - Findings: `l5k-close3-remaining-k.json`. Probes: `l5k-probes-c3/`.
+- **Close-out: RUNNING from cycle 4** `wf_da30f4d9-921` (task `wle5pdlf9`), launched 00:58 at weekly 34 %, with `fromCycle: 4`, `findingsFile` `l5k-close3-remaining-k.json` and `usageStop: 40`. The 40 % stop may come during cycle 5; at the stop: re-forecast, rewrite this section, and ask the owner only for a new stop.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
