@@ -23,7 +23,7 @@ heading or by reference to this draft):
 | k-1 | `CDNSyncCoordinator.run(_:)`: `client.subscribe()`, `client.sync(mode)`, then `follower.value`; and the `await self.run(_:)` of `syncIfNeeded()` and `verifyAndRepair()`, after which nothing is read (fix round 1) | Nothing of the coordinator is read across them. `progress` is written only by this call's follower while the run is in flight and by the outcome once the follower was cancelled **and awaited**, so no progress event lands after the outcome. A concurrent call joins the same single-flight run and publishes the same outcome (its follower may republish a `.syncing` value until its own outcome lands). |
 | k-2 | the follower's `for await event in events` (a main-actor task) | Each event is applied in the turn it arrives, after `self` is re-read (weak: a released coordinator publishes nothing). Progress never moves backwards within a run by construction (sync.md §10.6: the engine's completed count is monotone and one subscription delivers a run's progress in order, newest-wins), so no guard is needed. |
 | k-3 | `CDNSyncCoordinator.verifyFullyAvailable()`: `cdn.fetchManifest()` | Nothing of the coordinator; the client's snapshot is read after the fetch, so the comparison uses what is stored when the manifest arrived. |
-| k-4 | `SyncEngine.storedLocation(of:lane:)` (`EnginePresence.swift`, WP-F's file, close-out rulings L5K-R1, L5K-R14): `store.adoptLegacyNow(id, urgency:)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes, at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). After a `.bulk` adoption the caller's own awaits follow, each re-validated as f-11 says: the lane is re-read, and a job promoted to the user-initiated lane meanwhile asks the store once more at `.userInitiated`, which installs the snapshot at once (L5K-R18); then the store's deadline is re-read into the heap (RE-S40, O(1) while the alarm already wakes within about two install intervals), so the adoption's trailing install runs on the alarm (L5K-R16). The answer is the outcome of the store's one adoption of the prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits for that processing and reads the location it bound; when a batch has not finished hashing the file, both may hash it and the one whose bytes verify second waits out the other's adoption. So `nil` means no prior-art file to adopt, or one dropped or kept, never a failure the other adopter caused (the round-1 text of this row claimed the first placement always bound before the other call decided; L5K-C1-00 showed it did not). |
+| k-4 | `SyncEngine.storedLocation(of:in:lane:)` (`EnginePresence.swift`, WP-F's file, close-out rulings L5K-R1, L5K-R14, L5K-R16, L5K-R18; `storedLocation(of:lane:)` until cycle 3): `store.adoptLegacyNow(id, urgency:)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes, at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). After a `.bulk` adoption the caller's own awaits follow, each re-validated as f-11 says: the lane is re-read, and a job promoted to the user-initiated lane meanwhile asks the store once more at `.userInitiated`, which installs the snapshot at once (L5K-R18); then the store's deadline is re-read into the heap (RE-S40, O(1) while the alarm already wakes within about two install intervals), so the adoption's trailing install runs on the alarm (L5K-R16). The answer is the outcome of the store's one adoption of the prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits for that processing and reads the location it bound; when a batch has not finished hashing the file, both may hash it and the one whose bytes verify second waits out the other's adoption. So `nil` means no prior-art file to adopt, or one dropped or kept, never a failure the other adopter caused (the round-1 text of this row claimed the first placement always bound before the other call decided; L5K-C1-00 showed it did not). |
 | k-5 | `AssetStore.performAdoptLegacyNow(_:urgency:)` (`Migration/LegacyPhases.swift`, WP-C's file, close-out ruling L5K-R13): the wait for the processing of the same prior-art file in flight, another adopt-on-demand's (`MigrationState.onDemand`, from its claim to its installed snapshot) or another call's adoption (`MigrationState.adopting`), `awaitLegacyFlight(of:)`; and the loop's `awaitOpen()` after it | Nothing is carried across the wait: the call starts again and reads the location, the phase, the plan commit, the queue, the claims and the flights anew. The processing it waited for has ended: adopted (the location is present: the call installs a snapshot at its urgency and answers the location read after that install), dropped or kept (the file is neither queued nor claimed: `nil`), or ended without an outcome for the file (its caller was cancelled, or a transient failure deferred it back to the queue: this call takes the file and processes it itself, as a call arriving then would). `close()` resumes it: it drains the units and resumes the key and commit waiters, so the processing it waits for returns from its await, throws `.closed` at its next phase check, and ends its mark (every exit path of `processLegacyFile` and `processLegacyFileOnDemand` does), which resumes this call; its `awaitOpen()` then throws `.closed`. |
 | k-6 | `AssetStore.processLegacyFile(_:)` (`Migration/LegacyPhases.swift`, L5K-R13): after its hash, whether it succeeded or failed, the wait until no other call's adoption of the file is in flight, `awaitLegacyAdoption(of:)` | The loop re-reads `adopting[file]` and the phase (`checkLive`, so a closing store answers `.closed`); it returns in the turn in which no adoption is in flight, and the caller then reads the records as that adoption left them: bound (`.alreadyAdopted`; for a failed hash, `legacyFailureOutcome` sees the binding), no longer wanted (`.dropped`), or still wanted (the other adoption failed: this call adopts with its own verified hash, marking `adopting` in that same turn, so at most one adoption runs at a time). A `notFound` read caused by the other call's rename, or a key in `publishing`, is therefore never classified before that call's binding. `close()` resumes it as for k-5. |
 | k-7 | `AssetStore.performMigrateLegacy(maxFiles:)` (`Migration/LegacyPhases.swift`, close-out ruling L5K-R17): with the queue empty and every claimed file an adopt-on-demand's (`MigrationState.onDemand`), the wait for one such processing, `awaitLegacyFlight(of:)`, then `checkLive()` | The queue, the claims and the phase, re-read by the loop in the turn the wait returns: the processing it waited for has ended, adopted, dropped or kept (the file is no longer claimed), or deferred or cancelled (the file is back in the queue, which ends the wait); while every claimed file still is an adopt-on-demand's the call waits for the next one, so it never returns with nothing it could do, and once the claims are empty it goes on to phases 3 and 4 itself (the finish check that follows the loop). A closing store answers `.closed` (`checkLive`); `close()` resumes the wait through the processing it waits for, as for k-5. Each wait is bounded by one adoption. |
@@ -932,6 +932,7 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   | `performReportUnreadable` | `reportUnreadable` | Its doom; it installs at once | RE-S40 in `quarantined` (existing); **added** when it threw |
   | `performStorageReport`, `performMetrics` | `storageReport()`, `metrics()` | No: reads | Nothing |
   | the facade (`AssetClient.perform`) | `verifyRootNow()` | No: a read | Nothing |
+  | `publish`'s early exits, `publicationFailed`, `failed`'s resume reads, launch reconciliation | the store's staging sink (`StoreStagingSink.discard`, `readSidecar`) | No: staging files, not the records or the snapshot | Nothing |
 
   The two calls the ruling named (the funnel's adoption, `migrateLegacy`) and the commit path's re-read keep the O(1)
   shortcut; the other added re-arms are on rare paths (a failure, a job that ended during its publication, a launch with a
@@ -1179,6 +1180,65 @@ Checked, no pattern:
   full read, which the O(1) shortcut keeps to about one per install interval on the funnel's and the migration loop's
   paths; L5K-R18 adds one O(1) install per user-initiated read of an already present asset during migration. Neither was
   measured (no benchmark, L5K-R11).
+
+## Evidence (close-out cycle 3; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
+- **Failing first (L5K-R16).** On `30be1bf` (`1901e91`'s code plus the tripwire and the tests): `--filter
+  "EngineLegacyMigrationTransferTests|EngineModelTests"`: `✘ Test run with 13 tests in 2 suites failed after 2.246
+  seconds with 7 issues.`: PR14a (`unseen.isEmpty`, the tripwire), PR14b (`unseen.isEmpty`), probes I/J
+  (`unseenPages.isEmpty`, `unseen.isEmpty`, the tripwire), `adoptionsKeepTheInstallRate` (the tripwire); the engine model
+  passed. The shim test: `✘ Test run with 1 test in 1 suite failed after 0.013 seconds with 2 issues.`, "existingLocalURL
+  answers 0 of 11", "lookup answers 0 of 11". With `623378b` all pass. Mutants afterwards: with only the funnel's re-arm
+  (the migration loop's removed), `migrationAdoptionsReachTheReaders` (PR14c, probes I/J) fails with 3 issues while PR14a
+  passes; without the start path's re-arm, `reconciledAdoptionReachesTheReaders` fails (`unseen.isEmpty`, the tripwire).
+- **Failing first (crossed answers).** On `296e5a0`: the crossing test failed on the older answer having taken the store's
+  entry off the heap and on the asset never reaching the readers. With `d931f9e` (the deterministic form of the test): 6
+  of 6 runs of the L5K-R1 file pass; a plain-replace mutant of `applyStoreDeadline` fails the test 4 of 4 times
+  (`afterOlder == due`, `unseen.isEmpty`), the fix passes 4 of 4.
+- **Failing first (L5K-R17).** On `390523a`: the store test `✘ … with 2 issues` (`!returnedEarly`,
+  `progress.finished && progress.remaining == 0`); the engine test `✘ … with 2 issues` ("10 migrateLegacy calls while the
+  job's adoption held the last file", 13 to finish). With `4ce04d9` both pass.
+- **Failing first (L5K-R18).** On `94b55a3`: 3 of 3 runs `✘` on `unseen.isEmpty`. The engine change alone still fails it;
+  with `09afc28` it passes 3 of 3, and a mutant whose store present path installs only after a join fails it and the store
+  pin.
+- **L5K-R19.** The two held variants: 6 of 6 runs pass. The stochastic tests' margin: in the L5K-R2 table.
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `92aa5a1`: `VERIFY: PASS` (Model 151, Sync 341, Storage
+  455, Transport 84, Kit 85, Compatibility 71, AppleHosted 104 tests).
+- **Runs ×3** (debug, on `8e67d8a`; the simulator build and run beside them, so the 1-minute load went from 5.1 to 297.3
+  and back to 54.8): `ZTronAssetCompatibilityTests` `✔ Test run with 71 tests in 10 suites passed` ×3,
+  `ZTronAssetSyncTests` 341/341 ×3, `ZTronAssetKitTests` 85/85 ×3, `ZTronAssetStorageTests` 455/455 ×3 (and once more each
+  in `--quick` and in the coverage run).
+- **TSan** (`--sanitize=thread`): Compatibility `✔ Test run with 71 tests in 10 suites passed after 5.595 seconds.`, Sync
+  `✔ Test run with 341 tests in 52 suites passed after 38.205 seconds.` (both on `92aa5a1`, load 3.4 to 11.8), Storage
+  `✔ Test run with 455 tests in 60 suites passed after 491.419 seconds.` (on `8e67d8a`, load up to 297); no
+  ThreadSanitizer report in any log.
+- **Release build** (`swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`): `Build complete!`.
+- **Gates.** `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`; `gates.py trace` written to
+  `.build-k/trace-check.md`: `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1167`, `TRACE: PASS`;
+  `gates.py selftest`: `SELFTEST: PASS`. Every `await` the close-out added in `Sources/` carries a `// REENTRANCY:` line
+  (a script over the diff from `1901e91`, 0 missing).
+- **Coverage** (`swift test --scratch-path .build-k --enable-code-coverage --skip Benchmarks`, the merged export over the
+  seven test bundles, `gates.py coverage`): AppleHosted 99.76 %, Kit 97.83 % (1444/1476), Model 99.31 %, Storage 97.39 %
+  (8096/8313), Sync 93.57 % (8567/9156), Transport 99.08 %, `COVERAGE overall lines=96.58% (25055/25941)`, device-only
+  share 0.68 %, `COVERAGE: PASS` (L5K-R12: every per-target figure above its floor). The shims in the compatibility bundle:
+  98.18 % (538/548), unchanged. Lines this close-out added that no test runs, for ARCHITECTURE §14: the defensive re-arms
+  of `publish` when the job ended during its publication (`EngineDispatch.swift`), of `permanentMissing` and
+  `integrityFailed` when the job ended (`EngineFailures.swift`), of maintenance's failed-step exit (`EngineCommands.swift`)
+  and of a `migrateLegacy` call that throws while the engine runs (`EngineRuns.swift`); the tripwire's violation message
+  (reached only when the invariant breaks, as in the failing-first runs); and text-only changes of lines that were
+  uncovered before (`storedLocation`'s catch, `reconcileLaunch`'s early `return false` exits).
+- **iOS.** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, only the informational `IDERunDestination` line.
+- **iOS Simulator** (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
+  `caffeinate -i`, on `8e67d8a`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result: Passed`, 1,291 tests, 1,291
+  passed, 0 failed, 0 skipped, 0 expected failures (`Test-ZTronAssetKit-2026.10.23_23-25-07-+0200.xcresult`). The
+  simulator is shut down.
+- **No benchmark** was run (L5K-R11).
+- **Writes.** Nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR`, the module
+  caches and `LLVM_PROFILE_FILE` under `.build-k/tmp` (unset for the coverage run, whose profiles SwiftPM writes under
+  `.build-k`), derived data under `.build-k/xcode*`; the mutants and the temporary join-count print were reverted before
+  any commit; `python3 -B`, so no `Scripts/__pycache__`; `docs/TRACEABILITY.md` untouched (the trace gate wrote to
+  `.build-k`).
 
 ## Evidence (close-out cycle 2; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
 - **Failing first (L5K-R13).** On `5c9612a` (the cycle-1 code plus the tests and the two unused `MigrationState`
