@@ -1136,17 +1136,15 @@ struct EngineLegacyMigrationTransferTests {
         try await bulk.requireHeldUnits(atLeast: 1)
         let phaseFour = Set(await bulk.heldUnits)
         let running = await engine.readForTests { $0.state.migration.running && $0.state.migration.pending }
-        let unseenAtTheHold = await EngineLegacyMigrationTransferTests.unseen(harness, ids)
         let from = time.monotonicNow()
-        // The clock passes the install window while phase 4 is held: only the engine's alarm can run the trailing install
-        // the last batch's publication left due.
+        // The clock passes the install window while phase 4 is held: a trailing install the last batch's publication left
+        // due could run only on the engine's alarm, which cannot know of it before the migration call returns.
         try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
         let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, ids)
         let elapsed = time.monotonicNow().seconds(since: from)
         let held = Set(await bulk.heldUnits).isSuperset(of: phaseFour)
 
         #expect(running, "premise: the migration had not finished (phase 4 held)")
-        #expect(!unseenAtTheHold.isEmpty, "premise: the last batch published at bulk urgency inside the install window")
         #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(ids.count) files the last batch adopted stayed out of the readers' snapshot past the install window while phases 3 and 4 ran (L5K-C3-01)")
         #expect(elapsed <= 2 * 0.1 + 1e-6, "within about two install intervals of the publication: \(elapsed) s")
         #expect(held, "phase 4 stayed held throughout")

@@ -382,22 +382,25 @@ extension LegacyOnDemandRaceTests {
         #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
     }
 
-    @Test("R-STO-13: the last migration batch whose publication is coalesced returns right after it, before phases 3 and 4, so its caller can schedule the trailing install; the next call finishes (L5K-R20)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: the last migration batch installs its adoptions at once, so phases 3 and 4 run in the same call without a trailing install left due behind them (L5K-R20)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
-    func coalescedLastBatchReturnsBeforePhasesThreeAndFour() async throws {
-        // ARCHITECTURE §5's interval; the clock never moves, so after open's install the window stays closed.
+    func lastBatchInstallsBeforePhasesThreeAndFour() async throws {
+        // ARCHITECTURE §5's interval; the clock never moves, so after open's install a bulk publication stays coalesced.
         let race = try await LegacyRace.open(installInterval: 0.1)
-        let files = await race.harness.state.migration.queue.count
-        let first = try await race.harness.store.migrateLegacy(maxFiles: 64)
-        let phase = await race.harness.state.migration.phase
+        let queue = await race.harness.state.migration.queue
+        let ids = queue.flatMap(\.ids)
+        let installsBefore = await race.harness.sink.offeredKeys.count
+        let progress = try await race.harness.store.migrateLegacy(maxFiles: 64)
         let installDue = await race.harness.state.core.snapshots.installDue
-        let second = try await race.harness.store.migrateLegacy(maxFiles: 64)
+        let installs = await race.harness.sink.offeredKeys.count - installsBefore
+        let installed = await race.harness.sink.installed
+        let unseen = ids.filter { installed.location(for: $0, extensions: []) == nil }
 
-        #expect(files > 0 && files <= 64, "premise: one batch takes every file: \(files)")
-        #expect(installDue, "premise: the last batch's publication left the trailing install due")
-        #expect(first == LegacyMigrationProgress(adopted: files, remaining: 0, dropped: 0, finished: false), "the first call returned right after its publication: \(first)")
-        #expect(phase == .inProgress, "phases 3 and 4 did not run in the call that published (L5K-C3-01)")
-        #expect(second.finished && second.adopted == files, "the next call ran phases 3 and 4: \(second)")
+        #expect(!queue.isEmpty && queue.count <= 64, "premise: one batch takes every file: \(queue.count)")
+        #expect(progress == LegacyMigrationProgress(adopted: queue.count, remaining: 0, dropped: 0, finished: true), "the same call ran phases 3 and 4: \(progress)")
+        #expect(!installDue, "R-STO-13: the call ran phases 3 and 4 with its batch's trailing install still due, which only the caller's alarm could run once the call returned (L5K-C3-01)")
+        #expect(unseen.isEmpty, "the readers' snapshot holds every adopted file when the call returns: \(unseen.count) missing")
+        #expect(installs == 1, "one install, the last batch's: \(installs)")
         #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
     }
 }
