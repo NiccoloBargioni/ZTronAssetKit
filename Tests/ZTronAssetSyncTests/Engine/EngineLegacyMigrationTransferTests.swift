@@ -540,6 +540,47 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    // MARK: A job promoted during its adoption (L5K-R18)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: a prefetch job promoted to the user-initiated lane while its pre-transfer adoption runs answers its user-initiated asker only once the readers' snapshot holds the asset (L5K-R18)", .timeLimit(.minutes(1)))
+    func promotedAdoptionInstallsAtOnce() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_200)
+        let asset = catalog[1].0
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        // A prefetch job adopts the prior-art file before any bytes, at bulk urgency (L5K-R14); its hash unit is held.
+        let token = try await engine.registerGroup([asset.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        // ensureAvailable joins that job while the adoption runs (its own bulk units, a manifest's decode, are let
+        // through): the job is promoted to the user-initiated lane.
+        let ensure = Task {
+            await engine.ensureAvailable(scope: .identifiers([asset.identifier]))
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration.union(jobHash), on: engine) { engine in
+            engine.state.jobs[asset.transferID]?.lane == .userInitiated
+        }
+        // The adoption goes on; every unit but the migration's is let through until ensureAvailable returns.
+        let (result, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await ensure.value
+        }
+        let report = try result.get()
+        // Read before the clock moves: a bulk-urgency publication would reach the readers only at the trailing install.
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [asset.identifier])
+
+        #expect(report.present == 1 && report.missing == 0, "ensureAvailable reports the asset available: \(report)")
+        #expect(unseen.isEmpty, "R-STO-13: ensureAvailable, a user-initiated asker, returned before the readers' snapshot held the asset its job adopted (ARCHITECTURE §5)")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
     // MARK: No hot loop around a store call (L5K-R17)
 
     @available(macOS 15.0, iOS 18.0, *)
