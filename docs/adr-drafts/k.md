@@ -958,14 +958,15 @@ files (`EngineHarness.swift` included: the tripwire's helper is an extension in 
   deadline (a commit window, a reap). The test helper `EngineHarness.idleViolations()` reads the engine, then the store,
   then the engine again, and checks only when the engine was settled both times with the same alarm and store entry (no
   alarm turn ran the store's work in between). Asserted at idle (`expectSettled`: drive the clock until idle-silent, then
-  the tripwire) in every new test, in the ten earlier tests of the L5K-R1 file, and in the engine model after every
+  the tripwire) in every new test, in the nine earlier tests of the L5K-R1 file, and in the engine model after every
   operation and at the end of its walk (every caller withdrawn, every group released, every transfer failing at once,
   then idle-silent). On the cycle-2 code it fails the L5K-R14 test, which only counted installs.
 - **Tests, failing first** (`30be1bf`, on `1901e91`'s code): `syncAdoptionsReachTheReaders` (PR14a: 20 files, a bulk
   sync during held migration, installs within the limiter), `prefetchedNeighboursReachTheReaders` (PR14b: the store's
   production windows, a user-initiated page visible at once, 11 prefetched neighbours), `migrationAdoptionsReachTheReaders`
-  (probes I and J: 12 standard files adopted by the sync, 8 on-demand pages only migration adopts, the sync's trailing
-  install run first), and the shim test `prefetchedNeighboursDuringLegacyMigration` (PK-R14b: `SyncTuning`'s default
+  (PR14c, probes I and J: 12 standard files adopted by the sync, 8 on-demand pages only migration adopts, the sync's
+  trailing install run first), each also bounding its installs by the limiter (PR14b's and PR14c's bounds added after the
+  failing-first commit, `b0fcb68`), and the shim test `prefetchedNeighboursDuringLegacyMigration` (PK-R14b: `SyncTuning`'s default
   interval, `client.prefetch` beside a user-initiated `resolveViaNetwork`). Each failed on its own assertions (the
   readers saw none of the adopted assets; 0 of 11 for `existingLocalURL` and `lookup` through the shims), and
   `adoptionsKeepTheInstallRate` failed on the tripwire. With the fix (`623378b`, `d931f9e`) all pass. The tests that hold
@@ -1201,8 +1202,8 @@ Checked, no pattern:
   with `09afc28` it passes 3 of 3, and a mutant whose store present path installs only after a join fails it and the store
   pin.
 - **L5K-R19.** The two held variants: 6 of 6 runs pass. The stochastic tests' margin: in the L5K-R2 table.
-- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `92aa5a1`: `VERIFY: PASS` (Model 151, Sync 341, Storage
-  455, Transport 84, Kit 85, Compatibility 71, AppleHosted 104 tests).
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `92aa5a1` and again on `b0fcb68`: `VERIFY: PASS` (Model
+  151, Sync 341, Storage 455, Transport 84, Kit 85, Compatibility 71, AppleHosted 104 tests).
 - **Runs ×3** (debug, on `8e67d8a`; the simulator build and run beside them, so the 1-minute load went from 5.1 to 297.3
   and back to 54.8): `ZTronAssetCompatibilityTests` `✔ Test run with 71 tests in 10 suites passed` ×3,
   `ZTronAssetSyncTests` 341/341 ×3, `ZTronAssetKitTests` 85/85 ×3, `ZTronAssetStorageTests` 455/455 ×3 (and once more each
@@ -1231,7 +1232,10 @@ Checked, no pattern:
   OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, only the informational `IDERunDestination` line.
 - **iOS Simulator** (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
   `caffeinate -i`, on `8e67d8a`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result: Passed`, 1,291 tests, 1,291
-  passed, 0 failed, 0 skipped, 0 expected failures (`Test-ZTronAssetKit-2026.10.23_23-25-07-+0200.xcresult`). The
+  passed, 0 failed, 0 skipped, 0 expected failures (`Test-ZTronAssetKit-2026.10.23_23-25-07-+0200.xcresult`). On
+  `b0fcb68`, which adds two limiter bounds to two engine tests, the Sync bundle again (`-only-testing:ZTronAssetSyncTests`):
+  `result: Passed`, 341 of 341 (`Test-ZTronAssetKit-2026.10.23_23-45-26-+0200.xcresult`), with the Sync target once more in
+  debug (341/341) and under TSan (`✔ Test run with 341 tests in 52 suites passed after 28.131 seconds.`, no report). The
   simulator is shut down.
 - **No benchmark** was run (L5K-R11).
 - **Writes.** Nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR`, the module
