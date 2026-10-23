@@ -50,6 +50,13 @@ struct MigrationState: Sendable {
     /// Phase 1's writes are in a committed generation: no legacy file moves before that (a crash could otherwise leave
     /// moved files that no committed record expects).
     var planCommitted = false
+    /// Legacy files whose verified bytes a batch or an adopt-on-demand is placing and binding (`adoptVerifiedFile`), by
+    /// their path below the root, with the calls waiting for that adoption to end (orchestrator ruling L5K-R13).
+    /// WP-K skeleton: not written yet.
+    var adopting: [[String]: [CheckedContinuation<Void, Never>]] = [:]
+    /// Legacy files an adopt-on-demand is processing, by their path below the root, with the later adopt-on-demand calls
+    /// of the same file waiting for it (L5K-R13). WP-K skeleton: not written yet.
+    var onDemand: [[String]: [CheckedContinuation<Void, Never>]] = [:]
     /// Legacy entries phase 3's check reads between two releases of the actor (`AssetStore.legacyEntriesPresent`):
     /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation
     /// (G4: the seam that release needs).

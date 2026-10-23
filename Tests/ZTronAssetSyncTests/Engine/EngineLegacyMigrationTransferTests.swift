@@ -19,10 +19,10 @@ import ZTronAssetTestSupport
 /// cancellation (ARCHITECTURE §14, sync test rule 2).
 @Suite("Engine: transfers during legacy migration (L5K-R1)")
 struct EngineLegacyMigrationTransferTests {
-    /// `count` prior-art entries (standard policy) with their bytes.
-    static func catalog(_ count: Int, seed: UInt64) -> [(ManifestEntry, Data)] {
+    /// `count` prior-art entries (standard policy) of `size` bytes each, with their bytes.
+    static func catalog(_ count: Int, seed: UInt64, size: Int = 300) -> [(ManifestEntry, Data)] {
         (0..<count).map { index in
-            let bytes = EngineFixture.bytes(seed + UInt64(index))
+            let bytes = EngineFixture.bytes(seed + UInt64(index), count: size)
             return (EngineFixture.entry("legacy\(index)", bytes), bytes)
         }
     }
@@ -367,5 +367,89 @@ struct EngineLegacyMigrationTransferTests {
         #expect(await harness.source.starts.map(\.id) == [held], "only the asset the prior art never had was downloaded")
         #expect(try harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
         await engine.shutdown()
+    }
+
+    // MARK: One adoption per prior-art file beside a migration that runs at its own pace (L5K-R13)
+
+    /// Launches each race test makes. The interleaving L5K-R13 closes (a job's pre-transfer adoption meets a migration
+    /// batch's processing of the same prior-art file, the verifier's probes PK2b and PK8u) depends on scheduling, so each
+    /// test repeats a launch rather than hold the migration: before the fix, 8 to 13 of 20 such launches downloaded files.
+    static let raceLaunches = 20
+
+    /// Prior-art files per race launch, and their size (PK2b's 150 files of 64 KiB, smaller for the sanitizer's pace).
+    static let raceFiles = 120
+    static let raceFileSize = 16_384
+
+    /// The store's debug lines of a call that waited for another call's processing of the same prior-art file
+    /// (`Migration/LegacyPhases.swift`, L5K-R13): the evidence that a launch reached the race.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func raceJoins(_ harness: EngineHarness) -> Int {
+        harness.tap.lines.filter { $0.message.contains("the same legacy file") }.count
+    }
+
+    /// One launch over a prior-art tree of `raceFiles` files with the harness's inline executors, so legacy migration
+    /// runs at its own pace beside whatever the test starts right after `start()`; the origin serves every file's bytes,
+    /// so only an adoption avoids a transfer.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func raceLaunch(_ launch: Int, seed: UInt64) async throws -> (harness: EngineHarness, catalog: [(ManifestEntry, Data)]) {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(
+            EngineLegacyMigrationTransferTests.raceFiles,
+            seed: seed + UInt64(launch) * 1_000,
+            size: EngineLegacyMigrationTransferTests.raceFileSize
+        )
+        let harness = EngineHarness.make(
+            disk: try EngineRunPathTests.legacyDisk(catalog, time: time),
+            time: time,
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot)
+        )
+        await harness.serveManifest(catalog.map(\.0))
+        await harness.scriptTransfers(catalog)
+        return (harness, catalog)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(1)))
+    func ensureAvailableBesideARunningMigration() async throws {
+        var joins = 0
+        for launch in 0..<EngineLegacyMigrationTransferTests.raceLaunches {
+            await Task.yield()
+            let (harness, catalog) = try await EngineLegacyMigrationTransferTests.raceLaunch(launch, seed: 7_700)
+            let opened = try await harness.start()
+            try #require(opened.legacyMigrationPending, "launch \(launch) has a legacy migration")
+            let report = try await harness.engine.ensureAvailable(scope: .all).get()
+            let starts = await harness.source.starts
+            #expect(starts.isEmpty, "launch \(launch): R-STO-11: \(starts.count) of \(catalog.count) prior-art files were downloaded (L5K-R13)")
+            #expect(report.present == catalog.count && report.missing == 0, "launch \(launch): every asset is available: \(report)")
+            joins += EngineLegacyMigrationTransferTests.raceJoins(harness)
+            await harness.engine.shutdown()
+        }
+        #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(1)))
+    func userInitiatedPrefetchBesideARunningMigration() async throws {
+        var joins = 0
+        for launch in 0..<EngineLegacyMigrationTransferTests.raceLaunches {
+            await Task.yield()
+            let (harness, catalog) = try await EngineLegacyMigrationTransferTests.raceLaunch(launch, seed: 7_900)
+            let engine = harness.engine
+            try #require(try await harness.start().legacyMigrationPending, "launch \(launch) has a legacy migration")
+            let token = try await engine.registerGroup(catalog.map(\.0.identifier), lane: .userInitiated).get()
+            await engine.awaitCondition { engine in
+                guard let group = engine.state.groups[token] else {
+                    return false
+                }
+                return group.claimCursor == group.members.count && group.pending.isEmpty && engine.state.jobs.isEmpty
+            }
+            let starts = await harness.source.starts
+            #expect(starts.isEmpty, "launch \(launch): R-STO-11: \(starts.count) of \(catalog.count) prior-art files were downloaded (L5K-R13)")
+            #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog), "launch \(launch): every prior-art asset is stored")
+            joins += EngineLegacyMigrationTransferTests.raceJoins(harness)
+            await engine.releaseGroup(token)
+            await engine.shutdown()
+        }
+        #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
     }
 }
