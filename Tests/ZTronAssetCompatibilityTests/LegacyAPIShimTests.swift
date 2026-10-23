@@ -257,6 +257,37 @@ struct LegacyAPIShimTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
+    @Test("R-CAR-6: a prior-art store whose directory lies in Caches shares its root with a client at StorageLocation.caches, which admits one client (R-STO-9)", .timeLimit(.minutes(1)))
+    func legacyStoreInCachesSharesTheCachesRoot() async throws {
+        // The fake volume's standard Caches directory, which `StorageLocation.caches` resolves to.
+        let caches = URL(fileURLWithPath: "/fake-volume/Library/Caches", isDirectory: true)
+        let store = PriorArt.localStore(CDNLocalStore.self, baseDirectory: caches.appendingPathComponent("CDNAssets", isDirectory: true))
+        // An installed process client configured with `location: .caches`, and the prior-art store's own client.
+        let configurations = [CDNConfiguration(location: .caches), store.installPoint.configuration]
+        let fakes = CompatHarness.make()
+        let clients = configurations.map { configuration -> AssetClient in
+            var tuned = configuration
+            tuned.clientConfiguration.tuning = CompatHarness.tuning
+            return CDNProviderFactory.makeClient(tuned, environment: fakes.environment)
+        }
+        await fakes.serveManifest([])
+
+        try await clients[0].start()
+        var failure: AssetError?
+        do throws(AssetError) {
+            try await clients[1].start()
+        } catch {
+            failure = error
+        }
+
+        #expect(failure == .storageUnavailable(.locked), "one client per resolved base directory: `.custom(<Caches>)` is `.caches`")
+        for client in clients {
+            await client.shutdown()
+        }
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
     @Test("R-CAR-6: localURL is the stored blob for an asset the client holds, and the prior art's default path for one it does not", .timeLimit(.minutes(1)))
     func localURLIsTheStoredBlob() async throws {
         let iconBytes = CompatFixture.bytes(70)

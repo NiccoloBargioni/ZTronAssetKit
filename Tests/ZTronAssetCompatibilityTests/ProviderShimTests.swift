@@ -3,6 +3,33 @@ import Testing
 import ZTronAssetKit
 import ZTronAssetTestSupport
 
+/// An app-defined manifest source that sends SPEC §2.3's app key: what MIGRATION.md step 4 recommends as
+/// `verifyFullyAvailable()`'s manifest source at a keyed origin (`StaticManifestCDNProvider` sends no key, K-5). The
+/// test key is a placeholder, never a real secret; an app's own source also keeps the key at its origin (R-NET-4).
+private struct KeyedManifestSource: CDNProviding {
+    /// SPEC §2.3's header.
+    static let header = "x-zombietron-app-key"
+    /// The loopback origin's key.
+    static let testKey = "compat-test-key"
+
+    let url: URL
+    let session: URLSession
+
+    func fetchManifest() async throws -> [CDNAsset] {
+        var request = URLRequest(url: self.url, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.setValue(KeyedManifestSource.testKey, forHTTPHeaderField: KeyedManifestSource.header)
+        let (data, response) = try await self.session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw StaticManifestCDNProviderError.badResponse(response)
+        }
+        return try JSONDecoder().decode([CDNAsset].self, from: data)
+    }
+
+    func downloadAsset(_ asset: CDNAsset, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        throw ScriptedProviderFailure.unscripted
+    }
+}
+
 /// R-CAR-6: the prior art's two providers as manifest sources and tier descriptions (the client downloads).
 @Suite("Compatibility shims: providers")
 struct ProviderShimTests {
@@ -97,6 +124,39 @@ struct ProviderShimTests {
         session.invalidateAndCancel()
         await server.stop()
         #expect(status == 404)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: StaticManifestCDNProvider sends no app key, so verifyFullyAvailable through it fails with the 403 of an origin that requires one, while a manifest source that sends the key reaches it", .timeLimit(.minutes(1)))
+    func keylessProviderAtAKeyedOrigin() async throws {
+        let icon = CompatFixture.asset("bo7.ri.easter.egg.icon", CompatFixture.bytes(63))
+        let body = CompatFixture.manifestData([icon])
+        // SPEC §2.3's CloudFront Function: a request without the app key (or with another one) gets 403 and no body.
+        let (server, base, session) = try await ProviderShimTests.origin { request in
+            request.header(KeyedManifestSource.header) == KeyedManifestSource.testKey ? LoopbackResponse(body: body) : LoopbackResponse(status: 403)
+        }
+        // A client that never starts: `verifyFullyAvailable()` reads only its (empty) snapshot after the fetch.
+        let client = CompatHarness.make().client
+        let provider = StaticManifestCDNProvider(baseURL: base, manifestPath: "manifest.json", urlSession: session, executor: InlineBlockingExecutor())
+        let keyless = CDNSyncCoordinator(client: client, cdn: provider)
+        let keyed = CDNSyncCoordinator(client: client, cdn: KeyedManifestSource(url: base.appendingPathComponent("manifest.json"), session: session))
+
+        var status: Int?
+        do {
+            _ = try await keyless.verifyFullyAvailable()
+            Issue.record("the keyed origin must refuse the provider's request")
+        } catch StaticManifestCDNProviderError.badResponse(let response) {
+            status = (response as? HTTPURLResponse)?.statusCode
+        }
+        let missing = try await keyed.verifyFullyAvailable()
+
+        session.invalidateAndCancel()
+        let requests = await server.requests
+        await server.stop()
+        #expect(status == 403)
+        #expect(requests.map { $0.header(KeyedManifestSource.header) != nil } == [false, true], "the provider's own request carries no key (K-5)")
+        #expect(missing == [icon], "a manifest source that sends the key reaches the origin; nothing is stored yet")
     }
 
     @available(macOS 26.0, iOS 26.0, *)
