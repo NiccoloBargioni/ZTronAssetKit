@@ -18,18 +18,39 @@ struct MigrationLaunchShimTests {
     /// MIGRATION.md step 3's configuration, with the harness's tuning.
     @available(macOS 15.0, iOS 18.0, *)
     static var configuration: CDNConfiguration {
+        MigrationLaunchShimTests.configuration(tuning: CompatHarness.tuning)
+    }
+
+    /// MIGRATION.md step 3's configuration with `tuning`.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func configuration(tuning: SyncTuning) -> CDNConfiguration {
         var configuration = CDNConfiguration()
-        configuration.clientConfiguration.tuning = CompatHarness.tuning
+        configuration.clientConfiguration.tuning = tuning
         return configuration
     }
 
+    /// The harness's tuning with the production snapshot install interval (`SyncTuning`'s default, 0.1 s): a bulk or
+    /// prefetch publication then reaches the lookups only through the trailing install the engine's alarm runs
+    /// (ARCHITECTURE §5), which the harness's interval of 0 never exercises (L5K-R16).
+    @available(macOS 15.0, iOS 18.0, *)
+    static var rateLimitedTuning: SyncTuning {
+        var tuning = CompatHarness.tuning
+        tuning.snapshotInstallInterval = SyncTuning().snapshotInstallInterval
+        return tuning
+    }
+
     /// One launch over a volume holding the prior art's tree: `count` prior-art videos of `size` bytes, a client
-    /// configured as MIGRATION.md step 3 does (with the harness's tuning) and installed into a local point, and a store
-    /// bound to that point. `bulk` is the store's bulk executor (inline unless the test holds the migration). Nothing is
-    /// started.
+    /// configured as MIGRATION.md step 3 does (with `tuning`, the harness's unless a test needs the production install
+    /// interval) and installed into a local point, and a store bound to that point. `bulk` is the store's bulk executor
+    /// (inline unless the test holds the migration). Nothing is started.
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
-    static func adoptionLaunch(count: Int, size: Int, bulk: any BlockingExecutor = InlineBlockingExecutor()) async throws -> AdoptionLaunch {
+    static func adoptionLaunch(
+        count: Int,
+        size: Int,
+        bulk: any BlockingExecutor = InlineBlockingExecutor(),
+        tuning: SyncTuning = CompatHarness.tuning
+    ) async throws -> AdoptionLaunch {
         let assets = (0..<count).map { index -> (CDNAsset, Data) in
             let bytes = CompatFixture.bytes(UInt64(5_000 + index), count: size)
             return (CompatFixture.asset("bo7.ri.easter.egg.video\(index)", bytes, ext: "mp4"), bytes)
@@ -37,7 +58,7 @@ struct MigrationLaunchShimTests {
         let fakes = CompatHarness.make(bulk: bulk)
         try PriorArtTree.seed(assets, under: MigrationLaunchShimTests.legacyRoot, on: fakes.fileSystem)
         let point = CDNInstallPoint()
-        let client = CDNProviderFactory.install(MigrationLaunchShimTests.configuration, into: point, environment: fakes.environment)
+        let client = CDNProviderFactory.install(MigrationLaunchShimTests.configuration(tuning: tuning), into: point, environment: fakes.environment)
         await fakes.serve(assets)
         return AdoptionLaunch(fakes: fakes, client: client, store: CDNLocalStore(installPoint: point), assets: assets)
     }
@@ -140,6 +161,60 @@ struct MigrationLaunchShimTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
+    @Test("R-CAR-6: on a launch during legacy migration with the production snapshot install interval, existingLocalURL and lookup see every neighbour a prefetch adopted once the install window has passed (L5K-R16, PK-R14b)", .timeLimit(.minutes(1)))
+    func prefetchedNeighboursDuringLegacyMigration() async throws {
+        // The migration is held at a unit of its first file while the page is resolved and its neighbours are prefetched
+        // (L5K-R2: a held state, not a race), so every neighbour is adopted by a prefetch job's pre-transfer read, which
+        // publishes at bulk urgency (L5K-R14): only the trailing install the engine's alarm runs can show it to the lookups.
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let launch = try await MigrationLaunchShimTests.adoptionLaunch(count: 12, size: 256, bulk: bulk, tuning: MigrationLaunchShimTests.rateLimitedTuning)
+        let page = launch.assets[11].0
+        let neighbours = launch.assets[0..<11].map(\.0)
+        let migration = try await CompatHarness.startHoldingMigration(launch.client, bulk: bulk)
+        let releaser = CompatHarness.releaser(bulk, keeping: migration)
+
+        // The page a user opens: resolved user-initiated, so the lookups answer it when the call returns.
+        let resolver = CDNAssetResolver(client: launch.client)
+        let pageURL = await resolver.resolveViaNetwork(identifier: page.identifier, candidateExtensions: ["mp4"])
+        let pageVisible = launch.store.existingLocalURL(identifier: page.identifier, candidateExtensions: ["mp4"]) != nil
+        // Its neighbours, prefetched at the default lane, as the carousel's prefetch window does.
+        let handle = launch.client.prefetch(neighbours.map(CompatFixture.id))
+        try await handle.awaitRegistration()
+        // A public condition, never a clock move having happened (L5K-R3): every neighbour stored, the prefetch's jobs ended
+        // and no engine timer left. A trailing install the engine scheduled has run by then: the self-advancing clock passes
+        // its sleep, and the alarm's task, which installs it, is an owned task until its turn has ended.
+        let scope = AssetScope.identifiers(Set(neighbours.map(CompatFixture.id)))
+        try await MigrationLaunchShimTests.waitUntil("every neighbour is stored and the engine owns no timer or job") {
+            guard try await launch.client.availability(scope: scope).present == neighbours.count else {
+                return false
+            }
+            let counts = try await MigrationLaunchShimTests.engineCounts(launch.client)
+            let timers = (counts["armedTimers"] ?? 0) + (counts["scheduledDeadlines"] ?? 0)
+            let busy = (counts["ownedTasks"] ?? 0) - (counts["watcherActive"] ?? 0) - (counts["memoryPressureObserverActive"] ?? 0)
+            // The migration loop, held at its file, is the one owned task left.
+            return (counts["interests"] ?? 0) == 0 && timers == 0 && busy == 1
+        }
+        let visible = neighbours.filter { launch.store.existingLocalURL(identifier: $0.identifier, candidateExtensions: ["mp4"]) != nil }
+        let looked = neighbours.filter { launch.client.lookup(CompatFixture.id($0), extensions: ["mp4"]) != nil }
+        let held = neighbours.filter { launch.store.hasAsset($0) }
+        let downloaded = await launch.fakes.starts(after: 0)
+        releaser.cancel()
+        await releaser.value
+        let overlapped = Set(await bulk.heldUnits).isSuperset(of: migration)
+
+        #expect(pageURL != nil && pageVisible, "a user-initiated resolve's adoption answers the lookups when it returns")
+        #expect(visible.count == neighbours.count, "R-STO-13: existingLocalURL answers \(visible.count) of \(neighbours.count) stored neighbours after the install window (L5K-R16)")
+        #expect(looked.count == neighbours.count, "R-STO-13: lookup answers \(looked.count) of \(neighbours.count) stored neighbours after the install window")
+        #expect(held.count == visible.count, "hasAsset agrees with existingLocalURL")
+        #expect(downloaded.isEmpty, "R-STO-11: moved, not downloaded again")
+        #expect(overlapped, "the migration was held at its file throughout")
+        handle.cancel()
+        await bulk.setHolding(false)
+        await launch.client.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
     @Test("R-CAR-6: a coordinator's syncIfNeeded right after start on a later launch that resumes an unfinished legacy migration completes and downloads none of the prior art's files (L5K-V3-06)", .timeLimit(.minutes(1)))
     func launchSyncDuringResumedMigration() async throws {
         // Launch 1: MIGRATION.md steps 3 and 4 in the launch task, and the app is terminated during them
@@ -213,6 +288,33 @@ struct MigrationLaunchShimTests {
         #expect(availability.present == first.assets.count && availability.missing == 0, "every prior-art asset is stored: \(availability)")
         await secondBulk.setHolding(false)
         await client.shutdown()
+    }
+}
+
+extension MigrationLaunchShimTests {
+    /// The engine's counters from the client's public diagnostic report (`DiagnosticReport.engineCounts`): the jobs'
+    /// interests, the alarm, the deadlines and the owned tasks, which this public-API-only target reads instead of the
+    /// engine's state (K-1).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func engineCounts(_ client: AssetClient) async throws -> [String: Int] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
+        return try decoder.decode(DiagnosticReport.self, from: try await client.diagnosticReport()).engineCounts
+    }
+
+    /// Re-reads `condition`, a public observable (the client's answers, never a clock move), until it holds; each read is
+    /// a round trip through the client, and the wait ends on cancellation (the test's time limit), recording `what` as
+    /// the condition that never held. On the main actor, like the shim tests that call it.
+    @MainActor
+    static func waitUntil(_ what: String, _ condition: () async throws -> Bool) async throws {
+        while !(try await condition()) {
+            if Task.isCancelled {
+                Issue.record("the wait ended before \(what)")
+                throw CancellationError()
+            }
+            await Task.yield()
+        }
     }
 }
 

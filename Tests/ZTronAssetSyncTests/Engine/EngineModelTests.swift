@@ -111,12 +111,32 @@ struct EngineModelTests {
                     }
                 }
             }
-            let violations = await engine.invariantViolations()
+            // L5K-R16's tripwire joins the invariants whenever the engine is settled after an operation: every deadline the
+            // store reports, a trailing install among them, is then on the engine's heap.
+            let violations = await harness.idleViolations().violations
             #expect(violations.isEmpty, "seed \(seed) operation \(operation): \(violations)")
             if !violations.isEmpty {
                 break
             }
         }
+        // At idle (L5K-R16): every caller withdrawn, every group released, every transfer failing at once and the
+        // conditions unrestricted, the clock is driven until the engine is idle-silent; the store then reports no deadline
+        // the engine's heap lacks.
+        await harness.conditions.send(.unrestricted)
+        for index in callers.indices where !callers[index].cancelled {
+            callers[index].cancelled = true
+            callers[index].task.cancel()
+        }
+        for token in groups {
+            await engine.releaseGroup(token)
+        }
+        for transfer in transfers {
+            await source.script(transfer, Array(repeating: .fail(.rejected(.unexpectedStatus(400))), count: 16))
+        }
+        try await harness.drive(advances: 8_192) { $0.isIdleSilent }
+        let idle = await harness.idleViolations()
+        #expect(idle.checked, "seed \(seed): the engine settled after the walk")
+        #expect(idle.violations.isEmpty, "seed \(seed) at idle: \(idle.violations)")
         await engine.shutdown()
         for caller in callers {
             let result = await caller.task.value

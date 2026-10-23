@@ -153,6 +153,17 @@ struct EngineLegacyMigrationTransferTests {
         await harness.engine.awaitCondition { !$0.state.migration.pending && !$0.state.migration.running }
     }
 
+    /// Drives the clock until the engine is idle-silent and checks orchestrator ruling L5K-R16's tripwire there
+    /// (`EngineHarness.idleViolations()`): the engine is settled, and every deadline the store reports, a trailing
+    /// install among them, is on its heap.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func expectSettled(_ harness: EngineHarness, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await harness.drive { $0.isIdleSilent }
+        let idle = await harness.idleViolations()
+        #expect(idle.checked, "the tripwire read the store while the engine was settled", sourceLocation: sourceLocation)
+        #expect(idle.violations.isEmpty, "\(idle.violations)", sourceLocation: sourceLocation)
+    }
+
     // MARK: Every path that creates a job adopts instead of downloading
 
     @available(macOS 15.0, iOS 18.0, *)
@@ -181,6 +192,7 @@ struct EngineLegacyMigrationTransferTests {
         await task.value
         #expect(try harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
         #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
 
@@ -212,6 +224,7 @@ struct EngineLegacyMigrationTransferTests {
         await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
         #expect(try harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
         #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
 
@@ -239,6 +252,7 @@ struct EngineLegacyMigrationTransferTests {
         await task.value
         #expect(try harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
         #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
 
@@ -292,6 +306,7 @@ struct EngineLegacyMigrationTransferTests {
         await EngineLegacyMigrationTransferTests.finishMigration(second.harness, bulk: second.bulk)
         await task.value
         #expect(try second.harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
+        try await EngineLegacyMigrationTransferTests.expectSettled(second.harness)
         await engine.shutdown()
     }
 
@@ -324,6 +339,7 @@ struct EngineLegacyMigrationTransferTests {
         #expect(!left.active && !left.waiting && left.joiners == 0)
         #expect(await harness.source.manifestRequests.count == 1, "one manifest request in this launch")
         #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
 
@@ -370,6 +386,7 @@ struct EngineLegacyMigrationTransferTests {
         #expect(await harness.source.manifestRequests.count == 1)
         #expect(await harness.source.starts.map(\.id) == [held], "only the asset the prior art never had was downloaded")
         #expect(try harness.fileSystem.itemInfo(at: EngineRunPathTests.legacyRoot) == nil, "phase 4 removed the prior art's tree")
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
 
@@ -426,6 +443,7 @@ struct EngineLegacyMigrationTransferTests {
             #expect(starts.isEmpty, "launch \(launch): R-STO-11: \(starts.count) of \(catalog.count) prior-art files were downloaded (L5K-R13)")
             #expect(report.present == catalog.count && report.missing == 0, "launch \(launch): every asset is available: \(report)")
             joins += EngineLegacyMigrationTransferTests.raceJoins(harness)
+            try await EngineLegacyMigrationTransferTests.expectSettled(harness)
             await harness.engine.shutdown()
         }
         #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
@@ -452,6 +470,7 @@ struct EngineLegacyMigrationTransferTests {
             #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog), "launch \(launch): every prior-art asset is stored")
             joins += EngineLegacyMigrationTransferTests.raceJoins(harness)
             await engine.releaseGroup(token)
+            try await EngineLegacyMigrationTransferTests.expectSettled(harness)
             await engine.shutdown()
         }
         #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
@@ -517,6 +536,201 @@ struct EngineLegacyMigrationTransferTests {
         await engine.releaseGroup(token)
         await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
         await task.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
+    }
+
+    // MARK: Every coalesced publication reaches the readers (L5K-R16)
+
+    /// The ids of `ids` the readers' snapshot (the sink's installed snapshot, what `lookup` reads) does not hold.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func unseen(_ harness: EngineHarness, _ ids: some Sequence<AssetID>) async -> [AssetID] {
+        let installed = await harness.sink.installed
+        return ids.filter { installed.location(for: $0, extensions: []) == nil }.sorted()
+    }
+
+    /// A launch over `catalog`'s prior-art tree with ARCHITECTURE §5's install interval (0.1 s): a bulk-lane adoption
+    /// publishes at bulk urgency, and only the engine's alarm runs the trailing install it leaves due. `commitInterval`
+    /// is the store's commit window (the production 0.25 s for PR14b's shape). Nothing is started.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func rateLimitedLaunch(
+        _ catalog: [(ManifestEntry, Data)],
+        time: ManualTimeSource,
+        commitInterval: TimeInterval = 0
+    ) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor) {
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let harness = EngineHarness.make(
+            disk: try EngineRunPathTests.legacyDisk(catalog, time: time),
+            time: time,
+            bulk: bulk,
+            commitInterval: commitInterval,
+            installInterval: 0.1,
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot)
+        )
+        await harness.serveManifest(catalog.map(\.0))
+        await harness.scriptTransfers(catalog)
+        return (harness, bulk)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)", .timeLimit(.minutes(1)))
+    func syncAdoptionsReachTheReaders() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(20, seed: 8_500)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let pending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        try #require(pending.count >= catalog.count - 1, "the sync's jobs have the prior art's files to adopt")
+
+        let start = time.monotonicNow()
+        let beforeSync = await harness.sink.offeredKeys.count
+        let (outcome, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await engine.sync(.force)
+        }
+        let report = try #require(outcome.completeReport, "the sync completes: \(outcome)")
+        let syncInstalls = await harness.sink.offeredKeys.count - beforeSync
+        let unseenAtTheSyncsEnd = await EngineLegacyMigrationTransferTests.unseen(harness, pending)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        // The clock passes the install window: only the engine's alarm runs the trailing install the adoptions left due.
+        try await harness.drive { $0.isIdleSilent }
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, catalog.map(\.0.identifier))
+        let installs = await harness.sink.offeredKeys.count - beforeSync
+        let elapsed = time.monotonicNow().seconds(since: start)
+        let idle = await harness.idleViolations()
+
+        #expect(report.fetched == pending.count, "the bulk jobs adopted every pending file")
+        #expect(!unseenAtTheSyncsEnd.isEmpty, "premise: the adoptions published at bulk urgency inside the install window, so the trailing install was still due when the sync returned")
+        #expect(syncInstalls <= 2, "\(syncInstalls) snapshot installs while the clock stood still: one per adoption bypasses the limiter")
+        #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(catalog.count) adopted prior-art files never reached the readers' snapshot: \(unseen)")
+        #expect(installs <= syncInstalls + Int((elapsed / 0.1).rounded(.up)) + 1, "the trailing installs stay within the limiter: \(installs) installs over \(elapsed) s")
+        #expect(idle.checked, "the tripwire read the store while the engine was settled")
+        #expect(idle.violations.isEmpty, "\(idle.violations)")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at once, and the neighbours a prefetch group's jobs adopt reach it once the install window has passed (L5K-R16, PR14b)", .timeLimit(.minutes(1)))
+    func prefetchedNeighboursReachTheReaders() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(12, seed: 8_600)
+        let page = catalog[11].0.identifier
+        let neighbours = catalog[0..<11].map(\.0.identifier)
+        // The store's production windows: commit 0.25 s, install 0.1 s.
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time, commitInterval: 0.25)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+
+        let (resolved, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await engine.awaitAsset(page, lane: .userInitiated)
+        }
+        _ = try resolved.get()
+        let pageUnseen = await EngineLegacyMigrationTransferTests.unseen(harness, [page])
+        let token = try await engine.registerGroup(neighbours, lane: .prefetch).get()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            guard let group = engine.state.groups[token] else {
+                return false
+            }
+            return group.claimCursor == group.members.count && group.pending.isEmpty && engine.state.jobs.isEmpty
+        }
+        let unseenAtTheJoinsEnd = await EngineLegacyMigrationTransferTests.unseen(harness, neighbours)
+        // The clock passes the install window while the migration is still held, so no batch and no launch run installs
+        // anything: only the engine's alarm can run the trailing install the neighbours' adoptions left due.
+        try await harness.drive { $0.scheduledDeadlines == 0 }
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, neighbours)
+        let held = Set(await bulk.heldUnits).isSuperset(of: migration)
+
+        #expect(pageUnseen.isEmpty, "a user-initiated resolve's adoption is in the readers' snapshot when it returns")
+        #expect(!unseenAtTheJoinsEnd.isEmpty, "premise: the prefetch lane's adoptions published at bulk urgency inside the install window")
+        #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(neighbours.count) prefetched neighbours never reached the readers' snapshot: \(unseen)")
+        #expect(held, "the migration was held throughout")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.releaseGroup(token)
+        // Phase 3's durable commit waits for the store's commit window, so the clock moves while migration ends.
+        await harness.withClock {
+            await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        }
+        await task.value
+        try await harness.drive { $0.isIdleSilent }
+        let idle = await harness.idleViolations()
+        #expect(idle.checked && idle.violations.isEmpty, "settled: \(idle.checked), \(idle.violations)")
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, probes I and J)", .timeLimit(.minutes(1)))
+    func migrationAdoptionsReachTheReaders() async throws {
+        let time = ManualTimeSource()
+        let standard = EngineLegacyMigrationTransferTests.catalog(12, seed: 8_700)
+        // On-demand pages the sync's run does not plan: only migration's batches adopt them.
+        let pages = (0..<8).map { index -> (ManifestEntry, Data) in
+            let bytes = EngineFixture.bytes(8_800 + UInt64(index))
+            return (EngineFixture.entry("page\(index)", bytes, policy: .onDemand), bytes)
+        }
+        let pageIDs = pages.map(\.0.identifier)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(standard + pages, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+
+        let (outcome, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await engine.sync(.force)
+        }
+        _ = try #require(outcome.completeReport, "the sync completes: \(outcome)")
+        let waiting = await engine.readForTests { $0.state.migration.launchRunWaiting }
+        // Probe J: the sync's own trailing install runs first, while the migration is still held.
+        try await harness.drive { $0.scheduledDeadlines == 0 }
+        let pagesBefore = await EngineLegacyMigrationTransferTests.unseen(harness, pageIDs)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        // Migration's batches published the pages at bulk urgency inside the install window that trailing install opened;
+        // the sync took the launch run's place, so no launch run's apply follows migration to install them.
+        try await harness.drive { $0.isIdleSilent }
+        let unseenPages = await EngineLegacyMigrationTransferTests.unseen(harness, pageIDs)
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, (standard + pages).map(\.0.identifier))
+        let runs = await engine.readForTests { $0.state.lastRunID }
+        let idle = await harness.idleViolations()
+
+        #expect(!waiting, "the sync took the parked launch run's place (L5K-R1)")
+        #expect(pagesBefore.count == pages.count, "premise: no page was adopted before migration went on")
+        #expect(unseenPages.isEmpty, "R-STO-13: \(unseenPages.count) of \(pages.count) pages migration adopted never reached the readers' snapshot: \(unseenPages)")
+        #expect(unseen.isEmpty, "every prior-art file is in the readers' snapshot: \(unseen)")
+        #expect(runs == 1, "no launch run followed migration")
+        #expect(idle.checked && idle.violations.isEmpty, "settled: \(idle.checked), \(idle.violations)")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.shutdown()
+    }
+}
+
+/// What L5K-R16's tripwire compares before and after it reads the store (`EngineHarness.idleViolations()`): whether the
+/// engine was settled, its alarm and the store deadline on its heap. Equal marks mean that no alarm turn ran the store's
+/// work while the store was read, so the store's answer describes the state the engine is settled in.
+struct SettledMark: Sendable, Equatable {
+    let settled: Bool
+    let alarm: UInt64?
+    let deadline: MonotonicInstant?
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension EngineHarness {
+    /// The engine invariants with orchestrator ruling L5K-R16's tripwire folded in
+    /// (`SyncEngine.invariantViolations(storeDeadlineDue:)`), read at idle: `checked` when the engine was settled
+    /// (`storeDeadlineSettled`) before and after the store's `nextDeadline()` was read, with the same alarm and the same
+    /// store deadline on its heap; then a deadline the store reports, a trailing install among them, must be on the
+    /// engine's heap. Otherwise only the plain invariants are returned.
+    func idleViolations() async -> (checked: Bool, violations: [String]) {
+        let engine = self.engine
+        let before = await engine.readForTests { engine in
+            SettledMark(settled: engine.storeDeadlineSettled, alarm: engine.state.alarm?.token, deadline: engine.state.heap.deadline(for: .store))
+        }
+        let storeDeadline = await self.store.nextDeadline()
+        return await engine.readForTests { engine in
+            let after = SettledMark(settled: engine.storeDeadlineSettled, alarm: engine.state.alarm?.token, deadline: engine.state.heap.deadline(for: .store))
+            guard before.settled, after == before else {
+                return (false, engine.invariantViolations())
+            }
+            return (true, engine.invariantViolations(storeDeadlineDue: storeDeadline != nil))
+        }
     }
 }

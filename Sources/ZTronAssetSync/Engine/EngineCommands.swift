@@ -1575,8 +1575,18 @@ extension SyncEngine {
     }
 
     /// The engine invariants (sync.md §6.2, ARCHITECTURE §7.1), as violations; checked by the model-based test.
-    func invariantViolations() -> [String] {
+    ///
+    /// `storeDeadlineDue` is orchestrator ruling L5K-R16's tripwire: whether the store reported a time-only deadline
+    /// (`nextDeadline() != nil`) when the caller read it while the engine was settled (`storeDeadlineSettled`). The store
+    /// reports one whenever a coalesced publication's trailing install is due (`installDue`, ARCHITECTURE §5), so the
+    /// engine must then hold a store deadline on its heap: settled, nothing else re-reads it, and without the alarm's
+    /// `runDueWork()` the readers' snapshot would miss what the store holds (and its commit or reap would wait) until some
+    /// unrelated store call (ADR-022, RE-S40). Callers that do not read the store pass `false`.
+    func invariantViolations(storeDeadlineDue: Bool = false) -> [String] {
         var violations: [String] = []
+        if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
+            violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
+        }
         for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
             violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
         }
@@ -1668,6 +1678,22 @@ extension SyncEngine {
             violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")
         }
         return violations
+    }
+
+    /// Whether no engine work is under way that could still re-read the store's deadline, for L5K-R16's tripwire
+    /// (`invariantViolations(storeDeadlineDue:)`): the engine runs, no job, run or migration loop exists, no alarm's store
+    /// work, deadline re-read, settling read, presence read, `apply` or catch-up is in flight, and no owned task runs but
+    /// the alarm, the conditions watcher and the memory-pressure observer, none of which re-reads the deadline outside
+    /// the alarm's own `runDueWork()` turn.
+    var storeDeadlineSettled: Bool {
+        guard self.isRunning, self.state.jobs.isEmpty, self.state.run == nil, !self.state.migration.running,
+              self.state.storeWorkRuns == 0, !self.state.spaceDeadlineReread, !self.state.spaceSettleRead,
+              self.state.presenceReaders == 0, self.state.appliesInFlight == 0, self.state.manifestCatchUps == 0
+        else {
+            return false
+        }
+        let timers = Set([self.state.alarm?.task, self.state.watcher?.task, self.state.pressure.task].compactMap { $0 })
+        return self.state.tasks.keys.allSatisfy { timers.contains($0) }
     }
 
     /// The claim counters against the groups' pending claims and the released groups' claims left to drop (L5-R1).
