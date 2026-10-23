@@ -41,12 +41,23 @@ public final class NetworkAvailabilityMonitor: Sendable {
     /// A monitor over the event stream `events` returns (`nil`: none, so retries stay pending), with tokens from
     /// `makeToken` (the live default draws random UUIDs, as the prior art did).
     init(events: @escaping @Sendable () async -> AsyncStream<AssetEvent>?, makeToken: @escaping @Sendable () -> UUID = UUID.init) {
-        let (_, mailbox) = AsyncStream.makeStream(of: Message.self)
+        let (messages, mailbox) = AsyncStream.makeStream(of: Message.self)
         self.mailbox = mailbox
         self.makeToken = makeToken
-        // WP-K skeleton: nothing consumes the mailbox and nothing follows the client yet.
-        self.registry = Task {}
-        self.forwarder = Task {}
+        self.registry = Task {
+            await NetworkAvailabilityMonitor.serve(messages)
+        }
+        // The forwarder holds the mailbox's continuation, never the monitor, so releasing the monitor ends both tasks.
+        self.forwarder = Task {
+            guard let stream = await events() else {
+                return
+            }
+            for await event in stream {
+                if case .conditionsChanged(let conditions) = event, conditions.network.satisfied {
+                    mailbox.yield(.available)
+                }
+            }
+        }
     }
 
     deinit {
@@ -59,19 +70,49 @@ public final class NetworkAvailabilityMonitor: Sendable {
     /// Device connectivity says nothing about whether the origin has the asset; it is only a reasonable moment to try.
     @discardableResult
     public func retryWhenAvailable(_ retry: @escaping @Sendable () -> Void) -> UUID {
-        // WP-K skeleton: nothing is registered yet.
-        self.makeToken()
+        let token = self.makeToken()
+        self.mailbox.yield(.register(token, retry))
+        return token
     }
 
     /// Withdraws a registered retry; a token that already ran or was cancelled changes nothing.
     public func cancelRetry(_ token: UUID) {
-        // WP-K skeleton: nothing is withdrawn yet.
+        self.mailbox.yield(.cancel(token))
     }
 
     /// Returns once every registration, cancellation and connectivity report made before the call was applied, with the
     /// number of retries still pending (a test seam: what the prior art's tests drove with `runPendingRetries()`).
     func flush() async -> Int {
-        // WP-K skeleton: nothing is pending yet.
-        0
+        await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+            self.mailbox.yield(.flush(continuation))
+        }
+    }
+
+    /// The registry: the only owner of the pending retries, applying the mailbox in order. Retries run in registration
+    /// order (the prior art's order was a dictionary's), each once, on this task.
+    private static func serve(_ messages: AsyncStream<Message>) async {
+        var pending: [UUID: @Sendable () -> Void] = [:]
+        var order: [UUID] = []
+        for await message in messages {
+            switch message {
+            case .register(let token, let retry):
+                if pending.updateValue(retry, forKey: token) == nil {
+                    order.append(token)
+                }
+            case .cancel(let token):
+                if pending.removeValue(forKey: token) != nil {
+                    order.removeAll { $0 == token }
+                }
+            case .available:
+                let due = order.compactMap { pending[$0] }
+                pending.removeAll()
+                order.removeAll()
+                for retry in due {
+                    retry()
+                }
+            case .flush(let continuation):
+                continuation.resume(returning: pending.count)
+            }
+        }
     }
 }
