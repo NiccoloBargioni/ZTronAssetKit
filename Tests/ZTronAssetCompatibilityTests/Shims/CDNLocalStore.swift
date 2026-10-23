@@ -9,6 +9,10 @@ import ZTronAssetKit
 /// here (`existingLocalURL`, `hasAsset`, `missingOrStaleAssets`, `isFullyAvailable`) are `@MainActor` and read
 /// `AssetClient.lookup` only: no file-system call, no network, no hashing. A store is bound to an install point:
 /// `shared` follows the process-wide one, `init(client:)` binds one client.
+///
+/// The snapshot is the client's, installed by `AssetClient.start()` (ADR-037): until the installed client has started,
+/// the lookups answer `nil` and `false` even for assets stored in an earlier launch, where the prior art read the disk
+/// from launch on. Start the client at launch, before carousel content is created (MIGRATION.md, step 3).
 public final class CDNLocalStore: Sendable {
     /// The prior art's shared store: it follows `CDNInstallPoint.process`, so it answers for the client the app
     /// installed (`CDNProviderFactory.install`, `CDNAssetResolver.installed`), and like an empty cache before that.
@@ -33,8 +37,17 @@ public final class CDNLocalStore: Sendable {
     /// The prior art's initialiser. Without `baseDirectory` the store is `shared`'s view of the process install point
     /// (two clients may not open one root, R-STO-9, so a second default store must not build a second client). With
     /// one, the store gets an install point of its own whose client, built from the first prior-art provider that needs
-    /// one, keeps its root in `baseDirectory` and migrates the prior art's files found there. `computeChecksum` is
-    /// ignored: the client verifies SHA-256 checksums itself (R-INT-*).
+    /// one, migrates the prior art's files found in `baseDirectory` (its legacy root) and keeps its own root beside it,
+    /// in the same parent directory (`<parent>/ZTronAssetKit/v1`, `StorageLocation.custom`): on the same volume, so
+    /// migration renames instead of copying, and in the durability class the app chose by picking that parent. Never
+    /// inside it: the module refuses to migrate a legacy root that contains the store (R-STO-11), and the prior art's
+    /// directory need not exist on a fresh install, where its parent (`Caches`, `Documents`) does.
+    ///
+    /// One store per parent directory: two directories with one parent map to one root, which admits one client
+    /// (R-STO-9; the second client's `start()` throws `storageUnavailable(.locked)`). A parent that does not exist makes
+    /// `start()` throw `storageUnavailable`, and a `baseDirectory` named `ZTronAssetKit` is the store's own directory,
+    /// whose migration the module refuses. `computeChecksum` is ignored: the client verifies SHA-256 checksums itself
+    /// (R-INT-*).
     @available(*, deprecated, message: "Bind the store to a client: CDNLocalStore(client:), or CDNLocalStore.shared after CDNProviderFactory.install(_:)")
     public convenience init(
         baseDirectory: URL? = nil,
@@ -44,7 +57,10 @@ public final class CDNLocalStore: Sendable {
             self.init(installPoint: .process)
             return
         }
-        let configuration = CDNConfiguration(location: .custom(baseDirectory), legacy: LegacyMigrationPolicy(root: baseDirectory))
+        let configuration = CDNConfiguration(
+            location: .custom(baseDirectory.deletingLastPathComponent()),
+            legacy: LegacyMigrationPolicy(root: baseDirectory)
+        )
         self.init(installPoint: CDNInstallPoint(configuration: configuration))
     }
 
@@ -85,6 +101,10 @@ public final class CDNLocalStore: Sendable {
     /// The stored blob for `asset` (its extension), else where the prior art would have put it: `localPathComponents`
     /// (or the identifier's segments minus the last) and `resolvedFileName` under the legacy root, where the client never
     /// writes, so for an asset the client does not hold the URL names no file, as an absent asset's did before.
+    ///
+    /// Unlike the prior art, the path stays inside the legacy root whatever the entry says (a manifest is untrusted
+    /// input, R-MAN-2, R-SEC-2): a directory component that is empty, `.` or `..`, or that contains `/`, is dropped, and
+    /// in the file name every `/` becomes `_` (a name that would be `.` or `..` becomes `_`).
     @available(*, deprecated, message: "Use existingLocalURL(identifier:candidateExtensions:) or AssetClient.lookup; paths are content-addressed now")
     @MainActor
     public func localURL(for asset: CDNAsset) -> URL {
@@ -95,8 +115,22 @@ public final class CDNLocalStore: Sendable {
             ? Array(CDNLocalStore.segments(of: asset.identifier).dropLast())
             : asset.localPathComponents
         let root = self.installPoint.configuration.clientConfiguration.legacy.root ?? CDNLocalStore.defaultLegacyRoot()
-        let directory = directories.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
-        return directory.appendingPathComponent("\(asset.resolvedFileName).\(asset.fileExtension)", isDirectory: false)
+        let directory = directories.filter(CDNLocalStore.isConfinedComponent).reduce(root) {
+            $0.appendingPathComponent($1, isDirectory: true)
+        }
+        let fileName = CDNLocalStore.confinedFileName("\(asset.resolvedFileName).\(asset.fileExtension)")
+        return directory.appendingPathComponent(fileName, isDirectory: false)
+    }
+
+    /// Whether `component` names one directory below its parent: not empty, not `.` or `..`, no `/`.
+    static func isConfinedComponent(_ component: String) -> Bool {
+        !component.isEmpty && component != "." && component != ".." && !component.contains("/")
+    }
+
+    /// `name` as one entry of its directory: every `/` becomes `_`, and a name that would be `.` or `..` is `_`.
+    static func confinedFileName(_ name: String) -> String {
+        let flattened = name.replacingOccurrences(of: "/", with: "_")
+        return CDNLocalStore.isConfinedComponent(flattened) ? flattened : "_"
     }
 
     /// The prior art's default root, `<Caches>/CDNAssets` (a path computation, no I/O; what
@@ -134,15 +168,19 @@ public final class CDNLocalStore: Sendable {
     /// snapshot, no file-system call and no network (RECON §5: offline). Unlike the prior art, the extension filter also
     /// applies to an asset the manifest knows (ADR-037, as `AssetFallbackChain.locate`), so an image page is never handed
     /// a video. A stale asset (new content announced, not yet stored) still answers with its old bytes, as before.
+    /// `nil` until the installed client has started (`AssetClient.start()` installs the first snapshot, ADR-037), even
+    /// for an asset stored in an earlier launch.
     @MainActor
     public func existingLocalURL(identifier: String, candidateExtensions: [String]) -> URL? {
         self.client?.lookup(AssetID(identifier), extensions: candidateExtensions)?.url
     }
 
-    /// Whether `asset` is stored at the content it describes: present in the client's snapshot with its extension, not
-    /// stale, and, when `checksum` is a SHA-256 (64 hex characters), stored under that digest (a blob's name is the
-    /// SHA-256 of its bytes, I-1). A checksum that is not a SHA-256 cannot be compared, so such an asset is trusted on
-    /// presence (R-MAN-5), where the prior art compared it with its own hash of the file and never matched.
+    /// Whether `asset` is stored at the content it describes: present in the client's snapshot with its extension and,
+    /// when `checksum` is a SHA-256 (64 hex characters), stored under that digest (a blob's name is the SHA-256 of its
+    /// bytes, I-1). The answer is relative to the asset given, as the prior art's comparison was: the client's own view
+    /// of staleness (`AssetLocation.isStale`, relative to its applied manifest) is not consulted. A checksum that is not
+    /// a SHA-256 cannot be compared, so such an asset is trusted on presence (R-MAN-5), where the prior art compared it
+    /// with its own hash of the file and never matched. `false` until the installed client has started (ADR-037).
     @MainActor
     public func hasAsset(_ asset: CDNAsset) -> Bool {
         guard let location = self.client?.lookup(AssetID(asset.identifier), extensions: [asset.fileExtension]) else {

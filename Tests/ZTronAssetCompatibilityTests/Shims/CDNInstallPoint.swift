@@ -16,7 +16,8 @@ public final class CDNInstallPoint {
     nonisolated public static let process = CDNInstallPoint()
 
     /// What a client built here for a prior-art provider looks like (`installClient(for:)`): location, legacy
-    /// migration, refresh policy, and the remote tiers a custom provider leaves unset.
+    /// migration, refresh policy, the remote tiers a custom provider leaves unset, and the HTTP settings (the app key
+    /// among them) that a prior-art provider at the same origin keeps (`CDNProviderFactory.makeClient(for:base:environment:)`).
     nonisolated public let configuration: CDNConfiguration
     /// The environment such a client runs in (`nil` builds `.live()`); tests pass fakes.
     nonisolated let environment: AssetEnvironment?

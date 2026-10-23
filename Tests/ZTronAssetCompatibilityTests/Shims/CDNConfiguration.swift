@@ -62,17 +62,50 @@ public enum CDNProviderFactory {
     }
 
     /// A client for a prior-art provider: `base` with the provider's tier (`remoteConfiguration(for:)`), or with
-    /// `base`'s own remote when the provider is a custom conformance the client cannot use as a transport.
+    /// `base`'s own remote when the provider is a custom conformance the client cannot use as a transport. When `base`
+    /// names an HTTP origin and the provider's HTTP tier is at that origin (scheme, host and port), the client keeps
+    /// `base`'s HTTP settings, the app key among them, with the provider's base URL and manifest path: the origin answers
+    /// 403 without the key (SPEC §2.3), and the key is never carried to another origin (R-NET-4). The process install
+    /// point's configuration names no origin, so a prior-art provider builds a client without a key there.
     public static func makeClient(
         for provider: any CDNProviding,
         base: CDNConfiguration = CDNConfiguration(),
         environment: AssetEnvironment? = nil
     ) -> AssetClient {
-        var configuration = base
-        if let remote = CDNProviderFactory.remoteConfiguration(for: provider) {
-            configuration.remote = remote
+        CDNProviderFactory.makeClient(CDNProviderFactory.configuration(for: provider, base: base), environment: environment)
+    }
+
+    /// `base` with the tier that replaces `provider`, keeping `base`'s HTTP settings at the same origin
+    /// (`makeClient(for:base:environment:)`); `base` itself for a custom conformance.
+    static func configuration(for provider: any CDNProviding, base: CDNConfiguration) -> CDNConfiguration {
+        guard var remote = CDNProviderFactory.remoteConfiguration(for: provider) else {
+            return base
         }
-        return CDNProviderFactory.makeClient(configuration, environment: environment)
+        if let tier = remote.http, var configured = base.remote.http,
+            let origin = CDNProviderFactory.origin(of: tier.baseURL), origin == CDNProviderFactory.origin(of: configured.baseURL)
+        {
+            configured.baseURL = tier.baseURL
+            configured.manifestPath = tier.manifestPath
+            remote.http = configured
+        }
+        var configuration = base
+        configuration.remote = remote
+        return configuration
+    }
+
+    /// `scheme://host:port` of an http or https URL, normalised as the transport compares origins (scheme and host
+    /// lowercased, a trailing dot dropped, the scheme's default port when none is written); `nil` for anything else.
+    static func origin(of url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http", var host = url.host?.lowercased() else {
+            return nil
+        }
+        while host.hasSuffix(".") {
+            host.removeLast()
+        }
+        guard !host.isEmpty else {
+            return nil
+        }
+        return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
     }
 
     /// The client tier that replaces a prior-art provider: `StaticManifestCDNProvider` is the HTTP tier with its base
@@ -82,7 +115,9 @@ public enum CDNProviderFactory {
     }
 
     /// Installs a client for `configuration` into `point` (the process-wide one by default) unless one is installed
-    /// already, and returns the installed client: the first installation wins (`CDNInstallPoint`).
+    /// already, and returns the installed client: the first installation wins (`CDNInstallPoint`). No I/O and no task
+    /// (P-12), so the client is not started: start it at launch (`try await client.start()`), before carousel content
+    /// is created, because `CDNLocalStore`'s synchronous lookups answer `nil` until it has (ADR-037).
     @MainActor
     @discardableResult
     public static func install(
