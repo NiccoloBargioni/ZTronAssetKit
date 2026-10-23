@@ -452,4 +452,67 @@ struct EngineLegacyMigrationTransferTests {
         }
         #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
     }
+
+    // MARK: The install rate during migration (L5K-R14)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("ARCHITECTURE §5 during legacy migration: a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows, and a user-initiated job's adoption installs at once (L5K-R14)", .timeLimit(.minutes(1)))
+    func adoptionsKeepTheInstallRate() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineLegacyMigrationTransferTests.catalog(100, seed: 8_100)
+        // Four prior-art pages the bulk sync leaves alone (on demand), for the user-initiated lane afterwards.
+        let pages = (0..<4).map { index -> (ManifestEntry, Data) in
+            let bytes = EngineFixture.bytes(8_300 + UInt64(index))
+            return (EngineFixture.entry("page\(index)", bytes, policy: .onDemand), bytes)
+        }
+        let bulk = SteppedBlockingExecutor(holding: true)
+        // ARCHITECTURE §5's interval (0.1 s, ≤ 10 Hz); the clock never moves, so the limiter allows no second bulk install.
+        let harness = EngineHarness.make(
+            disk: try EngineRunPathTests.legacyDisk(catalog + pages, time: time),
+            time: time,
+            bulk: bulk,
+            installInterval: 0.1,
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot)
+        )
+        await harness.serveManifest((catalog + pages).map(\.0))
+        await harness.scriptTransfers(catalog + pages)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let pending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        try #require(pending.count >= catalog.count - 1, "the sync's jobs have the prior art's files to adopt")
+
+        let beforeSync = await harness.sink.offeredKeys.count
+        let (outcome, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await engine.sync(.force)
+        }
+        let report = try #require(outcome.completeReport, "the sync completes: \(outcome)")
+        let syncInstalls = await harness.sink.offeredKeys.count - beforeSync
+
+        #expect(report.fetched == pending.count, "the bulk jobs adopted every pending file")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        // The run's apply installs at once (ARCHITECTURE §5); each bulk-lane adoption publishes at bulk urgency, which
+        // the limiter coalesces into the trailing install it schedules, so the 100 adoptions add no install of their own.
+        #expect(syncInstalls <= 2, "\(syncInstalls) snapshot installs for a sync that adopted \(pending.count) files: one per adoption bypasses the limiter")
+
+        // The install window is still closed (the clock never moved): a user-initiated job's adoption installs at once.
+        let beforePages = await harness.sink.offeredKeys.count
+        let token = try await engine.registerGroup(pages.map(\.0.identifier), lane: .userInitiated).get()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            guard let group = engine.state.groups[token] else {
+                return false
+            }
+            return group.claimCursor == group.members.count && group.pending.isEmpty && engine.state.jobs.isEmpty
+        }
+        let pageInstalls = await harness.sink.offeredKeys.count - beforePages
+        let installed = await harness.sink.installed
+
+        #expect(pageInstalls >= pages.count, "each user-initiated adoption installed its snapshot at once: \(pageInstalls) installs for \(pages.count) adoptions")
+        #expect(pages.allSatisfy { installed.location(for: $0.0.identifier, extensions: []) != nil }, "the readers see every adopted page")
+        #expect(await harness.source.starts.isEmpty)
+        #expect(Set(await bulk.heldUnits).isSuperset(of: migration), "the migration was held throughout")
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
+        await engine.shutdown()
+    }
 }
