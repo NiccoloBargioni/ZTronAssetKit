@@ -476,6 +476,130 @@ struct EngineLegacyMigrationTransferTests {
         #expect(joins > 0, "no launch reached the race the test exists for: no job's adoption met a migration batch's processing of the same file")
     }
 
+    // MARK: The same race, held so that it is reached in every run (L5K-R19, L5K-C2-04)
+
+    /// A launch over two prior-art files with both store executors stepped: the bulk executor holds every unit (the
+    /// migration batch is held at a file's hash unit once started: the first one's, or the second one's when the start's
+    /// last release met the first, `heldFile`), the metadata executor lets units through until the test holds it. The
+    /// origin answers every manifest request "not modified", so no request decodes a manifest on the bulk executor: the
+    /// first bulk unit after the migration's is a job's. Nothing is started.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func heldJoinLaunch(seed: UInt64, time: ManualTimeSource) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor, metadata: SteppedBlockingExecutor, catalog: [(ManifestEntry, Data)]) {
+        let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: seed)
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = EngineHarness.make(
+            disk: try EngineRunPathTests.legacyDisk(catalog, time: time),
+            time: time,
+            metadata: metadata,
+            bulk: bulk,
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot)
+        )
+        await harness.scriptTransfers(catalog)
+        return (harness, bulk, metadata, catalog)
+    }
+
+    /// The prior-art file whose hash unit the held migration batch waits at: the first one still pending, since a batch
+    /// takes the files in path order.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func heldFile(_ harness: EngineHarness, _ catalog: [(ManifestEntry, Data)]) async throws -> ManifestEntry {
+        let pending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        return try #require(catalog.map(\.0).first { pending.contains($0.identifier) }, "the held batch has a file to adopt")
+    }
+
+    /// Drives the race L5K-R13 closes to the join, in an order no scheduling can change: the job's adoption of the one
+    /// file `jobHash` names runs its hash, takes the adoption step and holds its placement unit; only then is the batch's
+    /// hash of the same file released, so the batch, finding that adoption in flight, must wait for it (the store's debug
+    /// line of a call that waited for another call's processing of the same legacy file). The placement stays held until
+    /// that line exists: the wait below is for a condition the held placement guarantees, not for a number of rounds.
+    /// Then everything is let go.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func reachTheJoin(
+        _ harness: EngineHarness,
+        bulk: SteppedBlockingExecutor,
+        metadata: SteppedBlockingExecutor,
+        migration: Set<Int>,
+        jobHash: Set<Int>
+    ) async throws -> Int {
+        await metadata.setHolding(true)
+        for unit in jobHash {
+            await bulk.release(unit)
+        }
+        try await metadata.requireHeldUnits(atLeast: 1)
+        for unit in migration {
+            await bulk.release(unit)
+        }
+        while EngineLegacyMigrationTransferTests.raceJoins(harness) == 0 {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+        let joins = EngineLegacyMigrationTransferTests.raceJoins(harness)
+        await metadata.setHolding(false)
+        await bulk.setHolding(false)
+        return joins
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: a user-initiated prefetch group's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(1)))
+    func userInitiatedPrefetchReachesTheJoin() async throws {
+        let time = ManualTimeSource()
+        let (harness, bulk, metadata, catalog) = try await EngineLegacyMigrationTransferTests.heldJoinLaunch(seed: 9_300, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let asset = try await EngineLegacyMigrationTransferTests.heldFile(harness, catalog)
+        // The job's adoption of the file the batch holds unhashed processes it at once (L5K-R13): its hash unit is held.
+        let token = try await engine.registerGroup([asset.identifier], lane: .userInitiated).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        let joins = try await EngineLegacyMigrationTransferTests.reachTheJoin(harness, bulk: bulk, metadata: metadata, migration: migration, jobHash: jobHash)
+        await engine.awaitCondition { engine in
+            guard let group = engine.state.groups[token] else {
+                return false
+            }
+            return group.claimCursor == group.members.count && group.pending.isEmpty && engine.state.jobs.isEmpty
+        }
+        let starts = await harness.source.starts
+
+        #expect(joins > 0, "the batch waited for the job's adoption of the same file")
+        #expect(starts.isEmpty, "R-STO-11: \(starts.count) prior-art files were downloaded (L5K-R13)")
+        await engine.releaseGroup(token)
+        await engine.awaitCondition { !$0.state.migration.pending && !$0.state.migration.running }
+        #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog))
+        #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: ensureAvailable's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(1)))
+    func ensureAvailableReachesTheJoin() async throws {
+        let time = ManualTimeSource()
+        let (harness, bulk, metadata, catalog) = try await EngineLegacyMigrationTransferTests.heldJoinLaunch(seed: 9_400, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let asset = try await EngineLegacyMigrationTransferTests.heldFile(harness, catalog)
+        // ensureAvailable's manifest request is answered "not modified" (nothing to decode), so its job's adoption of the
+        // file the batch holds unhashed, which processes it at once (L5K-R13), submits the first bulk unit after the
+        // migration's: the job's hash unit, held.
+        let ensure = Task {
+            await engine.ensureAvailable(scope: .identifiers([asset.identifier]))
+        }
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        let joins = try await EngineLegacyMigrationTransferTests.reachTheJoin(harness, bulk: bulk, metadata: metadata, migration: migration, jobHash: jobHash)
+        let report = try await ensure.value.get()
+        let starts = await harness.source.starts
+
+        #expect(joins > 0, "the batch waited for the job's adoption of the same file")
+        #expect(report.present == 1 && report.missing == 0, "the asset is available: \(report)")
+        #expect(starts.isEmpty, "R-STO-11: \(starts.count) prior-art files were downloaded (L5K-R13)")
+        await engine.awaitCondition { !$0.state.migration.pending && !$0.state.migration.running }
+        #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog))
+        #expect(await harness.source.starts.isEmpty)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
     // MARK: The install rate during migration (L5K-R14)
 
     @available(macOS 15.0, iOS 18.0, *)
