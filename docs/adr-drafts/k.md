@@ -197,6 +197,11 @@ heading or by reference to this draft):
   (`0dc2869` → `2dfbb0c`), providers and deprecated API (`4576216` → `6930f1e`), and the monitor's redesign (failing test
   `c623b34` → `cd2da19`). On the skeletons two tests passed because their expected answers are the neutral ones (a
   cancelled wait answering `nil`, since removed with the install point's wait, and the empty process install point).
+  Implementation commits also sharpened tests the skeleton run had exposed as too weak or wrong about the module (the
+  stale asset observed while its new content is in flight; the transient and 404 cases of K-11; a wait cancelled after
+  it registered). Two later commits change no behaviour under test: `066b0a5` drops a progress guard the engine makes
+  unreachable and covers the default legacy root, `35c9f8f` pins the carousel's call sites (K-3), tests of shims that
+  already existed.
 
 ## K-13 — An optional future API (not a contract change request)
 - A public read of the client's applied manifest (for example `AssetClient.manifestEntries(scope:)`, no network) would
@@ -210,3 +215,35 @@ heading or by reference to this draft):
   origin, `defaultAppVersion()` inside an app bundle, `BackgroundAssetsCDNProvider` on a device.
 - Adoption inside ZTronCarouselCore (Q-10, ADR-006): MIGRATION.md describes it; nothing outside this repository was
   built or written.
+
+## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; code at `35c9f8f`)
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick`: `VERIFY: PASS` (Model 151, Sync 323, Storage 445, Transport
+  84, Kit 85, Compatibility 54, AppleHosted 104 tests).
+- `swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`: `Build complete!`.
+- `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Both scan `Sources/`, which WP-K does not touch; a scan of
+  `Shims/` finds its 99 public declarations documented and no unsafe pattern (two doc comments name the prior art's).
+- Coverage (`swift test --enable-code-coverage --skip Benchmarks`, the merged export, `gates.py coverage`): every target
+  OK, `COVERAGE overall lines=96.59% (24772/25647)`, `COVERAGE: PASS`. The shims sit in a test target, outside the gate;
+  `llvm-cov report` of the compatibility bundle over `Shims/*.swift` gives 97.59 % (485/497). Not covered: the setter of
+  `CDNAssetResolver.installed` (the process install point, which no test fills, K-2), the deprecated coordinator
+  initialiser's body (calling it constructs `UserDefaults`, K-9), the default argument of
+  `CDNLocalStore.init(baseDirectory:computeChecksum:)` (deprecated, so only a protocol call reaches the initialiser), the
+  fallback of `defaultLegacyRoot()` for a system without a Caches directory, one line of the Stage 1 `CDNAsset.swift`.
+- iOS: `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no diagnostic.
+- The floors, with the compiler: the shims alone typecheck against the built modules through their public API only (no
+  `-package-name`): `xcrun --sdk iphoneos swiftc -typecheck -swift-version 6 -target arm64-apple-ios15.0
+  -warnings-as-errors -I .build-k/xcode/Build/Products/Debug-iphoneos Tests/ZTronAssetCompatibilityTests/Shims/*.swift`
+  exit 0; the same with `--sdk macosx -target arm64-apple-macos12.0 -I .build-k/out/Products/Debug` exit 0.
+- iOS Simulator (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
+  `caffeinate -i`, shut down afterwards): `cd2da19` 1,245/1,245; `35c9f8f` first run 1,244/1,246 with the two known
+  loopback flakes of WP-D's stalled-transfer tests under a load of about 258 (`ForegroundBackendTests.swift:200,202`,
+  ADR-053's environment item, and `SizeAndResumeTests.swift:175-179`, the same `awaitProgress` shape; no WP-K file is
+  involved), then 1,246/1,246 (`Test-ZTronAssetKit-2026.10.23_13-28-05-+0200.xcresult`, `result: Passed`).
+- Repeated runs: the compatibility target three times in a row after the monitor's redesign (53/53 each, `cd2da19`), and
+  in every `--quick` and coverage run since (54/54).
+- Benchmarks: none (ARCHITECTURE §1.2 gives WP-K no benchmarks file).
+- Writes: nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR` and the module
+  caches were under `.build-k/tmp`, derived data under `.build-k/xcode*`; the tests write real files only under
+  `.build-tests/compatibility/` and remove them.
