@@ -539,19 +539,20 @@ extension AssetStore {
 
     // MARK: Adopt on demand
 
-    /// `adoptLegacyNow(_:)`: the current location when the asset is present; otherwise, while migration runs, adopts its
-    /// legacy file now and installs the snapshot at once. Each adoption is counted once, by the call that adopted the
-    /// file; a drop only by the call that took the file from the queue.
+    /// `adoptLegacyNow(_:urgency:)`: the current location when the asset is present; otherwise, while migration runs,
+    /// adopts its legacy file now and publishes the snapshot at `urgency` (at once for `.userInitiated`, L5K-R14). Each
+    /// adoption is counted once, by the call that adopted the file; a drop only by the call that took the file from the
+    /// queue.
     ///
     /// One adoption per legacy file, whoever asks (orchestrator ruling L5K-R13). A call that finds the file being
     /// processed by another adopt-on-demand (`MigrationState.onDemand`, from its claim to its snapshot) or being adopted by
     /// a batch (`MigrationState.adopting`) waits for that processing to end and starts again (REENTRANCY k-5): it shares
-    /// that hash and answers the location that adoption bound, installed at once; it answers `nil` only when the file was
-    /// dropped or kept; and when the processing ended without an outcome for the file (its caller was cancelled, or a
-    /// transient failure deferred it back to the queue) it takes the file and processes it itself, as a call arriving
-    /// then would. A file a batch holds but has not finished hashing is processed at once (the two hashes may overlap,
-    /// one adoption still binds, `processLegacyFile`): a lookup never waits behind a batch's hash.
-    func performAdoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
+    /// that hash and answers the location that adoption bound, published at its own urgency; it answers `nil` only when
+    /// the file was dropped or kept; and when the processing ended without an outcome for the file (its caller was
+    /// cancelled, or a transient failure deferred it back to the queue) it takes the file and processes it itself, as a
+    /// call arriving then would. A file a batch holds but has not finished hashing is processed at once (the two hashes
+    /// may overlap, one adoption still binds, `processLegacyFile`): a lookup never waits behind a batch's hash.
+    func performAdoptLegacyNow(_ id: AssetID, urgency: AssetPriority) async throws(StoreError) -> AssetLocation? {
         var joined = false
         while true {
             // REENTRANCY: R1, k-5 (proposed) — nothing was read before it, or everything is read again below after a wait;
@@ -561,10 +562,10 @@ extension AssetStore {
                 guard joined else {
                     return location
                 }
-                // The adoption this call waited for may be in a coalesced snapshot only (a batch's): an adopt-on-demand
-                // installs its answer at once, whoever adopted the file.
+                // The adoption this call waited for may be in a coalesced snapshot only (a batch's): this call publishes
+                // at its own urgency, so a user-initiated one installs its answer at once, whoever adopted the file.
                 // REENTRANCY: R17 — nothing but the phase: the location is read from the record afterwards.
-                await self.publishSnapshot(urgency: .userInitiated)
+                await self.publishSnapshot(urgency: urgency)
                 return self.location(for: id, extensions: [], recordingAccess: false)
             }
             try self.checkWritable()
@@ -600,14 +601,14 @@ extension AssetStore {
             self.state.migration.onDemand[file.components] = []
             // REENTRANCY: R18, k-6 (proposed) — the file is this call's to process (claimed or held by a batch, marked in
             // `onDemand`); `processLegacyFileOnDemand` re-reads the location from the record after its awaits.
-            return try await self.processLegacyFileOnDemand(file, id: id, taken: queued != nil)
+            return try await self.processLegacyFileOnDemand(file, id: id, taken: queued != nil, urgency: urgency)
         }
     }
 
     /// Processes `file` for an adopt-on-demand of `id` that marked it in `MigrationState.onDemand` (and took it from the
-    /// queue when `taken`), books the outcome, installs the snapshot at once, then ends the mark, so the adopt-on-demand
-    /// calls waiting for it see the adoption in the installed snapshot.
-    func processLegacyFileOnDemand(_ file: LegacyFile, id: AssetID, taken: Bool) async throws(StoreError) -> AssetLocation? {
+    /// queue when `taken`), books the outcome, publishes the snapshot at `urgency`, then ends the mark, so the
+    /// adopt-on-demand calls waiting for it find the adoption published.
+    func processLegacyFileOnDemand(_ file: LegacyFile, id: AssetID, taken: Bool, urgency: AssetPriority) async throws(StoreError) -> AssetLocation? {
         let outcome: LegacyOutcome
         do throws(StoreError) {
             // REENTRANCY: R18, k-6 (proposed) — `processLegacyFile` re-validates after each await and waits out another
@@ -631,8 +632,8 @@ extension AssetStore {
             self.count(outcome)
         }
         // REENTRANCY: R17, R18 — nothing but the phase: the location is read from the record afterwards; the calls waiting
-        // for this one are resumed only after the install (`endLegacyOnDemand` below).
-        await self.publishSnapshot(urgency: .userInitiated)
+        // for this one are resumed only after the publication (`endLegacyOnDemand` below).
+        await self.publishSnapshot(urgency: urgency)
         self.endLegacyOnDemand(file)
         return self.location(for: id, extensions: [], recordingAccess: false)
     }

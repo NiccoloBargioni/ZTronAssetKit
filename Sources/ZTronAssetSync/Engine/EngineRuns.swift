@@ -98,7 +98,7 @@ extension SyncEngine {
         }
         // A run that starts while the launch run waits for legacy migration takes its place (orchestrator ruling L5K-R1):
         // it applies the same manifest, and its jobs adopt the prior-art files migration has not reached yet
-        // (`storedLocation(of:)`), so the migration loop starts no second run when it ends, whether this run is still
+        // (`storedLocation(of:lane:)`), so the migration loop starts no second run when it ends, whether this run is still
         // active then or not, and no flag is left behind.
         self.state.migration.launchRunWaiting = false
         self.broadcast(.syncStarted(run.id, trigger))

@@ -172,7 +172,7 @@ extension SyncEngine {
     /// current content (a location that is not stale) is answered from the store (`answerPresentMembers`); when no
     /// interest is left, the attempt ends before it started (no stream exists, so nothing drains), and nothing is
     /// downloaded twice. One O(1) read per id of the job, never a planning view (C2). While legacy migration is pending,
-    /// the read adopts the id's prior-art file instead (`storedLocation(of:)`, orchestrator ruling L5K-R1): every job
+    /// the read adopts the id's prior-art file instead (`storedLocation(of:lane:)`, orchestrator ruling L5K-R1): every job
     /// passes here before any bytes, whatever created it, so no transfer starts for a file migration can still adopt
     /// (R-STO-11). The window between the last read and the transfer is the one the 404 path has (a legacy or orphan
     /// adoption of the same content; single flight rules out any other binding of this content while its job exists).
@@ -184,10 +184,13 @@ extension SyncEngine {
         let serial = self.state.ledgerForgets
         var present: Set<AssetID> = []
         for id in job.assets.sorted() where self.state.applied.entry(for: id)?.transferID == transfer {
+            // The job's lane as of this read (a promotion during an earlier read raised it): only a user-initiated job's
+            // adoption installs its snapshot at once (L5K-R14).
+            let lane = self.state.jobs[transfer]?.lane ?? job.lane
             // REENTRANCY: f-11 (proposed), k-4 (proposed) — the lifecycle, the job epoch and the attempt (still without a
             // handle), re-checked after the reads; the interests answered are those the job holds then; the bindings are
             // recorded only when nothing was forgotten during the reads (an adoption here is such a binding).
-            if let location = await self.storedLocation(of: id), !location.isStale {
+            if let location = await self.storedLocation(of: id, lane: lane), !location.isStale {
                 present.insert(id)
             }
         }
@@ -214,11 +217,14 @@ extension SyncEngine {
     /// `adoptLegacyNow`, which answers a present asset's location, otherwise adopts the asset's prior-art file at once and
     /// answers its location, so a file migration can still adopt is moved, never downloaded again (R-STO-11), as on the
     /// resolve path (ADR-029). The store does the work on its executors (the hash on the bulk executor), never on the
-    /// main actor, and only for the ids of a job about to transfer (C2). `nil` when the store holds nothing for `id`: no
+    /// main actor, and only for the ids of a job about to transfer (C2). The adoption's snapshot is published at
+    /// `.userInitiated` for a job of `lane` `.userInitiated` (installed at once, as a resolve's) and at `.bulk` otherwise,
+    /// which the store's install-rate limiter coalesces, so ARCHITECTURE §5's bound (at most one bulk install per
+    /// `snapshotInstallInterval`) holds while a sync adopts (L5K-R14). `nil` when the store holds nothing for `id`: no
     /// prior-art file to adopt, or one that cannot be adopted (it did not verify, it was kept, or the store refused),
     /// which is then downloaded, as on the resolve path; never because a migration batch or another call is adopting the
     /// same file at that moment (the store's single flight per prior-art file, orchestrator ruling L5K-R13).
-    func storedLocation(of id: AssetID) async -> AssetLocation? {
+    func storedLocation(of id: AssetID, lane: AssetPriority) async -> AssetLocation? {
         guard self.state.migration.pending else {
             // REENTRANCY: f-11 (proposed) — nothing here: the caller re-validates after its reads.
             return await self.store.location(for: id, extensions: [], recordingAccess: false)
@@ -230,7 +236,7 @@ extension SyncEngine {
             // for that processing and reads the location it bound; when a batch has not finished hashing the file, both may
             // hash it, and the one whose bytes verify second waits out the other's adoption before it decides. So the
             // answer is that one adoption's outcome, never a failure the other adopter caused.
-            return try await self.store.adoptLegacyNow(id)
+            return try await self.store.adoptLegacyNow(id, urgency: lane == .userInitiated ? .userInitiated : .bulk)
         } catch {
             return nil
         }

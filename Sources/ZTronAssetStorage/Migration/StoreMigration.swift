@@ -41,13 +41,19 @@ extension AssetStore {
         try await self.performMigrateLegacy(maxFiles: maxFiles)
     }
 
-    /// Adopt-on-demand for a `resolve` or lease of a legacy id not yet adopted (store-2 S2-09); installs its
-    /// snapshot at once.
+    /// Adopt-on-demand for a `resolve` or lease of a legacy id not yet adopted (store-2 S2-09), and for the engine's
+    /// pre-transfer read while migration is pending (orchestrator ruling L5K-R1). Publishes its snapshot at `urgency`
+    /// (ARCHITECTURE §5, L5K-R14): `.userInitiated`, the default, installs it at once (a resolve, a lease, a job of the
+    /// user-initiated lane); `.prefetch` and `.bulk` install it within the install window, so the adoptions of a bulk
+    /// sync coalesce as its publications do.
     ///
     /// Returns the asset's current location when it is present (adopted or not), `nil` when it is neither present nor a
-    /// legacy file still to adopt, or when its file did not verify.
-    package func adoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
-        // REENTRANCY: R1, R18 — `performAdoptLegacyNow` re-validates the file and reads the location from the record.
-        try await self.performAdoptLegacyNow(id)
+    /// legacy file still to adopt, or when its file did not verify or was kept. One adoption per legacy file runs at a
+    /// time, whoever asks (L5K-R13): a call that meets another call's processing of the same file waits for it and
+    /// answers that adoption's outcome.
+    package func adoptLegacyNow(_ id: AssetID, urgency: AssetPriority = .userInitiated) async throws(StoreError) -> AssetLocation? {
+        // REENTRANCY: R1, R18, k-5 (proposed) — `performAdoptLegacyNow` re-validates the file and reads the location from
+        // the record.
+        try await self.performAdoptLegacyNow(id, urgency: urgency)
     }
 }
