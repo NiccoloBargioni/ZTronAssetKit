@@ -16,7 +16,7 @@ heading or by reference to this draft):
 
 | Row | Where | What is re-validated after the await |
 |---|---|---|
-| k-1 | `CDNSyncCoordinator.run(_:)`: `client.subscribe()`, `client.sync(mode)`, then `follower.value` | Nothing of the coordinator is read across them. `progress` is written only by this call's follower while the run is in flight and by the outcome once the follower was cancelled **and awaited**, so no progress event lands after the outcome. A concurrent call joins the same single-flight run and publishes the same outcome (its follower may republish a `.syncing` value until its own outcome lands). |
+| k-1 | `CDNSyncCoordinator.run(_:)`: `client.subscribe()`, `client.sync(mode)`, then `follower.value`; and the `await self.run(_:)` of `syncIfNeeded()` and `verifyAndRepair()`, after which nothing is read (fix round 1) | Nothing of the coordinator is read across them. `progress` is written only by this call's follower while the run is in flight and by the outcome once the follower was cancelled **and awaited**, so no progress event lands after the outcome. A concurrent call joins the same single-flight run and publishes the same outcome (its follower may republish a `.syncing` value until its own outcome lands). |
 | k-2 | the follower's `for await event in events` (a main-actor task) | Each event is applied in the turn it arrives, after `self` is re-read (weak: a released coordinator publishes nothing). Progress never moves backwards within a run by construction (sync.md §10.6: the engine's completed count is monotone and one subscription delivers a run's progress in order, newest-wins), so no guard is needed. |
 | k-3 | `CDNSyncCoordinator.verifyFullyAvailable()`: `cdn.fetchManifest()` | Nothing of the coordinator; the client's snapshot is read after the fetch, so the comparison uses what is stored when the manifest arrived. |
 
@@ -317,37 +317,49 @@ heading or by reference to this draft):
   iOS 27 simulator and macOS 27 only; their iOS 15 compile is the typecheck recorded in the evidence below.
 - `NetworkAvailabilityMonitor.shared` over the live reachability conformer, `StaticManifestCDNProvider` against a real
   origin, `defaultAppVersion()` inside an app bundle, `BackgroundAssetsCDNProvider` on a device.
+- `CDNLocalStore(baseDirectory:)`'s placement and migration over the live file system in an app container (the tests run
+  them on `FakeFileSystem`), and the 403 a keyless client gets from the real origin (SPEC §2.3, not exercised here).
 - Adoption inside ZTronCarouselCore (Q-10, ADR-006): MIGRATION.md describes it; nothing outside this repository was
   built or written.
 
-## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; code at `35c9f8f`)
+## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; fix round 1, code at `05c1a41`)
+- Test first: the round-1 tests on the round-0 shims (`82490e7`), `swift test --filter ZTronAssetCompatibilityTests`:
+  `Test run with 59 tests in 9 suites failed … with 12 issues` (the layout expectation; `localURL` ×2; the app key; the
+  fresh install ×2; one root per parent ×2, its first `start()` throwing `.storageUnavailable(ioFailure)`; the adoption
+  ×4: the blob outside `<parent>/ZTronAssetKit/v1/`, a transfer started, the legacy file still there, the "overlaps the
+  store" line logged). After `e81449c`: 59/59, then six repeated runs 59/59; after `9150501`: 63/63, then eight repeated
+  runs 63/63.
 - `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick`: `VERIFY: PASS` (Model 151, Sync 323, Storage 445, Transport
-  84, Kit 85, Compatibility 54, AppleHosted 104 tests).
+  84, Kit 85, Compatibility 64, AppleHosted 104 tests).
 - `swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`: `Build complete!`.
 - `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
-  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Both scan `Sources/`, which WP-K does not touch; a scan of
-  `Shims/` finds its 99 public declarations documented and no unsafe pattern (two doc comments name the prior art's).
-- Coverage (`swift test --enable-code-coverage --skip Benchmarks`, the merged export, `gates.py coverage`): every target
-  OK, `COVERAGE overall lines=96.59% (24772/25647)`, `COVERAGE: PASS`. The shims sit in a test target, outside the gate;
-  `llvm-cov report` of the compatibility bundle over `Shims/*.swift` gives 97.59 % (485/497). Not covered: the setter of
-  `CDNAssetResolver.installed` (the process install point, which no test fills, K-2), the deprecated coordinator
-  initialiser's body (calling it constructs `UserDefaults`, K-9), the default argument of
-  `CDNLocalStore.init(baseDirectory:computeChecksum:)` (deprecated, so only a protocol call reaches the initialiser), the
-  fallback of `defaultLegacyRoot()` for a system without a Caches directory, one line of the Stage 1 `CDNAsset.swift`.
+  documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Both scan `Sources/`, which WP-K does not touch
+  (`git diff --stat l5g-merged...HEAD -- Sources Tests/ZTronAssetKitBenchmarks Package.swift Scripts` is empty). The
+  shims, checked with `gates.py`'s own `docs_check` and `unsafe_check` over their contents in memory (the tree walker
+  skips `.build*` and needs `/Sources/`): `DOCS public declarations=90 documented=90`, `UNSAFE escapes found=0`.
+- Coverage (`--quick`'s `swift test --enable-code-coverage --skip Benchmarks`, the merged export over every bundle,
+  `gates.py coverage`): every target OK, `COVERAGE overall lines=96.62% (24780/25647)`, `COVERAGE: PASS`. The shims sit
+  in a test target, outside the gate; `llvm-cov report` of the compatibility bundle over `Shims/*.swift`: 97.80 %
+  (533/545). Not covered, as before: the setter of `CDNAssetResolver.installed` (the process install point, which no
+  test fills, K-2), the deprecated coordinator initialiser's body (it constructs `UserDefaults`, K-9), the default
+  argument of `CDNLocalStore.init(baseDirectory:computeChecksum:)` (reached only through a protocol), the fallback of
+  `defaultLegacyRoot()`, one line of the Stage 1 `CDNAsset.swift`. Every line added in round 1 is covered (the origin
+  normalisation through its unit test).
 - iOS: `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
   OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no diagnostic.
-- The floors, with the compiler: the shims alone typecheck against the built modules through their public API only (no
-  `-package-name`): `xcrun --sdk iphoneos swiftc -typecheck -swift-version 6 -target arm64-apple-ios15.0
-  -warnings-as-errors -I .build-k/xcode/Build/Products/Debug-iphoneos Tests/ZTronAssetCompatibilityTests/Shims/*.swift`
-  exit 0; the same with `--sdk macosx -target arm64-apple-macos12.0 -I .build-k/out/Products/Debug` exit 0.
+- The floors, with the compiler: the shims alone typecheck against the built modules through their public API only:
+  `xcrun --sdk iphoneos swiftc -typecheck -swift-version 6 -target arm64-apple-ios15.0 -warnings-as-errors
+  -I .build-k/xcode/Build/Products/Debug-iphoneos Tests/ZTronAssetCompatibilityTests/Shims/*.swift` exit 0; the same with
+  `--sdk macosx -target arm64-apple-macos12.0 -I .build-k/out/Products/Debug` exit 0 (module caches under `.build-k/tmp`).
 - iOS Simulator (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
-  `caffeinate -i`, shut down afterwards): `cd2da19` 1,245/1,245; `35c9f8f` first run 1,244/1,246 with the two known
-  loopback flakes of WP-D's stalled-transfer tests under a load of about 258 (`ForegroundBackendTests.swift:200,202`,
-  ADR-053's environment item, and `SizeAndResumeTests.swift:175-179`, the same `awaitProgress` shape; no WP-K file is
-  involved), then 1,246/1,246 (`Test-ZTronAssetKit-2026.10.23_13-28-05-+0200.xcresult`, `result: Passed`).
-- Repeated runs: the compatibility target three times in a row after the monitor's redesign (53/53 each, `cd2da19`), and
-  in every `--quick` and coverage run since (54/54).
-- Benchmarks: none (ARCHITECTURE §1.2 gives WP-K no benchmarks file).
+  `caffeinate -i`): `** TEST SUCCEEDED **`, `xcresulttool … summary`: `result: Passed`, 1,256/1,256, 0 failed, 0 skipped
+  (`Test-ZTronAssetKit-2026.10.23_14-46-28-+0200.xcresult`); the simulator is shut down.
+- Benchmarks: WP-K owns none and changed none. For the orchestrator's P-13 question (correct lens, issue 9), one run of
+  `swift test -c release --scratch-path .build-k-perf -Xswiftc -enable-testing --filter Benchmarks` on this worktree
+  (Sources identical to `l5g-merged`; load average 3.9, 19.6 over 5 min, right after the simulator run): 35 tests, 1
+  issue, again P-13 `longest <= batchBudget`: unit max 6.35 ms wall against 5.0 ms (0.82 ms on CPU; p50 0.96 ms, p95
+  0.99 ms), two units over budget, blob unlinks inside the reclaim max 5.67 ms against a volume unlink profile max of
+  0.085 ms: the same wall-time stalls in single unlinks the verifier measured, WP-B's budget, not WP-K's.
 - Writes: nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR` and the module
   caches were under `.build-k/tmp`, derived data under `.build-k/xcode*`; the tests write real files only under
   `.build-tests/compatibility/` and remove them.
