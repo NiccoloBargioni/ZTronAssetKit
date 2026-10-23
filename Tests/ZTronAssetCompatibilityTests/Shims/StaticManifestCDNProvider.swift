@@ -36,15 +36,22 @@ public struct StaticManifestCDNProvider: CDNProviding {
     /// Everything the origin advertises, validated (unknown fields ignored, invalid entries quarantined, structural
     /// violations rejected with a `ManifestError`); a non-2xx answer throws `StaticManifestCDNProviderError.badResponse`.
     public func fetchManifest() async throws -> [CDNAsset] {
-        // WP-K skeleton: nothing is fetched yet.
-        []
+        let url = self.baseURL.appendingPathComponent(self.manifestPath)
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        let (data, response) = try await self.urlSession.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw StaticManifestCDNProviderError.badResponse(response)
+        }
+        let manifest = try await self.executor.run { () throws(ManifestError) -> ValidatedManifest in
+            try ManifestDecoder.decode(data)
+        }
+        return manifest.entries.map(CDNAsset.init(entry:))
     }
 
     /// Gone: the client downloads, verifies and stores (`AssetClient.resolve`). Throws `CDNShimError.downloadsGoThroughTheClient`.
     @available(*, deprecated, message: "The AssetClient downloads, verifies and stores assets; use AssetClient.resolve(_:priority:) or CDNAssetResolver.resolveViaNetwork")
     public func downloadAsset(_ asset: CDNAsset, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        // WP-K skeleton: the refusal is not written yet.
-        self.baseURL
+        throw CDNShimError.downloadsGoThroughTheClient
     }
 }
 

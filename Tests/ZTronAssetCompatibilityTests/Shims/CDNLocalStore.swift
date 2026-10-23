@@ -40,23 +40,30 @@ public final class CDNLocalStore: Sendable {
         baseDirectory: URL? = nil,
         computeChecksum: @escaping @Sendable (URL) throws -> String = CDNLocalStore.sha256Hex
     ) {
-        // WP-K skeleton: the directory is not used yet.
-        self.init(installPoint: .process)
+        guard let baseDirectory else {
+            self.init(installPoint: .process)
+            return
+        }
+        let configuration = CDNConfiguration(location: .custom(baseDirectory), legacy: LegacyMigrationPolicy(root: baseDirectory))
+        self.init(installPoint: CDNInstallPoint(configuration: configuration))
     }
 
     /// The prior art's checksum: lowercase-hex SHA-256 of a whole file, read on the calling thread (never call it on
     /// the main thread, C2). The client never needs it: a stored blob's name is its SHA-256.
     @available(*, deprecated, message: "The AssetClient hashes and verifies what it stores; a blob's file name is its SHA-256")
     public static func sha256Hex(of fileURL: URL) throws -> String {
-        // WP-K skeleton: nothing is hashed yet.
-        ""
+        ContentHash.sha256(of: try Data(contentsOf: fileURL, options: .mappedIfSafe)).hex
     }
 
     /// The prior art's fallback directories: one per dot-separated segment of `identifier`.
     @available(*, deprecated, message: "The AssetClient stores content-addressed blobs; no path is derived from an identifier (R-SEC-2)")
     public static func mechanicalPathComponents(for identifier: String) -> [String] {
-        // WP-K skeleton: nothing is derived yet.
-        []
+        CDNLocalStore.segments(of: identifier)
+    }
+
+    /// The dot-separated segments of `identifier` (the prior art's mechanical path rule).
+    static func segments(of identifier: String) -> [String] {
+        identifier.split(separator: ".").map(String.init)
     }
 
     /// Records `assets` as this store's cached manifest, for `cachedAsset(forIdentifier:)` (a duplicate identifier keeps
@@ -64,7 +71,7 @@ public final class CDNLocalStore: Sendable {
     @available(*, deprecated, message: "The AssetClient fetches and applies manifests itself")
     @MainActor
     public func cacheManifest(_ assets: [CDNAsset]) {
-        // WP-K skeleton: nothing is recorded yet.
+        self.memory.entries = Dictionary(assets.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// The entry for `identifier` in the manifest last handed to `cacheManifest` or `reconcile` on this store in this
@@ -72,8 +79,7 @@ public final class CDNLocalStore: Sendable {
     @available(*, deprecated, message: "The AssetClient applies manifests internally; look assets up with existingLocalURL or AssetClient.lookup")
     @MainActor
     public func cachedAsset(forIdentifier identifier: String) -> CDNAsset? {
-        // WP-K skeleton: nothing is recorded yet.
-        nil
+        self.memory.entries[identifier]
     }
 
     /// The stored blob for `asset` (its extension), else where the prior art would have put it: `localPathComponents`
@@ -82,15 +88,30 @@ public final class CDNLocalStore: Sendable {
     @available(*, deprecated, message: "Use existingLocalURL(identifier:candidateExtensions:) or AssetClient.lookup; paths are content-addressed now")
     @MainActor
     public func localURL(for asset: CDNAsset) -> URL {
-        // WP-K skeleton: nothing is computed yet.
-        URL(fileURLWithPath: "/", isDirectory: true)
+        if let location = self.client?.lookup(AssetID(asset.identifier), extensions: [asset.fileExtension]) {
+            return location.url
+        }
+        let directories = asset.localPathComponents.isEmpty
+            ? Array(CDNLocalStore.segments(of: asset.identifier).dropLast())
+            : asset.localPathComponents
+        let root = self.installPoint.configuration.clientConfiguration.legacy.root ?? CDNLocalStore.defaultLegacyRoot()
+        let directory = directories.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+        return directory.appendingPathComponent("\(asset.resolvedFileName).\(asset.fileExtension)", isDirectory: false)
+    }
+
+    /// The prior art's default root, `<Caches>/CDNAssets` (a path computation, no I/O; what
+    /// `LegacyMigrationPolicy.root == nil` means).
+    static func defaultLegacyRoot() -> URL {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).appendingPathComponent("Library/Caches", isDirectory: true)
+        return caches.appendingPathComponent("CDNAssets", isDirectory: true)
     }
 
     /// Refused: the client places only bytes it fetched and verified itself. Throws `CDNShimError.storeIsOwnedByTheClient`
     /// and leaves `temporaryURL` in place, as a failed move did in the prior art.
     @available(*, deprecated, message: "The AssetClient downloads, verifies and stores assets; use AssetClient.resolve(_:priority:)")
     public func store(temporaryURL: URL, for asset: CDNAsset) throws {
-        // WP-K skeleton: nothing is refused yet.
+        throw CDNShimError.storeIsOwnedByTheClient
     }
 
     /// Records `newManifest` as `cacheManifest` does and reports nothing moved: the client reconciles inside its own sync,
@@ -99,8 +120,8 @@ public final class CDNLocalStore: Sendable {
     @MainActor
     @discardableResult
     public func reconcile(newManifest: [CDNAsset]) -> CDNReconciliationSummary {
-        // WP-K skeleton: nothing is recorded yet.
-        CDNReconciliationSummary()
+        self.cacheManifest(newManifest)
+        return CDNReconciliationSummary()
     }
 
     /// The client this store adapts, once one is installed.

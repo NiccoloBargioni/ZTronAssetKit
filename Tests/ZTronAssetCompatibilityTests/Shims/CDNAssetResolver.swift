@@ -43,13 +43,7 @@ public struct CDNAssetResolver: Sendable {
         case .client(let client):
             return client
         case .store(let store, let provider):
-            // WP-K skeleton: the client is built but not installed yet.
-            return store.installPoint.client
-                ?? CDNProviderFactory.makeClient(
-                    for: provider,
-                    base: store.installPoint.configuration,
-                    environment: store.installPoint.environment
-                )
+            return store.installPoint.installClient(for: provider)
         }
     }
 

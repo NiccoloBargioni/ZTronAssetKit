@@ -50,14 +50,7 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// What the prior-art initialiser does, without its ignored parameters (tests call it: constructing `UserDefaults`
     /// is off limits for them).
     convenience init(sharingClientOf localStore: CDNLocalStore, cdn: any CDNProviding) {
-        // WP-K skeleton: the client is built but not installed yet.
-        let client = localStore.installPoint.client
-            ?? CDNProviderFactory.makeClient(
-                for: cdn,
-                base: localStore.installPoint.configuration,
-                environment: localStore.installPoint.environment
-            )
-        self.init(client: client, cdn: cdn, localStore: localStore)
+        self.init(client: localStore.installPoint.installClient(for: cdn), cdn: cdn, localStore: localStore)
     }
 
     private init(client: AssetClient, cdn: any CDNProviding, localStore: CDNLocalStore) {

@@ -19,8 +19,7 @@ public struct BackgroundAssetsCDNProvider: CDNProviding {
 
     /// The app-supplied catalog, as in the prior art (no network, no pack access).
     public func fetchManifest() async throws -> [CDNAsset] {
-        // WP-K skeleton: the catalog is not served yet.
-        []
+        self.catalog
     }
 
     /// Gone: the client's Apple tier adopts pack files (`AssetClient.resolve`). A `remotePath` that is not
@@ -28,8 +27,13 @@ public struct BackgroundAssetsCDNProvider: CDNProviding {
     /// throws `CDNShimError.downloadsGoThroughTheClient`.
     @available(*, deprecated, message: "The AssetClient's Apple-hosted tier adopts pack files; use AssetClient.resolve(_:priority:) or CDNAssetResolver.resolveViaNetwork")
     public func downloadAsset(_ asset: CDNAsset, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        // WP-K skeleton: the refusal is not written yet.
-        URL(fileURLWithPath: asset.remotePath)
+        guard let separator = asset.remotePath.firstIndex(of: "/"),
+            separator != asset.remotePath.startIndex,
+            asset.remotePath.index(after: separator) != asset.remotePath.endIndex
+        else {
+            throw BackgroundAssetsCDNProviderError.malformedRemotePath(asset.remotePath)
+        }
+        throw CDNShimError.downloadsGoThroughTheClient
     }
 }
 
