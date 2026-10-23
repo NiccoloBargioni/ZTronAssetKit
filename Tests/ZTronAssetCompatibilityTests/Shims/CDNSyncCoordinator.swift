@@ -28,10 +28,42 @@ public final class CDNSyncCoordinator: ObservableObject {
     private let localStore: CDNLocalStore
 
     /// A coordinator over `client`; `cdn` answers `verifyFullyAvailable()`'s manifest fetch.
-    public init(client: AssetClient, cdn: any CDNProviding) {
+    public convenience init(client: AssetClient, cdn: any CDNProviding) {
+        self.init(client: client, cdn: cdn, localStore: CDNLocalStore(client: client))
+    }
+
+    /// The prior art's initialiser. The coordinator drives the client of `localStore`'s install point, built from `cdn`
+    /// there when the point is empty (as `CDNAssetResolver(cdn:localStore:)` does), so it shares the installed client;
+    /// `cdn` stays the manifest source of `verifyFullyAvailable()`. `defaults` and `appVersionProvider` are ignored: the
+    /// stamp lives in the client's index and the app version comes from its environment, in the same format (D-6,
+    /// R-SYN-9); the client migrates the prior art's `UserDefaults` stamp once (R-STO-11).
+    @available(*, deprecated, message: "Build one AssetClient (CDNProviderFactory.install(_:)) and use CDNSyncCoordinator(client:cdn:)")
+    public convenience init(
+        cdn: any CDNProviding,
+        localStore: CDNLocalStore = .shared,
+        defaults: UserDefaults = .standard,
+        appVersionProvider: @escaping @Sendable () -> String = CDNSyncCoordinator.defaultAppVersion
+    ) {
+        self.init(sharingClientOf: localStore, cdn: cdn)
+    }
+
+    /// What the prior-art initialiser does, without its ignored parameters (tests call it: constructing `UserDefaults`
+    /// is off limits for them).
+    convenience init(sharingClientOf localStore: CDNLocalStore, cdn: any CDNProviding) {
+        // WP-K skeleton: the client is built but not installed yet.
+        let client = localStore.installPoint.client
+            ?? CDNProviderFactory.makeClient(
+                for: cdn,
+                base: localStore.installPoint.configuration,
+                environment: localStore.installPoint.environment
+            )
+        self.init(client: client, cdn: cdn, localStore: localStore)
+    }
+
+    private init(client: AssetClient, cdn: any CDNProviding, localStore: CDNLocalStore) {
         self.client = client
         self.cdn = cdn
-        self.localStore = CDNLocalStore(client: client)
+        self.localStore = localStore
     }
 
     /// The prior art's version string, `"<CFBundleShortVersionString>+<CFBundleVersion>"` (`"0"` for a missing key).

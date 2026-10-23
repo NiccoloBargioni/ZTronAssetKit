@@ -10,17 +10,47 @@ import ZTronAssetKit
 /// swallowed into `nil`. It adds what the prior art lacked: single-flight transfers, verification and typed errors
 /// (callers that need them use `AssetClient.resolve` or `AssetFallbackChain.fetch`).
 public struct CDNAssetResolver: Sendable {
-    private let resolvedClient: AssetClient
+    /// Where the resolver's client comes from.
+    private enum Binding: Sendable {
+        /// A client given explicitly.
+        case client(AssetClient)
+        /// The prior-art initialiser: the client of `store`'s install point, built from `provider` on first use.
+        case store(CDNLocalStore, provider: any CDNProviding)
+    }
+
+    private let binding: Binding
 
     /// A resolver over `client`.
     public init(client: AssetClient) {
-        self.resolvedClient = client
+        self.binding = .client(client)
     }
 
-    /// The client this resolver resolves through.
+    /// The prior art's initialiser. The resolver resolves through the client of `localStore`'s install point; when that
+    /// point is empty, the first use builds one there from `cdn` (`CDNInstallPoint.installClient(for:)`: the HTTP tier
+    /// at a `StaticManifestCDNProvider`'s base URL, the Apple-hosted tier for a `BackgroundAssetsCDNProvider`, the point's
+    /// configured tiers for a custom provider, which is never used as a transport). So the prior art's launch idiom,
+    /// `CDNAssetResolver.installed = CDNAssetResolver(cdn: provider)`, installs one client that `CDNLocalStore.shared`
+    /// and `CDNSyncCoordinator(cdn:)` share.
+    @available(*, deprecated, message: "Build one AssetClient (CDNProviderFactory.install(_:)) and use CDNAssetResolver(client:) or CDNAssetResolver.installed")
+    public init(cdn: any CDNProviding, localStore: CDNLocalStore = .shared) {
+        self.binding = .store(localStore, provider: cdn)
+    }
+
+    /// The client this resolver resolves through (for the prior-art initialiser, built and installed on first use).
     @MainActor
     public var client: AssetClient {
-        self.resolvedClient
+        switch self.binding {
+        case .client(let client):
+            return client
+        case .store(let store, let provider):
+            // WP-K skeleton: the client is built but not installed yet.
+            return store.installPoint.client
+                ?? CDNProviderFactory.makeClient(
+                    for: provider,
+                    base: store.installPoint.configuration,
+                    environment: store.installPoint.environment
+                )
+        }
     }
 
     /// The process-wide resolver of the prior art, now a view of `CDNInstallPoint.process`: `nil` until the app installs
@@ -43,9 +73,16 @@ public struct CDNAssetResolver: Sendable {
     /// not one of `candidateExtensions` (any extension when empty) or anything fails. The extension is checked once the
     /// client resolved the asset, as `AssetFallbackChain.fetch` does (ADR-037), because only then is the entry known.
     public func resolveViaNetwork(identifier: String, candidateExtensions: [String]) async -> URL? {
+        let client: AssetClient
+        switch self.binding {
+        case .client(let explicit):
+            client = explicit
+        case .store:
+            client = await MainActor.run { self.client }
+        }
         let url: URL
         do {
-            url = try await self.resolvedClient.resolve(AssetID(identifier), priority: .userInitiated)
+            url = try await client.resolve(AssetID(identifier), priority: .userInitiated)
         } catch {
             return nil
         }

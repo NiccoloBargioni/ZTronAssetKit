@@ -41,8 +41,8 @@ extension BackgroundAssetsCDNProvider: CDNRemoteConfigurable {
     }
 }
 
-/// The prior art's provider error, unchanged.
-public enum BackgroundAssetsCDNProviderError: Error {
+/// The prior art's provider error (now also `Hashable`).
+public enum BackgroundAssetsCDNProviderError: Error, Hashable {
     /// `remotePath` was not in the `"<packID>/<relativePath>"` shape this provider expects.
     case malformedRemotePath(String)
 }

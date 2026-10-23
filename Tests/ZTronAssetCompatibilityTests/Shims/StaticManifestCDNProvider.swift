@@ -55,8 +55,8 @@ extension StaticManifestCDNProvider: CDNRemoteConfigurable {
     }
 }
 
-/// The prior art's provider error, unchanged.
-public enum StaticManifestCDNProviderError: Error {
+/// The prior art's provider error (now also `Equatable`, by the response's identity).
+public enum StaticManifestCDNProviderError: Error, Equatable {
     /// A non-2xx answer (or a response that is not HTTP).
     case badResponse(URLResponse)
 }
