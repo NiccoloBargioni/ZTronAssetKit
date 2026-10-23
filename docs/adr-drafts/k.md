@@ -442,44 +442,53 @@ heading or by reference to this draft):
   how long the lookups miss its files and how many a sync during it would download (CCR-K1); the tests run it on
   `FakeFileSystem` with an inline executor.
 
-## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; fix round 1, code at `05c1a41`)
-- Test first: the round-1 tests on the round-0 shims (`82490e7`), `swift test --filter ZTronAssetCompatibilityTests`:
-  `Test run with 59 tests in 9 suites failed … with 12 issues` (the layout expectation; `localURL` ×2; the app key; the
-  fresh install ×2; one root per parent ×2, its first `start()` throwing `.storageUnavailable(ioFailure)`; the adoption
-  ×4: the blob outside `<parent>/ZTronAssetKit/v1/`, a transfer started, the legacy file still there, the "overlaps the
-  store" line logged). After `e81449c`: 59/59, then six repeated runs 59/59; after `9150501`: 63/63, then eight repeated
-  runs 63/63.
-- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick`: `VERIFY: PASS` (Model 151, Sync 323, Storage 445, Transport
-  84, Kit 85, Compatibility 64, AppleHosted 104 tests).
+## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; fix round 2, code at `409db9a`)
+- Test first. Round 1: the round-1 tests on the round-0 shims (`82490e7`) failed with 12 issues, all passed after
+  `e81449c` (K-12). Round 2: the CCR-K1 test without its `withKnownIssue` wrapper, `swift test --skip-build --filter
+  MigrationLaunchShimTests`, 15 consecutive runs at a load average of about 5: 15 of 15 failed `downloaded == 0` (6 to
+  41 of 150 prior-art files downloaded, K-15), with no other expectation failing; the lookups pin passed 15 of 15. With
+  the wrapper, `swift test --skip-build --filter ZTronAssetCompatibilityTests` 10 consecutive times while the simulator
+  run loaded the host (load average up to 139): 69/69 each, no known issue recorded (migration won the race), the
+  lookups pin passed 10 of 10. The `installed` seam's test against a mutant seam that drops its value (built, run,
+  reverted): `failed … with 3 issues`.
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `409db9a`: `VERIFY: PASS` (Model 151, Sync 323, Storage
+  445, Transport 84, Kit 85 tests; Compatibility 69 tests `passed … with 1 known issue`, CCR-K1; AppleHosted 104). The
+  same on `9cf19be`: `VERIFY: PASS`, the same counts.
 - `swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`: `Build complete!`.
 - `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
   documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Both scan `Sources/`, which WP-K does not touch
   (`git diff --stat l5g-merged...HEAD -- Sources Tests/ZTronAssetKitBenchmarks Package.swift Scripts` is empty). The
-  shims, checked with `gates.py`'s own `docs_check` and `unsafe_check` over their contents in memory (the tree walker
-  skips `.build*` and needs `/Sources/`): `DOCS public declarations=90 documented=90`, `UNSAFE escapes found=0`.
-- Coverage (`--quick`'s `swift test --enable-code-coverage --skip Benchmarks`, the merged export over every bundle,
-  `gates.py coverage`): every target OK, `COVERAGE overall lines=96.62% (24780/25647)`, `COVERAGE: PASS`. The shims sit
-  in a test target, outside the gate; `llvm-cov report` of the compatibility bundle over `Shims/*.swift`: 97.80 %
-  (533/545). Not covered, as before: the setter of `CDNAssetResolver.installed` (the process install point, which no
-  test fills, K-2), the deprecated coordinator initialiser's body (it constructs `UserDefaults`, K-9), the default
-  argument of `CDNLocalStore.init(baseDirectory:computeChecksum:)` (reached only through a protocol), the fallback of
-  `defaultLegacyRoot()`, one line of the Stage 1 `CDNAsset.swift`. Every line added in round 1 is covered (the origin
-  normalisation through its unit test).
+  shims, through `gates.py`'s own `docs_check` and `unsafe_check` over their contents in memory: `DOCS public
+  declarations=90 documented=90`, `UNSAFE escapes found=0`. `gates.py selftest`: `SELFTEST: PASS`; `gates.py trace`
+  written to `.build-k/trace-check.md` (never to `docs/TRACEABILITY.md`): `TRACE requirements=90 (MUST=78) budgets=14
+  tests-with-ids=1137`, `TRACE: PASS`.
+- Coverage (`--quick`'s `swift test --enable-code-coverage --skip Benchmarks` on `409db9a`, the merged export over
+  every bundle, `gates.py coverage`): every target OK (AppleHosted 99.76 %, Kit 97.90 %, Model 99.31 %, Storage
+  97.37 %, Sync 93.56 %, Transport 99.08 %), `COVERAGE overall lines=96.60% (24774/25647)`, `COVERAGE: PASS`. The shims
+  sit in a test target, outside the gate; `llvm-cov export` of the compatibility bundle over `Shims/*.swift`: 98.18 %
+  (538/548, round 1: 533/545). Not covered: the `installed` setter's one call (the process point, which no test fills;
+  its body is the tested seam, K-2), the deprecated coordinator initialiser's body (it constructs `UserDefaults`, K-9),
+  the default argument of `CDNLocalStore.init(baseDirectory:computeChecksum:)` (reached only through a protocol), the
+  fallback of `defaultLegacyRoot()`, one line of the Stage 1 `CDNAsset.swift`.
 - iOS: `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
-  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no diagnostic.
-- The floors, with the compiler: the shims alone typecheck against the built modules through their public API only:
-  `xcrun --sdk iphoneos swiftc -typecheck -swift-version 6 -target arm64-apple-ios15.0 -warnings-as-errors
-  -I .build-k/xcode/Build/Products/Debug-iphoneos Tests/ZTronAssetCompatibilityTests/Shims/*.swift` exit 0; the same with
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no diagnostic (`** BUILD SUCCEEDED **` without `-quiet`;
+  incremental, `Sources/` unchanged since round 1).
+- The floors, with the compiler: the shims alone typecheck through the public API only: `xcrun --sdk iphoneos swiftc
+  -typecheck -swift-version 6 -target arm64-apple-ios15.0 -warnings-as-errors -I
+  .build-k/xcode/Build/Products/Debug-iphoneos Tests/ZTronAssetCompatibilityTests/Shims/*.swift` exit 0; the same with
   `--sdk macosx -target arm64-apple-macos12.0 -I .build-k/out/Products/Debug` exit 0 (module caches under `.build-k/tmp`).
 - iOS Simulator (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
-  `caffeinate -i`): `** TEST SUCCEEDED **`, `xcresulttool … summary`: `result: Passed`, 1,256/1,256, 0 failed, 0 skipped
-  (`Test-ZTronAssetKit-2026.10.23_14-46-28-+0200.xcresult`); the simulator is shut down.
-- Benchmarks: WP-K owns none and changed none. For the orchestrator's P-13 question (correct lens, issue 9), one run of
-  `swift test -c release --scratch-path .build-k-perf -Xswiftc -enable-testing --filter Benchmarks` on this worktree
-  (Sources identical to `l5g-merged`; load average 3.9, 19.6 over 5 min, right after the simulator run): 35 tests, 1
-  issue, again P-13 `longest <= batchBudget`: unit max 6.35 ms wall against 5.0 ms (0.82 ms on CPU; p50 0.96 ms, p95
-  0.99 ms), two units over budget, blob unlinks inside the reclaim max 5.67 ms against a volume unlink profile max of
-  0.085 ms: the same wall-time stalls in single unlinks the verifier measured, WP-B's budget, not WP-K's.
+  `caffeinate -i`, on `9cf19be`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result: Passed`, 1,261 tests,
+  1,260 passed, 0 failed, 0 skipped, 1 expected failure (CCR-K1's known issue, recorded there)
+  (`Test-ZTronAssetKit-2026.10.23_15-53-36-+0200.xcresult`); the simulator is shut down.
+- Benchmarks: WP-K owns none and changed none. `swift test -c release --scratch-path .build-k-perf -Xswiftc
+  -enable-testing --filter Benchmarks` (load average 24 falling to 3.7, right after the simulator run): 35 tests, 1
+  issue, again P-13 `longest <= batchBudget`: unit max 9.65 ms wall against 5.0 ms (1.02 ms on CPU; p50 0.96 ms, p95
+  0.99 ms), six units over budget, each under 0.79 ms on CPU, blob unlinks inside the reclaim max 9.00 ms (7 over
+  4.0 ms) against a volume unlink profile with p99 0.065 ms and max 18.7 ms: the wall-time stalls in single unlinks of
+  rounds 0 and 1, WP-B's budget, not WP-K's.
 - Writes: nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR` and the module
   caches were under `.build-k/tmp`, derived data under `.build-k/xcode*`; the tests write real files only under
-  `.build-tests/compatibility/` and remove them.
+  `.build-tests/compatibility/` and remove them. Two strays of this round inside the worktree were removed before
+  committing: a `default.profraw` (an instrumented test binary run without `--enable-code-coverage`) and
+  `Scripts/__pycache__/` (the in-memory gate check; `python3 -B` since).
