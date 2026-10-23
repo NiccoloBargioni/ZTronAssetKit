@@ -886,7 +886,7 @@ struct EngineLegacyMigrationTransferTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, probes I and J)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, PR14c, probes I and J)", .timeLimit(.minutes(1)))
     func migrationAdoptionsReachTheReaders() async throws {
         let time = ManualTimeSource()
         let standard = EngineLegacyMigrationTransferTests.catalog(12, seed: 8_700)
