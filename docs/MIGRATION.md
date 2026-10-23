@@ -39,8 +39,9 @@ was changed. Adoption is the owner's follow-up, described here. Decisions and th
    launch after adoption, and any later launch that resumes a migration an earlier launch did not finish (an app
    terminated while phase 2 hashed the prior art's bytes). The client adopts the prior art's files (legacy migration,
    R-STO-11) in batches that start only after `start()` has returned, and a prior-art file answers the lookups once the
-   snapshot holding its adoption is installed: at once when a resolve adopted it on demand, at the end of its batch when
-   migration did. Right after `start()` the files not adopted yet miss (`missingOrStaleAssets` lists them), so
+   snapshot holding its adoption is installed: at once when a resolve adopted it on demand, or found migration adopting
+   it and waited for that adoption (the client runs one adoption per prior-art file, orchestrator ruling L5K-R13); at
+   the end of its batch when migration adopted it alone. Right after `start()` the files not adopted yet miss (`missingOrStaleAssets` lists them), so
    `BasicVideoPage.init?`, which has no network step, returns `nil` for such a video until then; `ZTronSVGView` falls back
    to `resolveViaNetwork`, which adopts a pending file on demand without a download. An app that must show the prior
    art's videos at once on such a launch resolves them first (`client.resolve(_:priority:)` adopts on demand too); the
@@ -69,8 +70,10 @@ was changed. Adoption is the owner's follow-up, described here. Decisions and th
    The prior art's launch call, `.task { await coordinator.syncIfNeeded() }`, is safe on every launch: it joins the
    client's launch run, answers `.upToDate`, or retries a run that failed. On a launch during legacy migration (step 3)
    it starts a run at once, and that run adopts the prior-art files migration has not reached yet instead of
-   downloading them: before any transfer the client adopts a file migration can still adopt, whatever asked for it
-   (R-STO-11; the engine's fix of CCR-K1, orchestrator ruling L5K-R1, K-15). That run takes the place of the launch run
+   downloading them: before any transfer the client adopts a file migration can still adopt, whatever asked for it,
+   even while a migration batch is adopting that same file, since the client runs one adoption per prior-art file and
+   every asker gets its outcome (R-STO-11; the engine's fix of CCR-K1 and the store's single flight, orchestrator rulings
+   L5K-R1 and L5K-R13, K-15). That run takes the place of the launch run
    that waited for migration, so the launch still syncs once. `verifyAndRepair()` and a call from a user action behave
    the same.
 5. **Background transfers** (only if `HTTPSourceConfiguration.background` is enabled): forward
@@ -186,7 +189,11 @@ Recorded in `docs/adr-drafts/k.md`; the ones tagged **NEEDS-HUMAN-REVIEW** there
   thermal pressure for bulk work, where the prior art downloaded regardless. The client then starts a pending run by itself once
   the gate opens, which the coordinator does not observe: `progress` keeps the call's outcome while those assets arrive
   in the same launch. A sync requested during legacy migration adopts the prior-art files migration has not reached
-  yet instead of downloading them, and takes the place of the launch run that waited for migration (L5K-R1, K-15).
+  yet instead of downloading them, a file a migration batch is adopting at that moment included, and takes the place of
+  the launch run that waited for migration (L5K-R1, L5K-R13, K-15). Like the files a sync downloads, the files it adopts
+  reach the lookups within `SyncTuning.snapshotInstallInterval` (0.1 s by default) of their adoption, because the
+  client coalesces a bulk sync's snapshot installs (ARCHITECTURE §5, L5K-R14); a resolve's adoption is installed before
+  it returns.
 - **Inherited from the module** (K-11): an asset whose new content the origin reports missing (404) is no longer served
   until its manifest entry changes, where the prior art kept the old file and asked again on every sync; the candidate
   extensions also filter manifest-known assets (ADR-037); an on-demand resolve downloads before its extension check; a

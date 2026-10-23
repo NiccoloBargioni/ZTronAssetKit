@@ -88,8 +88,9 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// On a launch during legacy migration (the first launch after adoption, and any later launch that resumes an
     /// unfinished migration), a call made while migration is still adopting the prior art's files starts a run at once,
     /// and that run adopts the files migration has not reached yet instead of downloading them (R-STO-11: before any
-    /// transfer the client adopts a file migration can still adopt, orchestrator ruling L5K-R1); it takes the place of
-    /// the launch run that waited for migration, so the launch still syncs once (MIGRATION.md step 4, K-15).
+    /// transfer the client adopts a file migration can still adopt, even one a migration batch is adopting at that moment,
+    /// orchestrator rulings L5K-R1 and L5K-R13); it takes the place of the launch run that waited for migration, so the
+    /// launch still syncs once (MIGRATION.md step 4, K-15).
     public func syncIfNeeded() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.ifDue)
@@ -112,7 +113,7 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// `syncIfNeeded()` does. Unlike the prior art, a complete repair also writes the sync stamp, which is true and
     /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version"). A repair
     /// while legacy migration is still adopting adopts the files it has not reached yet, as `syncIfNeeded()` does
-    /// (L5K-R1).
+    /// (L5K-R1, L5K-R13).
     public func verifyAndRepair() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.force)

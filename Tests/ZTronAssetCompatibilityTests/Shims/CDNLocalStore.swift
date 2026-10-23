@@ -16,9 +16,9 @@ import ZTronAssetKit
 /// during legacy migration (the first launch after adoption, and any later launch that resumes a migration an earlier
 /// launch did not finish) that is not enough for the prior art's own files: legacy migration adopts them in batches that
 /// start only after `start()` has returned, and a file answers once the snapshot holding its adoption is installed, at
-/// the end of its batch, or at once when a resolve adopted it on demand (`CDNAssetResolver.resolveViaNetwork`, no
-/// download). Until then a lookup misses it, so `BasicVideoPage`, which has no network step, finds a prior-art video only
-/// once it is adopted (K-15).
+/// the end of its batch, or at once when a resolve adopted it on demand or waited for migration's adoption of it
+/// (`CDNAssetResolver.resolveViaNetwork`, no download; one adoption per prior-art file, L5K-R13). Until then a lookup
+/// misses it, so `BasicVideoPage`, which has no network step, finds a prior-art video only once it is adopted (K-15).
 public final class CDNLocalStore: Sendable {
     /// The prior art's shared store: it follows `CDNInstallPoint.process`, so it answers for the client the app
     /// installed (`CDNProviderFactory.install`, `CDNAssetResolver.installed`), and like an empty cache before that.

@@ -9,7 +9,8 @@ comment only), `docs/MIGRATION.md`, this draft. No contract signature changed. `
 shims to document their differences there, and orchestrator ruling L5K-R10 makes it WP-K's file. **For the orchestrator
 at merge:** record it as WP-K's file in ARCHITECTURE §1.2 (a "Files WP-K added" paragraph like WP-F's and WP-G's), so
 WP-I does not treat it as unowned (fix round 1, reqs issue 2; L5K-R10). The close-out's authorised edits in WP-F's
-engine (orchestrator ruling L5K-R1) are listed under "Authorised edits outside WP-K (close-out)" below.
+engine (orchestrator rulings L5K-R1, L5K-R14) and in WP-C's legacy migration (L5K-R13, L5K-R14) are listed under
+"Authorised edits outside WP-K (close-out)" below.
 
 **Proposed REENTRANCY rows** (the code cites them as "k-n (proposed)"; all are main-actor awaits of
 `CDNSyncCoordinator`, a test-target type, so ARCHITECTURE §10 may list them under a new "compatibility shims"
@@ -20,9 +21,11 @@ heading or by reference to this draft):
 | k-1 | `CDNSyncCoordinator.run(_:)`: `client.subscribe()`, `client.sync(mode)`, then `follower.value`; and the `await self.run(_:)` of `syncIfNeeded()` and `verifyAndRepair()`, after which nothing is read (fix round 1) | Nothing of the coordinator is read across them. `progress` is written only by this call's follower while the run is in flight and by the outcome once the follower was cancelled **and awaited**, so no progress event lands after the outcome. A concurrent call joins the same single-flight run and publishes the same outcome (its follower may republish a `.syncing` value until its own outcome lands). |
 | k-2 | the follower's `for await event in events` (a main-actor task) | Each event is applied in the turn it arrives, after `self` is re-read (weak: a released coordinator publishes nothing). Progress never moves backwards within a run by construction (sync.md §10.6: the engine's completed count is monotone and one subscription delivers a run's progress in order, newest-wins), so no guard is needed. |
 | k-3 | `CDNSyncCoordinator.verifyFullyAvailable()`: `cdn.fetchManifest()` | Nothing of the coordinator; the client's snapshot is read after the fetch, so the comparison uses what is stored when the manifest arrived. |
-| k-4 | `SyncEngine.storedLocation(of:)` (`EnginePresence.swift`, WP-F's file, close-out ruling L5K-R1): `store.adoptLegacyNow(id)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). The store orders this adoption against the migration loop's adoption of the same file (store rows R17, R18): `performAdoptLegacyNow` moves a queued file to `claimed` before its hash, so no batch takes it; a file a batch already claimed may be hashed by both calls, and `processLegacyFile` and `adoptVerifiedFile` re-validate the records after each await, so the first placement binds the records and the other call finds the file adopted (`alreadyAdopted`) and reads the location from the record. |
+| k-4 | `SyncEngine.storedLocation(of:lane:)` (`EnginePresence.swift`, WP-F's file, close-out rulings L5K-R1, L5K-R14): `store.adoptLegacyNow(id, urgency:)` while legacy migration is pending, called once per id of a job from `answeredFromStore` (row f-11) before any bytes, at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise | Nothing in the callee: `answeredFromStore` re-validates after its reads exactly as f-11 says (the lifecycle, the job epoch and the attempt still without a handle; the interests the job holds then; bindings recorded only when nothing was forgotten meanwhile, the adoption being such a binding). A thrown `StoreError` (the caller's cancellation at shutdown, a store that refuses) reads as "nothing stored", so the attempt goes on to the transfer, as the resolve path's own adoption does (ADR-029). The answer is the outcome of the store's one adoption of the prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits for that processing and reads the location it bound; when a batch has not finished hashing the file, both may hash it and the one whose bytes verify second waits out the other's adoption. So `nil` means no prior-art file to adopt, or one dropped or kept, never a failure the other adopter caused (the round-1 text of this row claimed the first placement always bound before the other call decided; L5K-C1-00 showed it did not). |
+| k-5 | `AssetStore.performAdoptLegacyNow(_:urgency:)` (`Migration/LegacyPhases.swift`, WP-C's file, close-out ruling L5K-R13): the wait for the processing of the same prior-art file in flight, another adopt-on-demand's (`MigrationState.onDemand`, from its claim to its installed snapshot) or another call's adoption (`MigrationState.adopting`), `awaitLegacyFlight(of:)`; and the loop's `awaitOpen()` after it | Nothing is carried across the wait: the call starts again and reads the location, the phase, the plan commit, the queue, the claims and the flights anew. The processing it waited for has ended: adopted (the location is present: the call installs a snapshot at its urgency and answers the location read after that install), dropped or kept (the file is neither queued nor claimed: `nil`), or ended without an outcome for the file (its caller was cancelled, or a transient failure deferred it back to the queue: this call takes the file and processes it itself, as a call arriving then would). `close()` resumes it: it drains the units and resumes the key and commit waiters, so the processing it waits for returns from its await, throws `.closed` at its next phase check, and ends its mark (every exit path of `processLegacyFile` and `processLegacyFileOnDemand` does), which resumes this call; its `awaitOpen()` then throws `.closed`. |
+| k-6 | `AssetStore.processLegacyFile(_:)` (`Migration/LegacyPhases.swift`, L5K-R13): after its hash, whether it succeeded or failed, the wait until no other call's adoption of the file is in flight, `awaitLegacyAdoption(of:)` | The loop re-reads `adopting[file]` and the phase (`checkLive`, so a closing store answers `.closed`); it returns in the turn in which no adoption is in flight, and the caller then reads the records as that adoption left them: bound (`.alreadyAdopted`; for a failed hash, `legacyFailureOutcome` sees the binding), no longer wanted (`.dropped`), or still wanted (the other adoption failed: this call adopts with its own verified hash, marking `adopting` in that same turn, so at most one adoption runs at a time). A `notFound` read caused by the other call's rename, or a key in `publishing`, is therefore never classified before that call's binding. `close()` resumes it as for k-5. |
 
-**Proposed amendment of row f-11** (ARCHITECTURE §10.2, the orchestrator's file): in its "Await" column, "`store.location(for:extensions:recordingAccess:)` per id of the job" becomes "`store.location(for:extensions:recordingAccess:)` per id of the job, or, while legacy migration is pending, `store.adoptLegacyNow(id)` (row k-4, L5K-R1)"; its re-validation column is unchanged.
+**Proposed amendment of row f-11** (ARCHITECTURE §10.2, the orchestrator's file): in its "Await" column, "`store.location(for:extensions:recordingAccess:)` per id of the job" becomes "`store.location(for:extensions:recordingAccess:)` per id of the job, or, while legacy migration is pending, `store.adoptLegacyNow(id, urgency:)` at `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise (row k-4, L5K-R1, L5K-R14)"; its re-validation column is unchanged.
 
 **Contract change requests:** no signature change. One behaviour change in another WP's code (fix round 2), **ruled
 by the orchestrator (L5K-R1) and made in the close-out** (see "Orchestrator rulings (close-out)" and "L5K-R1: every
@@ -44,6 +47,11 @@ transfer path during legacy migration" below); the request as it was filed:
   and downloads none of the prior art's files (CCR-K1)`, whose download count sits in `withKnownIssue(…,
   isIntermittent: true)`; remove the wrapper with the fix. WP-F's F-8 pins only the launch run, so WP-F's own tests
   need the direct case too. Until then MIGRATION.md step 4 keeps the coordinator out of the launch task.
+  **Status (close-out):** ruled L5K-R1 and fixed in the close-out (`9fe92fc`), then closed as a class by L5K-R13 (one
+  adoption per prior-art file, `4811c50`: L5K-C1-00 showed a user-initiated job's adoption racing a migration batch's);
+  the wrapper is gone and the test is strict (`3cd3768`), and it holds migration across the call since L5K-R15
+  (`de99d9a`); the window includes every later launch that resumes an interrupted migration (L5K-R4); MIGRATION.md
+  step 4 calls the launch-task sync safe. The text above is the request as filed.
 
 (K-13 notes optional future APIs; the shims do not need them.)
 
@@ -408,7 +416,9 @@ transfer path during legacy migration" below); the request as it was filed:
   the client adopts the prior art's files (R-STO-11, phase 2) in engine-owned batches (`migrateLegacy(maxFiles: 64)` per
   call of the migration loop) that start only after `start()` has settled: `EngineLifecycle.swift` settles the start,
   spawns the migration and parks the due launch run behind it. A batch installs its snapshot at its end (bulk urgency);
-  an on-demand adoption (`adoptLegacyNow`, a resolve's or, since L5K-R1, any job's) installs its own at once. The
+  an on-demand adoption (`adoptLegacyNow`, a resolve's or, since L5K-R1, any job's) installs its own at once when it is
+  a resolve's or a user-initiated job's, and within the install interval when it is a bulk or prefetch job's
+  (L5K-R14); one adoption per prior-art file runs at a time, whoever asks (L5K-R13). The
   `UserDefaults` stamp migrates in phase 3, after every entry. On a device a terminated first launch is plausible,
   because phase 2 hashes every prior-art byte, so "the first launch after adoption" was never the whole window
   (L5K-V3-01, L5K-V3-06; orchestrator ruling L5K-R4 rescoped every passage).
@@ -434,10 +444,13 @@ transfer path during legacy migration" below); the request as it was filed:
   migration started an explicit run at once, and its bulk jobs downloaded every prior-art file phase 2 had not adopted
   yet (6 to 41 of 150 files in 15 of 15 quiet runs; 30, 38 and 42 of 150 in this close-out's runs of the strict test
   on the pre-fix engine). Since L5K-R1 the engine's pre-transfer read adopts such a file instead, whatever created the
-  job, and a run that starts while the launch run waits for migration takes its place (the next section). Through the
+  job, even one a migration batch is adopting at that moment (L5K-R13: the read waits for that adoption and answers
+  its location), and a run that starts while the launch run waits for migration takes its place (the next section).
+  Through the
   shims: `R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes and
   downloads none of the prior art's files (CCR-K1)` (150 prior-art files of 64 KiB, MIGRATION.md steps 3 and 4 in one
-  launch task) is strict now: no transfer, every prior-art file out of the prior art's tree when the sync returns,
+  launch task, the migration held at a unit of its first file across the call since L5K-R15, so the sync provably
+  overlaps it) is strict now: no transfer, every prior-art file out of the prior art's tree when the sync returns,
   `.complete`, and every asset stored (`availability(scope:)`; the lookups' snapshot follows a running batch's
   adoptions only at the batch's end, and no public event marks the end of migration when a run took the launch run's
   place). Its resumed-launch twin, `R-CAR-6: a coordinator's syncIfNeeded right after start on a later launch that
@@ -445,7 +458,7 @@ transfer path during legacy migration" below); the request as it was filed:
   runs steps 3 and 4 with every bulk unit held, and is shut down once its sync's run has started (the sync's joiner is
   answered in the shutdown turn that cancels the migration, so at most the files of the units then held are adopted:
   one for the migration and one per running job; 148 of 150 files were left in the runs on the pre-fix engine); launch
-  2 starts on the same volume and syncs right away:
+  2 starts on the same volume, its resumed migration held at a unit of its first file (L5K-R15), and syncs right away:
   `.complete`, no transfer, the tree empty, every asset stored. On the pre-fix engine it failed 3 of 3 runs (6, 6 and
   18 of the 148 files left were downloaded). MIGRATION.md step 4 calls the launch-task sync safe on every launch again.
 - **Consequences.** What remains is the lookups' window above, as long as migration runs; on a device it grows with the
@@ -500,8 +513,8 @@ transfer path during legacy migration" below); the request as it was filed:
 - reqs 6 / correct 4 (P-13): not WP-K's (no source or benchmark file changed); one run recorded in the evidence.
 
 ## Orchestrator rulings (close-out)
-The rulings of `.build-orchestrator/l5k-rulings.md` (L5K-R1…R12), recorded as made; where a ruling and an earlier
-entry of this draft disagree, the ruling wins.
+The rulings of `.build-orchestrator/l5k-rulings.md` (L5K-R1…R15, and cycle 2's correction to L5K-R1), recorded as
+made; where a ruling and an earlier entry of this draft disagree, the ruling wins.
 
 - **Orchestrator ruling (close-out), L5K-R1 (CCR-K1 as a class; R-STO-11).** While legacy migration is pending or
   running, no transfer starts for an asset whose prior-art file can still be adopted, whatever created the job. Done
@@ -553,6 +566,29 @@ entry of this draft disagree, the ruling wins.
 - **Orchestrator ruling (close-out), L5K-R12 (coverage).** The gate's per-target figures must not drop (Sync ≥ 90 %,
   Storage ≥ 90 %, Kit ≥ 70 %); WP-K's own measure is llvm-cov over `Shims/*.swift` in the compatibility bundle, ≥ 70 %;
   the uncovered lines listed in the round-2 evidence are accepted as listed. Figures in "Evidence (close-out cycle 1)".
+- **Orchestrator ruling (close-out), correction to L5K-R1 (cycle 2).** L5K-R1's line "the store's install-rate limiter
+  coalesces snapshot installs" was wrong: `adoptLegacyNow` published at `.userInitiated`, which the limiter never
+  coalesces (recorded in cycle 1 under "C2" below). L5K-R14 fixes the consequence.
+- **Orchestrator ruling (close-out), L5K-R13 (one adoption per prior-art file, whoever asks; L5K-C1-00, blocking).** At
+  most one adoption runs per prior-art file at a time, among a batch, an on-demand call or two on-demand calls; every
+  concurrent asker gets that adoption's outcome, the location or `nil` only for a file dropped or kept; a failure caused
+  only by the other adopter is never reported as dropped, deferred or `nil`. Done as the ruling's acceptable alternative,
+  widened: the adoption step is single per file (`MigrationState.adopting`), whole processings are single among
+  adopt-on-demand calls (`MigrationState.onDemand`), and a call decides only once no other adoption of its file is in
+  flight; a file a batch has not finished hashing stays adoptable at once. Why, and the outcome of every state and pair:
+  "L5K-R13: one adoption per prior-art file". Failing tests first (`5c9612a`), then the fix (`4811c50`). Rows k-5 and
+  k-6 proposed and k-4 corrected; the L5K-R1 section's store paragraph, MIGRATION.md step 3, step 4 and §4, K-15 and the
+  shim doc comments (`CDNSyncCoordinator`, `CDNLocalStore`) state the real ordering. Runs: "Evidence (close-out cycle
+  2)".
+- **Orchestrator ruling (close-out), L5K-R14 (bulk-lane adoptions keep the install rate; L5K-C1-02).**
+  `AssetStore.adoptLegacyNow(_:urgency:)` with `urgency: AssetPriority = .userInitiated` (package API, defaulted, not
+  NEEDS-HUMAN-REVIEW); the funnel passes `.userInitiated` for a job of the user-initiated lane and `.bulk` otherwise.
+  Failing test first (`3e51cf8`), fix (`dcd2437`), store pin (`c857cde`): "L5K-R14: the install rate of bulk-lane
+  adoptions".
+- **Orchestrator ruling (close-out), L5K-R15 (the clearly right cycle-1 items).** L5K-C1-01 and L5K-C1-03: both strict
+  shim tests hold migration across the coordinator's call and prove the overlap, every strict assertion kept, the two
+  L5K-R2 rows updated; L5K-C1-04: the CCR-K1 header ends with a status line; L5K-C1-05: the migration loop's flag clear
+  at shutdown is pinned (`de99d9a`; mutant M3 fails it).
 
 ## Authorised edits outside WP-K (close-out)
 Under L5K-R1 only, internal state and bodies, no public or package signature changed; ownership unchanged (WP-F's):
@@ -568,7 +604,26 @@ Under L5K-R1 only, internal state and bodies, no public or package signature cha
   run while migration runs).
 - New: `Tests/ZTronAssetSyncTests/Engine/EngineLegacyMigrationTransferTests.swift` (6 tests, failing first at `e4cd072`).
 
-No store file changed (`ZTronAssetStorageTests` once: 445/445), and no Kit file (`ZTronAssetKitTests` ×3: 85/85 each).
+In cycle 1 no store file changed (`ZTronAssetStorageTests` once: 445/445), and no Kit file (`ZTronAssetKitTests` ×3:
+85/85 each).
+
+Cycle 2, bodies and internal state; the one signature change is L5K-R14's package parameter:
+- Under L5K-R13: `Sources/ZTronAssetStorage/Migration/LegacyPhases.swift` (WP-C): `processLegacyFile` marks its
+  adoption in `adopting` and, after its hash, waits out another call's adoption of the file (`awaitLegacyAdoption`,
+  `endLegacyAdoption`); `performAdoptLegacyNow` waits for a processing in flight and starts again (`awaitLegacyFlight`,
+  the `onDemand` mark, `processLegacyFileOnDemand`, `endLegacyOnDemand`); the doc comments of `legacyFailureOutcome`
+  and `LegacyOutcome.alreadyAdopted`. `Sources/ZTronAssetStorage/Migration/MigrationState.swift` (WP-C): the fields
+  `adopting` and `onDemand`. New: `Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift` (8 tests: 7 for
+  L5K-R13, failing first at `5c9612a`; 1 for L5K-R14). `EnginePresence.swift`: the k-4 comment and `storedLocation`'s
+  doc comment. The engine test file: the two race tests over a migration that is not held, `catalog(_:seed:size:)`.
+- Under L5K-R14: `Sources/ZTronAssetStorage/Migration/StoreMigration.swift` (`adoptLegacyNow(_:urgency:)`, defaulted),
+  `LegacyPhases.swift` (`performAdoptLegacyNow(_:urgency:)` and `processLegacyFileOnDemand` publish at that urgency),
+  `EnginePresence.swift` (`storedLocation(of:lane:)` passes the job's lane), `EngineRuns.swift` (one comment naming the
+  funnel's new signature, under L5K-R1's authorisation); the engine test `adoptionsKeepTheInstallRate`.
+- Under L5K-R15: WP-K's own `MigrationLaunchShimTests.swift`, and the engine test file (`resumedMigrationSync`'s flag
+  pin).
+
+No Kit source changed, and no WP-B file: `close()` resumes the new waiters through the call they wait for (row k-5).
 
 ## L5K-R1: every transfer path during legacy migration
 - **The funnel.** Every transfer the engine starts goes through one place: `EngineDispatch.start(_:probe:)` spawns the
@@ -614,11 +669,11 @@ No store file changed (`ZTronAssetStorageTests` once: 445/445), and no Kit file 
   transfer keeps the run active across the end of migration). With no run started during migration, the launch run
   still starts when the loop ends (`R-STO-11: the launch run waits for legacy migration and downloads nothing it
   adopted`, F-8; the shim lookups test waits for exactly that run).
-- **Store serialisation (row k-4).** The store already orders an on-demand adoption against the migration loop's:
-  `performAdoptLegacyNow` moves a queued file to `claimed` before hashing it, so no batch takes it; a file a batch has
-  claimed may be hashed by both calls, and `processLegacyFile` and `adoptVerifiedFile` re-validate the records after
-  every await (rows R17, R18), so the first placement binds and the other call finds the file adopted (`alreadyAdopted`)
-  and reads the location from the record. The resolve path has relied on this since L3; the funnel uses the same call.
+- **Store serialisation (row k-4), corrected in cycle 2.** Cycle 1 wrote here that the store already ordered an
+  on-demand adoption against the migration loop's: a file a batch had claimed hashed by both, the first placement
+  binding before the other call decided. It did not: the other call could decide between the placement's rename and its
+  binding, and answer `nil` (L5K-C1-00). Since L5K-R13 the store runs one adoption per prior-art file and the funnel's
+  answer is that adoption's outcome ("L5K-R13: one adoption per prior-art file"; rows k-4, k-5, k-6).
 - **C2.** One `adoptLegacyNow` per id of a job, only while migration is pending, after a job was dispatched; the hash
   runs on the store's bulk executor and the placement on its metadata executor, never on the main actor; the engine's
   actor only awaits. Correction of the ruling's premise: `adoptLegacyNow` publishes its snapshot at `.userInitiated`,
@@ -644,7 +699,111 @@ No store file changed (`ZTronAssetStorageTests` once: 445/445), and no Kit file 
 
   Every turn stays far inside C2's 10 ms at SPEC §6's scale; the store's per-call queue search (one linear search per
   on-demand adoption, `performAdoptLegacyNow`) and the snapshot copy grow with the catalog, which the 10,000-file row
-  bounds. Not a device measurement (Not verified here).
+  bounds. Not a device measurement (Not verified here). Since L5K-R14 (cycle 2) a bulk or prefetch job's adoption
+  publishes at `.bulk`, which the limiter coalesces: the table's last column describes cycle 1's code (one install per
+  adoption); the 100-file sync of `adoptionsKeepTheInstallRate` installs one snapshot (the apply's) where it installed
+  101. The turns above do not grow with that change (each install was an O(1) swap); they were not re-measured (no
+  benchmark, L5K-R11).
+
+## L5K-R13: one adoption per prior-art file
+- **The defect (L5K-C1-00).** `performAdoptLegacyNow` processed a file a batch had already claimed concurrently with
+  that batch. When the batch's placement had renamed the file into `blobs/` but not bound the record yet, the on-demand
+  hash failed `.notFound`, `legacyFailureOutcome` answered `.dropped` (the record was not bound yet), `adoptLegacyNow`
+  returned `nil`, and the job downloaded a file the batch adopted moments later (the verifier's probes PS1, PS1b, PK2b
+  and PK8u). The reverse order made the batch count as dropped a file the on-demand call adopted. Row k-4 and
+  MIGRATION.md step 4 claimed an ordering that did not hold.
+- **Design.** Two marks in `MigrationState`, keyed by the file's path below the root, each holding its waiters:
+  - `adopting`: a batch or an adopt-on-demand is placing and binding the file's verified bytes (`adoptVerifiedFile`,
+    the extension copies included). Set in the turn the call decides to adopt, which is the turn in which it found no
+    other adoption of the file in flight; cleared on every exit of that call. So at most one adoption runs at a time.
+  - `onDemand`: an adopt-on-demand is processing the file, from its claim to its installed snapshot.
+  - An adopt-on-demand that finds either mark, the file queued or claimed, waits (`awaitLegacyFlight`, row k-5) and
+    starts again: it shares that processing's hash and reads its outcome from the records.
+  - A call whose own hash of the file ended, successfully or not, waits until no other call's adoption of the file is in
+    flight (`awaitLegacyAdoption`, row k-6) before it decides, so a `notFound` read caused by the other call's rename,
+    or the other call's key in `publishing`, reads as `.alreadyAdopted` once that call bound the records.
+  - A file a batch has claimed but not finished hashing carries no mark: an adopt-on-demand processes it at once, as
+    before, so a user's lookup never waits behind a batch's hash. The two hashes may overlap; the adoption step stays
+    single.
+- **Why not one flight from a batch's claim (the ruling's recommended form).** The ruling keeps "claimed and not
+  started" adoptable on demand at once, and the store cannot tell a batch whose first hash unit is queued from one whose
+  hash runs without instrumenting WP-B's `hashFileInternal`, which is not authorised. Treating a batch's hash as in
+  flight would also change the premise of WP-C's pre-existing `R-STO-11: an adopt-on-demand racing a batch on the same
+  file adopts it once and returns its location` (`LegacyEdgeTests.adoptNowRacesBatch`: the batch's hash unit held while
+  the on-demand hash runs first), a file L5K-R13 does not authorise, and every test that holds a migration at its first
+  file's hash unit while a job or a resolve adopts that file would wait forever (the L5K-R1 engine tests,
+  `lookupsDuringLegacyMigration`). So the ruling's acceptable alternative applies, widened: the prototype waited out a
+  placement only while its key was in `publishing`, which misses a reused or rescued key (it never enters `publishing`)
+  and the extension copies `bindCopy` places after the first binding; `adopting` covers the whole adoption step. Whole
+  processings are single among adopt-on-demand calls, as the recommended form has them. The enumeration below shows the
+  invariant for every state and pair. The cost: an adopt-on-demand that arrives while a batch hashes the file reads it a
+  second time; every other asker shares the one hash (`secondOnDemandSharesTheFirstsHash` counts one read for two
+  calls).
+- **The enumeration.** B is a batch (`migrateLegacy`); D, D1 and D2 are adopt-on-demand calls (`adoptLegacyNow`: the
+  engine's pre-transfer read or a resolve). A row is the state of the file in the first call's hands when the second
+  call meets it; "counted" is the progress counter. In every cell exactly one adoption counts, and no side reports
+  `.dropped` for an adopted file.
+
+  | State when the second call meets the file | B first, then D | D first, then B | D1 first, then D2 |
+  |---|---|---|---|
+  | Queued (nobody processes it) | — (B is not processing it) | D claims it before its hash, so B never takes it: B pops only queued files | D1 claims it and marks `onDemand` in one turn, so D2 always meets D1's mark (the rows below) |
+  | Claimed, not started | Not observable: B takes a file and calls `processLegacyFile` in one turn. A batch that claimed ahead would leave the file unmarked: D processes it at once and B later waits out D's adoption, `.alreadyAdopted` | B cannot take it (above) | D2 waits for D1 (`onDemand`), no hash |
+  | Hashing | D marks `onDemand` and hashes too. Whoever's bytes verify first marks `adopting`, places, binds and reports `.adopted`, counted (by B, or by D, which did not take the file from the queue); the other waits out that adoption after its own hash, which may have failed with `notFound` once the file was renamed, and reports `.alreadyAdopted`, uncounted. D answers the location either way. Pinned: `batchWaitsForTheOnDemandAdoption` (D places first, B's read fails), WP-C's `adoptNowRacesBatch` (D first, B's hash held) | B cannot take it. One edge: D processes a file batch B1 holds, B1's own read fails transiently and defers it back to the queue, and a later batch B2 pops it while D still processes it; then as in the left cell (one adoption binds, the other reports `.alreadyAdopted`) | D2 waits for D1, no hash: `secondOnDemandSharesTheFirstsHash` (one read of the file for both) |
+  | Placing (`adopting` set, the key in `publishing`, or a reused or rescued key) | D joins `adopting` (no hash) and starts again once B's adoption ended: the location is present, D publishes at its own urgency and answers it; B `.adopted`, counted. Pinned: `onDemandJoinsTheBatchsAdoption` (PS1b: D reads no byte of the file) | As in the left cell, for the edge above | D2 waits for D1 (`onDemand`): `secondOnDemandJoinsTheFirstsAdoption` |
+  | Binding (the first extension bound, the copies under other extensions being placed; `adopting` still set) | As placing: D answers the location once the copies are bound | As in the left cell | As placing |
+  | Adopted | B unclaims the file in the turn its adoption ends; D finds the location at its first read and answers it | D unclaims it, or a batch's claim stays and that batch reports `.alreadyAdopted`, uncounted | D2 waits until D1's snapshot is published, then finds the location and publishes at its own urgency |
+  | Deferred (a transient read or move failure of that call) | B put the file back at the head of the queue in the turn it decided (or kept it, at the third deferral); D, waiting or arriving, finds it queued and processes it itself (or answers `nil` when it was kept) | D answered `nil` (an adopt-on-demand that defers answers `nil`, since L3) and requeued it; B takes it on its next call | D1 answers `nil`; D2 starts again, finds the file queued and processes it itself: `waiterRetriesADeferredFile` |
+  | Cancelled (the first call's caller) | B requeues the file it held; D takes it | D requeues it when it took it from the queue (WP-C's `cancelledAdoptNowRequeues`) | D1 throws `.cancelled` and requeues it; D2 takes it over: `waiterTakesOverACancelledProcessing` |
+  | Dropped or kept | B unclaimed it; D finds it neither queued nor claimed and answers `nil`: really dropped or kept | D, when it took the file, counted it dropped or kept; B never sees it | D2 answers `nil` |
+
+- **The invariant in the deferred and cancelled rows.** A processing that ended without an outcome for the file (its
+  caller was cancelled, or a transient failure deferred it) has no adoption to share, so the waiting call re-runs as a
+  call arriving then would, and answers `nil` only when the file is dropped or kept, or when its own attempt deferred it.
+  Each asker makes at most one attempt per processing it waited for, counted by `deferLegacyFile`; the third deferral
+  in a lifetime keeps the file, as before. The call whose own read failed answers `nil`, as in L3: a real failure of
+  that read, not one the other adopter caused.
+- **Close and shutdown.** `close()`, and so the engine's shutdown, resumes every waiter through the call it waits for.
+  It sets `closing`, resumes the key waiters, drains the units and resumes the commit waiters, so every await inside a
+  processing returns (the hash and placement units, `acquireReference`'s key wait, the snapshot install). The
+  processing's next phase check throws `.closed`, and every exit path of `processLegacyFile` and
+  `processLegacyFileOnDemand` ends its marks, which resumes its waiters; they re-run and get `.closed` from `awaitOpen`
+  or `checkLive`. WP-B's `closeOpenStore` is not an authorised file, so it does not walk the new lists itself. Rows k-5
+  and k-6. Pinned: `closeResumesAWaitingAsker` (the waiting call throws `.closed`; no mark or waiter is left).
+- **Tests, failing first** (`5c9612a`, against the cycle-1 code). The store's `LegacyOnDemandRaceTests`: 7 tests, 17
+  issues, every one on the defect's own assertions. The engine's `ensureAvailableBesideARunningMigration` and
+  `userInitiatedPrefetchBesideARunningMigration`: 20 launches each over 120 prior-art files of 16 KiB, inline executors
+  so the migration is not held; 22 of 40 launches downloaded 1 to 5 files (PK2b, PK8u). The engine tests assert zero
+  transfers in every launch, and that the race was reached: they count the store's debug lines of a call that waited
+  for another call's processing of the same file. With the fix, 19 or 20 of 20 launches had such waits, about 10 to 16
+  per launch (three runs, measured with a temporary print that was not committed). The fix (`4811c50`): all pass;
+  `adoptNowRacesBatch` and every other store, engine, Kit and compatibility test pass unchanged.
+- **C2.** No new I/O and no new unit: the waits are continuations on the store's actor, the bookkeeping is O(1)
+  dictionary work per call, and a call that joins reads no byte.
+
+## L5K-R14: the install rate of bulk-lane adoptions
+- **The defect (L5K-C1-02).** Since L5K-R1 every bulk job's pre-transfer read called `adoptLegacyNow`, which published
+  at `.userInitiated`, an urgency the install-rate limiter never coalesces. A sync adopting N prior-art files installed
+  N snapshots (101 for 100 files in the new test), so ARCHITECTURE §5's bound ("at most 10 snapshot builds … per
+  second") did not hold during migration.
+- **Change.** `AssetStore.adoptLegacyNow(_:urgency:)`, `urgency: AssetPriority = .userInitiated`: package API,
+  defaulted, so the resolve path, leases and every existing caller keep their behaviour. The adoption publishes at that
+  urgency; a call that joined another's processing publishes at its own, so a user-initiated joiner installs at once
+  whoever adopted. The engine's funnel (`storedLocation(of:lane:)`) passes `.userInitiated` for a job of the
+  user-initiated lane, read before each id (a promotion during an earlier read counts), and `.bulk` otherwise, the
+  prefetch lane included, as the ruling says.
+- **Tests.** Failing first (`3e51cf8`): `adoptionsKeepTheInstallRate`, a bulk sync whose jobs adopt 100 prior-art files
+  under `ManualTimeSource` with ARCHITECTURE §5's 0.1 s interval installs at most 2 snapshots (1 measured, the apply's;
+  101 before the fix); then a user-initiated prefetch join of 4 prior-art pages installs one snapshot at once per
+  adoption (4), and readers see every page. The fix: `dcd2437`. Store pin (`c857cde`): `adoptionPublishesAtItsUrgency`,
+  three bulk adoptions install at most one snapshot, and a user-initiated one installs at once and carries them.
+- **Consequence for the shims.** Like the files a sync downloads, the files a sync adopts reach the lookups within
+  `SyncTuning.snapshotInstallInterval` (0.1 s by default) of their adoption; the trailing install runs on the engine's
+  alarm (ARCHITECTURE §5). A resolve's adoption, and a user-initiated job's, is installed before it returns. MIGRATION.md
+  §4 says so. The compatibility harness runs with an interval of 0.
+- **For the docs level.** ARCHITECTURE §5's bound holds during migration again, so L5K-C1-02's alternative (qualifying
+  §5 and ADR-016) is moot. Its sentence "`apply`, `purge`, `reportUnreadable` and `adoptLegacyNow` install at once"
+  becomes "`apply`, `purge`, `reportUnreadable` and `adoptLegacyNow` at its default `.userInitiated` install at once
+  (the engine's pre-transfer read of a bulk or prefetch job passes `.bulk`, L5K-R14)".
 
 ## L5K-R2: the compatibility tests' timing dependence
 Every test of `Tests/ZTronAssetCompatibilityTests` (70 in 10 suites, the orchestrator's `CompatibilityShimTests.swift`
@@ -658,9 +817,9 @@ store's own writes; and L5K-R2's addition, an outcome that depends on whether th
 
 | Test (file: function) | Pattern | Fix |
 |---|---|---|
-| `MigrationLaunchShimTests: launchSyncDuringLegacyMigration` (L5K-V3-04) | (a): `legacyLeft == 0` waited only for the resolves, while the CCR-K1 downloads left legacy copies for the migration loop or phase 4 to remove later (5 of 6 TSan runs failed); `stored` read the lookups' snapshot, which shows a running batch's adoptions only at the batch's end | After L5K-R1 the post-condition is strict at the sync's return: no transfer at all; every prior-art file out of the tree (each planned file was adopted before its job ended, each unplanned one was present when the run planned); stored read through `availability(scope:)`, the store's state, which the sync's completion orders. The resolves and the known-issue wrapper are gone, and nothing waits for `.syncStarted(_, .launch)` (a run took the launch run's place, so none follows) |
+| `MigrationLaunchShimTests: launchSyncDuringLegacyMigration` (L5K-V3-04) | (a): `legacyLeft == 0` waited only for the resolves, while the CCR-K1 downloads left legacy copies for the migration loop or phase 4 to remove later (5 of 6 TSan runs failed); `stored` read the lookups' snapshot, which shows a running batch's adoptions only at the batch's end | After L5K-R1 the post-condition is strict at the sync's return: no transfer at all; every prior-art file out of the tree (each planned file was adopted before its job ended, each unplanned one was present when the run planned); stored read through `availability(scope:)`, the store's state, which the sync's completion orders. The resolves and the known-issue wrapper are gone, and nothing waits for `.syncStarted(_, .launch)` (a run took the launch run's place, so none follows). Cycle 2 (L5K-R15, L5K-C1-03), pattern (a) again: nothing held migration, so `.complete` and the overlap the assertions need depended on the sync reaching the client before migration and the launch run it held back had ended (the verifier's probe: `.upToDate` in 10 of 10 runs with a 50 ms stall after `start()`). Now migration is held at a unit of its first file across the call (`startHoldingMigration`, a `releaser` for the jobs' units) and `heldUnits ⊇ migration` afterwards proves the overlap; the strict assertions hold deterministically, the claimed file being adopted by its job too |
 | `MigrationLaunchShimTests: lookupsDuringLegacyMigration` | (a): "all 40 (formerly 320) answer" right after the resolves over a running migration: a resolve that finds a file a still-running batch adopted answers from the store, and that file reaches the lookups only at the batch's end | The migration is held at a unit of its first file (`startHoldingMigration`) while the resolves run (`releaser`), so every adoption in the window is a resolve's, installed before it returns; "none answers after `start()`" replaces "fewer than all" (a held state, not a count race); "all answer" waits for `.syncStarted(_, .launch)`, the launch run the migration loop's end starts when no run took its place (L5K-R1's decision; no other run starts in this test, and the subscription is registered while the migration is held, so the event cannot be missed) |
-| `MigrationLaunchShimTests: launchSyncDuringResumedMigration` (new) | written against the patterns | Launch 1's interruption is ordered by events, not timing: the sync's run has started (`EventProbe`), and its joiner is answered in the shutdown turn that cancels the migration; launch 2's post-conditions are the strict ones of the first row |
+| `MigrationLaunchShimTests: launchSyncDuringResumedMigration` (new) | written against the patterns | Launch 1's interruption is ordered by events, not timing: the sync's run has started (`EventProbe`), and its joiner is answered in the shutdown turn that cancels the migration; launch 2's post-conditions are the strict ones of the first row. Cycle 2 (L5K-R15, L5K-C1-01): launch 2 ran on inline executors, so its overlap with the resumed migration was a race (the verifier's probe: `.upToDate` in 5 of 10 runs with a 100 ms stall); it now holds the resumed migration across the call as the first row does, with `heldUnits ⊇ migration` afterwards |
 
 Checked, no pattern:
 - `CompatibilityShimTests` (3, the orchestrator's file): pure.
@@ -672,8 +831,9 @@ Checked, no pattern:
   (awaited `start()` calls); `localURLIsTheStoredBlob`, `legacyInitialisersShareOneClient` (a settled launch, then
   awaited calls); `legacyStoreAdoptsThePriorArtFiles` (one prior-art file: if its batch adopts it, the batch binds the
   record and installs its snapshot with no await in between, so a resolve that finds the file present runs only after
-  the install was handed to the main actor, ahead of the test's continuation; if the resolve adopts it, it installs
-  before returning; its `starts.isEmpty` counts a fresh source, and since L5K-R1 no job downloads the file either).
+  the install was handed to the main actor, ahead of the test's continuation; if the resolve adopts it, or since
+  L5K-R13 meets the batch's adoption and waits for it, it installs before returning; its `starts.isEmpty` counts a
+  fresh source, and since L5K-R1 no job downloads the file either).
 - `LocalStoreShimTests` (10): settled launches (`settleLaunch()`); baselines for `manifestRequests`, `mainThreadCalls`
   and `starts` taken right before the call; `staleAssetServesItsOldBytes` waits for the probe's `syncProgress` with a
   completed asset (the subscription precedes the sync) and holds the republished icon's transfer; the two replacement
@@ -725,6 +885,20 @@ Checked, no pattern:
   of ARCHITECTURE §1.2 is the docs level's.
 - L5K-V3-03 and L5K-V3-10 (P-13 and the C2 benchmarks under load): not WP-K's; no benchmark run (L5K-R11).
 
+## Close-out cycle 2 — the cycle-1 issues and what became of them
+- L5K-C1-00 (blocking: an on-demand adoption racing a batch's adoption of the same file answered `nil`, and the job
+  downloaded the file): ruled (L5K-R13) and fixed in WP-C's legacy-migration files under authorisation, failing tests
+  first (`5c9612a` → `4811c50`); see "L5K-R13: one adoption per prior-art file". Row k-4, the L5K-R1 section's store
+  paragraph, MIGRATION.md step 3, step 4 and §4, K-15 and the shim doc comments now state the real ordering.
+- L5K-C1-02 (bulk-lane adoptions bypass the install rate): ruled (L5K-R14) and fixed (`3e51cf8` → `dcd2437`; store
+  pin `c857cde`); see "L5K-R14: the install rate of bulk-lane adoptions".
+- L5K-C1-01 and L5K-C1-03 (the two strict shim tests' timing dependence): fixed (L5K-R15, `de99d9a`); the two L5K-R2
+  rows say how.
+- L5K-C1-04 (the CCR-K1 header's stale text): the bullet ends with a status line.
+- L5K-C1-05 (no test pinned the migration loop's flag clear at shutdown): pinned in `resumedMigrationSync`'s launch 1
+  (true before the stop, false after it, `de99d9a`); mutant M3, which clears the flag only while the engine runs, fails
+  it.
+
 ## Not verified here
 - The shims at the iOS 15 floor at run time: the test target builds at iOS 17 / macOS 14 (ADR-051), the shims run on the
   iOS 27 simulator and macOS 27 only; their iOS 15 compile is the typecheck recorded in the evidence below.
@@ -740,6 +914,9 @@ Checked, no pattern:
   of one snapshot install per adopted file was not measured on a device (each is an O(1) swap there).
 - That the main actor runs its jobs in the order they were enqueued, which `legacyStoreAdoptsThePriorArtFiles`'s
   determinism argument uses (L5K-R2): taken from the main executor's serial queue, not tested here.
+- The one adoption per prior-art file (L5K-R13) with the live executors and on a device: the store tests step its units
+  (`SteppedBlockingExecutor`) on `FakeFileSystem`, and the engine tests run them inline there, reaching the race in
+  almost every launch on macOS 27 and passing under TSan; nothing measured how often a device reaches it.
 
 ## Evidence (close-out cycle 1; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`, `.build-k-perf`)
 - **Failing first (L5K-R1).** The six engine tests on the pre-fix engine (`e4cd072`), `swift test --skip-build
