@@ -854,6 +854,8 @@ struct EngineLegacyMigrationTransferTests {
         }
         _ = try resolved.get()
         let pageUnseen = await EngineLegacyMigrationTransferTests.unseen(harness, [page])
+        let coalescedFrom = time.monotonicNow()
+        let installsBefore = await harness.sink.offeredKeys.count
         let token = try await engine.registerGroup(neighbours, lane: .prefetch).get()
         try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
             guard let group = engine.state.groups[token] else {
@@ -866,8 +868,11 @@ struct EngineLegacyMigrationTransferTests {
         // anything: only the engine's alarm can run the trailing install the neighbours' adoptions left due.
         try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
         let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, neighbours)
+        let installs = await harness.sink.offeredKeys.count - installsBefore
+        let elapsed = time.monotonicNow().seconds(since: coalescedFrom)
         let held = Set(await bulk.heldUnits).isSuperset(of: migration)
 
+        #expect(installs <= Int((elapsed / 0.1).rounded(.up)) + 1, "the prefetch lane's installs stay within the limiter: \(installs) installs over \(elapsed) s")
         #expect(pageUnseen.isEmpty, "a user-initiated resolve's adoption is in the readers' snapshot when it returns")
         #expect(!unseenAtTheJoinsEnd.isEmpty, "premise: the prefetch lane's adoptions published at bulk urgency inside the install window")
         #expect(unseen.isEmpty, "R-STO-13: \(unseen.count) of \(neighbours.count) prefetched neighbours never reached the readers' snapshot: \(unseen)")
@@ -904,6 +909,8 @@ struct EngineLegacyMigrationTransferTests {
             await engine.sync(.force)
         }
         _ = try #require(outcome.completeReport, "the sync completes: \(outcome)")
+        let coalescedFrom = time.monotonicNow()
+        let installsBefore = await harness.sink.offeredKeys.count
         let waiting = await engine.readForTests { $0.state.migration.launchRunWaiting }
         // Probe J: the sync's own trailing install runs first, while the migration is still held.
         try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
@@ -915,8 +922,11 @@ struct EngineLegacyMigrationTransferTests {
         try await harness.drive { $0.isIdleSilent }
         let unseenPages = await EngineLegacyMigrationTransferTests.unseen(harness, pageIDs)
         let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, (standard + pages).map(\.0.identifier))
+        let installs = await harness.sink.offeredKeys.count - installsBefore
+        let elapsed = time.monotonicNow().seconds(since: coalescedFrom)
         let runs = await engine.readForTests { $0.state.lastRunID }
         let idle = await harness.idleViolations()
+        #expect(installs <= Int((elapsed / 0.1).rounded(.up)) + 1, "the bulk installs stay within the limiter: \(installs) installs over \(elapsed) s")
 
         #expect(!waiting, "the sync took the parked launch run's place (L5K-R1)")
         #expect(pagesBefore.count == pages.count, "premise: no page was adopted before migration went on")
