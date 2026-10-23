@@ -929,6 +929,36 @@ struct EngineLegacyMigrationTransferTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: a download launch reconciliation adopts from staging at bulk urgency reaches the readers' snapshot once the install window has passed, on a launch with no sync due (L5K-R16, enumeration)", .timeLimit(.minutes(1)))
+    func reconciledAdoptionReachesTheReaders() async throws {
+        // Another publication the enumeration found without a re-arm: launch reconciliation publishes a download the OS
+        // completed while the app was dead at bulk urgency, while the engine is still starting; no launch run follows
+        // (the sync is not due), so only the alarm can install it.
+        let time = ManualTimeSource()
+        let bytes = EngineFixture.bytes(9_500)
+        let entry = EngineHarness.onDemand("done", bytes)
+        let first = try await EngineLaunchTests.firstLifetime([entry], time: time)
+        let fileSystem = FakeFileSystem(disk: first.fileSystem.survivingDisk(), time: time)
+        let name = StagingFileName(transfer: entry.transferID, attempt: TransferAttempt(epoch: 1, sequence: 4), kind: .partial)
+        try fileSystem.write(bytes, to: StoreLayout(base: EngineHarness.base).stagingURL(name), mode: .truncate)
+        let source = FakeRemoteSource(capabilities: EngineLaunchTests.background)
+        await source.scriptReattached([ReattachedTransfer(name: name, isRunning: false, bytesReceived: Int64(bytes.count))])
+        let second = EngineHarness.make(time: time, source: source, installInterval: 0.1, fileSystem: fileSystem)
+        try await second.start()
+        let runs = await second.engine.readForTests { $0.state.lastRunID }
+        try await second.drive { $0.isIdleSilent }
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(second, [entry.identifier])
+        let idle = await second.idleViolations()
+
+        #expect(runs == 0, "premise: no launch run, whose apply would install the publication")
+        #expect(try await second.view().records["done"]?.referencedBlob != nil, "adopted from staging")
+        #expect(unseen.isEmpty, "R-STO-13: the adopted download never reached the readers' snapshot")
+        #expect(idle.checked && idle.violations.isEmpty, "settled: \(idle.checked), \(idle.violations)")
+        #expect(await source.starts.isEmpty, "adopted, not downloaded again")
+        await second.engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
     @Test("R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)", .timeLimit(.minutes(1)))
     func crossedDeadlineReadsKeepTheTrailingInstall() async throws {
         let time = ManualTimeSource()
