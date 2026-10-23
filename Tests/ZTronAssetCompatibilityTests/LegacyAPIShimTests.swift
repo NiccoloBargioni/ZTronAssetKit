@@ -98,16 +98,21 @@ struct LegacyAPIShimTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
-    @Test("R-CAR-6: localURL is the stored blob for an asset the client holds", .timeLimit(.minutes(1)))
+    @Test("R-CAR-6: localURL is the stored blob for an asset the client holds, and the prior art's default path for one it does not", .timeLimit(.minutes(1)))
     func localURLIsTheStoredBlob() async throws {
         let iconBytes = CompatFixture.bytes(70)
         let icon = CompatFixture.asset("bo6.tm.icon", iconBytes)
+        let absent = CompatFixture.asset("bo6.tm.poster", CompatFixture.bytes(74), directories: ["Black Ops 6", "The Tomb"])
         let harness = CompatHarness.make()
         await harness.serve([(icon, iconBytes)])
         try await harness.settleLaunch()
         let store: any PriorArtLocalStore = CDNLocalStore(client: harness.client)
 
         #expect(store.localURL(for: icon) == harness.client.lookup(CompatFixture.id(icon))?.url)
+        // The harness's client names no legacy root, so the prior art's default, `<Caches>/CDNAssets`, applies (a path
+        // computation only: nothing is created there).
+        let legacy = store.localURL(for: absent)
+        #expect(legacy.path.hasSuffix("/Caches/CDNAssets/Black Ops 6/The Tomb/poster.png"))
         await harness.client.shutdown()
     }
 

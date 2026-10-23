@@ -81,7 +81,7 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// Fetches a fresh manifest from `cdn` and returns every asset in it that is not stored at its content
     /// (`CDNLocalStore.missingOrStaleAssets`), downloading nothing. Throws only when the manifest fetch throws.
     public func verifyFullyAvailable() async throws -> [CDNAsset] {
-        // REENTRANCY: k-4 (proposed) — nothing of the coordinator is read across the fetch; the client's snapshot is
+        // REENTRANCY: k-3 (proposed) — nothing of the coordinator is read across the fetch; the client's snapshot is
         // read after it, so the comparison uses what is stored when the manifest arrived.
         let manifest = try await self.cdn.fetchManifest()
         return self.localStore.missingOrStaleAssets(against: manifest)
@@ -103,35 +103,28 @@ public final class CDNSyncCoordinator: ObservableObject {
     private func run(_ mode: SyncMode) async {
         let events: AsyncStream<AssetEvent>
         do {
-            // REENTRANCY: k-2 (proposed) — nothing of the coordinator is read across the subscription; `progress` is
+            // REENTRANCY: k-1 (proposed) — nothing of the coordinator is read across the subscription; `progress` is
             // written afterwards only by this call's follower and its final outcome.
             events = try await self.client.subscribe()
         } catch {
             self.finish(.failed(error))
             return
         }
+        // Progress never moves backwards within a run by construction (sync.md §10.6): the engine's completed count is
+        // monotone and one subscription delivers a run's progress in order, newest-wins.
         let follower = Task { @MainActor [weak self] in
-            var lastRun: SyncRunID?
-            var lastCompleted = 0
-            // REENTRANCY: k-3 (proposed) — each event is applied in the turn it arrives: `self` is re-checked (weak) and
-            // a count below the run's last one is dropped, so progress never moves backwards within a run.
+            // REENTRANCY: k-2 (proposed) — each event is applied in the turn it arrives, after re-reading `self` (weak).
             for await event in events {
-                guard case .syncProgress(let run, let progress) = event else {
-                    continue
+                if case .syncProgress(_, let progress) = event {
+                    self?.progress = CDNSyncProgress(progress: progress)
                 }
-                if run == lastRun, progress.completedCount < lastCompleted {
-                    continue
-                }
-                lastRun = run
-                lastCompleted = progress.completedCount
-                self?.progress = CDNSyncProgress(progress: progress)
             }
         }
-        // REENTRANCY: k-2 (proposed) — the follower publishes progress meanwhile; the outcome is applied only after the
+        // REENTRANCY: k-1 (proposed) — the follower publishes progress meanwhile; the outcome is applied only after the
         // follower ended (below).
         let outcome = await self.client.sync(mode)
         follower.cancel()
-        // REENTRANCY: k-2 (proposed) — the follower has ended, so the outcome is the last value this call publishes.
+        // REENTRANCY: k-1 (proposed) — the follower has ended, so the outcome is the last value this call publishes.
         await follower.value
         self.finish(outcome)
     }

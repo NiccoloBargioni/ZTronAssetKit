@@ -192,12 +192,6 @@ public struct CDNReconciliationSummary: Sendable, Hashable {
         public let identifier: String
         /// The error's description.
         public let reason: String
-
-        /// Creates a failure.
-        public init(identifier: String, reason: String) {
-            self.identifier = identifier
-            self.reason = reason
-        }
     }
 
     /// Assets whose directory or file name changed, applied without a download.
