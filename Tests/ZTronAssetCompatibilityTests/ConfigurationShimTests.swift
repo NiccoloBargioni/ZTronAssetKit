@@ -138,4 +138,35 @@ struct ConfigurationShimTests {
         let later = point.installClient(for: StaticManifestCDNProvider(baseURL: second)).identity
         #expect(later == client.identity)
     }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: a prior-art provider at the configured origin keeps the configuration's app key and HTTP settings, and one at another origin gets neither")
+    func providerAtTheConfiguredOriginKeepsTheAppKey() throws {
+        let harness = CompatHarness.make()
+        let origin = try #require(URL(string: "https://d111111abcdef8.cloudfront.net/"))
+        var configured = CDNConfiguration(baseURL: origin, appKey: AppKey("canary-key"), refreshPolicy: .everyLaunch)
+        configured.remote.http?.requestTimeout = 12
+        configured.remote.http?.maxConnectionsPerHost = 3
+        // The same origin spelled differently (host case, the default port written out, another path): SPEC §2.3's
+        // origin answers 403 without the key, so the client keeps it, with the provider's base URL and manifest path.
+        let sameOrigin = try #require(URL(string: "https://D111111ABCDEF8.cloudfront.net:443/assets/"))
+        let point = CDNInstallPoint(configuration: configured, environment: harness.environment)
+
+        let client = point.installClient(for: StaticManifestCDNProvider(baseURL: sameOrigin, manifestPath: "catalog.json"))
+
+        var expected = try #require(configured.remote.http)
+        expected.baseURL = sameOrigin
+        expected.manifestPath = "catalog.json"
+        #expect(client.configuration.remote == RemoteConfiguration(http: expected))
+        #expect(client.configuration.refresh == .everyLaunch)
+        for other in ["https://other.example.com/", "http://d111111abcdef8.cloudfront.net/", "https://d111111abcdef8.cloudfront.net:8443/"] {
+            let elsewhere = try #require(URL(string: other))
+            let built = CDNProviderFactory.makeClient(for: StaticManifestCDNProvider(baseURL: elsewhere), base: configured, environment: harness.environment)
+            #expect(
+                built.configuration.remote == RemoteConfiguration(http: HTTPSourceConfiguration(baseURL: elsewhere)),
+                "the key is never carried to another origin: \(other)"
+            )
+        }
+    }
 }
