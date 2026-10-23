@@ -153,13 +153,14 @@ extension SyncEngine {
                 // Waiting test seams re-evaluate their conditions once the store's work is over.
                 self.notifyObservers()
             }
+            let since = self.state.storeDeadlineUpdates
             // REENTRANCY: RE-S27 — the lifecycle; reaped bytes wake `awaitingSpace` jobs; re-armed from the store's
-            // new `nextDeadline()`.
+            // new `nextDeadline()`, applied against a re-read that landed meanwhile (`applyStoreDeadline`, L5K-R16).
             let work = await self.store.runDueWork()
             guard self.isRunning else {
                 return
             }
-            self.setStoreDeadline(work.nextDeadline)
+            self.applyStoreDeadline(work.nextDeadline, readSince: since)
             if work.reapedBytes > 0 {
                 // REENTRANCY: f-4 (proposed) — the lifecycle; the ledger's base is replaced by a fresh read (a read that
                 // fails leaves the last figures, which then decide), and every job parked for space is re-read below.
@@ -201,9 +202,12 @@ extension SyncEngine {
         }
     }
 
-    /// Re-reads `store.nextDeadline()` into the heap (RE-S40).
+    /// Re-reads `store.nextDeadline()` into the heap (RE-S40), against the updates that land while the read is in
+    /// flight (`applyStoreDeadline`).
     func refreshStoreDeadline() async {
-        // REENTRANCY: RE-S40 — the lifecycle; a stale entry is replaced by the newest deadline.
+        let since = self.state.storeDeadlineUpdates
+        // REENTRANCY: RE-S40 — the lifecycle; the answer is applied against the updates that landed meanwhile, so a stale
+        // entry is replaced by the newest deadline and a newer one is never dropped.
         let deadline = await self.store.nextDeadline()
         if case .armed = self.state.storeDeadlineReadHold {
             // REENTRANCY: f-8 (proposed) — nothing: a test seam no production path arms, resumed once by
@@ -216,7 +220,21 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
-        self.setStoreDeadline(deadline)
+        self.applyStoreDeadline(deadline, readSince: since)
+    }
+
+    /// Applies an answer of the store's deadline (a re-read, the alarm's `runDueWork()` report, a lease release) that was
+    /// requested when `storeDeadlineUpdates` was `since`. The store answers in its own order and the engine resumes the
+    /// answers in its own (task priorities), so when another update landed while this one was in flight the two may have
+    /// crossed: the earlier deadline is kept then, never the later one or none, and at worst the alarm wakes once early,
+    /// its `runDueWork()` report re-arming from the newest deadline. With no update meanwhile the answer replaces the
+    /// heap's store entry (orchestrator ruling L5K-R16).
+    func applyStoreDeadline(_ deadline: MonotonicInstant?, readSince since: UInt64) {
+        guard self.state.storeDeadlineUpdates != since, let landed = self.state.storeDeadline else {
+            self.setStoreDeadline(deadline)
+            return
+        }
+        self.setStoreDeadline(deadline.map { min($0, landed) } ?? landed)
     }
 
     /// Test seam: the next `refreshStoreDeadline()` waits once the store answered, until `releaseStoreDeadlineRead()`
@@ -256,8 +274,9 @@ extension SyncEngine {
     }
 
     /// Replaces the heap's store entry; a cleared one leaves jobs waiting for space without a wake (see
-    /// `settleUnwakeableSpaceWaits`).
+    /// `settleUnwakeableSpaceWaits`). Every update is counted (`storeDeadlineUpdates`, `applyStoreDeadline`).
     func setStoreDeadline(_ deadline: MonotonicInstant?) {
+        self.state.storeDeadlineUpdates &+= 1
         self.state.storeDeadline = deadline
         if let deadline {
             self.state.heap.schedule(.store, at: deadline)

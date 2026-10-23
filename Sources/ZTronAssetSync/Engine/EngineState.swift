@@ -199,6 +199,9 @@ struct EngineState {
     var lastAlarm: UInt64 = 0
     /// The store's next deadline as last read.
     var storeDeadline: MonotonicInstant?
+    /// Updates of `storeDeadline` so far (`setStoreDeadline`): an answer of the store's deadline requested at one count
+    /// and applied at another may have crossed a newer answer (`applyStoreDeadline`, orchestrator ruling L5K-R16).
+    var storeDeadlineUpdates: UInt64 = 0
     /// How many alarm runs have their `store.runDueWork()`, and what follows it (a free-space read after reaped bytes),
     /// under way: the store deadline is cleared meanwhile, yet that work may still reap. A count, not a flag: a deadline
     /// armed during one run's await starts a second alarm, and the first to end must not mark the other's work over

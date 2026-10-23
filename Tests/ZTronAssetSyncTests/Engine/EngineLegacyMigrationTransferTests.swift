@@ -572,6 +572,24 @@ struct EngineLegacyMigrationTransferTests {
         return (harness, bulk)
     }
 
+    /// Drives the clock until the engine holds no deadline on its heap and no alarm turn's store work is in flight, for
+    /// a test whose migration is held (so the engine never becomes idle-silent). Heap emptiness alone is a weaker
+    /// condition than the readers' check needs: the alarm takes the store's entry off the heap before its
+    /// `runDueWork()`, which installs the trailing snapshot (L5K-R2 pattern (a)), and that work may arm the next store
+    /// deadline. Every wait ends on cancellation.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func runStoreWork(_ harness: EngineHarness) async throws {
+        let engine = harness.engine
+        while true {
+            try await harness.drive { $0.scheduledDeadlines == 0 }
+            await engine.awaitCondition { $0.state.storeWorkRuns == 0 }
+            if await engine.readForTests({ $0.state.heap.count == 0 && $0.state.storeWorkRuns == 0 }) {
+                return
+            }
+            try Task.checkCancellation()
+        }
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)", .timeLimit(.minutes(1)))
     func syncAdoptionsReachTheReaders() async throws {
@@ -638,7 +656,7 @@ struct EngineLegacyMigrationTransferTests {
         let unseenAtTheJoinsEnd = await EngineLegacyMigrationTransferTests.unseen(harness, neighbours)
         // The clock passes the install window while the migration is still held, so no batch and no launch run installs
         // anything: only the engine's alarm can run the trailing install the neighbours' adoptions left due.
-        try await harness.drive { $0.scheduledDeadlines == 0 }
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
         let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, neighbours)
         let held = Set(await bulk.heldUnits).isSuperset(of: migration)
 
@@ -680,7 +698,7 @@ struct EngineLegacyMigrationTransferTests {
         _ = try #require(outcome.completeReport, "the sync completes: \(outcome)")
         let waiting = await engine.readForTests { $0.state.migration.launchRunWaiting }
         // Probe J: the sync's own trailing install runs first, while the migration is still held.
-        try await harness.drive { $0.scheduledDeadlines == 0 }
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
         let pagesBefore = await EngineLegacyMigrationTransferTests.unseen(harness, pageIDs)
         await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
         await task.value
@@ -710,6 +728,17 @@ struct EngineLegacyMigrationTransferTests {
         let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(catalog, time: time)
         let engine = harness.engine
         let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        // A known store state, set up through the store itself: whatever the start left due is done (the migration may
+        // have adopted its first file before the hold), then a user-initiated adoption installs at once, which closes the
+        // install window, and its records are committed, so nothing is due.
+        time.advance(by: 1)
+        _ = await harness.store.runDueWork()
+        let warm = catalog[2].0.identifier
+        let (warmed, warmTask) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            (try? await harness.store.adoptLegacyNow(warm)) ?? nil
+        }
+        _ = await harness.store.runDueWork()
+        try #require(warmed != nil, "premise: the user-initiated adoption bound its asset")
         try #require(await harness.store.nextDeadline() == nil, "premise: the store has nothing due before the reads")
 
         // Re-read A answers "nothing due" and waits before the engine applies that answer, as the answer of a task of
@@ -726,20 +755,24 @@ struct EngineLegacyMigrationTransferTests {
             (try? await harness.store.adoptLegacyNow(id, urgency: .bulk)) ?? nil
         }
         let due = try #require(await harness.store.nextDeadline(), "premise: the adoption left the trailing install due")
+        // The alarm's turns wait until the older answer has been applied, so the heap shows what the two answers left.
+        await engine.holdAlarmTurns()
         await engine.refreshStoreDeadline()
         let afterNewer = await engine.readForTests { $0.state.heap.deadline(for: .store) }
         // Re-read A applies its older answer last.
         await engine.releaseStoreDeadlineRead()
         await older.value
         let afterOlder = await engine.readForTests { $0.state.heap.deadline(for: .store) }
-        try await harness.drive { $0.scheduledDeadlines == 0 }
+        await engine.releaseAlarmTurns()
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
         let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [id])
 
         #expect(adopted != nil, "the adoption bound the asset")
-        #expect(afterNewer == due, "the newer answer scheduled the trailing install")
-        #expect(afterOlder.map { $0 <= due } == true, "R-STO-13: the older answer took the trailing install off the heap: \(String(describing: afterOlder))")
-        #expect(unseen.isEmpty, "the trailing install ran, so the readers see the adopted asset")
+        #expect(afterNewer == due, "the newer answer scheduled the store's due work")
+        #expect(afterOlder == due, "R-STO-13: the older answer took the store's due work, the trailing install among it, off the heap: \(String(describing: afterOlder))")
+        #expect(unseen.isEmpty, "R-STO-13: the trailing install never ran, so the readers miss the adopted asset")
         await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await warmTask.value
         await task.value
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()

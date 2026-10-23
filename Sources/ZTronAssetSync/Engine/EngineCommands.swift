@@ -882,17 +882,22 @@ extension SyncEngine {
             return
         }
         self.spawn(.entry) { engine in
-            // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
-            let deadline = await engine.store.releaseLease(lease)
-            await engine.leaseReleased(deadline)
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle.
+            await engine.releaseLease(lease)
         }
     }
 
-    private func leaseReleased(_ deadline: MonotonicInstant?) {
+    /// The store's release, whose answer is the store's new deadline, applied against the updates that landed while it
+    /// was in flight (`applyStoreDeadline`, orchestrator ruling L5K-R16).
+    private func releaseLease(_ lease: AssetLease) async {
+        let since = self.state.storeDeadlineUpdates
+        // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline and a newer one is
+        // never dropped.
+        let deadline = await self.store.releaseLease(lease)
         guard self.isRunning else {
             return
         }
-        self.setStoreDeadline(deadline)
+        self.applyStoreDeadline(deadline, readSince: since)
     }
 
     // MARK: Purge (R-CLN-6, RE-S24)
