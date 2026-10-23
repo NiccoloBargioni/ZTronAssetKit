@@ -20,44 +20,91 @@ public final class CDNInstallPoint {
     nonisolated public let configuration: CDNConfiguration
     /// The environment such a client runs in (`nil` builds `.live()`); tests pass fakes.
     nonisolated let environment: AssetEnvironment?
+    /// The client a point was created with (`init(client:)`): set before the point is shared, never changed.
+    nonisolated private let initial: AssetClient?
+    /// The client installed later, at most once, when there was no initial one.
     private var installed: AssetClient?
+    /// Tasks waiting in `waitForClient()`, resumed by the installation or by their cancellation.
+    private var waiters: [UInt64: CheckedContinuation<AssetClient?, Never>] = [:]
+    private var lastWaiter: UInt64 = 0
 
     /// An empty point whose clients are built from `configuration` and `environment`.
     nonisolated public init(configuration: CDNConfiguration = CDNConfiguration(), environment: AssetEnvironment? = nil) {
         self.configuration = configuration
         self.environment = environment
+        self.initial = nil
     }
 
     /// A point that already holds `client` (what `CDNLocalStore(client:)` binds to).
     nonisolated public init(client: AssetClient) {
         self.configuration = CDNConfiguration(clientConfiguration: client.configuration)
         self.environment = nil
-        // WP-K skeleton: the client is not kept yet.
+        self.initial = client
     }
 
     /// The installed client, if any.
     public var client: AssetClient? {
-        self.installed
+        self.initial ?? self.installed
     }
 
     /// Installs `client` unless a client is installed already; returns the installed client.
     @discardableResult
     public func install(_ client: AssetClient) -> AssetClient {
-        // WP-K skeleton: nothing is kept yet.
-        client
+        if let current = self.client {
+            return current
+        }
+        self.installed = client
+        let waiting = self.waiters
+        self.waiters = [:]
+        for continuation in waiting.values {
+            continuation.resume(returning: client)
+        }
+        return client
     }
 
     /// The installed client, or one built for `provider` (`CDNProviderFactory.makeClient(for:base:environment:)`
     /// with this point's configuration and environment) and installed now. Only the first provider builds a client.
     @discardableResult
     public func installClient(for provider: any CDNProviding) -> AssetClient {
-        // WP-K skeleton: nothing is built or kept yet.
-        CDNProviderFactory.makeClient(for: provider, base: self.configuration, environment: self.environment)
+        if let current = self.client {
+            return current
+        }
+        return self.install(CDNProviderFactory.makeClient(for: provider, base: self.configuration, environment: self.environment))
     }
 
     /// Suspends until a client is installed and returns it; `nil` when the calling task is cancelled first.
     public func waitForClient() async -> AssetClient? {
-        // WP-K skeleton: nobody waits yet.
-        self.installed
+        if let current = self.client {
+            return current
+        }
+        self.lastWaiter += 1
+        let key = self.lastWaiter
+        // REENTRANCY: k-1 (proposed) — nothing is read after the wait: the continuation carries the installed client
+        // (written once, so it cannot change afterwards) or nil, and only one of `install` and `cancelWaiter` finds the
+        // key, so the wait resumes exactly once.
+        return await withTaskCancellationHandler {
+            // REENTRANCY: k-1 (proposed) — as above; the body registers synchronously, after re-reading the slot and
+            // the cancellation flag on the main actor.
+            await withCheckedContinuation { (continuation: CheckedContinuation<AssetClient?, Never>) in
+                if let current = self.client {
+                    continuation.resume(returning: current)
+                } else if Task.isCancelled {
+                    continuation.resume(returning: nil)
+                } else {
+                    self.waiters[key] = continuation
+                }
+            }
+        } onCancel: {
+            // The handler runs on the cancelling thread; the slot is the main actor's, so the withdrawal hops there.
+            // A cancellation that lands before the registration finds no key here, and the body sees the flag.
+            Task { @MainActor in
+                self.cancelWaiter(key)
+            }
+        }
+    }
+
+    /// Resumes a cancelled waiter with `nil`, unless the installation resumed it already.
+    private func cancelWaiter(_ key: UInt64) {
+        self.waiters.removeValue(forKey: key)?.resume(returning: nil)
     }
 }

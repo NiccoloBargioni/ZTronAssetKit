@@ -48,6 +48,13 @@ public struct StaticManifestCDNProvider: CDNProviding {
     }
 }
 
+extension StaticManifestCDNProvider: CDNRemoteConfigurable {
+    /// The HTTP tier at this provider's base URL and manifest path (no app key: the prior art sent none).
+    var remoteConfiguration: RemoteConfiguration {
+        RemoteConfiguration(http: HTTPSourceConfiguration(baseURL: self.baseURL, manifestPath: self.manifestPath))
+    }
+}
+
 /// The prior art's provider error, unchanged.
 public enum StaticManifestCDNProviderError: Error {
     /// A non-2xx answer (or a response that is not HTTP).

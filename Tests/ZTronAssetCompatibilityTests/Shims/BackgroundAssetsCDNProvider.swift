@@ -33,6 +33,14 @@ public struct BackgroundAssetsCDNProvider: CDNProviding {
     }
 }
 
+@available(iOS 26.0, *)
+extension BackgroundAssetsCDNProvider: CDNRemoteConfigurable {
+    /// The Apple-hosted tier with SPEC §2.3's layout (catalog `ZTronCatalog/catalog.json`, release after adoption).
+    var remoteConfiguration: RemoteConfiguration {
+        RemoteConfiguration(appleHosted: AppleTierConfiguration())
+    }
+}
+
 /// The prior art's provider error, unchanged.
 public enum BackgroundAssetsCDNProviderError: Error {
     /// `remotePath` was not in the `"<packID>/<relativePath>"` shape this provider expects.

@@ -162,15 +162,28 @@ struct ConfigurationShimTests {
     }
 
     @MainActor
-    @Test("R-CAR-6: a cancelled wait on an install point resumes with nil", .timeLimit(.minutes(1)))
+    @Test("R-CAR-6: a wait on an install point cancelled before or after it registered resumes with nil", .timeLimit(.minutes(1)))
     func cancelledWaiterResumesWithNil() async {
         let point = CDNInstallPoint()
-        let waiter = Task { @MainActor in
+        let early = Task { @MainActor in
             await point.waitForClient()
         }
-        waiter.cancel()
-        let resumed = await waiter.value
-        #expect(resumed == nil)
+        early.cancel()
+        let earlyAnswer = await early.value
+        #expect(earlyAnswer == nil, "cancelled before it registered")
+
+        let (waiting, signal) = AsyncStream<Void>.makeStream()
+        let registered = Task { @MainActor in
+            signal.yield()
+            return await point.waitForClient()
+        }
+        // The waiter runs on the main actor up to its registration before this test resumes.
+        for await _ in waiting {
+            break
+        }
+        registered.cancel()
+        let registeredAnswer = await registered.value
+        #expect(registeredAnswer == nil, "cancelled while registered")
         #expect(point.client == nil)
     }
 }

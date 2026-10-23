@@ -26,8 +26,13 @@ public struct CDNConfiguration: Sendable, Hashable {
         location: StorageLocation = .applicationSupport,
         legacy: LegacyMigrationPolicy = LegacyMigrationPolicy()
     ) {
-        // WP-K skeleton: the mapping is not written yet.
-        self.clientConfiguration = AssetClientConfiguration(remote: RemoteConfiguration())
+        let http = baseURL.map { HTTPSourceConfiguration(baseURL: $0, manifestPath: manifestPath, appKey: appKey) }
+        self.clientConfiguration = AssetClientConfiguration(
+            remote: RemoteConfiguration(http: http, appleHosted: appleHosted, awsOnly: awsOnly),
+            location: location,
+            legacy: legacy,
+            refresh: refreshPolicy.refreshPolicy
+        )
     }
 
     /// The remote tiers of `clientConfiguration`.
@@ -53,8 +58,7 @@ protocol CDNRemoteConfigurable {
 public enum CDNProviderFactory {
     /// A client for `configuration`; no I/O, no task (P-12). `environment` is for tests; `nil` builds `.live()`.
     public static func makeClient(_ configuration: CDNConfiguration, environment: AssetEnvironment? = nil) -> AssetClient {
-        // WP-K skeleton: the configuration is not applied yet.
-        AssetClient(configuration: AssetClientConfiguration(remote: RemoteConfiguration()), environment: environment)
+        AssetClient(configuration: configuration.clientConfiguration, environment: environment)
     }
 
     /// A client for a prior-art provider: `base` with the provider's tier (`remoteConfiguration(for:)`), or with
@@ -64,15 +68,17 @@ public enum CDNProviderFactory {
         base: CDNConfiguration = CDNConfiguration(),
         environment: AssetEnvironment? = nil
     ) -> AssetClient {
-        // WP-K skeleton: the provider's tier is not applied yet.
-        AssetClient(configuration: base.clientConfiguration, environment: environment)
+        var configuration = base
+        if let remote = CDNProviderFactory.remoteConfiguration(for: provider) {
+            configuration.remote = remote
+        }
+        return CDNProviderFactory.makeClient(configuration, environment: environment)
     }
 
     /// The client tier that replaces a prior-art provider: `StaticManifestCDNProvider` is the HTTP tier with its base
     /// URL and manifest path, `BackgroundAssetsCDNProvider` the Apple-hosted tier; `nil` for any other conformance.
     public static func remoteConfiguration(for provider: any CDNProviding) -> RemoteConfiguration? {
-        // WP-K skeleton: no provider is recognised yet.
-        nil
+        (provider as? any CDNRemoteConfigurable)?.remoteConfiguration
     }
 
     /// Installs a client for `configuration` into `point` (the process-wide one by default) unless one is installed
@@ -84,7 +90,9 @@ public enum CDNProviderFactory {
         into point: CDNInstallPoint = .process,
         environment: AssetEnvironment? = nil
     ) -> AssetClient {
-        // WP-K skeleton: nothing is installed yet.
-        CDNProviderFactory.makeClient(configuration, environment: environment)
+        if let installed = point.client {
+            return installed
+        }
+        return point.install(CDNProviderFactory.makeClient(configuration, environment: environment))
     }
 }
