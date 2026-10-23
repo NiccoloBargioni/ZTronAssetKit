@@ -180,7 +180,8 @@ extension AssetStore {
     enum LegacyOutcome: Sendable, Hashable {
         /// Its bytes verified and its records were bound to them.
         case adopted
-        /// Someone else adopted it meanwhile (a batch and an adopt-on-demand raced).
+        /// Another call adopted it meanwhile: a batch and an adopt-on-demand, or two adopt-on-demand calls, processed it
+        /// at once, and this call waited out that adoption before deciding (orchestrator ruling L5K-R13).
         case alreadyAdopted
         /// Its bytes did not verify, or it vanished, or no record wants it any more.
         case dropped
@@ -211,6 +212,15 @@ extension AssetStore {
 
     /// Hashes one legacy file and adopts it for the records that still want it (hash, re-validate, `adoptVerifiedFile`).
     /// Throws only the lifecycle and cancellation errors; a transient failure defers the file, every other one drops it.
+    ///
+    /// At most one adoption of a file runs at a time (orchestrator ruling L5K-R13). Two calls may hash the same file at
+    /// once (an adopt-on-demand of a file a batch holds but has not finished hashing, so a lookup never waits behind a
+    /// batch's hash); the first whose bytes verify marks the file in `MigrationState.adopting` in the turn it decides, and
+    /// the other, whatever its own hash gave, waits out that adoption before it decides from the records
+    /// (`awaitLegacyAdoption`). So a file the other call renamed away (a `notFound` read) or is placing (its key in
+    /// `publishing`) reads as `alreadyAdopted`, never as dropped or deferred. The callers start it only while no adoption
+    /// of the file is in flight: a batch on a file it just took from the queue, an adopt-on-demand only after it found
+    /// none (`performAdoptLegacyNow`).
     func processLegacyFile(_ file: LegacyFile) async throws(StoreError) -> LegacyOutcome {
         guard let root = self.state.migration.root, !self.legacyWanters(file).isEmpty else {
             return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
@@ -219,33 +229,77 @@ extension AssetStore {
             .appendingPathComponent(file.components.last ?? "", isDirectory: false)
         let hashed: (digest: ContentHash, byteCount: Int64)
         do throws(StoreError) {
-            // REENTRANCY: R11, R18 — after the hash: the phase; the records still expect the digest (`legacyWanters`
-            // below); the file's bytes are what was planned (the digest and size checks).
+            // REENTRANCY: R11, R18 — after the hash: the phase; another call's adoption of the file is waited out before
+            // anything is decided (k-6, below); the records still expect the digest (`legacyWanters` below); the file's
+            // bytes are what was planned (the digest and size checks).
             hashed = try await self.hashFile(at: url)
         } catch {
             try AssetStore.rethrowLifecycle(error)
+            // REENTRANCY: k-6 (proposed) — a racing adoption may have renamed the file away: its outcome is waited for,
+            // then the records decide (`legacyFailureOutcome`).
+            try await self.awaitLegacyAdoption(of: file)
             return self.legacyFailureOutcome(file, error)
         }
         try self.checkLive()
+        // REENTRANCY: k-6 (proposed) — the records below are read once no other call's adoption of the file is in flight.
+        try await self.awaitLegacyAdoption(of: file)
         let wanting = self.legacyWanters(file)
         guard hashed.digest == file.digest, file.byteSize.map({ $0 == hashed.byteCount }) ?? true, !wanting.isEmpty else {
             return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
         }
+        // No other adoption of the file is in flight in this turn (the wait above): this call's starts.
+        self.state.migration.adopting[file.components] = []
+        let locations: [AssetID: AssetLocation]
         do throws(StoreError) {
             // REENTRANCY: R11, R18, R3, R4 — `adoptVerifiedFile` re-validates every record after its placement unit and
-            // binds only those that still expect the digest.
-            let locations = try await self.adoptVerifiedFile(at: url, digest: hashed.digest, byteCount: hashed.byteCount, for: wanting)
-            if !locations.isEmpty {
-                return .adopted
-            }
+            // binds only those that still expect the digest; this call's mark in `adopting` keeps every other call that
+            // processes the file waiting until the binding is done (k-5, k-6).
+            locations = try await self.adoptVerifiedFile(at: url, digest: hashed.digest, byteCount: hashed.byteCount, for: wanting)
         } catch {
+            self.endLegacyAdoption(of: file)
             try AssetStore.rethrowLifecycle(error)
             return self.legacyFailureOutcome(file, error)
+        }
+        self.endLegacyAdoption(of: file)
+        if !locations.isEmpty {
+            return .adopted
         }
         return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
     }
 
-    /// The outcome of a file whose hash or move failed with `error`: adopted by a racing call, deferred when the error
+    /// Waits until no other call's adoption of `file` is in flight (`MigrationState.adopting`) and returns in the turn in
+    /// which none is, so the caller decides from the records as that adoption left them and may start its own adoption in
+    /// that turn (L5K-R13). Throws the store's shutdown answer when it closed meanwhile: `close()` lets the adopting call's
+    /// units finish and resumes its key waiters, so that call ends (with `.closed`) and resumes this one.
+    func awaitLegacyAdoption(of file: LegacyFile) async throws(StoreError) {
+        while self.state.migration.adopting[file.components] != nil {
+            self.environment.log.log(.store, .debug, "a legacy file's processing waits for another call's adoption of the same legacy file")
+            // REENTRANCY: k-6 (proposed) — the loop re-reads `adopting` and the phase (`checkLive`) once that adoption ended;
+            // the caller then reads the records anew.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                if self.state.migration.adopting[file.components] != nil {
+                    self.state.migration.adopting[file.components]?.append(continuation)
+                } else {
+                    continuation.resume()
+                }
+            }
+            try self.checkLive()
+        }
+    }
+
+    /// Ends this call's adoption of `file`: the mark goes and every call waiting for it is resumed; each re-reads the
+    /// records (REENTRANCY k-5, k-6).
+    func endLegacyAdoption(of file: LegacyFile) {
+        guard let waiters = self.state.migration.adopting.removeValue(forKey: file.components) else {
+            return
+        }
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
+    /// The outcome of a file whose hash or move failed with `error`, once no other call's adoption of it is in flight (a
+    /// racing placement renames the file away before it binds, L5K-R13): adopted by that call, deferred when the error
     /// says nothing about the file (`isTransientLegacyFailure`), dropped otherwise.
     func legacyFailureOutcome(_ file: LegacyFile, _ error: StoreError) -> LegacyOutcome {
         if self.legacyAdopted(file) {
@@ -316,8 +370,9 @@ extension AssetStore {
             self.state.migration.claimed.append(file)
             let outcome: LegacyOutcome
             do throws(StoreError) {
-                // REENTRANCY: R11 — `processLegacyFile` re-validates after each of its awaits; the queue and the claims
-                // are this call's own (an adopt-on-demand of a claimed file never counts it).
+                // REENTRANCY: R11, k-6 (proposed) — `processLegacyFile` re-validates after each of its awaits and waits out
+                // another call's adoption of the file before it decides; the queue and the claims are this call's own (an
+                // adopt-on-demand of a claimed file never counts it).
                 outcome = try await self.processLegacyFile(file)
             } catch {
                 self.unclaimLegacyFile(file, requeue: true)
@@ -487,57 +542,127 @@ extension AssetStore {
     /// `adoptLegacyNow(_:)`: the current location when the asset is present; otherwise, while migration runs, adopts its
     /// legacy file now and installs the snapshot at once. Each adoption is counted once, by the call that adopted the
     /// file; a drop only by the call that took the file from the queue.
+    ///
+    /// One adoption per legacy file, whoever asks (orchestrator ruling L5K-R13). A call that finds the file being
+    /// processed by another adopt-on-demand (`MigrationState.onDemand`, from its claim to its snapshot) or being adopted by
+    /// a batch (`MigrationState.adopting`) waits for that processing to end and starts again (REENTRANCY k-5): it shares
+    /// that hash and answers the location that adoption bound, installed at once; it answers `nil` only when the file was
+    /// dropped or kept; and when the processing ended without an outcome for the file (its caller was cancelled, or a
+    /// transient failure deferred it back to the queue) it takes the file and processes it itself, as a call arriving
+    /// then would. A file a batch holds but has not finished hashing is processed at once (the two hashes may overlap,
+    /// one adoption still binds, `processLegacyFile`): a lookup never waits behind a batch's hash.
     func performAdoptLegacyNow(_ id: AssetID) async throws(StoreError) -> AssetLocation? {
-        // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
-        try await self.awaitOpen()
-        if let location = self.location(for: id, extensions: [], recordingAccess: false) {
-            return location
+        var joined = false
+        while true {
+            // REENTRANCY: R1, k-5 (proposed) — nothing was read before it, or everything is read again below after a wait;
+            // `awaitOpen` re-reads the phase itself.
+            try await self.awaitOpen()
+            if let location = self.location(for: id, extensions: [], recordingAccess: false) {
+                guard joined else {
+                    return location
+                }
+                // The adoption this call waited for may be in a coalesced snapshot only (a batch's): an adopt-on-demand
+                // installs its answer at once, whoever adopted the file.
+                // REENTRANCY: R17 — nothing but the phase: the location is read from the record afterwards.
+                await self.publishSnapshot(urgency: .userInitiated)
+                return self.location(for: id, extensions: [], recordingAccess: false)
+            }
+            try self.checkWritable()
+            guard self.state.migration.phase == .inProgress else {
+                return nil
+            }
+            if !self.state.migration.planCommitted {
+                // No legacy file moves before a generation holding the phase-1 plan is committed, on demand too (C-13).
+                // REENTRANCY: R17, R18 — then the call starts again: the location, the phase, the queue, the claims and the
+                // files in flight are read anew (a batch may have adopted the asset meanwhile).
+                try await self.commitLegacyPlanIfNeeded()
+                continue
+            }
+            let migration = self.state.migration
+            // One linear search per call (adopt-on-demand serves a lookup miss); batches take files from the end in O(1).
+            let queued = migration.queue.lastIndex { $0.ids.contains(id) }
+            guard let file = queued.map({ migration.queue[$0] }) ?? migration.claimed.first(where: { $0.ids.contains(id) }) else {
+                return nil
+            }
+            if migration.onDemand[file.components] != nil || migration.adopting[file.components] != nil {
+                joined = true
+                self.environment.log.log(.store, .debug, "an adopt-on-demand waits for the processing of the same legacy file in flight")
+                // REENTRANCY: k-5 (proposed) — then the call starts again and reads everything anew: the processing it
+                // waited for has ended (adopted: the location is present; dropped or kept: the file is neither queued nor
+                // claimed; cancelled or deferred: the file is back in the queue and this call takes it).
+                await self.awaitLegacyFlight(of: file)
+                continue
+            }
+            if let queued {
+                self.state.migration.queue.remove(at: queued)
+                self.state.migration.claimed.append(file)
+            }
+            self.state.migration.onDemand[file.components] = []
+            // REENTRANCY: R18, k-6 (proposed) — the file is this call's to process (claimed or held by a batch, marked in
+            // `onDemand`); `processLegacyFileOnDemand` re-reads the location from the record after its awaits.
+            return try await self.processLegacyFileOnDemand(file, id: id, taken: queued != nil)
         }
-        try self.checkWritable()
-        guard self.state.migration.phase == .inProgress else {
-            return nil
-        }
-        if !self.state.migration.planCommitted {
-            // No legacy file moves before a generation holding the phase-1 plan is committed, on demand too (C-13).
-            // REENTRANCY: R17, R18 — then the call starts again: the location, the phase, the queue and the claims are
-            // read anew (a batch may have adopted the asset meanwhile).
-            try await self.commitLegacyPlanIfNeeded()
-            // REENTRANCY: R18 — as above.
-            return try await self.performAdoptLegacyNow(id)
-        }
-        let migration = self.state.migration
-        // One linear search per call (adopt-on-demand serves a lookup miss); batches take files from the end in O(1).
-        let queued = migration.queue.lastIndex { $0.ids.contains(id) }
-        guard let file = queued.map({ migration.queue[$0] }) ?? migration.claimed.first(where: { $0.ids.contains(id) }) else {
-            return nil
-        }
-        if let queued {
-            self.state.migration.queue.remove(at: queued)
-            self.state.migration.claimed.append(file)
-        }
+    }
+
+    /// Processes `file` for an adopt-on-demand of `id` that marked it in `MigrationState.onDemand` (and took it from the
+    /// queue when `taken`), books the outcome, installs the snapshot at once, then ends the mark, so the adopt-on-demand
+    /// calls waiting for it see the adoption in the installed snapshot.
+    func processLegacyFileOnDemand(_ file: LegacyFile, id: AssetID, taken: Bool) async throws(StoreError) -> AssetLocation? {
         let outcome: LegacyOutcome
         do throws(StoreError) {
-            // REENTRANCY: R18 — `processLegacyFile` re-validates after each await; a batch that adopted the file meanwhile
-            // wins and the location is read from the record below.
+            // REENTRANCY: R18, k-6 (proposed) — `processLegacyFile` re-validates after each await and waits out another
+            // call's adoption of the file before it decides; a batch that adopted the file meanwhile wins and the location
+            // is read from the record below.
             outcome = try await self.processLegacyFile(file)
         } catch {
-            if queued != nil {
+            if taken {
                 self.unclaimLegacyFile(file, requeue: true)
             }
+            self.endLegacyOnDemand(file)
             throw error
         }
-        if queued != nil, outcome == .deferred {
+        if taken, outcome == .deferred {
             _ = self.deferLegacyFile(file)
-        } else if queued != nil {
+        } else if taken {
             self.unclaimLegacyFile(file, requeue: false)
             self.count(outcome)
         } else if outcome == .adopted {
             // A batch holds the file and will see it adopted (`alreadyAdopted`, uncounted): this call counts it.
             self.count(outcome)
         }
-        // REENTRANCY: R17, R18 — nothing but the phase: the location is read from the record afterwards.
+        // REENTRANCY: R17, R18 — nothing but the phase: the location is read from the record afterwards; the calls waiting
+        // for this one are resumed only after the install (`endLegacyOnDemand` below).
         await self.publishSnapshot(urgency: .userInitiated)
+        self.endLegacyOnDemand(file)
         return self.location(for: id, extensions: [], recordingAccess: false)
+    }
+
+    /// Suspends until the processing of `file` that an adopt-on-demand must not duplicate has ended: another
+    /// adopt-on-demand's (`MigrationState.onDemand`, which ends after its snapshot), otherwise another call's adoption
+    /// (`MigrationState.adopting`). Returns at once when neither is in flight. `close()` lets that call's units finish and
+    /// resumes its key and commit waiters, so it ends (with `.closed`) and resumes this one.
+    func awaitLegacyFlight(of file: LegacyFile) async {
+        // REENTRANCY: k-5 (proposed) — nothing here: the caller starts its call again and reads everything anew.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if self.state.migration.onDemand[file.components] != nil {
+                self.state.migration.onDemand[file.components]?.append(continuation)
+            } else if self.state.migration.adopting[file.components] != nil {
+                self.state.migration.adopting[file.components]?.append(continuation)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Ends an adopt-on-demand's processing of `file`: the mark goes and the adopt-on-demand calls waiting for it are
+    /// resumed; each starts again (REENTRANCY k-5).
+    func endLegacyOnDemand(_ file: LegacyFile) {
+        guard let waiters = self.state.migration.onDemand.removeValue(forKey: file.components) else {
+            return
+        }
+        for waiter in waiters {
+            waiter.resume()
+        }
     }
 }
 

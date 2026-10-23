@@ -51,11 +51,13 @@ struct MigrationState: Sendable {
     /// moved files that no committed record expects).
     var planCommitted = false
     /// Legacy files whose verified bytes a batch or an adopt-on-demand is placing and binding (`adoptVerifiedFile`), by
-    /// their path below the root, with the calls waiting for that adoption to end (orchestrator ruling L5K-R13).
-    /// WP-K skeleton: not written yet.
+    /// their path below the root, with the calls waiting for that adoption to end (orchestrator ruling L5K-R13;
+    /// REENTRANCY k-5, k-6): at most one adoption of a file runs at a time, and a call that hashed the same file, or an
+    /// adopt-on-demand that finds it here, decides only once it ended (`AssetStore.processLegacyFile`).
     var adopting: [[String]: [CheckedContinuation<Void, Never>]] = [:]
-    /// Legacy files an adopt-on-demand is processing, by their path below the root, with the later adopt-on-demand calls
-    /// of the same file waiting for it (L5K-R13). WP-K skeleton: not written yet.
+    /// Legacy files an adopt-on-demand is processing, from its claim to its snapshot, by their path below the root, with
+    /// the later adopt-on-demand calls of the same file waiting for it (L5K-R13; k-5): they share its hash and read its
+    /// outcome from the records (`AssetStore.performAdoptLegacyNow`).
     var onDemand: [[String]: [CheckedContinuation<Void, Never>]] = [:]
     /// Legacy entries phase 3's check reads between two releases of the actor (`AssetStore.legacyEntriesPresent`):
     /// `AssetStore.legacyCheckChunk`; a test lowers it so a handful of entries reaches the release and its re-validation

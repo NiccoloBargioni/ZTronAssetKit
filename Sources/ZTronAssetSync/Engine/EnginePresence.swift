@@ -215,18 +215,21 @@ extension SyncEngine {
     /// answers its location, so a file migration can still adopt is moved, never downloaded again (R-STO-11), as on the
     /// resolve path (ADR-029). The store does the work on its executors (the hash on the bulk executor), never on the
     /// main actor, and only for the ids of a job about to transfer (C2). `nil` when the store holds nothing for `id`: no
-    /// prior-art file to adopt, or one that cannot be adopted (it did not verify, or the store refused), which is then
-    /// downloaded, as on the resolve path.
+    /// prior-art file to adopt, or one that cannot be adopted (it did not verify, it was kept, or the store refused),
+    /// which is then downloaded, as on the resolve path; never because a migration batch or another call is adopting the
+    /// same file at that moment (the store's single flight per prior-art file, orchestrator ruling L5K-R13).
     func storedLocation(of id: AssetID) async -> AssetLocation? {
         guard self.state.migration.pending else {
             // REENTRANCY: f-11 (proposed) — nothing here: the caller re-validates after its reads.
             return await self.store.location(for: id, extensions: [], recordingAccess: false)
         }
         do {
-            // REENTRANCY: k-4 (proposed) — nothing here: the caller re-validates after its reads. The store orders this
-            // adoption against the migration loop's: a queued file is claimed before its hash, so no batch takes it; a file
-            // a batch already claimed may be hashed by both, and each re-validates the records after its awaits (R18), so
-            // the first placement binds and the other finds it adopted, reading the location from the record.
+            // REENTRANCY: k-4 (proposed) — nothing here: the caller re-validates after its reads. The store runs one
+            // adoption per prior-art file (L5K-R13, rows k-5 and k-6): a queued file is claimed before its hash, so no batch
+            // takes it; a call that finds the file being processed by another adopt-on-demand, or adopted by a batch, waits
+            // for that processing and reads the location it bound; when a batch has not finished hashing the file, both may
+            // hash it, and the one whose bytes verify second waits out the other's adoption before it decides. So the
+            // answer is that one adoption's outcome, never a failure the other adopter caused.
             return try await self.store.adoptLegacyNow(id)
         } catch {
             return nil
