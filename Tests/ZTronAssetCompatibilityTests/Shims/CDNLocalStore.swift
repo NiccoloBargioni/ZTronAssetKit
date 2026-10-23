@@ -12,11 +12,13 @@ import ZTronAssetKit
 ///
 /// The snapshot is the client's, installed by `AssetClient.start()` (ADR-037): until the installed client has started,
 /// the lookups answer `nil` and `false` even for assets stored in an earlier launch, where the prior art read the disk
-/// from launch on. Start the client at launch, before carousel content is created (MIGRATION.md, step 3). On the first
-/// launch after adoption that is not enough for the prior art's own files: legacy migration adopts them in batches that
-/// start only after `start()` has returned, and a file answers once its batch is committed and in the snapshot, or once
-/// a resolve adopted it on demand (`CDNAssetResolver.resolveViaNetwork`, no download). Until then a lookup misses it, so
-/// `BasicVideoPage`, which has no network step, finds a prior-art video only once it is adopted (K-15).
+/// from launch on. Start the client at launch, before carousel content is created (MIGRATION.md, step 3). On a launch
+/// during legacy migration (the first launch after adoption, and any later launch that resumes a migration an earlier
+/// launch did not finish) that is not enough for the prior art's own files: legacy migration adopts them in batches that
+/// start only after `start()` has returned, and a file answers once the snapshot holding its adoption is installed, at
+/// the end of its batch, or at once when a resolve adopted it on demand (`CDNAssetResolver.resolveViaNetwork`, no
+/// download). Until then a lookup misses it, so `BasicVideoPage`, which has no network step, finds a prior-art video only
+/// once it is adopted (K-15).
 public final class CDNLocalStore: Sendable {
     /// The prior art's shared store: it follows `CDNInstallPoint.process`, so it answers for the client the app
     /// installed (`CDNProviderFactory.install`, `CDNAssetResolver.installed`), and like an empty cache before that.
@@ -177,8 +179,14 @@ public final class CDNLocalStore: Sendable {
     /// applies to an asset the manifest knows (ADR-037, as `AssetFallbackChain.locate`), so an image page is never handed
     /// a video. A stale asset (new content announced, not yet stored) still answers with its old bytes, as before.
     /// `nil` until the installed client has started (`AssetClient.start()` installs the first snapshot, ADR-037), even
-    /// for an asset stored in an earlier launch, and, on the first launch after adoption, for a prior-art file until
+    /// for an asset stored in an earlier launch, and, on a launch during legacy migration, for a prior-art file until
     /// legacy migration or a resolve adopted it, after `start()` has returned (K-15).
+    ///
+    /// The URL names stored content (a content-addressed blob), not the prior art's pretty path, whose bytes the prior art
+    /// replaced in place: after a content change, a prune or an eviction, the old file is removed
+    /// `StoragePolicy.deletionGrace` after the new snapshot (ADR-017). A consumer that reads the path later, such as
+    /// `BasicVideoPage`'s player, looks it up again when a read fails, or holds a lease (`AssetClient.withAsset`) while it
+    /// reads (K-11).
     @MainActor
     public func existingLocalURL(identifier: String, candidateExtensions: [String]) -> URL? {
         self.client?.lookup(AssetID(identifier), extensions: candidateExtensions)?.url
@@ -190,7 +198,7 @@ public final class CDNLocalStore: Sendable {
     /// of staleness (`AssetLocation.isStale`, relative to its applied manifest) is not consulted. A checksum that is not
     /// a SHA-256 cannot be compared, so such an asset is trusted on presence (R-MAN-5), where the prior art compared it
     /// with its own hash of the file and never matched. `false` until the installed client has started (ADR-037) and,
-    /// on the first launch after adoption, for a prior-art file until it is adopted (K-15).
+    /// on a launch during legacy migration, for a prior-art file until its adoption is installed (K-15).
     @MainActor
     public func hasAsset(_ asset: CDNAsset) -> Bool {
         guard let location = self.client?.lookup(AssetID(asset.identifier), extensions: [asset.fileExtension]) else {
@@ -208,8 +216,8 @@ public final class CDNLocalStore: Sendable {
     }
 
     /// Every asset of `manifest` that is not stored at the content it describes (`hasAsset`), in manifest order, with
-    /// no network: the prior art's availability guarantee. One snapshot read per asset on the main actor. On the first
-    /// launch after adoption it also lists the prior-art files legacy migration has not adopted yet (K-15).
+    /// no network: the prior art's availability guarantee. One snapshot read per asset on the main actor. On a launch
+    /// during legacy migration it also lists the prior-art files whose adoption is not installed yet (K-15).
     @MainActor
     public func missingOrStaleAssets(against manifest: [CDNAsset]) -> [CDNAsset] {
         manifest.filter { !self.hasAsset($0) }

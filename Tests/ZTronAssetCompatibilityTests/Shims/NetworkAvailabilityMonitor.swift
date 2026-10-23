@@ -11,6 +11,14 @@ import ZTronAssetKit
 /// registration and lasts as long as the monitor, like the prior art's monitor once created; every report of a satisfied
 /// path runs the pending retries, the first one included, as the prior art's initial path update did.
 ///
+/// A report is a conditions report, not only a path update: the live source sends one on every path change and also on
+/// every Low Power Mode or thermal-state change, so a pending retry also runs on those reports while the path is
+/// satisfied, where the prior art's `NWPathMonitor` retried on path updates only. A view that keeps failing (ZTronSVGView
+/// registers again after each failure) therefore also retries then. Running retries only on a changed `network` value
+/// would lose path updates the prior art retried on (Wi-Fi to another Wi-Fi), so the shim keeps every satisfied report
+/// (orchestrator ruling L5K-R6, K-8). `shared` builds its own live conditions source (ADR-038: fresh conformers per call),
+/// so it is a second path monitor in the process beside the one each client observes.
+///
 /// The prior art guarded its registry with a dispatch queue behind `@unchecked Sendable` and `nonisolated(unsafe)`
 /// (D-5). Here the registry belongs to one task that consumes a single ordered mailbox (an `AsyncStream`, whose
 /// continuation is `Sendable`), so registrations, cancellations and reports are applied in order with no lock and no
@@ -53,7 +61,8 @@ public final class NetworkAvailabilityMonitor: Sendable {
         self.registry.cancel()
     }
 
-    /// Registers `retry` to run the next time the network path is reported satisfied, and returns its token. Device
+    /// Registers `retry` to run at the next satisfied conditions report (a path change, or a power or thermal report while
+    /// the path is satisfied), and returns its token. Device
     /// connectivity says nothing about whether the origin has the asset; it is only a reasonable moment to try again.
     @discardableResult
     public func retryWhenAvailable(_ retry: @escaping @Sendable () -> Void) -> UUID {

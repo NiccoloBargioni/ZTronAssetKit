@@ -85,11 +85,11 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// the gate opens, which this coordinator does not observe, so `progress` keeps the call's outcome while those
     /// assets arrive.
     ///
-    /// On the first launch after adoption, a call made while legacy migration is still adopting the prior art's files
-    /// (which it does after `start()` has returned) does not wait for it: it starts a run at once, and that run downloads
-    /// again every prior-art file migration has not adopted yet, where R-STO-11 wants them moved (CCR-K1, an engine
-    /// defect reported for WP-F; K-15). The client's own launch run waits for migration, so until the engine is fixed,
-    /// leave that launch's sync to it (MIGRATION.md step 4).
+    /// On a launch during legacy migration (the first launch after adoption, and any later launch that resumes an
+    /// unfinished migration), a call made while migration is still adopting the prior art's files starts a run at once,
+    /// and that run adopts the files migration has not reached yet instead of downloading them (R-STO-11: before any
+    /// transfer the client adopts a file migration can still adopt, orchestrator ruling L5K-R1); it takes the place of
+    /// the launch run that waited for migration, so the launch still syncs once (MIGRATION.md step 4, K-15).
     public func syncIfNeeded() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.ifDue)
@@ -111,8 +111,8 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// A repair pass regardless of the refresh policy: `AssetClient.sync(.force)`, publishing progress as
     /// `syncIfNeeded()` does. Unlike the prior art, a complete repair also writes the sync stamp, which is true and
     /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version"). A repair
-    /// while legacy migration is still adopting downloads the files it has not adopted yet, as `syncIfNeeded()` does
-    /// (CCR-K1).
+    /// while legacy migration is still adopting adopts the files it has not reached yet, as `syncIfNeeded()` does
+    /// (L5K-R1).
     public func verifyAndRepair() async {
         // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.force)
