@@ -734,11 +734,59 @@ Checked, no pattern:
   them on `FakeFileSystem`), and the 403 a keyless client gets from the real origin (SPEC §2.3, not exercised here).
 - Adoption inside ZTronCarouselCore (Q-10, ADR-006): MIGRATION.md describes it; nothing outside this repository was
   built or written.
-- The first launch after adoption on a device (K-15): how long legacy migration takes over a real prior-art tree, hence
-  how long the lookups miss its files and how many a sync during it would download (CCR-K1); the tests run it on
-  `FakeFileSystem` with an inline executor.
+- A launch during legacy migration on a device (K-15): how long migration takes over a real prior-art tree, hence how
+  long the lookups miss its files; the tests run it on `FakeFileSystem` with inline or stepped executors. The C2 figures
+  of an adoption by a sync (L5K-R1) come from a release-mode probe on macOS 27, not a device, and the main actor's cost
+  of one snapshot install per adopted file was not measured on a device (each is an O(1) swap there).
+- That the main actor runs its jobs in the order they were enqueued, which `legacyStoreAdoptsThePriorArtFiles`'s
+  determinism argument uses (L5K-R2): taken from the main executor's serial queue, not tested here.
 
-## Evidence (macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; fix round 2, code at `409db9a`)
+## Evidence (close-out cycle 1; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`, `.build-k-perf`)
+- **Failing first (L5K-R1).** The six engine tests on the pre-fix engine (`e4cd072`), `swift test --skip-build
+  --scratch-path .build-k --filter EngineLegacyMigrationTransferTests`, 3 consecutive runs: `✘ Test run with 6 tests in 1
+  suite failed after 0.018 seconds with 14 issues.` each; every issue is the defect's own assertion (`starts.isEmpty` in
+  the four download tests; the parked flag, `left.runs == 1` and `manifestRequests.count == 1` in the parked-run tests),
+  none a hang. With the fix (`9fe92fc`): `✔ Test run with 6 tests in 1 suite passed` in 3 of 3 runs. The strict shim
+  tests on the pre-fix engine (the three engine files checked out from `e4cd072`, built, run 3 times, restored): every
+  run failed, `downloaded.isEmpty` (30, 38 and 42 of 150 for the CCR-K1 test; 6, 6 and 18 of the 148 files left on the
+  resumed launch) and `legacyLeft == 0` (5 of the 6 runs of those two tests); the lookups test passed.
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `3657f80`: `VERIFY: PASS` (Model 151, Sync 329, Storage
+  445, Transport 84, Kit 85, Compatibility 70, AppleHosted 104 tests).
+- **The engine's runs (L5K-R1).** `ZTronAssetSyncTests` ×3: `✔ Test run with 329 tests in 52 suites passed` each (load
+  4.1–4.5); under TSan: `✔ Test run with 329 tests in 52 suites passed after 23.991 seconds.`, no ThreadSanitizer report
+  (load 4.3–5.2); `ZTronAssetStorageTests` once: 445/445; `ZTronAssetKitTests` ×3: 85/85 each (load 11.1–12.3, a release
+  build ran meanwhile).
+- **The compatibility target.** ×3: `✔ Test run with 70 tests in 10 suites passed` each (load 3.5); under TSan: 70/70,
+  no ThreadSanitizer report (load 7.0).
+- **Stress (L5K-R2).** ×20 with the 1-minute load average at 41.3 to 172.5 before each run (the simulator test run beside
+  it): 20 of 20 `✔ Test run with 70 tests in 10 suites passed`; ×5 under TSan (load falling from 156.5 to 10.8): 5 of 5
+  passed, no ThreadSanitizer report; the simulator run below includes the target.
+- **Release build** (`swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`): `Build complete!`.
+- **Gates.** `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`; the shims through `gates.py`'s
+  `docs_check` and `unsafe_check` in memory: `DOCS public declarations=90 documented=90`, `UNSAFE escapes found=0`;
+  `gates.py trace` written to `.build-k/trace-check.md` (never to `docs/TRACEABILITY.md`): `TRACE requirements=90
+  (MUST=78) budgets=14 tests-with-ids=1144`, `TRACE: PASS`; `gates.py selftest`: `SELFTEST: PASS`.
+- **Coverage** (`swift test --scratch-path .build-k --enable-code-coverage --skip Benchmarks`, the merged export over the
+  seven test bundles, `gates.py coverage`): AppleHosted 99.76 %, Kit 97.90 % (1445/1476), Model 99.31 %, Storage 97.37 %
+  (7973/8188), Sync 93.63 % (8434/9008), Transport 99.08 %, `COVERAGE overall lines=96.62% (24800/25668)`,
+  device-only share 0.68 %, `COVERAGE: PASS` (L5K-R12: no per-target figure dropped). The shims in the compatibility
+  bundle (`llvm-cov report` over `Shims/*.swift`): 98.18 % (538/548), the uncovered lines of round 2 unchanged.
+- **iOS.** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, no diagnostic (xcodebuild's one informational line
+  `IDERunDestination: Supported platforms for the buildables in the current scheme is empty.`).
+- **iOS Simulator** (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
+  `caffeinate -i`, on `3657f80`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result: Passed`, 1,268 tests, 1,268
+  passed, 0 failed, 0 skipped, 0 expected failures (CCR-K1's known issue is gone)
+  (`Test-ZTronAssetKit-2026.10.23_17-51-45-+0200.xcresult`); the simulator is shut down.
+- **C2 (L5K-R1).** The table in "L5K-R1: every transfer path during legacy migration": a release-mode probe filtered to
+  itself, removed afterwards; no benchmark was run (L5K-R11).
+- **Writes.** Nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR`, the module
+  caches and `LLVM_PROFILE_FILE` under `.build-k/tmp`, derived data under `.build-k/xcode*`; the tests write real files
+  only under `.build-tests/compatibility/` and remove them; the probe file was deleted before any commit; `python3 -B`,
+  so no `Scripts/__pycache__`.
+
+## Evidence of fix round 2 (history; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`; code at `409db9a`)
 - Test first. Round 1: the round-1 tests on the round-0 shims (`82490e7`) failed with 12 issues, all passed after
   `e81449c` (K-12). Round 2: the CCR-K1 test without its `withKnownIssue` wrapper, `swift test --skip-build --filter
   MigrationLaunchShimTests`, 15 consecutive runs at a load average of about 5: 15 of 15 failed `downloaded == 0` (6 to
