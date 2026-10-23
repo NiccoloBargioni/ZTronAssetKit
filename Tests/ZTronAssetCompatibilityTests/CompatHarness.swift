@@ -201,7 +201,8 @@ struct CompatHarness {
     static func make(
         refresh: RefreshPolicy = .oncePerAppVersion,
         conditions: DeviceConditions = .unrestricted,
-        appVersion: String = "1.0+1"
+        appVersion: String = "1.0+1",
+        tuning: SyncTuning = CompatHarness.tuning
     ) -> CompatHarness {
         let time = ManualTimeSource()
         let clock = AutoAdvancingClock(manual: time)
@@ -219,7 +220,7 @@ struct CompatHarness {
             remote: RemoteConfiguration(),
             legacy: LegacyMigrationPolicy(enabled: false),
             refresh: refresh,
-            tuning: CompatHarness.tuning
+            tuning: tuning
         )
         return CompatHarness(
             time: time,
@@ -262,6 +263,19 @@ struct CompatHarness {
     /// The transfers started from now on: the source's start log after `baseline` entries.
     func starts(after baseline: Int) async -> [TransferID] {
         await self.source.starts.dropFirst(baseline).map(\.id)
+    }
+
+    /// A client of a later launch: the same configuration, volume, origin, clock and conditions, reporting
+    /// `appVersion`. Nothing is started; shut the earlier client down first (one root admits one client, R-STO-9).
+    func relaunch(appVersion: String) -> AssetClient {
+        let environment = CompatHarness.environment(
+            time: self.clock,
+            fileSystem: self.fileSystem,
+            source: self.source,
+            conditions: self.conditions,
+            appVersion: appVersion
+        )
+        return AssetClient(configuration: self.configuration, environment: environment)
     }
 }
 

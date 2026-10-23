@@ -48,6 +48,34 @@ struct ProviderShimTests {
         #expect(requests.map(\.target) == ["/catalog/manifest.json", "/catalog/manifest.json"])
     }
 
+    @Test("R-CAR-6: StaticManifestCDNProvider answers the validated manifest: checksums in lowercase hex, quarantined entries left out", .timeLimit(.minutes(1)))
+    func staticProviderAnswersTheValidatedManifest() async throws {
+        let icon = CompatFixture.asset("bo7.ri.easter.egg.icon", CompatFixture.bytes(62))
+        let shouted = CDNAsset(
+            identifier: icon.identifier,
+            fileExtension: icon.fileExtension,
+            remotePath: icon.remotePath,
+            localPathComponents: icon.localPathComponents,
+            byteSize: icon.byteSize,
+            checksum: icon.checksum?.uppercased()
+        )
+        // R-MAN-2: a checksum must be 64 hex characters when present (an ETag-style MD5 is not), an extension
+        // `[A-Za-z0-9]{1,8}`; the prior art returned both entries as decoded.
+        let etagged = CDNAsset(identifier: "bo7.ri.easter.egg.card", fileExtension: "png", remotePath: "media/ab/card.png", checksum: "d41d8cd98f00b204e9800998ecf8427e")
+        let slashed = CDNAsset(identifier: "bo7.ri.easter.egg.poster", fileExtension: "p/ng", remotePath: "media/cd/poster.png")
+        let body = CompatFixture.manifestData([shouted, etagged, slashed])
+        let (server, base, session) = try await ProviderShimTests.origin { _ in
+            LoopbackResponse(body: body)
+        }
+        let provider = StaticManifestCDNProvider(baseURL: base, manifestPath: "manifest.json", urlSession: session, executor: InlineBlockingExecutor())
+
+        let fetched = try await provider.fetchManifest()
+
+        session.invalidateAndCancel()
+        await server.stop()
+        #expect(fetched == [icon], "the checksum normalised to lowercase, the two invalid entries quarantined")
+    }
+
     @Test("R-CAR-6: StaticManifestCDNProvider rejects a non-2xx answer with badResponse and an invalid manifest with a ManifestError", .timeLimit(.minutes(1)))
     func staticProviderRejectsBadAnswers() async throws {
         let (server, base, session) = try await ProviderShimTests.origin { request in

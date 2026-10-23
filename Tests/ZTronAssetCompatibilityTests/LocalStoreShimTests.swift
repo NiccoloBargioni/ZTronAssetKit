@@ -223,6 +223,20 @@ struct LocalStoreShimTests {
         await harness.source.scriptManifest([.notModified])
         _ = await harness.client.sync(.force)
         #expect(await harness.starts(after: starts).isEmpty, "the prior art re-requested it on every sync (D-16)")
+
+        // A changed entry (new content again) is requested once and stored.
+        let newerBytes = CompatFixture.bytes(19)
+        let newer = CompatFixture.asset(icon.identifier, newerBytes)
+        await harness.serve([(newer, newerBytes)], etag: "v3")
+        let beforeChange = await harness.source.starts.count
+        let changed = await harness.client.sync(.force)
+        guard case .complete = changed else {
+            Issue.record("the changed entry should be fetched: \(changed)")
+            return
+        }
+        #expect(await harness.starts(after: beforeChange) == [CompatFixture.transfer(newer)])
+        #expect(store.hasAsset(newer))
+        #expect(store.existingLocalURL(identifier: icon.identifier, candidateExtensions: ["png"])?.deletingPathExtension().lastPathComponent == newer.checksum)
         await harness.client.shutdown()
     }
 
@@ -254,5 +268,33 @@ struct LocalStoreShimTests {
         #expect(store.existingLocalURL(identifier: icon.identifier, candidateExtensions: ["png"]) == harness.client.lookup(CompatFixture.id(icon))?.url)
         #expect(store.hasAsset(icon))
         await harness.client.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: the lookups answer nil for an asset stored in an earlier launch until the installed client has started, and its file right after", .timeLimit(.minutes(1)))
+    func lookupsWaitForTheStartedClient() async throws {
+        let videoBytes = CompatFixture.bytes(18)
+        let video = CompatFixture.asset("bo7.ri.easter.egg.intro", videoBytes, ext: "mp4")
+        // Launch 1 stores the video and writes the stamp.
+        let earlier = try await LocalStoreShimTests.settled([(video, videoBytes)])
+        await earlier.client.shutdown()
+        // Launch 2 on the same volume: MIGRATION.md step 3 installs a client (no I/O, no task: P-12).
+        let point = CDNInstallPoint()
+        let client = CDNProviderFactory.install(CDNConfiguration(clientConfiguration: earlier.configuration), into: point, environment: earlier.environment)
+        let store = CDNLocalStore(installPoint: point)
+
+        // ADR-037: the snapshot is installed by `start()`; `BasicVideoPage.init?` returns nil on this answer.
+        #expect(store.existingLocalURL(identifier: video.identifier, candidateExtensions: ["mp4"]) == nil)
+        #expect(!store.hasAsset(video))
+
+        try await client.start()
+
+        let found = store.existingLocalURL(identifier: video.identifier, candidateExtensions: ["mp4"])
+        #expect(found != nil, "step 3 starts the client before carousel content is created")
+        #expect(found == client.lookup(CompatFixture.id(video))?.url)
+        #expect(store.hasAsset(video))
+        #expect(await earlier.source.starts.count == 1, "the file launch 1 stored: nothing was fetched again")
+        await client.shutdown()
     }
 }

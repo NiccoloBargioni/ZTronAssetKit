@@ -167,7 +167,7 @@ struct SyncCoordinatorShimTests {
             return completed
         }
         #expect(!counts.isEmpty)
-        #expect(counts == counts.sorted(), "progress never moves backwards (CDNSyncCoordinator.swift:154-164)")
+        #expect(counts == counts.sorted(), "progress never moves backwards (k-2, the follower in CDNSyncCoordinator.run(_:))")
         await harness.client.shutdown()
     }
 
@@ -320,9 +320,114 @@ struct SyncCoordinatorShimTests {
 
     @Test("R-CAR-6: defaultAppVersion joins the marketing version and the build number with a plus")
     func defaultAppVersionFormat() {
-        let version = CDNSyncCoordinator.defaultAppVersion()
-        let parts = version.split(separator: "+", omittingEmptySubsequences: false)
-        #expect(parts.count >= 2)
-        #expect(parts.allSatisfy { !$0.isEmpty })
+        #expect(CDNSyncCoordinator.appVersion(from: ["CFBundleShortVersionString": "2.3", "CFBundleVersion": "45"]) == "2.3+45")
+        #expect(CDNSyncCoordinator.appVersion(from: ["CFBundleVersion": "45"]) == "0+45", "a missing key is \"0\"")
+        #expect(CDNSyncCoordinator.appVersion(from: ["CFBundleShortVersionString": "2.3"]) == "2.3+0")
+        #expect(CDNSyncCoordinator.appVersion(from: nil) == "0+0")
+        let info = Bundle.main.infoDictionary
+        let marketing = info?["CFBundleShortVersionString"] as? String ?? "0"
+        let build = info?["CFBundleVersion"] as? String ?? "0"
+        #expect(CDNSyncCoordinator.defaultAppVersion() == "\(marketing)+\(build)", "read from the main bundle")
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: a run blocked by Low Power Mode reports failed with blocked and stays due, and the client finishes it unobserved once the gate opens", .timeLimit(.minutes(1)))
+    func blockedRunReportsFailed() async throws {
+        let iconBytes = CompatFixture.bytes(63)
+        let posterBytes = CompatFixture.bytes(64)
+        let cardBytes = CompatFixture.bytes(65)
+        let icon = CompatFixture.asset("bo7.ri.easter.egg.icon", iconBytes, directories: ["Black Ops 7", "Rex Infernus"])
+        let poster = CompatFixture.asset("bo7.ri.easter.egg.poster", posterBytes)
+        let card = CompatFixture.asset("bo7.ri.easter.egg.card", cardBytes)
+        // The pending run waits `pendingRunDebounce` (5 s by default) after the gate opens; within the harness clock's
+        // horizon the debounce passes by itself, so nothing races the test's own clock moves.
+        var tuning = CompatHarness.tuning
+        tuning.pendingRunDebounce = 0.5
+        let harness = CompatHarness.make(refresh: .atMostEvery(SyncCoordinatorShimTests.interval), tuning: tuning)
+        await harness.serve([(icon, iconBytes), (poster, posterBytes)])
+        try await harness.settleLaunch()
+        let coordinator = CDNSyncCoordinator(client: harness.client, cdn: ScriptedCDNProvider(manifest: .success([])))
+        // v2 moves the icon (a relocation), drops the poster (a prune) and adds the card (a bulk fetch).
+        let moved = CompatFixture.asset(icon.identifier, iconBytes, directories: ["Black Ops 7", "Rex Infernus", "Vehytherion Temple"])
+        await harness.serveManifest([moved, card], etag: "v2")
+        await harness.source.script(CompatFixture.transfer(card), [.stage(cardBytes)])
+        var lowPower = DeviceConditions.unrestricted
+        lowPower.power.lowPowerMode = true
+        await harness.conditions.send(lowPower)
+        harness.time.advance(by: SyncCoordinatorShimTests.interval + 1)
+        let starts = await harness.source.starts.count
+
+        await coordinator.syncIfNeeded()
+
+        guard case .failed(let reason) = coordinator.progress else {
+            Issue.record("a blocked run is a failure in the prior art's terms: \(coordinator.progress)")
+            return
+        }
+        #expect(reason.hasPrefix("blocked("))
+        #expect(reason.contains("lowPowerMode"), "bulk sync waits in Low Power Mode by default (ADR-036)")
+        #expect(coordinator.lastReconciliation == CDNReconciliationSummary(migratedCount: 1, prunedCount: 1), "reconciled before the blocked download")
+        #expect(await harness.starts(after: starts).isEmpty)
+        #expect(try await harness.client.isSyncDue(), "no stamp after a blocked run: the next launch retries")
+
+        // The pending run starts by itself once the gate opens (sync-2 S2-03); the coordinator observes only its calls.
+        let probe = EventProbe(stream: try await harness.client.subscribe())
+        await harness.source.scriptManifest([.notModified])
+        await harness.conditions.send(.unrestricted)
+        _ = await probe.next { event in
+            if case .syncProgress(_, let progress) = event {
+                return progress.completedCount >= 1
+            }
+            return false
+        }
+        #expect(CDNLocalStore(client: harness.client).hasAsset(card))
+        #expect(await harness.starts(after: starts) == [CompatFixture.transfer(card)])
+        #expect(coordinator.progress == .failed(reason: reason), "still the outcome of its own call")
+        await probe.stop()
+        await harness.client.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-6: once per app version: a later launch of the same version reports upToDate without a manifest request, and a new version syncs at launch", .timeLimit(.minutes(1)))
+    func oncePerAppVersionAcrossLaunches() async throws {
+        let iconBytes = CompatFixture.bytes(66)
+        let cardBytes = CompatFixture.bytes(67)
+        let icon = CompatFixture.asset("bo6.tm.icon", iconBytes)
+        let card = CompatFixture.asset("bo6.tm.card", cardBytes)
+        let first = CompatHarness.make(refresh: .oncePerAppVersion, appVersion: "1.0+1")
+        await first.serve([(icon, iconBytes)])
+        try await first.settleLaunch()
+        await first.client.shutdown()
+
+        // Launch 2, the same build, on the same volume and origin: the coordinator starts the client and finds nothing due.
+        let sameBuild = first.relaunch(appVersion: "1.0+1")
+        let unchanged = CDNSyncCoordinator(client: sameBuild, cdn: ScriptedCDNProvider(manifest: .success([])))
+        await unchanged.syncIfNeeded()
+        #expect(unchanged.progress == .upToDate)
+        #expect(await first.source.manifestRequests.count == 1, "launch 1's stamp holds for its version")
+        #expect(CDNLocalStore(client: sameBuild).hasAsset(icon))
+        await sameBuild.shutdown()
+
+        // Launch 3, a new build: the sync is due at launch and the client's own launch run performs it (R-SYN-9), which
+        // the settle below joins or follows; the coordinator then finds nothing due (K-7).
+        await first.serve([(icon, iconBytes), (card, cardBytes)], etag: "v2")
+        let starts = await first.source.starts.count
+        let newBuild = first.relaunch(appVersion: "1.0+2")
+        try await newBuild.start()
+        let launchRun = await newBuild.sync(.ifDue)
+        switch launchRun {
+        case .complete, .notDue:
+            break
+        default:
+            Issue.record("setup: the new version's launch run did not complete: \(launchRun)")
+        }
+        let upgraded = CDNSyncCoordinator(client: newBuild, cdn: ScriptedCDNProvider(manifest: .success([])))
+        await upgraded.syncIfNeeded()
+        #expect(upgraded.progress == .upToDate)
+        #expect(await first.source.manifestRequests.count == 2, "one manifest request for the new version")
+        #expect(await first.starts(after: starts) == [CompatFixture.transfer(card)], "only what the new catalog adds")
+        #expect(CDNLocalStore(client: newBuild).isFullyAvailable(against: [icon, card]))
+        await newBuild.shutdown()
     }
 }

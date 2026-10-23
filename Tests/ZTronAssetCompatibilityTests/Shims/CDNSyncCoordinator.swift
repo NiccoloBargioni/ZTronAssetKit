@@ -64,7 +64,12 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// the app version through its environment (`LiveAppVersionSource`, the same format), so the shims use this only
     /// for the prior-art initialiser's default.
     nonisolated public static func defaultAppVersion() -> String {
-        let info = Bundle.main.infoDictionary
+        CDNSyncCoordinator.appVersion(from: Bundle.main.infoDictionary)
+    }
+
+    /// `"<CFBundleShortVersionString>+<CFBundleVersion>"` of an Info.plist dictionary, `"0"` for a missing key (the
+    /// seam `defaultAppVersion()` reads the main bundle through).
+    nonisolated static func appVersion(from info: [String: Any]?) -> String {
         let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "0"
         let buildNumber = info?["CFBundleVersion"] as? String ?? "0"
         return "\(shortVersion)+\(buildNumber)"
@@ -73,8 +78,12 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// The launch sync: `AssetClient.sync(.ifDue)`, safe on every launch. `.upToDate` without network when the refresh
     /// policy says no; otherwise `.syncing` while the run (the client's launch run, if one is active, or a new one)
     /// transfers, then `.complete` or `.failed(reason:)`. A failed or partial run leaves the sync due, so the next launch
-    /// retries and downloads only what is still missing.
+    /// retries and downloads only what is still missing. A run whose remaining jobs are blocked (offline, Low Power or
+    /// Low Data Mode under the default policy, an open breaker, a throttle, space) is `.failed(reason: "blocked(…)")`
+    /// and leaves the sync due; the client then finishes it by itself once the gate opens, which this coordinator does
+    /// not observe, so `progress` keeps the call's outcome while those assets arrive.
     public func syncIfNeeded() async {
+        // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.ifDue)
     }
 
@@ -91,6 +100,7 @@ public final class CDNSyncCoordinator: ObservableObject {
     /// `syncIfNeeded()` does. Unlike the prior art, a complete repair also writes the sync stamp, which is true and
     /// harmless (sync.md §12.3: the prior art skipped it only because its flag meant "once per version").
     public func verifyAndRepair() async {
+        // REENTRANCY: k-1 (proposed) — nothing is read after it.
         await self.run(.force)
     }
 
