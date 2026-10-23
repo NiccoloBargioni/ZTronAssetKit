@@ -18,7 +18,17 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Worktree:** `.worktrees/k` on `wp/k`, from `l5g-merged`.
 - **Keep-awake:** a new `caffeinate -ims -t 172800` from 23 Oct 11:42 runs to 25 Oct 11:42. The earlier one ends 25 Oct 09:48.
 - **Forecast (strict, from WP-G's measured costs):** ~9–23 h and ~8–24 weekly points, so it ends between Fri 23 Oct ~21:00 and Sat 24 Oct ~11:00, at weekly ~26–42 %.
-- **Next, as for WP-G:**
+- **Main run: done** at 16:44 (5.0 h, weekly 18 % → 25 %). Blocking went 3 → 2 → 2, out of 18, 10 and 11 issues in total.
+  - The author's `--quick` gave `VERIFY: PASS`. Shims coverage was 97.59 % in the compatibility bundle, and the simulator ran 1,246/1,246.
+  - Both remaining blockers trace back to **CCR-K1**: an explicit sync during legacy migration downloads prior-art files that R-STO-11 wants moved. The other is the tripwire test that races migration under TSan.
+- **Rulings:** L5K-R1…R12 in `.build-orchestrator/l5k-rulings.md` (local), with findings in `l5k-remaining-k.json` (`L5K-V3-nn`).
+  - **L5K-R1:** CCR-K1 as a class. While migration is pending or running, the pre-transfer read (`answeredFromStore`) adopts instead of downloading. Authorised edits in `EnginePresence`, `EngineRuns`, `EngineState` and `EngineLifecycle`, plus a new engine test file.
+  - **L5K-R2:** L5-R14's enumeration applied to every compatibility test.
+  - **L5K-R3…R12:** the auto-advancing clock accepted with conditions, the docs rescoped, the NEEDS-HUMAN-REVIEW shim decisions approved as defaults, ownership, no benchmarks in the close-out, and coverage.
+- **Close-out: RUNNING** `wf_d5c59efd-6db` (task `wzgzwm1jw`), launched 16:52 at weekly 25 %, with `usageStop: 40`, the sections and focus as in the rulings, and the same sims.
+  - Run dir: `…/subagents/workflows/wf_d5c59efd-6db`.
+  - Resume cold from its `journal.jsonl` with `fromCycle` and the last verification's issues.
+- **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
   3. When a class repeats, stop right after the verification and relaunch with `fromCycle`.
