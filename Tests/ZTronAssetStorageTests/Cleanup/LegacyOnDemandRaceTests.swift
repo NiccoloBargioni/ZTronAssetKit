@@ -332,6 +332,50 @@ extension LegacyOnDemandRaceTests {
         #expect(answer != nil && answer == location, "the adopt-on-demand answers its location")
         #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
     }
+
+    @Test("R-STO-11: close() while a migration batch waits for the adopt-on-demand of the last claimed legacy file ends both calls with the store's shutdown answer and leaves no mark (L5K-R17, L5K-R22, row k-7)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func closeWhileTheBatchWaits() async throws {
+        let race = try await LegacyRace.open()
+        await race.bulk.setHolding(true)
+        // An adopt-on-demand takes the next file from the queue and its hash unit is held.
+        let onDemand = LegacyRace.tracked {
+            try await race.harness.store.adoptLegacyNow(race.id)
+        }
+        try await race.bulk.requireHeldUnits(atLeast: 1)
+        let onDemandHash = Set(await race.bulk.heldUnits)
+        // A batch adopts every other file, then waits for that adoption of the one claimed file.
+        let batch = LegacyRace.tracked {
+            try await race.harness.store.migrateLegacy(maxFiles: 64)
+        }
+        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
+                await race.bulk.release(unit)
+            }
+            return await race.settled(batch.finished)
+        }
+        let returnedEarly = await batch.finished.value
+        let closing = Task {
+            await race.harness.store.close()
+        }
+        try await CorePoll.until("the store is closing") {
+            await race.harness.state.core.phase != .open
+        }
+        await race.releaseAll()
+        await closing.value
+        let batchResult = await batch.task.result
+        let onDemandResult = await onDemand.task.result
+        let left = await race.harness.state.migration
+
+        #expect(!returnedEarly, "premise: the batch waited for the adopt-on-demand")
+        #expect(throws: StoreError.closed) {
+            try batchResult.get()
+        }
+        #expect(throws: StoreError.closed) {
+            try onDemandResult.get()
+        }
+        #expect(left.adopting.isEmpty && left.onDemand.isEmpty, "no adoption or adopt-on-demand mark is left")
+    }
 }
 
 extension LegacyOnDemandRaceTests {
