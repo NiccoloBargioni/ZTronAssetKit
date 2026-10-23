@@ -336,7 +336,11 @@ extension AssetStore {
         }
     }
 
-    /// `migrateLegacy(maxFiles:)`.
+    /// `migrateLegacy(maxFiles:)`. No call suspends behind a coalesced publication of its own (orchestrator ruling
+    /// L5K-R20): a batch that leaves files to process publishes at bulk urgency and, when that left the trailing install
+    /// due, returns right after it (`remaining > 0`, `finished` false), so the engine schedules that install before it
+    /// calls again; the last batch, which phases 3 and 4 follow in the same call, installs at once. Only a call with no
+    /// install of its own left due waits for an adopt-on-demand of the last claimed files (L5K-R17).
     func performMigrateLegacy(maxFiles: Int) async throws(StoreError) -> LegacyMigrationProgress {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -391,14 +395,25 @@ extension AssetStore {
             adoptedAny = adoptedAny || outcome == .adopted
         }
         if adoptedAny {
+            // A batch publishes at bulk urgency, and inside the install window that only marks the trailing install due,
+            // which only the engine's alarm runs once the engine re-reads the deadline after this call: so no call waits
+            // or runs a later phase behind a coalesced publication (orchestrator ruling L5K-R20). With files left (queued,
+            // or claimed by an adopt-on-demand) the call returns right after it, with `remaining > 0`, and the next call
+            // goes on. With nothing left, phases 3 and 4 follow in this call, so the batch installs at once instead: a
+            // return then would read "nothing remaining, not finished", which tells the caller to back off (RE-S29).
+            let last = self.state.migration.queue.isEmpty && self.state.migration.claimed.isEmpty
             // REENTRANCY: R17 — nothing but the phase: the adoptions were bound before the await.
-            await self.publishSnapshot(urgency: .bulk)
+            await self.publishSnapshot(urgency: last ? .userInitiated : .bulk)
+            if !last, self.state.core.snapshots.installDue {
+                return self.state.migration.progress
+            }
         }
         // With the queue empty and every claimed file an adopt-on-demand's (from its claim to its snapshot), this call can
         // only wait: returning would make its caller call again at once, a hot loop for as long as that adoption hashes
         // (orchestrator ruling L5K-R17). It waits for one such processing at a time, then re-reads the queue, the claims
         // and the phase, so it finishes the migration itself once the last one ended. Each wait is bounded by one
-        // adoption, and `close()` resumes it through that adoption (row k-5).
+        // adoption, and `close()` resumes it through that adoption (row k-5). A call gets here with no install of its own
+        // left due (L5K-R20), and phases 3 and 4 publish no snapshot.
         while self.state.migration.queue.isEmpty, self.state.migration.phase == .inProgress,
               let held = self.state.migration.claimed.first,
               self.state.migration.claimed.allSatisfy({ self.state.migration.onDemand[$0.components] != nil })
