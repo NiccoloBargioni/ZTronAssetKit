@@ -96,6 +96,11 @@ extension SyncEngine {
             }
             return
         }
+        // A run that starts while the launch run waits for legacy migration takes its place (orchestrator ruling L5K-R1):
+        // it applies the same manifest, and its jobs adopt the prior-art files migration has not reached yet
+        // (`storedLocation(of:)`), so the migration loop starts no second run when it ends, whether this run is still
+        // active then or not, and no flag is left behind.
+        self.state.migration.launchRunWaiting = false
         self.broadcast(.syncStarted(run.id, trigger))
         if let before = held, let origin = self.state.remote?.originID {
             self.breakerChanged(origin, from: before)
@@ -1049,12 +1054,15 @@ extension SyncEngine {
     }
 
     /// Calls `migrateLegacy` again while not finished; backs off to the next maintenance window when a call leaves
-    /// nothing remaining yet is not finished (RE-S29).
+    /// nothing remaining yet is not finished (RE-S29). When the loop ends, the launch run that waited for it starts,
+    /// unless a run took its place meanwhile (`startRun` cleared the flag, so no run can be active here with the flag
+    /// set) or the engine no longer runs; the flag is cleared either way.
     private func migrateLoop() async {
         defer {
             self.state.migration.running = false
-            if self.state.migration.launchRunWaiting, self.isRunning {
-                self.state.migration.launchRunWaiting = false
+            let launchRunWaiting = self.state.migration.launchRunWaiting
+            self.state.migration.launchRunWaiting = false
+            if launchRunWaiting, self.isRunning {
                 self.startRun(trigger: .launch, mode: .force)
             }
         }

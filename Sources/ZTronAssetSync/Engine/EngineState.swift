@@ -799,7 +799,9 @@ struct MigrationProgress {
     var running = false
     /// Whether it backed off to the next maintenance window.
     var deferred = false
-    /// Whether the launch run waits for it.
+    /// Whether the launch run waits for it: set by `start()` when a sync is due while migration runs; cleared by the first
+    /// run that starts meanwhile, which takes the launch run's place (orchestrator ruling L5K-R1), or when the loop ends,
+    /// which then starts the launch run if the engine still runs.
     var launchRunWaiting = false
 }
 
