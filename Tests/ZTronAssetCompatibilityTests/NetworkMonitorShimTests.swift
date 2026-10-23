@@ -67,7 +67,12 @@ struct NetworkMonitorShimTests {
 
         let second = monitor.retryWhenAvailable(log.retry(2))
         #expect(await monitor.flush() == 1)
+        // The conditions source keeps only its newest value: the engine must report the drop before connectivity
+        // returns, or the two changes collapse into none.
+        let probe = EventProbe(stream: try await harness.client.subscribe())
         await harness.conditions.send(NetworkMonitorShimTests.offline)
+        _ = await probe.next { $0 == .conditionsChanged(NetworkMonitorShimTests.offline) }
+        await probe.stop()
         await harness.conditions.send(.unrestricted)
         #expect(await runs.next() == 2)
         #expect(log.recorded == [1, 2], "the first retry did not run again")
@@ -96,6 +101,29 @@ struct NetworkMonitorShimTests {
         monitor.cancelRetry(kept)
         monitor.cancelRetry(cancelled)
         #expect(await monitor.flush() == 0)
+        await harness.client.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-6: a retry registered while the client is idle still runs when connectivity returns", .timeLimit(.minutes(1)))
+    func retryRunsWhileTheClientIsIdle() async throws {
+        let iconBytes = CompatFixture.bytes(30)
+        let icon = CompatFixture.asset("bo7.ri.icon", iconBytes)
+        let harness = CompatHarness.make()
+        await harness.serve([(icon, iconBytes)])
+        try await harness.settleLaunch()
+        // The launch run is over: the client has no work, so its engine observes nothing (R-SYN-14). This is the prior
+        // art's moment: an on-demand fetch failed and the view registers a retry for when the network comes back.
+        let monitor = NetworkAvailabilityMonitor(client: harness.client)
+        let log = RetryLog()
+        var runs = log.ran.makeAsyncIterator()
+        monitor.retryWhenAvailable(log.retry(1))
+        #expect(await monitor.flush() == 1)
+
+        await harness.conditions.send(NetworkMonitorShimTests.offline)
+        await harness.conditions.send(.unrestricted)
+
+        #expect(await runs.next() == 1)
         await harness.client.shutdown()
     }
 
