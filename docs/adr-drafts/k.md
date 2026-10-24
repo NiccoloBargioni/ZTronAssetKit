@@ -15,9 +15,9 @@ engine (orchestrator rulings L5K-R1, L5K-R14, L5K-R16, L5K-R17, L5K-R18, L5K-R21
 migration (L5K-R13, L5K-R14, L5K-R17, L5K-R18, L5K-R20, L5K-R23) are listed under "Authorised edits outside WP-K
 (close-out)" below.
 
-**Proposed REENTRANCY rows** (the code cites them as "k-n (proposed)"; all are main-actor awaits of
-`CDNSyncCoordinator`, a test-target type, so ARCHITECTURE §10 may list them under a new "compatibility shims"
-heading or by reference to this draft):
+**Proposed REENTRANCY rows** (the code cites them as "k-n (proposed)"; k-1…k-3 are main-actor awaits of
+`CDNSyncCoordinator`, a test-target type, k-4 an engine await and k-5…k-7 store awaits added in the close-out;
+ARCHITECTURE §10.7 holds all seven under these numbers, ADR-055):
 
 | Row | Where | What is re-validated after the await |
 |---|---|---|
@@ -403,8 +403,8 @@ transfer path during legacy migration" below); the request as it was filed:
   adopted, or an awaitable migration report: MIGRATION.md step 3 could then hold carousel content until the prior art's
   files answer the lookups on a launch during legacy migration (K-15). Recorded for the owner, not requested.
 - **Orchestrator ruling (close-out), L5K-R9:** a public read of the applied manifest is not added in Level 5: it would be
-  a public API addition to `ZTronAssetKit` (NEEDS-HUMAN-REVIEW) that no requirement needs. Both items stay owner options
-  (DECISIONS.md's owner review list).
+  a public API addition to `ZTronAssetKit` (NEEDS-HUMAN-REVIEW) that no requirement needs. Both items stay owner options,
+  recorded in ADR-055 (not on DECISIONS.md's owner review list, which holds the NEEDS-HUMAN-REVIEW tags only, L5K-R28).
 
 ## K-14 — The deprecated `localURL(for:)` stays inside the legacy root (fix round 1)
 - **Context.** For an asset the client does not hold, `localURL(for:)` builds the prior art's pretty path from

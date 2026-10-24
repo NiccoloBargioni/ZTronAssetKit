@@ -18,8 +18,8 @@ import ZTronAssetStorage
 ///   a unique spawn id (sync-1 S1-09).
 /// - One alarm serves every deadline, including the store's (`AssetStore.nextDeadline()`, ADR-022); the heap is
 ///   compacted eagerly and the watcher stops when the engine goes idle (sync-1 S1-10, R-SYN-14).
-/// - Every `await` carries a `// REENTRANCY: RE-Snn` comment and re-checks the lifecycle and the job epoch after
-///   resumption (ARCHITECTURE §10).
+/// - Every `await` carries a `// REENTRANCY:` comment citing its ledger row (an RE-S, f-n or k-n row) and re-checks
+///   the lifecycle and the job epoch after resumption (ARCHITECTURE §10).
 /// - **After `shutdown()` began, every entry point fails with `AssetError.shutDown`** (R-SYN-15, ADR-042): every
 ///   query and command returns `.failure(.shutDown)`, `sync` returns `.failed(.shutDown)`, a group registration
 ///   fails and holds nothing, and a stream made afterwards yields `clientShutDown` and finishes. Only the releases
