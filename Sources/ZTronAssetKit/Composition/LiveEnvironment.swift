@@ -5,9 +5,9 @@ import ZTronAssetStorage
 import ZTronAssetTransport
 
 extension AssetEnvironment {
-    /// The real world (C4): the only place that names the environment's live conformers (three seams outside it
-    /// default to their own: `AssetFallbackChain`'s `MainBundleLookup`, the Apple tier's `LiveAssetPackBackend` and
-    /// the background backend's `LiveBackgroundSessionDriver`). Building it performs no I/O (P-12); each
+    /// The real world (C4): the only place that names the environment's live conformers (seams outside it that default
+    /// to their own include `AssetFallbackChain`'s `MainBundleLookup`, the Apple tier's `LiveAssetPackBackend`, the
+    /// background session driver and `HTTPRemoteSource`'s foreground backend). Building it performs no I/O (P-12); each
     /// call builds fresh conformers, so two clients never share executors or observers. A function, not a
     /// `static var` (SPEC §4.2, ADR-038). The legacy `UserDefaults` stamp is read from `legacyDefaultsSuiteName`,
     /// `.standard` when `nil` (R-STO-11); `AssetClient(configuration:)` passes

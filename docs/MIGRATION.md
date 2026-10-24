@@ -11,7 +11,9 @@ was changed. Adoption is the owner's follow-up, described here. Decisions and th
 
 1. **Depend on the package.** In ZTronCarouselCore's `Package.swift`, add `.package(path: "../ZTronAssetKit")` (switch it
    to the repository URL and a version on release) and the product `ZTronAssetKit` to the `ZTronCarouselCore` target. iOS
-   15 is the floor both packages share; macOS 12 is this package's own (ZTronCarouselCore declares only iOS).
+   15 is the floor both packages share; macOS 12 is this package's own (ZTronCarouselCore declares only iOS). Build
+   ZTronCarouselCore with a Swift 6.2 or newer toolchain: it compiles this package's sources, which use `@concurrent`
+   ([ADR-056](DECISIONS.md), awaiting the owner's confirmation).
 2. **Replace `CDN/`.** Delete the nine prior-art files of `Sources/ZTronCarouselCore/CDN/` and copy the eleven files of
    `Tests/ZTronAssetCompatibilityTests/Shims/` in their place. They import `Foundation`, `ZTronAssetKit` and, for
    `CDNSyncCoordinator`, `Combine`; they use only the package's public API (K-1). Keep their `public` access: the app and

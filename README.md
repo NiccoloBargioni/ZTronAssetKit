@@ -17,7 +17,7 @@ App Group stay with the app ([SPEC](SPEC.md) §1.3).
   `swift-tools-version: 6.0`, the lowest that gives Swift 6 language mode, so a manifest on tools 6.0 can declare the
   dependency ([SPEC](SPEC.md) §3). An app or package that depends on ZTronAssetKit compiles the package's sources too,
   which use `@concurrent` (SE-0461, Swift 6.2), so no toolchain older than Swift 6.2 builds them; 6.3 or newer is the
-  one this package is built and tested with.
+  one this package is built and tested with ([ADR-056](docs/DECISIONS.md), awaiting the owner's confirmation).
 - **Language mode.** Swift 6 with complete strict concurrency, also spelled out in [`Package.swift`](Package.swift).
   At most three audited escape hatches are allowed, each justified in
   [docs/UNSAFE-AUDIT.md](docs/UNSAFE-AUDIT.md).
