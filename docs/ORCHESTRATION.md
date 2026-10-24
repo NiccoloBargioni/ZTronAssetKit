@@ -67,6 +67,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **L5K-R26:** a verification budget.
   - Findings: `l5k-close4-remaining-k.json`. Probes: `l5k-probes-c4/`.
 - **Close-out: RUNNING from cycle 5** `wf_02981dcc-c86` (task `w60vy571x`), launched 03:37 at weekly 44 %, with **`usageStop: 60`** (owner's 65 % for WP-K), `fromCycle: 5` and `findingsFile` `l5k-close4-remaining-k.json`. Docs will run with `usageStop: 65`.
+- **Close-out cycle 5:** `wf_02981dcc-c86`, 03:37–05:4x, weekly 44 % → 57 %, including the owner's own Fable use (the Fable meter 12 → 32 %). **0 blocking in both lenses** at `2df51ab`, so the close-out converged.
+  - Over 5 cycles, blocking went 2 → 1 → 3 → 6 (4 distinct) → 0.
+  - L5K-R27 sends the non-blocking items to Stage 3 or the docs level; L5K-R28 is the docs brief for ADR-055.
+- **Merged:** `wp/k` into `feature/asset-kit` as `23807ac` (`--no-ff`), 24 Oct 05:5x.
+  - Phase-A gates are running: `.build-orch/l5k-gates-a.sh`, logs in `.build-orch/l5k/summary.txt`.
+  - Next: commit TRACEABILITY.md; near-idle TSan and `--perf`; the docs worktree `l5kdocs` with `assetkit-level-docs.js` (ADR-055, `usageStop: 65`); confirm the acknowledged items; merge the docs; re-run `--quick` and `--gates-only`; tag **`l5-merged`**; remove the worktrees and `wp/*` branches.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
