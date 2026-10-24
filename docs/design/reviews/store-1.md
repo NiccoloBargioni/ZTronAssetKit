@@ -1,7 +1,5 @@
 # Adversarial review #1 — `docs/design/store.md`
-
-> **Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.
-
+**Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.\
 **Lens.** Crash consistency and durability: every file-system operation boundary, fsync/rename ordering, torn or partial writes, index corruption and rebuild, ENOSPC/EIO mid-commit, the P-5 window (published but not yet indexed), the advisory lock and a second opener.
 **Reviewer.** review-store-1. I did not write the design.
 **Read.** `CLAUDE.md`; SPEC §1.4, §4.2–§4.4, §5.2, §5.3, §5.7, R-SEC-2, §6 (P-2, P-5, P-6, P-13), §7.3; `docs/RECON.md`, `docs/DECISIONS.md`, `docs/BASELINE.md`; all of `store.md`; `sync.md` §3.2, §4.4 and §17.1 as cross-checks; the drafter's probes `.build-probe-store/{crash,lock}`.
