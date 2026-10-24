@@ -196,11 +196,17 @@ Recorded in `docs/adr-drafts/k.md`; the ones tagged **NEEDS-HUMAN-REVIEW** there
   snapshot installs (ARCHITECTURE §5, L5K-R14) and its alarm runs the trailing install, which the client schedules after
   every such adoption (L5K-R16), skipping the re-read while its alarm already wakes within about two intervals (RE-S40's
   shortcut, F-12); a migration batch returns to the client right after such a publication instead of waiting behind it,
-  and the last batch installs at once (L5K-R20). A resolve's adoption is installed before the call returns, and so is
-  every prior-art file a job answers a user-initiated request with (`resolve`, `ensureAvailable`, a user-initiated
-  prefetch), whenever that request joined it (L5K-R18, L5K-R21). Outside these adoptions, a user-initiated request that
-  joins a prefetch or bulk download while the client is verifying it returns up to about two intervals before the lookups
-  see the asset (the location it returns is valid at once); recorded for the owner in k.md (L5K-R21 enumeration).
+  and the last batch installs at once (L5K-R20, L5K-R23). A resolve's adoption is installed before the call returns, and
+  so is every prior-art file a job answers a user-initiated request with (`resolve`, `ensureAvailable`, a user-initiated
+  prefetch), whenever that request joined it (L5K-R18, L5K-R21); a job also adopts, rather than downloads, the prior-art
+  file of every other id of the same content that joins it before its transfer would start (L5K-R23). Elsewhere a
+  user-initiated answer can precede the lookups by up to about two intervals (0.2 s by default), the lag ADR-016
+  documents for the module, which the shims inherit (orchestrator ruling L5K-R24): a request that joins a prefetch or
+  bulk download while the client verifies it, `ensureAvailable`'s report of assets already stored (during legacy
+  migration too, for a file a migration batch or a prefetch adopted moments earlier), and a `resolve` that finds its
+  asset already stored. The location such an answer returns is valid at once; `lookup`, `existingLocalURL` and
+  `hasAsset` see the asset at the next install, which the client has scheduled. A later version may install a pending
+  trailing install before such answers if a device test shows the lag matters (k.md, "L5K-R24").
 - **Inherited from the module** (K-11): an asset whose new content the origin reports missing (404) is no longer served
   until its manifest entry changes, where the prior art kept the old file and asked again on every sync; the candidate
   extensions also filter manifest-known assets (ADR-037); an on-demand resolve downloads before its extension check; a
