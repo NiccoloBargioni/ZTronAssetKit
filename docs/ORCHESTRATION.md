@@ -56,6 +56,17 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Close-out: RUNNING from cycle 4** `wf_da30f4d9-921` (task `wle5pdlf9`), launched 00:58 at weekly 34 %, with `fromCycle: 4`, `findingsFile` `l5k-close3-remaining-k.json` and `usageStop: 40`. **Owner, 24 Oct 01:25: "move usage target to 65%".** The WP-K stop is now 65 % (close-out 60, docs 65). The run above still has 40 built in.
   - At the next clean boundary (cycle 4's verification, or the old gate halting the run), relaunch `assetkit-closeout.js` with `usageStop: 60`, `fromCycle` set to the next cycle, and `findingsFile` set to the last verification's issues (`verifyFirst: true` if fix 4 finished but was not verified).
   - Docs then run with `usageStop: 65`.
+- **Close-out cycle 4:** `wf_da30f4d9-921`, 00:58–03:2x, weekly 34 % → 44 %. The verifiers cost about 7 points, and the owner's own Fable use (the Fable meter went 0 → 12 %) also moved the meter.
+  - The run stopped at the old 40 % gate before fix 5.
+  - It left 4 blocking items, 3 of them with fixes the verifiers validated in scratch: a stale `last` across an await in `migrateLegacy`, the per-read re-arm lost in a multi-id job, and a late joiner never read.
+  - The fourth was L5K-R21 applied to pre-existing answer sites: ADR-016's lag of at most about two install intervals.
+  - Rulings:
+    - **L5K-R23:** the three validated fixes.
+    - **L5K-R24:** L5K-R21 is scoped to the funnel; the other sites keep ADR-016's lag, recorded for the owner, with Stage 3 holding an optional `installIfDue()`.
+    - **L5K-R25:** small fixes, including `drive`'s guard against a request for a retired job (`EngineDispatch.swift`, guard only).
+    - **L5K-R26:** a verification budget.
+  - Findings: `l5k-close4-remaining-k.json`. Probes: `l5k-probes-c4/`.
+- **Close-out: RUNNING from cycle 5** `wf_02981dcc-c86` (task `w60vy571x`), launched 03:37 at weekly 44 %, with **`usageStop: 60`** (owner's 65 % for WP-K), `fromCycle: 5` and `findingsFile` `l5k-close4-remaining-k.json`. Docs will run with `usageStop: 65`.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
   2. Run `assetkit-closeout.js` with `{wp: "k", name: "WP-K (compatibility shims)", base: "l5g-merged", target: "(test target only)", testTarget: "ZTronAssetCompatibilityTests", coverageMin: 70, bar: "strict", maxCycle: 30, usageStop: 40}`, using the same sims as WP-G.
