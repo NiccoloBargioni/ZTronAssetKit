@@ -14,8 +14,10 @@ App Group stay with the app ([SPEC](SPEC.md) §1.3).
 - **Platforms.** iOS 15.0 and macOS 12.0 are the package floors ([ADR-005](docs/DECISIONS.md)). The Apple-hosted
   tier runs on iOS 26 or macOS 26 and later.
 - **Toolchain.** Building and testing this package needs Swift 6.3 or newer. The manifest declares
-  `swift-tools-version: 6.0`, the lowest that gives Swift 6 language mode, so packages on tools 6.0 can depend on it
-  ([SPEC](SPEC.md) §3).
+  `swift-tools-version: 6.0`, the lowest that gives Swift 6 language mode, so a manifest on tools 6.0 can declare the
+  dependency ([SPEC](SPEC.md) §3). An app or package that depends on ZTronAssetKit compiles the package's sources too,
+  which use `@concurrent` (SE-0461, Swift 6.2), so no toolchain older than Swift 6.2 builds them; 6.3 or newer is the
+  one this package is built and tested with.
 - **Language mode.** Swift 6 with complete strict concurrency, also spelled out in [`Package.swift`](Package.swift).
   At most three audited escape hatches are allowed, each justified in
   [docs/UNSAFE-AUDIT.md](docs/UNSAFE-AUDIT.md).
@@ -25,14 +27,14 @@ App Group stay with the app ([SPEC](SPEC.md) §1.3).
   `ZTronAssetTransport`, `ZTronAssetAppleHosted`, `ZTronAssetSync`) are internal to the package, and the fakes in
   `ZTronAssetTestSupport` are not a product ([SPEC](SPEC.md) §4.1).
 
-Decisions the owner is asked to confirm, such as the storage location, the on-disk format, the platform floors, the
-policy defaults, background transfers and the compatibility shims, are tagged NEEDS-HUMAN-REVIEW in
+Decisions that need the owner's confirmation, such as the storage location, the on-disk format, the platform floors,
+the policy defaults, background transfers and the compatibility shims, are tagged NEEDS-HUMAN-REVIEW in
 [docs/DECISIONS.md](docs/DECISIONS.md); the owner review list at the top of that file names each one.
 
 ## Installation
 
-No published repository URL exists, so depend on a local checkout with SwiftPM. A release would switch this line to
-the repository URL and a version.
+Depend on the package with SwiftPM: a path dependency on a checkout, as below; from a published repository, its URL and
+a version.
 
 ```swift
 // Package.swift of the package or app that uses ZTronAssetKit
@@ -78,10 +80,11 @@ if let location = client.lookup(pages[0], extensions: ["heic", "png"]) {   // ma
 
 This is top-level code, which runs on the main actor. In an app, create the client once at launch on the main actor
 and call `start()` from the launch task before the first carousel page is created, the placement that step 3 of
-[docs/MIGRATION.md](docs/MIGRATION.md) describes for the shims; keep the client alive for the app's lifetime.
-Creating it performs no I/O and starts nothing. `start()` returns when the client
-is ready, not when a sync has finished. The key is wrapped in `AppKey`, which prints as `AppKey(<redacted>)`, is not
-`Codable` and cannot be read back by the app, and the client sends it only to allow-listed HTTPS origins.
+[docs/MIGRATION.md](docs/MIGRATION.md) describes for the shims; keep the client alive for the app's lifetime. A store
+root admits one client at a time: a second client, process or extension on the same location fails `start()` with
+`.storageUnavailable(.locked)` (R-STO-9). Creating a client performs no I/O and starts nothing. `start()` returns when
+the client is ready, not when a sync has finished. The key is wrapped in `AppKey`, which prints as `AppKey(<redacted>)`,
+is not `Codable` and cannot be read back by the app, and the client sends it only to allow-listed HTTPS origins.
 
 ## How it works, briefly
 
@@ -128,13 +131,19 @@ let client = AssetClient(configuration: configuration)   // no environment: Asse
 `lookup(_:extensions:)` is `@MainActor`, O(1) and does no I/O: it reads the snapshot mirror and returns an
 `AssetLocation` (URL, extension, size, whether the bytes were verified against a checksum, and whether newer content is
 pending while the old bytes are served) or `nil`. It returns `nil` before `start()` installed the first snapshot, after
-`shutdown()`, and while a reopen replaces the store. `resolve(_:priority:)` is the asynchronous step: one transfer per
-content however many callers wait, a caller's cancellation affects only that caller, `.userInitiated` (the default)
-overtakes prefetch and bulk work, and an unknown identifier makes the client fetch the manifest first. The public
-async APIs throw the closed `AssetError` (offline, authRejected, notFound, insufficientSpace, integrityFailure,
-serverUnavailable, cancelled, storageUnavailable, shutDown), so a UI can switch over it exhaustively; `withAsset`
-throws untyped errors because its body is the caller's, and `sync` reports failures in its outcome
-([ADR-004](docs/DECISIONS.md), [ADR-042](docs/DECISIONS.md)).
+`shutdown()`, and while a reopen replaces the store. It can also miss an asset for up to about two
+`tuning.snapshotInstallInterval`s (0.2 s by default) after `resolve` returned it or an `assetAvailable` event announced
+it, because prefetch and bulk work install snapshots at a bounded rate ([ADR-016](docs/DECISIONS.md),
+[docs/MIGRATION.md](docs/MIGRATION.md) §4), and during legacy migration it misses a prior-art file until that file's
+adoption is installed. After `resolve`, use the URL it returns; on `assetAvailable`, call `resolve`, which answers a
+stored asset without a transfer, rather than `lookup`.
+
+`resolve(_:priority:)` is the asynchronous step: one transfer per content however many callers wait, a caller's
+cancellation affects only that caller, `.userInitiated` (the default) overtakes prefetch and bulk work, and an unknown
+identifier makes the client fetch the manifest first. The public async APIs throw the closed `AssetError` (offline,
+authRejected, notFound, insufficientSpace, integrityFailure, serverUnavailable, cancelled, storageUnavailable,
+shutDown), so a UI can switch over it exhaustively; `withAsset` throws untyped errors because its body is the caller's,
+and `sync` reports failures in its outcome ([ADR-004](docs/DECISIONS.md), [ADR-042](docs/DECISIONS.md)).
 
 A URL the client hands out stays readable for at least `StoragePolicy.deletionGrace` of awake time after a snapshot
 without it was installed ([ADR-017](docs/DECISIONS.md)). Code that reads the file again later, such as video playback,
@@ -266,15 +275,19 @@ shutdown), so an app keeps one client for its whole lifetime.
 Background `URLSession` transfers are off by default: with `HTTPSourceConfiguration.background` at `.disabled`, every
 transfer runs in the foreground session ([ADR-026](docs/DECISIONS.md)). Setting it to
 `.enabled(BackgroundTransferOptions(...))` is the app's attestation that its AppDelegate forwards
-`application(_:handleEventsForBackgroundURLSession:completionHandler:)` to the client. Nothing detects at run time an
-app that attests the hook without wiring it, so enable the policy only together with the hook:
+`application(_:handleEventsForBackgroundURLSession:completionHandler:)` to the client (a SwiftUI app adds one with
+`@UIApplicationDelegateAdaptor`). Nothing detects at run time an app that attests the hook without wiring it, so enable
+the policy only together with the hook:
 
 ```swift
 // AppDelegate, in application(_:handleEventsForBackgroundURLSession:completionHandler:):
-let handled = client.handleBackgroundEvents(identifier: identifier, completionHandler: completionHandler)
+if !client.handleBackgroundEvents(identifier: identifier, completionHandler: completionHandler) {
+    completionHandler()   // not the client's session; an app with sessions of its own passes it to their owner
+}
 ```
 
-`handleBackgroundEvents` returns `false` for a session that is not the client's and completes the handler once the
+`handleBackgroundEvents` returns `false`, and keeps nothing, for a session that is not the client's; the app then
+passes that handler to the session's owner, or calls it. For the client's own session it calls the handler once the
 session's events are staged. Only bulk transfers of known size within the cap, without a range resume, go to the
 background session, and only those that carry no app key unless `keyRedirectExposure` is `.acceptedByOwner`: in the
 background the system follows redirects without asking the app, so the key could reach a redirect target, and the hop
