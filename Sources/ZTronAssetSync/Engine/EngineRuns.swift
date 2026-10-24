@@ -96,6 +96,11 @@ extension SyncEngine {
             }
             return
         }
+        // A run that starts while the launch run waits for legacy migration takes its place (orchestrator ruling L5K-R1):
+        // it applies the same manifest, and its jobs adopt the prior-art files migration has not reached yet
+        // (`storedLocation(of:lane:)`), so the migration loop starts no second run when it ends, whether this run is still
+        // active then or not, and no flag is left behind.
+        self.state.migration.launchRunWaiting = false
         self.broadcast(.syncStarted(run.id, trigger))
         if let before = held, let origin = self.state.remote?.originID {
             self.breakerChanged(origin, from: before)
@@ -1049,24 +1054,44 @@ extension SyncEngine {
     }
 
     /// Calls `migrateLegacy` again while not finished; backs off to the next maintenance window when a call leaves
-    /// nothing remaining yet is not finished (RE-S29).
+    /// nothing remaining yet is not finished (RE-S29). When the loop ends, the launch run that waited for it starts,
+    /// unless a run took its place meanwhile (`startRun` cleared the flag, so no run can be active here with the flag
+    /// set) or the engine no longer runs; the flag is cleared either way.
+    ///
+    /// After every call, returned or thrown, the store's deadline is re-read into the heap (RE-S40, orchestrator ruling
+    /// L5K-R16): a batch publishes its adoptions at bulk urgency, which inside the install window leaves the trailing
+    /// install to the engine's alarm (ARCHITECTURE §5), and since L5K-R1's parked-run decision no launch run's apply need
+    /// follow migration to install them; a call that threw may have published first (phase 3's commit throws after the
+    /// batch's publication). The re-read is O(1) while the alarm already wakes within about two install intervals (F-12).
     private func migrateLoop() async {
         defer {
             self.state.migration.running = false
-            if self.state.migration.launchRunWaiting, self.isRunning {
-                self.state.migration.launchRunWaiting = false
+            let launchRunWaiting = self.state.migration.launchRunWaiting
+            self.state.migration.launchRunWaiting = false
+            if launchRunWaiting, self.isRunning {
                 self.startRun(trigger: .launch, mode: .force)
             }
         }
         while self.isRunning, !Task.isCancelled {
             let progress: LegacyMigrationProgress
+            self.state.migration.batchCalls += 1
             do {
                 // REENTRANCY: RE-S29 — the lifecycle; calls again while not finished and the engine runs.
                 progress = try await self.store.migrateLegacy(maxFiles: 64)
             } catch {
                 self.state.migration.deferred = true
+                if self.isRunning {
+                    // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+                    await self.refreshStoreDeadlineAfterPublish()
+                }
                 return
             }
+            guard self.isRunning else {
+                return
+            }
+            // REENTRANCY: RE-S40 — the lifecycle, re-checked below; the heap's store entry is replaced by the newest
+            // deadline, so the trailing install of this batch's publication runs on the alarm (L5K-R16).
+            await self.refreshStoreDeadlineAfterPublish()
             guard self.isRunning else {
                 return
             }

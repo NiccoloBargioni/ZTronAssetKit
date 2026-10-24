@@ -58,7 +58,9 @@ public enum CDNRefreshPolicy: Sendable, Hashable {
 
 /// R-CAR-6 shim (ADR-033): the prior art's provider protocol, kept so custom providers still compile. Adapters over
 /// `AssetClient` (`CDNLocalStore`, `CDNAssetResolver.installed`, `CDNSyncCoordinator`, `NetworkAvailabilityMonitor`,
-/// `CDNProviderFactory`/`CDNConfiguration`) are WP-G's, in this target.
+/// `CDNProviderFactory`/`CDNConfiguration`) are WP-K's, in this target (ADR-033's round-4 amendment). In the shims a
+/// provider is a manifest source (`CDNSyncCoordinator.verifyFullyAvailable()`) and, for the two prior-art providers,
+/// a description of the client tier that replaces it; the client never downloads through a provider.
 public protocol CDNProviding: Sendable {
     /// Everything the CDN currently advertises.
     func fetchManifest() async throws -> [CDNAsset]

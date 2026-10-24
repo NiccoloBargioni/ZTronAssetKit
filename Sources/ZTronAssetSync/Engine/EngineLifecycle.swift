@@ -287,7 +287,7 @@ extension SyncEngine {
             return
         }
         // REENTRANCY: RE-S28 — the lifecycle; the reconciliation plan is computed after all three reads.
-        await self.reconcileLaunch(sink: sink)
+        let reconciledPublication = await self.reconcileLaunch(sink: sink)
         guard !self.isShuttingDown else {
             self.settleStart(.failure(.shutDown))
             return
@@ -335,6 +335,14 @@ extension SyncEngine {
         }
         self.pump()
         self.reconcileIdle()
+        if reconciledPublication {
+            // Launch reconciliation published a staged file at bulk urgency while the engine was starting, when no
+            // re-read reaches the heap (`refreshStoreDeadline` applies only while running): its trailing install is
+            // scheduled now, so the adopted asset reaches the readers' snapshot even when no launch run follows
+            // (orchestrator ruling L5K-R16).
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+            await self.refreshStoreDeadlineAfterPublish()
+        }
     }
 
     /// The applied entries that are not present (absent or stale, never failed), by transfer: what launch
@@ -364,15 +372,16 @@ extension SyncEngine {
     }
 
     /// Launch reconciliation (ADR-028): re-attached transfers, then the staging inventory, then the plan against
-    /// the applied entries that are not present; then staging GC keeping every claim.
-    private func reconcileLaunch(sink: StoreStagingSink) async {
+    /// the applied entries that are not present; then staging GC keeping every claim. `true` when it asked the store to
+    /// publish a staged file (at bulk urgency), whose trailing install the caller schedules once the engine runs.
+    private func reconcileLaunch(sink: StoreStagingSink) async -> Bool {
         guard let remote = self.state.remote else {
-            return
+            return false
         }
         // REENTRANCY: RE-S28 — the lifecycle; this is the first of the three reads the plan needs.
         let live = await remote.reattachedTransfers()
         guard !self.isShuttingDown else {
-            return
+            return false
         }
         let inventory: StagingInventory
         let view: StorePlanningView
@@ -382,18 +391,19 @@ extension SyncEngine {
             // REENTRANCY: RE-S37 — the lifecycle; the view is a snapshot.
             view = try await self.store.planningView()
         } catch {
-            return
+            return false
         }
         guard !self.isShuttingDown else {
-            return
+            return false
         }
         self.adoptApplied(view.appliedManifest, etag: view.stamp?.manifestETag)
         // REENTRANCY: RE-S28 — the lifecycle; the wanted set is computed off the actor from the view, a value (C2: one
         // pass over up to `maxEntries` entries).
         let wanted = await SyncEngine.wantedTransfers(view)
         guard !self.isShuttingDown else {
-            return
+            return false
         }
+        var published = false
         let actions = TransferReconciler.plan(live: live, staged: inventory, wanted: Set(wanted.keys))
         for action in actions {
             switch action {
@@ -420,6 +430,7 @@ extension SyncEngine {
                 }
                 let size = inventory.items[name]?.byteSize ?? 0
                 let file = StagedFile(name: name, byteCount: size, resumed: false, httpStatus: nil, etag: nil)
+                published = true
                 do {
                     // REENTRANCY: RE-S14 — the lifecycle; the result is bound to the ids the store still finds with
                     // this identity.
@@ -430,7 +441,7 @@ extension SyncEngine {
                 }
             }
             guard !self.isShuttingDown else {
-                return
+                return published
             }
         }
         var claims = Set(self.state.jobs.keys)
@@ -442,6 +453,7 @@ extension SyncEngine {
         } catch {
             self.record(nil, .storage, "launch staging collection failed: \(error)")
         }
+        return published
     }
 
     // MARK: Shutdown (R-SYN-15, ADR-039, ADR-042)
@@ -560,6 +572,7 @@ extension SyncEngine {
             conditionWaiters[token]?.resume()
         }
         self.releaseApplyFollow()
+        self.releaseStoreDeadlineRead()
         self.releaseManifestOutcomeDelivery()
         self.releaseRunSettlementDelivery()
         self.releaseAlarmTurns()

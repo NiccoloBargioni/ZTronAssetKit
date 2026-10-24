@@ -69,6 +69,11 @@ struct EngineState {
     /// releases it (`holdNextApplyFollow()`, `releaseApplyFollow()`), so the test decides what the engine does in
     /// between. No production path arms it.
     var applyFollowHold: ApplyFollowHold = .idle
+    /// Test seam (orchestrator ruling L5K-R16): the next re-read of the store's deadline (`refreshStoreDeadline()`) waits
+    /// after the store answered and before the engine applies the answer, until a test releases it
+    /// (`holdNextStoreDeadlineRead()`, `releaseStoreDeadlineRead()`), so the test can land a newer read first, an order
+    /// the tasks' priorities can produce. No production path arms it.
+    var storeDeadlineReadHold: StoreDeadlineReadHold = .idle
     /// Bumped whenever the engine's copy of the applied manifest changes (`adoptApplied`). A store view read before a
     /// change the engine made meanwhile may be older than the copy: it is not followed (close-out cycle 3, F-23).
     var copySerial: UInt64 = 0
@@ -194,6 +199,9 @@ struct EngineState {
     var lastAlarm: UInt64 = 0
     /// The store's next deadline as last read.
     var storeDeadline: MonotonicInstant?
+    /// Updates of `storeDeadline` so far (`setStoreDeadline`): an answer of the store's deadline requested at one count
+    /// and applied at another may have crossed a newer answer (`applyStoreDeadline`, orchestrator ruling L5K-R16).
+    var storeDeadlineUpdates: UInt64 = 0
     /// How many alarm runs have their `store.runDueWork()`, and what follows it (a free-space read after reaped bytes),
     /// under way: the store deadline is cleared meanwhile, yet that work may still reap. A count, not a flag: a deadline
     /// armed during one run's await starts a second alarm, and the first to end must not mark the other's work over
@@ -799,8 +807,13 @@ struct MigrationProgress {
     var running = false
     /// Whether it backed off to the next maintenance window.
     var deferred = false
-    /// Whether the launch run waits for it.
+    /// Whether the launch run waits for it: set by `start()` when a sync is due while migration runs; cleared by the first
+    /// run that starts meanwhile, which takes the launch run's place (orchestrator ruling L5K-R1), or when the loop ends,
+    /// which then starts the launch run if the engine still runs.
     var launchRunWaiting = false
+    /// Test seam: the `migrateLegacy` calls the loop has made in this lifetime, so a test bounds them while a job's
+    /// adoption holds the last claimed prior-art file (orchestrator ruling L5K-R17: no hot loop around a store call).
+    var batchCalls = 0
 }
 
 /// The negative cache of unknown identifiers (LRU-bounded).
@@ -835,6 +848,17 @@ struct NegativeCache {
             self.order.removeAll { $0 == id }
         }
     }
+}
+
+/// The store-deadline read test seam (`SyncEngine.holdNextStoreDeadlineRead()`): a test holds one re-read's answer
+/// before the engine applies it, to order it after a newer read (L5K-R16), which no production path can do.
+enum StoreDeadlineReadHold {
+    /// Nothing armed (always, outside tests).
+    case idle
+    /// The next re-read waits once the store answered.
+    case armed
+    /// That re-read waits for `releaseStoreDeadlineRead()` or for shutdown.
+    case holding(CheckedContinuation<Void, Never>)
 }
 
 /// The apply follow-up test seam (`SyncEngine.holdNextApplyFollow()`): a test holds the engine's side of one committed

@@ -750,6 +750,17 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
+        // Nor for an attempt retired during the reads (its last group released, say) or whose job's epoch or attempt moved
+        // on: the request would be cancelled as soon as it was sent (orchestrator ruling L5K-R25; L5K-C4-08, L5K-C4-14).
+        // With no request there is no stream to drain, so its draining record ends here, as a drained stream's does
+        // (`finishAttempt`), and the transfer's next attempt may start.
+        guard self.state.jobs[transfer]?.epoch == epoch, self.state.jobs[transfer]?.active?.attempt == request.attempt else {
+            if self.state.draining[transfer]?.attempt == request.attempt {
+                self.state.draining[transfer] = nil
+            }
+            self.pump()
+            return
+        }
         // Counted where the request is sent: an attempt answered from the store sent none.
         self.state.metrics.transferRequests += 1
         if self.state.jobs[transfer]?.interests.values.contains(where: { $0.kind == .waiter }) == true {
@@ -936,6 +947,11 @@ extension SyncEngine {
         } catch {
             // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
             await self.publicationFailed(transfer, epoch: epoch, file: file, error: error, cancelledAttempt: cancelledAttempt)
+            // A publication that threw may have published first, or doomed a key (the store re-validates the bindings
+            // after its snapshot and throws `.superseded` when none is left; a placement that failed drops its provisional
+            // reference): its trailing install runs on the alarm all the same (orchestrator ruling L5K-R16).
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+            await self.refreshStoreDeadlineAfterPublish()
             return
         }
         guard self.isRunning else {
@@ -943,6 +959,10 @@ extension SyncEngine {
         }
         self.recordBreaker(.objectSuccess(transfer))
         guard let current = self.state.jobs[transfer], current.epoch == epoch else {
+            // The job ended while its content was published (its asset pruned, its content superseded): the publication's
+            // trailing install is scheduled whatever became of the job (L5K-R16).
+            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+            await self.refreshStoreDeadlineAfterPublish()
             return
         }
         self.transition(transfer, to: .committing)
