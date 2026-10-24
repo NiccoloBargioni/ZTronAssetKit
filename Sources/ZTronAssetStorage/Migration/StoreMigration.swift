@@ -26,9 +26,16 @@ extension AssetStore {
         try await self.performLegacyPhaseOne()
     }
 
-    /// Adopts up to `maxFiles` legacy files (hash, then `adoptVerifiedFile`), publishing snapshots as it goes at bulk
+    /// Adopts up to `maxFiles` legacy files (hash, then `adoptVerifiedFile`) and publishes their snapshot at bulk
     /// urgency; phases 3 and 4 run when nothing remains. Phase 3 sets `state.core.stamp` (every entry adopted) or
-    /// `state.core.syncDue` (directly or through `markSyncDue()`), then commits durably.
+    /// `state.core.syncDue` (directly or through `markSyncDue()`), then commits durably. A call whose bulk publication
+    /// left the trailing install due returns right after it while files remain once that publication returned, so the
+    /// caller can schedule that install before it calls again; otherwise, and for the last batch, it installs at once
+    /// (orchestrator rulings L5K-R20, L5K-R23). With the queue empty and every claimed file held by an
+    /// adopt-on-demand, the call waits for those adoptions instead of returning at once and, once no file is left,
+    /// finishes the migration itself; when an adoption it waited for ends without an outcome for the file (its caller
+    /// was cancelled, or a transient failure deferred the file), the file is back in the queue and the call returns,
+    /// with `remaining > 0`, for the next call to process it (L5K-R17).
     ///
     /// Progress is cumulative over the lifetime; `finished` once the tree and the key are gone (also when there was
     /// nothing to migrate). A call may end with nothing remaining and `finished` still false, when phase 4 could not
@@ -45,7 +52,9 @@ extension AssetStore {
     /// pre-transfer read while migration is pending (orchestrator ruling L5K-R1). Publishes its snapshot at `urgency`
     /// (ARCHITECTURE §5, L5K-R14): `.userInitiated`, the default, installs it at once (a resolve, a lease, a job of the
     /// user-initiated lane); `.prefetch` and `.bulk` install it within the install window, so the adoptions of a bulk
-    /// sync coalesce as its publications do.
+    /// sync coalesce as its publications do. A `.userInitiated` call also installs before it answers an asset that is
+    /// present already, since the adoption that made it present may be in a coalesced snapshot only (L5K-R18), and a
+    /// call that waited for another call's processing of the same file publishes at its own urgency.
     ///
     /// Returns the asset's current location when it is present (adopted or not), `nil` when it is neither present nor a
     /// legacy file still to adopt, or when its file did not verify or was kept. One adoption per legacy file runs at a
