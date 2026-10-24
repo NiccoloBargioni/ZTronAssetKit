@@ -2,9 +2,11 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
-## WP-I (documentation and README) — RUNNING (launched 2026-10-24 ~08:40 CEST)
+## WP-I (documentation and README) — RUNNING (launched 2026-10-24 12:11 CEST)
 - **Owner:** "Run WP-I: documentation and README" (24 Oct).
-  - The owner gave no stop, so the orchestrator applied a default of **70 %** for WP-I; the owner may change it.
+  - The owner gave no stop, so the orchestrator applied a default of 70 %. **Owner, 24 Oct 12:16: "set usage threshold at 75". WP-I's stop is now 75 %.**
+  - The running script still has 70 built in. If its gate halts the run at 70 %, resume it with `Workflow({scriptPath: ".claude/workflows/assetkit-wp-i-docs.js", resumeFromRunId: "wf_3045417c-704", args: {base: "l5-merged", worktree: "i", usageStop: 75, maxRounds: 6}})`. Completed agents replay from cache.
+  - The merge-docs step (ADR-056) uses 75 as well.
   - Weekly usage at launch: 60 % (Fable 32 %).
 - **Scope** (ARCHITECTURE §1.2, row "end | I docs"; SPEC §8):
   - `README.md` with a quick start of at most 20 code lines, compiled against the public API in a scratch package;
