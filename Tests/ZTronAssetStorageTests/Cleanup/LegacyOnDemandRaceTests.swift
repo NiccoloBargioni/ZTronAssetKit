@@ -191,14 +191,18 @@ struct LegacyOnDemandRaceTests {
         }
         let answeredEarly = await onDemand.finished.value
         // close() begins while the batch's placement unit is held; its drain then lets that unit finish.
-        let closing = Task {
+        let closing = LegacyRace.tracked {
             await race.harness.store.close()
         }
         try await CorePoll.until("the store is closing") {
             await race.harness.state.core.phase != .open
         }
         await race.releaseAll()
-        await closing.value
+        // A resume that never comes fails at the time limit, and the run goes on, instead of awaiting a result for ever
+        // (L5K-R25, L5K-C4-12).
+        try await CorePoll.until("close() and both calls ended") {
+            await LegacyRace.ended(closing.finished, batch.finished, onDemand.finished)
+        }
         let batchResult = await batch.task.result
         let onDemandResult = await onDemand.task.result
 
@@ -355,14 +359,18 @@ extension LegacyOnDemandRaceTests {
             return await race.settled(batch.finished)
         }
         let returnedEarly = await batch.finished.value
-        let closing = Task {
+        let closing = LegacyRace.tracked {
             await race.harness.store.close()
         }
         try await CorePoll.until("the store is closing") {
             await race.harness.state.core.phase != .open
         }
         await race.releaseAll()
-        await closing.value
+        // A resume that never comes (an adopt-on-demand that never ends its mark, the verifier's mutant M8) fails at the
+        // time limit, and the run goes on, instead of awaiting a result for ever (L5K-R25, L5K-C4-12).
+        try await CorePoll.until("close() and both calls ended") {
+            await LegacyRace.ended(closing.finished, batch.finished, onDemand.finished)
+        }
         let batchResult = await batch.task.result
         let onDemandResult = await onDemand.task.result
         let left = await race.harness.state.migration
@@ -622,6 +630,16 @@ struct LegacyRace {
             }
         }
         return (task, finished)
+    }
+
+    /// Whether every one of the tracked calls has returned or thrown.
+    static func ended(_ calls: CleanupSteps.Finished...) async -> Bool {
+        for call in calls {
+            guard await call.value else {
+                return false
+            }
+        }
+        return true
     }
 
     /// Every later read of the file fails with `notFound`: what a reader finds once a placement renamed it into `blobs/`
