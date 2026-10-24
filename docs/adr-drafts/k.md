@@ -1420,6 +1420,71 @@ Findings `.build-orchestrator/l5k-close3-remaining-k.json` (`L5K-C3-nn`); ruling
   window of the L5K-R21 enumeration was shown by a probe on macOS 27 only, and how often a device produces it (a
   user-initiated request joining a download while it is verified) was not measured.
 
+## Evidence (close-out cycle 4; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
+- **Failing first (L5K-R20).** On `a8eadc8` (`9c53e06`'s code plus the tests): the engine tests `✘ Test run with 2 tests
+  in 1 suite failed after 0.011 seconds with 2 issues.`, each on `unseen.isEmpty` with every premise holding; the store
+  pins `✘ Test run with 2 tests in 1 suite failed after 0.018 seconds with 5 issues.` (`returned`, the first call's
+  progress, the second call's finish; the last batch's progress and phase). On `4b84327` (the last batch's new
+  expectation, still the old code): engine `✘ … with 2 issues.` (`unseen.isEmpty`), store `✘ … failed after 0.016 seconds
+  with 6 issues.` (`returned` and the progress; `!installDue`, `unseen.isEmpty`, `installs == 1`). With `8d858af` all four
+  pass, and at that commit the engine file and `EngineRecoveryTests` 26/26, the six legacy store suites 51/51,
+  Compatibility 71/71, Sync 343/343, Storage 457/457.
+- **Option (b) taken literally for the last batch (tried, not committed).** A return with `remaining == 0 && !finished`
+  and an engine that called again after a counted adoption: `ZTronAssetSyncTests` `✘ Test run with 343 tests in 52 suites
+  failed after 64.271 seconds with 2 issues.`, both in `deferredMigrationFinishesInMaintenance` (its time limit, and the
+  sync it then could not run): the call that adopted 3 files and failed phase 4 was called again and finished, so the
+  migration never deferred. Hence the decision in "L5K-R20".
+- **Failing first (L5K-R21).** On `694583a`: 2 of 2 runs `✘ Test run with 2 tests in 1 suite failed after 0.012 seconds
+  with 2 issues.` (0.009 s the second time), each on `unseen.isEmpty` with every premise holding (planned absent, the
+  re-read held, the prefetch lane at the hold, the promotion). With `dfc16e8` both pass; the engine file 22/22, Sync
+  345/345, Compatibility 71/71.
+- **Mutants** (each applied in the worktree, run, and reverted before any commit). M17 (the L5K-R17 wait removed):
+  `migrationLoopWaitsForTheLastAdoption` fails in 4 of 4 runs of its file (`waited`, `callsWhileHeld <= 1`, `calls <= 2`)
+  and in a full `ZTronAssetSyncTests` run (`✘ Test run with 346 tests in 52 suites failed after 9.264 seconds with 5
+  issues.`, with `shutdownWhileTheMigrationWaits` and the KC3 test failing on their premise), 1-minute load 5.4–5.9. M16a
+  (no re-arm after the funnel's reads): PE5, PR14a and PR14b fail. M21 (no answer-site publication): PE5, the two-id test
+  and `promotedAdoptionInstallsAtOnce` fail. M20 (`.bulk` always, no early return): both L5K-R20 engine tests and both
+  store pins fail.
+- **Probe K4-COMMITPROMO** (a temporary test file, removed before any commit; its source is kept at
+  `.build-k/tmp/probes/ProbeK4CommitPromotion.swift`): `unseenAtReturn=1` in 5 of 5 runs (the L5K-R21 enumeration).
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick` on `d98ec3a`: `VERIFY: PASS` (Model 151, Sync 346, Storage 458,
+  Transport 84, Kit 85, Compatibility 71, AppleHosted 104 tests).
+- **Runs ×3** (debug, on `d98ec3a`, beside the simulator run, a TSan run and other agents' work; 1-minute load at the
+  runs' ends 16.7 to 270.7): `ZTronAssetCompatibilityTests` `✔ Test run with 71 tests in 10 suites passed` ×3,
+  `ZTronAssetSyncTests` 346/346 ×3, `ZTronAssetKitTests` 85/85 ×3, `ZTronAssetStorageTests` 458/458 ×3 (and once more each
+  in `--quick` and in the coverage run).
+- **TSan** (`--sanitize=thread`, `.build-k-tsan`): Compatibility `✔ Test run with 71 tests in 10 suites passed after
+  15.464 seconds.`; Sync `✔ Test run with 346 tests in 52 suites passed after 45.504 seconds.`; Storage, first run (at a
+  1-minute load of 110 to 270, beside the debug runs and the simulator): `✘ Test run with 458 tests in 60 suites failed
+  after 670.499 seconds with 1045 issues.`, every issue a time-limit overrun: WP-B's CPU-bound state-space enumeration
+  `R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5` (8 cases over their one-minute
+  limit; the other 1,036 issues are its later iterations reporting `.cancelled`) and the loopback server's `Test support:
+  start racing stop …`; neither touches legacy migration. Re-run alone at load 8: `✔ Test run with 458 tests in 60 suites
+  passed after 223.235 seconds.` No ThreadSanitizer report in any log.
+- **Release build** (`swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`): `Build complete!`.
+- **Gates.** `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`; `gates.py selftest`: `SELFTEST: PASS`;
+  `gates.py trace` written to `.build-k/trace-check.md`: `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1175`,
+  `TRACE: PASS`. Every `await` cycle 4 added or changed in `Sources/` carries a `// REENTRANCY:` line (a script over the
+  diff from `9c53e06`: 6 awaits, 0 missing).
+- **Coverage** (`swift test --scratch-path .build-k --enable-code-coverage --skip Benchmarks`, the merged export over the
+  seven test bundles, `gates.py coverage`): AppleHosted 99.76 %, Kit 97.83 % (1444/1476), Model 99.31 %, Storage 97.38 %
+  (8107/8325), Sync 93.60 % (8583/9170), Transport 99.08 %, `COVERAGE overall lines=96.59% (25082/25967)`, device-only
+  share 0.68 %, `COVERAGE: PASS` (L5K-R12: every per-target figure above its floor). The shims in the compatibility bundle:
+  98.18 % (538/548), unchanged. A line cycle 4 changed that no test runs: `storedLocation`'s catch (a thrown adoption,
+  uncovered before too).
+- **iOS.** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, only the informational `IDERunDestination` line.
+- **iOS Simulator** (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
+  `caffeinate -i`, on `d98ec3a`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result: Passed`, 1,299 tests, 1,299
+  passed, 0 failed, 0 skipped, 0 expected failures (`Test-ZTronAssetKit-2026.10.24_01-55-57-+0200.xcresult`). The
+  simulator is shut down.
+- **No benchmark** was run (L5K-R11).
+- **Writes.** Nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR` and the module
+  cache under `.build-k/tmp` (the coverage run's profiles SwiftPM writes under `.build-k`), derived data under
+  `.build-k/xcode*`; the mutants and the probe file were removed before any commit; `python3 -B`, so no
+  `Scripts/__pycache__`; `docs/TRACEABILITY.md` untouched (the trace gate wrote to `.build-k`).
+
 ## Evidence (close-out cycle 3; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
 - **Failing first (L5K-R16).** On `30be1bf` (`1901e91`'s code plus the tripwire and the tests): `--filter
   "EngineLegacyMigrationTransferTests|EngineModelTests"`: `✘ Test run with 13 tests in 2 suites failed after 2.246
