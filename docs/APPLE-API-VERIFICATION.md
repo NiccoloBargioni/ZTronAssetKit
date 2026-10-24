@@ -148,7 +148,7 @@ All file access calls (`contents`, `descriptor`, `url`) are **`nonisolated` and 
 - **Consequences:**
   - (a) The catalog pack's ID, and which packs are essential, are **configuration** of `ZTronAssetAppleHosted`, never queried from the system.
   - (b) **`AssetPackManager.shared` must only be referenced lazily inside `LiveAssetPackBackend`**. Never touch it from `AssetClient.init`, from tier selection, or from any test.
-  - (c) `README`/`MIGRATION.md` must tell the app owner to add the downloader extension.
+  - (c) `README`/`MIGRATION.md` must tell the app owner to add the downloader extension. **Done (ADR-056, 2026-10-24):** the README's "The Apple-hosted tier" and `MIGRATION.md` step 3 (orchestrator ruling WPI-R7) tell the owner to ship the downloader extension, its Info.plist keys and App Group, and the packs, and that a configured `appleHosted` has no fallback; neither names an Info.plist key, since none was verified here.
 
 ### 1.8 Error types
 | Type | Declaration | Availability | Mapping suggestion |
