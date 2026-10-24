@@ -54,22 +54,18 @@ an Xcode app project, add the checkout as a local package and link the `ZTronAss
 ```swift
 import Foundation
 import ZTronAssetKit
-
 // A placeholder: the real key comes from the app's secure configuration and is never logged (R-SEC-1).
 let key = AppKey("PLACEHOLDER-APP-KEY")
 let http = HTTPSourceConfiguration(baseURL: URL(string: "https://assets.example.com/")!, appKey: key)
 let client = AssetClient(configuration: AssetClientConfiguration(remote: RemoteConfiguration(http: http)))
-
 try await client.start()                    // opens the store, installs the first snapshot, launches a due sync
 let events = try await client.subscribe()   // registered before it returns; replays the current state
 Task {
     for await case .assetAvailable(let id, _) in events { print("available:", id) }
 }
-
 let pages: [AssetID] = ["page-1", "page-2", "page-3"]
 let window = PrefetchWindowController(client: client)   // keep it alive while the carousel is on screen
 window.update(ids: pages, current: 0)                   // page-1 at .userInitiated, its neighbours at .prefetch
-
 if let location = client.lookup(pages[0], extensions: ["heic", "png"]) {   // main actor, O(1), no I/O
     print("local:", location.url)
 } else {
