@@ -2,7 +2,59 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
-## Level 5 WP-K — RUNNING (launched 2026-10-23 11:42 CEST)
+## Level 5 — DONE (`l5-merged` = `45e25a1`, 24 Oct 08:30 CEST). Next session: start here
+- **State.** WP-G (`l5g-merged` = `da8d444`, ADR-054) and WP-K (merged `23807ac`, docs `45e25a1`, ADR-055) are on `feature/asset-kit`.
+  - Nothing is running. There are no worktrees and no `wp/*` branches, and the tree is clean.
+  - Weekly usage was about 59–60 % at the tag, with the owner's own Fable use counting toward it (the Fable meter was 32 %). The week resets **Thu 29 Oct 04:00 CEST**.
+  - `caffeinate` holds the Mac awake until 25 Oct 11:42. Both instances are background tasks of session `d8335845-…`.
+- **Gates at `l5-merged`** (logs `.build-orch/l5k/summary.txt`):
+  - `--quick` gave `VERIFY: PASS` (Model 151, Sync 351, Storage 459, Transport 84, Kit 85, Compatibility 71, AppleHosted 104).
+  - `--gates-only` gave `VERIFY: PASS` (trace PASS, 1,181 tests with ids; unsafe 0; docs 1281/1281).
+  - At the WP-K merge head `23807ac`/`a9e464d`: coverage PASS (Kit 97.83 %, Sync 93.42 %, Storage 97.36 %, overall 96.51 %); release and iOS builds green; simulator **1,305/1,305**; whole-package TSan, 0 reports.
+  - `--perf`: 34/35. **P-13 fails** (8.70 ms vs 5 ms; owner ruling pending, ADR-050), so `VERIFY: FAIL (1 failed: benchmarks)`.
+- **WP-K runs** (session `d8335845-…`):
+
+  | Run | What | Cost |
+  |---|---|---|
+  | `wf_5feaaf72-e33` | main run: author + 3 verification rounds | $93 |
+  | `wf_d5c59efd-6db` | close-out cycle 1 | $47 |
+  | `wf_d80dd07d-5cd` | cycle 2 | $33 |
+  | `wf_cfb1c56d-e3f` | cycle 3 | $67 |
+  | `wf_da30f4d9-921` | cycle 4 | $48 |
+  | `wf_02981dcc-c86` | cycle 5, **0 blocking** | $43 |
+  | `wf_763379c2-80b` | docs: ADR-055, 2 rounds | $59 |
+
+  WP-K: **~$390 plus orchestration**, 11:42 on 23 Oct → 08:30 on 24 Oct (about 21 h). Weekly 18 % → ~59 %, of which ~24 points are WP-K's and the rest the owner's other use.
+  - Level 5 in total, WP-G plus WP-K: **~$665** and ~36 h.
+- **Records:**
+  - Rulings L5K-R1…R29 are in `.build-orchestrator/l5k-rulings.md` (local). Findings files: `l5k-remaining-k.json` and `l5k-close{1..4}-remaining-k.json`. Probes: `l5k-probes-c{1,3,4}/`.
+  - ADR-055 in `docs/DECISIONS.md` adds **NEEDS-HUMAN-REVIEW K-2, K-3, K-5, K-6 and K-15** to the owner review list. WP-K's decisions are in `docs/adr-drafts/k.md`; `docs/MIGRATION.md` is the adoption guide.
+- **Stage 3 backlog added by Level 5** (ADR-054 and ADR-055 Assignments):
+  - L5-R16: a claim that inherits the retry policy.
+  - L5-R22 (1)–(4) and the model tightening.
+  - CCR-G1's run-time detection.
+  - The P-9 survey.
+  - L5K-R24's optional `installIfDue()` for ADR-016's lag at the pre-existing answer sites.
+  - L5K-R27: the remaining liveness waits in `LegacyOnDemandRaceTests`, and a **pre-existing WP-C TSan flake to settle before Stage 5's `--full`**.
+- **Next (owner decides):** WP-I docs (`docs/**`, README), then Stage 3 hardening, then Stage 5 (`--full`; VERIFICATION, DEVICE-TEST-PLAN, RESIDUAL-RISKS).
+  - **Forecast**, re-estimated from Level 5's measured costs: ~$40–65 per strict cycle, ~0.062 points per dollar, plus the owner's other use.
+
+    | Step | Points | Run time |
+    |---|---|---|
+    | WP-I docs | ~4–8 | ~3–6 h |
+    | Stage 3 hardening | ~30–55 | ~25–45 h |
+    | Stage 5 | ~3–6 | ~3–6 h |
+    | **Total** | **~37–69** | **~31–57 h** |
+
+  - About 40 points are left this week, less the owner's other use, so Stage 3 probably runs into the week of 29 Oct.
+  - `--full` green at Stage 5 needs the owner's P-13 ruling.
+- **Owner questions:**
+  - P-13 (ADR-050): Option A, the p99 per batch, recommended; or Option B, `batch_ms_max` raised to 15 ms.
+  - The NEEDS-HUMAN-REVIEW list, now including ADR-055's K-2/K-3/K-5/K-6/K-15.
+  - The unanswered "any non-blocking bugs up to this point?" survey.
+  - Which step runs next, and its stop.
+
+## Level 5 WP-K — done (launched 2026-10-23 11:42 CEST; merged and tagged `l5-merged`)
 - **WP-G is complete.**
   - `l5g-merged` = `da8d444` (WP-G + ADR-054).
   - The final `--quick` and `--gates-only` passed at `da8d444`; near-idle TSan had 0 reports; `--perf` was 34/35, with only WP-B's P-13 failing (owner item).
