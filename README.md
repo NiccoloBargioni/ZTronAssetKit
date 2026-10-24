@@ -107,14 +107,17 @@ default live environment reads the prior art's sync stamp from, `prefetchRadius`
 `PrefetchWindowController`, `storage.evictionPermitted` lets a sync evict to make room (maintenance eviction runs
 regardless), `limits.maxAssetBytes` is also the store's per-asset cap, and `tuning.snapshotInstallInterval` bounds how
 often prefetch and bulk work install a new snapshot. Out-of-range tuning values are clamped, and `diagnosticReport()`
-shows the clamped values. The defaults are recorded in [ADR-001](docs/DECISIONS.md) (the location: `Application Support`,
-excluded from backup, so the system never purges essential assets; `.caches` suits a fully regenerable catalog; a
-`.custom(URL)` base in an App Group container is unsupported unless the app closes the client whenever it is
-backgrounded), [ADR-035](docs/DECISIONS.md) (storage) and [ADR-036](docs/DECISIONS.md) (network, power and tuning).
+shows the clamped values. The defaults are recorded in [ADR-001](docs/DECISIONS.md) (the location:
+`Application Support`, excluded from backup, so the system never purges essential assets; `.caches` suits a fully
+regenerable catalog), [ADR-035](docs/DECISIONS.md) (storage) and [ADR-036](docs/DECISIONS.md) (network, power and
+tuning). A `.custom(URL)` base in an App Group container is unsupported unless the app shuts its client down
+(`shutdown()`) whenever it is backgrounded and creates a new one when it returns: a lock held in a shared container
+while the app is suspended risks its termination (0xdead10cc; the documentation of `StorageLocation.custom`, risk R6
+of [docs/design/store.md](docs/design/store.md)).
 
 ```swift
 var configuration = AssetClientConfiguration(remote: remote)
-configuration.storage.budget = .bytes(2_000_000_000)     // default: half of the free space
+configuration.storage.budget = .bytes(2_000_000_000)     // default: half of (store usage + free space)
 configuration.refresh = .atMostEvery(24 * 60 * 60)       // default: once per app version
 configuration.retentionScope = .tags(["free"])           // default: .all
 let client = AssetClient(configuration: configuration)   // no environment: AssetEnvironment.live(...)
@@ -152,13 +155,15 @@ transfer runs for nobody. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 
 
 ### The fallback chain: bundle, then local, then network
 
-`AssetFallbackChain` reproduces the prior art's `BasicImagePage` chain (R-CAR-2). `prepare(kinds:)` indexes the app
-bundle once, off the main thread; `locate(_:kind:)` (main actor, synchronous, no file-system work) tries the bundle for
-each candidate extension and then the local snapshot; `fetch(_:kind:)` is the network step. `AssetKind` fixes the
-candidates: `.image` (heic, png, jpg, jpeg), `.svg`, `.video(fileExtension:)` and `.audio` (wav, mp3). It deviates from
-the prior art in three ways ([ADR-037](docs/DECISIONS.md)): local hits appear only once `start()` installed the first
-snapshot, the extension filter also applies to local hits, and asset catalogs (`UIImage(named:)`) stay in the
-carousel's UIKit adapter.
+`AssetFallbackChain` is the three-step chain R-CAR-2 asks for: bundle, then local, then network, trying each candidate
+extension of the asset's kind. In the prior art only ZTronCarousel's `ZTronSVGView` has all three steps;
+ZTronCarouselCore's `BasicImagePage` looks only in the bundle and `BasicVideoPage` goes bundle then local
+([docs/RECON.md](docs/RECON.md) §1). `prepare(kinds:)` indexes the app bundle once, off the main thread;
+`locate(_:kind:)` (main actor, synchronous, no file-system work) tries the bundle for each candidate extension and then
+the local snapshot; `fetch(_:kind:)` is the network step. `AssetKind` fixes the candidates: `.image` (heic, png, jpg,
+jpeg), `.svg`, `.video(fileExtension:)` and `.audio` (wav, mp3). It deviates from the prior art in three ways
+([ADR-037](docs/DECISIONS.md)): local hits appear only once `start()` installed the first snapshot, the extension
+filter also applies to local hits, and asset catalogs (`UIImage(named:)`) stay in the carousel's UIKit adapter.
 
 ```swift
 let chain = AssetFallbackChain(client: client)          // bundle step: MainBundleLookup()
@@ -294,33 +299,42 @@ the system still holds.
 The app sets itself up for Apple hosting; the package does not ([SPEC](SPEC.md) §1.3). That means the downloader
 extension (an app extension target built on StoreKit's `StoreDownloaderExtension`, iOS 26), the Info.plist keys and
 the App Group, and the packs themselves, whose download policy (essential, prefetch or on demand) is build-time data;
-the catalog belongs in the essential pack that `catalogPackID` names. The BackgroundAssets surface the tier uses, and
-what only a device can confirm, are in [docs/APPLE-API-VERIFICATION.md](docs/APPLE-API-VERIFICATION.md) §1.7 and §5.
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §6.6.
+the catalog belongs in the essential pack that `catalogPackID` names.
+[docs/APPLE-API-VERIFICATION.md](docs/APPLE-API-VERIFICATION.md) holds the downloader extension and the pack policies in
+§1.7 (the pack manifest cross-checked against Apple's page "Creating managed asset packs"), the BackgroundAssets
+surface the tier uses in §1, and what only a device can confirm in §5. None of the Info.plist keys or the App Group
+was verified, so this repository names none of them: take them, with the extension target's setup, from Apple's
+BackgroundAssets documentation. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §6.6.
 
 ### Reopen after a replaced root
 
-If the store's root directory vanishes or is replaced while the app runs (the system purging a `.caches` root, for
-example), commits fail with `.storageUnavailable(.rootVanished)` while reads keep working. The client then reopens: it
-shuts the old engine down, resets the main-actor mirror (`lookup` returns `nil` until the replacement installs its first
+If the store's root directory vanishes or is replaced while the app runs (something outside the client deletes or
+replaces it; a `.caches` root the system purges between launches is healed at the next launch instead, R-CLN-7),
+commits fail with `.storageUnavailable(.rootVanished)` while reads keep working. The client then reopens: it shuts the
+old engine down, resets the main-actor mirror (`lookup` returns `nil` until the replacement installs its first
 snapshot), builds a replacement from the same configuration and environment, and repeats the failed call on it, at most
 three reopens per call. After any other failure that can stem from the file system (`storageUnavailable`,
-`serverUnavailable`, `insufficientSpace`, `integrityFailure`), the client checks the root and reopens only if it was
-replaced, and `withAsset` checks it before it takes a lease. Prefetch registrations, the memory-pressure observer and
-the retention scope set at run time survive a reopen; pins do not, since they lived in the vanished root. Event
-streams continue with the replacement's `clientStarted(generation:)`, whose value may repeat an earlier one, and never
-show the retired engine's `clientShutDown` (B-15, [ADR-050](docs/DECISIONS.md), [ADR-054](docs/DECISIONS.md);
+`serverUnavailable`, `insufficientSpace`, `integrityFailure`), the client checks the root (one stat, off the main
+actor) and reopens only if it was replaced. `withAsset` reads the store's recorded reason (no I/O) before it takes a
+lease and reopens first when that reason names a vanished root. Until a commit or a check detects a replacement, a call
+that succeeds still uses the old store, a `withAsset` lease included. Prefetch registrations, the memory-pressure
+observer and the retention scope set at run time survive a reopen; pins do not, since they lived in the vanished root.
+Event streams continue with the replacement's `clientStarted(generation:)`, whose value may repeat an earlier one, and
+never show the retired engine's `clientShutDown` (B-15, [ADR-050](docs/DECISIONS.md), [ADR-054](docs/DECISIONS.md);
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §5 and §8).
 
 ## Compatibility with ZTronCarouselCore
 
-Every public CDN symbol of the prior art (`CDNAsset`, `CDNProviding`, `CDNLocalStore`, `CDNAssetResolver.installed`,
-`CDNSyncCoordinator`, `CDNRefreshPolicy`, `CDNProviderFactory` and `CDNConfiguration`, `NetworkAvailabilityMonitor`)
-keeps compiling through shims over `AssetClient`, deprecated where the module's own API replaces them, in
-[`Tests/ZTronAssetCompatibilityTests/Shims/`](Tests/ZTronAssetCompatibilityTests/Shims/) (R-CAR-6). They live in a test
-target, so they never ship in the product and Combine stays out of the production targets
-([ADR-033](docs/DECISIONS.md)). They use only the public API and run there against a real client, and the carousel's
-call sites are copied into
+Every public CDN symbol of the prior art (`CDNAsset`, `CDNProviding`, `StaticManifestCDNProvider` and
+`BackgroundAssetsCDNProvider` with their error types, `CDNLocalStore` with `CDNReconciliationSummary`,
+`CDNAssetResolver.installed`, `CDNSyncCoordinator`, `CDNSyncProgress`, `NetworkAvailabilityMonitor`) keeps compiling
+through shims, adapters over `AssetClient` (`NetworkAvailabilityMonitor` over the environment's conditions source),
+deprecated where the module's own API replaces them, in
+[`Tests/ZTronAssetCompatibilityTests/Shims/`](Tests/ZTronAssetCompatibilityTests/Shims/) (R-CAR-6). `CDNRefreshPolicy`,
+`CDNProviderFactory` and `CDNConfiguration`, which SPEC R-CAR-6 names but the prior art on disk lacks, are provided new;
+[docs/MIGRATION.md](docs/MIGRATION.md) §2 maps every symbol. The shims live in a test target, so they never ship in the
+product and Combine stays out of the production targets ([ADR-033](docs/DECISIONS.md)). They use only the public API
+and run there against a real client, and the carousel's call sites are copied into
 [`PriorArtCallSiteTests.swift`](Tests/ZTronAssetCompatibilityTests/PriorArtCallSiteTests.swift), so a shim change that
 would break them fails this package's build. This package changes nothing in ZTronCarouselCore or ZTronCarousel
 ([ADR-006](docs/DECISIONS.md)): adopting it there is the owner's step, and [docs/MIGRATION.md](docs/MIGRATION.md) is the
