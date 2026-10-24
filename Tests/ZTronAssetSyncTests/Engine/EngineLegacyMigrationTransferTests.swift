@@ -1374,14 +1374,17 @@ extension EngineLegacyMigrationTransferTests {
     // MARK: What a migration call returns after its publication (L5K-R23)
 
     /// A launch as `rateLimitedLaunch` builds it (ARCHITECTURE §5's install interval of 0.1 s, a bulk executor that holds
-    /// every unit, the origin serving `catalog`), except that the store installs into `sink`, which holds the install a
-    /// test asks it to and answers every install from `sink.inner`, the harness's sink (the readers' view). Nothing is
-    /// started.
+    /// every unit, the origin serving `catalog`'s bytes and, when `servesManifest`, `catalog` as its manifest, otherwise
+    /// answering every manifest request "not modified", so nothing is applied), except that the store installs into
+    /// `sink`, which holds the install a test asks it to and answers every install from `sink.inner`, the harness's sink
+    /// (the readers' view), and that the engine plans with `planner`. Nothing is started.
     @available(macOS 15.0, iOS 18.0, *)
     static func heldSinkLaunch(
         _ catalog: [(ManifestEntry, Data)],
         time: ManualTimeSource,
-        sink: HeldInstallSink
+        sink: HeldInstallSink,
+        planner: any SyncPlanning = StandardSyncPlanner(),
+        servesManifest: Bool = true
     ) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor) {
         let bulk = SteppedBlockingExecutor(holding: true)
         let fileSystem = FakeFileSystem(
@@ -1434,10 +1437,12 @@ extension EngineLegacyMigrationTransferTests {
             pressure: pressure,
             tap: tap,
             store: store,
-            engine: SyncEngine(store: store, environment: environment, configuration: configuration),
+            engine: SyncEngine(store: store, environment: environment, configuration: configuration, planner: planner),
             configuration: configuration
         )
-        await harness.serveManifest(catalog.map(\.0))
+        if servesManifest {
+            await harness.serveManifest(catalog.map(\.0))
+        }
         await harness.scriptTransfers(catalog)
         return (harness, bulk)
     }
@@ -1644,6 +1649,101 @@ extension EngineLegacyMigrationTransferTests {
         await engine.releaseGroup(token)
         await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
         await ensured?.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: an id of the same content that joins a job during the answer site's user-initiated publication is asked too before the answer, so its prior-art file is adopted and nothing is downloaded (L5K-R23)", .timeLimit(.minutes(1)))
+    func idJoiningDuringTheAnswerSitesPublicationIsAskedToo() async throws {
+        let time = ManualTimeSource()
+        let bytes = EngineFixture.bytes(9_950)
+        let others = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_960)
+        let first = EngineFixture.entry("legacy5", bytes)
+        let second = EngineFixture.entry("legacy6", bytes)
+        let gate = MigrationPlannerGate()
+        defer {
+            gate.open()
+        }
+        // The origin answers "not modified", so ensureAvailable applies nothing (an apply would install at once).
+        let sink = HeldInstallSink(inner: ScriptedSnapshotSink())
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.heldSinkLaunch(
+            others + [(first, bytes), (second, bytes)],
+            time: time,
+            sink: sink,
+            planner: MigrationGatedPlanner(gate: gate),
+            servesManifest: false
+        )
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        try #require(first.transferID == second.transferID, "premise: one content, one job")
+        let bothPending = try await EngineLegacyMigrationTransferTests.nonePresent(harness, [first.identifier, second.identifier])
+        // A prefetch job of `first` adopts that id's prior-art file at bulk urgency; its hash unit is held.
+        let token = try await engine.registerGroup([first.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let firstHash = Set(await bulk.heldUnits).subtracting(migration)
+        // ensureAvailable of `first` plans while `first` is absent, and its plan is held there.
+        gate.arm()
+        let ensure = Task {
+            await engine.ensureAvailable(scope: .identifiers([first.identifier]))
+        }
+        try await EngineLegacyMigrationTransferTests.releaseUntilPlanned(bulk, keeping: migration.union(firstHash), gate: gate)
+        // The job's adoption of `first` ends; its re-read of the store's deadline (RE-S40) is held once the store answered.
+        await engine.holdNextStoreDeadlineRead()
+        for unit in firstHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.storeDeadlineReadHeld || engine.state.jobs[first.transferID] == nil
+        }
+        let heldRead = await engine.readForTests { $0.storeDeadlineReadHeld }
+        // ensureAvailable registers during that re-read and promotes the job, so its answer site publishes at
+        // `.userInitiated` once the re-read ends: the sink holds that install (the next one holding `first`).
+        let firstID = first.identifier
+        await sink.holdFirst { snapshot in
+            snapshot.location(for: firstID, extensions: []) != nil
+        }
+        gate.open()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[first.transferID]?.lane == .userInitiated || engine.state.jobs[first.transferID] == nil
+        }
+        let promoted = await engine.readForTests { $0.state.jobs[first.transferID]?.lane == .userInitiated }
+        await engine.releaseStoreDeadlineRead()
+        while !(await sink.isHolding) {
+            for unit in await bulk.heldUnits where !migration.contains(unit) {
+                await bulk.release(unit)
+            }
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+        // A prefetch group of `second`, of the same content, joins the job during that publication.
+        let joiner = try await engine.registerGroup([second.identifier], lane: .prefetch).get()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[first.transferID]?.assets.contains(second.identifier) == true || engine.state.jobs[first.transferID] == nil
+        }
+        let joined = await engine.readForTests { $0.state.jobs[first.transferID]?.assets.contains(second.identifier) == true }
+        await sink.release()
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[first.transferID] == nil
+        }
+        let (result, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+            await ensure.value
+        }
+        let report = try result.get()
+        let starts = await harness.source.starts.map(\.remotePath)
+        let bothStored = try await EngineLegacyMigrationTransferTests.arePresent(harness, [first.identifier, second.identifier])
+
+        #expect(bothPending, "premise: both ids were still to adopt after the start")
+        #expect(heldRead, "premise: the job's re-read of the store's deadline awaited the store")
+        #expect(promoted, "premise: ensureAvailable joined the job during that re-read")
+        #expect(joined, "premise: `second` joined the job during the answer site's publication")
+        #expect(starts.isEmpty, "R-STO-11: the content was downloaded for `second`, which joined during the answer site's publication while its prior-art file could still be adopted: \(starts)")
+        #expect(bothStored, "both ids are present in the store")
+        #expect(report.present == 1 && report.missing == 0, "ensureAvailable reports `first` available: \(report)")
+        await engine.releaseGroup(joiner)
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await task.value
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
