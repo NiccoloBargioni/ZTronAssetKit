@@ -2,7 +2,29 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
-## WP-I (documentation and README) — RUNNING (launched 2026-10-24 12:11 CEST)
+## Stage 2 — COMPLETE (`wpi-merged` = `0554b8f`, 24 Oct 15:20 CEST). Next session: start here
+- **State.** Stage 2 is complete: `l5-merged` (WP-G + WP-K), then WP-I (README, ADR-056).
+  - Nothing is running. There are no worktrees and no `wp/*` branches, and `feature/asset-kit` is clean.
+  - Weekly usage is **66 %** (Fable 34 %, the owner's own use). It resets **Thu 29 Oct 04:00 CEST**.
+  - `caffeinate` runs until 25 Oct 11:42, as background tasks of session `d8335845-…`; start a new one for the next run.
+- **Gates at `wpi-merged`:** `--quick` gave `VERIFY: PASS` (Transport 151, Sync 351, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104), and `--gates-only` gave `VERIFY: PASS` (logs `.build-orch/wpi/summary.txt`).
+  - Earlier, at `l5-merged`: coverage PASS, the simulator 1,305/1,305, whole-package TSan with 0 reports, and `--perf` 34/35 (only P-13 fails, the owner item).
+- **WP-I:**
+  - `wf_3045417c-704`: README, the round-2 verification found 0 blocking; $44.
+  - `wf_915bed8f-166`: ADR-056, round 2 found 0 blocking; $23.
+  - Rulings WPI-R1…R9 are in `.build-orchestrator/wpi-rulings.md`.
+  - The WP-I workflow script is `.claude/workflows/assetkit-wp-i-docs.js`.
+- **Owner questions:**
+  1. P-13 (ADR-050): option A, the p99 per batch, recommended; or option B, `batch_ms_max` raised to 15 ms. Stage 5's `--full` needs it.
+  2. The NEEDS-HUMAN-REVIEW list in DECISIONS.md, now including ADR-055 (K-2/K-3/K-5/K-6/K-15) and **ADR-056 (WPI-R5: consumers need Swift 6.2+)**.
+  3. The unanswered "any non-blocking bugs?" survey.
+  4. **Whether to run Stage 3 (hardening) now, and its stop.**
+- **Stage 3 forecast** (strict; Level 5's measured costs): ~30–55 weekly points and ~25–45 h.
+  - Scope: coverage closure; adversarial hunters; ≥ 12 mutation probes (`docs/MUTATION-PROBES.md`); `--perf`; and the backlogs of ADR-052…056, among them `installIfDue()`, the WP-C TSan flake, the liveness waits, the claim retry policy, the invariant false positive, and P-13 once ruled.
+  - About 34 points are left this week, less the owner's other use, so Stage 3 likely spans into the week of 29 Oct.
+  - Stage 5 then needs ~3–6 points and ~3–6 h.
+
+## WP-I (documentation and README) — done (launched 2026-10-24 12:11 CEST; merged, tagged `wpi-merged`)
 - **Owner:** "Run WP-I: documentation and README" (24 Oct).
   - The owner gave no stop, so the orchestrator applied a default of 70 %. **Owner, 24 Oct 12:16: "set usage threshold at 75". WP-I's stop is now 75 %.**
   - The running script still has 70 built in. If its gate halts the run at 70 %, resume it with `Workflow({scriptPath: ".claude/workflows/assetkit-wp-i-docs.js", resumeFromRunId: "wf_3045417c-704", args: {base: "l5-merged", worktree: "i", usageStop: 75, maxRounds: 6}})`. Completed agents replay from cache.
