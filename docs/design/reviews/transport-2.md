@@ -1,5 +1,7 @@
 # Adversarial review #2 — `docs/design/transport.md`
 
+> **Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.
+
 > **Lens:** lifecycle and platform. This review covers:
 > - background-session re-attachment across relaunch (duplicated or lost work);
 > - delegate `Sendable` conformance without `@unchecked`;

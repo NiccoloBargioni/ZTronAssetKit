@@ -1,5 +1,7 @@
 # Adversarial review #1 — `docs/design/sync.md`
 
+> **Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.
+
 > **Lens:** actor reentrancy, single-flight and cancellation. Covers interleavings at every `await`, the last-interest rule, cancellation storms, continuation leaks and double resumes, promotion races, prefetch-handle `deinit`, shutdown mid-flight and leaked tasks.
 > **Reviewer:** Phase B reviewer `review-sync-1`, who did not write the design. **Date:** 2026-10-04.
 > **Read:** `CLAUDE.md`; SPEC §1.4, §3, §4.1–4.5, §5.6, §5.8, §5.9, §5.10, §6, §7; `docs/RECON.md`; `docs/DECISIONS.md` (ADR-001…011); `docs/BASELINE.md`; `docs/design/sync.md` (all of it); `docs/design/store.md` §4.2, §4.4–4.6, §6.5 (the contracts the engine calls); the drafter's probes in `.build-probe-sync/`.

@@ -1,5 +1,7 @@
 # Adversarial review #2 — `docs/design/sync.md`
 
+> **Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.
+
 > **Lens:** liveness and resources. That covers lane starvation, retry storms, the circuit breaker, backoff on `ManualTimeSource`, unbounded buffers and backpressure, idle silence, network and power policy, free space and eviction before a plan, main-actor cost, the feasibility of P-1/P-4/P-7/P-8/P-9/P-12/P-14, and whether 90 % coverage of Sync is reachable.
 > **Reviewer:** did not write the design. **Read:** `CLAUDE.md`, SPEC §1.4, 4.2, 4.5, 5.6, 5.8, 5.9, 6 and 7.3, `docs/RECON.md`, ADR-001…011, `docs/BASELINE.md`, `sync.md` in full, `store.md` (the parts the engine depends on), `Scripts/verify.sh`, `Scripts/gates.py`, `Scripts/quality-gates.json`, and the drafter's probes in `.build-probe-sync/`. I also read `reviews/sync-1.md` after writing my findings, so that overlaps are marked rather than repeated (§3).
 > **Evidence:** every Swift or SDK claim below was compiled and, where it says so, **run** in `.build-probe-review-sync-2/` (git-ignored) with Apple Swift 6.4, the iPhoneOS 27 SDK and macOS 27 on an M3. Nothing outside this repository was written. Probe index: §5.

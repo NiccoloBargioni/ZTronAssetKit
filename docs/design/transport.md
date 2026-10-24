@@ -1,5 +1,7 @@
 # Design — transport and the Apple-hosted tier (`ZTronAssetTransport`, `ZTronAssetAppleHosted`)
 
+> **Historical.** A Stage 1 design draft, kept for its rationale and probe evidence; where it differs from the merged code, [ARCHITECTURE.md](../ARCHITECTURE.md) and [DECISIONS.md](../DECISIONS.md) are authoritative.
+
 **Status:** Stage 1, Phase A draft by the transport drafter, for Phase B adversaries and Phase C contracts.
 **Owns:** H-6, H-7 · R-NET-1…10 · R-APL-1…5 · R-SEC-1 · R-SEC-3 · R-CLN-10 · budgets P-10 and P-11.
 **Read:** CLAUDE.md; SPEC §2 (§2.3 remote facts are authoritative), §4.1, §4.2, §5.4, §5.5, §5.9, §6, App. B and C; `docs/RECON.md`; `docs/DECISIONS.md` (ADR-001…011); `docs/BASELINE.md`; `docs/APPLE-API-VERIFICATION.md` (relied on, and cited as **AAV §n**). I also read the parallel `docs/design/sync.md` and `docs/design/store.md` to reconcile interfaces (§15). Prior art: `StaticManifestCDNProvider.swift`, `BackgroundAssetsCDNProvider.swift`, `NetworkAvailabilityMonitor.swift` (read-only).
