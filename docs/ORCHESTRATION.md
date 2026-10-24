@@ -71,7 +71,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - Over 5 cycles, blocking went 2 → 1 → 3 → 6 (4 distinct) → 0.
   - L5K-R27 sends the non-blocking items to Stage 3 or the docs level; L5K-R28 is the docs brief for ADR-055.
 - **Merged:** `wp/k` into `feature/asset-kit` as `23807ac` (`--no-ff`), 24 Oct 05:5x.
-  - Phase-A gates are running: `.build-orch/l5k-gates-a.sh`, logs in `.build-orch/l5k/summary.txt`.
+  - **Phase-A gates at `23807ac` (logs `.build-orch/l5k/summary.txt`):**
+    - `--quick` gave `VERIFY: PASS` (Model 151, Sync 351, Storage 459, Transport 84, Kit 85, Compatibility 71, AppleHosted 104).
+    - Coverage: `COVERAGE: PASS` (Kit 97.83 %, Sync 93.42 %, Storage 97.36 %, overall 96.51 %).
+    - `--gates-only` gave `VERIFY: PASS`; TRACEABILITY is committed in `7d90719`.
+    - The release build completed, and the iOS build exited 0 with no error or warning lines.
+    - The simulator: `** TEST SUCCEEDED **`, 1,305/1,305.
+  - **Deferred:** TSan and `--perf`. The load at 05:54 was about 50; run them near-idle, after the docs.
+  - **Docs: RUNNING** `wf_763379c2-80b` (task `wzw2li006`), worktree `.worktrees/l5kdocs` on `wp/l5kdocs` from `7d90719`, ADR-055, `usageStop: 65`.
   - Next: commit TRACEABILITY.md; near-idle TSan and `--perf`; the docs worktree `l5kdocs` with `assetkit-level-docs.js` (ADR-055, `usageStop: 65`); confirm the acknowledged items; merge the docs; re-run `--quick` and `--gates-only`; tag **`l5-merged`**; remove the worktrees and `wp/*` branches.
 - **Next, as for WP-G** (step 1 is done):
   1. Write `.build-orchestrator/l5k-rulings.md` and dump `l5k-remaining-k.json`.
