@@ -39,7 +39,8 @@ Not touched, as the task requires: `docs/ARCHITECTURE.md`, `DECISIONS.md`, `TRAC
   names appear only to label the historical documents and the drafts; no license section (the repository has none).
   API names, defaults and behaviour were read from `Sources/ZTronAssetKit/**` and `Sources/ZTronAssetModel/**` (and,
   where a doc comment points there, the engine: `registerSubscriber`'s replay, the memory-pressure observer's
-  `environment.memoryPressure != nil` guard), never from memory; every Swift block was compiled (I-2, I-3).
+  `environment.memoryPressure != nil` guard), never from memory; every Swift snippet was compiled (I-2, I-3); the manifest fragment uses the two forms of the check
+  package's own manifest (I-3).
 - **Consequences.** Facts that are NEEDS-HUMAN-REVIEW decisions are stated as the code does them and cite their ADR
   (the storage location, ADR-001; pack retention, ADR-027; background transfers, ADR-026, and an explicit shutdown
   cancelling them, ADR-039 / D-10; the fallback-chain deviations, ADR-037; the migration deviations, ADR-052; the shims,
@@ -156,7 +157,7 @@ Beyond the task, the same package cross-built for the iOS floor (round 1, clean)
 
   | File | Note | Why |
   |---|---|---|
-  | `docs/design/store.md` | yes | e.g. lines 416 and 1084 say Swift Testing rejects a two-platform `@available` on a `@Test` and that test targets are never compiled for iOS (superseded, ADR-051) |
+  | `docs/design/store.md` | yes | e.g. line 416 (and the probe row at 1084) says Swift Testing rejects a two-platform `@available` on a `@Test`, and line 417 says test targets are never compiled for iOS (superseded, ADR-051) |
   | `docs/design/sync.md` | yes | e.g. line 749 gates suites with `@available(macOS 15.0, *)` (superseded by ADR-014 as amended by ADR-051) |
   | `docs/design/transport.md` | yes | e.g. lines 270 and 544 run foreground transfers as download tasks (superseded by ADR-019: data tasks into staging) |
   | `docs/design/reviews/*.md` (6) | yes | each states defects of the design draft in the present tense; their resolutions are ARCHITECTURE §12 |

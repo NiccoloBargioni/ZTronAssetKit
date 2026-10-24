@@ -90,7 +90,8 @@ by the SHA-256 of their bytes (`blobs/<aa>/<sha256>.<ext>`) and one atomically r
 any point leaves a state the next launch reconciles (H-1). Lookups read an immutable snapshot mirrored onto the main
 actor. The engine schedules work in three lanes, `userInitiated` above `prefetch` above `bulk`, so the page the user
 opens overtakes a bulk sync already in flight. Time, randomness, the file system, the network, reachability and power
-state are injected through one `AssetEnvironment` value, and `.live()` is the only place that touches the real world.
+state are injected through one `AssetEnvironment` value, whose `.live()` assembles the real conformers; the fallback
+chain's bundle step (`MainBundleLookup`, over `Bundle.main`) is a seam of its own (`AssetFallbackChain(client:bundle:)`).
 Details:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §2 (concurrency), §3 (every file on disk), §5 (snapshot), §7 (engine)
 and §9 (the ten hard problems, each with its decision and its tests).
@@ -142,9 +143,10 @@ shutDown), so a UI can switch over it exhaustively; `withAsset` throws untyped e
 and `sync` reports failures in its outcome ([ADR-004](docs/DECISIONS.md), [ADR-042](docs/DECISIONS.md)).
 
 A URL the client hands out stays readable for at least `StoragePolicy.deletionGrace` of awake time after a snapshot
-without it was installed ([ADR-017](docs/DECISIONS.md)). Code that reads the file again later, such as video playback,
-loads it through `Data` or holds a lease with `withAsset(_:_:)`, which keeps eviction, prune and purge away while its
-body runs. When the UI cannot decode a file, `reportUnreadable(_:)` quarantines it and downloads it again with backoff.
+without it was installed ([ADR-017](docs/DECISIONS.md)). Code that reads the file again later loads it through `Data`
+(an image decoder such as `UIImage(contentsOfFile:)`) or holds a lease with `withAsset(_:_:)`, which keeps eviction,
+prune and purge away while its body runs; a video player holds a lease or looks the asset up again when a read fails
+(ADR-017 as amended). When the UI cannot decode a file, `reportUnreadable(_:)` quarantines it and downloads it again with backoff.
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §5 and §8, [ADR-016](docs/DECISIONS.md).
 
 ### Prefetch windows
@@ -163,7 +165,9 @@ transfer runs for nobody. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 
 `AssetFallbackChain` is the three-step chain R-CAR-2 asks for: bundle, then local, then network, trying each candidate
 extension of the asset's kind. In the prior art only ZTronCarousel's `ZTronSVGView` has all three steps;
 ZTronCarouselCore's `BasicImagePage` looks only in the bundle and `BasicVideoPage` goes bundle then local
-([docs/RECON.md](docs/RECON.md) §1). `prepare(kinds:)` indexes the app bundle once, off the main thread;
+([docs/RECON.md](docs/RECON.md) §1). `prepare(kinds:)` indexes the app bundle off the main thread; await it once, with
+every kind the app will locate, before the first `locate`: until it returns the bundle step finds nothing, and a later
+call replaces the index rather than adding to it;
 `locate(_:kind:)` (main actor, synchronous, no file-system work) tries the bundle for each candidate extension and then
 the local snapshot; `fetch(_:kind:)` is the network step. `AssetKind` fixes the candidates: `.image` (heic, png, jpg,
 jpeg), `.svg`, `.video(fileExtension:)` and `.audio` (wav, mp3). It deviates from the prior art in three ways
@@ -197,10 +201,16 @@ and cancelling the task that iterates, or releasing the stream, releases the sub
 
 The retention scope says what the app wants kept, as an `AssetScope` value (`.all`, `.identifiers`, `.tags`,
 `.prefix`): the app passes it in the configuration and calls `setRetentionScope(_:)` whenever the paywall changes
-(R-CAR-5, [ADR-027](docs/DECISIONS.md)). It is the scope of every bulk sync, eviction removes entries outside it first,
+(R-CAR-5, [ADR-027](docs/DECISIONS.md)). Tags and the per-asset policy (`essential`, `standard`, `onDemand`) are
+optional fields of each manifest entry, `tags` and `policy` (R-MAN-6), set by whoever publishes the catalog; without them
+an entry has no tags and is `standard`. The HTTP tier reads the manifest at `baseURL` + `manifestPath` (`manifest.json` by
+default), as a bare JSON array of assets or a `{ "schemaVersion", "assets" }` envelope (R-MAN-1). It is the scope of
+every bulk sync, eviction removes entries outside it first,
 and Apple-hosted packs whose remaining entries it excludes may be released. Changing it deletes and fetches nothing:
-`ensureAvailable(scope:)` or `sync(.force)` fetch what it newly includes, and `purge(.scope(_:))` deletes what it
-dropped. `pin(_:)` keeps assets away from eviction, though `purge(.all)` and `purge(.scope(_:))` still remove them, and
+`ensureAvailable(scope:)` or `sync(.force)` fetch what it newly includes, and `purge(.scope(_:))` deletes every entry of
+the scope it is given, pinned and essential ones included, whether or not the retention scope still names it, so give it
+a scope that holds only what was dropped (an entry tagged both `season-0` and `free` would be deleted by the example
+below and fetched again later). `pin(_:)` keeps assets away from eviction, though `purge(.all)` and `purge(.scope(_:))` still remove them, and
 `unpin(_:)` undoes it ([ADR-044](docs/DECISIONS.md)).
 
 ```swift
@@ -258,8 +268,8 @@ built from one engine's figures and still answers when the store cannot (R-OBS-3
 
 ### Shutdown
 
-`shutdown()` cancels and joins every task the client owns, finishes every event stream with `clientShutDown` and
-flushes the index durably; calling it again does nothing. Afterwards every API fails with `.shutDown`: the async APIs
+`shutdown()` cancels and joins every task the engine owns (each store-touching call, transfer, timer and observer),
+finishes every event stream with `clientShutDown` and flushes the index durably; calling it again does nothing. Afterwards every API fails with `.shutDown`: the async APIs
 throw it, `sync` returns `.failed(.shutDown)`, a new `PrefetchHandle` reports it from `awaitRegistration()`,
 `register(_:)` throws it, a new `events` stream yields only `clientShutDown`, and `lookup` returns `nil`; releases stay
 harmless, and `handleBackgroundEvents` completes the system's handler at once (R-SYN-15, [ADR-039](docs/DECISIONS.md),
@@ -303,7 +313,10 @@ pack (`ZTronCatalog/catalog.json` by default), and each asset is streamed into s
 store. With `PackRetention.releaseAfterAdoption`, the default, a media pack is released once every entry it holds is
 adopted in a durably committed index generation or excluded by the retention scope; `.keepPacks` keeps the packs, and
 with them a second copy of their bytes ([ADR-027](docs/DECISIONS.md)). `StorageReport.sourceCopyBytes` reports what
-the system still holds.
+the system still holds. A configured `appleHosted` has no fallback: on iOS 26 and macOS 26 and later the client selects
+the Apple-hosted tier whether or not the app ships the extension and the packs, and `http` then serves only with
+`awsOnly` set. Pass `appleHosted` only in a build that ships that setup; the `appleHosted: AppleTierConfiguration()` of
+step 3 of [docs/MIGRATION.md](docs/MIGRATION.md) presumes it.
 
 The app sets itself up for Apple hosting; the package does not ([SPEC](SPEC.md) §1.3). That means the downloader
 extension (an app extension target built on StoreKit's `StoreDownloaderExtension`, iOS 26), the Info.plist keys and
@@ -337,8 +350,9 @@ never show the retired engine's `clientShutDown` (B-15, [ADR-050](docs/DECISIONS
 Every public CDN symbol of the prior art (`CDNAsset`, `CDNProviding`, `StaticManifestCDNProvider` and
 `BackgroundAssetsCDNProvider` with their error types, `CDNLocalStore` with `CDNReconciliationSummary`,
 `CDNAssetResolver.installed`, `CDNSyncCoordinator`, `CDNSyncProgress`, `NetworkAvailabilityMonitor`) keeps compiling
-through shims, adapters over `AssetClient` (`NetworkAvailabilityMonitor` over the environment's conditions source),
-deprecated where the module's own API replaces them, in
+through shims (`CDNLocalStore`, `CDNAssetResolver` and `CDNSyncCoordinator` adapt `AssetClient`;
+`NetworkAvailabilityMonitor` adapts the environment's conditions source), deprecated where the module's own API replaces
+them, in
 [`Tests/ZTronAssetCompatibilityTests/Shims/`](Tests/ZTronAssetCompatibilityTests/Shims/) (R-CAR-6). `CDNRefreshPolicy`,
 `CDNProviderFactory` and `CDNConfiguration`, which SPEC R-CAR-6 names but the prior art on disk lacks, are provided new;
 [docs/MIGRATION.md](docs/MIGRATION.md) §2 maps every symbol. The shims live in a test target, so they never ship in the
@@ -393,8 +407,10 @@ Keep build output inside the repository: a scratch path such as `.build-<yournam
 
 ## Documentation map
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md](docs/DECISIONS.md) are authoritative: where any
-other document disagrees with them, they win. The owner review list of NEEDS-HUMAN-REVIEW decisions is at the top of
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md](docs/DECISIONS.md) describe the package as built:
+where another document under docs/ (a design, a review, a decision record, RECON or BASELINE) disagrees with them, they
+win; [SPEC.md](SPEC.md), [PROMPT.md](PROMPT.md) and [CLAUDE.md](CLAUDE.md) keep the precedence of PROMPT.md's conflict
+rule. The owner review list of NEEDS-HUMAN-REVIEW decisions is at the top of
 DECISIONS.md.
 
 | File | What it holds |
