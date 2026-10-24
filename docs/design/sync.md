@@ -1,5 +1,5 @@
 # Design — sync engine and `AssetClient` facade
-
+> **Historical.** A Stage 1 design draft, kept for its rationale and probe evidence; where it differs from the merged code, [ARCHITECTURE.md](../ARCHITECTURE.md) and [DECISIONS.md](../DECISIONS.md) are authoritative.\
 > **Stage 1, Phase A, drafter (b).** Scope: `ZTronAssetSync` (WP-F) and the `ZTronAssetKit` facade (WP-G).
 > **Status:** draft for adversarial review (Phase B). Phase C merges it into `docs/ARCHITECTURE.md` and the ADRs.
 > **Owns:** H-3, H-4, H-5, H-8, H-9 · R-SYN-1…16 · R-CAR-1…5, R-CAR-7, R-CAR-8 · R-OBS-1…3 · R-ENV-1 · P-1, P-4, P-7, P-8, P-9, P-12, P-14.

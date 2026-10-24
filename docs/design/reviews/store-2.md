@@ -1,5 +1,5 @@
 # Adversarial review #2: `docs/design/store.md`
-
+**Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.\
 **Reviewer.** review-store-2. I did not write the design.
 **Lens.** Snapshot-vs-deletion and lifecycle races: leases, the grace window and I-3; GC, eviction and prune racing a concurrent resolve, publish or commit; OS purge between launches; idempotence and crash safety of legacy migration; quota, LRU and hysteresis; P-13 batching; whether ≥ 90 % coverage of `ZTronAssetStorage` is reachable.
 **Inputs read.** `CLAUDE.md`; SPEC §1.4, §4.2–4.4, §5.2, §5.3, §5.7, §5.9 (R-SEC-2), §6 (P-2, P-5, P-6, P-13), §7.3; `docs/RECON.md`; `docs/DECISIONS.md` (ADR-001…011); `docs/BASELINE.md`; `docs/design/store.md` (all); `docs/design/sync.md` §3.2, §9, §12, §13.3–13.5 (only where the store's lifecycle depends on them).

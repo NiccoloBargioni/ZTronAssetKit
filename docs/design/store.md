@@ -1,5 +1,5 @@
 # Storage layer design — `ZTronAssetStorage`
-
+**Historical.** A Stage 1 design draft, kept for its rationale and probe evidence; where it differs from the merged code, [ARCHITECTURE.md](../ARCHITECTURE.md) and [DECISIONS.md](../DECISIONS.md) are authoritative.\
 **Status.** Stage 1 Phase A draft (drafter: store). Input to Phase B (adversarial review) and Phase C (`ARCHITECTURE.md`, ADRs, contract code).
 **Owns.** SPEC §1.4 **H-1, H-2, H-10** · §4.2 (store side of the concurrency model) · §4.3 (layout, I-1…I-5) · §4.4 · R-STO-1…13 · R-INT-1…6 · R-CLN-1…12 · R-SEC-2 · budgets P-2, P-5, P-6, P-13.
 **Read before writing.** `CLAUDE.md`, SPEC §1–§7 and appendices, `docs/RECON.md` (all), `docs/DECISIONS.md` (ADR-001…011), `docs/BASELINE.md`, prior art `../ZTronCarouselCore/Sources/ZTronCarouselCore/CDN/{CDNLocalStore,CDNAsset,CDNSyncCoordinator,CDNAssetResolver,StaticManifestCDNProvider,BackgroundAssetsCDNProvider}.swift`, which was read only and never written.

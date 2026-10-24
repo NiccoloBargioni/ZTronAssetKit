@@ -1,5 +1,5 @@
 # Adversarial review #1 — `docs/design/transport.md` (security and HTTP semantics)
-
+**Historical.** A Stage 1 adversarial review of a design draft, kept as written; each finding's resolution is in [ARCHITECTURE.md](../../ARCHITECTURE.md) §12, which with [DECISIONS.md](../../DECISIONS.md) is authoritative.\
 **Reviewer:** review-transport-1. I did not write the design.
 **Lens:** app-key leakage (redirects, logs, `Mirror`, `dump`, errors, diagnostics), allow-list and HTTPS bypasses, the 403 ambiguity, ETag/304 and URLSession cache staleness, gzip vs `Content-Length` vs `byteSize`, size-cap bypass, truncated bodies, trusting resumed bytes, and path escape via `remotePath`.
 **Read:** CLAUDE.md; SPEC §2.3, §4.1–4.3, §5.2–5.5, §5.9, §6 (P-10, P-11), §7.3, App. B and C; `docs/RECON.md`; `docs/DECISIONS.md`; `docs/BASELINE.md`; `docs/design/transport.md` (all of it); the parts of `store.md` (§2.6, §5.1–5.5, §6.3) and `sync.md` (§3, §6, §8) that transport couples to. I also read the drafter's prototype in `.build-probe-transport/pkg/Sources/TransportProto/` and its `out/experiments-final.txt` (read-only).
