@@ -6,8 +6,9 @@ public enum StorageLocation: Sendable, Hashable {
     case applicationSupport
     /// `Caches`: for catalogs that are fully regenerable; the OS may purge it (R-CLN-7 handles that).
     case caches
-    /// An explicit base directory. App Group containers are unsupported unless the app closes the client when it
-    /// is backgrounded (a held `flock` in a shared container risks 0xdead10cc, store design R6).
+    /// An explicit base directory. App Group containers are unsupported unless the app shuts the client down when it
+    /// is backgrounded and creates a new one when it returns (a held `flock` in a shared container risks 0xdead10cc,
+    /// store design R6).
     case custom(URL)
 }
 

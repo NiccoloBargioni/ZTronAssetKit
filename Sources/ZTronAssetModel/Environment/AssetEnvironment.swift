@@ -1,9 +1,9 @@
 /// Everything the module needs from the real world, in one value (SPEC §4.2, C4, R-ENV-1).
 ///
 /// The protocols live in the Model so this value can be declared below every target (ADR-038). `.live()` is
-/// assembled by the composition root (`ZTronAssetKit`), which is the only place that names live conformers;
-/// tests build an environment from `ZTronAssetTestSupport` fakes. Constructing an environment performs no I/O
-/// (P-12): every conformer defers its work to the first call.
+/// assembled by the composition root (`ZTronAssetKit`), which is the only place that names the environment's live
+/// conformers; tests build an environment from `ZTronAssetTestSupport` fakes. Constructing an environment performs
+/// no I/O (P-12): every conformer defers its work to the first call.
 public struct AssetEnvironment: Sendable {
     /// Every file-system effect (R-STO-6).
     public var fileSystem: any FileSystem
@@ -23,7 +23,8 @@ public struct AssetEnvironment: Sendable {
     public var appVersion: any AppVersionSource
     /// The legacy `UserDefaults` stamp (R-STO-11).
     public var legacyDefaults: any LegacyDefaults
-    /// Optional memory-pressure events (R-CLN-11, MAY).
+    /// Optional memory-pressure events (R-CLN-11, MAY); `nil` in `.live()`, so an app that registers a
+    /// `PurgeableCache` sets it, or no cache is ever purged (ADR-044 as amended by ADR-056).
     public var memoryPressure: (any MemoryPressureSource)?
     /// Where log lines are written (R-OBS-1, ADR-047): `OSLogSink` in `.live()`, `TapOnlyLogSink` (the default)
     /// in every test environment, so tests never write to the unified log.
