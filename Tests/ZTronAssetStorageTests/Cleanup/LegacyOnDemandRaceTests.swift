@@ -450,6 +450,64 @@ extension LegacyOnDemandRaceTests {
 }
 
 extension LegacyOnDemandRaceTests {
+    @Test("R-STO-11: a migration batch whose install suspends while the adopt-on-demand of the last claimed legacy file ends reads what is left again after its publication, installs at once and finishes, never answering RE-S29's back-off signal with every file adopted (L5K-R23, KC4-STALELAST)", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func batchRereadsWhatIsLeftAfterItsInstall() async throws {
+        let readers = ScriptedSnapshotSink()
+        let sink = HeldForwardingSink(inner: readers)
+        // ARCHITECTURE §5's interval.
+        let race = try await LegacyRace.open(installInterval: 0.1, sink: readers, sinkOverride: sink)
+        let queue = await race.harness.state.migration.queue
+        let ids = queue.flatMap(\.ids)
+        await race.bulk.setHolding(true)
+        // A bulk-lane adopt-on-demand (a prefetch job's pre-transfer read) takes the next file; its hash unit is held.
+        let onDemand = LegacyRace.tracked {
+            try await race.harness.store.adoptLegacyNow(race.id, urgency: .bulk)
+        }
+        try await race.bulk.requireHeldUnits(atLeast: 1)
+        let onDemandHash = Set(await race.bulk.heldUnits)
+        // The install window is open again when the batch publishes, so its publication installs at once and suspends at
+        // the sink, which holds it.
+        race.harness.time.advance(by: 1)
+        await sink.setHolding(true)
+        let batch = LegacyRace.tracked {
+            try await race.harness.store.migrateLegacy(maxFiles: 64)
+        }
+        try await CorePoll.until("the batch's install is held at the sink, or the batch returned") {
+            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
+                await race.bulk.release(unit)
+            }
+            if await sink.heldCount > 0 {
+                return true
+            }
+            return await batch.finished.value
+        }
+        let atHold = await race.harness.state.migration
+        // The adopt-on-demand ends while that install is held: it unclaims the last file, so nothing is left, and publishes
+        // inside the window the batch's install has just closed.
+        await race.bulk.setHolding(false)
+        let answer = try await onDemand.task.value
+        let installDueMeanwhile = await race.harness.state.core.snapshots.installDue
+        await sink.setHolding(false)
+        let progress = try await batch.task.value
+        let phase = await race.harness.state.migration.phase
+        let installDue = await race.harness.state.core.snapshots.installDue
+        let installed = await readers.installed
+        let unseen = ids.filter { installed.location(for: $0, extensions: []) == nil }
+
+        #expect(atHold.queue.isEmpty && atHold.claimed == [race.file], "premise: the batch published with only the adopt-on-demand's file claimed")
+        #expect(answer != nil, "premise: the adopt-on-demand adopted its file")
+        #expect(installDueMeanwhile, "premise: the adopt-on-demand's bulk publication left the trailing install due while the batch's install was held")
+        #expect(progress.finished || progress.remaining > 0, "migrateLegacy answered `remaining == 0 && !finished`, RE-S29's back-off signal, with every file adopted (L5K-C4-00): \(progress)")
+        #expect(progress == LegacyMigrationProgress(adopted: queue.count, remaining: 0, dropped: 0, finished: true), "the same call finished the migration: \(progress)")
+        #expect(phase == .done, "phases 3 and 4 ran: \(phase)")
+        #expect(!installDue, "R-STO-13: phases 3 and 4 ran with the adopt-on-demand's trailing install still due (L5K-R20)")
+        #expect(unseen.isEmpty, "the readers' snapshot holds every adopted file when the call returns: \(unseen.count) missing")
+        #expect(await CoreInvariants.violations(of: race.harness).isEmpty)
+    }
+}
+
+extension LegacyOnDemandRaceTests {
     @Test("R-STO-13: an adopt-on-demand publishes at its urgency: bulk adoptions wait for the install window, a user-initiated one installs at once and carries them (L5K-R14)", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func adoptionPublishesAtItsUrgency() async throws {
@@ -516,8 +574,14 @@ struct LegacyRace {
     let bytes: Data
 
     /// Opens a store over `files` (the repository's `legacy-v0` fixture when `nil`) with the prior art's key set and the
-    /// given snapshot install interval.
-    static func open(files: [String: Data]? = nil, installInterval: TimeInterval = 0) async throws -> LegacyRace {
+    /// given snapshot install interval. The store installs into `sinkOverride` when one is given (a sink that holds
+    /// installs, answering from `sink`, which stays the harness's readers' view), otherwise into `sink`.
+    static func open(
+        files: [String: Data]? = nil,
+        installInterval: TimeInterval = 0,
+        sink: ScriptedSnapshotSink = ScriptedSnapshotSink(),
+        sinkOverride: (any SnapshotSink)? = nil
+    ) async throws -> LegacyRace {
         let tree = try files ?? LegacyFixture.fixtureFiles()
         let bulk = SteppedBlockingExecutor(holding: false)
         let metadata = SteppedBlockingExecutor(holding: false)
@@ -528,7 +592,9 @@ struct LegacyRace {
             defaults: defaults,
             installInterval: installInterval,
             metadata: metadata,
-            bulk: bulk
+            bulk: bulk,
+            sink: sink,
+            sinkOverride: sinkOverride
         )
         _ = try await harness.store.open()
         let file = try #require(await harness.state.migration.queue.last, "a legacy file is queued")
@@ -604,5 +670,48 @@ struct LegacyRace {
     func releaseAll() async {
         await self.bulk.setHolding(false)
         await self.metadata.setHolding(false)
+    }
+}
+
+/// A snapshot sink that holds installs while `holding` (at the await of REENTRANCY R6) and answers each, once released,
+/// from `inner`, which stays the readers' view (`inner.installed`): a test suspends a publication at its install, lets
+/// other calls run meanwhile, then reads what the readers see. `heldCount` lets a cancellation-aware poll wait for a held
+/// install (`CorePoll.until`).
+actor HeldForwardingSink: SnapshotSink {
+    private let inner: ScriptedSnapshotSink
+    private var holding = false
+    private var held: [CheckedContinuation<Void, Never>] = []
+
+    init(inner: ScriptedSnapshotSink) {
+        self.inner = inner
+    }
+
+    /// The installs held now.
+    var heldCount: Int {
+        self.held.count
+    }
+
+    /// Starts or stops holding; stopping releases every held install in arrival order.
+    func setHolding(_ holding: Bool) {
+        self.holding = holding
+        guard !holding else {
+            return
+        }
+        let released = self.held
+        self.held = []
+        for continuation in released {
+            continuation.resume()
+        }
+    }
+
+    func install(_ snapshot: AssetSnapshot) async -> InstallAck {
+        if self.holding {
+            // REENTRANCY: test sink — nothing: the install below answers from the inner sink's state at release.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.held.append(continuation)
+            }
+        }
+        // REENTRANCY: test sink — nothing is read afterwards.
+        return await self.inner.install(snapshot)
     }
 }

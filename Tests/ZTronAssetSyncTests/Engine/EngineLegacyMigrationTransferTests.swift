@@ -1370,6 +1370,177 @@ struct EngineLegacyMigrationTransferTests {
     }
 }
 
+extension EngineLegacyMigrationTransferTests {
+    // MARK: What a migration call returns after its publication (L5K-R23)
+
+    /// A launch as `rateLimitedLaunch` builds it (ARCHITECTURE §5's install interval of 0.1 s, a bulk executor that holds
+    /// every unit, the origin serving `catalog`), except that the store installs into `sink`, which holds the install a
+    /// test asks it to and answers every install from `sink.inner`, the harness's sink (the readers' view). Nothing is
+    /// started.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func heldSinkLaunch(
+        _ catalog: [(ManifestEntry, Data)],
+        time: ManualTimeSource,
+        sink: HeldInstallSink
+    ) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor) {
+        let bulk = SteppedBlockingExecutor(holding: true)
+        let fileSystem = FakeFileSystem(
+            disk: try EngineRunPathTests.legacyDisk(catalog, time: time),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: 64 << 30, opportunisticCapacity: 64 << 30)
+        )
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource(initial: .unrestricted)
+        let pressure = FakeMemoryPressureSource()
+        let tap = RecordingLogTap()
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: bulk,
+            time: time,
+            random: SeededRandom(seed: 0x5EED),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(version: "1.0+1"),
+            legacyDefaults: FakeLegacyDefaults(),
+            memoryPressure: pressure,
+            logTap: tap
+        )
+        let storeConfiguration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(),
+            legacy: LegacyMigrationPolicy(enabled: true, root: EngineRunPathTests.legacyRoot),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0.1
+        )
+        let store = AssetStore(configuration: storeConfiguration, environment: StoreEnvironment(environment: environment, snapshotSink: sink))
+        let configuration = EngineConfiguration(
+            tuning: SyncTuning(),
+            storage: StoragePolicy(),
+            network: NetworkPolicy(),
+            power: PowerPolicy(),
+            refresh: .oncePerAppVersion,
+            remote: RemoteConfiguration(),
+            limits: ManifestLimits(),
+            retentionScope: .all
+        )
+        let harness = EngineHarness(
+            time: time,
+            fileSystem: fileSystem,
+            sink: sink.inner,
+            source: source,
+            conditions: conditions,
+            pressure: pressure,
+            tap: tap,
+            store: store,
+            engine: SyncEngine(store: store, environment: environment, configuration: configuration),
+            configuration: configuration
+        )
+        await harness.serveManifest(catalog.map(\.0))
+        await harness.scriptTransfers(catalog)
+        return (harness, bulk)
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: when a job's adoption of the last claimed prior-art file ends while the migration batch's install is held, the migration still finishes in that launch instead of backing off to the next maintenance window with every file adopted (L5K-R23, KC4-STALELAST)", .timeLimit(.minutes(1)))
+    func lastAdoptionDuringTheBatchsInstallFinishesTheMigration() async throws {
+        let time = ManualTimeSource()
+        // Three files: the batch holds the first pending one at its hash; a prefetch job adopts the last pending one,
+        // which is still queued whichever file the batch holds (a batch takes the files in path order).
+        let catalog = EngineLegacyMigrationTransferTests.catalog(3, seed: 9_900)
+        let sink = HeldInstallSink(inner: ScriptedSnapshotSink())
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.heldSinkLaunch(catalog, time: time, sink: sink)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        let pending = try await EngineLegacyMigrationTransferTests.pending(harness, catalog)
+        try #require(pending.count >= catalog.count - 1, "premise: the held batch's file and every file after it are pending: \(pending.count)")
+        let asset = try #require(catalog.map(\.0).last { pending.contains($0.identifier) })
+        let batchIDs = pending.subtracting([asset.identifier])
+        let token = try await engine.registerGroup([asset.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let jobHash = Set(await bulk.heldUnits).subtracting(migration)
+        // The install window opens again before the batch publishes, so the batch's publication installs at once: the sink
+        // holds that install (the one whose snapshot holds the batch's adoptions and not the job's).
+        time.advance(by: 1)
+        let jobID = asset.identifier
+        await sink.holdFirst { snapshot in
+            batchIDs.allSatisfy { snapshot.location(for: $0, extensions: []) != nil } && snapshot.location(for: jobID, extensions: []) == nil
+        }
+        while !(await sink.isHolding) {
+            for unit in await bulk.heldUnits where !jobHash.contains(unit) {
+                await bulk.release(unit)
+            }
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+        // The job's adoption ends while that install is held: it unclaims the last file, so nothing is left, and publishes
+        // inside the window the batch's install has just closed; the job is answered from the store.
+        for unit in jobHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: [], on: engine) { engine in
+            engine.state.jobs[asset.transferID] == nil
+        }
+        let installDue = await harness.store.nextDeadline() != nil
+        await sink.release()
+        await bulk.setHolding(false)
+        await engine.awaitCondition { !$0.state.migration.running }
+        let flags = await engine.readForTests { ($0.state.migration.pending, $0.state.migration.deferred) }
+
+        #expect(installDue, "premise: the job's bulk adoption left the trailing install due while the batch's install was held")
+        #expect(!flags.0 && !flags.1, "the migration loop backed off to the next maintenance window with every file adopted: pending \(flags.0), deferred \(flags.1) (L5K-C4-00)")
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        #expect(try await EngineLegacyMigrationTransferTests.allPresent(harness, catalog))
+        await engine.releaseGroup(token)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
+}
+
+/// A snapshot sink that, once armed, holds the first install whose snapshot satisfies a predicate (at the await of the
+/// store's REENTRANCY R6) until the test releases it, and answers every install from `inner`, the harness's sink: a test
+/// suspends one publication at its install while other calls run, and `inner.installed` stays the readers' view.
+actor HeldInstallSink: SnapshotSink {
+    /// The harness's sink: what the readers see.
+    let inner: ScriptedSnapshotSink
+    private var predicate: (@Sendable (AssetSnapshot) -> Bool)?
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(inner: ScriptedSnapshotSink) {
+        self.inner = inner
+    }
+
+    /// Whether an install is held now.
+    var isHolding: Bool {
+        self.held != nil
+    }
+
+    /// Holds the next install whose snapshot satisfies `predicate`.
+    func holdFirst(where predicate: @escaping @Sendable (AssetSnapshot) -> Bool) {
+        self.predicate = predicate
+    }
+
+    /// Releases the held install, if any, and holds no other.
+    func release() {
+        self.predicate = nil
+        self.held?.resume()
+        self.held = nil
+    }
+
+    func install(_ snapshot: AssetSnapshot) async -> InstallAck {
+        if let predicate = self.predicate, predicate(snapshot) {
+            self.predicate = nil
+            // REENTRANCY: test sink — nothing: the install below answers from the inner sink's state at release.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.held = continuation
+            }
+        }
+        // REENTRANCY: test sink — nothing is read afterwards.
+        return await self.inner.install(snapshot)
+    }
+}
+
 /// A planner whose next `plan` call, once armed, blocks its thread until the test opens the gate (the verifier's probe
 /// PE5): a test holds `ensureAvailable` between its planning view and its group's registration. The plan is the
 /// production planner's. A test opens the gate on every exit (`defer`), so no planning thread stays blocked; the hold
