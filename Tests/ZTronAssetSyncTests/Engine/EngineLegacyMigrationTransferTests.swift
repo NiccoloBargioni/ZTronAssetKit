@@ -1584,6 +1584,69 @@ extension EngineLegacyMigrationTransferTests {
         #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
         await engine.shutdown()
     }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)", .timeLimit(.minutes(1)), arguments: [false, true])
+    func idJoiningDuringTheReadIsAskedToo(viaEnsure: Bool) async throws {
+        let time = ManualTimeSource()
+        let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_970, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        try #require(first.transferID == second.transferID, "premise: one content, one job")
+        let bothPending = try await EngineLegacyMigrationTransferTests.nonePresent(harness, [first.identifier, second.identifier])
+        // A prefetch job of `first` adopts that id's prior-art file before any bytes; its hash unit is held.
+        let token = try await engine.registerGroup([first.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let firstHash = Set(await bulk.heldUnits).subtracting(migration)
+        // A second asker wants `second`, of the same content: it joins the job during that read.
+        var joiner: InterestToken?
+        var ensure: Task<Result<AvailabilityReport, AssetError>, Never>?
+        if viaEnsure {
+            ensure = Task {
+                await engine.ensureAvailable(scope: .identifiers([second.identifier]))
+            }
+        } else {
+            joiner = try await engine.registerGroup([second.identifier], lane: .prefetch).get()
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration.union(firstHash), on: engine) { engine in
+            engine.state.jobs[first.transferID]?.assets.contains(second.identifier) == true || engine.state.jobs[first.transferID] == nil
+        }
+        let joined = await engine.readForTests { $0.state.jobs[first.transferID]?.assets.contains(second.identifier) == true }
+        // The read of `first` ends; the job ends once every id it holds is answered, or once its transfer committed.
+        for unit in firstHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[first.transferID] == nil
+        }
+        var report: AvailabilityReport?
+        var ensured: Task<Void, Never>?
+        if let ensure {
+            let (result, task) = try await EngineLegacyMigrationTransferTests.duringMigration(keeping: migration, bulk: bulk) {
+                await ensure.value
+            }
+            report = try result.get()
+            ensured = task
+        }
+        let starts = await harness.source.starts.map(\.remotePath)
+        let bothStored = try await EngineLegacyMigrationTransferTests.arePresent(harness, [first.identifier, second.identifier])
+
+        #expect(bothPending, "premise: both ids were still to adopt after the start")
+        #expect(joined, "premise: `second` joined the job during its read of `first`")
+        #expect(starts.isEmpty, "R-STO-11: the content was downloaded for `second`, whose prior-art file migration could still adopt (L5K-C4-02): \(starts)")
+        #expect(bothStored, "both ids are present in the store")
+        if viaEnsure {
+            #expect(report?.present == 1 && report?.missing == 0, "ensureAvailable reports `second` available: \(String(describing: report))")
+        }
+        if let joiner {
+            await engine.releaseGroup(joiner)
+        }
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        await ensured?.value
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
 }
 
 /// A snapshot sink that, once armed, holds the first install whose snapshot satisfies a predicate (at the await of the
