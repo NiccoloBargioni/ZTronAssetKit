@@ -76,9 +76,10 @@ if let location = client.lookup(pages[0], extensions: ["heic", "png"]) {   // ma
 }
 ```
 
-This is top-level code, which runs on the main actor. In an app, build the client once at launch on the main actor
-and make the async calls from the launch task, as step 3 of [docs/MIGRATION.md](docs/MIGRATION.md) shows; keep the
-client alive for the app's lifetime. Creating it performs no I/O and starts nothing. `start()` returns when the client
+This is top-level code, which runs on the main actor. In an app, create the client once at launch on the main actor
+and call `start()` from the launch task before the first carousel page is created, the placement that step 3 of
+[docs/MIGRATION.md](docs/MIGRATION.md) describes for the shims; keep the client alive for the app's lifetime.
+Creating it performs no I/O and starts nothing. `start()` returns when the client
 is ready, not when a sync has finished. The key is wrapped in `AppKey`, which prints as `AppKey(<redacted>)`, is not
 `Codable` and cannot be read back by the app, and the client sends it only to allow-listed HTTPS origins.
 
