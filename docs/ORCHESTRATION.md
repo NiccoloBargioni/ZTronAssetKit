@@ -14,6 +14,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - decisions in `docs/adr-drafts/i.md`.
   - Excluded: ARCHITECTURE, DECISIONS, TRACEABILITY, ORCHESTRATION, MIGRATION (WP-K's), other drafts, and the Stage 3/5 reports.
 - **Run:** `wf_3045417c-704` (task `w2j6uh9aw`). It uses a dedicated script, **`.claude/workflows/assetkit-wp-i-docs.js`**: an author, an accuracy verifier and a usability verifier, and fix rounds (at most 6), with no builds or simulator runs beyond the quick-start compile. Arguments: `{base: "l5-merged", worktree: "i", usageStop: 70, maxRounds: 6}`. Worktree `.worktrees/i` on `wp/i`.
+- **Result:** `wf_3045417c-704` ended 13:4x.
+  - Round 1: 3 blocking out of 19 (README facts). The fix round fixed all 19. **Round 2: 0 blocking out of 11.**
+  - The quick start is 19 code lines, compiled verbatim, with an iOS 15 cross-build.
+  - The orchestrator applied the 11 last notes after checking each fact (`f234cda`).
+  - Rulings WPI-R1…R8 are in `.build-orchestrator/wpi-rulings.md`.
+- **Merged:** `wp/i` as `70b339b`. The orchestrator's WPI-R7 pointer in MIGRATION.md step 3 is `52936d6`.
+  - Gates are running (logs `.build-orch/wpi/summary.txt`).
+  - **Docs: RUNNING** `wf_915bed8f-166` (task `wf9yrmid0`), worktree `.worktrees/widocs` from `52936d6`, ADR-056, `usageStop: 75`. WPI-R5 (the consumer toolchain, Swift 6.2+) is tagged NEEDS-HUMAN-REVIEW.
 - **Then:**
   1. Merge `--no-ff`.
   2. Run `--quick` and `--gates-only`.
