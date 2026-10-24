@@ -177,24 +177,24 @@ extension SyncEngine {
     /// (R-STO-11). The window between the last read and the transfer is the one the 404 path has (a legacy or orphan
     /// adoption of the same content; single flight rules out any other binding of this content while its job exists).
     ///
-    /// After the reads, a bulk-urgency adoption's trailing install is scheduled: the store's deadline is re-read into the
-    /// heap (RE-S40, orchestrator ruling L5K-R16), in O(1) while the alarm already wakes within about two install
-    /// intervals (F-12), so the adoption reaches the readers' snapshot within about two install intervals. Then, after that
-    /// last ordinary await, the answer site checks the job's interests (orchestrator ruling L5K-R21): when the job holds a
-    /// user-initiated interest and an id was answered by a read that did not itself install the snapshot at once (a
-    /// bulk-urgency adoption, a present asset whose trailing install may still be due, or a plain location read), one
-    /// user-initiated publication follows (`adoptLegacyNow` at `.userInitiated` of that id, which installs the whole state
-    /// at once, ARCHITECTURE §5), and nothing else is awaited before the synchronous answer. So a user-initiated asker,
-    /// whether it joined before the reads, during any of them, during the re-read, or as migration ended mid-loop, is
-    /// never answered before the readers' snapshot holds the asset; a promotion after the check cannot interleave, since
-    /// no suspension follows it. `true` when the attempt ended here.
+    /// After each bulk-urgency adoption, before the job's next read, that adoption's trailing install is scheduled: the
+    /// store's deadline is re-read into the heap (RE-S40, orchestrator rulings L5K-R16 and L5K-R23), in O(1) while the alarm
+    /// already wakes within about two install intervals (F-12), so the adoption reaches the readers' snapshot within about
+    /// two install intervals however long the job's later reads take. Then, after the last ordinary await (the last read,
+    /// or its re-read of the deadline), the answer site checks the job's interests (orchestrator ruling L5K-R21): when the
+    /// job holds a user-initiated interest and an id was answered by a read that did not itself install the snapshot at
+    /// once (a bulk-urgency adoption, a present asset whose trailing install may still be due, or a plain location read),
+    /// one user-initiated publication follows (`adoptLegacyNow` at `.userInitiated` of that id, which installs the whole
+    /// state at once, ARCHITECTURE §5), and nothing else is awaited before the synchronous answer. So a user-initiated
+    /// asker, whether it joined before the reads, during any of them or of their re-reads of the deadline, or as migration
+    /// ended mid-loop, is never answered before the readers' snapshot holds the asset; a promotion after the check cannot
+    /// interleave, since no suspension follows it. `true` when the attempt ended here.
     func answeredFromStore(_ transfer: TransferID, epoch: UInt64, attempt: TransferAttempt) async -> Bool {
         guard let job = self.state.jobs[transfer] else {
             return false
         }
         let serial = self.state.ledgerForgets
         var present: Set<AssetID> = []
-        var bulkRead = false
         // The last id answered by a read that installed nothing at once, unless a later user-initiated adoption installed
         // the whole state after it.
         var uninstalled: AssetID?
@@ -207,7 +207,6 @@ extension SyncEngine {
             // user-initiated one after the last ordinary await (L5K-R21); the bindings are recorded only when nothing was
             // forgotten during the reads (an adoption here is such a binding).
             let read = await self.storedLocation(of: id, lane: lane)
-            bulkRead = bulkRead || read.urgency == .bulk
             if read.location != nil, read.urgency == .userInitiated {
                 // A user-initiated adoption installed the whole state at once, the earlier answers included.
                 uninstalled = nil
@@ -218,12 +217,13 @@ extension SyncEngine {
                     uninstalled = id
                 }
             }
-        }
-        if bulkRead {
-            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline, so the
-            // trailing install a bulk-urgency adoption left due runs on the alarm (L5K-R16). The job's interests are
-            // checked after it, below, and the rest as f-11 says.
-            await self.refreshStoreDeadlineAfterPublish()
+            if read.urgency == .bulk {
+                // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline, so
+                // the trailing install this bulk-urgency adoption left due runs on the alarm while the job's later reads run
+                // (L5K-R16; orchestrator ruling L5K-R23). The job's interests are checked after the last of these awaits,
+                // below, and the rest as f-11 says.
+                await self.refreshStoreDeadlineAfterPublish()
+            }
         }
         if let id = uninstalled, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated {
             // The answer site (orchestrator ruling L5K-R21): a user-initiated asker joined before, during a read or during
