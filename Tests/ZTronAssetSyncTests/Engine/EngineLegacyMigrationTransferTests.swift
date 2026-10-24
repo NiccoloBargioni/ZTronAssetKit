@@ -1647,6 +1647,49 @@ extension EngineLegacyMigrationTransferTests {
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
+
+    // MARK: No request for a retired attempt (L5K-R25)
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-11: a job whose last group is released while its pre-transfer read adopts a later id sends no transfer request for the retired attempt, and its draining record ends (L5K-R25, KC4-MULTIID release variant)", .timeLimit(.minutes(1)))
+    func releasedDuringALaterReadSendsNoRequest() async throws {
+        let time = ManualTimeSource()
+        let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_960, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        try #require(first.transferID == second.transferID, "premise: one content, one job")
+        let bothPending = try await EngineLegacyMigrationTransferTests.nonePresent(harness, [first.identifier, second.identifier])
+        // A prefetch job of both ids adopts `first`, then its read of `second` hashes that id's file: that unit is held.
+        let token = try await engine.registerGroup([first.identifier, second.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let firstHash = Set(await bulk.heldUnits).subtracting(migration)
+        for unit in firstHash {
+            await bulk.release(unit)
+        }
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let secondHash = Set(await bulk.heldUnits).subtracting(migration)
+        // The carousel scrolls on: the group is released during that read, which retires the job; its attempt, which has
+        // no handle yet, is recorded as draining.
+        await engine.releaseGroup(token)
+        let retired = await engine.readForTests { $0.state.jobs[first.transferID] == nil && $0.state.draining[first.transferID] != nil }
+        for unit in secondHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.draining[first.transferID] == nil
+        }
+        let starts = await harness.source.starts.map(\.remotePath)
+        let requests = await engine.readForTests { $0.state.metrics.transferRequests }
+        let bothStored = try await EngineLegacyMigrationTransferTests.arePresent(harness, [first.identifier, second.identifier])
+
+        #expect(bothPending, "premise: both ids were still to adopt after the start")
+        #expect(retired, "premise: the release retired the job during its read of `second`, its attempt draining")
+        #expect(starts.isEmpty && requests == 0, "R-STO-11: a transfer request was sent, and cancelled at once, for the attempt retired during its reads (L5K-C4-08, L5K-C4-14): \(starts), \(requests) requests")
+        #expect(bothStored, "the reads adopted both ids' prior-art files")
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        await engine.shutdown()
+    }
 }
 
 /// A snapshot sink that, once armed, holds the first install whose snapshot satisfies a predicate (at the await of the
