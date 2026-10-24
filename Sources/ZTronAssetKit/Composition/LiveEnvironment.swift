@@ -5,11 +5,16 @@ import ZTronAssetStorage
 import ZTronAssetTransport
 
 extension AssetEnvironment {
-    /// The real world (C4): the only place that names live conformers. Building it performs no I/O (P-12); each
+    /// The real world (C4): the only place that names the environment's live conformers (seams outside it that default
+    /// to their own include `AssetFallbackChain`'s `MainBundleLookup`, the Apple tier's `LiveAssetPackBackend`, the
+    /// background session driver and `HTTPRemoteSource`'s foreground backend). Building it performs no I/O (P-12); each
     /// call builds fresh conformers, so two clients never share executors or observers. A function, not a
     /// `static var` (SPEC §4.2, ADR-038). The legacy `UserDefaults` stamp is read from `legacyDefaultsSuiteName`,
     /// `.standard` when `nil` (R-STO-11); `AssetClient(configuration:)` passes
     /// `configuration.legacy.defaultsSuiteName` (ADR-048). Lines go to the unified log (`OSLogSink`, ADR-047).
+    /// It sets no `memoryPressure` (the UIKit conformer lives outside the module, R-CLN-11, R-CAR-9): an app that
+    /// registers a `PurgeableCache` sets a source on the returned value and passes it to
+    /// `AssetClient(configuration:environment:)`, or no cache is ever purged (ADR-044 as amended by ADR-056).
     public static func live(legacyDefaultsSuiteName: String? = nil) -> AssetEnvironment {
         let metadataExecutor = DispatchBlockingExecutor(label: "com.ztron.assetkit.metadata")
         return AssetEnvironment(
