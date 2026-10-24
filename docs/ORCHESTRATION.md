@@ -2,6 +2,23 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
+## WP-I (documentation and README) — RUNNING (launched 2026-10-24 ~08:40 CEST)
+- **Owner:** "Run WP-I: documentation and README" (24 Oct).
+  - The owner gave no stop, so the orchestrator applied a default of **70 %** for WP-I; the owner may change it.
+  - Weekly usage at launch: 60 % (Fable 32 %).
+- **Scope** (ARCHITECTURE §1.2, row "end | I docs"; SPEC §8):
+  - `README.md` with a quick start of at most 20 code lines, compiled against the public API in a scratch package;
+  - status notes on historical WP-I-owned docs;
+  - decisions in `docs/adr-drafts/i.md`.
+  - Excluded: ARCHITECTURE, DECISIONS, TRACEABILITY, ORCHESTRATION, MIGRATION (WP-K's), other drafts, and the Stage 3/5 reports.
+- **Run:** `wf_3045417c-704` (task `w2j6uh9aw`). It uses a dedicated script, **`.claude/workflows/assetkit-wp-i-docs.js`**: an author, an accuracy verifier and a usability verifier, and fix rounds (at most 6), with no builds or simulator runs beyond the quick-start compile. Arguments: `{base: "l5-merged", worktree: "i", usageStop: 70, maxRounds: 6}`. Worktree `.worktrees/i` on `wp/i`.
+- **Then:**
+  1. Merge `--no-ff`.
+  2. Run `--quick` and `--gates-only`.
+  3. Fold `i.md` into DECISIONS as ADR-056, by `assetkit-level-docs.js` or, if small, by the orchestrator, with the reasons recorded.
+  4. Tag `wpi-merged`, which completes Stage 2.
+  5. Remove the worktree and branch, and update this file.
+
 ## Level 5 — DONE (`l5-merged` = `45e25a1`, 24 Oct 08:30 CEST). Next session: start here
 - **State.** WP-G (`l5g-merged` = `da8d444`, ADR-054) and WP-K (merged `23807ac`, docs `45e25a1`, ADR-055) are on `feature/asset-kit`.
   - Nothing is running. There are no worktrees and no `wp/*` branches, and the tree is clean.
