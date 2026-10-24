@@ -26,7 +26,7 @@
 | R-CAR-3 | MUST | 12 |
 | R-CAR-4 | MUST | 15 |
 | R-CAR-5 | MUST | 7 |
-| R-CAR-6 | MUST | 4 |
+| R-CAR-6 | MUST | 72 |
 | R-CAR-7 | MUST | 3 |
 | R-CAR-8 | SHOULD | 4 |
 | R-CAR-9 | MUST | 1 |
@@ -79,9 +79,9 @@
 | R-SEC-3 | MUST | 1 |
 | R-STO-1 | MUST | 9 |
 | R-STO-10 | MUST | 1 |
-| R-STO-11 | MUST | 40 |
+| R-STO-11 | MUST | 65 |
 | R-STO-12 | SHOULD | 6 |
-| R-STO-13 | MUST | 8 |
+| R-STO-13 | MUST | 24 |
 | R-STO-2 | MUST | 2 |
 | R-STO-3 | MUST | 3 |
 | R-STO-4 | MUST | 24 |
@@ -89,13 +89,13 @@
 | R-STO-6 | MUST | 15 |
 | R-STO-7 | MUST | 2 |
 | R-STO-8 | MUST | 2 |
-| R-STO-9 | MUST | 26 |
+| R-STO-9 | MUST | 28 |
 | R-SYN-1 | MUST | 11 |
 | R-SYN-10 | MUST | 19 |
 | R-SYN-11 | MUST | 44 |
 | R-SYN-12 | MUST | 35 |
 | R-SYN-13 | MUST | 8 |
-| R-SYN-14 | MUST | 3 |
+| R-SYN-14 | MUST | 4 |
 | R-SYN-15 | MUST | 18 |
 | R-SYN-16 | SHOULD | 5 |
 | R-SYN-2 | MUST | 9 |
