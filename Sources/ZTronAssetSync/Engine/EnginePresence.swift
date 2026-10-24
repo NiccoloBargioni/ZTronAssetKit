@@ -188,19 +188,20 @@ extension SyncEngine {
     /// job holds a user-initiated interest and an id was answered by a read that did not itself install the snapshot at
     /// once (a bulk-urgency adoption, a present asset whose trailing install may still be due, or a plain location read),
     /// one user-initiated publication follows (`adoptLegacyNow` at `.userInitiated` of that id, which installs the whole
-    /// state at once, ARCHITECTURE §5), and nothing else is awaited before the synchronous answer. So a user-initiated
-    /// asker, whether it joined before the reads, during any of them or of their re-reads of the deadline, or as migration
-    /// ended mid-loop, is never answered before the readers' snapshot holds the asset; a promotion after the check cannot
-    /// interleave, since no suspension follows it. `true` when the attempt ended here.
+    /// state at once, ARCHITECTURE §5; of the id before it when that id is no longer present, L5K-R25), and nothing else is
+    /// awaited before the synchronous answer. So a user-initiated asker, whether it joined before the reads, during any of
+    /// them or of their re-reads of the deadline, or as migration ended mid-loop, is never answered before the readers'
+    /// snapshot holds the asset; a promotion after the check cannot interleave, since no suspension follows it. `true` when
+    /// the attempt ended here.
     func answeredFromStore(_ transfer: TransferID, epoch: UInt64, attempt: TransferAttempt) async -> Bool {
         guard let job = self.state.jobs[transfer] else {
             return false
         }
         let serial = self.state.ledgerForgets
         var present: Set<AssetID> = []
-        // The last id answered by a read that installed nothing at once, unless a later user-initiated adoption installed
-        // the whole state after it.
-        var uninstalled: AssetID?
+        // The ids answered by reads that installed nothing at once, in read order, since the last user-initiated adoption
+        // (which installed the whole state, the earlier answers included).
+        var uninstalled: [AssetID] = []
         // Every id asked so far: an id the job gains during the reads is asked once too (orchestrator ruling L5K-R23).
         var asked: Set<AssetID> = []
         var next = job.assets.filter { self.state.applied.entry(for: $0)?.transferID == transfer }.sorted()
@@ -218,12 +219,12 @@ extension SyncEngine {
                 let read = await self.storedLocation(of: id, lane: lane)
                 if read.location != nil, read.urgency == .userInitiated {
                     // A user-initiated adoption installed the whole state at once, the earlier answers included.
-                    uninstalled = nil
+                    uninstalled.removeAll()
                 }
                 if let location = read.location, !location.isStale {
                     present.insert(id)
                     if read.urgency != .userInitiated {
-                        uninstalled = id
+                        uninstalled.append(id)
                     }
                 }
                 if read.urgency == .bulk {
@@ -240,14 +241,26 @@ extension SyncEngine {
             // adopt (orchestrator ruling L5K-R23; L5K-C4-02). Each id is asked once, so the rounds end.
             next = self.unaskedIDs(of: transfer, epoch: epoch, attempt: attempt, asked: asked)
         }
-        if let id = uninstalled, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated {
+        if !uninstalled.isEmpty, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated {
             // The answer site (orchestrator ruling L5K-R21): a user-initiated asker joined before, during a read or during
-            // the re-read, and an answered id may be in a coalesced snapshot only. One user-initiated publication installs
-            // the whole state before the answer below, which follows it synchronously.
-            // REENTRANCY: k-4 (proposed) — the lifecycle, the job epoch and the attempt, re-checked below as f-11 says; a
-            // promotion during this await finds the snapshot it installs, which holds every answered id (bound before
-            // it); an answer that throws (the store closing) leaves the caller's lifecycle check to discard the answers.
-            _ = try? await self.store.adoptLegacyNow(id, urgency: .userInitiated)
+            // a re-read of the deadline, and an answered id may be in a coalesced snapshot only. One user-initiated
+            // publication installs the whole state before the answer below, which follows it synchronously. It is made
+            // through the last such id; when that id is no longer present (`adoptLegacyNow` answers `nil` and publishes
+            // nothing) the one before it is tried, so the install never depends on one id surviving (orchestrator ruling
+            // L5K-R25; L5K-C4-07).
+            for id in uninstalled.reversed() {
+                do {
+                    // REENTRANCY: k-4 (proposed) — the lifecycle, the job epoch and the attempt, re-checked below as f-11
+                    // says; a promotion during this await finds the snapshot it installs, which holds every answered id
+                    // still present (bound before it); a `nil` answer installed nothing, so the next id is tried.
+                    if try await self.store.adoptLegacyNow(id, urgency: .userInitiated) != nil {
+                        break
+                    }
+                } catch {
+                    // The store refused or is closing: the caller's lifecycle check discards the answers.
+                    break
+                }
+            }
         }
         guard !present.isEmpty, self.isRunning, let current = self.state.jobs[transfer], current.epoch == epoch,
               let active = current.active, active.attempt == attempt, active.handle == nil
