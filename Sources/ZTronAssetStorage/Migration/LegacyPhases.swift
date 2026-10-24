@@ -339,8 +339,12 @@ extension AssetStore {
     /// `migrateLegacy(maxFiles:)`. No call suspends behind a coalesced publication of its own (orchestrator ruling
     /// L5K-R20): a batch that leaves files to process publishes at bulk urgency and, when that left the trailing install
     /// due, returns right after it (`remaining > 0`, `finished` false), so the engine schedules that install before it
-    /// calls again; the last batch, which phases 3 and 4 follow in the same call, installs at once. Only a call with no
-    /// install of its own left due waits for an adopt-on-demand of the last claimed files (L5K-R17).
+    /// calls again; the last batch, which phases 3 and 4 follow in the same call, installs at once. What is left is read
+    /// after the publication returned, never before it (orchestrator ruling L5K-R23): an install that suspends at the sink
+    /// lets an adopt-on-demand of the last claimed file end meanwhile, and a batch that then finds nothing left installs at
+    /// once and goes on to phases 3 and 4 rather than returning "nothing remaining, not finished", the caller's back-off
+    /// signal (RE-S29). Only a call with no install of its own left due waits for an adopt-on-demand of the last claimed
+    /// files (L5K-R17).
     func performMigrateLegacy(maxFiles: Int) async throws(StoreError) -> LegacyMigrationProgress {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -402,10 +406,21 @@ extension AssetStore {
             // goes on. With nothing left, phases 3 and 4 follow in this call, so the batch installs at once instead: a
             // return then would read "nothing remaining, not finished", which tells the caller to back off (RE-S29).
             let last = self.state.migration.queue.isEmpty && self.state.migration.claimed.isEmpty
-            // REENTRANCY: R17 — nothing but the phase: the adoptions were bound before the await.
+            // REENTRANCY: R17 — the queue, the claims and `installDue`, read again below: the adoptions were bound before
+            // the await, but an install that suspends at the sink lets an adopt-on-demand of the last claimed file end
+            // meanwhile, which unclaims the file and publishes inside the window this install closed (L5K-C4-00).
             await self.publishSnapshot(urgency: last ? .userInitiated : .bulk)
-            if !last, self.state.core.snapshots.installDue {
-                return self.state.migration.progress
+            if self.state.core.snapshots.installDue {
+                // What is left is read after the publication (orchestrator ruling L5K-R23): with files left the call
+                // returns with `remaining > 0`; with none, phases 3 and 4 follow, so what is due installs at once first, an
+                // adoption that an adopt-on-demand ended during this call's install included.
+                guard self.state.migration.queue.isEmpty, self.state.migration.claimed.isEmpty else {
+                    return self.state.migration.progress
+                }
+                // REENTRANCY: R17 — nothing but the phase: nothing is queued or claimed, and a file returns to the queue
+                // only from the claims, so nothing is left after this await either; the finish check below re-reads the
+                // queue, the claims and the phase.
+                await self.publishSnapshot(urgency: .userInitiated)
             }
         }
         // With the queue empty and every claimed file an adopt-on-demand's (from its claim to its snapshot), this call can
