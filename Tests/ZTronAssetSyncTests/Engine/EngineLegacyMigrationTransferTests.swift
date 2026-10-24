@@ -1496,6 +1496,90 @@ extension EngineLegacyMigrationTransferTests {
         try await EngineLegacyMigrationTransferTests.expectSettled(harness)
         await engine.shutdown()
     }
+
+    // MARK: Every id of a job is asked, and each bulk adoption scheduled, before the answer (L5K-R23)
+
+    /// A launch as `rateLimitedLaunch` builds it over two prior-art files the held batch takes first (`legacy0`,
+    /// `legacy1`: a batch takes the files in path order, so it never holds the job's files) and one content under two ids,
+    /// `first` and `second` (a job reads its ids in that order), whose prior-art files both hold that content. Nothing is
+    /// started.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func twoIDLaunch(
+        seed: UInt64,
+        time: ManualTimeSource
+    ) async throws -> (harness: EngineHarness, bulk: SteppedBlockingExecutor, first: ManifestEntry, second: ManifestEntry) {
+        let bytes = EngineFixture.bytes(seed)
+        let others = EngineLegacyMigrationTransferTests.catalog(2, seed: seed + 10)
+        let first = EngineFixture.entry("legacy5", bytes)
+        let second = EngineFixture.entry("legacy6", bytes)
+        let (harness, bulk) = try await EngineLegacyMigrationTransferTests.rateLimitedLaunch(others + [(first, bytes), (second, bytes)], time: time)
+        return (harness, bulk, first, second)
+    }
+
+    /// Whether the store holds neither of `ids` present yet.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func nonePresent(_ harness: EngineHarness, _ ids: [AssetID]) async throws -> Bool {
+        let view = try await harness.view()
+        return ids.allSatisfy { view.records[$0]?.referencedBlob == nil }
+    }
+
+    /// Whether the store holds every one of `ids` present at its current content.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func arePresent(_ harness: EngineHarness, _ ids: [AssetID]) async throws -> Bool {
+        let view = try await harness.view()
+        return ids.allSatisfy { view.records[$0]?.referencedBlob != nil && view.records[$0]?.isStale == false }
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-STO-13: a job of two ids schedules the trailing install of its first id's bulk-urgency adoption before it reads the second id, so the readers see the first id once the install window has passed while that read is still held (L5K-R23, KC4-MULTIID)", .timeLimit(.minutes(1)))
+    func earlierAdoptionReachesTheReadersDuringALaterRead() async throws {
+        let time = ManualTimeSource()
+        let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_980, time: time)
+        let engine = harness.engine
+        let (_, migration) = try await EngineLegacyMigrationTransferTests.startHoldingMigration(harness, bulk: bulk)
+        try #require(first.transferID == second.transferID, "premise: one content, one job")
+        let bothPending = try await EngineLegacyMigrationTransferTests.nonePresent(harness, [first.identifier, second.identifier])
+        // A prefetch job of both ids reads `first` first: its adoption's hash unit is held, then let go, so `first` is
+        // adopted at bulk urgency inside the install window (the clock stands still after open's install).
+        let token = try await engine.registerGroup([first.identifier, second.identifier], lane: .prefetch).get()
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let firstHash = Set(await bulk.heldUnits).subtracting(migration)
+        for unit in firstHash {
+            await bulk.release(unit)
+        }
+        // The job's read of `second` then hashes that id's own prior-art file: that unit is held.
+        try await bulk.requireHeldUnits(atLeast: migration.count + 1)
+        let secondHash = Set(await bulk.heldUnits).subtracting(migration)
+        let firstStored = try await EngineLegacyMigrationTransferTests.arePresent(harness, [first.identifier])
+        let unseenAtTheRead = await EngineLegacyMigrationTransferTests.unseen(harness, [first.identifier])
+        let scheduled = await engine.readForTests { $0.state.heap.deadline(for: .store) }
+        let storeDeadline = await harness.store.nextDeadline()
+        // The read of `second` lasts past the install window.
+        time.advance(by: 0.3)
+        try await EngineLegacyMigrationTransferTests.runStoreWork(harness)
+        let unseen = await EngineLegacyMigrationTransferTests.unseen(harness, [first.identifier])
+        let stillHeld = Set(await bulk.heldUnits).isSuperset(of: secondHash)
+
+        #expect(bothPending, "premise: both ids were still to adopt after the start")
+        #expect(firstStored && unseenAtTheRead == [first.identifier], "premise: `first` was adopted at bulk urgency, in a coalesced snapshot only, before the read of `second`")
+        #expect(stillHeld, "premise: the read of `second` was still held when the readers were read")
+        #expect(storeDeadline != nil, "premise: the store reports the trailing install's deadline")
+        if let storeDeadline {
+            #expect(scheduled.map { $0 <= storeDeadline } == true, "L5K-R16: the heap held no store deadline no later than the store's (\(String(describing: scheduled)) for \(storeDeadline)) while the job's read of `second` ran (L5K-C4-01)")
+        }
+        #expect(unseen.isEmpty, "R-STO-13: `first`, adopted at bulk urgency, stayed out of the readers' snapshot past the install window while the job's read of `second` ran (L5K-C4-01)")
+        for unit in secondHash {
+            await bulk.release(unit)
+        }
+        try await EngineLegacyMigrationTransferTests.release(bulk, keeping: migration, on: engine) { engine in
+            engine.state.jobs[first.transferID] == nil
+        }
+        await engine.releaseGroup(token)
+        await EngineLegacyMigrationTransferTests.finishMigration(harness, bulk: bulk)
+        try await EngineLegacyMigrationTransferTests.expectSettled(harness)
+        #expect(await harness.source.starts.isEmpty, "R-STO-11: moved, not downloaded again")
+        await engine.shutdown()
+    }
 }
 
 /// A snapshot sink that, once armed, holds the first install whose snapshot satisfies a predicate (at the await of the
