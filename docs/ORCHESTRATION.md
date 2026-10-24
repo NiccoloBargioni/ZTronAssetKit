@@ -35,7 +35,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - Weekly usage was about 59–60 % at the tag, with the owner's own Fable use counting toward it (the Fable meter was 32 %). The week resets **Thu 29 Oct 04:00 CEST**.
   - `caffeinate` holds the Mac awake until 25 Oct 11:42. Both instances are background tasks of session `d8335845-…`.
 - **Gates at `l5-merged`** (logs `.build-orch/l5k/summary.txt`):
-  - `--quick` gave `VERIFY: PASS` (Model 151, Sync 351, Storage 459, Transport 84, Kit 85, Compatibility 71, AppleHosted 104).
+  - `--quick` gave `VERIFY: PASS` (Transport 151, Sync 351, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104).
   - `--gates-only` gave `VERIFY: PASS` (trace PASS, 1,181 tests with ids; unsafe 0; docs 1281/1281).
   - At the WP-K merge head `23807ac`/`a9e464d`: coverage PASS (Kit 97.83 %, Sync 93.42 %, Storage 97.36 %, overall 96.51 %); release and iOS builds green; simulator **1,305/1,305**; whole-package TSan, 0 reports.
   - `--perf`: 34/35. **P-13 fails** (8.70 ms vs 5 ms; owner ruling pending, ADR-050), so `VERIFY: FAIL (1 failed: benchmarks)`.
@@ -151,7 +151,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - L5K-R27 sends the non-blocking items to Stage 3 or the docs level; L5K-R28 is the docs brief for ADR-055.
 - **Merged:** `wp/k` into `feature/asset-kit` as `23807ac` (`--no-ff`), 24 Oct 05:5x.
   - **Phase-A gates at `23807ac` (logs `.build-orch/l5k/summary.txt`):**
-    - `--quick` gave `VERIFY: PASS` (Model 151, Sync 351, Storage 459, Transport 84, Kit 85, Compatibility 71, AppleHosted 104).
+    - `--quick` gave `VERIFY: PASS` (Transport 151, Sync 351, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104).
     - Coverage: `COVERAGE: PASS` (Kit 97.83 %, Sync 93.42 %, Storage 97.36 %, overall 96.51 %).
     - `--gates-only` gave `VERIFY: PASS`; TRACEABILITY is committed in `7d90719`.
     - The release build completed, and the iOS build exited 0 with no error or warning lines.
@@ -188,7 +188,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Findings files:** `l5-remaining-g.json`, `l5-close1-remaining-g.json`, `l5-close2-remaining-g.json`. Probes are in `l5-probes-r3/`, `l5-probes-c1/` and `l5-probes-c2/`.
 - **Merge:** `wp/g` merged `--no-ff` into `feature/asset-kit` as `3de588e`; `6d1e0cc` regenerated `docs/TRACEABILITY.md`.
 - **Post-merge phase A (orchestrator, `.build-orch`, logs in `.build-orch/l5/summary.txt`):**
-  - `--quick` gave `VERIFY: PASS` (Model 151, Sync 323, Storage 445, Transport 84, Kit 85, Compat 3, AppleHosted 104).
+  - `--quick` gave `VERIFY: PASS` (Transport 151, Sync 323, Storage 445, Model 84, Kit 85, Compat 3, AppleHosted 104).
   - Coverage: `COVERAGE: PASS`, with Kit 97.83 %, Sync 93.54 % and Storage 97.41 %.
   - `--gates-only` gave `VERIFY: PASS`. TRACE now passes: P-1, P-8 and P-12 have benchmarks.
   - The release build completed, and the iOS generic build exited 0 with no error or warning lines.
