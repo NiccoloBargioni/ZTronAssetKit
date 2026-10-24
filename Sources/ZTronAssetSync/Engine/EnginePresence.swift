@@ -175,10 +175,11 @@ extension SyncEngine {
     /// the read adopts the id's prior-art file instead (`storedLocation(of:lane:)`, orchestrator ruling L5K-R1): every job
     /// passes here before any bytes, whatever created it, so no transfer starts for a file migration can still adopt
     /// (R-STO-11). An id of the same content that joins the job during the reads (ADR-020: a prefetch join,
-    /// `ensureAvailable`, a run's later materialisation, a reroute) is read too, round after round until no new id is left
-    /// (orchestrator ruling L5K-R23), so its prior-art file is adopted rather than downloaded. The window between the last
-    /// read and the transfer is the one the 404 path has (a legacy or orphan adoption of the same content; single flight
-    /// rules out any other binding of this content while its job exists).
+    /// `ensureAvailable`, a run's later materialisation, a reroute) is read too, round after round until no new id is left,
+    /// and so is one that joins during the answer site's publication below (orchestrator ruling L5K-R23), so its prior-art
+    /// file is adopted rather than downloaded. The window between the last read and the transfer is the one the 404 path
+    /// has (a legacy or orphan adoption of the same content; single flight rules out any other binding of this content
+    /// while its job exists).
     ///
     /// After each bulk-urgency adoption, before the job's next read, that adoption's trailing install is scheduled: the
     /// store's deadline is re-read into the heap (RE-S40, orchestrator rulings L5K-R16 and L5K-R23), in O(1) while the alarm
@@ -240,8 +241,9 @@ extension SyncEngine {
             // otherwise its interest stays and the transfer downloads content whose prior-art file migration can still
             // adopt (orchestrator ruling L5K-R23; L5K-C4-02). Each id is asked once, so the rounds end.
             next = self.unaskedIDs(of: transfer, epoch: epoch, attempt: attempt, asked: asked)
-        }
-        if !uninstalled.isEmpty, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated {
+            guard next.isEmpty, !uninstalled.isEmpty, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated else {
+                continue
+            }
             // The answer site (orchestrator ruling L5K-R21): a user-initiated asker joined before, during a read or during
             // a re-read of the deadline, and an answered id may be in a coalesced snapshot only. One user-initiated
             // publication installs the whole state before the answer below, which follows it synchronously. It is made
@@ -251,7 +253,8 @@ extension SyncEngine {
             for id in uninstalled.reversed() {
                 do {
                     // REENTRANCY: k-4 (proposed) — the lifecycle, the job epoch and the attempt, re-checked below as f-11
-                    // says; a promotion during this await finds the snapshot it installs, which holds every answered id
+                    // says; the ids the job gained meanwhile are read next (`unaskedIDs`), and the check is made again after
+                    // them; a promotion during this await finds the snapshot it installs, which holds every answered id
                     // still present (bound before it); a `nil` answer installed nothing, so the next id is tried.
                     if try await self.store.adoptLegacyNow(id, urgency: .userInitiated) != nil {
                         break
@@ -261,6 +264,11 @@ extension SyncEngine {
                     break
                 }
             }
+            // That install holds every id answered so far (a whole-state snapshot). An id that joined the job during it is
+            // asked too, and the check is made again after its read, so the last check still follows the last ordinary
+            // await (orchestrator rulings L5K-R21 and L5K-R23).
+            uninstalled.removeAll()
+            next = self.unaskedIDs(of: transfer, epoch: epoch, attempt: attempt, asked: asked)
         }
         guard !present.isEmpty, self.isRunning, let current = self.state.jobs[transfer], current.epoch == epoch,
               let active = current.active, active.attempt == attempt, active.handle == nil
