@@ -1552,6 +1552,10 @@ extension EngineLegacyMigrationTransferTests {
         let secondHash = Set(await bulk.heldUnits).subtracting(migration)
         let firstStored = try await EngineLegacyMigrationTransferTests.arePresent(harness, [first.identifier])
         let unseenAtTheRead = await EngineLegacyMigrationTransferTests.unseen(harness, [first.identifier])
+        // The heap is read once no alarm turn runs the store's due work (the adoption's commit is due at once): such a turn
+        // takes the store's entry off the heap before its `runDueWork()`, whose report puts the next deadline back (L5K-R2
+        // pattern (a)).
+        await engine.awaitCondition { $0.state.storeWorkRuns == 0 }
         let scheduled = await engine.readForTests { $0.state.heap.deadline(for: .store) }
         let storeDeadline = await harness.store.nextDeadline()
         // The read of `second` lasts past the install window.
