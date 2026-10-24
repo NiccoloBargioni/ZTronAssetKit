@@ -1199,11 +1199,13 @@ source, any WP-B file, `EngineHarness.swift` (the held-sink launch is built in t
   durable commit, the tree's removal) followed its publication.
 - **The fix: option (b) of L5K-C3-01 where it applies.** A batch that leaves files to process (queued, or claimed by an
   adopt-on-demand) publishes at `.bulk` and, when that left the trailing install due (`installDue` after the
-  publication: the window was closed), returns right after it with `remaining > 0` and `finished == false`; the engine's
-  loop re-arms (RE-S40) and calls again, and that call, which published nothing, waits for the adopt-on-demand (L5K-R17)
-  or goes on. A publication that installed at once (the window was open) leaves nothing to schedule, and the call goes on
-  as one that published nothing; the store tests' install interval of 0 is that case, so no pre-existing store test
-  changes. No hot loop: every early return follows a batch that adopted at least one file, and the call after it waits.
+  publication: the window was closed, or an adopt-on-demand published during the batch's install; what is left is read
+  after the publication returned, the cycle-5 correction below), returns right after it with `remaining > 0` and
+  `finished == false`; the engine's loop re-arms (RE-S40) and calls again, and that call, which published nothing, waits
+  for the adopt-on-demand (L5K-R17) or goes on. A publication that installed at once (the window was open) leaves nothing
+  to schedule, and the call goes on as one that published nothing; the store tests' install interval of 0 is that case, so
+  no pre-existing store test changes. No hot loop: every early return follows a batch that adopted at least one file, and
+  the call after it waits.
 - **Decision: the last batch installs at once (option (a) for that batch only).** With nothing left after the batch,
   option (b)'s premise (`remaining > 0`) does not hold: the call would return `remaining == 0 && !finished`, the engine's
   signal to back off to the next maintenance window when phase 3's check or phase 4 could not complete (RE-S29;
@@ -1633,6 +1635,67 @@ Findings `.build-orchestrator/l5k-close4-remaining-k.json` (`L5K-C4-nn`); ruling
   join during the reads, and of the answer site's fallback (one more `adoptLegacyNow` per answered id, only when an id is
   gone); none measured (no benchmark, L5K-R11). The lag L5K-R24 keeps at the other answer sites was shown by the cycle-4
   verifiers' probes on macOS 27 only; its size on a device was not measured.
+
+## Evidence (close-out cycle 5; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
+- **Failing first (L5K-R23 (1), FIXLAST).** On `168882a` (`f4f8fbd`'s code plus the tests): the store test `✘ Test run
+  with 1 test in 1 suite failed after 0.015 seconds with 5 issues.` (progress `LegacyMigrationProgress(adopted: 13,
+  remaining: 0, dropped: 0, finished: false)`, the phase, `!installDue`, `unseen.isEmpty`); the engine test `✘ Test run
+  with 1 test in 1 suite failed after 0.009 seconds with 1 issue.` (`pending true, deferred true`); every premise holding.
+  With `a3a0f35`: `LegacyOnDemandRaceTests` 14/14, the engine file and `EngineRecoveryTests` 30/30.
+- **Failing first (L5K-R23 (2), PERREAD).** On `4510680`: `✘ Test run with 1 test in 1 suite failed after 0.011 seconds
+  with 2 issues.` (`nil for 1000000000ns`; `unseen → [legacy5]`). With the fix in the tree the test's heap read once met
+  the alarm's store work (`nil for 1100000000ns`, the readers' assertion passing), so `ce7b5c8` makes it wait; on the
+  unfixed engine it still fails on both counts (`… failed after 0.011 seconds with 2 issues.`). With `5a56908`: the engine
+  file and `EngineModelTests` 26/26, 3 of 3.
+- **Failing first (L5K-R23 (3)).** On `e54bdfc`: `✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 2
+  issues.` (both variants, `["media/legacy5.png"]`). With `8137ad8`: 27/27, 3 of 3. The answer site's await: on `7dce25f`
+  2 of 2 runs `✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 1 issue.` (0.019 s the second time;
+  `["media/legacy5.png"]`, every premise holding); with `58d8f56` the engine file 28/28, 3 of 3, and Sync 351/351.
+- **Failing first (L5K-R25, the guard).** On `7775919`: `✘ Test run with 1 test in 1 suite failed after 0.010 seconds with 1
+  issue.` (`["media/legacy5.png"], 1 requests`). With `3d9c7c1`, and with the fallback `a66c533`: Sync 350/350.
+- **Mutant M8** (L5K-C4-12; applied in the worktree, run, reverted before any commit): `closeWhileTheBatchWaits` recorded
+  `Time limit was exceeded: 60.000 seconds` and the poll's cancellation issue, `✘ Test run with 2 tests in 1 suite failed
+  after 63.993 seconds with 2 issues.`, and the process exited after 68 s; `closeResumesAWaitingAsker` passed.
+- **A test that hung while it was written.** The answer-site test's first version served a manifest, `ensureAvailable`
+  applied it, and the apply's install met the sink's hold first; every wait ended at the time limit (`Time limit was
+  exceeded: 60.000 seconds`, 64 s) and the run exited. Temporary prints located it (removed before any commit); the test
+  answers manifests "not modified", as `gatedLaunch` does.
+- Every run below used `58d8f56`'s sources: HEAD was `58d8f56`, then `cd2ac44`, which changed only this draft and
+  MIGRATION.md (committed during the third Storage run).
+- `SWIFTPM_SCRATCH=.build-k bash Scripts/verify.sh --quick`: `VERIFY: PASS`, exit status 0, my own log (Model
+  151, Sync 351, Storage 459, Transport 84, Kit 85, Compatibility 71, AppleHosted 104 tests, every bundle passing).
+- **Runs ×3** (debug; 1-minute load 20.0 to 33.5 at the runs' ends): `ZTronAssetStorageTests` `✔ Test run with
+  459 tests in 60 suites passed` ×3 (101.5, 78.3 and 82.6 s), `ZTronAssetSyncTests` 351/351 ×3, `ZTronAssetKitTests` 85/85
+  ×3, `ZTronAssetCompatibilityTests` `✔ Test run with 71 tests in 10 suites passed` ×3 (and once more each in `--quick` and
+  in the coverage run).
+- **TSan** (`--sanitize=thread`, `.build-k-tsan`): Compatibility `✔ Test run with 71 tests in 10 suites passed after 1.587
+  seconds.`; Sync `✔ Test run with 351 tests in 52 suites passed after 31.320 seconds.`; Storage `✔ Test run with 459
+  tests in 60 suites passed after 261.118 seconds.` (load 31 at its end). No ThreadSanitizer report in any of the three
+  logs.
+- **Release build** (`swift build -c release --scratch-path .build-k -Xswiftc -warnings-as-errors`): `Build complete!`.
+- **Gates.** `gates.py unsafe`: `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `gates.py docs`: `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%`, `DOCS: PASS`. Every `await` cycle 5 added or changed in
+  `Sources/` carries a `// REENTRANCY:` line (a script over the diff from `f4f8fbd`: 4 awaits, 0 missing). No `--gates-only`
+  or `--full` run, so `docs/TRACEABILITY.md` was not touched.
+- **Coverage** (`swift test --scratch-path .build-k --enable-code-coverage --skip Benchmarks`, the merged export over the
+  eight test bundles, `gates.py coverage`): AppleHosted 99.76 %, Kit 97.83 % (1444/1476), Model 99.31 %, Storage 97.36 %
+  (8116/8336), Sync 93.49 % (8619/9219), Transport 99.08 %, `COVERAGE overall lines=96.54% (25127/26027)`, device-only share
+  0.68 %, `COVERAGE: PASS`. The shims in the compatibility bundle: 98.18 % (538/548), unchanged. Both branches of FIXLAST
+  and the guard in `drive` run (the guard 51 times in the Sync bundle). Lines cycle 5 added that no test runs: the answer
+  site's `catch` (an adoption that throws there, the store closing; `try?` hid the same case before), beside
+  `storedLocation`'s catch (uncovered before too); the fallback's second iteration is unpinned ("L5K-R25").
+- **iOS.** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-k/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0, only the informational `IDERunDestination` line.
+- **iOS Simulator** (iPhone 18 Pro `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, the task's command under
+  `caffeinate -i`): `** TEST SUCCEEDED **`; `xcresulttool … summary`: `result:
+  Passed`, 1,305 tests, 1,305 passed, 0 failed, 0 skipped, 0 expected failures
+  (`Test-ZTronAssetKit-2026.10.24_04-27-22-+0200.xcresult`). The simulator is shut down.
+- **No benchmark** was run (L5K-R11, L5K-R26).
+- **Writes.** Nothing outside the repository except the simulator's device container (ADR-051). `TMPDIR`, the module cache
+  and `LLVM_PROFILE_FILE` under `.build-k/tmp`, logs under `.build-k/c5`, derived data under `.build-k/xcode*`; the
+  mutant M8 and the temporary prints were removed before any commit; `python3 -B`, so no `Scripts/__pycache__`. One
+  `git stash push` of my own uncommitted fix (to run the adjusted PERREAD test on the unfixed engine), popped right after
+  by its index; the owner's stash was not touched.
 
 ## Evidence (close-out cycle 4; macOS 27, Xcode 27.0, Swift 6.4; scratch `.build-k`, `.build-k-tsan`)
 - **Failing first (L5K-R20).** On `a8eadc8` (`9c53e06`'s code plus the tests): the engine tests `✘ Test run with 2 tests
