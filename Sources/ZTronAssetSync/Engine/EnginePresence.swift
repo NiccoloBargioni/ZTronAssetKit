@@ -174,8 +174,11 @@ extension SyncEngine {
     /// downloaded twice. One O(1) read per id of the job, never a planning view (C2). While legacy migration is pending,
     /// the read adopts the id's prior-art file instead (`storedLocation(of:lane:)`, orchestrator ruling L5K-R1): every job
     /// passes here before any bytes, whatever created it, so no transfer starts for a file migration can still adopt
-    /// (R-STO-11). The window between the last read and the transfer is the one the 404 path has (a legacy or orphan
-    /// adoption of the same content; single flight rules out any other binding of this content while its job exists).
+    /// (R-STO-11). An id of the same content that joins the job during the reads (ADR-020: a prefetch join,
+    /// `ensureAvailable`, a run's later materialisation, a reroute) is read too, round after round until no new id is left
+    /// (orchestrator ruling L5K-R23), so its prior-art file is adopted rather than downloaded. The window between the last
+    /// read and the transfer is the one the 404 path has (a legacy or orphan adoption of the same content; single flight
+    /// rules out any other binding of this content while its job exists).
     ///
     /// After each bulk-urgency adoption, before the job's next read, that adoption's trailing install is scheduled: the
     /// store's deadline is re-read into the heap (RE-S40, orchestrator rulings L5K-R16 and L5K-R23), in O(1) while the alarm
@@ -198,32 +201,44 @@ extension SyncEngine {
         // The last id answered by a read that installed nothing at once, unless a later user-initiated adoption installed
         // the whole state after it.
         var uninstalled: AssetID?
-        for id in job.assets.sorted() where self.state.applied.entry(for: id)?.transferID == transfer {
-            // The job's lane as of this read (a promotion during an earlier read raised it): only a user-initiated job's
-            // adoption installs its snapshot at once (L5K-R14).
-            let lane = self.state.jobs[transfer]?.lane ?? job.lane
-            // REENTRANCY: f-11 (proposed), k-4 (proposed) — the lifecycle, the job epoch and the attempt (still without a
-            // handle), re-checked after the reads; the interests answered are those the job holds then, checked for a
-            // user-initiated one after the last ordinary await (L5K-R21); the bindings are recorded only when nothing was
-            // forgotten during the reads (an adoption here is such a binding).
-            let read = await self.storedLocation(of: id, lane: lane)
-            if read.location != nil, read.urgency == .userInitiated {
-                // A user-initiated adoption installed the whole state at once, the earlier answers included.
-                uninstalled = nil
-            }
-            if let location = read.location, !location.isStale {
-                present.insert(id)
-                if read.urgency != .userInitiated {
-                    uninstalled = id
+        // Every id asked so far: an id the job gains during the reads is asked once too (orchestrator ruling L5K-R23).
+        var asked: Set<AssetID> = []
+        var next = job.assets.filter { self.state.applied.entry(for: $0)?.transferID == transfer }.sorted()
+        while !next.isEmpty {
+            for id in next {
+                asked.insert(id)
+                // The job's lane as of this read (a promotion during an earlier read raised it): only a user-initiated
+                // job's adoption installs its snapshot at once (L5K-R14).
+                let lane = self.state.jobs[transfer]?.lane ?? job.lane
+                // REENTRANCY: f-11 (proposed), k-4 (proposed) — the lifecycle, the job epoch and the attempt (still without
+                // a handle), re-checked after the reads; the ids the job gained meanwhile are read too (`unaskedIDs`); the
+                // interests answered are those the job holds then, checked for a user-initiated one after the last ordinary
+                // await (L5K-R21); the bindings are recorded only when nothing was forgotten during the reads (an adoption
+                // here is such a binding).
+                let read = await self.storedLocation(of: id, lane: lane)
+                if read.location != nil, read.urgency == .userInitiated {
+                    // A user-initiated adoption installed the whole state at once, the earlier answers included.
+                    uninstalled = nil
+                }
+                if let location = read.location, !location.isStale {
+                    present.insert(id)
+                    if read.urgency != .userInitiated {
+                        uninstalled = id
+                    }
+                }
+                if read.urgency == .bulk {
+                    // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline,
+                    // so the trailing install this bulk-urgency adoption left due runs on the alarm while the job's later
+                    // reads run (L5K-R16; orchestrator ruling L5K-R23). The job's interests are checked after the last of
+                    // these awaits, below, and the rest as f-11 says.
+                    await self.refreshStoreDeadlineAfterPublish()
                 }
             }
-            if read.urgency == .bulk {
-                // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline, so
-                // the trailing install this bulk-urgency adoption left due runs on the alarm while the job's later reads run
-                // (L5K-R16; orchestrator ruling L5K-R23). The job's interests are checked after the last of these awaits,
-                // below, and the rest as f-11 says.
-                await self.refreshStoreDeadlineAfterPublish()
-            }
+            // An id of this content that joined the job during the reads (a prefetch join, `ensureAvailable`, a run's later
+            // materialisation, a reroute) is asked before the answer too, round after round until no new id is left:
+            // otherwise its interest stays and the transfer downloads content whose prior-art file migration can still
+            // adopt (orchestrator ruling L5K-R23; L5K-C4-02). Each id is asked once, so the rounds end.
+            next = self.unaskedIDs(of: transfer, epoch: epoch, attempt: attempt, asked: asked)
         }
         if let id = uninstalled, self.isRunning, self.state.jobs[transfer]?.lane == .userInitiated {
             // The answer site (orchestrator ruling L5K-R21): a user-initiated asker joined before, during a read or during
@@ -250,6 +265,16 @@ extension SyncEngine {
         self.pump()
         self.reconcileIdle()
         return true
+    }
+
+    /// The ids `transfer`'s job holds that the engine's copy maps to this content and `answeredFromStore`'s reads have not
+    /// asked (`asked`): those the job gained during the reads, sorted. None once the engine stopped or the job's epoch or
+    /// attempt moved on, since that attempt is not answered from the store anyway (the final check after the reads).
+    private func unaskedIDs(of transfer: TransferID, epoch: UInt64, attempt: TransferAttempt, asked: Set<AssetID>) -> [AssetID] {
+        guard self.isRunning, let job = self.state.jobs[transfer], job.epoch == epoch, job.active?.attempt == attempt else {
+            return []
+        }
+        return job.assets.filter { !asked.contains($0) && self.state.applied.entry(for: $0)?.transferID == transfer }.sorted()
     }
 
     /// What the pre-transfer read gets from the store for `id` (L5K-R1, CCR-K1), with the urgency of the adoption that
