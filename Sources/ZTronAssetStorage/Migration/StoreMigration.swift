@@ -32,8 +32,10 @@ extension AssetStore {
     /// left the trailing install due returns right after it while files remain once that publication returned, so the
     /// caller can schedule that install before it calls again; otherwise, and for the last batch, it installs at once
     /// (orchestrator rulings L5K-R20, L5K-R23). With the queue empty and every claimed file held by an
-    /// adopt-on-demand, the call waits for those adoptions and finishes the migration itself, never returning with
-    /// nothing done (L5K-R17).
+    /// adopt-on-demand, the call waits for those adoptions instead of returning at once and, once no file is left,
+    /// finishes the migration itself; when an adoption it waited for ends without an outcome for the file (its caller
+    /// was cancelled, or a transient failure deferred the file), the file is back in the queue and the call returns,
+    /// with `remaining > 0`, for the next call to process it (L5K-R17).
     ///
     /// Progress is cumulative over the lifetime; `finished` once the tree and the key are gone (also when there was
     /// nothing to migrate). A call may end with nothing remaining and `finished` still false, when phase 4 could not
