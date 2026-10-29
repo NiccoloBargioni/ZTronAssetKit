@@ -155,22 +155,22 @@ extension AssetStore {
         guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
             return result
         }
-        var queue = self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted()[...]
+        // A cursor over the sorted keys: the keys a time-bounded unit did not attempt stay in place and lead the next
+        // batch, so the run is linear in the keys (S3-PERF-04).
+        var queue = ReapQueue(self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted())
         let batchSize = max(1, self.configuration.deletionBatchSize)
         let fileSystem = self.environment.fileSystem
         let time = self.environment.time
         var budget = maxKeys
         while !queue.isEmpty, budget > 0, self.state.core.phase == .open {
-            var batch: [BlobKey] = []
-            while let key = queue.first, batch.count < min(batchSize, budget) {
-                queue.removeFirst()
+            let batch = queue.nextBatch(limit: min(batchSize, budget)) { key in
                 // Re-validated per key: the state may have changed during the previous unit.
                 guard self.deletionBlocker(key) == .none, case .doomed(let info)? = self.state.core.blobTable[key] else {
-                    continue
+                    return false
                 }
                 self.state.core.deletingDooms[key] = info
                 self.state.core.blobTable[key] = .deleting
-                batch.append(key)
+                return true
             }
             guard !batch.isEmpty else {
                 break
@@ -186,11 +186,10 @@ extension AssetStore {
             for (position, key) in batch.enumerated() {
                 let info = self.state.core.deletingDooms.removeValue(forKey: key)
                 if position >= outcome.attempted {
-                    // Not attempted: back to doomed as it was, first in line for the next unit.
+                    // Not attempted: back to doomed as it was; it stays first in line for the next unit (`consume`).
                     if let info {
                         self.state.core.blobTable[key] = .doomed(info)
                     }
-                    queue.insert(key, at: queue.startIndex + (position - outcome.attempted))
                 } else if outcome.failures[key] != nil, var doom = info {
                     doom.failedUnlinks += 1
                     doom.eligibleAt = uptime.adding(seconds: AssetStore.unlinkBackoff(afterFailures: doom.failedUnlinks))
@@ -202,6 +201,7 @@ extension AssetStore {
                 }
                 self.resumeKeyWaiters(key)
             }
+            queue.consume(attempted: outcome.attempted)
             budget -= outcome.attempted
             // The processed keys leave DOOMED with the next commit (a lazy mutation).
             self.markDirtyInternal(.lazy)

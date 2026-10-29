@@ -238,6 +238,55 @@ struct DeletionUnitTests {
         let removed = fake.operations.filter { $0.kind == .removeItem && $0.url.path.contains("/blobs/") }.map(\.url)
         #expect(removed == payloads.map { CoreFixture.layout.blobURL(CoreFixture.key($0)) }.sorted { $0.lastPathComponent < $1.lastPathComponent })
     }
+
+    /// Stage 3 S3-PERF-04: the reaper's queue is read through a cursor, so the keys a time-bounded unit did not attempt
+    /// stay in place instead of being put back at the front of the remaining queue (one shift of the whole queue per
+    /// key). Pinned structurally: the reads per key are the same at every size, at most about `batch / attempted` (here
+    /// 64 / 20, as a 1 ms unit on the reference volume), and every key is consumed exactly once, in sorted order, the
+    /// unattempted ones first in the next batch.
+    @Test("P-13: the reaper reads each doomed key a bounded number of times whatever the size of the set, so a reclaim in time-bounded units is linear")
+    func reapQueueIsLinear() {
+        var readsPerKey: [Int: Double] = [:]
+        for count in [1_000, 10_000, 40_000] {
+            let keys = (0..<count).map { BlobKey(hash: ContentHash.sha256(of: Data("reap-\($0)".utf8)), ext: AssetFileExtension("png")!) }.sorted()
+            var queue = ReapQueue(keys)
+            var consumed: [BlobKey] = []
+            var units = 0
+            while !queue.isEmpty {
+                let batch = queue.nextBatch(limit: 64) { _ in true }
+                let attempted = min(20, batch.count)
+                if let first = batch.first, units > 0 {
+                    #expect(first == keys[consumed.count], "the first key the last unit left is first in line")
+                }
+                consumed += batch.prefix(attempted)
+                queue.consume(attempted: attempted)
+                units += 1
+            }
+            #expect(consumed == keys, "every key exactly once, in sorted order")
+            #expect(units == (count + 19) / 20)
+            readsPerKey[count] = Double(queue.reads) / Double(count)
+        }
+        // 64 / 20 = 3.2 reads per key, a little less for the short windows of the last units.
+        #expect(readsPerKey.values.allSatisfy { $0 > 3.1 && $0 <= 64.0 / 20.0 }, "reads per key do not depend on the size: \(readsPerKey)")
+    }
+
+    @Test("P-13: a key the reaper's re-validation refuses is passed over, and the keys before the first unattempted one are consumed")
+    func reapQueuePassesOverRefusedKeys() {
+        let keys = (0..<10).map { BlobKey(hash: ContentHash.sha256(of: Data("refuse-\($0)".utf8)), ext: AssetFileExtension("png")!) }.sorted()
+        let refused = Set([keys[1], keys[6]])
+        var queue = ReapQueue(keys)
+        let first = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(first == [keys[0], keys[2], keys[3], keys[4]])
+        queue.consume(attempted: 2)
+        let second = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(second == [keys[3], keys[4], keys[5], keys[7]], "the unattempted keys lead, unchanged")
+        queue.consume(attempted: 4)
+        let third = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(third == [keys[8], keys[9]])
+        queue.consume(attempted: 2)
+        #expect(queue.isEmpty && queue.nextBatch(limit: 4) { _ in true }.isEmpty)
+        #expect(queue.reads == 5 + 5 + 2, "each window's reads, refused keys included, and nothing for an empty queue")
+    }
 }
 
 /// A clock whose monotonic reads advance 1 ms each while stepping (a slow volume, seen from inside a unit).
