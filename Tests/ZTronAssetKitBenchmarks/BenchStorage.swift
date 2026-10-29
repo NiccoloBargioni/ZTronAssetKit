@@ -256,7 +256,11 @@ extension ZTronAssetKitBenchmarks {
         /// volume's own cost is linear. Before the fix each unit put its 44 unattempted keys back at the front of the
         /// remaining queue, one shift of the whole queue per key, and a doubled set cost about three times as much.
         /// SPEC §6 has no budget for the reaper's scaling, so the ratio is judged against P-4's `doubling_ratio_max`
-        /// (the planner's linearity bound), the 20-key-batch control (nothing left unattempted) printed beside it.
+        /// (the planner's linearity bound). A ratio of two runs is noise-prone on a loaded host (one run of the old
+        /// reaper passed at 1.996), so the reclaim is also judged against the 20-key-batch control at the same size, run
+        /// interleaved with it (nothing left unattempted, the same keys and volume): the fixed reaper costs about what the
+        /// control costs (0.98–1.04×), the old one 2.5–3.3× (close-out cycle 2). The bound for that comparison, 1.5×, is
+        /// this benchmark's own; the deterministic pin is `DeletionUnitTests.reaperWorkListIsLinear`.
         @Test(
             "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much",
             .timeLimit(.minutes(3))
@@ -265,22 +269,32 @@ extension ZTronAssetKitBenchmarks {
         func reapScaling() async throws {
             let ratioMax = try #require(try QualityBudgets().value("P-4", "doubling_ratio_max"))
             _ = try await ReapScalingBench.reapSeconds(count: 1_000)
+            let controlRatioMax = 1.5
             // Best of three runs per size: interference only ever slows a run down (ADR draft B-9's rule for throughput).
+            // At 20,000 and 40,000 each run is followed by its control run, so load hits both alike.
             var seconds: [Int: Double] = [:]
+            var control: [Int: Double] = [:]
             for count in [10_000, 20_000, 40_000] {
                 var runs: [Double] = []
+                var controls: [Double] = []
                 for _ in 0..<3 {
                     runs.append(try await ReapScalingBench.reapSeconds(count: count))
+                    if count >= 20_000 {
+                        controls.append(try await ReapScalingBench.reapSeconds(count: count, batchSize: 20))
+                    }
                 }
                 seconds[count] = runs.min()
+                control[count] = controls.min()
             }
             let ratio = try #require(seconds[40_000]) / max(try #require(seconds[20_000]), 1e-9)
-            let control20k = try await ReapScalingBench.reapSeconds(count: 20_000, batchSize: 20)
-            let control40k = try await ReapScalingBench.reapSeconds(count: 40_000, batchSize: 20)
+            let control20k = try #require(control[20_000])
+            let control40k = try #require(control[40_000])
+            let againstControl = try #require(seconds[40_000]) / max(control40k, 1e-9)
             print(
-                "P-13 reap scaling (wall seconds of runDueWork, 20 of 64 keys per unit): \(seconds.sorted { $0.key < $1.key }); 40,000 / 20,000 = \(ratio) (max \(ratioMax)); control with 20-key batches: 20,000 \(control20k) s, 40,000 \(control40k) s, ratio \(control40k / max(control20k, 1e-9))"
+                "P-13 reap scaling (wall seconds of runDueWork, 20 of 64 keys per unit): \(seconds.sorted { $0.key < $1.key }); 40,000 / 20,000 = \(ratio) (max \(ratioMax)); control with 20-key batches: 20,000 \(control20k) s, 40,000 \(control40k) s, ratio \(control40k / max(control20k, 1e-9)); 40,000 against its control = \(againstControl) (max \(controlRatioMax))"
             )
             #expect(ratio <= ratioMax, "reclaim of a doubled set: \(ratio)×")
+            #expect(againstControl <= controlRatioMax, "reclaim of 40,000 against the same reclaim with nothing left unattempted: \(againstControl)×")
         }
 
         /// Stage 3 S3-B-016 (L4-R24(6)): `gainReferenceInPlace` writes one blob-table entry through
