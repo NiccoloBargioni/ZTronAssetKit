@@ -168,9 +168,11 @@ extension EngineRegressionTests {
     /// A run over a 100,000-entry plan turns its fetches into jobs a pipeline at a time: at every notification of every
     /// turn the engine holds at most `pipelineDepth × maxConcurrentTransfers + runLookahead` jobs (sync-1 S1-15's run
     /// form, §7.3; the `ensureAvailable` form is `ensureMaterialisesInBatches`). The transfers wait unanswered, so the
-    /// run never drains its plan; it ends at shutdown.
+    /// run never drains its plan; it ends at shutdown. Hang guard (S3-R4): the 100,000-entry manifest is encoded, decoded,
+    /// planned and applied in a debug build, 5.7 to 6.4 s alone, and took 59.9 s of its 60 s under TSan in the whole Sync
+    /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(1)))
+    @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(3)))
     func runMaterialisesAPipelineAtATime() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0, pipelineDepth: 2, runLookahead: 4)
         let bound = tuning.pipelineDepth * tuning.maxConcurrentTransfers + tuning.runLookahead
