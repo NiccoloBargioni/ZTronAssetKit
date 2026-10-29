@@ -28,6 +28,45 @@ struct StoreApplyTests {
         #expect(try await harness.store.planningView().records[entry.identifier]?.revision == 1)
     }
 
+    /// S3-CONF-06 (Stage 3): when an apply changes an asset's checksum to bytes another asset already holds,
+    /// `adoptKnownBlob` binds the record to that live blob, and its release of the record's previous blob is the only
+    /// thing that ever schedules that blob for pruning; no test reached it before.
+    @Test(
+        "R-CLN-1: a content change onto bytes another asset holds adopts them without a download and prunes the old blob after grace",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func contentChangeOntoLiveBlob() async throws {
+        let harness = CoreHarness.make()
+        let x = CoreFixture.bytes(4_601, count: 400)
+        let y = CoreFixture.bytes(4_602, count: 380)
+        let v1 = [CoreFixture.entry("a", x), CoreFixture.entry("z", y)]
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest(v1, etagSeed: "v1"), etag: nil, eviction: nil)
+        try await harness.publish(x, [v1[0]], sequence: 1)
+        try await harness.publish(y, [v1[1]], sequence: 2)
+        try await harness.store.flush(.durable)
+        let oldKey = CoreFixture.key(x)
+        let sharedKey = CoreFixture.key(y)
+        let v2 = [CoreFixture.entry("a", y), CoreFixture.entry("z", y)]
+        _ = try await harness.store.apply(CoreFixture.manifest(v2, etagSeed: "v2"), etag: nil, eviction: nil)
+        // Adopted from the live blob: present, not stale, serving y, with nothing downloaded.
+        let location = try #require(await harness.store.location(for: "a", extensions: [], recordingAccess: false))
+        #expect(!location.isStale && location.url == harness.layout.blobURL(sharedKey) && harness.content(location.url) == y)
+        #expect(await harness.state.core.blobTable[sharedKey] == .live(references: 2))
+        // The old blob is released to the reaper: doomed `unreferenced`, still on disk until the grace passed (I-3).
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[oldKey], .unreferenced), "a's old blob was never released")
+        #expect(harness.exists(harness.layout.blobURL(oldKey)), "no blob is unlinked before the grace")
+        await harness.reapAfterGrace()
+        try await harness.store.flush(.durable)
+        #expect(!harness.exists(harness.layout.blobURL(oldKey)), "the blob no record references any more is never reaped")
+        let oldState = await harness.state.core.blobTable[oldKey]
+        #expect(oldState == nil, "the old blob is still \(String(describing: oldState))")
+        #expect(harness.content(harness.layout.blobURL(sharedKey)) == y)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+        await harness.store.close()
+    }
+
     @Test("R-CLN-1: prune keeps a blob still referenced by another identifier", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pruneKeepsSharedBlob() async throws {
