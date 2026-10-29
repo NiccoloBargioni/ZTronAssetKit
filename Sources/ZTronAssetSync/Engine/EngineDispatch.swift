@@ -741,7 +741,8 @@ extension SyncEngine {
             return
         }
         // REENTRANCY: f-11 (proposed) — the callee re-validates the lifecycle, the job epoch and the attempt after its
-        // reads; an attempt it did not end goes on below, which re-validates them after `remote.transfer`.
+        // reads; an attempt it did not end goes on below, which re-checks the lifecycle, the job epoch and the attempt
+        // before `remote.transfer` (L5K-R25: no request for an attempt retired during the reads) and again after it.
         if await self.answeredFromStore(transfer, epoch: epoch, attempt: request.attempt) {
             return
         }

@@ -360,8 +360,10 @@ extension SyncEngine {
         self.reconcileIdle()
     }
 
-    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 1 µs in
-    /// release (the member's transfer, the job's retirement), so the turn stays near 1 ms at SPEC §6's 10,000 (C2).
+    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 8 to 9 µs in
+    /// release (the member's transfer, the job's retirement with its queue entry and indexes), so a turn of 512 stays
+    /// near 4 to 5 ms at SPEC §6's 10,000, under C2's 10 ms (re-measured in Stage 3, S3-B-084: `handleReleaseTurns`'s
+    /// longest actor wait 4.1 to 4.8 ms; WP-G's probe 4.3 to 4.6 ms per 512-member turn).
     static let releasesPerTurn = 512
 
     /// Removes released groups' pending claims and then their interests, in token order and each group's member and
