@@ -272,6 +272,28 @@ extension ZTronAssetKitBenchmarks {
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
+        /// C2 at SPEC §6's reference scale when a sync's manifest changes the content of every member of a waiting
+        /// 10,000-member prefetch group (a catalog re-encode under `AssetClient.prefetch` of the catalog; the close-out
+        /// cycle-1 verifier's PROBE-V9): the follow after the apply supersedes every member's job, re-routes its interest
+        /// and creates a job for its new content. In one turn that held the actor 125 to 145 ms (S3F-5's residual,
+        /// S3-R5). Production's dispatch executors. Medians of three against P-9, the best of the three against C2, after
+        /// a warm-up.
+        @Test("R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func changedRefreshTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.changedRefreshWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.changedRefreshWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
+
         /// C2 at SPEC §6's reference scale for a sync whose manifest drops 10,000 ids while a subscriber reads nothing
         /// (Stage 3, S3-B-078): `applied()` announces every prune in the apply's turn, one queue slot per id. The turn was
         /// estimated, not measured (about 3.5 ms at 10,000). Medians of three against P-9, the best against C2, after a
@@ -1621,6 +1643,38 @@ extension SyncBench {
             }
         }
         await engine.shutdown()
+        return wait
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// The heartbeat's longest wait while a forced sync applies a manifest that changes the content of every member of a
+    /// waiting prefetch group of `count` on-demand entries; every invariant must hold afterwards.
+    static func changedRefreshWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.dispatchBench(members: count)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let changed = bench.entries.enumerated().map { index, entry in
+            SyncBench.entry(entry.identifier.rawValue, GeneratedPayload.bytes(seed: 0x77_000 + UInt64(index), offset: 0, length: bench.size), policy: .onDemand)
+        }
+        await bench.source.scriptManifest([.fetched(SyncBench.manifestData(changed), etag: ETag(rawValue: "\"v2\""))])
+        let wait = try await SyncBench.longestWait(on: engine) {
+            guard await engine.sync(.force).isComplete else {
+                throw SyncBenchError.incomplete("the refresh did not complete")
+            }
+        }
+        let violations = await engine.invariantViolations()
+        await engine.shutdown()
+        guard violations.isEmpty else {
+            throw SyncBenchError.incomplete("invariants: \(violations.prefix(3))")
+        }
         return wait
     }
 }
