@@ -148,6 +148,12 @@ enum ManifestRules {
     /// `\` and by percent-encoded slashes and backslashes (`%2F`, `%5C`), and a dot may be percent-encoded (`%2E`),
     /// since any of these may be decoded or normalised on the way (ADR draft A-4.7). A `?` or `#` anywhere is
     /// `queryOrFragment` (orchestrator decision 3, fix round 3): the transport would reject the path on every fetch.
+    ///
+    /// The same holds for the segments the transport's join (`RemoteURL.make`, ADR draft D-6) refuses, so they are
+    /// `parentSegment` too (Stage 3, S3AH-1): a `\` anywhere, and a `/`-separated segment that is empty (`a//b`, a
+    /// trailing `/`) or `.` (also `%2E`). Leading slashes that `absolute` or `authority` already reports are not
+    /// counted again. `RemotePathViolation` has no case of its own for these: adding one is a contract change, so
+    /// `parentSegment`, the rule for segments that do not name a child of the path before them, carries them.
     static func remotePathViolations(utf8: UnsafeRawBufferPointer, limits: ManifestLimits) -> [RemotePathViolation] {
         var result: [RemotePathViolation] = []
         ManifestRules.visitRemotePathViolations(utf8: utf8, limits: limits) {
@@ -204,21 +210,28 @@ enum ManifestRules {
             return
         }
         let hierarchyStart = schemeEnd.map { $0 + 1 } ?? 0
-        if hierarchyStart + 1 < count, utf8[hierarchyStart] == slash, utf8[hierarchyStart + 1] == slash, !visit(.authority) {
+        let authority = hierarchyStart + 1 < count && utf8[hierarchyStart] == slash && utf8[hierarchyStart + 1] == slash
+        if authority, !visit(.authority) {
             return
         }
-        if utf8[0] == slash, !visit(.absolute) {
+        let absolute = utf8[0] == slash
+        if absolute, !visit(.absolute) {
             return
         }
+        // The slashes `authority` and `absolute` reported: a `/`-separated segment ending at one is not checked.
+        let checkedFrom = authority ? hierarchyStart + 2 : (absolute ? 1 : 0)
         // One pass: the path ends at the first `?` or `#`, or at the payload's end; each segment is checked when its
-        // separator is reached. An ordinary byte costs one table load.
+        // separator is reached. An ordinary byte costs one table load. `segmentStart` begins the segment the `..` check
+        // reads (every separator ends it); `slashSegmentStart` the one the transport's join reads (only `/` ends it).
         let classes = ManifestRules.pathByteClasses
         var segmentStart = 0
+        var slashSegmentStart = 0
         var pathEnd = count
         var parent = false
         index = 0
         while index < pathEnd {
-            let byteClass = classes[Int(utf8[index])]
+            let byte = utf8[index]
+            let byteClass = classes[Int(byte)]
             if byteClass == ManifestRules.ordinary {
                 index += 1
                 continue
@@ -232,15 +245,23 @@ enum ManifestRules {
                 index += 1
                 continue
             }
-            if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) {
+            if ManifestRules.isParentSegment(utf8, from: segmentStart, to: index) || byte == UInt8(ascii: "\\")
+                || (byte == slash && index >= checkedFrom && ManifestRules.isUnnamedSegment(utf8, from: slashSegmentStart, to: index))
+            {
                 parent = true
                 break
+            }
+            if byte == slash {
+                slashSegmentStart = index + 1
             }
             index += separator
             segmentStart = index
         }
-        // Unless a parent segment ended the pass, the last segment ends at the path's end.
-        if parent || ManifestRules.isParentSegment(utf8, from: segmentStart, to: pathEnd), !visit(.parentSegment) {
+        // Unless a refused segment ended the pass, the last segment ends at the path's end.
+        let lastRefused = !parent
+            && (ManifestRules.isParentSegment(utf8, from: segmentStart, to: pathEnd)
+                || ManifestRules.isUnnamedSegment(utf8, from: slashSegmentStart, to: pathEnd))
+        if parent || lastRefused, !visit(.parentSegment) {
             return
         }
         // The path ended at a `?` or `#`, or one follows the parent segment that ended the pass.
@@ -293,6 +314,21 @@ enum ManifestRules {
         let isSlash = high == UInt8(ascii: "2") && low == UInt8(ascii: "f")
         let isBackslash = high == UInt8(ascii: "5") && low == UInt8(ascii: "c")
         return isSlash || isBackslash ? 3 : 0
+    }
+
+    /// Whether `utf8[start..<end]` is a segment the transport's join refuses besides `..`: empty, or `.` (also `%2e`,
+    /// `%2E`), the two spellings that percent-decode to nothing or to `.` (ADR draft D-6).
+    private static func isUnnamedSegment(_ utf8: UnsafeRawBufferPointer, from start: Int, to end: Int) -> Bool {
+        switch end - start {
+        case 0:
+            return true
+        case 1:
+            return utf8[start] == UInt8(ascii: ".")
+        case 3:
+            return utf8[start] == UInt8(ascii: "%") && utf8[start + 1] == UInt8(ascii: "2") && utf8[start + 2] | 0x20 == UInt8(ascii: "e")
+        default:
+            return false
+        }
     }
 
     /// Whether `utf8[start..<end]` is `..`, also spelled with percent-encoded dots (`%2e`, `%2E`).

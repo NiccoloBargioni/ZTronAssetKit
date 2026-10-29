@@ -657,8 +657,9 @@ extension ModelSuites {
             let bridgedID = NSString(string: "bo7.ri.\u{85}map") as String
             let bridgedPath = NSString(string: String(repeating: "p/", count: 600)) as String
             let entry = ManifestEntry(identifier: AssetID(bridgedID), fileExtension: NSString(string: "PNG") as String, remotePath: bridgedPath)
+            // The bridged path ends with `/`: since Stage 3 (S3AH-1) its empty last segment is `parentSegment` as well.
             #expect(ManifestDecoder.violations(of: entry, limits: ManifestLimits()) == [
-                .identifierControlCharacter, .remotePathInvalid(.tooLong(bytes: 1_200)),
+                .identifierControlCharacter, .remotePathInvalid(.tooLong(bytes: 1_200)), .remotePathInvalid(.parentSegment),
             ])
             let native = AssetID(String("bo7.ri.map".unicodeScalars.map(Character.init)))
             let bridged = AssetID(NSString(string: "bo7.ri.map") as String)
