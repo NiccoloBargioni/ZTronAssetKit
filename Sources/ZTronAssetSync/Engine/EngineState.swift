@@ -39,6 +39,9 @@ struct EngineState {
     /// Set when shutdown begins closing the store, after it joined every owned task (R-SYN-15, ADR-039): what a condition
     /// observer reads to check that order (Stage 3, S3-B-070).
     var closingStore = false
+    /// Introspection: the steps each turn of a shutdown's `settle(_:with:)` took, in order (each at most
+    /// `SyncEngine.shutdownStepsPerTurn`, C2; Stage 3, S3-PERF-01).
+    var shutdownSlices: [Int] = []
 
     // MARK: Jobs, interests and continuations (H-3)
 

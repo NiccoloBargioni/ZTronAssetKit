@@ -150,6 +150,7 @@ extension SyncEngine {
             continuation.resume(returning: .failure(error))
             steps += 1
             if steps == SyncEngine.shutdownStepsPerTurn {
+                self.state.shutdownSlices.append(steps)
                 steps = 0
                 // REENTRANCY: RE-S43 (proposed) — nothing: the drained continuations belong to this call, and while
                 // the lifecycle is `shuttingDown` no new one is registered.
@@ -168,12 +169,16 @@ extension SyncEngine {
             jobs.removeValue(forKey: transfer)
             steps += 1
             if steps == SyncEngine.shutdownStepsPerTurn {
+                self.state.shutdownSlices.append(steps)
                 steps = 0
                 // REENTRANCY: RE-S43 (proposed) — as above: the retired job table belongs to this call.
                 await Task.yield()
             }
         }
         drain.indexes = RetiredIndexes()
+        if steps > 0 {
+            self.state.shutdownSlices.append(steps)
+        }
         self.notifyObservers()
     }
 

@@ -9,7 +9,9 @@ extension EngineIdleTests {
     /// A shutdown answers its waiters and frees its job table over turns of at most `shutdownStepsPerTurn` steps (C2;
     /// Stage 3, S3-PERF-01): with more waiters and jobs than one turn takes, every waiter is still answered `shutDown`
     /// exactly once, the group's join ends, the engine owns nothing afterwards, and the drain holds every continuation
-    /// and job the state held (none is left behind for a later turn to miss).
+    /// and job the state held (none is left behind for a later turn to miss). The settle's slices are recorded
+    /// (`shutdownSlices`): none takes more than `shutdownStepsPerTurn` steps, and together they take every waiter and job,
+    /// so the bound holds on any device, not only where the benchmark measures it.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing", .timeLimit(.minutes(1)))
     func shutdownDrainsOverSeveralTurns() async throws {
@@ -46,6 +48,10 @@ extension EngineIdleTests {
             let answer = await caller.value
             #expect(answer == .failure(.shutDown), "\(answer)")
         }
+        let slices = await engine.readForTests { $0.state.shutdownSlices }
+        #expect(slices.allSatisfy { $0 <= SyncEngine.shutdownStepsPerTurn }, "every turn of the settle takes at most shutdownStepsPerTurn steps: \(slices)")
+        #expect(slices.reduce(0, +) == 2 * count, "the slices take every waiter and every job: \(slices)")
+        #expect(slices.count >= 3, "\(2 * count) steps take at least three turns: \(slices)")
         let census = await engine.introspect()
         #expect(census.ownedTasks == 0 && census.waiters == 0 && census.interests == 0, "\(census)")
         #expect(await engine.readForTests { $0.state.jobs.isEmpty && $0.state.groups.isEmpty && $0.state.inFlight.isEmpty })

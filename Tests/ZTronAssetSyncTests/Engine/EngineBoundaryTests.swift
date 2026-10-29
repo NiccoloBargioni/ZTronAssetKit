@@ -167,4 +167,43 @@ extension EngineSupportTests {
         #expect(heap.count == 1 && heap.first?.reason == .store)
         #expect(heap.popDue(at: now).isEmpty)
     }
+
+    /// The engine's alarm turn takes at most `dueDeadlinesPerTurn` due deadlines (C2; Stage 3, S3-B-077), pinned through
+    /// the engine, not only `DeadlineHeap.popDue`: the retries of `dueDeadlinesPerTurn` + 88 prefetch members fall due
+    /// together (each failed once transiently while the alarm's turns were held, then the clock passes every backoff),
+    /// and one released alarm turn re-queues at most `dueDeadlinesPerTurn` of them; the next turns re-queue the rest.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together", .timeLimit(.minutes(1)))
+    func alarmTurnRequeuesABoundedSlice() async throws {
+        let count = SyncEngine.dueDeadlinesPerTurn + 88
+        let harness = EngineHarness.make()
+        let members = (0..<count).map { EngineHarness.onDemand(String(format: "due-%04d", $0), EngineFixture.bytes(UInt64(5_000 + $0), count: 16)) }
+        try await EngineSingleFlightTests.applied(members, harness: harness)
+        let engine = harness.engine
+        let transient = TransferError.transient(.unknown(urlErrorCode: -1001), retryAfter: nil)
+        for member in members {
+            await harness.source.script(member.transferID, [.fail(transient), .hold])
+        }
+        await engine.holdAlarmTurns()
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.failedJobs.count == count }
+        harness.time.advance(by: 3_600)
+        await engine.awaitCondition { $0.alarmTurnHeld }
+        // One alarm turn: the held one runs, and the turn it re-arms (due at once) is held again.
+        await engine.readForTests { engine in
+            engine.releaseAlarmTurns()
+            engine.holdAlarmTurns()
+        }
+        // The turn ends with its successor held, or with no alarm left when it took every deadline.
+        await engine.awaitCondition { ($0.alarmTurnHeld || $0.state.alarm == nil) && $0.state.failedJobs.count < count }
+        let left = await engine.readForTests { $0.state.failedJobs.count }
+        #expect(count - left <= SyncEngine.dueDeadlinesPerTurn, "one turn re-queued \(count - left) retries")
+        #expect(left >= count - SyncEngine.dueDeadlinesPerTurn && left > 0, "the rest wait for the next turn: \(left)")
+        await engine.releaseAlarmTurns()
+        await engine.awaitCondition { $0.state.failedJobs.isEmpty }
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
 }
+
