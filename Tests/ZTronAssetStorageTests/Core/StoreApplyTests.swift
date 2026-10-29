@@ -97,6 +97,70 @@ struct StoreApplyTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Stage 3 S3B-9, close-out cycle 2: a release `apply` counts toward an overlapping eviction's need must stay
+    /// released. Swapping the contents of `o8` and `o9` makes both adoption candidates: `o8` adopts `o9`'s blob and
+    /// releases its own (doomed, counted), then `o9` adopts that very blob back (rescued) and releases the other one
+    /// (still referenced). Nothing left `usedBytes`, so the run must free what it measured, as it does alone afterwards.
+    @Test("R-CLN-4: a content swap between present assets while quota eviction computes its candidates releases nothing, so the run still frees what it measured", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func swapWhileEvictionCandidatesRun() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        let before = try await harness.store.freeSpace()
+        await bulk.setHolding(true)
+        let maintenance = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        // The run measured 550 bytes to free and waits in its candidates unit.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        var entries = EvictionOverlapTests.assets.map(\.entry)
+        (entries[8].checksum, entries[9].checksum) = (entries[9].checksum, entries[8].checksum)
+        let swapped = entries
+        let report = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(swapped, etagSeed: "swapped"), etag: nil, eviction: nil)
+        }.value
+        #expect(report.reused.sorted() == [EvictionOverlapTests.assets[8].id, EvictionOverlapTests.assets[9].id].sorted())
+        #expect(try await harness.store.freeSpace().usedBytes == before.usedBytes, "the swap leaves usedBytes unchanged")
+        await bulk.setHolding(false)
+        let result = try await maintenance.value
+        #expect(result == CleanupResult(bytesFreed: 600, filesRemoved: 6), "nothing left usedBytes: the 550 bytes it measured were all still needed")
+        #expect(await EvictionOverlapTests.evicted(harness) == Array(0..<6))
+        #expect(try await harness.store.freeSpace().usedBytes <= 450, "down to the hysteresis target (90 % of 500)")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// Stage 3 S3B-9, close-out cycle 2: the same holds across `apply` calls. One sync prunes `o9` (its 100 bytes
+    /// counted as released), the next lists it again and adopts its blob back from its doom before the eviction resumes:
+    /// the bytes are in `usedBytes` again, so they no longer count toward the need.
+    @Test("R-CLN-4: bytes one apply released and a later apply adopts back while quota eviction computes its candidates no longer count toward its need", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func pruneThenReadoptWhileEvictionCandidatesRun() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        await bulk.setHolding(true)
+        let maintenance = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        let all = EvictionOverlapTests.assets.map(\.entry)
+        let pruned = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(Array(all.prefix(9)), etagSeed: "pruned"), etag: nil, eviction: nil)
+        }.value
+        #expect(pruned.pruned == [EvictionOverlapTests.assets[9].id])
+        let readopted = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(all, etagSeed: "listed again"), etag: nil, eviction: nil)
+        }.value
+        #expect(readopted.reused == [EvictionOverlapTests.assets[9].id], "o9 adopts its doomed blob back")
+        await bulk.setHolding(false)
+        let result = try await maintenance.value
+        #expect(result == CleanupResult(bytesFreed: 600, filesRemoved: 6), "the pruned bytes came back: the 550 bytes it measured were all still needed")
+        #expect(await EvictionOverlapTests.evicted(harness) == Array(0..<6))
+        #expect(try await harness.store.freeSpace().usedBytes <= 450)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-1: prune keeps a blob still referenced by another identifier", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pruneKeepsSharedBlob() async throws {
