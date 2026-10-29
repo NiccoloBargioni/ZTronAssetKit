@@ -142,9 +142,18 @@ struct OracleTests {
             case .reopen: return "reopen"
             }
         }
+
+        /// A reap is drawn between a seed's operations and not counted among its 40, so each seed runs as many store,
+        /// change, relocate, remove, evict and reopen steps as before the reap existed (S3C-6, close-out cycle 2).
+        var isReap: Bool {
+            if case .reap = self {
+                return true
+            }
+            return false
+        }
     }
 
-    /// A random step that is valid in `model`; one in four is a reap.
+    /// A random step that is valid in `model`; one draw in four is a reap, drawn between operations (`Step.isReap`).
     static func step(_ model: Model, _ random: inout Generator) -> Step {
         if random.below(4) == 0 {
             return .reap
@@ -255,6 +264,7 @@ struct OracleTests {
         var history: [String] = []
         var lifetimes = 0
         var unlinks = 0
+        var reaps = 0
         lifetimes: while steps < 40, lifetimes < 200 {
             lifetimes += 1
             // Each lifetime may crash before a random mutation, in a random mode.
@@ -291,7 +301,11 @@ struct OracleTests {
             while steps < 40 {
                 await Task.yield()
                 let step = OracleTests.step(model, &random)
-                steps += 1
+                if step.isReap {
+                    reaps += 1
+                } else {
+                    steps += 1
+                }
                 history.append(step.description)
                 let target = OracleTests.apply(step, to: model, nextVersion: &nextVersion)
                 for (id, asset) in target.assets {
@@ -333,7 +347,7 @@ struct OracleTests {
             unlinks += OracleTests.unlinks(harness)
             disk = harness.fileSystem.survivingDisk()
         }
-        print("R-STO-5 oracle, seed \(seed): \(steps) steps, \(lifetimes) lifetimes, \(unlinks) blob unlinks")
+        print("R-STO-5 oracle, seed \(seed): \(steps) steps and \(reaps) reaps, \(lifetimes) lifetimes, \(unlinks) blob unlinks")
     }
 
     /// The blob unlinks of `harness`'s lifetime that succeeded.
