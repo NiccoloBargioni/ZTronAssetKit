@@ -84,10 +84,12 @@ extension SyncEngine {
             startedAt: self.environment.time.now(),
             purgeEpoch: self.state.purgeEpoch
         )
-        // A breaker that admits only a probe gives it to this run's manifest fetch in this turn, before the run is in place
-        // and before any later turn can dispatch a job (F-42); its `circuitChanged` follows `syncStarted`.
-        let held = self.reserveManifestProbe()
         self.state.run = run
+        // A breaker that admits only a probe gives it to this run's manifest fetch in this turn, before any later turn can
+        // dispatch a job (F-42); its `circuitChanged` follows `syncStarted`. The run is in place first: the reservation
+        // notifies the condition observers, which must not see a probe held for a run that does not exist yet (L4-R24(1);
+        // Stage 3, S3-B-064).
+        let held = self.reserveManifestProbe()
         // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
         guard self.spawn(.run, { engine in await engine.performRun(token) }) != nil else {
             self.state.run = nil
