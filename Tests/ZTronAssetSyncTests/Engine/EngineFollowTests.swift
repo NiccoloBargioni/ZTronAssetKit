@@ -381,8 +381,10 @@ extension EngineSyncTests {
     /// The user-queue form of `noReplacedContentStartsDuringTheFollow`, for an id the apply dropped: the job of a user
     /// waiter whose id left the manifest waits in the user queue (both slots run other user transfers) when the apply
     /// lands, and the follow owes it a visit. A slot freed between two follow turns does not start it: a transfer of
-    /// content no id wants is never requested after the apply. The follow's visit then ends the waiter's interest with
-    /// `.notFound` (T21), as the cycle-1 one-turn follow did in the apply's turn.
+    /// content no id wants is never requested after the apply. That user job takes no slot from other work either: the
+    /// freed slot goes to the first member of an unchanged prefetch group, and no running transfer is preempted for it.
+    /// The follow's visit then ends the waiter's interest with `.notFound` (T21), as the cycle-1 one-turn follow did in
+    /// the apply's turn.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit", .timeLimit(.minutes(1)))
     func droppedUserJobWaitsForTheFollow() async throws {
@@ -392,8 +394,9 @@ extension EngineSyncTests {
         let runningBytes = (0..<2).map { EngineFixture.bytes(UInt64(545_000 + $0), count: 16) }
         let running = (0..<2).map { EngineHarness.onDemand("u\($0)", runningBytes[$0]) }
         let dropped = EngineHarness.onDemand("dropped", EngineFixture.bytes(546_000, count: 16))
+        let unchanged = (0..<2).map { EngineHarness.onDemand("b\($0)", EngineFixture.bytes(UInt64(547_000 + $0), count: 16)) }
         // Listed last, so the follow's first turn does not reach its visit.
-        let v1 = members + running + [dropped]
+        let v1 = members + running + unchanged + [dropped]
         try await EngineSingleFlightTests.applied(v1, harness: harness)
         let engine = harness.engine
         for (entry, bytes) in zip(running, runningBytes) {
@@ -401,14 +404,16 @@ extension EngineSyncTests {
         }
         let runningWaiters = running.map { entry in Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) } }
         await engine.awaitCondition { engine in running.allSatisfy { engine.state.jobs[$0.transferID]?.state == .downloading } }
+        let steady = try await engine.registerGroup(unchanged.map(\.identifier), lane: .prefetch).get()
         let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
         let waiter = Task { await engine.awaitAsset(dropped.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { $0.state.jobs.count == count + 3 && $0.state.jobs[dropped.transferID]?.state == .queued }
+        await engine.awaitCondition { $0.state.jobs.count == count + 5 && $0.state.jobs[dropped.transferID]?.state == .queued }
+        let preemptions = await engine.readForTests { $0.state.metrics.preemptions }
         let changed = members.enumerated().map { index, entry in
             EngineHarness.onDemand(entry.identifier.rawValue, EngineFixture.bytes(UInt64(590_000 + index), count: 16))
         }
         await engine.readForTests { $0.holdFollowFollowUps() }
-        await harness.serveManifest(changed + running, etag: "v2")
+        await harness.serveManifest(changed + running + unchanged, etag: "v2")
         let before = await harness.source.starts.count
         let sync = Task { await engine.sync(.force) }
         await engine.awaitCondition { $0.state.followFollowUpWaiting }
@@ -419,13 +424,16 @@ extension EngineSyncTests {
         let between = await engine.readForTests { engine in
             (
                 queued: engine.state.jobs[dropped.transferID]?.state,
-                waits: engine.state.pumpWaitsForFollow,
+                steady: engine.state.jobs[unchanged[0].transferID]?.state,
+                preemptions: engine.state.metrics.preemptions,
                 violations: engine.invariantViolations()
             )
         }
         let startedBetween = await harness.source.starts.dropFirst(before).map(\.id)
         #expect(!startedBetween.contains(dropped.transferID), "the dropped id's transfer was requested after the apply")
-        #expect(between.queued == .queued && between.waits, "it waits at the head of its queue for the follow: \(between)")
+        #expect(between.queued == .queued, "it waits in its queue for the follow: \(between)")
+        #expect(between.steady == .downloading, "the freed slot went to the unchanged prefetch member: \(between)")
+        #expect(between.preemptions == preemptions, "no transfer was preempted for a job that waits for the follow")
         #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
         await engine.readForTests { $0.releaseFollowFollowUps() }
         let outcome = await EngineHarness.value(of: sync)
@@ -435,6 +443,7 @@ extension EngineSyncTests {
         #expect(!(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID), "never requested after the apply")
         await harness.source.release(running[1].transferID, with: .progress(received: 0, expected: nil))
         _ = await EngineHarness.value(of: runningWaiters[1])
+        await engine.releaseGroup(steady)
         await engine.releaseGroup(group)
         await engine.shutdown()
     }
