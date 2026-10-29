@@ -265,6 +265,7 @@ extension SyncEngine {
         guard var job = self.state.jobs[transfer] else {
             return nil
         }
+        let claimOnly = job.interests.isEmpty
         job.attempts += 1
         job.active = nil
         job.transientFailure = true
@@ -284,7 +285,7 @@ extension SyncEngine {
                 self.state.jobs[transfer]?.interests[token] = nil
             }
         }
-        guard let remaining = self.state.jobs[transfer], !remaining.interests.isEmpty else {
+        guard let remaining = self.state.jobs[transfer], !remaining.interests.isEmpty || (claimOnly && self.claimRetries(remaining, attempts: attempts)) else {
             if self.state.jobs[transfer] != nil {
                 self.transition(transfer, to: .failed(.nextRun))
                 self.publishTerminal(job: job, outcome: .failed(assetError))
@@ -294,6 +295,19 @@ extension SyncEngine {
             return nil
         }
         return remaining
+    }
+
+    /// Whether a job only a pending claim keeps, with no interest when its attempt failed, still has attempts left under
+    /// the retry policy of the lane it held (`Job.heldLane`): the claim stands for the released interest until the
+    /// successor's join adds one, so its failures count as that interest's would. Without this the job ended on its first
+    /// failed attempt with an `assetFailed` nobody asked for, and the join started the transfer afresh (L5-R16; Stage 3,
+    /// S3-B-081).
+    private func claimRetries(_ job: Job, attempts: Int) -> Bool {
+        guard let lane = job.heldLane, self.state.claims[ClaimKey(job: job)] != nil else {
+            return false
+        }
+        let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+        return attempts < max(1, policy.maxAttemptsPerRun)
     }
 
     /// A 429 (ARCHITECTURE §7.6): an origin-wide throttle until the clamped deadline (a `Retry-After` above
