@@ -201,10 +201,11 @@ extension AssetStore {
         report.added.reserveCapacity(diff.added.count)
         for id in diff.added {
             if let record = newRecords[id] {
-                // A record the manifest did not list (detached) is replaced as `insertRecord` would.
+                // A record the manifest did not list (detached) is replaced as `insertRecord` would, its blob released
+                // like a pruned record's (counted, OI-14).
                 if let previous = self.state.core.records.updateValue(record, forKey: id) {
                     if let blob = previous.referencedBlob {
-                        self.releaseReference(blob, dooming: .unreferenced)
+                        self.releaseCountingBytes(blob)
                     }
                     self.refreshPresentEntry(id)
                 }
