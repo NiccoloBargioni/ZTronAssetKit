@@ -686,9 +686,12 @@ extension SyncEngine {
     /// A job about to be re-queued or parked `insufficientSpace` that holds an id an owed follow has not moved yet is
     /// followed first (`followBeforeActing`), as a failure is: its fail-fast would answer that id's waiter or ensure member
     /// with the replaced content's figures although the copy lists the id at content that may fit, and its re-queue would
-    /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). The follow
-    /// counts against the same per-turn bound as the action it precedes, so a sweep still does at most `parksPerPump`
-    /// parks and `readmissionsPerTurn` re-queues or follows per turn; a job left waiting acts on nothing and is not followed.
+    /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). A follow
+    /// costs what a follow turn's visit costs (`followsPerTurn`), about ten times a re-queue or a park, so the sweep gives
+    /// it its own bound: at most `followsPerTurn` follows per turn besides `parksPerPump` parks and `readmissionsPerTurn`
+    /// re-queues, the rest left to the follow-up sweep. Counted as the re-queue or park it preceded, one turn followed up
+    /// to 1,024 jobs, 9.3 to 13 ms at 10,000 members (the close-out cycle-4 correctness lens, PROBE-C4-SWEEP2-C2). A job
+    /// left waiting acts on nothing and is not followed.
     func sweepSpaceParked(_ sweep: SpaceSweep) {
         var ahead = self.spaceAdmittedAhead()
         var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
@@ -709,6 +712,7 @@ extension SyncEngine {
         candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
         var requeues = 0
         var parks = 0
+        var follows = 0
         var waiting = false
         for candidate in candidates {
             if let room, smallest > room.subtractingClamped(ahead) {
@@ -719,7 +723,7 @@ extension SyncEngine {
                 continue
             }
             guard let verdict = self.spaceBlock(job, ahead: ahead) else {
-                guard requeues < Self.readmissionsPerTurn else {
+                guard requeues < Self.readmissionsPerTurn, self.followFits(job, follows: &follows) else {
                     self.scheduleSpaceSweepFollowUp(sweep)
                     break
                 }
@@ -743,7 +747,7 @@ extension SyncEngine {
                 waiting = true
                 continue
             }
-            guard parks < Self.parksPerPump else {
+            guard parks < Self.parksPerPump, self.followFits(job, follows: &follows) else {
                 self.scheduleSpaceSweepFollowUp(sweep)
                 break
             }
@@ -778,6 +782,20 @@ extension SyncEngine {
         if requeues > 0 {
             self.pump()
         }
+    }
+
+    /// Whether the sweep's turn may act on `job`: a job that holds an id an owed follow has not moved yet is followed
+    /// before the sweep acts on it and counts against `followsPerTurn` (counted in `follows`); any other job always fits.
+    /// `false` once the turn has followed `followsPerTurn` jobs, and the sweep leaves the rest to its follow-up turn.
+    private func followFits(_ job: Job, follows: inout Int) -> Bool {
+        guard self.holdsMovedID(job) else {
+            return true
+        }
+        guard follows < Self.followsPerTurn else {
+            return false
+        }
+        follows += 1
+        return true
     }
 
     /// The bytes of the jobs earlier sweeps re-queued that still wait in the queue with the ticket a sweep gave them;
