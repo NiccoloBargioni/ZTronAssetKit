@@ -490,16 +490,18 @@ extension SyncEngine {
         for key in self.state.tasks.keys.sorted() {
             self.state.tasks[key]?.cancel()
         }
-        for transfer in self.state.jobs.keys.sorted() {
-            self.state.jobs[transfer]?.active?.handle?.cancel()
-        }
-        self.resumeEverything(with: .shutDown)
+        self.cancelRunningHandles()
+        // REENTRANCY: RE-S43 (proposed) — the drain is answered and freed over bounded turns (C2); the lifecycle is
+        // `shuttingDown`, so nothing new spawns or registers, and the join loop below drains again after each join.
+        await self.settle(self.drainEverything(with: .shutDown), with: .shutDown)
         // Join every owned task: tasks that end during the loop remove themselves; the loop iterates a copy.
         while let key = self.state.tasks.keys.min(), let task = self.state.tasks[key] {
             // REENTRANCY: RE-S21 — the lifecycle is `shuttingDown`, so nothing new spawns; the table is re-read.
             await task.value
             self.state.tasks[key] = nil
-            self.resumeEverything(with: .shutDown)
+            // REENTRANCY: RE-S43 (proposed) — as above; what the joined task left (none registers while shutting
+            // down) is drained.
+            await self.settle(self.drainEverything(with: .shutDown), with: .shutDown)
         }
         if let remote = self.state.remote {
             // REENTRANCY: RE-S22 — terminal: returns after the foreground delegate's last callback (T2-04).
@@ -510,102 +512,6 @@ extension SyncEngine {
             await self.store.close()
         }
         self.finishShutdown()
-    }
-
-    /// Resumes every continuation table with the shutdown answer (S1-02). Safe to call repeatedly.
-    private func resumeEverything(with error: AssetError) {
-        let waiters = self.state.waiters
-        self.state.waiters.removeAll()
-        for token in waiters.keys.sorted() {
-            waiters[token]?.continuation.resume(returning: .failure(error))
-        }
-        let unknown = self.state.unknownWaiters
-        self.state.unknownWaiters.removeAll()
-        for token in unknown.keys.sorted() {
-            unknown[token]?.continuation.resume(returning: .failure(error))
-        }
-        for token in self.state.groups.keys.sorted() {
-            self.state.groups[token]?.continuation?.resume(returning: false)
-            self.state.groups[token]?.continuation = nil
-        }
-        self.state.groups.removeAll()
-        // Every pending claim ends with the engine (L5-R1), those a release or a join's give-up left for later turns
-        // included (L5-R15).
-        self.state.claims.removeAll()
-        self.state.claimHeld.removeAll()
-        self.state.unlistedClaims = 0
-        for token in self.state.releasing.keys.sorted() {
-            self.state.releasing[token]?.claims = []
-        }
-        let starts = self.state.startJoiners
-        self.state.startJoiners.removeAll()
-        for token in starts.keys.sorted() {
-            starts[token]?.resume(returning: .failure(error))
-        }
-        let syncs = self.state.syncJoiners
-        self.state.syncJoiners.removeAll()
-        for token in syncs.keys.sorted() {
-            syncs[token]?.resume(returning: .failed(error))
-        }
-        let runs = self.state.runCompletions
-        self.state.runCompletions.removeAll()
-        for token in runs.keys.sorted() {
-            runs[token]?.resume(returning: .shutDown)
-        }
-        let entries = self.state.entryJoins
-        self.state.entryJoins.removeAll()
-        self.state.entryTasks.removeAll()
-        for token in entries.keys.sorted() {
-            entries[token]?.resume(returning: .done(.failure(error)))
-        }
-        if var fetch = self.state.manifestFetch {
-            let waiting = fetch.waiters
-            fetch.waiters.removeAll()
-            self.state.manifestFetch = fetch
-            for token in waiting.keys.sorted() {
-                waiting[token]?.resume(returning: .shutDown)
-            }
-        }
-        let conditionWaiters = self.state.conditionWaiters
-        self.state.conditionWaiters.removeAll()
-        for token in conditionWaiters.keys.sorted() {
-            conditionWaiters[token]?.resume()
-        }
-        self.releaseApplyFollow()
-        self.releaseStoreDeadlineRead()
-        self.releaseManifestOutcomeDelivery()
-        self.releaseRunSettlementDelivery()
-        self.releaseAlarmTurns()
-        self.releaseApplyQueue()
-        for transfer in self.state.jobs.keys.sorted() {
-            self.state.jobs[transfer]?.active?.handle?.cancel()
-        }
-
-        self.state.jobs.removeAll()
-        self.state.inFlight.removeAll()
-        self.state.spaceParked.removeAll()
-        self.state.spaceSweepFollowUp = nil
-        self.state.spaceAdmitted.removeAll()
-        self.state.laneParked.removeAll()
-        self.state.circuitParked.removeAll()
-        self.state.throttleParked.removeAll()
-        self.state.failedJobs.removeAll()
-        self.state.edgeOwed.removeAll()
-        self.state.originOwed.removeAll()
-        self.state.readmissionsOwed = []
-        self.state.laneParksOwed.removeAll()
-        self.state.releasing.removeAll()
-        self.state.inFlightBytes = InFlightBytes()
-        self.state.draining.removeAll()
-        self.state.run = nil
-        self.state.pendingRun = nil
-        self.state.heap = DeadlineHeap()
-        self.state.alarm = nil
-        self.state.watcher = nil
-        self.state.pressure.task = nil
-        self.state.pressure.handler = nil
-        self.state.heals.removeAll()
-        self.notifyObservers()
     }
 
     /// Publishes `clientShutDown` last, ends the lifecycle and releases every observer and joiner.
