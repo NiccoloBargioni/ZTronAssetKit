@@ -166,8 +166,9 @@ extension EngineRegressionTests {
     /// condition observer, called at every notification, records whether any owned task is still registered when the
     /// engine marks the close (`closingStore`). A publication held at its first store unit while a run is in progress
     /// keeps owned tasks alive until the join; closing first (or not joining) closes the store under them. `close()`
-    /// drains in-flight work, so the store's own record cannot tell the orders apart (`f.md`, the level-4 verifier's
-    /// mutants M5 and M6).
+    /// drains in-flight work, so the store's own record cannot tell the orders apart afterwards (`f.md`, the level-4
+    /// verifier's mutants M5 and M6); the store is read while the shutdown joins the held task instead, and must still
+    /// be open, which a close moved alone before the joins fails (the close-out cycle-2 requirements lens).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: shutdown joins every owned task before it begins closing the store", .timeLimit(.minutes(1)))
     func shutdownJoinsBeforeClosing() async throws {
@@ -206,6 +207,11 @@ extension EngineRegressionTests {
         _ = await registration.next()
         let shutdown = Task { await engine.shutdown() }
         await engine.waitUntil { $0.lifecycle == .shuttingDown }
+        // From the store's side: once the shutdown has left the engine's actor (this read runs after its first
+        // suspension), it is joining the owned task whose publication the bulk unit holds, so the store is still open; a
+        // close begun before the joins would already refuse this read.
+        await engine.readForTests { _ in }
+        let openWhileJoining = (try? await harness.store.planningView()) != nil
         await bulk.release()
         await EngineHarness.value(of: shutdown)
         await EngineHarness.value(of: observer)
@@ -214,6 +220,7 @@ extension EngineRegressionTests {
         let record = seen.withLock { $0 }
         #expect(record.marks >= 1, "the observer saw the close begin")
         #expect(record.tasksAtMark.allSatisfy { $0 == 0 }, "no owned task was registered when the close began: \(record.tasksAtMark)")
+        #expect(openWhileJoining, "the store was still open while the shutdown joined the task its unit held")
         #expect(await engine.introspect().ownedTasks == 0)
     }
 }

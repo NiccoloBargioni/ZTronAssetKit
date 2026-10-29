@@ -510,15 +510,22 @@ extension SyncEngine {
             await remote.invalidate()
         }
         if self.state.launch != nil || self.state.startTask != nil {
-            // The order R-SYN-15 rests on (ADR-039): every owned task was joined above. Marked for the condition observers
-            // that check it (Stage 3, S3-B-070), since `close()` drains in-flight work and no store record tells the
-            // orders apart.
-            self.state.closingStore = true
-            self.notifyObservers()
+            // The order R-SYN-15 rests on (ADR-039): every owned task was joined above.
             // REENTRANCY: RE-S22 — terminal: every owned task is joined, so no store call is in flight.
-            await self.store.close()
+            await self.closeStore()
         }
         self.finishShutdown()
+    }
+
+    /// Closes the store, a shutdown's last store call: marks `closingStore` for the condition observers that check
+    /// R-SYN-15's order (Stage 3, S3-B-070; `close()` drains in-flight work, so no store record tells the orders apart),
+    /// then closes. The mark and the close are one step, so neither can move without the other (close-out cycle 3: a
+    /// close moved alone before the joins left the mark where the test looked).
+    private func closeStore() async {
+        self.state.closingStore = true
+        self.notifyObservers()
+        // REENTRANCY: RE-S22 — terminal: the caller joined every owned task, so no store call is in flight.
+        await self.store.close()
     }
 
     /// Publishes `clientShutDown` last, ends the lifecycle and releases every observer and joiner.
