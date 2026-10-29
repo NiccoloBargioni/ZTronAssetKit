@@ -173,8 +173,9 @@ extension EngineRegressionTests {
     /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard is `.minutes(3)`. Under TSan the engine's decode of
     /// the 21 MB manifest (the model's parser) takes about two thirds of the time, its plan and the store's apply most of
     /// the rest; the bytes are encoded in slices (1.3 s instead of 2.7 to 8.3 s). Close-out cycle 4 measured 46.1 s alone,
-    /// 68.3 s in the bundle and 104.3 to 104.7 s beside a second TSan process at a load of 16 to 26, over half of three
-    /// minutes: the guard awaits the orchestrator's ruling (`docs/adr-drafts/s3f.md`, cycle 4).
+    /// 68.3 s in the bundle and 104.3 to 104.7 s beside a second TSan process at a load of 16 to 26, and its verifier
+    /// 129.9 and 130.1 s beside a second TSan process at a load of 10.5 to 25.9, over half of three minutes: the guard
+    /// awaits the orchestrator's ruling (`docs/adr-drafts/s3f.md`, cycles 4 and 5).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(3)))
     func runMaterialisesAPipelineAtATime() async throws {
