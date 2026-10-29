@@ -998,7 +998,9 @@ All runs on this branch at `07ca8cb` (the code's HEAD; the draft's commit change
 earlier commit, scratch `.build-s3f*`, on the shared 8-core host whose load swung from 3 to 464 during the cycle (loads
 quoted per step).
 
-- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`**: see the final run at the end of this section.
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (at `340a28b`, 22:59–23:03, load 17→7): `VERIFY:
+  PASS`; Transport 151, Sync 405, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104 tests passed. (Also
+  `VERIFY: PASS` at 22:10–22:15 on the tree before the guard and benchmark commits.)
 - **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (22:09, sources as
   at `07ca8cb`): `Build complete! (27,92 s)`, exit 0.
 - **Gates:** `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
