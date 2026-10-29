@@ -305,7 +305,7 @@ Reference: an Apple-silicon Mac, **release** configuration, N = 10,000 assets un
 | P-10 | Connection reuse: `assets` small assets over a loopback server | ≤ `connections_max` TCP connections |
 | P-11 | Parallel speed-up: `assets` assets, `server_latency_ms` ms server latency, concurrency `concurrency` vs 1 | ≥ `speedup_min` × faster |
 | P-12 | `AssetClient.init` | ≤ `init_ms_max` ms and no I/O on the caller's thread |
-| P-13 | Reclaiming `blobs` blobs (eviction/GC) | ≤ `gc_total_s_max` s in total, in batches ≤ `batch_ms_max` ms between suspension points |
+| P-13 | Reclaiming `blobs` blobs (eviction/GC) | ≤ `gc_total_s_max` s in total, in batches ≤ `batch_ms_max` ms between suspension points, judged on the p99 of the batch durations (owner ruling 2026-10-29, ADR-050 option A) |
 | P-14 | Idle cost after quiescence | ≤ `idle_timers_max` timers and ≤ `idle_tasks_max` scheduled tasks (engine introspection) |
 
 ---
