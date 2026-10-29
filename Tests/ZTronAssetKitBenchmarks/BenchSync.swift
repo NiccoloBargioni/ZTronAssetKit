@@ -1021,6 +1021,11 @@ enum SyncBench {
     static func probeChainWait(members count: Int) async throws -> (wait: Double, total: Double) {
         let bench = try await SyncBench.scaleBench(members: count, room: nil)
         let engine = bench.engine
+        // The chain is 10,000 probes in a row, each a handful of hops between the engine's owned tasks; below the
+        // heartbeat's priority each hop queued behind its pulses on the actor, and a chain took 6 to 88 s on a quiet host.
+        // The owned tasks run at the heartbeat's priority, as the engine tests' harness raises them (F-17); the turns are
+        // the same, and no measured figure depends on a task's priority.
+        await SyncBench.raiseOwnedTaskPriority(engine)
         guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
@@ -1085,6 +1090,12 @@ enum SyncBench {
     static func originQuiet(_ engine: isolated SyncEngine) -> Bool {
         engine.state.inFlight.isEmpty && engine.state.originOwed.isEmpty && !engine.state.readmissionFollowUpScheduled
             && !engine.state.pumpFollowUpScheduled
+    }
+
+    /// Spawns every later owned task of `engine` at the heartbeat's priority (`.high`) or above (`ownedTaskPriorityFloor`,
+    /// the seam the engine tests' harness uses, F-17).
+    static func raiseOwnedTaskPriority(_ engine: isolated SyncEngine) {
+        engine.state.ownedTaskPriorityFloor = .high
     }
 
     /// Whether a chain of probes ended: no job parked by the breaker, queued, downloading or owed a re-queue, and no
