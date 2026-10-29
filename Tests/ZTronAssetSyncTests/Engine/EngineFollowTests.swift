@@ -377,4 +377,65 @@ extension EngineSyncTests {
         await engine.releaseGroup(group)
         await engine.shutdown()
     }
+
+    /// The user-queue form of `noReplacedContentStartsDuringTheFollow`, for an id the apply dropped: the job of a user
+    /// waiter whose id left the manifest waits in the user queue (both slots run other user transfers) when the apply
+    /// lands, and the follow owes it a visit. A slot freed between two follow turns does not start it: a transfer of
+    /// content no id wants is never requested after the apply. The follow's visit then ends the waiter's interest with
+    /// `.notFound` (T21), as the cycle-1 one-turn follow did in the apply's turn.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit", .timeLimit(.minutes(1)))
+    func droppedUserJobWaitsForTheFollow() async throws {
+        let count = 700
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0))
+        let members = (0..<count).map { EngineHarness.onDemand(String(format: "m%04d", $0), EngineFixture.bytes(UInt64(540_000 + $0), count: 16)) }
+        let runningBytes = (0..<2).map { EngineFixture.bytes(UInt64(545_000 + $0), count: 16) }
+        let running = (0..<2).map { EngineHarness.onDemand("u\($0)", runningBytes[$0]) }
+        let dropped = EngineHarness.onDemand("dropped", EngineFixture.bytes(546_000, count: 16))
+        // Listed last, so the follow's first turn does not reach its visit.
+        let v1 = members + running + [dropped]
+        try await EngineSingleFlightTests.applied(v1, harness: harness)
+        let engine = harness.engine
+        for (entry, bytes) in zip(running, runningBytes) {
+            await harness.source.script(entry.transferID, [.hold, .stage(bytes)])
+        }
+        let runningWaiters = running.map { entry in Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) } }
+        await engine.awaitCondition { engine in running.allSatisfy { engine.state.jobs[$0.transferID]?.state == .downloading } }
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        let waiter = Task { await engine.awaitAsset(dropped.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs.count == count + 3 && $0.state.jobs[dropped.transferID]?.state == .queued }
+        let changed = members.enumerated().map { index, entry in
+            EngineHarness.onDemand(entry.identifier.rawValue, EngineFixture.bytes(UInt64(590_000 + index), count: 16))
+        }
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest(changed + running, etag: "v2")
+        let before = await harness.source.starts.count
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        // A slot frees between two follow turns: the user queue's head is the dropped id's job.
+        await harness.source.release(running[0].transferID, with: .progress(received: 0, expected: nil))
+        #expect((try? await EngineHarness.value(of: runningWaiters[0]).get()) != nil)
+        await engine.awaitCondition { $0.state.jobs[running[0].transferID] == nil && $0.state.draining.isEmpty }
+        let between = await engine.readForTests { engine in
+            (
+                queued: engine.state.jobs[dropped.transferID]?.state,
+                waits: engine.state.pumpWaitsForFollow,
+                violations: engine.invariantViolations()
+            )
+        }
+        let startedBetween = await harness.source.starts.dropFirst(before).map(\.id)
+        #expect(!startedBetween.contains(dropped.transferID), "the dropped id's transfer was requested after the apply")
+        #expect(between.queued == .queued && between.waits, "it waits at the head of its queue for the follow: \(between)")
+        #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let outcome = await EngineHarness.value(of: sync)
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        let answer = await EngineHarness.value(of: waiter)
+        #expect(answer == .failure(.notFound), "the follow's visit ends the dropped id's interest: \(answer)")
+        #expect(!(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID), "never requested after the apply")
+        await harness.source.release(running[1].transferID, with: .progress(received: 0, expected: nil))
+        _ = await EngineHarness.value(of: runningWaiters[1])
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
 }
