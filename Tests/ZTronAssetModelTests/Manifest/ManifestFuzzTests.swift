@@ -70,7 +70,7 @@ extension ModelSuites {
 
             let tsan = DecodeMeasurement.underThreadSanitizer
             let limit = tsan ? 1 << 20 : ManifestCorpus.payloadLimit
-            var denseCPU: (small: Double, limit: Double)?
+            var denseCPU: DenseCPU?
             var limitCases = 0
             Self.forEachLimitCase(seed: seed, payloadBytes: limit) { fuzzCase in
                 limitCases += 1
@@ -94,17 +94,19 @@ extension ModelSuites {
                     #expect(cost.cpuSeconds <= 1.0, "\(label)")
                 }
                 if fuzzCase.name == Self.denseCaseName {
-                    let reference = ManifestCorpus.manifest(maxBytes: 1 << 20, seed: fuzzCase.seed).data
-                    let referenceCost = DecodeMeasurement.measure { Self.decode(reference) }.cost
-                    denseCPU = (referenceCost.cpuSeconds, cost.cpuSeconds)
+                    denseCPU = Self.lowestDenseCPU(fuzzCase, firstLimitSample: cost.cpuSeconds)
                 }
             }
             #expect(limitCases == 38)
             if !tsan {
                 // Linear time: 32x the bytes may cost at most 64x the CPU of the 1 MiB manifest (a quadratic path would
-                // cost about 1,000x).
+                // cost about 1,000x), each side's lowest sample (`lowestDenseCPU`).
                 let dense = try #require(denseCPU)
-                #expect(dense.limit <= 64 * dense.small, "dense 1 MiB \(dense.small) s vs limit \(dense.limit) s")
+                #expect(
+                    dense.limit <= Self.linearTimeRatio * dense.small,
+                    "dense 1 MiB \(dense.small) s (samples \(dense.smallSamples)) vs limit \(dense.limit) s (samples \(dense.limitSamples))"
+                )
+                print("R-MAN-3 linear time: dense 1 MiB samples \(dense.smallSamples) s, limit samples \(dense.limitSamples) s")
             }
         }
 
@@ -259,6 +261,37 @@ extension ModelSuites {
         }
 
         private static let denseCaseName = "dense manifest at the limit"
+
+        /// How much more CPU time 32x the bytes may cost (linear time with headroom; a quadratic path costs about 1,000x).
+        private static let linearTimeRatio: Double = 64
+
+        /// The linear-time comparison's samples and each side's lowest.
+        struct DenseCPU {
+            var smallSamples: [Double]
+            var limitSamples: [Double]
+            var small: Double { self.smallSamples.min() ?? .infinity }
+            var limit: Double { self.limitSamples.min() ?? .infinity }
+        }
+
+        /// OI-13 (Stage 3, S3AH-4): the same decode costs more CPU time on an efficiency core than on a performance
+        /// core, and the scheduler may move the thread between them, so one sample per side once failed the bound
+        /// (6.08 s against 5.86 s). Each side keeps the lowest of up to three samples, the one nearest a performance
+        /// core: the 1 MiB reference is decoded three times first, which fixes the bound (more samples only lower it,
+        /// so it is never looser than one sample); the limit side starts from the case's own measurement and is decoded
+        /// again, at most twice, only while its lowest sample is over the bound, since a further sample could only
+        /// lower it. The verdict is therefore that of three samples per side, and the 64x ratio is unchanged.
+        @available(macOS 15.0, iOS 18.0, *)
+        private static func lowestDenseCPU(_ fuzzCase: Case, firstLimitSample: Double) -> DenseCPU {
+            let reference = ManifestCorpus.manifest(maxBytes: 1 << 20, seed: fuzzCase.seed).data
+            var dense = DenseCPU(smallSamples: [], limitSamples: [firstLimitSample])
+            for _ in 0..<3 {
+                dense.smallSamples.append(DecodeMeasurement.measure { Self.decode(reference) }.cost.cpuSeconds)
+            }
+            while dense.limit > Self.linearTimeRatio * dense.small, dense.limitSamples.count < 3 {
+                dense.limitSamples.append(DecodeMeasurement.measure { Self.decode(fuzzCase.payload, options: fuzzCase.options) }.cost.cpuSeconds)
+            }
+            return dense
+        }
 
         /// The limit-scale cases, one of each class at (just under) `payloadBytes`, each generated just before `body`
         /// sees it so that no two large payloads are alive at once.
