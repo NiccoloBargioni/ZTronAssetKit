@@ -107,8 +107,6 @@ extension SyncEngine {
             // One pass per round; a start in the round is counted in place (`SlotCounts.started(in:)`), and the next
             // round, which follows any start, reads the jobs again.
             var counts = self.slotCounts
-            // A user queue whose head waits for the follow: that job takes no slot from a running transfer either.
-            var userWaitsForFollow = false
             for kind in [LaneQueues.Kind.userSingle, .userBatch] {
                 user: while maximum - counts.running > 0, counts.runningUser < userCap {
                     guard parks < Self.parksPerPump else {
@@ -125,12 +123,11 @@ extension SyncEngine {
                     case .parked(let count):
                         parks += count
                     case .waitsForFollow:
-                        userWaitsForFollow = true
                         break user
                     }
                 }
             }
-            if !userWaitsForFollow, self.hasQueuedUser() {
+            if self.hasQueuedUser() {
                 if self.preemptForUser() {
                     continue
                 }
@@ -295,7 +292,10 @@ extension SyncEngine {
     }
 
     /// Whether a valid user-initiated entry waits that is not draining, held for a manifest catch-up or wanted only by
-    /// released groups (those are set aside on the way, so each is stepped over once, C2).
+    /// released groups (those are set aside on the way, so each is stepped over once, C2). A queue whose first such entry
+    /// waits for an owed follow (`awaitsFollow`) has none that could start this turn (`dispatch` stops that queue at its
+    /// head), so it neither preempts a running transfer nor keeps the other lanes from a free slot: counting it, every
+    /// pump preempted a prefetch transfer for it, and the next pump gave the slot to another (close-out cycle 3).
     private func hasQueuedUser() -> Bool {
         // The queues are taken out of the state while the closures read it (no overlapping access).
         var queues = self.state.queues
@@ -305,7 +305,7 @@ extension SyncEngine {
             let ready = queues.peek(kind, isValid: { self.isValid($0) }, setAside: { self.setsAside($0) }) { entry in
                 self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
             }
-            found = ready != nil
+            found = ready.map { entry in self.state.jobs[entry.transfer].map { !self.awaitsFollow($0) } ?? true } ?? false
         }
         self.state.queues = queues
         return found
