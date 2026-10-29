@@ -248,3 +248,139 @@ extension LargeBlobTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 }
+
+extension LargeBlobTests {
+    /// What changes the blob's holders while a turn of it is pending: an id bound to it (an alias `apply` adopts onto the
+    /// live blob), or one of its later records leaving it (pruned by `apply`). Either makes the blob table's reference count
+    /// differ from the records left, so the turn reads the holders again.
+    enum HolderChange: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case bound
+        case left
+
+        var testDescription: String {
+            self.rawValue
+        }
+    }
+
+    /// The manifest after `change`: the shared records plus an alias of their bytes, or without w4.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func manifest(after change: HolderChange, _ shared: [CleanupFixture.Asset]) -> ValidatedManifest {
+        switch change {
+        case .bound:
+            return CoreFixture.manifest(shared.map(\.entry) + [CoreFixture.entry("w9", shared[0].bytes)])
+        case .left:
+            return CoreFixture.manifest(shared.dropLast().map(\.entry))
+        }
+    }
+
+    /// The selection's holders are no longer exactly the records left: eviction may not take the blob (C-1), so it stops
+    /// there, the chunk already taken staying evicted.
+    @Test(
+        "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks",
+        .timeLimit(.minutes(1)),
+        arguments: HolderChange.allCases
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictionStopsWhenTheHoldersChange(change: HolderChange) async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0)), metadata: metadata)
+        let shared = try await LargeBlobTests.seedShared(harness, count: 5, seed: 1_550)
+        let key = shared[0].key
+        await harness.store.testSetEvictionChunk(2)
+        await metadata.setHolding(true)
+        let eviction = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        let first = try await LargeBlobTests.atNextYield(metadata, "the first chunk of the blob's records is evicted") {
+            await LargeBlobTests.count(harness, shared, .absent(.evicted)) > 0
+        } observe: {
+            await LargeBlobTests.count(harness, shared, .absent(.evicted))
+        }
+        let held = Set(await metadata.heldUnits)
+        let applied = try await CleanupSteps.run(metadata, keeping: held) {
+            try await harness.store.apply(LargeBlobTests.manifest(after: change, shared), etag: nil, eviction: nil)
+        }.value
+        await metadata.setHolding(false)
+        let result = try await eviction.value
+        let kept = change == .bound ? Array(shared[2...4]) : Array(shared[2...3])
+
+        #expect(first == 2, "premise: one chunk was evicted before the change: \(first)")
+        #expect(change == .bound ? applied.reused == ["w9"] : applied.pruned == ["w4"], "premise: \(change): \(applied)")
+        #expect(result == CleanupResult(), "the blob stays live: nothing is released to the reaper")
+        #expect(await LargeBlobTests.count(harness, shared, .absent(.evicted)) == 2, "the chunk evicted before the change stays evicted")
+        for asset in kept {
+            #expect(await harness.isPresent(asset.id, at: key), "\(asset.id.rawValue) keeps the blob")
+        }
+        if change == .bound {
+            #expect(await harness.isPresent("w9", at: key), "the id bound meanwhile keeps the blob")
+        }
+        #expect(await LargeBlobTests.references(harness, key) == (change == .bound ? 4 : 2), "the records left on the blob")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// An evictable purge takes every current holder (`purgeChunk`'s rule): an id bound between two chunks is read with the
+    /// holders and purged too; a lease taken between them stops the blob, which a purge never takes while leased.
+    @Test("R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictablePurgeTakesAHolderBoundBetweenChunks() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let shared = try await LargeBlobTests.seedShared(harness, count: 5, seed: 1_560)
+        let key = shared[0].key
+        await harness.store.testSetCleanupChunk(2)
+        await metadata.setHolding(true)
+        let purge = Task {
+            try await harness.store.purge(.evictable)
+        }
+        let first = try await LargeBlobTests.atNextYield(metadata, "the first chunk of the blob's records is purged") {
+            await LargeBlobTests.count(harness, shared, .absent(.purged)) > 0
+        } observe: {
+            await LargeBlobTests.count(harness, shared, .absent(.purged))
+        }
+        let held = Set(await metadata.heldUnits)
+        let applied = try await CleanupSteps.run(metadata, keeping: held) {
+            try await harness.store.apply(LargeBlobTests.manifest(after: .bound, shared), etag: nil, eviction: nil)
+        }.value
+        await metadata.setHolding(false)
+        try await harness.time.requireSleepers(atLeast: 1)
+        harness.time.advance(by: harness.configuration.policy.deletionGrace)
+        let result = try await purge.value
+
+        #expect(first == 2, "premise: one chunk was purged before the alias was bound: \(first)")
+        #expect(applied.reused == ["w9"], "premise: apply bound the alias to the live blob: \(applied)")
+        #expect(result == PurgeResult(bytesFreed: 100, bytesDeferred: 0, assetsRemoved: 6), "every holder, the alias included")
+        #expect(await harness.record("w9")?.residency == .absent(.purged))
+        #expect(!harness.hasBlob(key), "the blob is reaped")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    @Test("R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a lease taken between its chunks", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictablePurgeStopsAtALease() async throws {
+        let metadata = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(metadata: metadata)
+        let shared = try await LargeBlobTests.seedShared(harness, count: 5, seed: 1_570)
+        let key = shared[0].key
+        await harness.store.testSetCleanupChunk(2)
+        await metadata.setHolding(true)
+        let purge = Task {
+            try await harness.store.purge(.evictable)
+        }
+        let first = try await LargeBlobTests.atNextYield(metadata, "the first chunk of the blob's records is purged") {
+            await LargeBlobTests.count(harness, shared, .absent(.purged)) > 0
+        } observe: {
+            await LargeBlobTests.count(harness, shared, .absent(.purged))
+        }
+        let lease = try await harness.store.acquireLease(shared[4].id)
+        await metadata.setHolding(false)
+        let result = try await purge.value
+        _ = await harness.store.releaseLease(lease)
+
+        #expect(first == 2, "premise: one chunk was purged before the lease: \(first)")
+        #expect(result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2))
+        for asset in shared.dropFirst(2) {
+            #expect(await harness.isPresent(asset.id, at: key), "\(asset.id.rawValue) keeps the blob")
+        }
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+}
