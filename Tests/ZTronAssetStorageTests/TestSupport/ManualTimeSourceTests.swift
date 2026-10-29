@@ -57,6 +57,46 @@ struct TestSupportManualTimeSourceTests {
         #expect(time.monotonicNow() == start.adding(seconds: 9))
     }
 
+    /// Stage 3 (S3AH-3, L4-R24(2)): `advance(to:)` moved by `seconds(since:)` through a `Double`, and landed 1 ns short
+    /// of the target for about 3 % of gaps, so a sleeper registered at exactly that deadline stayed asleep. It now moves
+    /// in nanoseconds: monotonic time lands on the target, awake time moves by the same nanoseconds, and a sleeper at
+    /// the target wakes, for every seeded gap up to 2^60 ns.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-ENV-1: advance(to:) lands exactly on the target instant, moves the awake clock by the same nanoseconds and wakes a sleeper there", .timeLimit(.minutes(1)))
+    func advanceToLandsExactly() async throws {
+        var random = SplitMix64(seed: 0x5EED_0000_0104)
+        var gaps: [UInt64] = [1, 999_999_999, 1_000_000_001, 1 << 60]
+        for _ in 0..<2_000 {
+            gaps.append(UInt64.random(in: 1..<(1 << UInt64.random(in: 1...60, using: &random)), using: &random))
+        }
+        for (index, gap) in gaps.enumerated() {
+            try Task.checkCancellation()
+            let time = ManualTimeSource()
+            let start = time.monotonicNow()
+            let uptime = time.uptimeNow()
+            let wall = time.now()
+            let target = MonotonicInstant(nanoseconds: start.nanoseconds + gap)
+            // The first gaps also park a sleeper at exactly the target (its deadline is the instant itself).
+            let sleeper = index < 64 ? Self.sleeper(time, until: target) : nil
+            if sleeper != nil {
+                try await time.requireSleepers(atLeast: 1)
+            }
+            time.advance(to: target)
+            #expect(time.monotonicNow() == target, "gap \(gap) ns")
+            #expect(time.uptimeNow().nanoseconds == uptime.nanoseconds + gap, "gap \(gap) ns")
+            #expect(time.now() == wall.addingTimeInterval(target.seconds(since: start)), "gap \(gap) ns")
+            if let sleeper {
+                // A sleeper left asleep is cancelled, so a miss fails here instead of hanging until the time limit.
+                let asleep = time.pendingSleepers
+                #expect(asleep == 0, "gap \(gap) ns: the sleeper at the target is still asleep")
+                if asleep > 0 {
+                    sleeper.cancel()
+                }
+                #expect(await sleeper.value, "gap \(gap) ns: the sleeper at the target did not wake")
+            }
+        }
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-ENV-1: advancing to an earlier instant moves no clock and wakes nobody", .timeLimit(.minutes(1)))
     func advanceToThePastIsANoOp() async throws {
