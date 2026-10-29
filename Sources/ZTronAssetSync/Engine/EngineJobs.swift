@@ -119,7 +119,6 @@ extension SyncEngine {
         let before = job.lane
         // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
         let wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
-        let ticket = job.ticket
         job.assets.insert(asset)
         if var interest = job.interests[token] {
             interest.assets.insert(asset)
@@ -129,14 +128,17 @@ extension SyncEngine {
             job.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
         }
         self.state.jobs[transfer] = job
-        self.relane(transfer, from: before)
-        self.failFastJoiner(token, of: transfer)
-        if wasReleasedOnly, let joined = self.state.jobs[transfer], joined.state == .queued, joined.ticket == ticket {
-            // Now that this interest wants it, it is queued again (a join at the job's own lane does not re-queue it
-            // above): at the place it waited, so jobs re-joined in one turn keep their order and pass no earlier work;
-            // an entry left in a queue or aside is stale.
+        if wasReleasedOnly {
+            // Now that this interest wants it, it is queued again at the place it waited, in the queue its lane now
+            // selects, whether the interest keeps its lane, changes it or comes from user work: jobs re-joined in one turn
+            // keep their order and pass no work queued before them, and a promotion jumps the queue as R-SYN-3 says
+            // (L4-R24(4); Stage 3, S3-B-065). An entry left in a queue or aside is stale. `relane`'s re-queue at the
+            // back is for a job that waited in its queue all along.
             self.reinstate(transfer)
+        } else {
+            self.relane(transfer, from: before)
         }
+        self.failFastJoiner(token, of: transfer)
         self.notifyObservers()
     }
 
