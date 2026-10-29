@@ -5,8 +5,12 @@ import ZTronAssetTestSupport
 
 @testable import ZTronAssetStorage
 
-/// The model-based test of SPEC §7.3 (store.md §9.3): seeded random sequences of store, relocate, remove, evict, crash
-/// and reopen steps, checked after every step against a trivial in-memory oracle and against I-1…I-5.
+/// The model-based test of SPEC §7.3 (store.md §9.3): seeded random sequences of store, relocate, remove, evict, reap,
+/// crash and reopen steps, checked after every step against a trivial in-memory oracle and against I-1…I-5. The reap
+/// step drives the deletion protocol to its end (`runDueWork()`, the grace, `runDueWork()` again), so blobs are really
+/// unlinked and I-3 is audited at every unlink (`CleanupAuditSink`: not held by the readers' snapshot, after an
+/// acknowledged snapshot without it and its grace); a quarter of the lifetimes run with a sink that acknowledges nothing,
+/// where no blob may be unlinked at all (Stage 3 ruling S3C-6, S3-CRAS-02).
 @Suite("Cleanup: model-based oracle (R-STO-5)")
 struct OracleTests {
     /// SplitMix64: a seeded generator, so a failing sequence is reproduced from the seed it prints.
@@ -123,6 +127,7 @@ struct OracleTests {
         case relocate(String)
         case remove(String)
         case evict(String)
+        case reap
         case reopen
 
         var description: String {
@@ -133,13 +138,17 @@ struct OracleTests {
             case .relocate(let id): return "relocate \(id)"
             case .remove(let id): return "remove \(id)"
             case .evict(let id): return "evict \(id)"
+            case .reap: return "reap"
             case .reopen: return "reopen"
             }
         }
     }
 
-    /// A random step that is valid in `model`.
+    /// A random step that is valid in `model`; one in four is a reap.
     static func step(_ model: Model, _ random: inout Generator) -> Step {
+        if random.below(4) == 0 {
+            return .reap
+        }
         let id = OracleTests.ids[random.below(OracleTests.ids.count)]
         guard let asset = model.assets[id] else {
             return random.below(6) == 0 ? .reopen : .add(id)
@@ -177,15 +186,18 @@ struct OracleTests {
         case .evict(let id):
             next.assets[id]?.present = false
             next.assets[id]?.evicted = true
-        case .reopen:
+        case .reap, .reopen:
+            // A reap unlinks only doomed blobs; an evicted asset may still come back after a power loss that loses an
+            // unsynced unlink, so `evicted` stays.
             break
         }
         return next
     }
 
-    /// Runs `step` on the store, ending with the commit that makes it durable; throws when the fake crashed.
+    /// Runs `step` on the store, ending with the commit that makes it durable; throws when the fake crashed. Every move
+    /// of the clock is reported to `audit`.
     @available(macOS 15.0, iOS 18.0, *)
-    static func run(_ step: Step, _ harness: CoreHarness, target: Model, sequence: inout UInt32) async throws {
+    static func run(_ step: Step, _ harness: CoreHarness, audit: CleanupAuditSink, target: Model, sequence: inout UInt32) async throws {
         switch step {
         case .add, .change, .relocate, .remove:
             _ = try await harness.store.apply(OracleTests.manifest(target), etag: nil, eviction: nil)
@@ -197,13 +209,18 @@ struct OracleTests {
         case .evict(let id):
             // Every asset is older than the residency window; everything but `id` is protected.
             harness.time.advance(by: 60)
+            await audit.clockMoved()
             let others = Set(target.assets.keys.filter { $0 != id }.map { AssetID($0) })
             let plan = try #require(await harness.store.evictionPlan(toFree: 1, protecting: others))
             #expect(plan.victims.map(\.id) == [AssetID(id)])
             _ = try await harness.store.apply(OracleTests.manifest(target), etag: nil, eviction: plan)
-            // Not reaped: the later steps run `apply` within the deletion grace, which must not adopt the evicted record
-            // again (OI-1, ruling R3 at the L3 close-out); the doomed blob waits for a relaunch or the reaper.
+            // Not reaped here: the later steps run `apply` within the deletion grace, which must not adopt the evicted
+            // record again (OI-1, ruling R3 at the L3 close-out); the doomed blob waits for a reap step or a relaunch.
             try await harness.store.flush(.ordered)
+        case .reap:
+            // Everything doomed whose snapshot was acknowledged goes once the grace passed (and nothing, when the sink
+            // acknowledges nothing).
+            await harness.settleDeletions(audited: audit)
         case .reopen:
             break
         }
@@ -212,8 +229,15 @@ struct OracleTests {
         }
     }
 
+    /// I-3 over the unlinks of `harness`'s lifetime so far.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func expectI3(_ harness: CoreHarness, _ audit: CleanupAuditSink, _ label: String, _ history: [String]) async {
+        let violations = await audit.violations(harness.fileSystem.operations, layout: harness.layout, grace: harness.configuration.policy.deletionGrace)
+        #expect(violations.isEmpty, "\(label): after \(history): \(violations)")
+    }
+
     @Test(
-        "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step",
+        "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step",
         .serialized,
         .timeLimit(.minutes(1)),
         arguments: Array(UInt64(1)...UInt64(16))
@@ -230,6 +254,7 @@ struct OracleTests {
         var steps = 0
         var history: [String] = []
         var lifetimes = 0
+        var unlinks = 0
         lifetimes: while steps < 40, lifetimes < 200 {
             lifetimes += 1
             // Each lifetime may crash before a random mutation, in a random mode.
@@ -238,8 +263,10 @@ struct OracleTests {
             // whatever was not synced.
             let drawn = CrashMode.allCases[random.below(CrashMode.allCases.count)]
             let mode = crashBefore == nil ? CrashMode.processKill : drawn
-            let harness = CoreHarness.cleanup(disk: disk, crashBefore: crashBefore, mode: mode, time: time)
-            let label = "seed \(seed), lifetime crash \(String(describing: crashBefore)) \(mode)"
+            // One lifetime in four installs into a sink that acknowledges nothing: no blob may be unlinked in it.
+            let acknowledging = random.below(4) != 0
+            let (harness, audit) = CoreHarness.audited(disk: disk, crashBefore: crashBefore, mode: mode, time: time, acknowledging: acknowledging)
+            let label = "seed \(seed), lifetime crash \(String(describing: crashBefore)) \(mode)\(acknowledging ? "" : ", unacknowledged")"
             do {
                 let report = try await harness.store.open()
                 let headers = IndexFile.allCases.compactMap { disk.files[harness.layout.indexURL($0).path].flatMap(IndexHeader.parse) }
@@ -273,6 +300,8 @@ struct OracleTests {
                 if case .reopen = step {
                     await harness.store.close()
                     disk = harness.fileSystem.survivingDisk()
+                    await OracleTests.expectI3(harness, audit, label, history)
+                    unlinks += OracleTests.unlinks(harness)
                     if harness.fileSystem.crashed {
                         let committed = await harness.state.core.committedGeneration
                         disk = try await OracleTests.reconcile(disk, time: time, model: &model, candidates: [model], committed: committed, versions: versions, label: label, history: history)
@@ -280,30 +309,45 @@ struct OracleTests {
                     continue lifetimes
                 }
                 do {
-                    try await OracleTests.run(step, harness, target: target, sequence: &sequence)
+                    try await OracleTests.run(step, harness, audit: audit, target: target, sequence: &sequence)
                     let observed = await OracleTests.observe(harness, versions: versions)
                     #expect(target.shows(observed), "\(label): after \(history): store \(observed) ≠ oracle \(target)")
                     let violations = await CoreInvariants.violations(of: harness)
                     #expect(violations.isEmpty, "\(label): after \(history): \(violations)")
+                    await OracleTests.expectI3(harness, audit, label, history)
                     guard target.shows(observed), violations.isEmpty else {
                         return
                     }
                     model = target
                 } catch {
                     #expect(harness.fileSystem.crashed, "\(label): \(step) failed without a crash: \(error)")
+                    await OracleTests.expectI3(harness, audit, label, history)
+                    unlinks += OracleTests.unlinks(harness)
                     let committed = await harness.state.core.committedGeneration
                     disk = try await OracleTests.reconcile(harness.fileSystem.survivingDisk(), time: time, model: &model, candidates: [model, target], committed: committed, versions: versions, label: label, history: history)
                     continue lifetimes
                 }
             }
             await harness.store.close()
+            await OracleTests.expectI3(harness, audit, label, history)
+            unlinks += OracleTests.unlinks(harness)
             disk = harness.fileSystem.survivingDisk()
         }
+        print("R-STO-5 oracle, seed \(seed): \(steps) steps, \(lifetimes) lifetimes, \(unlinks) blob unlinks")
+    }
+
+    /// The blob unlinks of `harness`'s lifetime that succeeded.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func unlinks(_ harness: CoreHarness) -> Int {
+        let prefix = harness.layout.blobsDirectory.path + "/"
+        return harness.fileSystem.operations.filter {
+            $0.kind == .removeItem && $0.failure == nil && $0.url.path.hasPrefix(prefix) && StoreLayout.parseBlobName($0.url.lastPathComponent) != nil
+        }.count
     }
 
     /// Reopens a crash survivor, checks I-1…I-5, and requires the store to show the oracle before or after the step
-    /// that crashed (a committed prefix, I-5); the oracle continues from whichever it shows. Returns the disk the
-    /// reopened store left at its close.
+    /// that crashed (a committed prefix, I-5); the oracle continues from whichever it shows; then reaps what the
+    /// relaunch may (audited for I-3) and checks again. Returns the disk the reopened store left at its close.
     @available(macOS 15.0, iOS 18.0, *)
     static func reconcile(
         _ disk: DiskImage,
@@ -315,7 +359,7 @@ struct OracleTests {
         label: String,
         history: [String]
     ) async throws -> DiskImage {
-        let reopened = CoreHarness.cleanup(disk: disk, time: time)
+        let (reopened, audit) = CoreHarness.audited(disk: disk, time: time)
         let report = try await reopened.store.open()
         let headers = IndexFile.allCases.compactMap { disk.files[reopened.layout.indexURL($0).path].flatMap(IndexHeader.parse) }
         #expect(headers.allSatisfy { report.launchEpoch > $0.generation }, "\(label): I-5 epoch after the crash in \(history)")
@@ -329,7 +373,13 @@ struct OracleTests {
         } else {
             Issue.record("\(label): after the crash in \(history): store \(observed) matches none of \(candidates)")
         }
+        await reopened.settleDeletions(audited: audit)
+        let reaped = await CoreInvariants.violations(of: reopened)
+        #expect(reaped.isEmpty, "\(label): after the relaunch's reap in \(history): \(reaped)")
+        let afterReap = await OracleTests.observe(reopened, versions: versions)
+        #expect(model.matching(afterReap) != nil, "\(label): after the relaunch's reap in \(history): store \(afterReap) ≠ oracle \(model)")
         await reopened.store.close()
+        await OracleTests.expectI3(reopened, audit, label + ", relaunch", history)
         return reopened.fileSystem.survivingDisk()
     }
 }
