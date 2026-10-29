@@ -121,12 +121,22 @@ public struct TransferAttempt: Hashable, Comparable, Sendable, Codable, CustomSt
         self.sequence = sequence
     }
 
-    /// Parses `"<epoch>-<sequence>"` (decimal, no sign, no leading `+`); `nil` otherwise.
+    /// Parses `"<epoch>-<sequence>"` in the canonical decimal form `token` writes (no sign, no leading zero); `nil`
+    /// otherwise.
     public init?(token: String) {
+        // Only the spelling `token` writes parses (Stage 3, S3AH-2): ASCII digits without a leading zero, or `0` alone.
+        // So a parsed token's `token` is the text it came from, and a staging name the module never wrote
+        // (`c-<h>.01-2.part`) is foreign instead of an alias of another file (`StagingFileName(parsing:)`).
+        let isCanonicalDecimal = { (text: Substring) -> Bool in
+            guard let first = text.utf8.first, first != UInt8(ascii: "0") || text.utf8.count == 1 else {
+                return false
+            }
+            return text.utf8.allSatisfy { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
+        }
         let parts = token.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 2,
-            parts[0].allSatisfy({ $0.isASCII && $0.isNumber }),
-            parts[1].allSatisfy({ $0.isASCII && $0.isNumber }),
+            isCanonicalDecimal(parts[0]),
+            isCanonicalDecimal(parts[1]),
             let epoch = UInt64(parts[0]),
             let sequence = UInt32(parts[1])
         else {
