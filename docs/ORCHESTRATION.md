@@ -2,6 +2,21 @@
 
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
+## Stage 3 (hardening) — RUNNING (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
+- **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
+  - No stop was given, so the orchestrator applied a **default of 70 % for all of Stage 3**: the hunt and the close-outs gate at 65, the merge docs at 70. The owner may change it.
+  - Usage at launch: weekly all models 0 %, Fable 0 % (reset Thu 29 Oct 04:00 CET; next reset **Thu 5 Nov 03:00 CET**).
+  - Keep-awake: `caffeinate -ims -t 259200` from 29 Oct 08:56 to 1 Nov 08:56 (background, this session).
+- **Base:** tag `s3-base` = `b5796ba` (`wpi-merged` plus the Stage 2 hand-off commit).
+- **Plan** (PROMPT §4 Stage 3, at most 3 rounds):
+  1. **Discovery: RUNNING** `wf_124dbd46-f15` (task `wwqhvzu68`), args `{base: "s3-base", usageStop: 65, pool: 4, sim: "897F9D8D-B10D-4D91-8E22-417A2B9D70AA"}`; run dir `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/eaf5a17f-3bdc-4079-a3a3-92d480a65b26/subagents/workflows/wf_124dbd46-f15`. Resume in the same session with `resumeFromRunId`; from a fresh session, read its `journal.jsonl` and re-run only the missing lenses with `only: [...]`. Script `.claude/workflows/assetkit-stage3-hunt.js` (read-only on the repo): a backlog survey (Sonnet; writes `.build-orchestrator/s3-backlog.{json,md}`, which also answers the owner's "non-blocking bugs?" question); six independent hunters (stability, concurrency, crash/fault, security, performance incl. P-13 root cause, conformance/G4), each proving bugs with failing probes copied to `.build-orchestrator/s3-probes/<lens>/`; two mutation agents (Sonnet, ≥ 21 mutants, diffs in `.build-orchestrator/s3-mutants/`); one independent confirmer per hunter. At most 4 building agents at once.
+  2. **Triage (orchestrator):** rulings `.build-orchestrator/s3-rulings.md`; findings per work package `.build-orchestrator/s3-findings-<wp>.json`.
+  3. **Fix:** `assetkit-closeout.js` per affected work package, `wp: "s3<wp>"` (worktree `.worktrees/s3<wp>`, branch `wp/s3<wp>`, draft `docs/adr-drafts/s3<wp>.md`), from `s3-base`, strict bar, `usageStop: 65`. At most two close-outs at once (6 agents).
+  4. **Merge** in dependency order; phase-A gates; then TSan and `--perf` on an idle host; `docs/MUTATION-PROBES.md`; ADR-057 via `assetkit-level-docs.js` (`usageStop: 70`). Tag `s3-merged`.
+  5. **Stage 5** (orchestrator): `verify.sh --full`, VERIFICATION, DEVICE-TEST-PLAN, RESIDUAL-RISKS, TRACEABILITY.
+- **Forecast** (strict; Level 5's measured costs, ~0.062 points per dollar): discovery ~11–19 points and ~6–9 h; fix close-outs ~19–37 points and ~15–30 h; merge, gates and docs ~3–5 points and ~3–5 h; **Stage 3 ≈ 33–61 points, ~24–44 h**. Stage 5 ≈ 3–6 points, ~3–6 h.
+- **Still open for the owner:** P-13 (ADR-050; option A, the p99 per batch, recommended; Stage 5's `--full` cannot pass without a ruling), the NEEDS-HUMAN-REVIEW list (ADR-050, 052, 055, 056), and the stop.
+
 ## Stage 2 — COMPLETE (`wpi-merged` = `0554b8f`, 24 Oct 15:20 CEST). Next session: start here
 - **State.** Stage 2 is complete: `l5-merged` (WP-G + WP-K), then WP-I (README, ADR-056).
   - Nothing is running. There are no worktrees and no `wp/*` branches, and `feature/asset-kit` is clean.
