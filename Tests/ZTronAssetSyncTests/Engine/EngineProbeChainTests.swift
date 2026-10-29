@@ -102,4 +102,57 @@ extension EngineFailurePathTests {
         await engine.releaseGroup(group)
         await engine.shutdown()
     }
+
+    /// The breaker's parked order follows a parked job's rank as interests join and leave it, and stays bounded
+    /// (S3-B-063): an ambiguous 403 opens the authentication breaker and three prefetch members park behind it; 70 more
+    /// prefetch groups join the second member (each join pushes its place again), which compacts the order back to its
+    /// bound; a user-initiated group joins the third member, raising its rank, and is released again, lowering it. At the
+    /// cooldown's end the first member in the pump's order (prefetch rank, oldest ticket) is the one re-admitted for the
+    /// probe, not the third member's stale user-initiated place.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded", .timeLimit(.minutes(1)))
+    func parkedOrderFollowsRanks() async throws {
+        let tuning = SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
+        let harness = EngineHarness.make(tuning: tuning)
+        let opener = EngineHarness.onDemand("rank-opener", EngineFixture.bytes(72_000))
+        let members = (0..<3).map { EngineHarness.onDemand("rank-\($0)", EngineFixture.bytes(72_001 + UInt64($0))) }
+        try await EngineSingleFlightTests.applied([opener] + members, harness: harness)
+        let engine = harness.engine
+        let origin = harness.source.originID
+        await harness.source.script(opener.transferID, [.fail(EngineRegressionCycle20Tests.forbidden)])
+        let openerGroup = try await engine.registerGroup([opener.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { if case .open? = $0.state.breakers[origin]?.state { return true } else { return false } }
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.circuitParked.count == members.count }
+        var joins: [InterestToken] = []
+        for _ in 0..<70 {
+            joins.append(try await engine.registerGroup([members[1].identifier], lane: .prefetch).get())
+        }
+        let bounded = await engine.readForTests { engine in (order: engine.state.circuitOrder.count, parked: engine.state.circuitParked.count) }
+        #expect(bounded.order <= 2 * bounded.parked + 64, "stale and repeated places are compacted: \(bounded)")
+        let user = try await engine.registerGroup([members[2].identifier], lane: .userInitiated).get()
+        await engine.awaitCondition { $0.state.jobs[members[2].transferID]?.lane == .userInitiated }
+        #expect(await engine.readForTests { $0.state.jobs[members[2].transferID]?.state.isCircuitParked } == true, "it stays parked: the breaker rejects")
+        await engine.releaseGroup(user)
+        await engine.awaitCondition { $0.state.jobs[members[2].transferID]?.lane == .prefetch && $0.state.releasing.isEmpty }
+        guard case .open(_, let cooldownEnd, _)? = await engine.readForTests({ $0.state.breakers[origin]?.state }) else {
+            Issue.record("setup: the breaker is open")
+            await engine.shutdown()
+            return
+        }
+        let before = await engine.readForTests { $0.state.circuitReadmissions }
+        EngineRegressionTests.land(harness.time, on: cooldownEnd)
+        await engine.awaitCondition { $0.state.breakers[origin]?.probe != nil }
+        let probing = await engine.readForTests { engine in (probe: engine.state.breakers[origin]?.probe, readmitted: engine.state.circuitReadmissions - before) }
+        #expect(probing.probe == members[0].transferID, "the first member in the pump's order probes: \(String(describing: probing.probe))")
+        #expect(probing.readmitted == 1, "one parked job was re-admitted for the probe: \(probing.readmitted)")
+        #expect(await engine.invariantViolations().isEmpty)
+        for token in joins {
+            await engine.releaseGroup(token)
+        }
+        await engine.releaseGroup(group)
+        await engine.releaseGroup(openerGroup)
+        await engine.shutdown()
+    }
 }
+

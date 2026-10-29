@@ -128,4 +128,51 @@ extension EngineSyncTests {
         await engine.releaseGroup(group)
         await engine.shutdown()
     }
+
+    /// While a follow still owes visits, a job held for a manifest catch-up (the store superseded its publication before
+    /// the engine's copy showed the new manifest, F-20) stays held when the last catch-up ends: it may be one the follow
+    /// moves, and dispatching it first would start a transfer of content no id wants any more. The follow's last turn
+    /// releases it. Jobs removed between two follow turns (here by the group's release) are skipped. The catch-up and
+    /// the held job are set up directly in one engine turn, the order a superseded publication and an `apply` in flight
+    /// leave, which no deterministic seam reaches end to end.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended", .timeLimit(.minutes(1)))
+    func heldJobsWaitForTheFollow() async throws {
+        let count = SyncEngine.followsPerTurn + 10
+        let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 1))
+        let members = (0..<count).map { EngineHarness.onDemand(String(format: "h%04d", $0), EngineFixture.bytes(UInt64(66_000 + $0), count: 16)) }
+        try await EngineSingleFlightTests.applied(members, harness: harness)
+        let engine = harness.engine
+        await harness.source.script(members[0].transferID, [.hold])
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs.count == count }
+        let changed = members.enumerated().map { index, entry in
+            EngineHarness.onDemand(entry.identifier.rawValue, EngineFixture.bytes(UInt64(166_000 + index), count: 16))
+        }
+        let manifest = try ValidatedManifest(entries: changed, digest: ContentHash.sha256(of: Data("held-follow".utf8)))
+        let held = members[count - 1].transferID
+        let first = await engine.readForTests { engine -> (owed: Bool, held: Bool, violations: [String]) in
+            engine.holdFollowFollowUps()
+            engine.state.manifestCatchUps += 1
+            engine.state.heldForManifest.insert(held)
+            let previous = engine.state.applied
+            engine.adoptApplied(manifest, etag: nil)
+            engine.followApplied(from: previous)
+            engine.manifestCaughtUp()
+            return (engine.followOwed, engine.state.heldForManifest.contains(held), engine.invariantViolations())
+        }
+        #expect(first.owed, "the follow owes visits after its first turn")
+        #expect(first.held, "the held job stays held while the follow is owed")
+        #expect(first.violations.isEmpty, "\(first.violations.prefix(3))")
+        // The group's release removes the jobs the follow still owes a visit; the follow's next turn skips them.
+        await engine.releaseGroup(group)
+        await engine.awaitCondition { $0.state.releasing.isEmpty }
+        await engine.releaseFollowFollowUps()
+        await engine.awaitCondition { !$0.followOwed }
+        let after = await engine.readForTests { engine in (held: engine.state.heldForManifest, violations: engine.invariantViolations()) }
+        #expect(after.held.isEmpty, "the follow's last turn released the held job: \(after.held)")
+        #expect(after.violations.isEmpty, "\(after.violations.prefix(3))")
+        await engine.shutdown()
+    }
 }
+
