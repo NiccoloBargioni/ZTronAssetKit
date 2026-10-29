@@ -77,10 +77,13 @@ struct EngineRegressionCycle22Tests {
             let started = engine.state.lastRunID
             if started > self.seen.withLock({ $0.after }) {
                 // An observer can run inside the start turn (any notification there); it must never see a half-started
-                // run (L4-R24(1)).
-                let violations = engine.invariantViolations()
-                if !violations.isEmpty {
-                    self.seen.withLock { $0.violations.append(contentsOf: violations.map { "run \(started): \($0)" }) }
+                // run (L4-R24(1)): `invariantViolations()`'s rule that a probe held for a manifest fetch belongs to a
+                // fetch in flight or to a run in place. The other rules describe turn boundaries, and an observer inside
+                // a turn sees their transients (an alarm about to be re-armed, a job about to be queued), so only the
+                // start turn's rule is asserted here.
+                let halfStarted = engine.invariantViolations().filter { $0.hasPrefix("the breaker's probe is held for a manifest fetch") }
+                if !halfStarted.isEmpty {
+                    self.seen.withLock { $0.violations.append(contentsOf: halfStarted.map { "run \(started): \($0)" }) }
                 }
             }
             guard let run = engine.state.run else {
