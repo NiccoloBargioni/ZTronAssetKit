@@ -24,8 +24,11 @@ extension EngineFailurePathTests {
     /// one per exit. The condition observer, which runs at every notification of every turn, never sees more than one
     /// member queued, nor more than one queued and one downloading; the members probe in the pump's order, each once, and
     /// the chain ends with every member failed and nothing parked.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 22.3 s alone and 33.0 to 33.2 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked", .timeLimit(.minutes(3)))
     func probeChainReadmitsOnePerExit() async throws {
         let count = 64
         let slots = 4

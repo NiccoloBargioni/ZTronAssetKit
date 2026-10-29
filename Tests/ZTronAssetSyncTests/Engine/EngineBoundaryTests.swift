@@ -172,8 +172,11 @@ extension EngineSupportTests {
     /// the engine, not only `DeadlineHeap.popDue`: the retries of `dueDeadlinesPerTurn` + 88 prefetch members fall due
     /// together (each failed once transiently while the alarm's turns were held, then the clock passes every backoff),
     /// and one released alarm turn re-queues at most `dueDeadlinesPerTurn` of them; the next turns re-queue the rest.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 34.3 to 45.4 s of its 60 s at a load of 11 to 41
+    /// (the Stage 3 close-out cycle-3 verifiers), and 33.8 s alone and 54.7 to 55.1 s beside a second TSan process at a
+    /// load of 16 to 26 (cycle 4), over half its limit at a load at most about 30, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together", .timeLimit(.minutes(3)))
     func alarmTurnRequeuesABoundedSlice() async throws {
         let count = SyncEngine.dueDeadlinesPerTurn + 88
         let harness = EngineHarness.make()

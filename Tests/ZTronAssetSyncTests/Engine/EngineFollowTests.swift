@@ -56,9 +56,11 @@ extension EngineSyncTests {
     /// `followFormatsPerTurn` changed entries and visits `followsPerTurn` jobs; every later turn moves at most
     /// `followsPerTurn` jobs. Between turns every invariant holds (a job the follow still owes a visit is in
     /// `unfollowed`; one its pass has not reached follows the replaced copy), the run does not settle while visits are
-    /// owed, and in the end every member's interest follows its new content with no job left on the old.
+    /// owed, and in the end every member's interest follows its new content with no job left on the old. Hang guard
+    /// (S3-R4): under TSan in the whole Sync bundle it took 26.7 s alone and 41.2 to 41.4 s beside a second TSan process
+    /// at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per turn with every invariant holding between turns", .timeLimit(.minutes(1)))
+    @Test("R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per turn with every invariant holding between turns", .timeLimit(.minutes(3)))
     func followIsBoundedPerTurn() async throws {
         let count = SyncEngine.followFormatsPerTurn + 100
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 1))
@@ -283,8 +285,11 @@ extension EngineSyncTests {
     /// `followFormatsPerTurn` comparisons, so no visit is even owed for it when its transfer answers 404. The member
     /// follows its new content (the group waits for that job) instead of being settled by the old content's failure
     /// (the close-out cycle-2 correctness lens, PROBE-W4b's shape with the hold seam).
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 24.3 s alone and 37.0 to 37.2 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content", .timeLimit(.minutes(1)))
+    @Test("R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content", .timeLimit(.minutes(3)))
     func replacedContentFailureFollowsTheMember() async throws {
         let count = SyncEngine.followFormatsPerTurn + 64
         let harness = EngineHarness.make()
@@ -491,7 +496,8 @@ extension EngineSyncTests {
         )
         let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
         let engine = harness.engine
-        let xBytes = EngineFixture.bytes(779_001, count: 4_000_000)
+        // Megabytes of one repeated byte: generated payloads of this size took seconds of the sanitizer run (S3-R4).
+        let xBytes = Data(repeating: 0x78, count: 4_000_000)
         let qBytes = EngineFixture.bytes(779_002, count: 300)
         let x = EngineFixture.entry("x", xBytes)
         let q = EngineFixture.entry("q", qBytes)
@@ -506,7 +512,7 @@ extension EngineSyncTests {
         let fillers = { (seed: UInt64) in
             (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "f%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
         }
-        let old = EngineHarness.onDemand("zz-target", EngineFixture.bytes(779_003, count: 5_000_000))
+        let old = EngineHarness.onDemand("zz-target", Data(repeating: 0x6F, count: 5_000_000))
         // v2 prunes x (its 4 MB wait for the 60 s grace) and lists the target's 5 MB content.
         await harness.serveManifest([q] + fillers(720_000) + [old], etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)

@@ -157,8 +157,11 @@ struct EngineSyncTests {
         await relaunched.engine.shutdown()
     }
 
+    /// One asset of 100 fails; the run completes and lists it. Hang guard (S3-R4): under TSan in the whole Sync bundle it
+    /// took 24.6 s alone and 35.7 to 37.5 s beside a second TSan process at a load of 16 to 26 (Stage 3 close-out cycle
+    /// 4), over half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report", .timeLimit(.minutes(3)))
     func oneFailureNeverAbortsTheRun() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(100)

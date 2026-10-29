@@ -110,8 +110,11 @@ struct EngineRegressionCycle3Tests {
     }
 
     /// PROBE-C2-6: the same with the default tuning and policy, and a 40-asset catalog whose first three transfers hold.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 20.7 s alone and 30.5 to 30.9 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger", .timeLimit(.minutes(3)))
     func runAfterLedgerDropDefaultTuning() async throws {
         let harness = EngineHarness.make()
         let engine = harness.engine

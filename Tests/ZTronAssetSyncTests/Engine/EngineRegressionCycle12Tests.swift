@@ -63,11 +63,13 @@ struct EngineRegressionCycle12Tests {
     /// (a re-joined member that waits in no queue among them, which a `reinstate` that queues no entry produces); every
     /// interleaving keeps them. The end is liveness: every handle released, then every job left and every caller's
     /// asset scripted to stage, the engine ends with no job and nothing left to release, and every caller gets its
-    /// asset.
+    /// asset. Hang guard (S3-R4): under TSan in the whole Sync bundle it took 42.4 s of its 60 s at a load of 19 to 41
+    /// (the Stage 3 close-out cycle-3 correctness verifier), and 40.5 s alone and 67.0 to 67.4 s beside a second TSan
+    /// process at a load of 16 to 26 (cycle 4), over half its limit at a load about 30, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: [UInt64(0x12_01), 0x12_02, 0x12_03, 0x12_04]
     )
     func randomReleasesAndRejoins(seed: UInt64) async throws {
@@ -106,6 +108,8 @@ struct EngineRegressionCycle12Tests {
             }
         }
         for operation in 0..<100 {
+            // A timed-out test ends at once (S3-R4).
+            try Task.checkCancellation()
             switch pick(100) {
             case 0..<30:
                 let handle = try await register(window(), lane: lanes[pick(lanes.count)])

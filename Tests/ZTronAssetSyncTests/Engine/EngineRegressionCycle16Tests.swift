@@ -392,8 +392,11 @@ struct EngineRegressionCycle16Tests {
     /// The answers to an extension come in turns of their own, at most `parksPerPump` jobs a turn (each answer costs about
     /// what a park does, C2); a later turn takes the rest. More user-initiated waiters than one turn answers wait for a
     /// 1 s throttle when a 60 s 429 extends it: every one of them gets the fail-fast answer, none is left waiting.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 26.5 s alone and 41.2 to 41.7 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast", .timeLimit(.minutes(3)))
     func everyUserWaiterFailsFastOnExtension() async throws {
         let count = SyncEngine.parksPerPump + 8
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4))

@@ -97,8 +97,11 @@ struct EngineLaneTests {
         await engine.shutdown()
     }
 
+    /// Every setting keeps at most `maxConcurrentTransfers` transfers running. Hang guard (S3-R4): under TSan in the whole
+    /// Sync bundle it took 22.3 s alone and 33.1 to 33.4 s beside a second TSan process at a load of 16 to 26 (Stage 3
+    /// close-out cycle 4), over half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16", .timeLimit(.minutes(1)), arguments: [1, 2, 4, 7, 16])
+    @Test("R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16", .timeLimit(.minutes(3)), arguments: [1, 2, 4, 7, 16])
     func boundedParallelism(concurrency: Int) async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: concurrency, reservedInteractiveSlots: 0))
         let catalog = (0..<40).map { index -> (ManifestEntry, Data) in

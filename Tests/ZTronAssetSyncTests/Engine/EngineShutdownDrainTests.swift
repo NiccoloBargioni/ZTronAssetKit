@@ -11,9 +11,11 @@ extension EngineIdleTests {
     /// exactly once, the group's join ends, the engine owns nothing afterwards, and the drain holds every continuation
     /// and job the state held (none is left behind for a later turn to miss). The settle's slices are recorded
     /// (`shutdownSlices`): none takes more than `shutdownStepsPerTurn` steps, and together they take every waiter and job,
-    /// so the bound holds on any device, not only where the benchmark measures it.
+    /// so the bound holds on any device, not only where the benchmark measures it. Hang guard (S3-R4): under TSan in the
+    /// whole Sync bundle it took 24.2 s alone and 40.3 to 42.9 s beside a second TSan process at a load of 16 to 26
+    /// (Stage 3 close-out cycle 4), over half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing", .timeLimit(.minutes(1)))
+    @Test("R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing", .timeLimit(.minutes(3)))
     func shutdownDrainsOverSeveralTurns() async throws {
         let count = SyncEngine.shutdownStepsPerTurn + 88
         let entries = (0..<count).map { EngineHarness.onDemand(String(format: "d%04d", $0), EngineFixture.bytes(UInt64(6_100 + $0), count: 32)) }

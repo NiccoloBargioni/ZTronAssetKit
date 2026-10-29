@@ -608,8 +608,11 @@ struct EngineLegacyMigrationTransferTests {
 
     // MARK: The install rate during migration (L5K-R14)
 
+    /// The install-rate limiter during migration. Hang guard (S3-R4): under TSan in the whole Sync bundle it took 21.1 s
+    /// alone and 30.5 to 30.6 s beside a second TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over
+    /// half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows (ARCHITECTURE §5), and a user-initiated job's adoption installs at once (L5K-R14)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows (ARCHITECTURE §5), and a user-initiated job's adoption installs at once (L5K-R14)", .timeLimit(.minutes(3)))
     func adoptionsKeepTheInstallRate() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(100, seed: 8_100)
