@@ -792,19 +792,29 @@ package final class BackgroundTransferHandle: TransferHandle {
 ///
 /// `nonisolated init`, so the nonisolated `AssetClient.init` can create it (transport-2 T2-16). The handler is
 /// UIKit's plain `() -> Void` and never leaves the main actor.
+///
+/// **Several handlers for one identifier (S3-CONC-02).** UIKit may hand a second handler for a session while the
+/// first still waits; Apple requires every one to be called, so each is kept, oldest first, and none replaces
+/// another. Each `accept` is followed by one `complete` once a wait for the session's events that began after the
+/// handler was accepted returned (`AssetClient.handleBackgroundEvents`). A `complete` cannot tell whose wait it ends,
+/// so it calls the oldest handler still waiting: by the k-th `complete`, k such waits returned, and at least one of
+/// them began after the k-th handler was accepted, so the k-th handler never runs before its own wake's events were
+/// staged, and every handler runs exactly once.
 @MainActor
 public final class BackgroundEventsRelay {
-    private var handlers: [String: () -> Void] = [:]
+    /// The handlers still waiting, oldest first, per identifier; never an empty list (`hasHandler` relies on it).
+    private var handlers: [String: [() -> Void]] = [:]
 
     /// Creates an empty relay.
     nonisolated public init() {}
 
-    /// Stores the handler for one of our identifiers; `false` (and nothing stored) for foreign identifiers.
+    /// Keeps the handler for one of our identifiers, after any handler for it still waiting; `false` (and nothing
+    /// kept) for foreign identifiers.
     public func accept(identifier: String, completionHandler: @escaping () -> Void) -> Bool {
         guard BackgroundSessionIdentifier.isOurs(identifier) else {
             return false
         }
-        self.handlers[identifier] = completionHandler
+        self.handlers[identifier, default: []].append(completionHandler)
         return true
     }
 
@@ -813,8 +823,13 @@ public final class BackgroundEventsRelay {
         self.handlers[identifier] != nil
     }
 
-    /// Calls and forgets the handler, once.
+    /// Calls and forgets the oldest handler still waiting for `identifier`, once; nothing when none waits.
     public func complete(identifier: String) {
-        self.handlers.removeValue(forKey: identifier)?()
+        guard let waiting = self.handlers[identifier], let oldest = waiting.first else {
+            return
+        }
+        let rest = waiting.dropFirst()
+        self.handlers[identifier] = rest.isEmpty ? nil : Array(rest)
+        oldest()
     }
 }
