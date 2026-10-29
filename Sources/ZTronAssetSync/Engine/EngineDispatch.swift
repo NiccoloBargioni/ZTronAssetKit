@@ -350,8 +350,8 @@ extension SyncEngine {
         /// The job, and with a lane-wide block other jobs of its lane, were parked or left to wait: the count, toward
         /// the pump's `parksPerPump`.
         case parked(Int)
-        /// The job holds an id the copy lists at other content while a follow is owed: it is back at the head of its
-        /// queue, and the queue waits for the follow's visit (`awaitsFollow`).
+        /// The job holds an id the copy maps to other content, or no longer lists, while a follow is owed: it is back
+        /// at the head of its queue, and the queue waits for the follow's visit (`awaitsFollow`).
         case waitsForFollow
     }
 
@@ -359,9 +359,9 @@ extension SyncEngine {
     /// in all (`parkLane`).
     ///
     /// A job that waits for an owed follow (`awaitsFollow`) is neither started nor parked: between two turns of a bounded
-    /// follow the jobs of replaced content keep their old places ahead of the new content's jobs, and every pump started
-    /// them, requests for content no id wants (the close-out cycle-2 correctness lens, PROBE-W1: 44 of 48 starts after
-    /// the apply at 3,000 members). It goes back to the head of its queue, which waits for the follow; each follow turn
+    /// follow the jobs of replaced or dropped content keep their old places ahead of the new content's jobs, and every
+    /// pump started them, requests for content no id wants (the close-out cycle-2 correctness lens, PROBE-W1: 44 of 48
+    /// starts after the apply at 3,000 members). It goes back to the head of its queue, which waits for the follow; each follow turn
     /// pumps again (`pumpWaitsForFollow`). The check costs one queue head per lane and pump, never a scan, and the visit
     /// stays the follow's, bounded per turn (C2): following the job here would move up to a queue of jobs per pump.
     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {

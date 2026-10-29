@@ -89,23 +89,32 @@ extension SyncEngine {
         }
     }
 
-    /// Whether `job` waits for the follow before it acts: a follow is owed and the job holds an id the engine's copy lists
-    /// at another transfer, so the job's content is not what that id wants any more. Such a job is one the follow still
-    /// owes a visit, one its pass has not reached yet (both up to about 40 turns after the apply at SPEC §6's 10,000), or
-    /// one joined meanwhile for an entry the copy replaced; the follow moves each of them (T22), and until it does the
-    /// job must neither start nor answer the moved id with its content's failure (the close-out cycle-2 correctness
-    /// lens, PROBE-W1 and PROBE-W4: the cycle-1 follow moved every job in the apply's turn). An id the copy does not list
-    /// is not counted: a waiter joined from the store's newer manifest (`EngineManifest.join`) holds one legitimately. One
-    /// lookup in the copy and one formatted transfer per id of the job.
+    /// Whether `job` waits for the follow before it starts: a follow is owed and the job holds an id the engine's copy
+    /// does not map to its content (listed at another transfer, or dropped), so the job's content may be what no id
+    /// wants any more. Such a job is one the follow still owes a visit, one its pass has not reached yet (both up to
+    /// about 40 turns after the apply at SPEC §6's 10,000), or one joined meanwhile for an entry the copy replaced; until
+    /// the follow moves or ends it, it must not start (the close-out cycle-2 correctness lens, PROBE-W1: the cycle-1
+    /// follow moved every job in the apply's turn). A job joined from the store's newer manifest, whose id the copy does
+    /// not list yet (`EngineManifest.join`), waits too, harmlessly: it starts once the follow has ended. One lookup in
+    /// the copy and one formatted transfer per id of the job.
     func awaitsFollow(_ job: Job) -> Bool {
         guard self.followOwed else {
             return false
         }
+        return job.assets.contains { self.state.applied.entry(for: $0)?.transferID != job.transfer }
+    }
+
+    /// Whether `job` holds an id the engine's copy lists at another transfer while a follow is owed: a failure of the
+    /// job's content is not that id's (F-20: never `.notFound` while the asset is listed; PROBE-W4). An id the copy does
+    /// not list is not counted: a waiter joined from the store's newer manifest (`EngineManifest.join`) holds one
+    /// legitimately, and the follow would end its interest `.notFound`; a dropped id's interest gets the failure's own
+    /// answer instead of the follow's `.notFound`, which no rule forbids.
+    func holdsMovedID(_ job: Job) -> Bool {
+        guard self.followOwed else {
+            return false
+        }
         return job.assets.contains { asset in
-            guard let listed = self.state.applied.entry(for: asset) else {
-                return false
-            }
-            return listed.transferID != job.transfer
+            self.state.applied.entry(for: asset).map { $0.transferID != job.transfer } ?? false
         }
     }
 
@@ -116,7 +125,7 @@ extension SyncEngine {
     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
     /// answer. A pump is scheduled for the new content's jobs, since some callers do not pump afterwards.
     func followBeforeActing(_ transfer: TransferID) -> Bool {
-        guard let job = self.state.jobs[transfer], self.awaitsFollow(job) else {
+        guard let job = self.state.jobs[transfer], self.holdsMovedID(job) else {
             return false
         }
         if self.follow(transfer) {
