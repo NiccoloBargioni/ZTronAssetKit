@@ -183,8 +183,9 @@ struct LargeBlobTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
-    /// The evictable selection re-reads every current holder in each chunk's turn: one pinned between two chunks stops the
-    /// blob there. The records purged before stay purged (each made a sync due, R-CLN-6); the rest keep the blob.
+    /// The evictable selection re-validates the blob and the holders of each chunk in that chunk's turn: w3, pinned
+    /// between the first two chunks, stops the blob at the second. The records purged before stay purged (each made a sync
+    /// due, R-CLN-6); the rest keep the blob.
     @Test("R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func evictablePurgeStopsAtAPinnedHolder() async throws {
@@ -204,7 +205,7 @@ struct LargeBlobTests {
         }
         let held = Set(await metadata.heldUnits)
         _ = try await CleanupSteps.run(metadata, keeping: held) {
-            try await harness.store.setPinned([shared[4].id], pinned: true)
+            try await harness.store.setPinned([shared[3].id], pinned: true)
         }
         await metadata.setHolding(false)
         let result = try await purge.value
@@ -215,6 +216,35 @@ struct LargeBlobTests {
             #expect(await harness.isPresent(asset.id, at: key), "\(asset.id.rawValue) keeps the blob")
         }
         #expect(harness.hasBlob(key))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+}
+
+extension LargeBlobTests {
+    /// The first turn checks every victim, as one turn did: a record that changed before the blob's first turn keeps the
+    /// blob whole, so only a change between its turns can split it.
+    @Test("R-CLN-4: quota eviction skips whole a blob more records share than a chunk holds when a later record was accessed before its first turn", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func evictionSkipsTheBlobChangedBeforeItsFirstTurn() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(budget: .bytes(0)), bulk: bulk)
+        let shared = try await LargeBlobTests.seedShared(harness, count: 5, seed: 1_540)
+        let key = shared[0].key
+        await harness.store.testSetEvictionChunk(2)
+        await bulk.setHolding(true)
+        let eviction = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        // The candidates unit selected the blob and is held; w4, in the blob's last chunk, is read meanwhile.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        harness.time.advance(by: 1)
+        #expect(await harness.store.location(for: shared[4].id, extensions: [], recordingAccess: true) != nil)
+        await bulk.setHolding(false)
+        let result = try await eviction.value
+
+        #expect(result == CleanupResult(), "nothing evicted, nothing released")
+        #expect(await LargeBlobTests.count(harness, shared, .absent(.evicted)) == 0, "the blob is kept whole")
+        #expect(await LargeBlobTests.references(harness, key) == 5)
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 }
