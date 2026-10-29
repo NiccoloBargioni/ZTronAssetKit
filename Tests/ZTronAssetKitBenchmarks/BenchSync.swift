@@ -223,6 +223,34 @@ extension ZTronAssetKitBenchmarks {
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
+        /// C2 at SPEC §6's reference scale when the engine shuts down (Stage 3, S3-PERF-01): under a 10,000-member
+        /// prefetch group (three run, the others wait in the queue) and 10,000 user-initiated `resolve` callers waiting on
+        /// its members, the shutdown's first turn sorted the job table twice to cancel handles, answered every waiter and
+        /// group and freed the job table in one actor turn (17 to 22 ms). The same path retires the engine of a store
+        /// whose root vanished while the app runs. Production's dispatch executors (the store's units off the actors).
+        /// Medians of three against P-9, the best of the three against C2, after a warm-up; the 1,000 figure gives the
+        /// ratio, and the group alone (no waiters) is measured too.
+        @Test("R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func shutdownTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            let small = try await SyncBench.shutdownWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.shutdownWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            var groupOnly: [Double] = []
+            for _ in 0..<3 {
+                groupOnly.append(try await SyncBench.shutdownWait(members: 10_000, waiters: false))
+            }
+            print("R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs); at 1,000: \(small) ms; the group without waiters: \(groupOnly)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+            #expect((groupOnly.min() ?? .infinity) <= Self.c2Budget, "group only: \(groupOnly)")
+        }
+
         /// C2 at SPEC §6's reference scale for a handle registered at user-initiated priority (`AssetClient.prefetch`
         /// accepts it; review of close-out cycle 9, PROBE-C9C-2): its four members run (every slot) and the others wait in
         /// the user queue. The release leaves the members it has not reached yet queued and only the released group
@@ -1428,4 +1456,85 @@ extension SyncOutcome {
         return false
     }
 
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// `scaleBench(members:room: nil)` with production's executors: the engine's manifest decode and the store's units
+    /// run on dedicated dispatch queues, off the actors (`InlineBlockingExecutor` would run them on the calling actor and
+    /// charge them to its turn).
+    static func dispatchBench(members count: Int) async throws -> ScaleBench {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: DispatchBlockingExecutor(label: "bench.metadata"),
+            bulkExecutor: DispatchBlockingExecutor(label: "bench.bulk"),
+            time: time,
+            random: SeededRandom(seed: 0x11),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let size = 400
+        let entries = (0..<count).map { index in
+            SyncBench.entry("s\(index)", GeneratedPayload.bytes(seed: 0x11_000 + UInt64(index), offset: 0, length: size), policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(entries), etag: ETag(rawValue: "\"v1\""))])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        return ScaleBench(engine: engine, source: source, conditions: conditions, entries: entries, size: size, fileSystem: fileSystem, ballast: nil, time: time)
+    }
+
+    /// The heartbeat's longest wait while `shutdown()` runs over a `count`-member prefetch group (three run, the others
+    /// wait in the queue) whose members, when `waiters`, each have one waiting user-initiated `resolve` caller; every
+    /// caller must be answered `shutDown`.
+    static func shutdownWait(members count: Int, waiters: Bool = true) async throws -> Double {
+        let bench = try await SyncBench.dispatchBench(members: count)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        callers.reserveCapacity(count)
+        for entry in bench.entries where waiters {
+            callers.append(Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) })
+        }
+        let expected = waiters ? count : 0
+        await engine.awaitCondition { $0.state.waiters.count == expected }
+        await engine.waitForAllHandles()
+        let wait = try await SyncBench.longestWait(on: engine) {
+            await engine.shutdown()
+        }
+        for caller in callers {
+            guard case .failure(.shutDown) = await caller.value else {
+                throw SyncBenchError.incomplete("a waiting resolve was not answered shutDown")
+            }
+        }
+        return wait
+    }
 }
