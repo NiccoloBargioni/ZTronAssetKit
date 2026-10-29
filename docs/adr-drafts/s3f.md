@@ -1,11 +1,13 @@
-# Stage 3 close-out `s3f` — WP-F (sync engine), cycle 1
+# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 and 2
 
 Branch `wp/s3f` from tag `s3-base`. Rulings: `.build-orchestrator/s3-rulings-s3f.md`; findings:
 `.build-orchestrator/s3-findings-s3f.json`. WP-F's Stage 2 record is `docs/adr-drafts/f.md` (background only).
 
 ## Orchestrator rulings (close-out)
 
-Each ruling below is recorded as given in the rulings file and applied in this cycle.
+Each ruling below is recorded as given in the rulings file and applied in cycles 1 and 2. Cycle 2 applied them again to
+the cycle-1 verifiers' findings (the section "Cycle 2" below); no ruling changed, and no new ruling was issued, so S3F-13
+is implemented rather than demoted.
 
 - **Orchestrator ruling (close-out) S3-R1, scope and order.** Blocking items first (failing test committed on its own,
   then the fix), then REQUIRED, then OPTIONAL; ADR-RECORD items get an entry here and no code; items not listed are out
@@ -40,6 +42,24 @@ Each ruling below is recorded as given in the rulings file and applied in this c
 - **Orchestrator ruling (close-out) S3-R9, records.** This file: one entry per item, then "Authorised edits outside
   WP-F", "Proposed document changes" and "Not verified here".
 - **Orchestrator ruling (close-out) S3F-1 to S3F-17.** The per-item rulings are quoted at the head of each entry below.
+
+## Cycle 2: the cycle-1 verification findings
+
+Every finding of the two cycle-1 lenses, with its disposition. Blocking ones first; each fix is detailed under its item.
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| reqs (blocking) | S3F-10 not applied: no behaviour test for any uncovered region | **Fixed**: tests for every region a seam reaches; the rest recorded with reasons (S3F-10 below) |
+| reqs (blocking) | S3F-13 not applied: re-admission still quadratic, benchmark at 1,000 | **Fixed**: lazy re-admission from an ordered index, structural pin, `probeChainTurns` at 10,000 (S3F-13 below) |
+| reqs (blocking) | S3F-14 partly done | **Fixed**: every remaining §12.3/§12.4 name written; R-SYN-15's join-before-close order has an engine-side check that M5 and M6 fail (S3F-14 below) |
+| correct (blocking) | S3F-5 residual: the follow of an apply changing every member of a waiting 10,000-member group held the actor 111–145 ms | **Fixed**: the follow is bounded per turn (S3F-5 below) |
+| reqs | S1-11's test hangs instead of failing under the strand mutant | **Fixed** (`ad98ac3`): `EngineHarness.value(of:)` forwards the time limit's cancellation to the awaited task; used at all 14 `withClock { await task.value }` sites. Strand mutant (`EngineDispatch.swift`, `guard let update = terminal else { return }`): `EngineSync1RegressionTests.swift:96:6: Time limit was exceeded: 60.000 seconds`, then `:114:9`, `:118:9`, `:119:9` recorded, `failed after 63.970 seconds with 4 issues` (it hung for over 31 minutes before). |
+| reqs | S3F-4: no deterministic pin of settle's per-turn bound | **Fixed** (`243c6da`): settle records its slices (`EngineState.shutdownSlices`); `R-SYN-15: a shutdown over more waiters and jobs than one turn takes …` asserts every slice ≤ `shutdownStepsPerTurn`, their sum = 1,200, at least three. No-chunk mutant (`if steps == Int.max`): `EngineShutdownDrainTests.swift:52:9: … every turn of the settle takes at most shutdownStepsPerTurn steps: [1200]` and `:54:9` |
+| reqs | S3F-15: `fireDue`'s use of the limit unpinned | **Fixed** (`243c6da`): `R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together` (600 retries due at once, the alarm turn held and stepped). Mutant `popDue(at: now)`: `EngineBoundaryTests.swift:199:9: … one turn re-queued 600 retries` and `:200:9: … the rest wait for the next turn: 0` (lines 200 and 201 since the wait was made to end when no alarm is left, so the mutant fails at once instead of after the time limit) |
+| reqs | P-4 missed at load (4 of 6 runs) | No change (planner untouched since `s3-base`); re-measured below; the orchestrator re-measures on a quiet host at the Stage 3 merge |
+| correct | P-11 2.51 and the throttle extension under load | No change (dispatch untouched by this cycle); re-measured below |
+| correct | S3F-13 still open | Same as the requirements finding (fixed) |
+| correct | other-wp:b: P-13 unit max 6.83 ms | **other-wp:b:** not WP-F's file (`BenchStorage.swift`), not touched; routed to WP-B |
 
 ## Items
 
@@ -123,6 +143,8 @@ process; make steps cheaper where possible; raise a guard only with measurements
 - **Structural test:** `R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown
   and leaves the engine owning nothing` (`EngineShutdownDrainTests.swift`): 600 waiters and jobs; the drain takes every
   waiter, job and group and leaves none in the state; every waiter is answered `shutDown` once; no owned task remains.
+  Cycle 2 (`243c6da`): the same test now pins the bound itself through the settle's recorded slices
+  (`EngineState.shutdownSlices`), which the cycle-1 verifier showed a no-chunk mutant survived (see "Cycle 2").
 
 ### S3F-5 [BLOCKING] S3-PERF-02 — an apply under a 10,000-member group — **Fixed**
 
@@ -146,6 +168,38 @@ process; make steps cheaper where possible; raise a guard only with measurements
   it was` (`EngineFollowTests.swift`): the changed member's interest follows its new content, the dropped member's job
   ends, the others keep their jobs, exactly one job is created, `unfollowed` is empty and every invariant holds; a
   second apply of the same manifest moves nothing.
+- **Cycle 2: the residual (correctness lens, blocking).** Proportional was not bounded: an apply that changes the content of
+  every member of a waiting 10,000-member prefetch group (a catalog re-encode under `AssetClient.prefetch`) superseded,
+  re-routed and re-created 10,000 jobs in one turn. Failing benchmark first (`b4c215d`): `R-SYN-6: a sync whose manifest
+  changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10
+  ms per turn` (`BenchSync.changedRefreshTurns`, production dispatch executors, the PROBE-V9 shape at 100 %), runs
+  [110.53, 111.25, 133.49] ms at load 6.7→10.5, `BenchSync.swift:293:13` (P-9's 50 ms median) and `:294:13` failed.
+- **Fix** (`958348e`, `Sources/ZTronAssetSync/Engine/EngineFollow.swift`, new; `followApplied` moved there from
+  `EngineRuns.swift`): the pass over the replaced copy is itself bounded (`followScansPerTurn` 16,384 entries compared and
+  `followFormatsPerTurn` 2,048 changed transfers formatted per turn: the pass alone over 10,000 changed entries took 7.5 to
+  15.6 ms, and the sort 3.4 to 3.6 ms, in a release probe), and at most `followsPerTurn` (256) jobs are visited per turn;
+  `supersede(_:settling: false)` lets a follow check the run and pump once per turn instead of once per job. The rest is
+  owed to owned follow-up turns (`EngineState.followScans`, `followOrder`/`followNext`; `followFollowUp()`): a job waits
+  in `unfollowed` from the pass's finding until its visit, which is that set's documented meaning, and a later apply's
+  follow restarts the visits from `unfollowed` and queues its pass behind the owed ones (every pass compares with the
+  copy as it stands when it runs, so two applies in a row are followed exactly). While a follow is owed `checkRunSettled`
+  does not settle (a claim may still move) and `manifestCaughtUp` keeps the jobs held for a catch-up held (the follow's
+  last turn releases them). New `invariantViolations()` rules: a follow owed with no turn scheduled; an owed job missing
+  from `unfollowed`; the `unfollowed` rule now accepts a job the owed pass has not reached (it follows the replaced copy).
+  Shutdown drains the follow's state. **REENTRANCY RE-S44 (proposed)**, the follow-up's hop (row below).
+- **Measured after** (release probe at load ~33): the follow's first turn 4.08 ms (was 111–145 ms in one turn); benchmark
+  runs [6.47, 9.87, 10.43] ms at load ~32, then [3.68, 3.80, 3.76] ms at load 6–8 (14:51). Later runs are under "Gate
+  evidence (cycle 2)".
+- **Tests:** `R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per turn with every
+  invariant holding between turns` (2,148 changed members, the follow-up held and stepped one turn at a time with
+  `holdFollowFollowUps()`: turn 1 stops its pass at 2,048 formats and moves 256 jobs, nine turns of at most 256 moves,
+  every invariant holding and the run unsettled between turns, every member's interest on its new content at the end).
+  Mutants: the visit bound removed → `EngineFollowTests.swift:111:9` (`first.moved == followsPerTurn`), `:112:9`,
+  `:114:9`; `checkRunSettled`'s follow guard removed → `:117:17: Expectation failed: !turn.settled`. And `R-SYN-2: a job
+  held for a manifest catch-up stays held until the follow that may move it has ended` (the catch-up and the held job are
+  set up in one engine turn, the order a superseded publication and an apply in flight leave; jobs a release removes
+  between two follow turns are skipped). Mutant (`manifestCaughtUp` without the follow guard) →
+  `EngineFollowTests.swift:165:9: Expectation failed: first.held`.
 
 ### S3F-6 [REQUIRED] S3-CONC-03 — run progress order for a lagging subscriber — **Fixed**
 
@@ -180,16 +234,37 @@ process; make steps cheaper where possible; raise a guard only with measurements
 `S3-CONF-05.mutant.diff`: `✘ … at EngineGateConformanceTests.swift:100:9: Expectation failed: result == .failure(.authRejected(.confirmed))`.
 Commit `3a602f6` (S3F-7a, S3F-8, S3F-9).
 
-### S3F-10 [REQUIRED] S3-CONF-08 — uncovered Sync regions — **Open (not reached in cycle 1)**
+### S3F-10 [REQUIRED] S3-CONF-08 — uncovered Sync regions — **Fixed in cycle 2 (tests where a seam reaches; reasons for the rest)**
 
-No behaviour test was added for the listed regions in this cycle. The regions, as §14 candidates until tests reach
-them: the engine's handling of a publication the store refuses (`unknownAsset`, `notPresent`, `assetFailed`,
-`unverifiedRejected`; R-INT-5 with `allowUnverifiedAssets = false`); an uncommanded `.cancelled(.byClient)` re-queue
-(§7.6 T7/T13); the progress replay for a subscriber joining mid-run; maintenance exhausting its budget between steps and a
-step that throws (R-SYN-16, L4-R5); the pending-run gate re-arming for conditions, breaker and throttle; stale edge and
-origin re-admissions; an apply adding an id over a detached record. The Kit regions (follower and group-registration
-races, `withAsset`'s "root vanished after every reopen") are **other-wp:g:**. Sync line coverage after this cycle:
-93.60 % (8804/9406), up from the hunter's 93.49 %; the gate's floor is 90 %.
+*Ruling:* a behaviour test through real APIs or a documented seam for each uncovered region the conformance hunter listed
+in Sync, `other-wp:` for the Storage and Kit ones, §14 candidates for the rest. Cycle 1 wrote none (the cycle-1 verifiers'
+blocking finding). Cycle 2 (`59e14fe`), every test in WP-F's suites, all passing on the current engine (none
+showed a bug):
+
+| Region (s3-base lines) | Test (display name) | Status |
+|---|---|---|
+| A publication the store refuses, `unverifiedRejected` (`EngineDispatch.swift:1112-1114`; R-INT-5, `allowUnverifiedAssets = false`) | `R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried` | covered; the engine still downloads before the store refuses (the hunter's "decide whether a strict policy should refuse before downloading"): recorded as observed behaviour, a proposal for the orchestrator, not changed here (a pre-download refusal changes what a user resolve answers and when) |
+| `unknownAsset` / `notPresent` (`:1109-1111`) | `R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer` (the store applies a manifest without the id behind the engine's copy while the transfer runs) | covered |
+| `assetFailed` (`:1112-1114`) | `R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record` (`recordFailure(…, reason: .notFound)` behind the engine) | covered |
+| An uncommanded `.cancelled(.byClient)` re-queue (`EngineFailures.swift:75-76`; §7.6 T7/T13) | `R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers` | covered |
+| The progress replay for a subscriber joining mid-run (`EngineEvents.swift:128-129`; R-SYN-12) | `R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress` | covered |
+| Maintenance out of budget between steps (`EngineCommands.swift:1054-1056`, after orphan collection) | `R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted` (the sweep's bulk unit held, the clock passes the deadline) | covered |
+| A maintenance step that throws `cancelled` (`:1081-1085`) | `R-SYN-16: a maintenance step cancelled by shutdown answers shutDown` | covered |
+| A maintenance step that throws otherwise (`:1086-1092`) | `R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs` (EIO on the staging listing) | covered |
+| Source copies a source fails to release (`EngineRuns.swift:1034-1035`; R-CLN-10) | `R-CLN-10: source copies a source fails to release after a run are recorded for diagnostics` (`ReclaimFailingSource`) | covered |
+| Maintenance out of budget after eviction (`EngineCommands.swift:1063-1065`, now `:1065-1067`) | — | **§14 candidate**: `evictIfNeeded`'s only executor unit is its free-space read on the metadata executor, which every earlier step also uses (staging and orphan listings, in an order WP-B owns), so no seam holds that unit without counting WP-B's units; the check is the same `expired()` as the tested exit after orphan collection |
+| "Adoption report failed" (`EngineRuns.swift:1036-1037`, now `:1009`) | — | **§14 candidate**: `adoptionReport()` throws only while the store is not open or marked unavailable (`awaitOpen`, `checkWritable`); no fake path marks it unavailable between a run's last commit and this read without failing that commit first |
+| The pending-run gate re-arming for conditions, breaker and throttle (`EngineRuns.swift:992-1004`, now `:963-976`, `pendingRunGate` → `.unarmed`) | — | **§14 candidate (defence in depth, as FULFIL and the F-39 re-check)**: `.unarmed` needs a pending run whose gate nothing will open; every path that sets or changes one arms it: a pending run is work, so the conditions watcher exists (`hasWork`, `ensureWatcher`); a breaker that rejects always has its cooldown or a probe's watchdog in the heap, or a probe whose outcome reconsiders (`scheduleBreakerDeadline` on every change); a throttle pending run's deadline is scheduled when it is set and moved by every extension (`throttleExtended(from:)`). `invariantViolations()`' `strandedPendingRun` names the state if it ever arises |
+| Stale edge and origin re-admissions (`EngineReadmission.swift:128-129`, `:134`, `:141-142`, `:147`) | — | **already in §14** (level-4 merge: "the stale-entry branches of the re-admission turn"): `reindex` removes a job from `edgeOwed`/`originOwed` in the transition that leaves the owed state and `removeJob` does too, so the passes find no stale entry |
+| An apply that adds an id over a detached record (`AssetStore+Apply.swift:206-210`) | — | **other-wp:b:** WP-B's file; the record kinds that stay detached are WP-B's to produce in a unit test |
+| Kit: follower and group-registration races, `withAsset`'s "root vanished after every reopen" (`ClientLifecycle.swift:246-253`, `:508-515`, `AssetClient.swift:148-149`) | — | **other-wp:g:** WP-G's files (`AssetClient.swift:146-151` is already in §14) |
+
+Cycle 2's own new code that no test runs (final coverage run, "Gate evidence (cycle 2)"), each a guard: the follow's
+follow-up that cannot be spawned (shutting down) or finds nothing owed (`EngineFollow.swift`), a job visited that no
+longer exists or did not move, the parked-order re-admission's illegal-transition `continue` and its no-breaker return
+(`EngineReadmission.swift`), and `readmitOpenedOriginGates`' eager branch for a breaker that admits every transfer while
+jobs stay parked (`EngineOriginGate.swift`: a closed breaker re-admits its parked jobs in the turn it closes, the rest owed
+in `originOwed`, which the callers check first). Proposed for §14 below.
 
 ### S3F-11 [REQUIRED] M-N-09, M-N-12, M-N-14, M-N-16, M-N-20, M-N-39 — **Fixed (tests)**
 
@@ -230,34 +305,94 @@ Tests (`EngineBoundaryTests.swift`, commit `1dcc21e`), each with its mutant's fa
   `releasesPerTurn` + 24 claims of a registered group, checked in the give-up's own turn; and a release holding members
   while registered is still reported). Failing first `435c58c` (`["group 5 is released and registered"]`); fix `3cf147d`.
 
-### S3F-13 [REQUIRED] S3-B-063 — lazy re-admission for probe chains — **Open (deferred to cycle 2)**
+### S3F-13 [REQUIRED] S3-B-063 — lazy re-admission for probe chains — **Fixed in cycle 2**
 
-Not implemented in this cycle. A lazy re-admission (re-queue only the next parked job when a probe exits without a
-verdict, from an ordered index of `circuitParked` by `(rank, ticket)`) changes what the engine's gate invariants mean:
-today no job may stay parked against a gate that admits at `now` (F-40; `EngineGateModelTests`, `checkRunSettled`'s
-"parked claim counts as working"), and a lazy design deliberately leaves all but one parked while the half-open breaker
-would admit a probe. The invariants and the run-settling rule need a reviewed redefinition (e.g. "the head of the
-ordered parked index is queued or probing") before the change; doing it inside this cycle risked the five blocking
-fixes. The `probeChainTurns` benchmark therefore still runs at 1,000 members (10,000 would take about 161 s under the
-quadratic total).
+*Ruling:* L4-R22: lazy re-admission with an ordered index (O(log n) per probe exit) so a chain of half-open probes is no
+longer quadratic in the parked jobs; pin it structurally (re-admission work per exit) and extend `BenchSync.swift:328`
+to 10,000 parked members under C2. Cycle 1 deferred it; no ruling demoted it, so cycle 2 implements it.
 
-### S3F-14 [REQUIRED] S3-B-068, S3-B-069, S3-B-070 — §12 regression names — **Partly done**
+- **Failing test first** (`ce021cb`): `R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked
+  job per probe exit, in the pump's order, not every job the breaker parked` (`EngineProbeChainTests.swift`, `extension
+  EngineFailurePathTests`): on `s3-base`'s eager re-admission `EngineProbeChainTests.swift:80:9: Expectation failed:
+  seen.mostQueued <= 1 ↳ at most one member waits in the queue for the probe: 64`.
+- **Fix** (`e575681`): `CircuitParkedOrder` (new, `Sources/ZTronAssetSync/Engine/CircuitParkedOrder.swift`), a binary
+  min-heap of the breaker-parked jobs by (queue rank, queue ticket, transfer) with lazy deletion: a job's place is pushed
+  when it enters `blocked(circuitOpen)` (`transition`) and when an interest joins it while parked (`addInterest`, its rank
+  may rise); a stale place (the job left the park, was queued again, or ranks lower now) is dropped or re-pushed at its
+  rank when it reaches the top; the order is emptied when nothing is parked and rebuilt in O(n) when stale places
+  outnumber live ones (`noteCircuitParked`). A breaker that admits a parked job only as its probe (open past its cooldown,
+  half-open without a probe or past a silent probe's watchdog: `breakerAdmitsOnlyProbe()`) re-admits only the first parked
+  job (`readmitForProbe()`), in `unblockOrigin(.circuitOpen)` (cooldown end, watchdog, probe exit without a verdict) and in
+  `readmitOpenedOriginGates` (which schedules a pump only when it re-queued one, so `checkRunSettled` cannot loop); it
+  re-admits nothing while that candidate (`EngineState.probeCandidate`) still waits in the queue and no parked job ranks
+  before it. A closed breaker still re-admits every parked job (bounded per turn, as before). The pump's end re-admits the
+  next parked job when the candidate was parked for another gate or ended (`ensureProbeCandidate()`; `removeJob` of the
+  candidate owes a pump); a joiner of a job that stays parked behind the candidate gets the park's fail-fast answer now
+  (`failFastJoiner`), as the eager design gave it when the pump parked that job again behind the probe.
+- **The invariants, redefined.** F-40's rule "no job stays parked against a gate that admits at `now`" becomes, for a
+  breaker that admits only a probe, "a queued job that the pump serves no later than the parked one (queue rank at or
+  before it) will take the probe" (the gate model's I3 oracle, `EngineGateModelTests.staleParks`), and the engine's own
+  `invariantViolations()` gains two rules: every parked job has its place in the order, and parked jobs are never stranded
+  (the breaker admits only a probe, nothing is queued, no re-queue, pump or due breaker deadline is owed). `checkRunSettled`
+  still counts a parked claim under a gate that admits as working: the candidate's dispatch takes the probe, after which
+  the gate rejects and the run settles blocked as before. Two cycle-20/21 regression tests waited for the claim to be
+  **queued** after the cooldown's turn; they now wait for it to be queued or parked behind the probe (their assertions
+  are unchanged; `EngineRegressionCycle20Tests.swift`, `EngineRegressionCycle21Tests.swift`).
+- **Structural pin:** the chain test counts the re-admission work (`EngineState.circuitReadmissions`, jobs re-queued from
+  `blocked(circuitOpen)`): over 60 parked members and 60 probe exits, exactly 60 re-admissions, never more than one member
+  queued nor more than one queued and one downloading at any notification, the members probing in the pump's order.
+  Eager mutant (the lazy branches disabled): `EngineProbeChainTests.swift:91:9: Expectation failed: readmitted == count -
+  slots`, `:92:9`, `:93:9`. Missing pump-end hook: the seeded gate walks fail (`EngineGateModelTests.swift:503:29` and the
+  walk test). Plus `R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays
+  bounded` (70 joins compact the order to its bound; a user-initiated join raises a parked member's rank and its release
+  lowers it again; the cooldown re-admits the first member in the pump's order, once). Mutant (rank check removed) →
+  `EngineProbeChainTests.swift:147:9: … probing.probe == members[0].transferID`. And `R-SYN-5: the breaker's parked order
+  always yields its smallest entry by rank, then ticket` (three seeds, against a sorted model).
+- **Benchmark:** `probeChainTurns` now runs 10,000 parked members (warm-up 1,000): `R-SYN-5: a chain of half-open probes
+  ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms
+  per turn, and reports the chain's total time`. At load 6–8 (14:51): runs [5.26, 2.08, 2.77] ms, totals [20.2, 22.3,
+  24.6] s (the quadratic design's estimate was about 161 s; the total is now dominated by each probe's attempt round trip
+  through the fake source and the bench's polling at default priority against utility-priority engine tasks, about 2 ms
+  per probe, not by re-admission work, which the structural test counts as one per exit). `cooldownEndTurns` 0.05–0.07
+  ms (one re-admission instead of 512 per turn). Later runs under "Gate evidence (cycle 2)".
 
-Written (`EngineSync1RegressionTests.swift`, `extension EngineRegressionTests`, commit `ee95eb8`), both passing (no
-bug found):
+### S3F-14 [REQUIRED] S3-B-068, S3-B-069, S3-B-070 — §12 regression names — **Fixed (cycles 1 and 2)**
 
-- S1-11 — `R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it`
-  (a `TruncatingSource` returns a handle whose stream finishes with no element; the engine records the attempt's
-  `incompleteCallbackSequence` failure once, and the retry delivers the asset; the first form read the `failed(.at)`
-  state, which the backoff's full jitter can make due at once, and failed once in `verify.sh --quick`, so it was
-  rewritten in `60eab9c`).
-- S1-07 — `R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again`.
+Every name ARCHITECTURE §12.3/§12.4 gives is written, in `extension EngineRegressionTests`; all pass on the current engine
+(no test failed first, so no bug was found and no fix commit was needed beyond the R-SYN-15 mark below):
 
-Open for cycle 2: S1-01 (both names), S1-12, S1-15's run form, S2-09, S2-10, S2-01's `ensureAvailable` form, S1-09's
-replaced-alarm and replaced-watcher halves (the watcher half can use `GatedConditionsSource` to hold the old watcher in
-`conditions()` while a new one starts), and the engine-side join-before-close assertion for R-SYN-15 (it needs an
-observable mark of the store's close, e.g. a `closingStore` flag checked by a condition observer, since `close()` drains
-and the file-system record cannot tell M5/M6 apart).
+| Finding | Test (display name) | File, commit |
+|---|---|---|
+| S1-01 | `R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure` | `EngineSync1LivenessTests.swift`, `b336bd9` |
+| S1-01 | `R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot` | same |
+| S1-07 | `R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again` | `EngineSync1RegressionTests.swift`, `ee95eb8` (cycle 1) |
+| S1-09 (replaced alarm) | `R-SYN-15: an alarm replaced while its turn waits never unregisters its successor, which fires every due deadline` | `EngineSync1HalvesTests.swift`, `b336bd9` |
+| S1-09 (replaced watcher) | `R-SYN-14: a watcher replaced while its observation is still being set up never unregisters its successor and never observes` (`HoldingConditionsSource` holds both watchers in `conditions()`; the harness gained `conditionsWrapper:`) | same |
+| S1-11 | `R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it` | `EngineSync1RegressionTests.swift`, `ee95eb8`/`60eab9c` (cycle 1), hang guard `ad98ac3` |
+| S1-12 | `R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable because of concurrent commits` (the member's publication held while the bulk run commits and moves the index generation) | `EngineSync1LivenessTests.swift`, `b336bd9` |
+| S1-15 (run form) | `R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs` (a condition observer samples the job count at every notification; hang guard 3 min, S3-R4 measurement below) | same, `942c633`, `a528809` |
+| S2-01 (`ensureAvailable` form) | `R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe` | `EngineSync2RegressionTests.swift`, `b336bd9` |
+| S2-09 | `R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed` | same |
+| S2-10 | `R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline` | same |
+| R-SYN-15 join-before-close | `R-SYN-15: shutdown joins every owned task before it begins closing the store` | `EngineSync1HalvesTests.swift`, `b336bd9` |
+
+- **R-SYN-15's engine-side assertion.** `performShutdown` now sets `EngineState.closingStore` and notifies observers right
+  before `store.close()`; a condition observer records the owned-task count whenever it sees the mark. The level-4
+  verifier's mutants M5 and M6 are not on file, so they are reconstructed from `f.md` F-20's description: M5 moves the
+  close before the join loop, M6 removes the join loop. Both fail the new test while the existing `R-SYN-15: no store
+  mutation or commit happens after close returns` still passes under them (the gap the backlog item named): M5
+  `EngineSync1HalvesTests.swift:216:9: Expectation failed: record.tasksAtMark.allSatisfy { $0 == 0 } ↳ no owned task was
+  registered when the close began: [1, 0, 0, 0]`; M6 the same line with `[3, 2, 1, 0, 0, 0]`.
+- **Mutants of the other tests** (scratch, re-applied and reverted in place, each rebuilt): the alarm body without its
+  token check → `EngineSync1HalvesTests.swift:100:29` (the successor is no longer the registered alarm); a stale watcher's
+  exit that unregisters the current watcher → `:153:9`, `:154:9`, `:156:9` (the two token checks alone are not the
+  defence: AsyncStream iteration ends on the replaced watcher's cancellation, so a mutant removing both still passes, and
+  the test pins the unregistration instead); the ledger without `committedSinceRead` →
+  `EngineSync2RegressionTests.swift:46:25` (b was admitted); an abandon that records no breaker outcome →
+  `EngineSync2RegressionTests.swift:154:25` (the ensure did not complete).
+- **S3-R4, the S1-15 run test.** 5.7–6.4 s in a debug build alone; under TSan in the whole Sync bundle at load 11–18 it
+  took 59.93 s of its 60 s limit, so its guard is `.minutes(3)` (`a528809`); the 100,000-entry manifest's encode, decode,
+  plan and apply are the cost, and the plan size is the test's subject (G3).
 
 ### S3F-15 [REQUIRED] S3-B-077, S3-B-078 — C2 measurements at 10,000 — **Done; one fix**
 
@@ -269,6 +404,8 @@ and the file-system record cannot tell M5/M6 apart).
   re-armed alarm fires again at once. After: runs [1.32, 5.07, 1.48] ms at load 55→493 (the host was saturated by
   other work during the run). Structural test: `R-SYN-5: an alarm turn takes at most dueDeadlinesPerTurn due deadlines,
   in order, and none that is not due`.
+- **Cycle 2** (`243c6da`): `fireDue`'s use of the limit is pinned through the engine: `R-SYN-5: one alarm turn of the
+  engine re-queues at most dueDeadlinesPerTurn retries that fell due together` (see "Cycle 2" for its mutant).
 - **The 10,000-id prune announcement** — `R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the
   engine's actor at most C2's 10 ms per turn` (`BenchSync.pruneAnnouncementTurns`): runs [6.12, 6.69, 6.81] ms at load
   435→334; under C2 at the reference scale, no change. The ~35 ms estimate at `maxEntries` (100,000) is outside C2's
@@ -302,12 +439,15 @@ re-checks before `remote.transfer` (L5K-R25) as well as after it.
 | S3-B-086 | Recorded in ADR-055 and §14; no seam reaches the second iteration. Unchanged. |
 | S3-B-087 | Documented; no supported host has one cooperative thread. Unchanged. |
 
-No real seam reaches any of them in this cycle, so no test was written.
+No real seam reaches any of them in this cycle, so no test was written. Cycle 2: unchanged (S3-B-063 aside, which is
+S3F-13's; the R-SYN-15 order and S1-09's halves, part of S3-B-070, are S3F-14's).
 
 ## Authorised edits outside WP-F
 
-None. Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`, `Tests/ZTronAssetSyncTests/**`,
-`Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft.
+None, in either cycle. Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
+`Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft. No contract signature
+changed (`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
+internal parameter).
 
 ## Proposed document changes (for the orchestrator at the Stage 3 merge)
 
@@ -342,7 +482,47 @@ None. Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync
   `EngineGiveUpInvariantTests.swift`, `EngineSync1RegressionTests.swift` (all under `Tests/ZTronAssetSyncTests/Engine/`).
 - **DECISIONS (L4-R8 precedent):** the S3F-2 hang guards with their measurements (table above).
 
-## Gate evidence
+Cycle 2 adds:
+
+- **§7.7 (circuit breaker), the "any other exit" sentence:** replace "re-admits in that turn every job the breaker parked (the
+  first dispatched probes, the others park again)" with "re-admits the first job the breaker parked in the pump's order
+  (`CircuitParkedOrder`, by queue rank then ticket; O(log n)), and so does a cooldown's end or a silent probe's watchdog;
+  the others stay parked while that job waits in the queue to take the probe, and the pump's end re-admits the next when
+  it was parked for another gate or ended; a joiner of a job left parked gets the park's fail-fast answer (Stage 3,
+  S3-B-063, L4-R22). A closed breaker re-admits every parked job, `readmissionsPerTurn` per turn."
+- **§7.10 settling and F-40 (§14 "the gate model"):** "A claim parked by a breaker that admits only a probe counts as
+  working while a queued job ranked at or before it will take the probe (I3 for a probe-only breaker)."
+- **§7.10, the follow:** "The follow after an apply compares the replaced copy with the copy at most
+  `followScansPerTurn` (16,384) entries and `followFormatsPerTurn` (2,048) changed transfers per turn and visits at most
+  `followsPerTurn` (256) jobs per turn; the rest is owed to owned follow-up turns; a job owed a visit is in `unfollowed`;
+  no run settles and no job held for a catch-up is released while a follow is owed (Stage 3, S3F-5's residual)."
+- **§7.10, shutdown (R-SYN-15):** "Shutdown marks `closingStore` after it joined every owned task and before it closes the
+  store; the engine-side test of that order reads the mark."
+- **§10.2, new row:** `RE-S44 | the follow's follow-up turn (`followFollowUp`, an owned task's hop) | the owed passes and
+  the visit cursor (a newer apply's follow may have extended or restarted them), the copy as it stands (each pass compares
+  with it), whether each job is still owed a visit (`unfollowed`, which `removeJob` leaves) and exists, and its state and
+  ids`.
+- **§11:** `R-SYN-5`'s probe-chain benchmark runs at 10,000 members; `R-SYN-6`'s new C2 benchmark of a refresh changing
+  every member of a waiting 10,000-member group (`changedRefreshTurns`).
+- **§12.3 / §12.4:** every regression test named there is written (cycle 2 table above); remove "not written at the
+  level-4 merge" from S1-01, S1-07, S1-09, S1-11, S1-12, S1-15, S2-01, S2-09 and S2-10, and point S1-09's halves and
+  R-SYN-15's order at the new names.
+- **§14:** remove "R-SYN-15's join-before-close order has no engine-side assertion" (it has one); add the S3F-10 regions
+  recorded above (maintenance's exit after eviction, the adoption-report failure, the pending-run gate's `.unarmed`
+  re-arming, and cycle 2's new guards: the follow's unspawnable or empty follow-up, a visited job that no longer exists or
+  did not move, `readmitForProbe`'s illegal-transition `continue` and no-breaker return, `readmitOpenedOriginGates`' eager
+  branch for a closed breaker); note that the stale re-admission branches remain as already listed; the strict R-INT-5
+  engine path (a checksum-less resolve under `allowUnverifiedAssets = false` downloads, then the store refuses) as an
+  observed behaviour for the orchestrator's decision. Replace L4-R22's "Stage 3 hardening" text with "done in Stage 3
+  (S3-B-063)".
+- **§1.2:** WP-F's new files in cycle 2: `Sources/ZTronAssetSync/Engine/EngineFollow.swift`,
+  `Sources/ZTronAssetSync/Engine/CircuitParkedOrder.swift`; tests `EngineProbeChainTests.swift`,
+  `EngineSync1LivenessTests.swift`, `EngineSync1HalvesTests.swift`, `EngineSync2RegressionTests.swift`,
+  `EnginePublicationRefusalTests.swift`, `EngineMaintenanceStepTests.swift`, `CircuitParkedOrderTests.swift` (all under
+  `Tests/ZTronAssetSyncTests/Engine/`).
+- **DECISIONS (L4-R8 precedent):** the S1-15 run test's hang guard (3 min; 59.93 s under TSan at load 11–18).
+
+## Gate evidence (cycle 1)
 
 All runs on this branch at `60eab9c`/HEAD (tests only changed after `60eab9c`: two `try` markers), scratch
 `.build-s3f*`, on a shared host whose load swung from 20 to 630 during the runs (loads quoted per step).
@@ -380,9 +560,60 @@ All runs on this branch at `60eab9c`/HEAD (tests only changed after `60eab9c`: t
   394.13] ms (both pass); chain totals base 4.0–11.3 s, HEAD 5.1–10.9 s. A load miss on both trees, not a regression
   (S3F-13 still owes this benchmark's quadratic total).
 
+## Gate evidence (cycle 2)
+
+All runs on this branch at `a528809` (HEAD of the code; the draft's own commit changes this file only), scratch
+`.build-s3f*`, on the shared 8-core host whose load swung from 4 to 200 during the runs (loads quoted per step).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (16:16–16:20, load 28→15): `VERIFY: PASS`; Transport
+  151, Sync 399, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104 tests passed. (An earlier `--quick` at
+  `eab2d5b`, 15:42–15:47, also `VERIFY: PASS`.)
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (15:47): `Build
+  complete! (29,19 s)`, exit 0.
+- **Gates:** `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (debug, load 31–36): `✔ Test run with 399 tests in 52 suites passed` after 19.83 s, 17.92 s,
+  12.14 s. (Also ×3 at `eab2d5b`, load 8.6–16.8: 12.17 s, 13.37 s, 10.66 s.)
+- **TSan once** (`.build-s3f-tsan`, 16:11–16:13, load 200→51): `✔ Test run with 399 tests in 52 suites passed after
+  61.554 seconds`. The longest: the S1-15 run test 61.5 s (guard 3 min; it was 59.93 s of its former 60 s in the run at
+  `eab2d5b`, 15:49–15:51, load 11–18, `✔ … 399 tests … passed after 59.931 seconds`), the stalled-subscriber test 49.1 s
+  (guard 4 min), the gate walks 40.8 s and 40.6 s and the model walk 40.2 s (guards 5 min); every cycle-2 test under 20 s
+  (the alarm-turn bound 18.7 s, the shutdown drain 13.7 s, the bounded follow 13.5 s at load 11–18).
+- **Coverage** (`--enable-code-coverage`, all seven test targets passed, 16:04–16:11): `COVERAGE target=ZTronAssetSync
+  lines= 94.04% (9187/9769) min=90.0 OK` (cycle 1: 93.60 %, 8804/9406), overall `96.68% (25695/26577)`, `COVERAGE:
+  PASS`. (`ZTronAssetKit 97.63% (1441/1476)` against 97.83 % before: WP-G's schedule-dependent lines, §14; no Kit file
+  changed.)
+- **iOS:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-s3f/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` exit 0 (15:52). **iOS Simulator tests** (simulator
+  897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iOS 27.0; `Test-ZTronAssetKit-2026.10.29_15-52-52-+0100.xcresult`, 15:52–15:58,
+  load 20→143): `result Passed, totalTestCount 1353, passedTests 1353, failedTests 0, skippedTests 0` (`** TEST SUCCEEDED
+  **`); the simulator is shut down.
+- **Mutants (S3-R3 practice, scratch edits in place, each rebuilt and reverted; `git status` clean after each):** S1-11's
+  strand, the settle without chunks, `fireDue` without its limit, the follow without its visit bound and without its
+  settle guard, `manifestCaughtUp` without its follow guard, the eager breaker re-admission, the missing pump-end hook,
+  the parked order without its rank check, M5, M6, the alarm without its token check, a stale watcher unregistering its
+  successor, the ledger without committed bytes, an abandon without a breaker outcome: all killed (lines under each
+  item and in "Cycle 2").
+- **WP-F benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter
+  SyncBenchmarks`, 15:59–16:04, load 53.7→5.1): `✔ Test run with 20 tests in 2 suites passed after 213.772 seconds`.
+  P-4 11.53 ms (budget 20.0), ratio 2.05 (max 2.5); P-7 4.89 / 0.97 MiB; P-11 speedup 3.15 (min 3.0); P-14 0 timers, 0
+  tasks; the stalled prune ratio 1.41. C2 (best of three, ms): the new `changedRefreshTurns` [3.73, 3.71, 3.75]; the
+  probe chain at 10,000 [0.76, 0.73, 0.86], totals [40.3, 48.5, 44.1] s; cooldown end [0.07, 0.06, 0.07]; shutdown
+  [1.75, 1.53, 1.37]; refresh under a group [1.22, 1.22, 1.27]; prune announcement [5.01, 5.00, 4.99]; due retries [0.86,
+  0.86, 0.90]; releases 4.6–4.9; re-joins 4.9–5.1; space parking 4.1–4.2 and 3.1–3.6; space re-admission 4.4–4.6; network
+  edges 1.1 and 4.5–4.6; throttle extension [14.39, 7.14, 17.22] (best 7.14, passing). The cycle-1 verifiers' load misses
+  (P-4 at loads 13–189, P-11 2.51, the throttle extension's 20.6 ms best) did not recur at this load; P-4 and P-11 rest on
+  code this close-out did not touch.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
   thermal and Low Power Mode).
 - The ~35 ms prune announcement at `maxEntries` (outside C2's reference scale).
-- S3F-10, S3F-13 and the open part of S3F-14 (above).
+- Cycle 1 left S3F-10, S3F-13 and part of S3F-14 open; cycle 2 closed them (above). Still not reached by any test: the
+  S3F-10 regions recorded above as §14 candidates, `other-wp:b` or `other-wp:g`.
+- The level-4 verifier's mutants M5 and M6 are not on file: they are reconstructed from `f.md` F-20's description (close
+  before the join; no join).
+- The probe chain's total wall time at 10,000 (20–48 s across runs and loads) is reported, not budgeted; its scaling is
+  pinned by the structural count of one re-admission per exit, not by the wall time, which the fake source's round trip
+  and the benchmark's polling dominate.
