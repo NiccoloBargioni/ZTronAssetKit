@@ -67,6 +67,36 @@ struct StoreApplyTests {
         await harness.store.close()
     }
 
+    /// OI-14 (Stage 3 S3B-9): bytes another release doomed while a maintenance eviction awaited count toward its need
+    /// (`EvictionState.releasedBytes`, C-2); `apply`'s prune dooms through WP-B's own release path, which counted
+    /// nothing, so a run overlapping a pruning `apply` freed up to the pruned bytes more than needed. WP-C's overlap
+    /// fixture: ten 100-byte assets against a budget of 500, a run alone evicts six (`o0` … `o5`).
+    @Test("R-CLN-4: bytes a pruning apply dooms while quota eviction computes its candidates count toward its need", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func pruneWhileEvictionCandidatesRun() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        await bulk.setHolding(true)
+        let maintenance = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        // The run measured 550 bytes to free and waits in its candidates unit.
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        // A sync meanwhile drops the two most recently used assets from the manifest: their 200 bytes leave usedBytes.
+        let kept = Array(EvictionOverlapTests.assets.prefix(8))
+        let report = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(kept.map(\.entry), etagSeed: "pruned"), etag: nil, eviction: nil)
+        }.value
+        #expect(report.pruned.sorted() == EvictionOverlapTests.assets.suffix(2).map(\.id).sorted())
+        await bulk.setHolding(false)
+        let result = try await maintenance.value
+        #expect(result == CleanupResult(bytesFreed: 400, filesRemoved: 4), "350 of the 550 bytes it measured were still needed")
+        let evicted = await EvictionOverlapTests.evicted(harness)
+        #expect(evicted == Array(0..<4), "the prune's 200 bytes and four evictions free what one run alone frees")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-1: prune keeps a blob still referenced by another identifier", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pruneKeepsSharedBlob() async throws {
