@@ -692,3 +692,11 @@ under `.build-s3c/c2runs/` (`runs-c2.sh`, sequential; `summary.txt`).
   (`StoreCrashTests.swift:167:6`) followed by 2,118 `.cancelled` issues from its catch (`:114`, the `other-wp:b:` item above,
   seen again), one case each of WP-B's `IndexCommitStateSpaceTests` (`:222:6`, `:328:6`) and WP-H's `LoopbackHTTPServerTests`
   (`:400:6`). This is the load the verifiers met, far outside S3-R4's envelope (about 30): recorded, nothing raised or cut.
+- TSan, third run (`tsan3.log`, 20:49 → 21:06; samples in `tsan3-samples.txt`: one-minute load 13 → 74 by 20:55, then 125, 336,
+  **465**, 366, 139 from 20:56 to 21:00, back to 5 by 21:05): `✘ Test run with 484 tests in 64 suites failed after 994.755 seconds
+  with 359 issues.`, 0 ThreadSanitizer reports. **Every WP-C test passed**, the legacy pairs included (`with 128 test cases
+  passed after 994.749 seconds`, 7.8 s per case on average through the spike) and the oracle (`with 16 test cases passed after
+  74.909 seconds`). The issues are other work packages' time limits: WP-B's `killThenPowerLoss` (8 cases at
+  `StoreCrashTests.swift:167:6`, then 350 `.cancelled` issues at `:114`) and WP-H's `LoopbackHTTPServerTests.swift:400:6`, both
+  already routed or recorded (above; ADR-052). No quiet window long enough for a fully clean storage TSan run came up in this
+  cycle; the first run (one-minute load 4.8–6.5) is the cycle's measurement for S3-R4.
