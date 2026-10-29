@@ -426,7 +426,10 @@ extension AssetStore {
         // With the queue empty and every claimed file an adopt-on-demand's (from its claim to its snapshot), this call can
         // only wait: returning would make its caller call again at once, a hot loop for as long as that adoption hashes
         // (orchestrator ruling L5K-R17). It waits for one such processing at a time, then re-reads the queue, the claims
-        // and the phase, so it finishes the migration itself once the last one ended. Each wait is bounded by one
+        // and the phase: once the last one ended with an outcome for its file, it finishes the migration itself; when a
+        // processing it waited for ended without one (its caller was cancelled, or a transient failure deferred the file),
+        // the file is back in the queue, the wait ends and the call returns with `remaining > 0`, for the next call to
+        // process it (ARCHITECTURE §4.7, level-5 WP-K amendment (3); Stage 3 ruling S3C-10). Each wait is bounded by one
         // adoption, and `close()` resumes it through that adoption (row k-5). A call gets here with no install of its own
         // left due (L5K-R20), and phases 3 and 4 publish no snapshot.
         while self.state.migration.queue.isEmpty, self.state.migration.phase == .inProgress,
