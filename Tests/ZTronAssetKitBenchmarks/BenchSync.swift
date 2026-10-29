@@ -272,6 +272,45 @@ extension ZTronAssetKitBenchmarks {
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
 
+        /// C2 at SPEC §6's reference scale for a sync whose manifest drops 10,000 ids while a subscriber reads nothing
+        /// (Stage 3, S3-B-078): `applied()` announces every prune in the apply's turn, one queue slot per id. The turn was
+        /// estimated, not measured (about 3.5 ms at 10,000). Medians of three against P-9, the best against C2, after a
+        /// warm-up.
+        @Test("R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func pruneAnnouncementTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.pruneAnnouncementWait(count: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.pruneAnnouncementWait(count: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
+
+        /// C2 at SPEC §6's reference scale when the retries of 10,000 prefetch members that failed transiently fall due
+        /// together, so one alarm turn (`fireDue`) finds every deadline due (Stage 3, S3-B-077). Medians of three against
+        /// P-9, the best against C2, after a warm-up.
+        @Test("R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func dueRetriesTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.dueRetriesWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.dueRetriesWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
+
         /// C2 at SPEC §6's reference scale for a handle registered at user-initiated priority (`AssetClient.prefetch`
         /// accepts it; review of close-out cycle 9, PROBE-C9C-2): its four members run (every slot) and the others wait in
         /// the user queue. The release leaves the members it has not reached yet queued and only the released group
@@ -1583,5 +1622,68 @@ extension SyncBench {
         }
         await engine.shutdown()
         return wait
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// The heartbeat's longest wait while a forced sync applies a manifest that drops `count` on-demand ids while one
+    /// subscriber reads nothing.
+    static func pruneAnnouncementWait(count: Int) async throws -> Double {
+        let bench = try await SyncBench.dispatchBench(members: count)
+        let engine = bench.engine
+        let subscription = try await engine.subscribe().get()
+        let keep = SyncBench.entry("keep", GeneratedPayload.bytes(seed: 0x12_000, offset: 0, length: 16), policy: .onDemand)
+        await bench.source.scriptManifest([.fetched(SyncBench.manifestData([keep]), etag: ETag(rawValue: "\"v2\""))])
+        let wait = try await SyncBench.longestWait(on: engine) {
+            guard case .complete(let report) = await engine.sync(.force), report.pruned == count else {
+                throw SyncBenchError.incomplete("the pruning sync did not complete")
+            }
+        }
+        let buffered = await engine.introspect().bufferedEvents
+        // The stream must outlive the measurement (an optimised build may end an unused value's lifetime early, which
+        // ends the subscription).
+        withExtendedLifetime(subscription) {}
+        if buffered < count {
+            throw SyncBenchError.incomplete("the stalled subscriber did not hold one slot per pruned id: \(buffered) for \(count)")
+        }
+        await engine.shutdown()
+        return wait
+    }
+
+    /// The heartbeat's longest wait while the clock moves past the retry deadlines of a `count`-member prefetch group
+    /// whose every first attempt failed with a timeout (each job `failed(.at)`), so they fall due in one alarm turn.
+    static func dueRetriesWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.dispatchBench(members: count)
+        let engine = bench.engine
+        for entry in bench.entries {
+            await bench.source.script(entry.transferID, [.fail(.transient(.timedOut, retryAfter: nil)), .hold])
+        }
+        guard case .success(let token) = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        await engine.awaitCondition { engine in
+            engine.state.failedJobs.count == count
+        }
+        guard let latest = await SyncBench.latestRetry(engine) else {
+            throw SyncBenchError.incomplete("no member waits for a retry")
+        }
+        let wait = try await SyncBench.longestWait(on: engine) {
+            bench.time.advance(to: latest)
+            await engine.awaitCondition { $0.state.failedJobs.isEmpty }
+        }
+        await engine.releaseGroup(token)
+        await engine.shutdown()
+        return wait
+    }
+
+    /// The latest retry deadline of the engine's failed jobs.
+    static func latestRetry(_ engine: isolated SyncEngine) -> MonotonicInstant? {
+        engine.state.jobs.values.compactMap { job -> MonotonicInstant? in
+            if case .failed(.at(let at)) = job.state {
+                return at
+            }
+            return nil
+        }.max()
     }
 }
