@@ -211,6 +211,79 @@ struct ForegroundBackendTests {
         await rig.stop()
     }
 
+    /// A reference that does not keep its object alive.
+    struct WeakReference {
+        weak var object: AnyObject?
+    }
+
+    /// The elements of `updates` other than progress, read to the stream's end the way the engine's per-transfer
+    /// reader reads them: the call returns only once the stream finished.
+    static func outcomes(of updates: AsyncStream<TransferUpdate>) async -> [TransferUpdate] {
+        var outcomes: [TransferUpdate] = []
+        for await update in updates {
+            if case .progress = update {
+                continue
+            }
+            outcomes.append(update)
+        }
+        return outcomes
+    }
+
+    /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+    /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021
+    /// gives the foreground handle synchronous controls and no control stream; this pins the consequence against the
+    /// real URLSession backend for every way a transfer ends (staged, failed, paused, cancelled): each reader ends at
+    /// its one terminal element, every `transfer` interval ended (the stream's termination ran), the session holds no
+    /// unfinished task, and once dropped no handle is kept alive by a task (S2-19's reader captured its transfer).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-14: no task outlives a transfer in the live foreground backend", .timeLimit(.minutes(1)))
+    func noTaskOutlivesATransfer() async throws {
+        let arrivals = Arrivals()
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { request in
+            arrivals.signal(request.target)
+            switch request.target {
+            case "/staged.bin":
+                return LoopbackResponse(body: TransportFixtures.payload(1_000))
+            case "/missing.bin":
+                return LoopbackResponse(status: 404)
+            default:
+                return LoopbackResponse(body: TransportFixtures.payload(100_000), ending: .stallAfter(bodyBytes: 10))
+            }
+        }
+        let staged = rig.request(TransportFixtures.contentID(1), path: "staged.bin", expected: 1_000)
+        let expected: [(path: String, terminal: TransferUpdate)] = [
+            ("staged.bin", .staged(StagedFile(name: staged.partialName, byteCount: 1_000, resumed: false, httpStatus: 200, etag: nil))),
+            ("missing.bin", .failed(.permanentMissing(httpStatus: 404))),
+            ("paused.bin", .paused(resumable: false)),
+            ("cancelled.bin", .failed(.cancelled(.byClient))),
+        ]
+        var handles: [any TransferHandle] = []
+        var readers: [Task<[TransferUpdate], Never>] = []
+        for (index, item) in expected.enumerated() {
+            let request = rig.request(TransportFixtures.contentID(UInt8(index + 1)), path: item.path, expected: index == 0 ? 1_000 : 100_000)
+            let handle = await rig.source.transfer(request)
+            #expect(await arrivals.next() == "/" + item.path)
+            // The reader holds the stream only, never the handle.
+            let updates = handle.updates
+            readers.append(Task { await Self.outcomes(of: updates) })
+            handles.append(handle)
+        }
+        handles[2].pause()
+        handles[3].cancel()
+        for (reader, item) in zip(readers, expected) {
+            #expect(await reader.value == [item.terminal], "\(item.path): exactly one terminal element, then the stream ended")
+        }
+        let edges = transferIntervalEdges(rig.tap)
+        #expect(edges.began == expected.count && edges.ended == expected.count)
+        #expect(await rig.foreground.liveTransfers().isEmpty)
+        let unfinished = await rig.foreground.session.allTasks.filter { $0.state != .completed }
+        #expect(unfinished.isEmpty, "\(unfinished.count) URLSession tasks outlived their transfers")
+        let references = handles.map { WeakReference(object: $0 as AnyObject) }
+        handles.removeAll()
+        #expect(references.allSatisfy { $0.object == nil }, "a task kept a handle alive after its transfer ended")
+        await rig.stop()
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-4: a request to an origin outside the policy is refused before any byte is sent", .timeLimit(.minutes(1)))
     func refusedOrigin() async throws {
