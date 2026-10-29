@@ -417,72 +417,6 @@ extension SyncEngine {
         return unreported
     }
 
-    /// Moves every job to the engine's copy of the applied manifest, which replaced `previous`: a job none of whose ids
-    /// still want its content is superseded (its interests follow their entries, T22, or end, T21), one some of whose ids
-    /// moved lets them go. A job that follows `previous` can only have moved for an id whose transfer differs between
-    /// the two copies, and that id's job is the transfer `previous` named for it; every other job that may not follow
-    /// the copy is in `unfollowed`. So the follow visits those jobs, in transfer order, not the whole table: at SPEC §6's
-    /// 10,000, a sorted walk of every job after every apply held the actor 10 to 12 ms although nothing moved (C2;
-    /// Stage 3, S3-PERF-02). One pass over `previous` with one lookup and a key comparison per id, nothing when the
-    /// copy did not change, and a transfer formatted only for an id that moved. A job verifying or committing is not
-    /// moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next follow.
-    func followApplied(from previous: ValidatedManifest) {
-        var candidates = self.state.unfollowed
-        self.state.unfollowed = []
-        let copy = self.state.applied
-        if !self.state.jobs.isEmpty, previous.digest != copy.digest || previous.count != copy.count {
-            for entry in previous.entries {
-                if let listed = copy.entry(for: entry.identifier), SyncEngine.sameTransfer(entry, listed) {
-                    continue
-                }
-                let transfer = entry.transferID
-                if self.state.jobs[transfer] != nil {
-                    candidates.insert(transfer)
-                }
-            }
-        }
-        for transfer in candidates.sorted() {
-            guard let job = self.state.jobs[transfer] else {
-                continue
-            }
-            let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
-            switch job.state {
-            case .verifying, .committing:
-                if !moved.isEmpty {
-                    self.state.unfollowed.insert(transfer)
-                }
-                continue
-            default:
-                break
-            }
-            guard !moved.isEmpty else {
-                continue
-            }
-            if moved.count == job.assets.count {
-                if job.state == .downloading {
-                    if let active = job.active {
-                        self.abandon(transfer, active)
-                    }
-                    // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
-                    self.recordBreaker(.abandoned(transfer))
-                }
-                self.supersede(transfer)
-            } else {
-                self.state.jobs[transfer]?.assets.subtract(moved)
-                for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-                    for asset in interest.assets.sorted() where moved.contains(asset) {
-                        self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
-                        self.reroute(token, interest: interest, asset: asset, from: transfer)
-                    }
-                    if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
-                        self.removeInterest(token, from: transfer)
-                    }
-                }
-            }
-        }
-        self.checkRunSettled()
-    }
-
     /// Skipped entries whose records failed until their entry changes count as the run's failures (a run with them
     /// never ends `.complete`, so the sync stays due).
     private func recordSkippedFailures(_ plan: SyncPlan, view: StorePlanningView) {
@@ -634,7 +568,8 @@ extension SyncEngine {
 
     /// `checkRunSettled()`; `spaceSwept` once this check has re-checked the space-parked jobs against the ledger.
     private func checkRunSettled(spaceSwept: Bool) {
-        guard let run = self.state.run, run.transferring, run.settlement == nil else {
+        // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again.
+        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followOwed else {
             return
         }
         self.materializeRun()

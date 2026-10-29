@@ -47,6 +47,20 @@ struct EngineState {
     /// and the jobs of the ids the copy's change moved, not the whole table (`followApplied(from:)`; C2, Stage 3,
     /// S3-PERF-02). A stale member is harmless: the follow finds nothing to move.
     var unfollowed: Set<TransferID> = []
+    /// The follow in progress, in visiting order: `followOrder[followNext...]` are the jobs it still owes a visit, each in
+    /// `unfollowed` until visited; empty when no follow is owed (`SyncEngine.followsPerTurn`, C2).
+    var followOrder: [TransferID] = []
+    /// The replaced copies whose comparison with the copy a follow still owes, oldest first (`followScansPerTurn`).
+    var followScans: [FollowScan] = []
+    /// The next index of `followOrder` to visit.
+    var followNext = 0
+    /// A later turn is scheduled to continue the follow.
+    var followFollowUpScheduled = false
+    /// Test seam: while set, the scheduled follow-up keeps its visits owed and stays scheduled instead of running
+    /// (`holdFollowFollowUps()`, `releaseFollowFollowUps()`). No production path sets it.
+    var followFollowUpsHeld = false
+    /// Test seam: a follow-up turn reached the hold and waits for its release.
+    var followFollowUpWaiting = false
     /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
     /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
     /// by that visit; `removeJob` drops it.
@@ -464,6 +478,15 @@ struct DrainingAttempt: Hashable {
     let attempt: TransferAttempt
     /// Its driver's owned-task key (the invariant check: a drain without a running driver is never cleared).
     let driver: UInt64
+}
+
+/// A replaced copy of the applied manifest whose comparison with the engine's copy a follow still owes, from `next` on
+/// (`SyncEngine.followApplied(from:)`).
+struct FollowScan {
+    /// The replaced copy.
+    let manifest: ValidatedManifest
+    /// The index of its next entry to compare.
+    var next = 0
 }
 
 /// One transfer's outstanding work (ARCHITECTURE §7.1).

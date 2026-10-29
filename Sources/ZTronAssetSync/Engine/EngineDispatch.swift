@@ -1126,8 +1126,9 @@ extension SyncEngine {
     /// Re-routes every interest of a job whose content its ids no longer want, and removes the job. An asset the
     /// engine's copy of the manifest still maps to this content was superseded by a manifest the store holds and the
     /// copy does not show yet: it waits on a fresh, held job of the content until the copy catches up (F-20), never
-    /// `.notFound` while the asset is listed.
-    func supersede(_ transfer: TransferID) {
+    /// `.notFound` while the asset is listed. A follow passes `settling: false` and checks the run and pumps once per
+    /// turn instead (C2).
+    func supersede(_ transfer: TransferID, settling: Bool = true) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
@@ -1143,6 +1144,9 @@ extension SyncEngine {
             for asset in interest.assets.sorted() {
                 self.reroute(token, interest: interest, asset: asset, from: transfer)
             }
+        }
+        guard settling else {
+            return
         }
         self.checkRunSettled()
         self.pump()

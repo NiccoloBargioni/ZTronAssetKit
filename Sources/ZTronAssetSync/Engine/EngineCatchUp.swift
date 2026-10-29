@@ -256,7 +256,8 @@ extension SyncEngine {
                 return
             }
         }
-        guard !self.state.heldForManifest.isEmpty else {
+        // While a follow owes visits a held job may be one it moves: its last turn releases them (`continueFollow`).
+        guard !self.state.heldForManifest.isEmpty, !self.followOwed else {
             return
         }
         self.state.heldForManifest.removeAll()

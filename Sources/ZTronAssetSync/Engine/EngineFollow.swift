@@ -1,0 +1,232 @@
+import ZTronAssetModel
+
+/// The follow after an apply (T21/T22), bounded per actor turn (C2; Stage 3, S3-PERF-02 and its cycle-2 residual).
+extension SyncEngine {
+    /// The jobs one follow turn visits at most before it leaves the rest to an owned follow-up turn. A visit that moves
+    /// a job supersedes it, re-routes each interest and creates the job of the id's new content: about 10 to 12 µs in
+    /// release, so a turn of 256 visits stays near 3 ms. In one turn, a sync whose manifest changed the content of every
+    /// member of a waiting 10,000-member prefetch group held the actor 111 to 145 ms (`changedRefreshTurns`, the close-out
+    /// cycle-1 verifier's PROBE-V9).
+    static let followsPerTurn = 256
+
+    /// The entries of a replaced copy one follow turn compares with the copy at most, and the transfers of changed
+    /// entries it formats at most: a comparison is a lookup and a checksum comparison (about 0.1 µs), a formatted transfer
+    /// and its job lookup about 0.75 µs in release. The whole pass over 10,000 changed entries took 7.5 to 15 ms in one
+    /// turn, and the sort of 10,000 transfers 3.6 ms more; a copy of SPEC §6's 10,000 entries where nothing moved is
+    /// still compared in one turn.
+    static let followScansPerTurn = 16_384
+    /// See `followScansPerTurn`.
+    static let followFormatsPerTurn = 2_048
+
+    /// Moves every job to the engine's copy of the applied manifest, which replaced `previous`: a job none of whose ids
+    /// still want its content is superseded (its interests follow their entries, T22, or end, T21), one some of whose ids
+    /// moved lets them go. A job that follows `previous` can only have moved for an id whose transfer differs between
+    /// the two copies, and that id's job is the transfer `previous` named for it; every other job that may not follow
+    /// the copy is in `unfollowed`. So the follow visits those jobs, not the whole table: at SPEC §6's 10,000, a sorted
+    /// walk of every job after every apply held the actor 10 to 12 ms although nothing moved (C2; Stage 3,
+    /// S3-PERF-02). One pass over `previous` with one lookup and a key comparison per id, and a transfer formatted only
+    /// for an id that moved.
+    ///
+    /// The pass and the visits are bounded per turn (`followScansPerTurn`, `followFormatsPerTurn`, `followsPerTurn`); the
+    /// rest is owed to owned follow-up turns (`followScans`, `followOrder`). The visits go in `unfollowed`'s transfer
+    /// order, then in the order the pass finds the moved jobs (the replaced copy's entry order), each job once. A job
+    /// waits in `unfollowed` from the pass's finding until its visit, which is what that set means (it may not follow
+    /// the copy); a job the pass has not reached yet follows a copy whose pass is owed. A later apply's follow starts its
+    /// visits over from `unfollowed` and queues its pass behind the owed ones; every pass compares with the copy as it
+    /// stands when it runs. While a follow is owed no run settles (a claim may still move) and no job held for a manifest
+    /// catch-up is released (it may be one the follow moves).
+    func followApplied(from previous: ValidatedManifest) {
+        self.state.followOrder = self.state.unfollowed.sorted()
+        self.state.followNext = 0
+        if !self.state.jobs.isEmpty || !self.state.followScans.isEmpty, previous.digest != self.state.applied.digest || previous.count != self.state.applied.count {
+            self.state.followScans.append(FollowScan(manifest: previous))
+        }
+        self.continueFollow()
+    }
+
+    /// Whether a follow still owes a pass or visits to follow-up turns.
+    var followOwed: Bool {
+        !self.state.followScans.isEmpty || self.state.followNext < self.state.followOrder.count
+    }
+
+    /// Continues the follow's owed passes, then visits its next `followsPerTurn` jobs; schedules a follow-up turn for the
+    /// rest, or ends the follow: the jobs held for a manifest catch-up that no catch-up holds any more are released, and
+    /// the run is checked.
+    private func continueFollow() {
+        self.continueFollowScans()
+        var visited = 0
+        var moved = false
+        while visited < Self.followsPerTurn, self.state.followNext < self.state.followOrder.count {
+            let transfer = self.state.followOrder[self.state.followNext]
+            self.state.followNext += 1
+            // A job owed a visit stays in `unfollowed` until it; one that left it was removed meanwhile (`removeJob`).
+            guard self.state.unfollowed.remove(transfer) != nil else {
+                continue
+            }
+            visited += 1
+            if self.follow(transfer) {
+                moved = true
+            }
+        }
+        if self.followOwed {
+            if moved {
+                self.pump()
+            }
+            self.scheduleFollowFollowUp()
+            return
+        }
+        self.state.followOrder = []
+        self.state.followNext = 0
+        if self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+            // `manifestCaughtUp` left them held while this follow was owed.
+            self.state.heldForManifest.removeAll()
+            moved = true
+        }
+        self.checkRunSettled()
+        if moved {
+            self.pump()
+        }
+    }
+
+    /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
+    /// entry the copy no longer maps to the same transfer is owed a visit (it joins `unfollowed` and `followOrder` once).
+    private func continueFollowScans() {
+        var compared = 0
+        var formatted = 0
+        let copy = self.state.applied
+        while !self.state.followScans.isEmpty, compared < Self.followScansPerTurn, formatted < Self.followFormatsPerTurn {
+            var scan = self.state.followScans.removeFirst()
+            let entries = scan.manifest.entries
+            while scan.next < entries.count, compared < Self.followScansPerTurn, formatted < Self.followFormatsPerTurn {
+                let entry = entries[scan.next]
+                scan.next += 1
+                compared += 1
+                if let listed = copy.entry(for: entry.identifier), SyncEngine.sameTransfer(entry, listed) {
+                    continue
+                }
+                formatted += 1
+                let transfer = entry.transferID
+                if self.state.jobs[transfer] != nil, self.state.unfollowed.insert(transfer).inserted {
+                    self.state.followOrder.append(transfer)
+                }
+            }
+            if scan.next < entries.count {
+                self.state.followScans.insert(scan, at: 0)
+            }
+        }
+    }
+
+    /// The ids of the owed passes' entries not compared yet, with the transfers those entries name: a job that holds one
+    /// of them for that transfer follows a copy whose pass is owed (`invariantViolations()`).
+    func unscannedFollowEntries() -> [AssetID: Set<TransferID>] {
+        var unscanned: [AssetID: Set<TransferID>] = [:]
+        for scan in self.state.followScans {
+            for entry in scan.manifest.entries[scan.next...] {
+                unscanned[entry.identifier, default: []].insert(entry.transferID)
+            }
+        }
+        return unscanned
+    }
+
+    /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job verifying or committing is
+    /// not moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next
+    /// follow. The caller checks the run and pumps once per turn, not once per job.
+    private func follow(_ transfer: TransferID) -> Bool {
+        guard let job = self.state.jobs[transfer] else {
+            return false
+        }
+        let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
+        switch job.state {
+        case .verifying, .committing:
+            if !moved.isEmpty {
+                self.state.unfollowed.insert(transfer)
+            }
+            return false
+        default:
+            break
+        }
+        guard !moved.isEmpty else {
+            return false
+        }
+        if moved.count == job.assets.count {
+            if job.state == .downloading {
+                if let active = job.active {
+                    self.abandon(transfer, active)
+                }
+                // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
+                self.recordBreaker(.abandoned(transfer))
+            }
+            self.supersede(transfer, settling: false)
+        } else {
+            self.state.jobs[transfer]?.assets.subtract(moved)
+            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
+                for asset in interest.assets.sorted() where moved.contains(asset) {
+                    self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
+                    self.reroute(token, interest: interest, asset: asset, from: transfer)
+                }
+                if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
+                    self.removeInterest(token, from: transfer)
+                }
+            }
+        }
+        return true
+    }
+
+    /// Schedules one later turn for the visits a follow turn left after `followsPerTurn`. When none can be spawned
+    /// (shutting down), the follow ends here: the jobs it still owed stay in `unfollowed` for the next follow.
+    private func scheduleFollowFollowUp() {
+        guard !self.state.followFollowUpScheduled else {
+            return
+        }
+        self.state.followFollowUpScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S44 (proposed) — the follow-up hops onto the actor and re-reads everything it uses: the
+            // owed passes and the visit cursor (a newer apply's follow may have extended or restarted them), the copy as
+            // it stands then (each pass compares with it), whether each job is still owed a visit (in `unfollowed`, which
+            // `removeJob` leaves) and still exists, and its state and ids, so a job that moved, started, ended or was
+            // re-joined meanwhile is followed as it is now.
+            await engine.followFollowUp()
+        }
+        if spawned == nil {
+            // The jobs found so far stay in `unfollowed`; the owed passes are dropped: shutting down, nothing follows.
+            self.state.followFollowUpScheduled = false
+            self.state.followOrder = []
+            self.state.followNext = 0
+            self.state.followScans = []
+        }
+    }
+
+    /// The scheduled continuation of `continueFollow`; it continues in any state but shutdown, as a release does.
+    private func followFollowUp() {
+        if self.state.followFollowUpsHeld {
+            // Test seam: the visits stay owed and the turn stays scheduled until the release runs it.
+            self.state.followFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
+        self.state.followFollowUpScheduled = false
+        guard !self.isShuttingDown, self.followOwed else {
+            return
+        }
+        self.continueFollow()
+        self.rearm()
+        self.reconcileIdle()
+        self.notifyObservers()
+    }
+
+    /// Test seam: the next follow-up turns keep their visits owed until `releaseFollowFollowUps()`, so a test reads the
+    /// engine between two follow turns, which no production path can order.
+    func holdFollowFollowUps() {
+        self.state.followFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held follow-up run in this turn, or disarms a hold nothing reached.
+    func releaseFollowFollowUps() {
+        self.state.followFollowUpsHeld = false
+        guard self.state.followFollowUpWaiting else {
+            return
+        }
+        self.state.followFollowUpWaiting = false
+        self.followFollowUp()
+    }
+}

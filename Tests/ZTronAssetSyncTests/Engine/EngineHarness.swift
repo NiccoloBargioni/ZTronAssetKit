@@ -324,6 +324,27 @@ struct EngineHarness {
         }
     }
 
+    /// Awaits `task`'s value and cancels the task when the caller is cancelled (a test's time limit): awaiting an
+    /// unstructured task's value alone never forwards the caller's cancellation, so an operation the engine stranded
+    /// would hang the test run instead of ending it with the time limit's recorded failure (Stage 3 close-out cycle 2,
+    /// the S1-11 hang guard). The engine's calls answer a cancelled caller (its interest is withdrawn), so the task ends.
+    static func value<T: Sendable>(of task: Task<T, Never>) async -> T {
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    /// `value(of:)` for a throwing task.
+    static func value<T: Sendable>(of task: Task<T, any Error>) async throws -> T {
+        try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
     /// Runs `operation` while a driver wakes every sleeper on the manual clock (a purge's grace wait, a commit window,
     /// a backoff), then stops the driver and returns once it has ended. Its waits end on cancellation, after which it
     /// advances nothing: a driver that outlived the call could advance the clock to a sleeper registered afterwards

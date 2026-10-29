@@ -29,6 +29,8 @@ struct RetiredIndexes {
     var releasing: [InterestToken: Release] = [:]
     /// The parked, failed and owed indexes and the in-flight set (`EngineState`).
     var transfers: [Set<TransferID>] = []
+    /// `EngineState.followOrder`.
+    var followOrder: [TransferID] = []
     /// `EngineState.heap`.
     var heap = DeadlineHeap()
 }
@@ -100,6 +102,10 @@ extension SyncEngine {
         self.state.spaceSweepFollowUp = nil
         self.state.spaceAdmitted.removeAll()
         self.state.readmissionsOwed = []
+        drain.indexes.followOrder = self.state.followOrder
+        self.state.followOrder = []
+        self.state.followNext = 0
+        self.state.followScans = []
         self.state.laneParksOwed.removeAll()
         self.state.inFlightBytes = InFlightBytes()
         self.state.draining.removeAll()

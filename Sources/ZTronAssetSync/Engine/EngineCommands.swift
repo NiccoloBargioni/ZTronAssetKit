@@ -1604,6 +1604,8 @@ extension SyncEngine {
         for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
             violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
         }
+        // A job the owed passes of a follow have not reached follows the copy they replaced (`followScans`).
+        let unscanned = self.state.followScans.isEmpty ? [:] : self.unscannedFollowEntries()
         for (transfer, job) in self.state.jobs {
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
                 let key = ClaimKey(job: job)
@@ -1618,7 +1620,7 @@ extension SyncEngine {
             }
             // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
             // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
-            if !self.state.unfollowed.contains(transfer), let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer }) {
+            if !self.state.unfollowed.contains(transfer), let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true }) {
                 violations.append("job \(transfer) holds \(asset), which the copy maps elsewhere, and is not in unfollowed")
             }
             if job.interests.values.contains(where: { $0.kind == .system }), !self.state.systemHeld.contains(transfer) {
@@ -1673,7 +1675,7 @@ extension SyncEngine {
                 violations.append("the run claims \(transfer), whose job does not hold its interest")
             }
         }
-        if self.isRunning, self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+        if self.isRunning, self.state.manifestCatchUps == 0, !self.followOwed, !self.state.heldForManifest.isEmpty {
             violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
         }
         if self.isRunning, let origin = self.state.remote?.originID, self.state.breakers[origin]?.probe == .manifest,
@@ -1794,6 +1796,15 @@ extension SyncEngine {
         }
         if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled {
             violations.append("re-queues are owed but no turn is scheduled for them")
+        }
+        if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
+            violations.append("a follow owes \(self.state.followScans.count) passes and \(self.state.followOrder.count - self.state.followNext) visits but no turn is scheduled for them")
+        }
+        if self.followOwed {
+            let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
+            if unmarked > 0 {
+                violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
+            }
         }
         if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
             violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
