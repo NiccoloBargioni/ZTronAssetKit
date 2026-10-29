@@ -939,11 +939,12 @@ extension SyncEngine {
     }
 
     /// Whether a later turn owes a pump that may dispatch queued or re-admitted jobs: a pump follow-up, a re-admission
-    /// follow-up (it pumps after its re-queues), re-queues still owed to an origin's jobs, or an `ensureAvailable` refill.
-    /// Each of those turns ends in `pump()`, which reconsiders a pending run that waits for the breaker (F-41).
+    /// follow-up (it pumps after its re-queues), re-queues still owed to an origin's jobs, an `ensureAvailable` refill, or
+    /// a queue whose head waits for an owed follow (each follow turn pumps; `pumpWaitsForFollow`). Each of those turns
+    /// ends in `pump()`, which reconsiders a pending run that waits for the breaker (F-41).
     var dispatchOwed: Bool {
         self.state.pumpFollowUpScheduled || self.state.readmissionFollowUpScheduled || self.state.ensureRefillScheduled
-            || !self.state.originOwed.isEmpty
+            || !self.state.originOwed.isEmpty || self.state.pumpWaitsForFollow
     }
 
     /// Starts the pending run when its gate is already open, and arms whatever opens a closed one.

@@ -262,7 +262,9 @@ extension SyncEngine {
     /// `retryLater` and by an ENOSPC that parks `awaitingSpace` (L4-R4), so a wait for the store's reclaim joins the
     /// same budget as a backoff.
     private func countFailedAttempt(_ transfer: TransferID, error: TransferError, assetError: AssetError) -> Job? {
-        guard var job = self.state.jobs[transfer] else {
+        // The ids an owed follow moved leave first (`followBeforeActing`): the attempt, and an answer at the cap, are not
+        // theirs.
+        guard !self.followBeforeActing(transfer), var job = self.state.jobs[transfer] else {
             return nil
         }
         let claimOnly = job.interests.isEmpty
@@ -499,9 +501,10 @@ extension SyncEngine {
     /// room above the reserve (F-22), re-evaluated at every later read (T17).
     func spaceFailed(_ transfer: TransferID, epoch: UInt64, required: Int64) async {
         self.state.jobs[transfer]?.active = nil
-        // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot.
+        // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot; the ids an
+        // owed follow moved (an apply may have landed during the read) leave the job before its park answers them.
         await self.refreshFreeSpace()
-        guard self.isRunning, let job = self.state.jobs[transfer], job.epoch == epoch else {
+        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), let job = self.state.jobs[transfer] else {
             return
         }
         let space = self.state.freeSpace

@@ -69,7 +69,8 @@ extension SyncEngine {
             }
         }
         if self.followOwed {
-            if moved {
+            // A pump that left a queue's head to this follow (`pumpWaitsForFollow`) looks again: its job may be followed now.
+            if moved || self.state.pumpWaitsForFollow {
                 self.pump()
             }
             self.scheduleFollowFollowUp()
@@ -83,9 +84,45 @@ extension SyncEngine {
             moved = true
         }
         self.checkRunSettled()
-        if moved {
+        if moved || self.state.pumpWaitsForFollow {
             self.pump()
         }
+    }
+
+    /// Whether `job` waits for the follow before it acts: a follow is owed and the job holds an id the engine's copy lists
+    /// at another transfer, so the job's content is not what that id wants any more. Such a job is one the follow still
+    /// owes a visit, one its pass has not reached yet (both up to about 40 turns after the apply at SPEC §6's 10,000), or
+    /// one joined meanwhile for an entry the copy replaced; the follow moves each of them (T22), and until it does the
+    /// job must neither start nor answer the moved id with its content's failure (the close-out cycle-2 correctness
+    /// lens, PROBE-W1 and PROBE-W4: the cycle-1 follow moved every job in the apply's turn). An id the copy does not list
+    /// is not counted: a waiter joined from the store's newer manifest (`EngineManifest.join`) holds one legitimately. One
+    /// lookup in the copy and one formatted transfer per id of the job.
+    func awaitsFollow(_ job: Job) -> Bool {
+        guard self.followOwed else {
+            return false
+        }
+        return job.assets.contains { asset in
+            guard let listed = self.state.applied.entry(for: asset) else {
+                return false
+            }
+            return listed.transferID != job.transfer
+        }
+    }
+
+    /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
+    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`): the moved ids' interests follow their new content
+    /// first (T22), exactly as the visit would have moved them before the failure arrived, and only the ids the copy
+    /// still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
+    /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
+    /// answer. A pump is scheduled for the new content's jobs, since some callers do not pump afterwards.
+    func followBeforeActing(_ transfer: TransferID) -> Bool {
+        guard let job = self.state.jobs[transfer], self.awaitsFollow(job) else {
+            return false
+        }
+        if self.follow(transfer) {
+            self.schedulePumpFollowUp()
+        }
+        return self.state.jobs[transfer]?.epoch != job.epoch
     }
 
     /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
@@ -193,6 +230,7 @@ extension SyncEngine {
             self.state.followOrder = []
             self.state.followNext = 0
             self.state.followScans = []
+            self.state.pumpWaitsForFollow = false
         }
     }
 

@@ -1814,6 +1814,9 @@ extension SyncEngine {
         if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
             violations.append("a follow owes \(self.state.followScans.count) passes and \(self.state.followOrder.count - self.state.followNext) visits but no turn is scheduled for them")
         }
+        if self.isRunning, self.state.pumpWaitsForFollow, !self.followOwed {
+            violations.append("a pump waits for a follow that nothing owes")
+        }
         if self.followOwed {
             let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
             if unmarked > 0 {

@@ -92,6 +92,8 @@ extension SyncEngine {
         }
         self.materializeRun()
         self.materializeEnsures()
+        // Set again below by a queue head that still waits for the follow (`dispatch`).
+        self.state.pumpWaitsForFollow = false
         let maximum = self.tuning.maxConcurrentTransfers
         let userCap = self.userCap
         var guardCount = 0
@@ -105,8 +107,10 @@ extension SyncEngine {
             // One pass per round; a start in the round is counted in place (`SlotCounts.started(in:)`), and the next
             // round, which follows any start, reads the jobs again.
             var counts = self.slotCounts
+            // A user queue whose head waits for the follow: that job takes no slot from a running transfer either.
+            var userWaitsForFollow = false
             for kind in [LaneQueues.Kind.userSingle, .userBatch] {
-                while maximum - counts.running > 0, counts.runningUser < userCap {
+                user: while maximum - counts.running > 0, counts.runningUser < userCap {
                     guard parks < Self.parksPerPump else {
                         self.schedulePumpFollowUp()
                         break rounds
@@ -120,10 +124,13 @@ extension SyncEngine {
                         counts.started(in: self.state.jobs[transfer]?.lane ?? .userInitiated)
                     case .parked(let count):
                         parks += count
+                    case .waitsForFollow:
+                        userWaitsForFollow = true
+                        break user
                     }
                 }
             }
-            if self.hasQueuedUser() {
+            if !userWaitsForFollow, self.hasQueuedUser() {
                 if self.preemptForUser() {
                     continue
                 }
@@ -131,7 +138,7 @@ extension SyncEngine {
             }
             let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
             let pipelineCap = self.tuning.pipelineDepth * maximum
-            while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
+            nonUser: while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
                 guard parks < Self.parksPerPump else {
                     self.schedulePumpFollowUp()
                     break rounds
@@ -145,6 +152,8 @@ extension SyncEngine {
                     counts.started(in: self.state.jobs[transfer]?.lane ?? .bulk)
                 case .parked(let count):
                     parks += count
+                case .waitsForFollow:
+                    break nonUser
                 }
                 self.materializeRun()
             }
@@ -341,11 +350,26 @@ extension SyncEngine {
         /// The job, and with a lane-wide block other jobs of its lane, were parked or left to wait: the count, toward
         /// the pump's `parksPerPump`.
         case parked(Int)
+        /// The job holds an id the copy lists at other content while a follow is owed: it is back at the head of its
+        /// queue, and the queue waits for the follow's visit (`awaitsFollow`).
+        case waitsForFollow
     }
 
     /// Starts `transfer` or parks it; a lane-wide block also parks the lane's other queued jobs, at most `parkLimit`
     /// in all (`parkLane`).
+    ///
+    /// A job that waits for an owed follow (`awaitsFollow`) is neither started nor parked: between two turns of a bounded
+    /// follow the jobs of replaced content keep their old places ahead of the new content's jobs, and every pump started
+    /// them, requests for content no id wants (the close-out cycle-2 correctness lens, PROBE-W1: 44 of 48 starts after
+    /// the apply at 3,000 members). It goes back to the head of its queue, which waits for the follow; each follow turn
+    /// pumps again (`pumpWaitsForFollow`). The check costs one queue head per lane and pump, never a scan, and the visit
+    /// stays the follow's, bounded per turn (C2): following the job here would move up to a queue of jobs per pump.
     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {
+        if let job = self.state.jobs[transfer], self.awaitsFollow(job) {
+            self.enqueue(transfer, front: true)
+            self.state.pumpWaitsForFollow = true
+            return .waitsForFollow
+        }
         switch self.gate(transfer) {
         case .wait:
             self.enqueue(transfer, front: true)

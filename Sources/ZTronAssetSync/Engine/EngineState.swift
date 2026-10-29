@@ -67,6 +67,10 @@ struct EngineState {
     var followFollowUpsHeld = false
     /// Test seam: a follow-up turn reached the hold and waits for its release.
     var followFollowUpWaiting = false
+    /// A pump left a queue's head in place because its job holds an id the copy lists at other content while a follow
+    /// is owed (`SyncEngine.awaitsFollow`): every follow turn pumps again, so the queue moves on once that job's visit
+    /// has followed it (Stage 3, close-out cycle 3).
+    var pumpWaitsForFollow = false
     /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
     /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
     /// by that visit; `removeJob` drops it.

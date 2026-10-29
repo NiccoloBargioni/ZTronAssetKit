@@ -111,6 +111,7 @@ extension SyncEngine {
         self.state.followOrder = []
         self.state.followNext = 0
         self.state.followScans = []
+        self.state.pumpWaitsForFollow = false
         self.state.laneParksOwed.removeAll()
         self.state.inFlightBytes = InFlightBytes()
         self.state.draining.removeAll()

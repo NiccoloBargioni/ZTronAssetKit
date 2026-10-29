@@ -184,7 +184,7 @@ enum ReplacedContentFailure: String, CaseIterable, Sendable {
     case notFound
     /// A 503 at the user lane's attempt cap: `countFailedAttempt` answers the capped interests.
     case serverErrorAtCap
-    /// ENOSPC on a volume that cannot hold the old content: `spaceFailed` parks the job and answers its waiters.
+    /// ENOSPC for more bytes than the volume holds: `spaceFailed` parks the job and answers its waiters with the figures.
     case noSpace
 
     /// The attempt's terminal element.
@@ -195,22 +195,21 @@ enum ReplacedContentFailure: String, CaseIterable, Sendable {
         case .serverErrorAtCap:
             return .failed(.transient(.serverError(httpStatus: 503), retryAfter: nil))
         case .noSpace:
-            return .failed(.insufficientSpace(requiredBytes: 5_000))
+            return .failed(.insufficientSpace(requiredBytes: 1 << 40))
         }
     }
 
-    /// An engine whose attempt cap or volume makes the failure terminal for the waiter.
+    /// An engine whose attempt cap makes the failure terminal for the waiter (the default volume holds the new content,
+    /// not the terabyte the ENOSPC asks for).
     @available(macOS 15.0, iOS 18.0, *)
     func harness() -> EngineHarness {
         switch self {
-        case .notFound:
-            return EngineHarness.make()
         case .serverErrorAtCap:
             var interactive = RetryPolicy.interactive
             interactive.maxAttemptsPerRun = 1
             return EngineHarness.make(tuning: SyncTuning(interactiveRetry: interactive))
-        case .noSpace:
-            return EngineHarness.make(capacity: StoragePolicy().reserveFreeBytes + 4_096)
+        case .notFound, .noSpace:
+            return EngineHarness.make()
         }
     }
 }

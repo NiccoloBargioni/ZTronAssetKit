@@ -545,7 +545,13 @@ extension SyncEngine {
 
     /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job; `follow` runs once
     /// the job is gone and before the run is checked for settling (interests that move to a fresh job of the transfer).
+    /// A failure is not delivered to an id the copy moved while a follow is owed: the job is followed first
+    /// (`followBeforeActing`), so that id's interest waits for its new content, never `.notFound` while it is listed
+    /// (F-20; the close-out cycle-2 correctness lens, PROBE-W4).
     func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, then follow: () -> Void = {}) {
+        if case .failed = outcome, self.followBeforeActing(transfer) {
+            return
+        }
         guard let job = self.state.jobs[transfer] else {
             return
         }
