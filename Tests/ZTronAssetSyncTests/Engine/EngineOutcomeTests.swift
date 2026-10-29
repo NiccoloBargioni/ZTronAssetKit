@@ -422,7 +422,7 @@ struct EngineOutcomeTests {
         await bulk.setHolding(false)
         await bulk.releaseAll()
         await maintenance.value
-        let location = try await harness.withClock { try await waiter.value.get() }
+        let location = try await harness.withClock { try await EngineHarness.value(of: waiter).get() }
         #expect(location.byteSize == Int64(bytes.count))
         #expect(await harness.source.starts.count == 1, "the publication completed from the file staging GC kept")
         await engine.shutdown()

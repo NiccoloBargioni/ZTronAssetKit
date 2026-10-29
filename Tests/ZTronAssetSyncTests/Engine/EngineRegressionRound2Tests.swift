@@ -405,7 +405,7 @@ struct EngineRegressionRound2Tests {
         try sink.createPartial(first.partialName)
         _ = try sink.appendPartial(Data(repeating: 7, count: 120), to: first.partialName)
         await harness.source.release(x.transferID, with: .failed(.transient(.connectionLost(resumable: false), retryAfter: nil)))
-        let result = await harness.withClock { await waiter.value }
+        let result = await harness.withClock { await EngineHarness.value(of: waiter) }
         #expect(result.map(\.byteSize) == .success(Int64(bytes.count)), "\(result)")
         await engine.waitUntil { $0.jobsByState.isEmpty }
         let inventory = try await harness.store.stagingInventory()

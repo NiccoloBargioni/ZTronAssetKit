@@ -227,7 +227,7 @@ struct EngineIdleTests {
         await bulk.release()
         // Shutdown joins the publication, whose commit window needs the clock, then closes the store.
         await harness.withClock {
-            await shutdown.value
+            await EngineHarness.value(of: shutdown)
         }
         _ = await run.value
         // The baseline is close's return: the store releases its lock last.

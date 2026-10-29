@@ -236,7 +236,7 @@ struct EngineRegressionCycle6Tests {
         #expect(await engine.readForTests { $0.state.storeDeadline != nil }, "setup: y waits with the store's deadline armed")
         // The volume gains room the engine has not read.
         try fileSystem.removeItem(at: ballast)
-        let ensured = await harness.withClock { await ensure.value }
+        let ensured = await harness.withClock { await EngineHarness.value(of: ensure) }
         #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes were never reclaimed")
         switch ensured {
         case .success(let report):

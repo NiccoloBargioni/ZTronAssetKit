@@ -70,7 +70,7 @@ struct EngineRegressionCycle5Tests {
         await bulk.release()
         await engine.awaitCondition { $0.applyFollowHeld && $0.state.appliesInFlight == 1 }
         await engine.releaseApplyFollow()
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let ensured = await ensure.value
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply && $0.state.appliesInFlight == 0 }
         #expect(outcome.completeReport != nil, "setup: the run completes: \(outcome)")
