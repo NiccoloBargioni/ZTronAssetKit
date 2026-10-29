@@ -119,7 +119,9 @@ public protocol BackgroundSessionDriver: Sendable {
 /// is joined only while no cancel or pause is ending it and its terminal was not processed yet (a listing goes stale
 /// across its await). **Controls** belong to one attach: each handle carries a token, and its pause, cancel,
 /// priority change or terminated stream acts only while that attach still holds the name, so a handle replaced by a
-/// later attach never reaches the transfer that replaced it. **Pause.** The driver is decision-free (T2-05): a
+/// later attach never reaches the transfer that replaced it; a handle delivers its controls in the order they were
+/// made, and of overlapping priority changes for one name the newest decides (R-NET-10, S3-CONC-01). **Pause.** The
+/// driver is decision-free (T2-05): a
 /// pause records the intent here, the driver returns the resume data, and the cancellation the session reports
 /// becomes `paused(resumable:)` whichever of the two arrives first; the data (checksummed content only, TR1-3) is
 /// handed to the driver when the engine restarts that content, once; the driver tags that task as created from
@@ -145,11 +147,22 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     }
 
     /// One attached consumer of a name; `token` tells it apart from earlier and later attaches to that name, and
-    /// `expected` is the attaching job's `byteSize`, which a joined OS task's file must match (R-NET-7).
+    /// `expected` is the attaching job's `byteSize`, which a joined OS task's file must match (R-NET-7). `controls`
+    /// feeds the handle's one control task: finished with the attach, so that task never outlives it.
     private struct Waiter {
         let token: UInt64
         let expected: Int64?
         let continuation: AsyncStream<TransferUpdate>.Continuation
+        let controls: AsyncStream<BackgroundTransferHandle.Control>.Continuation
+
+        /// Ends the attach's update stream with `update` (when given) and its control stream.
+        func end(with update: TransferUpdate?) {
+            if let update {
+                self.continuation.yield(update)
+            }
+            self.continuation.finish()
+            self.controls.finish()
+        }
     }
 
     private var events: AsyncStream<SessionEvent>?
@@ -167,6 +180,12 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     /// Names a cancel or pause is ending: counted from before its first await until the terminal is processed.
     private var cancelling: [StagingFileName: Int] = [:]
     private var priorities: [StagingFileName: Float] = [:]
+    /// The newest priority request per name while one lists the tasks (R-NET-10, S3-CONC-01): taken before a
+    /// request's first await and checked after its listing, so of two overlapping changes the newer one decides
+    /// whichever listing returns first. Cleared by that newest request and on `.finished`; serials are unique for the
+    /// coordinator's life, so a cleared entry never matches an older request again.
+    private var priorityRequests: [StagingFileName: UInt64] = [:]
+    private var lastPriorityRequest: UInt64 = 0
     private var pauses: [StagingFileName: PauseState] = [:]
     /// The resume data of pauses (T2-05), oldest dropped first past `maxTasks`; checksummed content only (TR1-3).
     /// A restart of the same content continues from it once (orchestrator ruling D-14.2).
@@ -418,15 +437,26 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     }
 
     /// Sets the OS task's priority (R-NET-10). With a `token`, only while that attach still holds `name` (a
-    /// handle's control).
+    /// handle's control). Of overlapping requests for one name the newest decides: one whose listing returns after
+    /// a later request began changes nothing (the engine never re-applies a lane, so an older value would stay).
     package func setPriority(_ priority: AssetPriority, of name: StagingFileName, token: UInt64? = nil) async {
         if let token, self.waiters[name]?.token != token {
             return
         }
-        // REENTRANCY: D-9 (proposed) — the task is looked up in this listing, the name re-checked against the
-        // processed terminals, and the attach token checked again, so a priority is recorded only for a task still
-        // live and never by a handle a later attach replaced meanwhile.
+        self.lastPriorityRequest += 1
+        let request = self.lastPriorityRequest
+        self.priorityRequests[name] = request
+        // REENTRANCY: D-9 (proposed, amended at Stage 3) — the task is looked up in this listing, the name re-checked
+        // against the processed terminals, the attach token checked again and the request checked to be still the
+        // newest for the name, so a priority is recorded only for a task still live, never by a handle a later
+        // attach replaced meanwhile, and never over a later request's value.
         let snapshot = await self.driver.snapshot()
+        guard self.priorityRequests[name] == request else {
+            // A later request for the name began meanwhile (or the name's terminal was processed): it decides.
+            return
+        }
+        // The newest request decides now, so the entry lives only while a request lists the tasks.
+        self.priorityRequests[name] = nil
         if let token, self.waiters[name]?.token != token {
             return
         }
@@ -435,7 +465,9 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         }
         let value = priority.urlSessionTaskPriority
         self.priorities[name] = value
-        // REENTRANCY: D-9 (proposed) — nothing is read after the last await.
+        // REENTRANCY: D-9 (proposed, amended at Stage 3) — nothing is read after the last await. Two writes for one
+        // name are in flight together only when their callers overlap the calls, and the one production caller, a
+        // handle's control task, delivers its next control only after this call returned (`BackgroundTransferHandle`).
         await self.driver.setPriority(taskIdentifier: task.taskIdentifier, value)
     }
 
@@ -452,10 +484,12 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     /// The consumer of attach `token`'s stream went away before its terminal element: cancel the OS task
     /// (`TransferHandle`), unless a later attach holds the name by now.
     package func consumerGone(_ name: StagingFileName, token: UInt64) async {
-        guard self.waiters[name]?.token == token else {
+        guard let waiter = self.waiters[name], waiter.token == token else {
             return
         }
         self.waiters.removeValue(forKey: name)
+        // Its consumer is gone: the attach ends here, and with it the handle's control task.
+        waiter.end(with: nil)
         // REENTRANCY: D-5 (proposed) — the waiter was removed before the await; nothing is read after it.
         await self.stop(name, keepingPartial: false)
     }
@@ -574,6 +608,7 @@ package actor BackgroundTransferCoordinator: TransferBackend {
             self.live.remove(name)
             self.cancelling[name] = nil
             self.priorities[name] = nil
+            self.priorityRequests[name] = nil
             self.processed.set(true, for: name)
             self.deliver(update, for: name)
         case .backgroundEventsFinished:
@@ -630,11 +665,13 @@ package actor BackgroundTransferCoordinator: TransferBackend {
 
     private func attach(_ name: StagingFileName, id: TransferID, expected: Int64?) -> any TransferHandle {
         let (updates, continuation) = AsyncStream.makeStream(of: TransferUpdate.self, bufferingPolicy: .bufferingNewest(4))
+        // Unbounded: controls come only from lane changes and the engine's pause or cancel, and none may be dropped.
+        let controls = AsyncStream.makeStream(of: BackgroundTransferHandle.Control.self)
         self.nextToken += 1
         let token = self.nextToken
-        if let previous = self.waiters.updateValue(Waiter(token: token, expected: expected, continuation: continuation), forKey: name) {
-            previous.continuation.yield(.failed(.cancelled(.byClient)))
-            previous.continuation.finish()
+        let waiter = Waiter(token: token, expected: expected, continuation: continuation, controls: controls.continuation)
+        if let previous = self.waiters.updateValue(waiter, forKey: name) {
+            previous.end(with: .failed(.cancelled(.byClient)))
         }
         self.live.insert(name)
         let interval = self.log.interval(.transfer, category: .transport, "background attempt \(name.attempt)")
@@ -648,17 +685,16 @@ package actor BackgroundTransferCoordinator: TransferBackend {
             }
         }
         self.ensurePump()
-        return BackgroundTransferHandle(coordinator: self, name: name, token: token, id: id, updates: updates)
+        return BackgroundTransferHandle(coordinator: self, name: name, token: token, id: id, updates: updates, controls: controls)
     }
 
-    /// Ends `name`'s stream with `update`; `false` when nobody waits for it.
+    /// Ends `name`'s stream with `update` (and its handle's control task); `false` when nobody waits for it.
     @discardableResult
     private func finishWaiter(_ name: StagingFileName, with update: TransferUpdate) -> Bool {
         guard let waiter = self.waiters.removeValue(forKey: name) else {
             return false
         }
-        waiter.continuation.yield(update)
-        waiter.continuation.finish()
+        waiter.end(with: update)
         return true
     }
 
@@ -671,10 +707,24 @@ package actor BackgroundTransferCoordinator: TransferBackend {
     }
 }
 
-/// The handle of one background transfer: its controls hop to the coordinator (the driver is async), in one
-/// short-lived task each, and act only while this handle's attach still holds its name; after the terminal element
-/// they find no task and change nothing.
+/// The handle of one background transfer: its controls hop to the coordinator (the driver is async) through the
+/// handle's one control task, which delivers them in the order they were made, each only after the previous one
+/// returned. The engine calls them synchronously on every lane change and never re-applies one (ADR-021 keeps
+/// controls ordered), so a task per call, free to reach the coordinator in either order, could leave the OS task at
+/// an older lane's priority (S3-CONC-01). The control task ends with the attach (terminal element, replacement,
+/// consumer gone, invalidation) or with this handle, whichever comes first, so it never outlives the transfer.
+/// Controls act only while this handle's attach still holds its name; after the terminal element they change nothing.
 package final class BackgroundTransferHandle: TransferHandle {
+    /// One control, as the handle received it.
+    enum Control: Sendable {
+        /// `setPriority(_:)`.
+        case priority(AssetPriority)
+        /// `pause()`.
+        case pause
+        /// `cancel()`.
+        case cancel
+    }
+
     /// The content being transferred.
     package let id: TransferID
     /// The attempt whose OS task this handle follows (an earlier attempt's when it joined a live task).
@@ -685,36 +735,56 @@ package final class BackgroundTransferHandle: TransferHandle {
     package let name: StagingFileName
     /// Which attach of `name` this handle is (the coordinator's control check).
     package let token: UInt64
-    private let coordinator: BackgroundTransferCoordinator
+    private let controls: AsyncStream<Control>.Continuation
 
-    init(coordinator: BackgroundTransferCoordinator, name: StagingFileName, token: UInt64, id: TransferID, updates: AsyncStream<TransferUpdate>) {
-        self.coordinator = coordinator
+    init(
+        coordinator: BackgroundTransferCoordinator,
+        name: StagingFileName,
+        token: UInt64,
+        id: TransferID,
+        updates: AsyncStream<TransferUpdate>,
+        controls: (stream: AsyncStream<Control>, continuation: AsyncStream<Control>.Continuation)
+    ) {
         self.name = name
         self.token = token
         self.id = id
         self.attempt = name.attempt
         self.updates = updates
+        self.controls = controls.continuation
+        let pending = controls.stream
+        // The control task captures the stream, never `self`, so dropping the handle still ends it (deinit).
+        Task { [coordinator, name, token] in
+            for await control in pending {
+                switch control {
+                case .priority(let priority):
+                    await coordinator.setPriority(priority, of: name, token: token)
+                case .pause:
+                    await coordinator.control(name, token: token, keepingPartial: true)
+                case .cancel:
+                    await coordinator.control(name, token: token, keepingPartial: false)
+                }
+            }
+        }
     }
 
-    /// Sets the OS task's priority.
+    deinit {
+        // Controls already made are still delivered; the control task ends after them.
+        self.controls.finish()
+    }
+
+    /// Sets the OS task's priority, after every control made before it.
     package func setPriority(_ priority: AssetPriority) {
-        Task { [coordinator, name, token] in
-            await coordinator.setPriority(priority, of: name, token: token)
-        }
+        self.controls.yield(.priority(priority))
     }
 
-    /// Cancels producing resume data; the stream ends with `paused(resumable:)`.
+    /// Cancels producing resume data, after every control made before it; the stream ends with `paused(resumable:)`.
     package func pause() {
-        Task { [coordinator, name, token] in
-            await coordinator.control(name, token: token, keepingPartial: true)
-        }
+        self.controls.yield(.pause)
     }
 
-    /// Cancels; the stream ends with `cancelled(.byClient)`.
+    /// Cancels, after every control made before it; the stream ends with `cancelled(.byClient)`.
     package func cancel() {
-        Task { [coordinator, name, token] in
-            await coordinator.control(name, token: token, keepingPartial: false)
-        }
+        self.controls.yield(.cancel)
     }
 }
 
