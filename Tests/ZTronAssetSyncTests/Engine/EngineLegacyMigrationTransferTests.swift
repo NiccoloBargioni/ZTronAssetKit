@@ -430,10 +430,13 @@ struct EngineLegacyMigrationTransferTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(1)))
+    /// Hang guard `.minutes(3)` (Stage 3, S3-STAB-03; ruling S3-R4): 21.8 s beside the Sync suite under TSan, 49.0 to
+    /// 49.6 s with a second TSan process of the suite (load 27 to 43). A cancelled run stops before its next launch.
+    @Test("R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(3)))
     func ensureAvailableBesideARunningMigration() async throws {
         var joins = 0
         for launch in 0..<EngineLegacyMigrationTransferTests.raceLaunches {
+            try Task.checkCancellation()
             await Task.yield()
             let (harness, catalog) = try await EngineLegacyMigrationTransferTests.raceLaunch(launch, seed: 7_700)
             let opened = try await harness.start()
@@ -450,10 +453,13 @@ struct EngineLegacyMigrationTransferTests {
     }
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(1)))
+    /// Hang guard `.minutes(3)` (Stage 3, S3-STAB-03; ruling S3-R4): 22.8 s beside the Sync suite under TSan, 49.7 to
+    /// 50.5 s with a second TSan process of the suite (load 27 to 43). A cancelled run stops before its next launch.
+    @Test("R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)", .timeLimit(.minutes(3)))
     func userInitiatedPrefetchBesideARunningMigration() async throws {
         var joins = 0
         for launch in 0..<EngineLegacyMigrationTransferTests.raceLaunches {
+            try Task.checkCancellation()
             await Task.yield()
             let (harness, catalog) = try await EngineLegacyMigrationTransferTests.raceLaunch(launch, seed: 7_900)
             let engine = harness.engine
@@ -708,7 +714,9 @@ struct EngineLegacyMigrationTransferTests {
     // MARK: No hot loop around a store call (L5K-R17)
 
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)", .timeLimit(.minutes(1)))
+    /// Hang guard `.minutes(3)` (Stage 3, S3-STAB-03; ruling S3-R4): 16.3 s beside the Sync suite under TSan, 37.4 to
+    /// 37.7 s with a second TSan process of the suite (load 27 to 43). The observation window stops at cancellation.
+    @Test("R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)", .timeLimit(.minutes(3)))
     func migrationLoopWaitsForTheLastAdoption() async throws {
         let time = ManualTimeSource()
         // Three files: the batch holds the first pending one at its hash; a prefetch job adopts the last pending one,
@@ -730,7 +738,7 @@ struct EngineLegacyMigrationTransferTests {
         // An observation window that releases every other unit and yields: a loop that returned at once would call again
         // in about every round (PSPIN-c3 saw 35 to 46 calls); the fixed loop makes none whatever its length, so the bound
         // below never depends on it.
-        for _ in 0..<2_000 {
+        for _ in 0..<2_000 where !Task.isCancelled {
             for unit in await bulk.heldUnits where !jobHash.contains(unit) {
                 await bulk.release(unit)
             }
@@ -1906,11 +1914,17 @@ extension EngineHarness {
     /// (`SyncEngine.invariantViolations(storeDeadlineDue:)`), read at idle: `checked` when the engine was settled
     /// (`storeDeadlineSettled`) before and after the store's `nextDeadline()` was read, with the same alarm and the same
     /// store deadline on its heap; then a deadline the store reports, a trailing install among them, must be on the
-    /// engine's heap. Otherwise only the plain invariants are returned.
+    /// engine's heap. Otherwise only the plain invariants are returned, read in the first engine turn when the engine
+    /// is not settled then (no store read, one hop instead of three: the model walk calls this after each of its 10,000
+    /// operations; Stage 3, S3-STAB-03).
     func idleViolations() async -> (checked: Bool, violations: [String]) {
         let engine = self.engine
-        let before = await engine.readForTests { engine in
-            SettledMark(settled: engine.storeDeadlineSettled, alarm: engine.state.alarm?.token, deadline: engine.state.heap.deadline(for: .store))
+        let (before, unsettled) = await engine.readForTests { engine -> (SettledMark, [String]?) in
+            let mark = SettledMark(settled: engine.storeDeadlineSettled, alarm: engine.state.alarm?.token, deadline: engine.state.heap.deadline(for: .store))
+            return (mark, mark.settled ? nil : engine.invariantViolations())
+        }
+        if let unsettled {
+            return (false, unsettled)
         }
         let storeDeadline = await self.store.nextDeadline()
         return await engine.readForTests { engine in

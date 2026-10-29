@@ -28,7 +28,9 @@ struct EngineRegressionCycle16Tests {
     /// open and started a second run and a second manifest request without the clock moving (the cycle-15 correctness
     /// verifier's PROBE-OWEDSETTLE). The follow-up is held here (`holdReadmissionFollowUps()`), so the order is fixed.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle", .timeLimit(.minutes(1)))
+    /// Hang guard `.minutes(3)` (Stage 3, S3-STAB-03; ruling S3-R4): 16.4 s beside the Sync suite under TSan, 36.6 to
+    /// 38.5 s with a second TSan process of the suite (load 27 to 43).
+    @Test("R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle", .timeLimit(.minutes(3)))
     func runWaitsForOwedClaims() async throws {
         let prefetchCount = SyncEngine.readmissionsPerTurn + 8
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0))

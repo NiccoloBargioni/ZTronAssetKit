@@ -17,8 +17,12 @@ struct EngineModelTests {
         var cancelled = false
     }
 
+    /// The hang guard is `.minutes(5)` (Stage 3, S3-STAB-03; ruling S3-R4, the precedent of `EngineGateModelTests`): the
+    /// walk takes about 8 s alone under TSan, but beside the rest of the Sync suite in the same process 29.5 s, and 59.2 to
+    /// 59.4 s with a second TSan process of the suite running (load 27 to 43), where a 1-minute guard failed it without any
+    /// invariant failing (the hunter's 87 s at load 190, the confirmer's 67 s at load 30). Every operation checks for cancellation, so a run the guard stops ends at once.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant", .timeLimit(.minutes(1)))
+    @Test("R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant", .timeLimit(.minutes(5)))
     func randomOperations() async throws {
         let seed: UInt64 = 0x2_5EED
         var random = SplitMix64(seed: seed)
@@ -59,6 +63,10 @@ struct EngineModelTests {
             DeviceConditions(network: NetworkConditions(satisfied: true, expensive: true, constrained: true), power: PowerConditions(lowPowerMode: true, thermal: .serious)),
         ]
         for operation in 0..<10_000 {
+            // The time limit cancels the test: stop the walk at once (the drive below then throws on cancellation).
+            guard !Task.isCancelled else {
+                break
+            }
             if operation % 64 == 0 {
                 await Task.yield()
             }
