@@ -159,6 +159,35 @@ struct StagingSinkTests {
         }
     }
 
+    /// Stage 3 M-S-11: the Apple tier's copier stages through `writeStaged`, and an ENOSPC there must reach the engine
+    /// as `insufficientSpace` (ADR-013), never as a short file renamed into place as a success that later fails as a
+    /// misleading size mismatch. The fault strikes the first (truncating) write or a later (appending) one.
+    @Test(
+        "R-STO-6: an ENOSPC while staging a chunk source surfaces as insufficientSpace and leaves nothing behind",
+        .timeLimit(.minutes(1)),
+        arguments: [1, 2]
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func writeStagedNoSpace(failingWrite: Int) async throws {
+        let (harness, sink) = try await StagingSinkTests.sink()
+        let chunks = [Data([1, 2]), Data([3, 4])]
+        let name = StagingSinkTests.name(1)
+        let temporary = harness.layout.stagingURL(name.with(kind: .partialTemporary))
+        let destination = harness.layout.stagingURL(name)
+        harness.fileSystem.addFault(
+            FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: ".parttmp"), occurrence: .nth(failingWrite), error: .noSpace)
+        )
+        await #expect(throws: StagingError.insufficientSpace) {
+            try await sink.writeStaged(name, from: ScriptedChunks(chunks: chunks, failAt: nil), maxBytes: 100)
+        }
+        let failed = harness.fileSystem.operations.filter { $0.kind == .write && $0.url == temporary && $0.failure == .noSpace }
+        #expect(failed.count == 1, "the fault fired once")
+        #expect(!harness.exists(temporary) && !harness.exists(destination), "nothing is left in staging")
+        // Space is back: the same name stages in full, so the failed attempt left no name in use.
+        #expect(try await sink.writeStaged(name, from: ScriptedChunks(chunks: chunks, failAt: nil), maxBytes: 100) == 4)
+        #expect(harness.content(destination) == Data([1, 2, 3, 4]))
+    }
+
     /// The executors a staging sink may run on: inline, the stepped one holding the unit until the test releases it
     /// (the caller is cancelled while its unit waits), and the live dispatch executor.
     enum CleanupExecutor: String, CaseIterable, Sendable {
