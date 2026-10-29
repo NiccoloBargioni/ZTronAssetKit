@@ -262,11 +262,8 @@ struct LeaseTests {
         // Meanwhile `a` loses its last reference: its blob is doomed by a generation after the held one. The
         // dereference's own units (a free-space measurement, say) run; only the held commit waits.
         let dereference = deref.start(seeded)
-        try await CorePoll.until("a's blob doomed by \(deref)") {
-            for unit in await metadata.heldUnits where unit != held {
-                await metadata.release(unit)
-            }
-            return StoreRecoveryTests.isDoomed(await harness.store.state.core.blobTable[key], deref.reason)
+        try await CorePoll.releasing(metadata, .allExcept([held]), until: "a's blob doomed by \(deref)") {
+            StoreRecoveryTests.isDoomed(await harness.store.state.core.blobTable[key], deref.reason)
         }
         // A snapshot without `a` is acknowledged and the grace passes: only the commit is missing.
         await harness.store.publishSnapshot(urgency: .userInitiated)

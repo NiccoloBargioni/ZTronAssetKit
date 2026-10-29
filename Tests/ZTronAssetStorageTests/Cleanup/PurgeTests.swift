@@ -345,22 +345,14 @@ struct PurgeTests {
             // The engine installs the fresh snapshot and its reaper takes both keys; every unit but the purge's goes
             // through until then. The held units are read before the check: a key turns `deleting` before its unit is
             // submitted.
-            try await CorePoll.until("runDueWork's reaper is deleting both blobs") {
-                let held = await metadata.heldUnits
-                var deleting = true
+            try await CorePoll.releasing(metadata, .allExcept([purgeYield]), until: "runDueWork's reaper is deleting both blobs") {
                 for asset in assets {
                     if case .deleting? = await harness.state.core.blobTable[asset.key] {
                         continue
                     }
-                    deleting = false
+                    return false
                 }
-                if deleting {
-                    return true
-                }
-                for sequence in held where sequence != purgeYield {
-                    await metadata.release(sequence)
-                }
-                return false
+                return true
             }
             try await metadata.requireHeldUnits(atLeast: 2)
             self.deletionUnit = try #require(await metadata.heldUnits.first { $0 != purgeYield })
@@ -374,19 +366,12 @@ struct PurgeTests {
 
         /// Lets every held unit but `kept` through until the purge returned or waits for an in-flight deletion.
         func untilPurgeReturnsOrWaits(keeping kept: Int) async throws {
-            try await CorePoll.until("the purge returned or waits for the in-flight deletion") {
-                let held = await self.metadata.heldUnits
+            try await CorePoll.releasing(self.metadata, .allExcept([kept]), until: "the purge returned or waits for the in-flight deletion") {
                 if await self.finished.value > 0 {
                     return true
                 }
                 let waiters = await self.harness.state.core.keyWaiters
-                if self.assets.contains(where: { waiters[$0.key] != nil }) {
-                    return true
-                }
-                for sequence in held where sequence != kept {
-                    await self.metadata.release(sequence)
-                }
-                return false
+                return self.assets.contains(where: { waiters[$0.key] != nil })
             }
         }
 

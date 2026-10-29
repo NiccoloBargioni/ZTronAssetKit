@@ -137,14 +137,8 @@ struct IdempotencyTests {
             harness.fileSystem.operations.filter { $0.kind == .contentsOfDirectory && $0.url.standardizedFileURL.path == harness.layout.blobsDirectory.standardizedFileURL.path }.count
         }
         let launchListings = blobsListed()
-        try await CorePoll.until("one unit of the collection ran") {
-            if operation == .stagingGC ? garbage.contains(where: { !harness.exists($0) }) : blobsListed() > launchListings {
-                return true
-            }
-            if await !metadata.heldUnits.isEmpty {
-                await metadata.releaseNext()
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "one unit of the collection ran") {
+            operation == .stagingGC ? garbage.contains(where: { !harness.exists($0) }) : blobsListed() > launchListings
         }
         task.cancel()
         await metadata.setHolding(false)

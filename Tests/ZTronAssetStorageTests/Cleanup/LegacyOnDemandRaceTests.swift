@@ -34,11 +34,8 @@ struct LegacyOnDemandRaceTests {
         let onDemand = LegacyRace.tracked {
             try await race.harness.store.adoptLegacyNow(race.id)
         }
-        try await CorePoll.until("the adopt-on-demand answered or waits for the batch's adoption") {
-            for unit in await race.metadata.heldUnits where !placement.contains(unit) {
-                await race.metadata.release(unit)
-            }
-            return await race.settled(onDemand.finished)
+        try await CorePoll.releasing(race.metadata, .allExcept(placement), until: "the adopt-on-demand answered or waits for the batch's adoption") {
+            await race.settled(onDemand.finished)
         }
         let answeredEarly = await onDemand.finished.value
         let readsWhileWaiting = race.reads() - readsBefore
@@ -80,11 +77,8 @@ struct LegacyOnDemandRaceTests {
         for unit in batchHash {
             await race.bulk.release(unit)
         }
-        try await CorePoll.until("the batch decided or waits for the adopt-on-demand's adoption") {
-            for unit in await race.metadata.heldUnits where !placement.contains(unit) {
-                await race.metadata.release(unit)
-            }
-            return await race.settled(batch.finished)
+        try await CorePoll.releasing(race.metadata, .allExcept(placement), until: "the batch decided or waits for the adopt-on-demand's adoption") {
+            await race.settled(batch.finished)
         }
         let batchDecidedEarly = await batch.finished.value
         await race.releaseAll()
@@ -116,11 +110,8 @@ struct LegacyOnDemandRaceTests {
         let second = LegacyRace.tracked {
             try await race.harness.store.adoptLegacyNow(race.id)
         }
-        try await CorePoll.until("the second adopt-on-demand answered or waits for the first") {
-            for unit in await race.metadata.heldUnits where !placement.contains(unit) {
-                await race.metadata.release(unit)
-            }
-            return await race.settled(second.finished)
+        try await CorePoll.releasing(race.metadata, .allExcept(placement), until: "the second adopt-on-demand answered or waits for the first") {
+            await race.settled(second.finished)
         }
         let secondAnsweredEarly = await second.finished.value
         let readsBySecond = race.reads() - readsBefore
@@ -183,11 +174,8 @@ struct LegacyOnDemandRaceTests {
         let onDemand = LegacyRace.tracked {
             try await race.harness.store.adoptLegacyNow(race.id)
         }
-        try await CorePoll.until("the adopt-on-demand answered or waits for the batch's adoption") {
-            for unit in await race.metadata.heldUnits where !placement.contains(unit) {
-                await race.metadata.release(unit)
-            }
-            return await race.settled(onDemand.finished)
+        try await CorePoll.releasing(race.metadata, .allExcept(placement), until: "the adopt-on-demand answered or waits for the batch's adoption") {
+            await race.settled(onDemand.finished)
         }
         let answeredEarly = await onDemand.finished.value
         // close() begins while the batch's placement unit is held; its drain then lets that unit finish.
@@ -317,11 +305,8 @@ extension LegacyOnDemandRaceTests {
         let batch = LegacyRace.tracked {
             try await race.harness.store.migrateLegacy(maxFiles: 64)
         }
-        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
-            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
-                await race.bulk.release(unit)
-            }
-            return await race.settled(batch.finished)
+        try await CorePoll.releasing(race.bulk, .allExcept(onDemandHash), until: "the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            await race.settled(batch.finished)
         }
         let returnedEarly = await batch.finished.value
         let held = await race.harness.state.migration
@@ -352,11 +337,8 @@ extension LegacyOnDemandRaceTests {
         let batch = LegacyRace.tracked {
             try await race.harness.store.migrateLegacy(maxFiles: 64)
         }
-        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
-            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
-                await race.bulk.release(unit)
-            }
-            return await race.settled(batch.finished)
+        try await CorePoll.releasing(race.bulk, .allExcept(onDemandHash), until: "the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            await race.settled(batch.finished)
         }
         let returnedEarly = await batch.finished.value
         let closing = LegacyRace.tracked {
@@ -403,11 +385,8 @@ extension LegacyOnDemandRaceTests {
         let first = LegacyRace.tracked {
             try await race.harness.store.migrateLegacy(maxFiles: 64)
         }
-        try await CorePoll.until("the batch returned or waits for the adopt-on-demand of the last claimed file") {
-            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
-                await race.bulk.release(unit)
-            }
-            return await race.settled(first.finished)
+        try await CorePoll.releasing(race.bulk, .allExcept(onDemandHash), until: "the batch returned or waits for the adopt-on-demand of the last claimed file") {
+            await race.settled(first.finished)
         }
         let returned = await first.finished.value
         let installDue = await race.harness.state.core.snapshots.installDue
@@ -481,10 +460,7 @@ extension LegacyOnDemandRaceTests {
         let batch = LegacyRace.tracked {
             try await race.harness.store.migrateLegacy(maxFiles: 64)
         }
-        try await CorePoll.until("the batch's install is held at the sink, or the batch returned") {
-            for unit in await race.bulk.heldUnits where !onDemandHash.contains(unit) {
-                await race.bulk.release(unit)
-            }
+        try await CorePoll.releasing(race.bulk, .allExcept(onDemandHash), until: "the batch's install is held at the sink, or the batch returned") {
             if await sink.heldCount > 0 {
                 return true
             }
@@ -673,10 +649,8 @@ struct LegacyRace {
     /// bulk unit outside `keepingBulk`, and returns the held metadata units: the placement's. A store over the fixture runs
     /// no other metadata unit here (commits run only when an operation requires one).
     func holdPlacement(keepingBulk: Set<Int> = []) async throws -> Set<Int> {
-        try await CorePoll.until("the file's placement unit is held") {
-            for unit in await self.bulk.heldUnits where !keepingBulk.contains(unit) {
-                await self.bulk.release(unit)
-            }
+        // The bulk units are read before the check (S3C-1).
+        try await CorePoll.releasing(self.bulk, .allExcept(keepingBulk), until: "the file's placement unit is held") {
             let placing = await self.harness.state.core.publishing.contains { $0.hash == self.file.digest }
             let held = await self.metadata.heldUnits
             return placing && !held.isEmpty

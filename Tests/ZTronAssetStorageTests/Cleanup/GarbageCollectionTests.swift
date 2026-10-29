@@ -230,11 +230,8 @@ struct GarbageCollectionTests {
         let publishB = Task {
             try await harness.store.publish(stagedB, binding: [b.identifier], expecting: b.contentIdentity, urgency: .bulk)
         }
-        try await CorePoll.until("B waits for A's placement") {
-            for unit in await metadata.heldUnits where unit != placementA {
-                await metadata.release(unit)
-            }
-            return await harness.state.core.keyWaiters[key]?.isEmpty == false
+        try await CorePoll.releasing(metadata, .allExcept([placementA]), until: "B waits for A's placement") {
+            await harness.state.core.keyWaiters[key]?.isEmpty == false
         }
         // The manifest changes A's content while A's placement runs.
         let changed = CoreFixture.entry("a", CoreFixture.bytes(441))
@@ -305,14 +302,8 @@ struct GarbageCollectionTests {
     /// unit (the one for `second`) is held, and lets everything run.
     @available(macOS 15.0, iOS 18.0, *)
     static func cancelDuringSecondRemoval(_ metadata: SteppedBlockingExecutor, _ harness: CoreHarness, first: URL, second: URL, task: Task<CleanupResult, any Error>) async throws {
-        try await CorePoll.until("the first removal unit ran") {
-            if !harness.exists(first) {
-                return true
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "the first removal unit ran") {
+            !harness.exists(first)
         }
         try await metadata.requireHeldUnits(atLeast: 1)
         #expect(harness.exists(second), "the second removal unit is held")
@@ -513,14 +504,8 @@ struct GarbageCollectionTests {
             try await harness.store.collectGarbage(until: deadline)
         }
         let fanOut = gone.key.hash.fanOut
-        try await CorePoll.until("the run listed gone's fan-out") {
-            if harness.fileSystem.operations.dropFirst(mark).contains(where: { $0.kind == .contentsOfDirectory && $0.url.lastPathComponent == fanOut }) {
-                return true
-            }
-            if let next = await metadata.heldUnits.first {
-                await metadata.release(next)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "the run listed gone's fan-out") {
+            harness.fileSystem.operations.dropFirst(mark).contains(where: { $0.kind == .contentsOfDirectory && $0.url.lastPathComponent == fanOut })
         }
         try await metadata.requireHeldUnits(atLeast: 1)
         let held = Set(await metadata.heldUnits)
@@ -585,14 +570,8 @@ struct GarbageCollectionTests {
             try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
         }
         // Every listing unit runs; the first metadata unit after them is the release between the first two chunks.
-        try await CorePoll.until("the listing completed") {
-            if harness.fileSystem.operations.dropFirst(mark).filter({ $0.kind == .contentsOfDirectory }).count == listings {
-                return true
-            }
-            if let next = await metadata.heldUnits.first {
-                await metadata.release(next)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "the listing completed") {
+            harness.fileSystem.operations.dropFirst(mark).filter({ $0.kind == .contentsOfDirectory }).count == listings
         }
         try await CorePoll.until("the sweep released the actor, or dooming every orphan in one turn") {
             let doomedLast = await harness.state.core.blobTable[planted[2]] != nil

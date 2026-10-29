@@ -100,15 +100,11 @@ struct EvictionOverlapTests {
             try await harness.store.evictIfNeeded()
         }
         // The space measurement runs, then the first chunk (o0, o1) is marked and eviction yields in a metadata unit.
-        try await CorePoll.until("eviction yields after its first chunk") {
-            if await harness.record(EvictionOverlapTests.assets[1].id)?.residency == .absent(.evicted) {
-                return await !metadata.heldUnits.isEmpty
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "eviction marked its first chunk") {
+            await harness.record(EvictionOverlapTests.assets[1].id)?.residency == .absent(.evicted)
         }
+        // The yield after the first chunk, which the poll never releases (S3C-1).
+        try await metadata.requireHeldUnits(atLeast: 1)
         let yield = try #require(await metadata.heldUnits.first)
         let plan = try #require(await harness.store.evictionPlan(toFree: 200, protecting: []))
         #expect(plan.victims.map(\.id) == [EvictionOverlapTests.assets[2].id, EvictionOverlapTests.assets[3].id])
@@ -142,11 +138,8 @@ struct EvictionOverlapTests {
             try await harness.store.purge(.scope(.identifiers(Set(purged))))
         }
         // The purge's selection unit runs; its chunk dooms o0 and o1, then it waits for the grace.
-        try await CorePoll.until("the purge doomed its selection") {
-            for unit in await bulk.heldUnits where unit != candidates {
-                await bulk.release(unit)
-            }
-            return await harness.record(purged[1])?.residency == .absent(.purged)
+        try await CorePoll.releasing(bulk, .allExcept([candidates]), until: "the purge doomed its selection") {
+            await harness.record(purged[1])?.residency == .absent(.purged)
         }
         await bulk.setHolding(false)
         let result = try await maintenance.value
