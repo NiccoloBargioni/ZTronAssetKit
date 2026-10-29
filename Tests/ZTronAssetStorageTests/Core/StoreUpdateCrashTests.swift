@@ -114,7 +114,7 @@ enum CatalogUpdateRun {
         var newACommitted = false
         /// The newest generation whose commit returned.
         var generation: UInt64 = 0
-        /// How many mutations ran before the deletion grace started to pass: no blob may be unlinked before.
+        /// How many mutations ran before the deletion grace had passed: no blob may be unlinked before.
         var graceStart: Int?
     }
 
@@ -135,8 +135,12 @@ enum CatalogUpdateRun {
                     trace.generation = await harness.state.core.committedGeneration
                 }
             }
+            // The install that drops the doomed keys (acknowledged), then the awake-clock grace: the reaper may unlink
+            // only from here on, in the next `runDueWork()` (§4.4).
+            _ = await harness.store.runDueWork()
+            harness.time.advance(by: harness.configuration.policy.deletionGrace)
             trace.graceStart = harness.fileSystem.mutationCount
-            await harness.reapAfterGrace()
+            _ = await harness.store.runDueWork()
             try await harness.store.flush(.durable)
             trace.newACommitted = trace.newAReturned
             trace.generation = await harness.state.core.committedGeneration
