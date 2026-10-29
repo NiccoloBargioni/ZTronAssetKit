@@ -89,9 +89,9 @@ actor TruncatingSource: RemoteSource, StagingAttachable {
 }
 
 extension EngineRegressionTests {
-    /// A transfer whose stream ends without a terminal element fails its attempt (`transient(.incompleteCallbackSequence)`)
-    /// instead of leaving the job downloading for ever: the job backs off, and its retry delivers the asset to the
-    /// waiter (sync-1 S1-11, ARCHITECTURE §12.3; Stage 3, S3-B-068).
+    /// A transfer whose stream ends without a terminal element fails its attempt (`transient(.incompleteCallbackSequence)`,
+    /// recorded once) instead of leaving the job downloading for ever: the job backs off, and its retry delivers the
+    /// asset to the waiter (sync-1 S1-11, ARCHITECTURE §12.3; Stage 3, S3-B-068).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it", .timeLimit(.minutes(1)))
     func streamWithoutTerminalFailsTheJob() async throws {
@@ -106,25 +106,24 @@ extension EngineRegressionTests {
         _ = await harness.engine.sync(.force)
         let engine = harness.engine
         let waiter = Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { engine in
-            if case .failed(.at)? = engine.state.jobs[entry.transferID]?.state {
-                return true
-            }
-            return false
-        }
-        let failure = await engine.readForTests { engine in engine.state.jobs[entry.transferID].map { ($0.attempts, $0.active == nil) } }
-        #expect(failure?.0 == 1 && failure?.1 == true, "the ended stream failed the attempt, nothing is left running: \(String(describing: failure))")
+        // The backoff's full jitter may make the retry due at once, so the failed state is not awaited: the failure is
+        // read from the engine's record of it, and the retry from the waiter's answer.
         let answer = try await harness.withClock {
             await waiter.value
         }
         #expect((try? answer.get()) != nil, "the retry delivered the asset: \(answer)")
+        let recorded = await engine.readForTests { engine in
+            engine.state.recentErrors.filter { $0.id == entry.identifier && $0.detail.contains("incompleteCallbackSequence") }.count
+        }
+        #expect(recorded == 1, "the ended stream failed its attempt once, as an incomplete callback sequence: \(recorded)")
         #expect(await base.starts.count == 1, "the retry reached the transport; the ended attempt never did")
         await engine.shutdown()
     }
 
-    /// A bulk job a policy blocks (Low Data Mode; a bulk-lane handle keeps it) is promoted by a user resolve and starts at once (user-initiated work
-    /// may use the constrained network); when the user waiter leaves, the job is demoted to bulk and its running
-    /// transfer is paused again, parked by the same policy (sync-1 S1-07, ARCHITECTURE §12.3; Stage 3, S3-B-068).
+    /// A bulk job a policy blocks (Low Data Mode; a bulk-lane handle keeps it) is promoted by a user resolve and starts
+    /// at once (user-initiated work may use the constrained network); when the user waiter leaves, the job is demoted to
+    /// bulk and its running transfer is paused again, parked by the same policy (sync-1 S1-07, ARCHITECTURE §12.3;
+    /// Stage 3, S3-B-068).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again", .timeLimit(.minutes(1)))
     func userResolveOfPolicyBlockedBulk() async throws {
