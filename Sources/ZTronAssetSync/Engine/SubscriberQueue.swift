@@ -69,8 +69,11 @@ enum EventSlot: Hashable, Sendable {
 
 /// One subscriber's bounded queue (sync.md §10.3, H-9): at most one live slot per progress key and per subject, and one
 /// for each of the two client lifecycle events (L5-R19), so a stalled subscriber costs memory bounded by keys and
-/// subjects, never by time or event volume. Delivery order is the publication order of each slot's latest occurrence;
-/// `clientShutDown` is always last (nothing is published after it).
+/// subjects, never by time or event volume. A terminal slot moves to the tail when published again; a progress slot is
+/// replaced in place and keeps the position of its first undelivered occurrence, except that one run's progress never
+/// replaces another's: the next run's first `syncProgress` takes a fresh slot at the tail, behind the previous run's
+/// `syncFinished` and its own `syncStarted`, and the previous run's undelivered progress, which that `syncFinished`
+/// superseded, is dropped (Stage 3, S3-CONC-03). `clientShutDown` is always last (nothing is published after it).
 struct SubscriberQueue {
     /// A live slot.
     private struct Live {
@@ -114,7 +117,7 @@ struct SubscriberQueue {
         }
         let slot = EventSlot(event)
         if var live = self.slots[slot] {
-            if slot.isProgress, !self.finished {
+            if slot.isProgress, !self.finished, !SubscriberQueue.isAnotherRun(event, than: live.event) {
                 live.event = event
                 self.slots[slot] = live
                 return (nil, true)
@@ -143,6 +146,15 @@ struct SubscriberQueue {
             }
         }
         return nil
+    }
+
+    /// Whether `event` is a run's progress and `live` another run's: then `event` is not a replacement in place (its
+    /// run started after `live`'s ended), so it takes a fresh slot at the tail.
+    private static func isAnotherRun(_ event: AssetEvent, than live: AssetEvent) -> Bool {
+        guard case .syncProgress(let run, _) = event, case .syncProgress(let previous, _) = live else {
+            return false
+        }
+        return run != previous
     }
 
     /// Drops an undelivered progress slot (a transfer's key retires with the transfer, ADR-023).
