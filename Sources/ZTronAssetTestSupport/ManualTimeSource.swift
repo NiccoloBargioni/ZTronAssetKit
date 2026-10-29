@@ -141,11 +141,22 @@ public final class ManualTimeSource: TimeSource {
     }
 
     /// Moves monotonic time to `deadline` (if later), wall and awake time by the same amount, and wakes sleepers.
+    ///
+    /// The move is made in nanoseconds, so monotonic time lands exactly on `deadline` and awake time moves by exactly
+    /// as many nanoseconds; only the wall clock takes the gap as seconds. Converting the gap to seconds and back
+    /// (`advance(by:)`) can miss `deadline` by a nanosecond and leave a sleeper there asleep (Stage 3, S3AH-3).
     public func advance(to deadline: MonotonicInstant) {
-        let seconds = self.state.withLock { state in
-            deadline.seconds(since: state.monotonic)
+        let due = self.state.withLock { state -> [Wake] in
+            let gap = deadline > state.monotonic ? deadline.nanoseconds - state.monotonic.nanoseconds : 0
+            state.wall = state.wall.addingTimeInterval(deadline.seconds(since: state.monotonic))
+            state.monotonic = MonotonicInstant(nanoseconds: state.monotonic.nanoseconds + gap)
+            let (uptime, overflow) = state.uptime.nanoseconds.addingReportingOverflow(gap)
+            state.uptime = MonotonicInstant(nanoseconds: overflow ? UInt64.max : uptime)
+            return ManualTimeSource.collectDue(&state)
         }
-        self.advance(by: seconds)
+        for continuation in due {
+            continuation.resume(returning: .success(()))
+        }
     }
 
     /// The device sleeps: wall and monotonic time advance, the awake clock does not (ADR-017).
