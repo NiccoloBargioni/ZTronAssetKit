@@ -1,4 +1,4 @@
-# ADR drafts — Stage 3 WP-B storage core, close-out cycle 1 (`wp/s3b`, from `s3-base`)
+# ADR drafts — Stage 3 WP-B storage core, close-out cycles 1 and 2 (`wp/s3b`, from `s3-base`)
 
 Items, levels and rulings come from `.build-orchestrator/s3-rulings-s3b.md`; each finding's evidence from
 `.build-orchestrator/s3-findings-s3b.json`. Commits are on `wp/s3b`; a bug's failing test is committed on its own before
@@ -8,7 +8,9 @@ the `@Test` function; CPU-bound case loops yield once per case). WP-B's Stage 2 
 
 ## Orchestrator rulings (Stage 3 close-out)
 
-Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 close-out)":
+Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 close-out)"; the file is unchanged for
+close-out cycle 2, so each stands as "Orchestrator ruling (close-out)" for that cycle too, with the cycle-2 findings
+(`.build-orchestrator/s3b-probes-c1/`) answered under their items and in "Close-out cycle 2 findings" below:
 
 - **S3-R1 Scope and order.** BLOCKING first (failing test on its own, then the fix), then REQUIRED, then OPTIONAL;
   ADR-RECORD items get an entry here and no code; items not listed are out of scope.
@@ -131,7 +133,7 @@ Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 c
   first unattempted key is read again by the next batch instead of being dropped from this run (it is re-validated, so
   nothing unsafe follows; a key that became deletable meanwhile is reaped one run earlier). No new await; REENTRANCY R7
   unchanged.
-- **Structural tests (deterministic, operations per key).** `DeletionUnitTests.reapQueueIsLinear`,
+- **Structural tests (deterministic, operations per key), as first written (cycle 1).** `DeletionUnitTests.reapQueueIsLinear`,
   `P-13: the reaper reads each doomed key a bounded number of times whatever the size of the set, so a reclaim in time-bounded units is linear`
   (1,000, 10,000 and 40,000 keys, 64-key batches, 20 attempted per unit: every key consumed exactly once in sorted order,
   the first key of each batch the first one the last unit left, `(n + 19) / 20` units, and reads per key in (3.1, 3.2]
@@ -139,6 +141,34 @@ Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 c
   `P-13: a key the reaper's re-validation refuses is passed over, and the keys before the first unattempted one are consumed`.
   The store-level order and unit count stay pinned by `P-13: a deletion unit stops when its time budget is spent and the
   reaper carries the rest to the next unit` (unchanged, passing).
+- **Correction (close-out cycle 2).** Cycle 1 said the read count pins linearity; it does not. Those two tests exercise
+  `ReapQueue` on its own, and the old quadratic reaper had the same read figures (3.128–3.198 per key; only its element
+  moves differed, 1,077–43,978 per key): with `s3-base`'s `reap(maxKeys:)` restored every deterministic test passed, and
+  only the release benchmark caught it, in one run of two.
+- **Store-level pin (cycle 2, `aafb43a`).** `reap(maxKeys:)` now records its work list in `StoreCoreState.lastReap`
+  (`ReapStatistics`, WP-B's `ReapQueue.swift`: keys listed, deletion units, `ReapQueue.reads`, and the keys its units left
+  unattempted, summed), set at the end of every run that listed a key; in memory only, no package or public change.
+  New test `DeletionUnitTests.reaperWorkListIsLinear`,
+  `P-13: the reaper reclaims 10,000 doomed blobs in 20-unlink units reading each key at most batch / attempted times, so its work is linear in the keys`:
+  10,000 blobs a previous launch left are listed as launch orphans and doomed by `doomOrphans(_:)`, and the store's own
+  reaper reclaims them while each monotonic read advances the clock 50 µs (`SteppingClock(step:)`, the benchmark's
+  20-of-64 shape); it asserts 10,000 files removed, `keys == 10,000`, `units == 500`, `carried` equal to the per-unit
+  model (44 while 64 or more keys remain, then 40, 20 and 0; 21,928 in all), `reads == keys + carried` (each key read
+  once, and again only where a unit left it) and `reads <= 3.2 × keys`. 10.6 s in debug at load about 120.
+- **The original defect fails it (S3-R3; scratch copy of `aafb43a` with `s3-base`'s `reap(maxKeys:)` spliced in, the
+  `S3BASEREAP` mutant):** `✘ Test "P-13: the reaper reclaims 10,000 doomed blobs in 20-unlink units reading each key at most
+  batch / attempted times, so its work is linear in the keys" recorded an issue at StoreDeletionTests.swift:311:30:
+  Expectation failed: await store.state.core.lastReap` / `✘ Test run with 11 tests in 2 suites failed after 8.479 seconds
+  with 1 issue.`
+- **Benchmark made robust under load (cycle 2, `a5edd1e`).** `reapScaling` now runs, at 20,000 and 40,000, each of its
+  three runs followed by the 20-key-batch control at the same size (best of three each) and also asserts
+  `seconds[40,000] <= 1.5 × control[40,000]`: the verifier measured the old reaper at 2.47× and 3.29× its control and the
+  fixed one at 0.98–1.04×, where the 40k/20k ratio alone let one run of the old reaper pass (1.996). The 1.5 bound is the
+  benchmark's own (SPEC §6 has none for the reaper); the deterministic pin is the test above. Measured this cycle
+  (release, load 49 → 8.7 and 15.8 → 10.3): fixed, 40k/20k 2.007 and 40,000 against its control 1.036; `s3-base`'s
+  reaper spliced into a scratch copy of `a5edd1e`: `[10000: 0.244 s, 20000: 0.658 s, 40000: 1.985 s]`, `✘ … recorded an
+  issue at BenchStorage.swift:296:13: Expectation failed: ratio <= ratioMax` (3.018) and `… BenchStorage.swift:297:13:
+  Expectation failed: againstControl <= controlRatioMax` (3.131).
 - **Release measurement (benchmark `StorageBenchmarks.reapScaling`, `8b3fc89`,
   `P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much`;
   each blob unlink advances the injected clock 50 µs, so every unit stops after 20 unlinks).**
@@ -202,6 +232,11 @@ Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 c
   for a raise is not met. The overruns the backlog
   records happened at host loads of 441–834; the cheaper reopens lower the work, but no guard can promise one minute at
   such loads.
+- **Close-out cycle 2 (the verifier's runs, recorded, no change).** Alone under TSan at load 137 → 280 the test passed in
+  21.201 s for its eight cases side by side, below half its limit; inside the full TSan storage run at load 277 → 628
+  (976.278 s in all) all eight cases overran the minute and the time-limit cancellation produced 62 follow-on issues
+  (`reopen or convergence failed with .cancelled`). S3-R4's condition for a raise (over half the limit at a load of about
+  30) is still not met, so the guard stays.
 
 ## S3B-8 — T2-06: a persisted launch epoch unique per launch (REQUIRED, S3-B-023) · test added
 
@@ -215,22 +250,86 @@ Recorded as given (`s3-rulings-s3b.md`), each as "Orchestrator ruling (Stage 3 c
   launch commit both failed, then a power loss, B-36; a wiped root) stay as ARCHITECTURE §4.5 records them; exclusive
   renames report `nameInUse` there.
 
-## S3B-9 — OI-14: `apply`'s own releases count toward an overlapping eviction's need (OPTIONAL) · fixed
+## S3B-9 — OI-14: `apply`'s own releases count toward an overlapping eviction's need while they stay released (OPTIONAL) · fixed (cycle 1), corrected (cycle 2)
 
 - **Failing test first (`b668371`).** `StoreApplyTests.pruneWhileEvictionCandidatesRun`, display name
   `R-CLN-4: bytes a pruning apply dooms while quota eviction computes its candidates count toward its need`, on WP-C's
   overlap fixture (ten 100-byte assets, budget 500, a run alone evicts six): a maintenance eviction measured 550 bytes and
   waits in its candidates unit; an `apply` prunes the two most recently used assets (200 bytes). Unfixed:
   `result → CleanupResult(bytesFreed: 600, filesRemoved: 6, bytesDeferred: 0)` and `evicted → [0, 1, 2, 3, 4, 5]` (2 issues).
-- **Fix (`fb99142`, WP-B's file only).** `AssetStore+Apply.swift`'s `releaseCountingBytes(_:)` wraps
-  `releaseReference(_:dooming: .unreferenced)` for the releases `apply` and `admit` make (the prune, a re-inserted
-  record's previous blob, `adoptKnownBlob`'s previous blob): when the release dooms a blob that was live, its `blobBytes`
-  are added to `state.eviction.releasedBytes` (saturating), as eviction, purge, quarantine and recorded failures count
-  theirs (C-2, ruling R7). Now 400 bytes and four evictions (`o0` … `o3`): with the prune's 200, what one run alone frees.
-  The overlap tests of WP-C (`EvictionOverlapTests`, 5) and `StoreApplyTests` pass.
-- **Ownership.** The write of WP-C's contract field `EvictionState.releasedBytes` from WP-B's file is the one S3B-9 rules
-  ("count a pruning apply's releases in WP-B's release path"); listed under the authorised edits below. The test reads
-  WP-C's test helpers (`EvictionOverlapTests.harness`, `.evicted`, `CleanupSteps.run`) as they are at `s3-base`.
+- **Fix, cycle 1 (`fb99142`, WP-B's file only).** `AssetStore+Apply.swift`'s `releaseCountingBytes(_:)` wraps
+  `releaseReference(_:dooming: .unreferenced)` for the releases `apply` and `admit` make: when the release dooms a blob
+  that was live, its `blobBytes` are added to `state.eviction.releasedBytes` (saturating), as eviction, purge, quarantine
+  and recorded failures count theirs (C-2, ruling R7). Now 400 bytes and four evictions (`o0` … `o3`).
+- **Cycle-2 finding (correctness lens, blocking).** The count was made the moment a release doomed a blob, but the same
+  `apply` can rescue that doom: swapping the contents of two present assets makes both adoption candidates, the first
+  adoption dooms one blob (counted, +100) and the second rescues it, so 100 bytes counted as released never left
+  `usedBytes` and the overlapping run stopped at `CleanupResult(bytesFreed: 500, filesRemoved: 5)`, 500 bytes used
+  against a 450 target (R-CLN-4 [MUST], REENTRANCY R13). The same over-count follows when a later `apply` adopts a pruned
+  blob back while one eviction spans both, and when a publication dedupes onto it.
+- **Failing tests first (`cb17625`).** `StoreApplyTests.swapWhileEvictionCandidatesRun`,
+  `R-CLN-4: a content swap between present assets while quota eviction computes its candidates releases nothing, so the run still frees what it measured`
+  (the verifier's probe, renamed into the owning suite), and `StoreApplyTests.pruneThenReadoptWhileEvictionCandidatesRun`,
+  `R-CLN-4: bytes one apply released and a later apply adopts back while quota eviction computes its candidates no longer count toward its need`.
+  On `fb99142`'s code both gave `result → CleanupResult(bytesFreed: 500, filesRemoved: 5, bytesDeferred: 0)`:
+  `✘ Test run with 12 tests in 1 suite failed after 0.017 seconds with 6 issues.`
+- **Fix, cycle 2 (`16ac464`, WP-B's files only).** A count is kept for exactly as long as its bytes stay released:
+  `releaseCountingBytes` records each counted doom in `StoreCoreState.countedReleases` (key → bytes) through
+  `countRelease(of:bytes:)`; every transition of a doomed key back to `live` takes the count back
+  (`takeBackCountedRelease(of:)`, subtracting the bytes from `releasedBytes`): `gainReferenceInPlace` (the adoption of
+  `apply` and `admit`, `setResidency`, binding) and `acquireReference`'s `.rescued` (a publication's dedupe). A count a
+  publication took back with its provisional reference is held in `StoreCoreState.provisionallyRescued`: if the
+  publication binds nothing and `dropProvisionalReference` dooms the key afresh, it counts again; if it binds (or another
+  reference holds the key), the entry goes with the provisional reference. The reaper's unlink drops the key's entry and
+  keeps the count (the bytes are gone for good); `open()` starts both maps empty. A doom counted by an eviction, a purge or
+  a quarantine is not in `countedReleases` and is never taken back here. Why subtraction rather than counting at the end
+  of the `apply`: `apply` yields between chunks, so an eviction can measure between a release and the end of the `apply`;
+  a deferred count would then count bytes that measurement had already seen leave. With the take-back, an eviction that
+  measured before the doom sees the doom and the rescue cancel, and one that measured after it frees the returned bytes
+  again, so in both cases it ends at its target.
+- **Pins (cycle 2).** `StoreApplyTests.publicationRescueTakesTheCountBack`,
+  `R-CLN-4: a publication that rescues bytes an apply counted as released takes the count back, and counts them again when it binds nothing`
+  (internal `acquireReference` / `abandonAcquisition`, then a real publication for a checksum-less record, then a prune
+  and the reaper); `StoreApplyTests.contentChangeOntoLiveBlobWhileEvictionCandidatesRun` (`53ee7f6`),
+  `R-CLN-4: the old bytes an apply releases when an asset's content moves onto another asset's bytes count toward an overlapping eviction's need`
+  (the verifier's OI14B gap: `adoptKnownBlob`'s previous blob; `CleanupResult(bytesFreed: 500, filesRemoved: 5)`, 400
+  bytes used, as a run alone after the change); and a bookkeeping check in `CoreInvariants.violations` (every test that
+  calls it): each `countedReleases` key is doomed `unreferenced` or being deleted with exactly the counted bytes, each
+  `provisionallyRescued` key is live.
+- **The detached record's replacement (cycle-2 finding, non-blocking) · now counted.** `applyDiff`'s replacement of a
+  record the applied manifest did not list released its blob with `releaseReference` directly, so cycle 1's "a
+  re-inserted record's previous blob counts" held only on `insertRecord`'s path. Failing test first (`5ac4090`):
+  `StoreApplyTests.detachedRecordReplacementCounts`,
+  `R-CLN-4: an apply that replaces a detached record counts its released bytes toward an overlapping eviction's need unless it adopts them back`
+  (the committed index rewritten so `a`'s record is detached, then reopened; new bytes: the 90 bytes count; the same
+  bytes: adopted back, nothing counts). Unrouted: `recorded an issue at StoreApplyTests.swift:226:13: Expectation failed:
+  await reopened.state.eviction.releasedBytes - start == counted` (new bytes). Fix `9b5b030`: the release goes through
+  `releaseCountingBytes`. `insertRecord`'s own previous-blob release (also through `releaseCountingBytes`) is not
+  reachable from `apply` or `admit`: both call it only for an id with no record (`admit`'s new id, `changeContent`'s
+  vanished record) or for an added id with no planned record, which `ApplyPlan.compute` never leaves; it stays as a
+  defensive path and is not separately pinned.
+- **Mutants (S3-R3; scratch copy of `9b5b030`, each mutant alone, `StoreApplyTests|EvictionOverlapTests|StoreDeletionTests|DeletionUnitTests|StorePublishTests`).**
+  - `GAIN` (no take-back in `gainReferenceInPlace`): `✘ Test run with 43 tests in 5 suites failed after 3.101 seconds with
+    11 issues.`, among them the swap test (`StoreApplyTests.swift:127:9: Expectation failed: result ==
+    CleanupResult(bytesFreed: 600, filesRemoved: 6)`), the re-adoption test (`:187:9`) and the detached test's same-bytes
+    case (`:226:13`).
+  - `ACQ` (no take-back in `acquireReference`): 6 issues, `StoreApplyTests.swift:272:9: Expectation failed: await
+    harness.state.eviction.releasedBytes == start`.
+  - `REDOOM` (no new count when an abandoned rescue dooms afresh): 3 issues, `StoreApplyTests.swift:281:9: Expectation
+    failed: await harness.state.eviction.releasedBytes == start + size`.
+  - `REAP` (the reaper keeps the entry): 3 issues, `StoreApplyTests.swift:297:9: Expectation failed: await
+    harness.state.core.countedReleases.isEmpty` and `CoreInvariants` in `contentChangeOntoLiveBlob` (`:66:9`).
+  - `OI14B` (the verifier's mutant: `adoptKnownBlob`'s previous blob released directly): 3 issues,
+    `StoreApplyTests.swift:156:9: Expectation failed: result == CleanupResult(bytesFreed: 500, filesRemoved: 5)`.
+  - `PERAPPLY` (the cycle-2 prototype's scope: counts forgotten when the apply gate is released): 11 issues, including
+    `StoreApplyTests.swift:187:9: Expectation failed: result == CleanupResult(bytesFreed: 600, filesRemoved: 6)` (the
+    re-adoption across two `apply` calls).
+- **Ownership.** WP-B's files write WP-C's contract field `EvictionState.releasedBytes`, as S3B-9 rules ("count a pruning
+  apply's releases in WP-B's release path"); since cycle 2 they also lower it when a counted doom is rescued, so its doc
+  comment's "never decreases" no longer holds (a proposed change to WP-C's doc below; WP-C's readers only take
+  differences against a value read at their measurement, so a lower value makes a run free more, never less). Listed
+  under the authorised edits below. The tests read WP-C's test helpers (`EvictionOverlapTests.harness`, `.evicted`,
+  `CleanupSteps.run`) as they are at `s3-base`.
 
 ## S3B-10 — OI-12: a per-key reap exclusion (OPTIONAL) · recorded
 
@@ -308,14 +407,15 @@ Evidence for the owner:
 ## S3B-14 — Recorded limits and device items (ADR-RECORD)
 
 - **S3-B-011 (actor stretches at `maxEntries`, 100,000).** Re-measured this cycle (release, `CleanupBenchmarks`):
-release, `d66eb2f`, load 8.9 → 5.7, thread CPU (worst of runs) at 100,000 assets: WP-B's grace start over every
+  release, `d66eb2f`, load 8.9 → 5.7, thread CPU (worst of runs) at 100,000 assets: WP-B's grace start over every
   doomed key 37.31 ms, the reaper's queue over every deletable key (filter and sort) 22.84 ms (22.93), the reaper's
   deletable filter 4.03 ms (4.10), `freeSpace()` 4.19 ms (8.10, wall), the first present-table copy after a publication
   3.33 ms (6.29), the first records copy under a live snapshot 9.34 ms (9.46, WP-C's figure of WP-B's state); longest
   actor holds of WP-C's operations there: quota eviction of half 21.98 ms, `purge(.all)` of a full store 35.83 ms,
   `purge(.evictable)` 34.02 ms, orphan GC of 100,000 orphans 18.43 ms. At 10,000 (SPEC's reference scale) every hold is
   under 3.2 ms (grace start 1.66 ms, the reaper's queue 1.93 ms) and every C2 assertion passed. The cursor of S3B-5
-  removes the reaper's re-insertions, not the queue's initial filter and sort, which is the 22.8 ms figure SPEC's reference scale is 10,000 (C2 holds there); the chunked `startGrace` (OPTIONAL) was not done:
+  removes the reaper's re-insertions, not the queue's initial filter and sort, which is the 22.8 ms figure. SPEC's
+  reference scale is 10,000 (C2 holds there); the chunked `startGrace` (OPTIONAL) was not done:
   `startGrace` (`AssetStore+Snapshot.swift`) walks the whole blob table in the acknowledgement's turn. Chunking the walk is
   safe (a key whose grace start is still pending stays `acknowledgement`-blocked, so nothing is reaped early), but it
   needs owned follow-up turns that a later acknowledgement must not overtake (each chunk carrying its own `eligibleAt`),
@@ -333,21 +433,45 @@ release, `d66eb2f`, load 8.9 → 5.7, thread CPU (worst of runs) at 100,000 asse
   back unacknowledged (store-1 S1-13). F-25's single sighting fits the last; the engine's fresh read stays.
 - **S3-B-016 (`gainReferenceInPlace` copying the blob table).** Measured in release with the new benchmark
   `StorageBenchmarks.gainReferenceInPlace`, `C2: a reference gained in place never copies the blob table, 1,000 gains at 100,000 blobs inside 10 ms`:
-`C2 1,000 in-place reference gains in one turn: ["10000 blobs 0.081084 ms", "100000 blobs 0.103375 ms"] (best of 5;
+  `C2 1,000 in-place reference gains in one turn: ["10000 blobs 0.081084 ms", "100000 blobs 0.103375 ms"] (best of 5;
   budget 10.0 ms)` (release, `d66eb2f`, load 8.9 → 5.7): about 0.1 µs per gain at either size, so the release build
   writes the entry in place and never copies the table (a copy of 100,000 entries per gain would take seconds). The debug
-  and TSan copies stay a property of unoptimised builds, where the test suites run at 10,000 entries at most
+  and TSan copies stay a property of unoptimised builds, where the test suites run at 10,000 entries at most.
 - **S3-B-018 (B-33's state-space limits), S3-B-019 (a double fault inside one commit unit), S3-B-020 (declined B-34
   relaxation and B-5 exposure), S3-B-021 (device-only: `F_BARRIERFSYNC`/`F_FULLFSYNC`, file protection, iOS 15 runtime,
   P-5/P-13 on a quiet host), S3-B-022 (a real `rename(2)` that takes effect and reports failure, `lstat`/`pread` I/O errors,
   `LiveFileSystem` catch paths APFS cannot provoke here, how long a volume keeps a killed rename undoable).** Unchanged;
   recorded limits as in `b.md` (B-33, B-28 cycle-5 amendment, B-34, B-36) and ADR-050, for Stage 5's device plan.
 
+## Close-out cycle 2 findings (dispositions)
+
+- **reqs, blocking — S3B-5's linearity had no deterministic pin.** Fixed: `ReapStatistics` / `lastReap` and
+  `DeletionUnitTests.reaperWorkListIsLinear`, which `s3-base`'s reaper fails; the benchmark also judged against its
+  interleaved control; the cycle-1 wording corrected (S3B-5 above).
+- **correct, blocking — OI-14 over-counted bytes the same apply rescued.** Fixed with rescue-aware counting; failing
+  tests first; six mutants killed (S3B-9 above).
+- **reqs, non-blocking — two counting sites unpinned (OI14B).** Pinned: `contentChangeOntoLiveBlobWhileEvictionCandidatesRun`
+  kills OI14B; `insertRecord`'s site is unreachable from `apply` and `admit` (S3B-9 above).
+- **correct, non-blocking — the detached record's replacement did not count.** Fixed, failing test first (S3B-9 above).
+- **reqs, non-blocking — wording glitches in S3B-14.** Fixed (continuation lines indented, the merged sentence split, the
+  final period added).
+- **correct, non-blocking — `killThenPowerLoss` under TSan at load 277–628.** Recorded under S3B-7; no change (S3-R4).
+- **other-wp:d (two findings) — loopback transport tests time out on the iOS Simulator under host load.** Not WP-B's
+  files; routed to WP-D / the orchestrator with the verifier's evidence
+  (`.build-orchestrator/s3b-probes-c1/reqs-sim-run1-transport-flake.json`, `reqs-sim-run1-timeouts-excerpt.txt`). This
+  cycle's simulator verdict is taken at the lowest load available (below).
+- **other-wp:c — `CleanupCrashTests` legacy-migration enumeration overran under TSan at load 280–628.** Routed to WP-C.
+- **other-wp:h — `LoopbackHTTPServerTests` 'start racing stop …' overran at load 311–628.** Routed to WP-H (DECISIONS TSan
+  headroom item 4).
+- **correct, non-blocking — benchmarks under load.** No action: WP-B's new benchmarks passed in both of the verifier's
+  runs; P-13's batch maximum stays the owner's (S3B-12).
+
 ## Authorised edits outside WP-B
 
-- `Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift` (WP-B's file) writes WP-C's contract field
-  `state.eviction.releasedBytes` (`EvictionState.swift`) in `releaseCountingBytes(_:)`: S3B-9 ("count a pruning apply's
-  releases in WP-B's release path"). No WP-C file changed.
+- `Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift` and `AssetStore+References.swift` (WP-B's files) write WP-C's
+  contract field `state.eviction.releasedBytes` (`EvictionState.swift`): `countRelease(of:bytes:)` adds a counted doom's
+  bytes and `takeBackCountedRelease(of:)` subtracts them when that doom is rescued (S3B-9, "count a pruning apply's
+  releases in WP-B's release path", cycles 1 and 2). No WP-C file changed.
 - Read-only use of WP-C's test helpers (`EvictionOverlapTests`, `CleanupSteps`) by `StoreApplyTests.pruneWhileEvictionCandidatesRun`;
   no WP-C test file changed.
 - No other file outside WP-B's directories, no `Package.swift`, `Scripts/`, contract test or shared document changed.
@@ -360,48 +484,72 @@ release, `d66eb2f`, load 8.9 → 5.7, thread CPU (worst of runs) at 100,000 asse
 - **ARCHITECTURE §4.4.** "the keys it did not attempt go first into the next unit, unchanged (no backoff)" stays true; add
   "read through a cursor over the sorted keys, so a reclaim is linear in the keys (S3-PERF-04)".
 - **ARCHITECTURE §4.6 and §10.1 R13.** Remove "residual: `apply`'s prune, OI-14" and add "`apply`'s and `admit`'s own
-  releases (prune, a re-inserted record's or an adopted record's previous blob)" to the releases that count.
+  releases (prune, a replaced detached record's or an adopted record's previous blob), each counted while its bytes stay
+  released: a rescue of that doom (adoption, publication dedupe) takes the count back, and a publication that binds
+  nothing and dooms the key afresh counts it again (`StoreCoreState.countedReleases`, `provisionallyRescued`; S3B-9
+  cycle 2)" to the releases that count.
+- **WP-C's `EvictionState.releasedBytes` doc comment (`EvictionState.swift`, WP-C's file; for WP-C or the orchestrator).**
+  Replace "never decreases" with "lowered when a doom that `apply` or `admit` counted is rescued (its bytes are back in
+  `usedBytes`); readers take differences against the value read at their measurement".
+- **ARCHITECTURE §4.4 / §14.** The reaper records its work list per run (`StoreCoreState.lastReap`, `ReapStatistics`,
+  diagnostics in memory only), pinned by `DeletionUnitTests.reaperWorkListIsLinear`.
 - **ARCHITECTURE §11.** R-STO-5: add `R-STO-5: crash at every file-system boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5` (B).
   R-MAN-2: add `R-MAN-2: availability saturates bytesMissing at Int64.max …` (B). R-STO-6: add `R-STO-6: an ENOSPC while
   staging a chunk source surfaces as insufficientSpace and leaves nothing behind` (B). R-CLN-1: add `R-CLN-1: a content
   change onto bytes another asset holds adopts them without a download and prunes the old blob after grace` (B). R-CLN-4:
-  add `R-CLN-4: bytes a pruning apply dooms while quota eviction computes its candidates count toward its need` (B).
+  add `R-CLN-4: bytes a pruning apply dooms while quota eviction computes its candidates count toward its need` and the
+  cycle-2 rows `R-CLN-4: a content swap between present assets while quota eviction computes its candidates releases nothing, so the run still frees what it measured`,
+  `R-CLN-4: bytes one apply released and a later apply adopts back while quota eviction computes its candidates no longer count toward its need`,
+  `R-CLN-4: the old bytes an apply releases when an asset's content moves onto another asset's bytes count toward an overlapping eviction's need`,
+  `R-CLN-4: an apply that replaces a detached record counts its released bytes toward an overlapping eviction's need unless it adopts them back`
+  and `R-CLN-4: a publication that rescues bytes an apply counted as released takes the count back, and counts them again when it binds nothing` (B).
   R-CLN-6: add `R-CLN-6: a purged doom is never rescued by launch adoption, …` (B). R-SYN-1: add `R-SYN-1: each launch
-  persists a launch epoch above every earlier one, …` (B). P-13: add the two `ReapQueue` tests and the `reapScaling`
-  benchmark; C2: add the `gainReferenceInPlace` benchmark.
+  persists a launch epoch above every earlier one, …` (B). P-13: add the two `ReapQueue` tests, `P-13: the reaper reclaims
+  10,000 doomed blobs in 20-unlink units reading each key at most batch / attempted times, so its work is linear in the
+  keys` and the `reapScaling` benchmark; C2: add the `gainReferenceInPlace` benchmark.
 - **ARCHITECTURE §12.1 S1-03.** Add `R-CLN-6: a purged doom is never rescued by launch adoption, …`.
 - **ARCHITECTURE §12.5 T2-06.** Replace "the cross-launch collision case … is not written at the level-4 merge (Stage 3,
   ADR-053)" with the new R-SYN-1 test's name.
 - **ARCHITECTURE §13.5 #3 / §14 row 3.** The three update scenarios now have their crash-at-every-boundary writer (WP-B).
-- **REENTRANCY (§10.1).** No new await in WP-B's files this cycle, so no new row; R7's text holds for the cursor.
+- **REENTRANCY (§10.1).** No new await in WP-B's files in either cycle, so no new row; R7's text holds for the cursor;
+  R13's text changes as above (a rescued counted doom no longer counts).
+- **CCR for WP-C (S3B-9 cycle 2).** WP-C's counting sites (`QuotaEviction.swift` `evict`, `StorePurge.swift`,
+  `IntegrityBookkeeping.swift`) could count through WP-B's `countRelease(of:bytes:)` instead of adding to
+  `releasedBytes` directly, so that a rescue of their dooms is taken back too (and `acquireReference`'s `.replaced` would
+  then take back a counted `purged`/`corrupt` doom). Not done here: WP-C's files.
 - **DECISIONS (Stage 3).** S3B-11's CCR (a WP-B package primitive for WP-F) and S3B-10's (WP-C), for ruling; S3B-12's
   options for the owner's P-13 decision; S3B-13 for Stage 5.
 
-## Gates and runs (this cycle, final code)
+## Gates and runs (close-out cycle 2, final code)
 
-All on `3ea2f21` (the last code commit; this draft is the only later change), `.build-s3b*` scratch paths, host load
-5–17 unless noted.
-- `SWIFTPM_SCRATCH=.build-s3b bash Scripts/verify.sh --quick`: `VERIFY: PASS` (Model 151, Sync 351, Storage 468, Transport
-  84, Kit 85, Compatibility 71, Apple-hosted 104 tests, all passing); `docs/TRACEABILITY.md` restored afterwards.
-- `swift build -c release --scratch-path .build-s3b -Xswiftc -warnings-as-errors`: `Build complete! (33,79 s)`.
+All on `a5edd1e` (the last code commit; this draft is the only later change), `.build-s3b*` scratch paths; host loads
+(1-minute) quoted per run, from other agents' work.
+- `SWIFTPM_SCRATCH=.build-s3b bash Scripts/verify.sh --quick` (13:30–13:37, load 59 → 135): `VERIFY: PASS` (Model 151,
+  Sync 351, Storage 474, Transport 84, Kit 85, Compatibility 71, Apple-hosted 104 tests, all passing);
+  `docs/TRACEABILITY.md` unchanged.
+- `swift build -c release --scratch-path .build-s3b -Xswiftc -warnings-as-errors`: `Build complete! (43,23 s)`.
 - `gates.py unsafe`: `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `gates.py docs`: `DOCS public declarations=1281
   documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
-- `ZTronAssetStorageTests` three times: `✔ Test run with 468 tests in 61 suites passed after 63.777 seconds.`, `… 68.215
-  seconds.`, `… 71.683 seconds.`; under TSan once: `✔ Test run with 468 tests in 61 suites passed after 261.418 seconds.`
-- Coverage (`--enable-code-coverage`, every test bundle): `COVERAGE target=ZTronAssetStorage lines= 97.48% (8178/8389)
-  min=90.0 OK`, `COVERAGE overall lines=96.62% (25199/26080) min=80.0 OK`, `COVERAGE: PASS`.
+- `ZTronAssetStorageTests` three times: `✔ Test run with 474 tests in 61 suites passed after 91.176 seconds.` (load
+  56 → 29), `… 75.873 seconds.` (29 → 16), `… 68.528 seconds.` (16 → 14); the new reaper test took 4.4–4.7 s. Under TSan
+  once (load 12.6 → 8.1): `✔ Test run with 474 tests in 61 suites passed after 213.749 seconds.`, no ThreadSanitizer
+  report; there the reaper test took 11.255 s and `killThenPowerLoss` 23.049 s (limit one minute each).
+- Coverage (`--enable-code-coverage`, every test bundle, load 7–8): `COVERAGE target=ZTronAssetStorage lines= 97.56%
+  (8228/8434) min=90.0 OK`, `COVERAGE overall lines=96.65% (25249/26125) min=80.0 OK`, `COVERAGE: PASS`.
 - iOS: `xcodebuild … -destination 'generic/platform=iOS' … OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`: exit 0.
 - iOS Simulator (ADR-051, simulator `02CE21B4-F307-4CB7-B80A-1F2EF72F115C`, iOS 27.0, Benchmarks built, not run):
   `caffeinate -i xcodebuild test … -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never
-  OTHER_SWIFT_FLAGS='-warnings-as-errors'`: `** TEST SUCCEEDED **`, exit 0, 11:47:07 → 11:52:24 (host load 8.6 at the
-  start, 135–178 at the end from other agents); `xcresulttool get test-results summary`: `result Passed, totalTestCount
-  1314, passedTests 1314, failedTests 0, skippedTests 0` on `iPhone 17e 27.0`. On the simulator the update enumeration
-  took 15.423 s and the kill→power-loss pairs 25.499 s (16 and 8 cases). The simulator was shut down afterwards.
-- Benchmarks WP-B owns, release (`StorageBenchmarks`, with WP-C's `CleanupBenchmarks` for S3-B-011; `d66eb2f`, load
-  8.9 → 5.7): every test passed except P-13's `longest <= batchBudget` (owner item, S3B-12): P-2 p95 9.04 ms (25),
-  P-5 ordered p95 13.29 ms and durable p95 28.94 ms (40), at most 4 commits in any second (4), P-6 2,410 MB/s (800),
-  ratio 0.83 (0.7), peak 0.05 MiB (4), P-13 total 0.60 s (2.0), unit max 7.87 ms (5.0, one stalled unlink), reap
-  scaling 2.00 (2.5), in-place gains 0.10 ms (10), C2 open/apply at 10,000 under 2.9 ms (10).
+  OTHER_SWIFT_FLAGS='-warnings-as-errors'`: `** TEST SUCCEEDED **`, exit 0, 13:52:20 → 13:57:18 (load 6.9 → 62);
+  `xcresulttool get test-results summary`: `result Passed, totalTestCount 1320, passedTests 1320, failedTests 0,
+  skippedTests 0` on `iPhone 17e 27.0`; the reaper test took 7.089 s there. The simulator is shut down.
+- Benchmarks WP-B owns, release (`swift test -c release --scratch-path .build-s3b-perf -Xswiftc -enable-testing --filter
+  StorageBenchmarks`, load 49 → 8.7): `✘ Test run with 7 tests in 2 suites failed after 31.091 seconds with 1 issue.`, the
+  one issue P-13's `longest <= batchBudget` (owner item, S3B-12: unit max 7.87 ms against 5.0, every over-budget unit
+  about 1 ms on CPU). Everything else passed: P-2 p95 9.72 ms (25), P-5 ordered p95 14.01 ms and durable p95 21.17 ms
+  (40), at most 4 commits in any second (4), P-6 2,406 MB/s (800), ratio 0.83 (0.7), peak 0.0 MiB (4), P-13 total
+  0.60 s (2.0); reap scaling `[10000: 0.162 s, 20000: 0.327 s, 40000: 0.655 s]`, 40k/20k 2.007 (2.5), controls 0.313 s
+  and 0.632 s, 40,000 against its control 1.036 (1.5); in-place gains 0.098 ms at 100,000 blobs (10); C2 at 10,000:
+  apply, open, prune and re-adoption at most 4.06 ms (10).
 
 ## Not verified here
 
@@ -410,3 +558,8 @@ All on `3ea2f21` (the last code commit; this draft is the only later change), `.
 - The benchmark figures were taken while other worktrees built (loads quoted beside each); P-13's batch maximum is the
   owner's item (S3B-12).
 - S3-B-015 was not reproduced (above); S3B-10 and S3B-11 need other packages' files.
+- S3B-9's take-back covers the dooms WP-B's `apply` and `admit` count. A doom quota eviction counts (WP-C's
+  `QuotaEviction.swift`, reason `unreferenced`) and a publication later rescues is not taken back, so a second run that
+  measured before it can still stop that blob's bytes short of its target; the same holds for a `purged` or `corrupt`
+  doom a verified publication replaces (new bytes under the name). Not exercised here: the counting sites are WP-C's
+  files. Proposed below as a CCR for WP-C.
