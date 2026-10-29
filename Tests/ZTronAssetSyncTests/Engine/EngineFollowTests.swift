@@ -448,3 +448,141 @@ extension EngineSyncTests {
         await engine.shutdown()
     }
 }
+
+/// The interest a listed id's replaced content holds when a space sweep reaches its parked job during an owed follow, and
+/// what the sweep then does with the job.
+enum SweptReplacedContent: String, CaseIterable, Sendable {
+    /// A user waiter (`awaitAsset`); the reclaim leaves too little room, so the sweep parks the job
+    /// `insufficientSpace` and its fail-fast answers the waiter.
+    case waiterReparked
+    /// A member of `ensureAvailable`'s group, as `waiterReparked`.
+    case ensureReparked
+    /// A user waiter; the reclaim makes room, so the sweep re-queues the job.
+    case waiterRequeued
+
+    /// The room above the reserve the test leaves just before the reclaim: with the 4 MB reaped, too little for the
+    /// replaced content's 5 MB, or room for it.
+    var roomBeforeReclaim: Int64 {
+        self == .waiterRequeued ? 2_000_000 : 500_000
+    }
+}
+
+extension EngineSyncTests {
+    /// A space sweep (`sweepSpaceParked`: the alarm's `.reclaimed` sweep after reaped bytes, `.settle`, a purge's
+    /// reclaim) reaching the parked job of a listed id's replaced content while a bounded follow still owes its visit
+    /// follows that job before it answers or re-queues it, as a failure does (`followBeforeActing`): the id's interest
+    /// moves to its new content (T22) and is answered from it. Without it the sweep parked the replaced 5 MB content
+    /// `insufficientSpace` and its fail-fast answered the waiter, or the ensure member, with that content's figures
+    /// although the copy lists the id at 16 bytes that fit (F-22: the figures are the bytes the asset needs), or it
+    /// re-queued the replaced content, whose head then stalled its queue until the follow's visit (the close-out cycle-3
+    /// correctness lens, PROBE-C3-SPACE). Setup: 4 MB of a pruned blob wait for the reclaim; the user job of the target's
+    /// 5 MB content is parked `awaitingSpace`; a forced sync moves the target to a 16-byte content while 2,100 changed
+    /// entries sort before it, so the follow's first pass stops before its entry (`holdFollowFollowUps()`); then the
+    /// deletion grace ends and the alarm's reaper frees the 4 MB.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)", .timeLimit(.minutes(1)), arguments: SweptReplacedContent.allCases)
+    func spaceSweepFollowsTheReplacedContent(_ swept: SweptReplacedContent) async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(779_001, count: 4_000_000)
+        let qBytes = EngineFixture.bytes(779_002, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let q = EngineFixture.entry("q", qBytes)
+        await harness.serveManifest([x, q])
+        await harness.scriptTransfers([(x, xBytes), (q, qBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // The fillers are changed on-demand entries without jobs that sort before the target: the follow's first pass
+        // formats `followFormatsPerTurn` of them and stops before the target's entry.
+        let fillers = { (seed: UInt64) in
+            (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "f%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
+        }
+        let old = EngineHarness.onDemand("zz-target", EngineFixture.bytes(779_003, count: 5_000_000))
+        // v2 prunes x (its 4 MB wait for the 60 s grace) and lists the target's 5 MB content.
+        await harness.serveManifest([q] + fillers(720_000) + [old], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        try await harness.store.flush(.ordered)
+        // 4 MB of room: the 5 MB do not fit before the reclaim, and fit the plan of `ensureAvailable` with it.
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(4_000_000, harness: harness, fileSystem: fileSystem)
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for the reclaim")
+        await engine.refreshFreeSpace()
+        await harness.source.script(old.transferID, [.hold])
+        // The answer: whether it came from the new content, and what it was.
+        let answer: Task<(fromNewContent: Bool, answer: String), Never>
+        switch swept {
+        case .waiterReparked, .waiterRequeued:
+            let waiter = Task { await engine.awaitAsset(old.identifier, lane: .userInitiated) }
+            answer = Task {
+                let result = await EngineHarness.value(of: waiter)
+                return ((try? result.get())?.byteSize == 16, "\(result)")
+            }
+        case .ensureReparked:
+            // The ensure's fetch-first finds v2 unchanged.
+            await harness.source.scriptManifest([.notModified])
+            let ensure = Task { await engine.ensureAvailable(scope: .identifiers([old.identifier])) }
+            answer = Task {
+                let result = await EngineHarness.value(of: ensure)
+                return ((try? result.get())?.isComplete == true, "\(result)")
+            }
+        }
+        await engine.awaitCondition { $0.state.jobs[old.transferID]?.state == .blocked(.awaitingSpace) }
+        let replacement = EngineHarness.onDemand("zz-target", EngineFixture.bytes(779_004, count: 16))
+        await harness.source.script(replacement.transferID, [.stage(EngineFixture.bytes(779_004, count: 16))])
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest([q] + fillers(820_000) + [replacement], etag: "v3")
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        let before = await engine.readForTests { engine in
+            (
+                listed: engine.state.applied.entry(for: old.identifier)?.transferID == replacement.transferID,
+                parked: engine.state.jobs[old.transferID]?.state,
+                reached: engine.state.unfollowed.contains(old.transferID),
+                owed: engine.followOwed
+            )
+        }
+        #expect(before.listed && before.parked == .blocked(.awaitingSpace) && !before.reached && before.owed, "setup: \(before)")
+        // The room the reclaim adds to: too little for the replaced 5 MB, or enough.
+        try await Self.leaveRoom(swept.roomBeforeReclaim, harness: harness, fileSystem: fileSystem)
+        // The grace ends: the alarm's due store work reaps x's 4 MB, then the `.reclaimed` sweep runs.
+        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[old.transferID]?.state != .blocked(.awaitingSpace) }
+        }
+        let afterSweep = await engine.readForTests { engine in
+            (
+                holds: engine.state.jobs[old.transferID]?.assets.contains(old.identifier) == true,
+                state: engine.state.jobs[old.transferID]?.state,
+                owed: engine.followOwed,
+                violations: engine.invariantViolations()
+            )
+        }
+        #expect(afterSweep.owed, "the sweep ran while the follow still owed the id's visit")
+        #expect(!afterSweep.holds, "the replaced content's job no longer holds the id after the sweep: \(String(describing: afterSweep.state))")
+        #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let answered = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: answer) }
+        #expect(answered.fromNewContent, "the id's interest is answered from its 16-byte new content: \(answered.answer)")
+        let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        #expect(!(await harness.source.starts.map(\.id)).contains(old.transferID), "the replaced content was never requested")
+        await engine.shutdown()
+    }
+
+    /// Takes the room above the reserve down to `room` with a second ballast file (`leaveRoom`'s own ballast stays).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func leaveRoom(_ room: Int64, harness: EngineHarness, fileSystem: FakeFileSystem) async throws {
+        let free = try await harness.store.freeSpace()
+        let excess = free.volumeImportant - free.reserveBytes - room
+        try #require(excess >= 0, "the room above the reserve is already below \(room): \(free)")
+        try fileSystem.write(Data(repeating: 2, count: Int(excess)), to: EngineHarness.base.appendingPathComponent("ballast-2"), mode: .truncate)
+    }
+}
