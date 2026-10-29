@@ -138,6 +138,40 @@ struct IntegrityTests {
         #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[old.key], .unreferenced), "its old bytes are unwanted")
     }
 
+    /// Stage 3 ruling S3C-9 (S3-B-040): the engine reads presence before it reports (`sparePresent`), but one await
+    /// separates that read from this write, and a legacy adoption, or an `apply` adopting an orphaned blob of the same
+    /// content, can bind the id meanwhile. The store then holds a record present at the failed content, as here; with
+    /// one attempt allowed, counting the failure against it dropped the verified bytes it serves.
+    @Test("R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func recordIntegrityFailureSparesPresentRecord() async throws {
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(maxIntegrityAttempts: 1))
+        let present = CleanupFixture.asset("present", seed: 328)
+        let old = CleanupFixture.asset("stale", seed: 329)
+        try await harness.seed([present, old])
+        let new = CleanupFixture.asset("stale", seed: 330)
+        _ = try await harness.store.apply(CoreFixture.manifest([present.entry, new.entry]), etag: nil, eviction: nil)
+        let before = try #require(await harness.record(present.id))
+        #expect(before.referencedBlob == present.key && !before.isStale, "setup: present is bound to its content")
+        #expect(await harness.record(new.id)?.isStale == true, "setup: stale still serves its old bytes")
+        let mutations = harness.fileSystem.mutationCount
+        try await harness.store.recordIntegrityFailure([present.id], identity: present.entry.contentIdentity)
+        let after = await harness.record(present.id)
+        let presentBlob = await harness.state.core.blobTable[present.key]
+        try await harness.store.recordIntegrityFailure([new.id], identity: new.entry.contentIdentity)
+
+        #expect(after == before, "a record present at the failed content is left unchanged: \(String(describing: after?.residency))")
+        #expect(harness.fileSystem.mutationCount == mutations, "nothing is written for it")
+        var live = false
+        if case .live? = presentBlob {
+            live = true
+        }
+        #expect(live, "its blob stays live: \(String(describing: presentBlob))")
+        #expect(await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil, "it is still served")
+        #expect(await harness.record(new.id)?.residency == .failed(.integrity), "a stale record still fails at the cap")
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[old.key], .unreferenced), "its old bytes are unwanted")
+    }
+
     @Test("R-CLN-8: reportUnreadable quarantines the entry, removes the blob after grace and schedules a re-download", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func reportUnreadable() async throws {
