@@ -541,7 +541,11 @@ extension AssetStore {
     /// `nil` when no pass could answer. The entries are read in chunks of `MigrationState.checkChunk` with the actor
     /// released in between (a no-op metadata unit); a pass answers "yes" only if no mutation was counted meanwhile
     /// (`CommitBookkeeping.mutationSerial`, which every persisted change bumps in its own turn through `markDirty`), else
-    /// it starts again. After `MigrationState.checkPasses` interrupted passes the answer is `nil`: a check of every entry
+    /// it starts again. One writer is the exception (Stage 3 audit, S3-B-035): `apply` writes records over several turns
+    /// behind its commit fence and bumps the serial once, in its last writing turn; but it installs the new applied
+    /// manifest in its first writing turn, before any record changes, so `finishLegacyMigration`'s comparison with the
+    /// manifest phase 1 decoded, made after the pass, refuses the stamp for any `apply` that changed a record meanwhile
+    /// (an `apply` of the same manifest has nothing to prune or change, and its adoptions only add presence). After `MigrationState.checkPasses` interrupted passes the answer is `nil`: a check of every entry
     /// in one turn would hold the actor 35–40 ms at `maxEntries` (review of close-out cycle 3: reachable whenever access
     /// stamps or pins arrive during the check), so the caller decides nothing and the next call checks again. A store of
     /// at most one chunk of legacy entries is checked in one turn and always answers. An entry found missing is missing
