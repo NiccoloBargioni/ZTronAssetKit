@@ -24,7 +24,7 @@ extension EngineLaneTests {
 
     /// Members of a released handle that regain an interest keep their queue positions whatever lane the interest brings
     /// (L4-R24(4); Stage 3, S3-B-065): with every slot busy, a handle of `releasesPerTurn` + 64 members waits queued, then
-    /// one user-initiated job is queued after them; in one turn the handle is released and three of its members still
+    /// one user-initiated job is queued after them (the busy slots run user-initiated work, so it preempts none); in one turn the handle is released and three of its members still
     /// waiting regain a user-initiated interest (system interests, the synchronous stand-in for a second handle's join),
     /// out of their queue order. When the slots free, the three are dispatched first, in their queue order, then the job
     /// queued after them: a re-join that changes lane, or comes from user work, goes back to its place in the queue its
@@ -46,7 +46,8 @@ extension EngineLaneTests {
         await harness.serveManifest(blockers + [later] + members)
         try await harness.start()
         _ = try #require(await engine.sync(.force).completeReport)
-        let blockerToken = try await engine.registerGroup(blockers.map(\.identifier), lane: .prefetch).get()
+        // The blockers run at the user-initiated lane, so the later user-initiated job cannot preempt one of them.
+        let blockerToken = try await engine.registerGroup(blockers.map(\.identifier), lane: .userInitiated).get()
         await engine.awaitCondition { $0.state.inFlight.count == 3 }
         let handle = try await engine.registerGroup(members.map(\.identifier), lane: rejoin.handleLane).get()
         await engine.awaitCondition { $0.state.jobs.count == count + 3 }
