@@ -33,6 +33,9 @@ struct EngineRegressionCycle22Tests {
             var registered = false
             var after: UInt64 = .max
             var sightings: [Sighting] = []
+            /// The engine invariants that failed at any observation once a watched run's identifier was taken, its
+            /// start turn included (L4-R24(1); Stage 3, S3-B-064).
+            var violations: [String] = []
         }
 
         let origin: String
@@ -65,7 +68,21 @@ struct EngineRegressionCycle22Tests {
             self.seen.withLock { $0.sightings }
         }
 
+        /// What `Seen.violations` collected.
+        var violations: [String] {
+            self.seen.withLock { $0.violations }
+        }
+
         func observe(_ engine: isolated SyncEngine) {
+            let started = engine.state.lastRunID
+            if started > self.seen.withLock({ $0.after }) {
+                // An observer can run inside the start turn (any notification there); it must never see a half-started
+                // run (L4-R24(1)).
+                let violations = engine.invariantViolations()
+                if !violations.isEmpty {
+                    self.seen.withLock { $0.violations.append(contentsOf: violations.map { "run \(started): \($0)" }) }
+                }
+            }
             guard let run = engine.state.run else {
                 return
             }
@@ -269,6 +286,7 @@ struct EngineRegressionCycle22Tests {
         }
         let after = await engine.readForTests { $0.state.lastRunID }
         #expect(after - before.0 == 1, "one run follows the cooldown: \(after - before.0) runs")
+        #expect(watch.violations.isEmpty, "no observer saw a half-started run (L4-R24(1)): \(watch.violations)")
         let start = watch.sightings.first
         #expect(start?.trigger == .breakerClosed, "the pending run started for the breaker's gate: \(String(describing: start?.trigger))")
         guard case .reject? = start?.admission else {
