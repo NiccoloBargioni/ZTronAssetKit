@@ -155,11 +155,11 @@ extension AssetStore {
     /// Purges one blob of more records than a chunk, `chunk` records per actor turn with a no-op metadata unit between
     /// turns (C2 at the reference scale: one blob that 10,000 ids share held the actor 13.4 ms in one turn, ruling R8 at
     /// the L3 close-out; Stage 3 ruling S3C-2). The first turn is the caller's. Each turn purges the next `chunk` selected
-    /// records that still reference the blob, as `purgeChunk` does; `.evictable` re-validates the blob and the turn's
-    /// holders first (`purgeTurnIDs`), and a turn whose check fails stops the blob there, the records purged in earlier
-    /// turns staying purged and the rest keeping the blob (a split one turn never made; C2 is the reason, and only blobs
-    /// of more records than a chunk are purged this way). The blob is waited for once, its bytes released in the turn it
-    /// is doomed. Returns how many records it purged.
+    /// records that still reference the blob, as `purgeChunk` does; `.evictable` re-validates the blob, that the ids left
+    /// are exactly its holders, and the turn's holders first (`purgeTurnIDs`), and a turn whose check fails stops the
+    /// blob there, the records purged in earlier turns staying purged and the rest keeping the blob (a split one turn
+    /// never made; C2 is the reason, and only blobs of more records than a chunk are purged this way). The blob is waited
+    /// for once, its bytes released in the turn it is doomed. Returns how many records it purged.
     func purgeAcrossTurns(
         _ group: PurgeSelection.Group,
         request: PurgeRequest,
@@ -169,7 +169,7 @@ extension AssetStore {
         var purged = 0
         var bytes: Int64?
         var released = false
-        // The ids left to purge from `offset` on (`.evictable`: the holders, read again when their count changed).
+        // The ids left to purge from `offset` on (`.evictable`: the holders, read again when they changed).
         var known = group.ids
         var offset = 0
         var first = true
@@ -193,8 +193,9 @@ extension AssetStore {
             }
             // REENTRANCY: s3c-2 (proposed) — the phase and writability, then the next turn's checks (`purgeTurnIDs`):
             // `.all` and `.scope` re-read each record (it still references the blob, above), `.evictable` the blob (live,
-            // unleased, not being placed) and the turn's holders (neither essential nor pinned; all of them, read again,
-            // when the blob's reference count no longer matches the ids left).
+            // unleased, not being placed), that the ids left are exactly its holders (each still references it and the
+            // reference count matches), and the turn's holders (neither essential nor pinned; every holder, read again,
+            // when the ids left are not exactly the holders).
             await self.runUnit(on: self.environment.metadataExecutor) {}
             try self.checkLive()
             try self.checkWritable()
@@ -207,11 +208,15 @@ extension AssetStore {
 
     /// The ids one turn of `purgeAcrossTurns` purges: the next `chunk` of `known` from `offset`, or `nil` when none is
     /// left or, for `.evictable`, the blob may not be purged any further. `.evictable` purges only while the blob is live,
-    /// unleased and not being placed and its holders are neither essential nor pinned. The `first` turn checks every
-    /// holder, as `purgeChunk` does in its one turn, so a blob whose holder was pinned before it is kept whole; a later
-    /// turn checks its own ids that still hold the blob, in O(`chunk`), while the blob table counts as many references as
-    /// ids are left. Otherwise (a publication in flight holds a provisional reference, or an id was bound to the blob or
-    /// left it since) the holders are read again (`holders(of:known:scan:)`) and every one of them is checked.
+    /// unleased and not being placed and its holders are neither essential nor pinned. Each of its turns first makes sure
+    /// the ids left are exactly the blob's holders, in O(ids left): each of them still references the blob and the blob
+    /// table counts as many references as ids are left (the ids are distinct records, `PurgeSelection.select`, so no
+    /// other holder fits). A count alone could not tell an id that left the blob from one bound to it in the same window
+    /// (one `apply` can prune one and bind another; verification of the S3C-2 fix, cycle 1). Otherwise (a publication in
+    /// flight holds a provisional reference, or an id left the blob or was bound to it since) the holders are read again
+    /// (`holders(of:known:scan:)`, at most one scan of the records) and every one of them is checked. The `first` turn
+    /// checks every holder too, as `purgeChunk` does in its one turn, so a blob whose holder changed before it is kept
+    /// whole; a later turn whose holders did not change checks its own ids, in O(`chunk`).
     func purgeTurnIDs(
         _ group: PurgeSelection.Group,
         request: PurgeRequest,
@@ -223,30 +228,29 @@ extension AssetStore {
         guard offset < known.count else {
             return nil
         }
+        // A holder neither essential nor pinned; an id that no longer holds the blob is not a holder, so not purgeable.
         let purgeable = { (id: AssetID) -> Bool in
-            guard let record = self.state.core.records[id], record.referencedBlob == group.blob else {
-                return true
-            }
-            return record.entry.policy != .essential && !record.pinned
+            self.state.core.records[id].map { $0.referencedBlob == group.blob && $0.entry.policy != .essential && !$0.pinned } ?? false
         }
+        var checkEvery = first
         if request == .evictable {
             guard case .live(let references)? = self.state.core.blobTable[group.blob],
                 self.state.cleanup.leases[group.blob]?.isEmpty ?? true, !self.state.core.publishing.contains(group.blob)
             else {
                 return nil
             }
-            if references != known.count - offset {
+            let left = known[offset...]
+            if references != left.count || !left.allSatisfy({ self.state.core.records[$0]?.referencedBlob == group.blob }) {
                 var scan = HolderScan(blobs: [group.blob])
-                known = self.holders(of: group.blob, known: Array(known[offset...]), scan: &scan)
+                known = self.holders(of: group.blob, known: Array(left), scan: &scan)
+                // When no record holds the blob any more, `known` is empty: an empty turn, after which the caller stops.
                 offset = 0
-                guard !known.isEmpty, known.allSatisfy(purgeable) else {
-                    return nil
-                }
+                checkEvery = true
             }
         }
         let end = min(offset + chunk, known.count)
         let ids = known[offset..<end]
-        guard request != .evictable || (first ? known[offset...] : ids).allSatisfy(purgeable) else {
+        guard request != .evictable || (checkEvery ? known[offset...] : ids).allSatisfy(purgeable) else {
             return nil
         }
         offset = end

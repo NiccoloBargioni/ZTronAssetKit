@@ -331,11 +331,11 @@ extension AssetStore {
     /// ruling R8 at the L3 close-out; Stage 3 ruling S3C-2). The first turn is the caller's. Each turn re-validates what
     /// `evict` checks for a whole blob, over the records it has not evicted yet (`acrossTurnsSlice`): the first turn
     /// checks every victim, as `evict` does, so a blob changed before its first turn is skipped whole; a later turn checks
-    /// its own victims and the blob's reference count. A turn whose check fails stops the blob there: the records evicted
-    /// in earlier turns stay evicted on the still-live blob, the state a publication in flight leaves (C-3), and nothing
-    /// is released (`stillReferenced`); the next run takes the rest once they are evictable again. So a change to a later
-    /// record between the blob's turns splits its records, which one turn never did (C-1); C2 is the reason, and only
-    /// blobs of more records than a chunk are taken this way.
+    /// that the victims left are exactly the blob's holders, and its own victims. A turn whose check fails stops the blob
+    /// there: the records evicted in earlier turns stay evicted on the still-live blob, the state a publication in flight
+    /// leaves (C-3), and nothing is released (`stillReferenced`); the next run takes the rest once they are evictable
+    /// again. So a change to a later record between the blob's turns splits its records, which one turn never did (C-1);
+    /// C2 is the reason, and only blobs of more records than a chunk are taken this way.
     func evictAcrossTurns(_ victims: [EvictionVictim], chunk: Int, rules first: EvictionOrder.Rules) async throws(StoreError) -> BlobEviction? {
         guard let key = victims.first?.blob else {
             return nil
@@ -377,11 +377,15 @@ extension AssetStore {
     }
 
     /// One turn's check of `evictAcrossTurns`: the blob is still live, unleased and not being placed; the records holding
-    /// it are exactly the victims from `range` on (none left it, none was bound to it since the selection); and each
-    /// victim of `range` (on the `first` turn, every victim) still holds it, is still evictable under `rules` and was not
-    /// accessed since the selection. Returns the blob's recorded size, or `nil` when the turn may not evict. A later turn
-    /// costs O(`range`) while the blob table counts as many references as victims are left, otherwise O(victims left)
-    /// and at most one scan of the records; the first turn O(victims), as `evict`'s one turn did.
+    /// it are exactly the victims from `range` on (none left it, none was bound to it since the selection, nor one of
+    /// each); and each victim of `range` (on the `first` turn, every victim) still holds it, is still evictable under
+    /// `rules` and was not accessed since the selection. Returns the blob's recorded size, or `nil` when the turn may not
+    /// evict. The holders are exact because every victim left is read again, in O(victims left), and must still hold the
+    /// blob; the victims being distinct records (`EvictionOrder.plan`), as many references as victims left then leave no
+    /// room for another holder, and another count is settled by the turn's one scan of the records
+    /// (`holders(of:known:scan:)`). A count alone could not tell a victim that left the blob from an id bound to it in
+    /// the same window (one `apply` can prune one and bind another; verification of the S3C-2 fix, cycle 1). A turn costs
+    /// O(victims left) and at most one scan; the first turn O(victims), as `evict`'s one turn did.
     func acrossTurnsSlice(_ victims: [EvictionVictim], _ range: Range<Int>, of key: BlobKey, rules: EvictionOrder.Rules, first: Bool) -> Int64? {
         guard case .live(let references)? = self.state.core.blobTable[key],
             self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
@@ -389,14 +393,16 @@ extension AssetStore {
         else {
             return nil
         }
-        let left = victims.count - range.lowerBound
-        if references != left {
-            // Another count: a publication in flight holds a provisional reference (no record), an id was bound to the
-            // blob, or a later victim left it. Only the first leaves the holders exactly the victims left.
-            let remaining = victims[range.lowerBound...].map(\.id)
+        let remaining = victims[range.lowerBound...]
+        guard remaining.allSatisfy({ self.state.core.records[$0.id]?.referencedBlob == key }) else {
+            return nil
+        }
+        if references != remaining.count {
+            // Another count: a publication in flight holds a provisional reference (no record), which leaves the holders
+            // exactly the victims left, or an id was bound to the blob, which does not. Every victim left holds it, so
+            // as many holders as victims left are exactly those victims.
             var scan = HolderScan(blobs: [key])
-            let holders = self.holders(of: key, known: remaining, scan: &scan)
-            guard holders.count == left, Set(holders) == Set(remaining) else {
+            guard self.holders(of: key, known: remaining.map(\.id), scan: &scan).count == remaining.count else {
                 return nil
             }
         }
