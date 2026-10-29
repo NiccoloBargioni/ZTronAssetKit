@@ -596,3 +596,33 @@ struct GarbageCollectionTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 }
+
+/// The orphan grace's boundary (Stage 3 ruling S3C-4; surviving mutant M-S-20).
+extension GarbageCollectionTests {
+    /// M-S-20: the sweep compared an orphan's age with 0 instead of `orphanGrace`. `orphanGC` plants its young orphan
+    /// after the clock moved, so its age is exactly 0 and nothing between 0 and the grace was ever tried. The decision
+    /// sweeps only orphans older than the grace (`OrphanCollection.decide`: `now − modified > grace`), so one exactly at
+    /// the grace stays too.
+    @Test("R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func orphanGraceBoundary() async throws {
+        let harness = CoreHarness.cleanup()
+        _ = try await harness.store.open()
+        let grace = harness.configuration.policy.orphanGrace
+        let orphan = try GarbageCollectionTests.plantBlob(harness.fileSystem, CoreFixture.bytes(900, count: 60))
+        harness.time.advance(by: grace / 2)
+        let inside = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        let insideDoom = await harness.state.core.blobTable[orphan]
+        harness.time.advance(by: grace / 2)
+        let atGrace = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+        let atGraceDoom = await harness.state.core.blobTable[orphan]
+        harness.time.advance(by: 1)
+        let past = try await harness.store.collectGarbage(until: harness.time.monotonicNow().adding(seconds: 60))
+
+        #expect(inside == CleanupResult() && insideDoom == nil, "half the grace old: kept, not doomed")
+        #expect(atGrace == CleanupResult() && atGraceDoom == nil, "exactly the grace old: kept (only older orphans go)")
+        #expect(past == CleanupResult(bytesFreed: 60, filesRemoved: 1, bytesDeferred: 0), "one second past the grace: doomed")
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[orphan], .unreferenced))
+        #expect(harness.hasBlob(orphan), "doomed, not unlinked: the reaper removes it later")
+    }
+}

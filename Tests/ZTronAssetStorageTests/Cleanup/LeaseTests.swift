@@ -361,3 +361,52 @@ actor HeldSnapshotSink: SnapshotSink {
         return InstallAck(installed: snapshot.key, accesses: [:], retired: retired)
     }
 }
+
+/// Each lease guard of eviction, pinned on its own (Stage 3 ruling S3C-3; surviving mutants M-S-07, M-S-08).
+extension LeaseTests {
+    /// M-S-07: `evict` no longer re-checked the leases when `apply` evicts its plan. `acquireLease` stamps an access, so
+    /// the "not accessed since the selection" guard refuses a victim leased later on its own, unless the lease lands at the
+    /// very instant of the record's last access: zero residency, zero grace and a clock that does not move.
+    @Test("R-CLN-5: apply skips a planned victim leased after the plan, even when no access since the plan protects it", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func applySkipsVictimLeasedAfterThePlan() async throws {
+        let harness = CoreHarness.cleanup(policy: CleanupFixture.policy(deletionGrace: 0))
+        let asset = CleanupFixture.asset("held", seed: 930)
+        _ = try await harness.store.open()
+        let manifest = CoreFixture.manifest([asset.entry])
+        _ = try await harness.store.apply(manifest, etag: nil, eviction: nil)
+        try await harness.publish(asset.bytes, [asset.entry], sequence: 1)
+        let plan = try #require(await harness.store.evictionPlan(toFree: 1, protecting: []))
+        #expect(plan.victims.map(\.id) == [asset.id], "premise: the plan names the asset")
+        let planned = try #require(plan.victims.first?.lastAccess)
+        let lease = try await harness.store.acquireLease(asset.id)
+        #expect(await harness.record(asset.id)?.lastAccess == planned, "premise: the lease's access stamp equals the planned one")
+        let report = try await harness.store.apply(manifest, etag: nil, eviction: plan)
+        _ = await harness.store.releaseLease(lease)
+
+        #expect(report.evicted.isEmpty, "a leased asset is never evicted")
+        #expect(await harness.isPresent(asset.id, at: asset.key) && harness.hasBlob(asset.key))
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
+    /// M-S-08: the dry run's ranking no longer left out leased blobs, so `evictionPlan` named a leased asset and counted
+    /// its bytes: a plan that cannot free the space it promises (R-SYN-11's `apply(eviction:)` relies on it).
+    @Test("R-CLN-5: the eviction dry run neither names a leased asset nor counts its bytes", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func dryRunLeavesOutLeasedAssets() async throws {
+        let harness = CoreHarness.cleanup()
+        let leased = CleanupFixture.asset("leased", seed: 920, count: 300)
+        let plain = CleanupFixture.asset("plain", seed: 921, count: 100)
+        try await EvictionTests.seedWithAccesses(harness, [leased, plain], recent: [])
+        let lease = try await harness.store.acquireLease(leased.id)
+        harness.time.advance(by: 3_600)
+        let plan = try #require(await harness.store.evictionPlan(toFree: 1, protecting: []))
+        let beyond = await harness.store.evictionPlan(toFree: 101, protecting: [])
+        _ = await harness.store.releaseLease(lease)
+        let released = await harness.store.evictionPlan(toFree: 101, protecting: [])
+
+        #expect(plan.victims.map(\.id) == [plain.id] && plan.bytes == 100, "only the unleased asset, and only its bytes: \(plan.victims.map(\.id))")
+        #expect(beyond == nil, "the leased 300 bytes are out of reach")
+        #expect(Set(released?.victims.map(\.id) ?? []) == [leased.id, plain.id], "premise: once released, its bytes are in reach again")
+    }
+}
