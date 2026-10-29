@@ -21,6 +21,7 @@ export const meta = {
 //   models: { fix, verify }      'opus' | 'fable' | 'sonnet' (optional)
 //   sims: { fix, reqs, correct } simulator UDIDs (never the owner's booted iPhone 17)
 //   fromCycle, maxCycle, verifyFirst, usageStop
+//   cleanScratch: true           verifiers delete their scratch builds before returning (Stage 3: six close-outs share one disk)
 const ROOT = '/Users/admin/Documents/ZTronAssetKit'
 const A = args
 const STOP = A.usageStop === undefined ? 101 : A.usageStop
@@ -82,7 +83,8 @@ Read CLAUDE.md, ${A.rulingsFile}, docs/adr-drafts/${A.wp}.md (dispositions and r
 ${LENS[lens]}
 ${prev ? 'The previous verification reported these issues (JSON); confirm each blocking one is fixed (reproduce it):\n' + JSON.stringify(prev) : 'The findings this close-out started from are in ' + A.findingsFile + '; confirm each blocking one is fixed (reproduce it).'}
 ${A.bar === 'converge' ? CONVERGE : ''}
-Return structured issues (blocking vs non-blocking) with file:line and a concrete fix, a status paragraph, and evidence lines.`
+Return structured issues (blocking vs non-blocking) with file:line and a concrete fix, a status paragraph, and evidence lines.${A.cleanScratch ? `
+Before you return, delete your own scratch paths inside the worktree (rm -rf .build-verify-${A.wp}-c${cycle}-${lens} .build-verify-${A.wp}-c${cycle}-${lens}-perf .build-verify-${A.wp}-c${cycle}-${lens}-tsan); copy any probe a finding cites to ${ROOT}/.build-orchestrator/${A.wp}-probes-c${cycle}/ first.` : ''}`
 
 const verifyBoth = async (cycle, prev) => {
   if (!(await gate('verify:' + cycle))) return null
