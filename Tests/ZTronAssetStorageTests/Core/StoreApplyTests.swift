@@ -161,6 +161,65 @@ struct StoreApplyTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Stage 3 S3B-9, close-out cycle 2: the count of an `apply`'s release lasts exactly as long as its bytes stay
+    /// released, whoever rescues them. A publication that dedupes onto the doomed blob takes the count back with its
+    /// provisional reference, counts it again when it binds nothing (the key is doomed afresh), and drops it when it
+    /// binds; the reaper's unlink ends the bookkeeping and keeps the count (the bytes are gone for good).
+    @Test("R-CLN-4: a publication that rescues bytes an apply counted as released takes the count back, and counts them again when it binds nothing", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func publicationRescueTakesTheCountBack() async throws {
+        let harness = CoreHarness.make()
+        let bytes = CoreFixture.bytes(173, count: 120)
+        let size = Int64(bytes.count)
+        let key = CoreFixture.key(bytes)
+        let a = CoreFixture.entry("a", bytes)
+        let b = CoreFixture.entry("b", CoreFixture.bytes(174))
+        // A checksum-less entry binds whatever verified bytes its publication brings (R-INT-6), so a download of the
+        // same bytes dedupes onto `a`'s doomed blob instead of being adopted by `apply`.
+        let c = CoreFixture.entry("c", bytes, checksum: false)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([a, b, c]), etag: nil, eviction: nil)
+        try await harness.publish(bytes, [a])
+        let start = await harness.state.eviction.releasedBytes
+        _ = try await harness.store.apply(CoreFixture.manifest([b, c]), etag: nil, eviction: nil)
+        #expect(await harness.state.eviction.releasedBytes == start + size, "the prune's doom counts")
+        #expect(await harness.state.core.countedReleases == [key: size])
+
+        let acquisition = try await harness.store.acquireReference(key)
+        guard case .rescued = acquisition else {
+            Issue.record("expected a rescue of the doomed key, got \(acquisition)")
+            return
+        }
+        #expect(await harness.state.eviction.releasedBytes == start, "the provisional reference brings the bytes back")
+        #expect(await harness.state.core.countedReleases.isEmpty)
+        #expect(await harness.state.core.provisionallyRescued == [key: size])
+        await harness.store.abandonAcquisition(key, acquisition)
+        guard case .doomed(let doom)? = await harness.state.core.blobTable[key] else {
+            Issue.record("an abandoned rescue dooms the key again")
+            return
+        }
+        #expect(doom.reason == .unreferenced)
+        #expect(await harness.state.eviction.releasedBytes == start + size, "doomed afresh: the bytes count again")
+        #expect(await harness.state.core.countedReleases == [key: size])
+        #expect(await harness.state.core.provisionallyRescued.isEmpty)
+
+        let bound = try await harness.publish(bytes, [c], sequence: 2)
+        #expect(bound[c.identifier] != nil)
+        #expect(await harness.state.core.blobTable[key] == .live(references: 1))
+        #expect(await harness.state.eviction.releasedBytes == start, "bound: the bytes stay in usedBytes")
+        #expect(await harness.state.core.countedReleases.isEmpty)
+        #expect(await harness.state.core.provisionallyRescued.isEmpty)
+
+        _ = try await harness.store.apply(CoreFixture.manifest([b]), etag: nil, eviction: nil)
+        #expect(await harness.state.core.countedReleases == [key: size])
+        await harness.reapAfterGrace()
+        #expect(!harness.exists(harness.layout.blobURL(key)), "the reaper unlinked the blob")
+        #expect(await harness.state.core.blobTable[key] == nil)
+        #expect(await harness.state.core.countedReleases.isEmpty, "the unlink ends the bookkeeping")
+        #expect(await harness.state.eviction.releasedBytes == start + size, "and keeps the count: the bytes are gone")
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     @Test("R-CLN-1: prune keeps a blob still referenced by another identifier", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func pruneKeepsSharedBlob() async throws {

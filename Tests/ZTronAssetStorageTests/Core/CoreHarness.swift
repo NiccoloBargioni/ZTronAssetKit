@@ -305,6 +305,27 @@ enum CoreInvariants {
                 found.append("S2-04: \(key.fileName) is doomed and referenced")
             }
         }
+        // OI-14 bookkeeping (Stage 3 S3B-9): a count of an `apply`'s release is held only for a doom `unreferenced` (or
+        // a deletion in flight) of exactly the bytes counted; a count a publication took back only for a live key.
+        for (key, bytes) in state.core.countedReleases {
+            switch state.core.blobTable[key] {
+            case .doomed(let info)? where info.reason == .unreferenced:
+                break
+            case .deleting?:
+                break
+            default:
+                found.append("OI-14: \(key.fileName) counts as released but is \(String(describing: state.core.blobTable[key]))")
+            }
+            if state.core.blobBytes[key] != bytes {
+                found.append("OI-14: \(key.fileName) counts \(bytes) bytes, the table knows \(String(describing: state.core.blobBytes[key]))")
+            }
+        }
+        for key in state.core.provisionallyRescued.keys {
+            if case .live? = state.core.blobTable[key] {
+                continue
+            }
+            found.append("OI-14: \(key.fileName) is provisionally rescued but not live")
+        }
         // The incremental snapshot table equals a rebuild.
         if state.core.presentTable != SnapshotTable.build(records: state.core.records, layout: harness.layout) {
             found.append("snapshot table drifted from the records")

@@ -158,6 +158,9 @@ extension AssetStore {
         self.state.core.launchEpoch = loaded.nextGeneration
         self.state.core.records = reconciled.records
         self.state.core.blobTable = reconciled.blobTable
+        // Counts of `apply`'s releases belong to the lifetime that made them (OI-14).
+        self.state.core.countedReleases = [:]
+        self.state.core.provisionallyRescued = [:]
         self.state.core.blobBytes = reconciled.blobBytes
         self.state.core.orphans = reconciled.orphans
         self.state.core.appliedManifest = content.appliedManifest

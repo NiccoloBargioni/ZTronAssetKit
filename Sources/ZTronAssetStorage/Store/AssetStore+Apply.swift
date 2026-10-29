@@ -261,7 +261,8 @@ extension AssetStore {
     /// live blob, its bytes left `FreeSpace.usedBytes` in this turn, so they count toward the need of a quota eviction
     /// that measured before (`EvictionState.releasedBytes`, as eviction, purge, quarantine and recorded failures count
     /// theirs). Otherwise a maintenance run overlapping a pruning `apply` freed up to the pruned bytes more than needed,
-    /// each extra asset to be downloaded again (OI-14; Stage 3 S3B-9).
+    /// each extra asset to be downloaded again (OI-14; Stage 3 S3B-9). The count is recorded in `countedReleases`, so a
+    /// rescue of the same doom takes it back (`takeBackCountedRelease(of:)`).
     private func releaseCountingBytes(_ key: BlobKey) {
         // Whether `usedBytes` counts the blob, and its bytes, read before the release.
         var wasLive = false
@@ -271,7 +272,7 @@ extension AssetStore {
         let bytes = self.state.core.blobBytes[key] ?? 0
         self.releaseReference(key, dooming: .unreferenced)
         if wasLive, case .doomed? = self.state.core.blobTable[key] {
-            self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+            self.countRelease(of: key, bytes: bytes)
         }
     }
 

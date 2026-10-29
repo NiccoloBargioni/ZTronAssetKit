@@ -196,6 +196,8 @@ extension AssetStore {
                     self.state.core.blobTable[key] = .doomed(doom)
                 } else {
                     self.state.core.blobTable[key] = nil
+                    // Unlinked: a count of its doom stays (the bytes are gone for good) and is no longer tracked.
+                    self.state.core.countedReleases[key] = nil
                     result.bytesFreed += self.state.core.blobBytes.removeValue(forKey: key) ?? 0
                     result.filesRemoved += 1
                 }

@@ -80,10 +80,34 @@ extension AssetStore {
             return true
         case .doomed(let info)? where info.reason == .unreferenced:
             self.state.core.blobTable[key] = .live(references: 1)
+            self.takeBackCountedRelease(of: key)
             return true
         default:
             return false
         }
+    }
+
+    /// Counts the bytes of a live blob that `apply` or `admit` just doomed toward the need of a quota eviction that
+    /// measured before (`EvictionState.releasedBytes`, OI-14) and remembers the count in `countedReleases`, so that a
+    /// rescue of the same doom takes it back.
+    func countRelease(of key: BlobKey, bytes: Int64) {
+        self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+        self.state.core.countedReleases[key] = bytes
+    }
+
+    /// A doomed key just became live again (a rescue): its bytes are back in `FreeSpace.usedBytes`. If `apply` or
+    /// `admit` counted that doom toward `EvictionState.releasedBytes`, the count is taken back, so a quota eviction
+    /// that measured before the doom no longer counts bytes that did not stay released, and one that measured after it
+    /// frees them again (R-CLN-4, REENTRANCY R13; Stage 3 S3B-9, close-out cycle 2: a content swap in one `apply`
+    /// doomed a blob and rescued it in the next adoption, and an overlapping run stopped 100 bytes above its target).
+    /// Returns the bytes taken back, or `nil` when no count of this doom was recorded.
+    @discardableResult
+    func takeBackCountedRelease(of key: BlobKey) -> Int64? {
+        guard let bytes = self.state.core.countedReleases.removeValue(forKey: key) else {
+            return nil
+        }
+        self.state.eviction.releasedBytes -= bytes
+        return bytes
     }
 
     /// `setResidency(_:of:dooming:)`: moves a record to `residency`, releasing its previous blob (doomed with
@@ -130,6 +154,11 @@ extension AssetStore {
                 return .reused
             case .doomed(let info)? where info.reason == .unreferenced:
                 self.state.core.blobTable[key] = .live(references: 1)
+                // The provisional reference brings the bytes back; a counted doom is taken back until the publication
+                // either binds (the entry goes with the reference) or is doomed afresh (it counts again).
+                if let bytes = self.takeBackCountedRelease(of: key) {
+                    self.state.core.provisionallyRescued[key] = bytes
+                }
                 return .rescued(previous: info)
             case .doomed(let info)?:
                 self.state.core.blobTable[key] = .live(references: 1)
@@ -338,8 +367,14 @@ extension AssetStore {
                     )
                 )
                 self.scheduleDoomedKey()
+                // The bytes left `usedBytes` again: a count a rescue took back counts again.
+                if let bytes = self.state.core.provisionallyRescued.removeValue(forKey: key) {
+                    self.countRelease(of: key, bytes: bytes)
+                }
                 return
             }
+            // Bound, or held by another reference: the bytes stay in `usedBytes`.
+            self.state.core.provisionallyRescued[key] = nil
             self.releaseReference(key, dooming: .unreferenced)
         case .new:
             if case .live? = self.state.core.blobTable[key] {

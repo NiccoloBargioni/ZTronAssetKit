@@ -172,6 +172,16 @@ struct StoreCoreState: Sendable {
     var manifestRevision: UInt64 = 0
     /// Serialises `apply` and `admit`, which yield between chunks (C2, proposed REENTRANCY row b-7).
     var applyGate = ApplyGate()
+    /// The dooms whose bytes `apply` and `admit` counted toward a quota eviction's need (`EvictionState.releasedBytes`,
+    /// OI-14), by key, with the bytes counted; each key here is doomed `unreferenced` or being deleted. A count holds
+    /// only while the bytes stay released: when the key is rescued (live again, its bytes back in `usedBytes`) the bytes
+    /// are taken back, so an eviction that measured before never counts bytes that did not leave (R-CLN-4, REENTRANCY
+    /// R13; Stage 3 S3B-9, close-out cycle 2). The reaper drops a key once its blob is unlinked.
+    var countedReleases: [BlobKey: Int64] = [:]
+    /// Counted dooms that a publication rescued with a provisional reference (`acquireReference`'s `.rescued`): their
+    /// bytes were taken back. If the publication binds nothing and the key is doomed again afresh, they count again;
+    /// otherwise the entry is dropped with the provisional reference. Each key here is live.
+    var provisionallyRescued: [BlobKey: Int64] = [:]
 }
 
 /// The gate that lets one `apply` or `admit` run at a time, and the commit fence of `apply`'s writes.
