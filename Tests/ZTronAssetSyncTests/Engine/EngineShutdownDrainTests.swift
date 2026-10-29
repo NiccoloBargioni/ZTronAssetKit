@@ -43,6 +43,12 @@ extension EngineIdleTests {
         }
         #expect(drained.waiters == count && drained.jobs == count && drained.groups == 1, "the drain takes every waiter, job and group: \(drained)")
         #expect(drained.left == 0, "nothing is left in the state for a later turn: \(drained.left)")
+        // An observer on the engine's own actor, queued before the shutdown, reads the recorded slices between its
+        // yields: it runs between two slices only if the settle releases the actor there.
+        let (started, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        let observer = Task { await engine.shutdownSliceCounts(signalling: signal) }
+        var starts = started.makeAsyncIterator()
+        _ = await starts.next()
         await engine.shutdown()
         for caller in callers {
             let answer = await caller.value
@@ -52,8 +58,30 @@ extension EngineIdleTests {
         #expect(slices.allSatisfy { $0 <= SyncEngine.shutdownStepsPerTurn }, "every turn of the settle takes at most shutdownStepsPerTurn steps: \(slices)")
         #expect(slices.reduce(0, +) == 2 * count, "the slices take every waiter and every job: \(slices)")
         #expect(slices.count >= 3, "\(2 * count) steps take at least three turns: \(slices)")
+        let seen = await EngineHarness.value(of: observer)
+        #expect(seen.contains { $0 > 0 && $0 < slices.count }, "the engine's actor ran other work between the settle's slices: \(seen)")
         let census = await engine.introspect()
         #expect(census.ownedTasks == 0 && census.waiters == 0 && census.interests == 0, "\(census)")
         #expect(await engine.readForTests { $0.state.jobs.isEmpty && $0.state.groups.isEmpty && $0.state.inFlight.isEmpty })
+    }
+}
+
+extension SyncEngine {
+    /// Test probe, on the engine's actor: the number of slices the shutdown's settle has recorded, each time it changes,
+    /// read between yields of this actor until the engine has shut down. Signals once it runs, so the caller queues the
+    /// shutdown behind it. The actor's queue runs jobs of one priority in order, so this probe runs between two slices
+    /// exactly when the settle yields there (`Task.yield()` queues it behind the probe).
+    func shutdownSliceCounts(signalling started: AsyncStream<Void>.Continuation) async -> [Int] {
+        var seen: [Int] = [self.state.shutdownSlices.count]
+        started.yield()
+        started.finish()
+        while self.state.lifecycle != .shutDown, !Task.isCancelled {
+            // REENTRANCY: nothing: a test probe that re-reads the slices and the lifecycle after every yield.
+            await Task.yield()
+            if seen.last != self.state.shutdownSlices.count {
+                seen.append(self.state.shutdownSlices.count)
+            }
+        }
+        return seen
     }
 }
