@@ -183,6 +183,39 @@ struct SizeAndResumeTests {
         await rig.stop()
     }
 
+    /// A response's validators and the one a pause may keep for `If-Range` (RFC 9110 §13.1.5).
+    struct WeakTagCase: Sendable, CustomTestStringConvertible {
+        var headers: [String: String]
+        var kept: ResumeValidator?
+        var testDescription: String
+    }
+
+    static let lastModified = "Wed, 21 Oct 2026 07:28:00 GMT"
+    static let weakTagCases = [
+        WeakTagCase(headers: ["ETag": "W/\"v1\"", "Last-Modified": lastModified], kept: .lastModified(lastModified), testDescription: "weak ETag and Last-Modified"),
+        WeakTagCase(headers: ["ETag": "W/\"v1\""], kept: nil, testDescription: "weak ETag only"),
+    ]
+
+    /// Mutant M-N-22: a weak tag taken as the validator would make the next attempt send a weak `If-Range`, which an
+    /// origin must ignore, so the whole file would be fetched again, and a response with only a weak tag would claim a
+    /// resumable pause it cannot continue.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-8: a weak ETag is never the resume validator: a pause keeps Last-Modified instead, or nothing without it", .timeLimit(.minutes(1)), arguments: SizeAndResumeTests.weakTagCases)
+    func weakETagIsNeverTheValidator(_ tagCase: WeakTagCase) async throws {
+        let rig = try await LoopbackRig.make { _ in
+            LoopbackResponse(headers: tagCase.headers, body: TransportFixtures.payload(1 << 20), ending: .stallAfter(bodyBytes: 512 * 1_024))
+        }
+        let request = rig.request(TransportFixtures.contentID(1), path: "a.bin", expected: 1 << 20)
+        let handle = await rig.source.transfer(request)
+        var iterator = handle.updates.makeAsyncIterator()
+        #expect(await awaitProgress(&iterator, reaching: 512 * 1_024))
+        handle.pause()
+        #expect(await iterator.next() == .paused(resumable: tagCase.kept != nil))
+        #expect(await iterator.next() == nil)
+        #expect(rig.staging.sidecars[request.partialName]?.validator == tagCase.kept, "sidecar: \(String(describing: rig.staging.sidecars[request.partialName]))")
+        await rig.stop()
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: checksum-less transfers are never resumed", .timeLimit(.minutes(1)))
     func checksumLessNeverResumed() async throws {
