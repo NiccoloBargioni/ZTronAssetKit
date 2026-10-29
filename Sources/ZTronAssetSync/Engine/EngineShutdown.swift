@@ -31,6 +31,8 @@ struct RetiredIndexes {
     var transfers: [Set<TransferID>] = []
     /// `EngineState.followOrder`.
     var followOrder: [TransferID] = []
+    /// `EngineState.circuitOrder`.
+    var circuitOrder = CircuitParkedOrder()
     /// `EngineState.heap`.
     var heap = DeadlineHeap()
 }
@@ -95,6 +97,9 @@ extension SyncEngine {
         self.state.spaceParked = []
         self.state.laneParked = []
         self.state.circuitParked = []
+        drain.indexes.circuitOrder = self.state.circuitOrder
+        self.state.circuitOrder = CircuitParkedOrder()
+        self.state.probeCandidate = nil
         self.state.throttleParked = []
         self.state.failedJobs = []
         self.state.edgeOwed = []

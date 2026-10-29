@@ -179,8 +179,15 @@ extension SyncEngine {
 
     /// Re-queues the jobs the origin parked for `kind` (its breaker closed, its cooldown or its throttle ended; T17):
     /// every one parked so now is owed the re-queue (`originOwed`, taken from the index without a pass over the jobs), at
-    /// most `readmissionsPerTurn` per turn.
+    /// most `readmissionsPerTurn` per turn. A breaker that admits only a probe (a cooldown's end, a watchdog, a probe's
+    /// exit without a verdict) re-admits only the first parked job in the pump's order (`readmitForProbe()`): the pump
+    /// would park every other one again behind that probe (S3-B-063).
     func unblockOrigin(_ kind: OriginBlock) {
+        if kind == .circuitOpen, self.breakerAdmitsOnlyProbe() {
+            // A cooldown's end, a silent probe's watchdog or a probe's exit without a verdict: one probe to give.
+            self.readmitForProbe()
+            return
+        }
         let parked = kind == .circuitOpen ? self.state.circuitParked : self.state.throttleParked
         if self.state.originOwed.isEmpty {
             self.state.originOwed = parked
@@ -253,5 +260,87 @@ extension SyncEngine {
         self.pump()
         self.rearm()
         self.notifyObservers()
+    }
+}
+
+// MARK: Lazy re-admission for the breaker's probe (S3-B-063, L4-R22)
+
+extension SyncEngine {
+    /// Whether the origin's breaker admits a job it parked only as its probe at `now` (open past its cooldown, half-open
+    /// without a probe or past a silent probe's watchdog; `CircuitBreaker.admission(of:at:)`).
+    func breakerAdmitsOnlyProbe() -> Bool {
+        guard let origin = self.state.remote?.originID, let breaker = self.state.breakers[origin] else {
+            return false
+        }
+        return breaker.admission(of: nil, at: self.environment.time.monotonicNow()) == .probe
+    }
+
+    /// Re-queues the first job the breaker parked in the pump's order (`circuitOrder`) for the probe a breaker that admits
+    /// only a probe gives, unless the job re-admitted for it earlier (`probeCandidate`) still waits in the queue and no
+    /// parked job ranks before it; the pump dispatches it as the probe, or parks it for another gate (its lane, space),
+    /// and its end re-admits the next one (`ensureProbeCandidate()`). Each event re-admits at most one job, in
+    /// O(log parked) plus the stale entries it drops, so a chain of probes ending without a verdict is O(parked log
+    /// parked) in total, not quadratic (S3-B-063). `true` when a job was re-queued.
+    @discardableResult
+    func readmitForProbe() -> Bool {
+        var waitingRank: Int?
+        if let candidate = self.state.probeCandidate, let job = self.state.jobs[candidate], job.state == .queued {
+            waitingRank = self.queueRank(job)
+        } else {
+            self.state.probeCandidate = nil
+        }
+        while let head = self.state.circuitOrder.first {
+            guard let job = self.state.jobs[head.transfer], job.state.isCircuitParked, job.ticket == head.ticket else {
+                self.state.circuitOrder.removeFirst()
+                continue
+            }
+            let rank = self.queueRank(job)
+            guard rank == head.rank else {
+                // Its rank fell since the entry was pushed (an interest left): it goes back at its place.
+                self.state.circuitOrder.removeFirst()
+                self.state.circuitOrder.insert(CircuitParkedOrder.Entry(rank: rank, ticket: job.ticket, transfer: head.transfer))
+                continue
+            }
+            if let waitingRank, waitingRank <= rank {
+                // The job waiting in the queue is served first and takes the probe.
+                return false
+            }
+            self.state.circuitOrder.removeFirst()
+            guard self.transition(head.transfer, to: .queued) else {
+                continue
+            }
+            self.enqueue(head.transfer)
+            self.state.probeCandidate = head.transfer
+            return true
+        }
+        return false
+    }
+
+    /// After a pump: when the breaker admits only a probe that nothing took and nothing waits in the queue for, the job
+    /// re-admitted for it was parked for another gate or ended, so the next parked job is re-admitted and a pump owed.
+    func ensureProbeCandidate() {
+        guard !self.state.circuitParked.isEmpty, self.breakerAdmitsOnlyProbe(), self.readmitForProbe() else {
+            return
+        }
+        self.schedulePumpFollowUp()
+    }
+
+    /// Keeps `circuitOrder` in step with `job`, which the breaker parks (or which an interest joined while parked):
+    /// pushes its place, and rebuilds the order from the parked set when stale entries outnumber live ones.
+    func noteCircuitParked(_ job: Job) {
+        self.state.circuitOrder.insert(CircuitParkedOrder.Entry(rank: self.queueRank(job), ticket: job.ticket, transfer: job.transfer))
+        let parked = self.state.circuitParked.count
+        guard self.state.circuitOrder.count > 2 * parked + 64 else {
+            return
+        }
+        var entries: [CircuitParkedOrder.Entry] = []
+        entries.reserveCapacity(parked)
+        for transfer in self.state.circuitParked {
+            let current = transfer == job.transfer ? job : self.state.jobs[transfer]
+            if let current {
+                entries.append(CircuitParkedOrder.Entry(rank: self.queueRank(current), ticket: current.ticket, transfer: transfer))
+            }
+        }
+        self.state.circuitOrder.rebuild(entries)
     }
 }

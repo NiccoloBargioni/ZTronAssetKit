@@ -320,6 +320,15 @@ struct EngineState {
     /// The jobs parked by their origin's breaker (`blocked(circuitOpen)`), kept and checked as `spaceParked` is: a
     /// closed breaker or a cooldown's end takes these as its owed re-queues in O(1), not a pass over every job (C2).
     var circuitParked: Set<TransferID> = []
+    /// `circuitParked` in the pump's order (`CircuitParkedOrder`, lazy deletion): a breaker that admits only a probe
+    /// re-admits its first job, not every parked job (S3-B-063).
+    var circuitOrder = CircuitParkedOrder()
+    /// The job last re-admitted for the probe a breaker that admits only a probe gives (`readmitForProbe()`): while it
+    /// waits in the queue, the next dispatch takes the probe, so the other parked jobs stay parked.
+    var probeCandidate: TransferID?
+    /// Introspection: the jobs re-queued from `blocked(circuitOpen)` since start, the work the breaker's re-admissions did
+    /// (a chain of probes ending without a verdict re-admits one parked job per exit, S3-B-063).
+    var circuitReadmissions = 0
     /// The jobs parked by their origin's throttle (`blocked(throttled)`), kept and checked as `circuitParked` is.
     var throttleParked: Set<TransferID> = []
     /// The failed jobs (any disposition), kept and checked as `spaceParked` is: a satisfied network edge re-queues

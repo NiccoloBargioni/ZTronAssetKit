@@ -88,11 +88,13 @@ struct EngineRegressionCycle20Tests {
             await engine.shutdown()
             return
         }
-        // The cooldown's turn re-queues both: the member (prefetch ranks ahead of the run's lane) probes and stays silent;
-        // the claim waits for a slot.
+        // The cooldown's turn re-admits the member (prefetch ranks ahead of the run's lane), which probes and stays silent;
+        // since Stage 3 (S3-B-063) only the first parked job is re-admitted for the probe, so the claim stays parked
+        // behind it (before, it was re-queued and waited for a slot).
         harness.time.advance(to: cooldownEnd)
         await engine.awaitCondition { engine in
-            engine.state.jobs[member.transferID]?.active != nil && engine.state.jobs[parked]?.state == .queued
+            engine.state.jobs[member.transferID]?.active != nil
+                && (engine.state.jobs[parked]?.state == .queued || engine.state.jobs[parked]?.state.isCircuitParked == true)
         }
         // `other` is rejected: its slot's dispatch parks the claim behind the silent probe until its watchdog.
         await harness.source.script(other, [.fail(Self.rejected)])

@@ -1664,6 +1664,9 @@ extension SyncEngine {
         if let stranded = self.strandedPendingRun() {
             violations.append(stranded)
         }
+        if let stranded = self.strandedBreakerParks() {
+            violations.append(stranded)
+        }
         if let unwakeable = self.unwakeableThrottleParks() {
             violations.append(unwakeable)
         }
@@ -1784,6 +1787,17 @@ extension SyncEngine {
         if circuitParked != self.state.circuitParked || throttleParked != self.state.throttleParked {
             violations.append("the index's \(self.state.circuitParked.count) and \(self.state.throttleParked.count) jobs parked by the breaker and the throttle differ from the table's \(circuitParked.count) and \(throttleParked.count)")
         }
+        // Every job the breaker parked has its place in the breaker's order (S3-B-063).
+        if !circuitParked.isEmpty {
+            var placed: Set<TransferID> = []
+            for entry in self.state.circuitOrder.entries where self.state.jobs[entry.transfer]?.ticket == entry.ticket {
+                placed.insert(entry.transfer)
+            }
+            let unplaced = circuitParked.subtracting(placed).count
+            if unplaced > 0 {
+                violations.append("\(unplaced) jobs the breaker parked have no place in its order")
+            }
+        }
         if failed != self.state.failedJobs {
             violations.append("the index's \(self.state.failedJobs.count) failed jobs differ from the table's \(failed.count)")
         }
@@ -1851,6 +1865,24 @@ extension SyncEngine {
             return "the alarm is armed after the earliest deadline (\(first.reason))"
         }
         return nil
+    }
+
+    /// Why the jobs the breaker parked may never be re-admitted, if so. A breaker that admits only a probe re-admits one
+    /// parked job for it (`readmitForProbe()`, S3-B-063); the others wait, legitimately, while a queued job will take the
+    /// probe. With the probe untaken, nothing queued, no re-queue or pump owed and no alarm turn due for the breaker (it
+    /// re-admits at a cooldown's end or a watchdog), nothing would re-admit them: a half-open breaker without a probe has no
+    /// deadline.
+    private func strandedBreakerParks() -> String? {
+        guard self.isRunning, let origin = self.state.remote?.originID, !self.state.circuitParked.isEmpty, self.breakerAdmitsOnlyProbe() else {
+            return nil
+        }
+        if let due = self.state.heap.deadline(for: .breaker(origin)), due <= self.environment.time.monotonicNow() {
+            return nil
+        }
+        if self.state.pumpFollowUpScheduled || !self.state.originOwed.isEmpty || self.state.jobs.values.contains(where: { $0.state == .queued }) {
+            return nil
+        }
+        return "nothing re-admits the \(self.state.circuitParked.count) jobs the breaker parked for the probe it admits"
     }
 
     /// Why the jobs a throttle parked may never be re-admitted, if so. Only the origin's `.throttle` deadline re-admits

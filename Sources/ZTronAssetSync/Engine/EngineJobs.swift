@@ -31,6 +31,11 @@ extension SyncEngine {
         let previous = job.state
         job.state = next
         self.reindex(transfer, from: previous, to: next)
+        if next.isCircuitParked, !previous.isCircuitParked {
+            self.noteCircuitParked(job)
+        } else if previous.isCircuitParked, next == .queued {
+            self.state.circuitReadmissions += 1
+        }
         let after = job.ledgerBytes
         if let before {
             self.state.inFlightBytes.remove(before)
@@ -67,6 +72,9 @@ extension SyncEngine {
             self.state.circuitParked.insert(transfer)
         } else if previous.isCircuitParked {
             self.state.circuitParked.remove(transfer)
+            if self.state.circuitParked.isEmpty {
+                self.state.circuitOrder.removeAll()
+            }
         }
         if next.isThrottleParked {
             self.state.throttleParked.insert(transfer)
@@ -128,6 +136,10 @@ extension SyncEngine {
             job.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
         }
         self.state.jobs[transfer] = job
+        if job.state.isCircuitParked {
+            // The interest may raise the job's rank: its place in the breaker's order moves with it.
+            self.noteCircuitParked(job)
+        }
         if wasReleasedOnly {
             // Now that this interest wants it, it is queued again at the place it waited, in the queue its lane now
             // selects, whether the interest keeps its lane, changes it or comes from user work: jobs re-joined in one turn
@@ -193,7 +205,12 @@ extension SyncEngine {
             let gate = self.originGateNow()
             if gate.admits(reason) == true {
                 self.readmitOpenedOriginGates(gate)
-                return
+                // A breaker that admits only a probe re-admits the first job in the pump's order (S3-B-063): a job that
+                // stays parked behind it would be parked again once that job takes the probe, so its joiner gets that
+                // park's answer now, as before the re-admission was lazy.
+                guard case .circuitOpen = reason, gate.breaker == .probe, self.state.jobs[transfer]?.state.isCircuitParked == true else {
+                    return
+                }
             }
         }
         switch self.state.jobs[transfer]?.state {
@@ -351,7 +368,16 @@ extension SyncEngine {
         }
         self.state.spaceParked.remove(transfer)
         self.state.laneParked.remove(transfer)
-        self.state.circuitParked.remove(transfer)
+        if self.state.circuitParked.remove(transfer) != nil, self.state.circuitParked.isEmpty {
+            self.state.circuitOrder.removeAll()
+        }
+        if self.state.probeCandidate == transfer {
+            // The job queued for the breaker's probe ended before it took it: a pump re-admits the next parked job.
+            self.state.probeCandidate = nil
+            if !self.state.circuitParked.isEmpty {
+                self.schedulePumpFollowUp()
+            }
+        }
         self.state.throttleParked.remove(transfer)
         self.state.failedJobs.remove(transfer)
         self.state.edgeOwed.remove(transfer)

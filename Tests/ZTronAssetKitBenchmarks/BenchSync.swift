@@ -430,24 +430,25 @@ extension ZTronAssetKitBenchmarks {
         /// The total cost of a chain of half-open probes that each end without a verdict (close-out cycle 21, F-41; the
         /// cycle-20 requirements verifier's ProbeC20RChain): 5xx answers open the breaker under a prefetch group, the open
         /// breaker parks every queued member, every member then answers 404, and the clock reaches the cooldown's end. Each
-        /// member probes in turn, and each exit re-admits every member the breaker still parks while the pump parks all but
-        /// the next probe again (F-40), so the chain's total actor work grows with the square of the parked members while
-        /// each turn stays within C2. 1,000 members (10,000 would take minutes: the verifier measured 160.88 s); the best of
-        /// three runs' longest actor wait against C2, the median against P-9, after a warm-up of 250. The totals are
-        /// reported for the orchestrator's ruling on the burst (F-41), not checked against a budget: none exists.
-        @Test("R-SYN-5: a chain of half-open probes ending without a verdict over 1,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time", .timeLimit(.minutes(3)))
+        /// member probes in turn. Until Stage 3 each exit re-admitted every member the breaker still parked while the pump
+        /// parked all but the next probe again (F-40), so the chain's total actor work grew with the square of the parked
+        /// members (1,000: 2.6 to 7.5 s; 10,000: about 161 s); since S3-B-063 (L4-R22) an exit re-admits only the first
+        /// parked member in the pump's order (`readmitForProbe`), so the chain runs at SPEC §6's 10,000. The best of three
+        /// runs' longest actor wait against C2, the median against P-9, after a warm-up of 1,000. The totals are reported,
+        /// not checked against a budget: none exists.
+        @Test("R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func probeChainTurns() async throws {
             let budgets = try QualityBudgets()
             let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
-            _ = try await SyncBench.probeChainWait(members: 250)
+            _ = try await SyncBench.probeChainWait(members: 1_000)
             var runs: [(wait: Double, total: Double)] = []
             for _ in 0..<3 {
-                runs.append(try await SyncBench.probeChainWait(members: 1_000))
+                runs.append(try await SyncBench.probeChainWait(members: 10_000))
             }
             let waits = runs.map(\.wait)
             let median = waits.sorted()[1]
-            print("R-SYN-5 chain of probes without a verdict over 1,000 prefetch members parked by the breaker: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); totals \(runs.map(\.total)) s; runs \(waits)")
+            print("R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); totals \(runs.map(\.total)) s; runs \(waits)")
             #expect(median <= gapMax)
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
         }

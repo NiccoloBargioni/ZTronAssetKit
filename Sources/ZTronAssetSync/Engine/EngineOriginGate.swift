@@ -98,8 +98,16 @@ extension SyncEngine {
             readmitted = true
         }
         if gate.admitsBreakerParked, !self.state.circuitParked.isEmpty {
-            self.unblockOrigin(.circuitOpen)
-            readmitted = true
+            if gate.breaker == .probe {
+                // One probe to give: the first parked job in the pump's order is re-admitted for it, unless one already
+                // waits in the queue for it (S3-B-063); nothing else is owed then, so no pump is scheduled for nothing.
+                if self.readmitForProbe() {
+                    readmitted = true
+                }
+            } else {
+                self.unblockOrigin(.circuitOpen)
+                readmitted = true
+            }
         }
         if readmitted {
             self.schedulePumpFollowUp()

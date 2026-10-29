@@ -232,10 +232,19 @@ struct EngineGateModelTests {
     /// that no run starts while its gate is closed; I5 checks that a pending run starts once its gate admits, read by the
     /// oracle rather than by the engine's own `pendingRunGate`, which `invariantViolations()` uses (close-out cycle 21:
     /// a gate reading that left a pending run waiting for a probe abandoned at its watchdog passed every other check).
+    ///
+    /// I3 for a breaker that offers only its probe (Stage 3, S3-B-063, L4-R22): it has one probe to give, and the engine
+    /// re-admits only the first parked job in the pump's order for it, so a job parked `circuitOpen` is stale only if no
+    /// queued job ranks at or before it (`queueRank`): such a job is dispatched first and takes the probe, after which the
+    /// gate rejects every other job, as it did when every parked job was re-queued and all but the probe parked again.
     static func staleParks(_ engine: isolated SyncEngine) -> [String] {
         let oracle = Oracle(engine)
+        let queuedRanks = engine.state.jobs.values.filter { $0.state == .queued }.map { engine.queueRank($0) }
         var found = engine.state.jobs.values.compactMap { job -> String? in
             guard case .blocked(let reason) = job.state, oracle.admits(reason) == true else {
+                return nil
+            }
+            if case .circuitOpen = reason, oracle.breakerOffersProbe, queuedRanks.contains(where: { $0 <= engine.queueRank(job) }) {
                 return nil
             }
             return "I3: \(job.transfer) stays parked \(reason) while that gate admits (\(oracle.description))"

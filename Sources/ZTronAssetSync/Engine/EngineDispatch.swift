@@ -156,6 +156,7 @@ extension SyncEngine {
             // A lane-wide park stopped at the bound: a later turn continues it whether or not a slot frees.
             self.schedulePumpFollowUp()
         }
+        self.ensureProbeCandidate()
         self.checkRunSettled()
         self.scheduleEnsureRefill()
         if self.state.pendingRun?.gate == .breaker {
