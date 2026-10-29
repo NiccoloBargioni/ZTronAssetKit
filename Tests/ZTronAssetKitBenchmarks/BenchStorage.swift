@@ -250,6 +250,39 @@ extension ZTronAssetKitBenchmarks {
             #expect(units.count >= count / StoreConfiguration().deletionBatchSize)
         }
 
+        /// Stage 3 S3-PERF-04: the reaper's own actor work grows linearly with the doomed set. Every unlink here takes
+        /// 50 µs on the injected clock (a `ManualTimeSource` the volume advances; the deletion unit reads only that
+        /// clock), so every 64-key unit stops after 20 unlinks, as on the reference volume (ADR draft B-10), and the fake
+        /// volume's own cost is linear. Before the fix each unit put its 44 unattempted keys back at the front of the
+        /// remaining queue, one shift of the whole queue per key, and a doubled set cost about three times as much.
+        /// SPEC §6 has no budget for the reaper's scaling, so the ratio is judged against P-4's `doubling_ratio_max`
+        /// (the planner's linearity bound), the 20-key-batch control (nothing left unattempted) printed beside it.
+        @Test(
+            "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much",
+            .timeLimit(.minutes(3))
+        )
+        @available(macOS 15.0, iOS 18.0, *)
+        func reapScaling() async throws {
+            let ratioMax = try #require(try QualityBudgets().value("P-4", "doubling_ratio_max"))
+            _ = try await ReapScalingBench.reapSeconds(count: 1_000)
+            // Best of three runs per size: interference only ever slows a run down (ADR draft B-9's rule for throughput).
+            var seconds: [Int: Double] = [:]
+            for count in [10_000, 20_000, 40_000] {
+                var runs: [Double] = []
+                for _ in 0..<3 {
+                    runs.append(try await ReapScalingBench.reapSeconds(count: count))
+                }
+                seconds[count] = runs.min()
+            }
+            let ratio = try #require(seconds[40_000]) / max(try #require(seconds[20_000]), 1e-9)
+            let control20k = try await ReapScalingBench.reapSeconds(count: 20_000, batchSize: 20)
+            let control40k = try await ReapScalingBench.reapSeconds(count: 40_000, batchSize: 20)
+            print(
+                "P-13 reap scaling (wall seconds of runDueWork, 20 of 64 keys per unit): \(seconds.sorted { $0.key < $1.key }); 40,000 / 20,000 = \(ratio) (max \(ratioMax)); control with 20-key batches: 20,000 \(control20k) s, 40,000 \(control40k) s, ratio \(control40k / max(control20k, 1e-9))"
+            )
+            #expect(ratio <= ratioMax, "reclaim of a doubled set: \(ratio)×")
+        }
+
         @Test("C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch", .timeLimit(.minutes(1)))
         @available(macOS 15.0, iOS 18.0, *)
         func actorStretches() async throws {
@@ -666,5 +699,142 @@ enum ActorHoldProbe {
         }
         done.withLock { $0 = true }
         return StorageBench.milliseconds(await probe.value)
+    }
+}
+
+/// The reaper scaling benchmark's store (Stage 3 S3-PERF-04): `count` doomed 16-byte blobs on the fake volume, each blob
+/// unlink advancing the store's `ManualTimeSource` by 50 µs.
+@available(macOS 15.0, iOS 18.0, *)
+enum ReapScalingBench {
+    /// The wall seconds of the `runDueWork()` that reclaims `count` doomed blobs in units of `batchSize`.
+    static func reapSeconds(count: Int, batchSize: Int = StoreConfiguration().deletionBatchSize) async throws -> Double {
+        let time = ManualTimeSource()
+        let fake = FakeFileSystem(time: time)
+        let environment = AssetEnvironment(
+            fileSystem: ClockedUnlinkFileSystem(base: fake, time: time, unlinkSeconds: 0.000_05),
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 9),
+            conditions: FakeDeviceConditionsSource(),
+            remoteSources: FakeRemoteSourceFactory(source: FakeRemoteSource()),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        var policy = StoragePolicy()
+        policy.deletionGrace = 0
+        var configuration = StoreConfiguration(
+            policy: policy,
+            legacy: LegacyMigrationPolicy(enabled: false),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        configuration.deletionBatchSize = batchSize
+        let payloads = (0..<count).map { GeneratedPayload.bytes(seed: UInt64(90_000 + $0), offset: 0, length: 16) }
+        let entries = payloads.enumerated().map { index, bytes in
+            ManifestEntry(
+                identifier: AssetID("reap.\(index)"),
+                fileExtension: "png",
+                remotePath: "media/\(index).png",
+                byteSize: 16,
+                checksum: ContentHash.sha256(of: bytes)
+            )
+        }
+        let manifest = try ValidatedManifest(entries: entries, digest: ContentHash.sha256(of: Data("reap".utf8)))
+        let first = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        _ = try await first.open()
+        _ = try await first.apply(manifest, etag: nil, eviction: nil)
+        await first.close()
+        // The blobs as a previous launch left them; the next open adopts every one by hash (P-13's shape).
+        let layout = try StoreLayout(base: fake.standardDirectory(.applicationSupport))
+        try fake.createDirectory(at: layout.root)
+        try fake.createDirectory(at: layout.blobsDirectory)
+        for (entry, bytes) in zip(entries, payloads) {
+            let key = BlobKey(hash: try #require(entry.checksum), ext: try #require(AssetFileExtension("png")))
+            try fake.createDirectory(at: layout.fanOutDirectory(for: key.hash))
+            try fake.write(bytes, to: layout.blobURL(key), mode: .truncate)
+        }
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let report = try await store.open()
+        try #require(report.missingBlobs == 0)
+        _ = try await store.apply(ValidatedManifest.empty(), etag: nil, eviction: nil)
+        let started = ContinuousClock.now
+        let work = await store.runDueWork()
+        let elapsed = StorageBench.milliseconds(ContinuousClock.now - started) / 1_000
+        await store.close()
+        try #require(work.reapedKeys == count)
+        return elapsed
+    }
+}
+
+/// A fake volume whose blob unlinks each take `unlinkSeconds` on the injected `ManualTimeSource` (and no real time), so
+/// a time-bounded deletion unit stops after a fixed number of unlinks whatever the host's load.
+@available(macOS 15.0, iOS 18.0, *)
+struct ClockedUnlinkFileSystem: FileSystem {
+    let base: FakeFileSystem
+    let time: ManualTimeSource
+    let unlinkSeconds: TimeInterval
+
+    func read(from url: URL, offset: Int64, maxLength: Int) throws(FileSystemError) -> Data {
+        try self.base.read(from: url, offset: offset, maxLength: maxLength)
+    }
+
+    func standardDirectory(_ directory: StandardDirectory) throws(FileSystemError) -> URL {
+        try self.base.standardDirectory(directory)
+    }
+
+    func itemInfo(at url: URL) throws(FileSystemError) -> FileItemInfo? {
+        try self.base.itemInfo(at: url)
+    }
+
+    func contentsOfDirectory(at url: URL) throws(FileSystemError) -> [FileItemInfo] {
+        try self.base.contentsOfDirectory(at: url)
+    }
+
+    func availableCapacity(at url: URL, for purpose: CapacityPurpose) throws(FileSystemError) -> Int64 {
+        try self.base.availableCapacity(at: url, for: purpose)
+    }
+
+    func storeAttributes(at url: URL) throws(FileSystemError) -> StoreAttributes {
+        try self.base.storeAttributes(at: url)
+    }
+
+    func createDirectory(at url: URL) throws(FileSystemError) {
+        try self.base.createDirectory(at: url)
+    }
+
+    func write(_ data: Data, to url: URL, mode: WriteMode) throws(FileSystemError) {
+        try self.base.write(data, to: url, mode: mode)
+    }
+
+    func synchronizeFile(at url: URL, level: SyncLevel) throws(FileSystemError) {
+        try self.base.synchronizeFile(at: url, level: level)
+    }
+
+    func synchronizeDirectory(at url: URL, level: SyncLevel) throws(FileSystemError) {
+        try self.base.synchronizeDirectory(at: url, level: level)
+    }
+
+    func rename(from source: URL, to destination: URL, mode: RenameMode) throws(FileSystemError) {
+        try self.base.rename(from: source, to: destination, mode: mode)
+    }
+
+    func removeItem(at url: URL) throws(FileSystemError) {
+        try self.base.removeItem(at: url)
+        if url.path.contains("/blobs/") {
+            self.time.advance(by: self.unlinkSeconds)
+        }
+    }
+
+    func applyStoreAttributes(_ attributes: StoreAttributes, at url: URL) throws(FileSystemError) {
+        try self.base.applyStoreAttributes(attributes, at: url)
+    }
+
+    func acquireExclusiveLock(at url: URL) throws(FileSystemError) -> FileLockToken {
+        try self.base.acquireExclusiveLock(at: url)
+    }
+
+    func releaseLock(_ token: FileLockToken) {
+        self.base.releaseLock(token)
     }
 }
