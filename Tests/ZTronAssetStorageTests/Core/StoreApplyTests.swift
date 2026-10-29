@@ -130,6 +130,35 @@ struct StoreApplyTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Stage 3 S3B-9, close-out cycle 2: `adoptKnownBlob`'s release of a record's previous blob counts as the prune's
+    /// does. `o9`'s content moves onto `o8`'s bytes: `o9` adopts them and its old blob is doomed, 100 bytes that left
+    /// `usedBytes` while the run awaited, so five evictions are enough, as for a run alone after the change.
+    @Test("R-CLN-4: the old bytes an apply releases when an asset's content moves onto another asset's bytes count toward an overlapping eviction's need", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func contentChangeOntoLiveBlobWhileEvictionCandidatesRun() async throws {
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let harness = try await EvictionOverlapTests.harness(bulk: bulk)
+        await bulk.setHolding(true)
+        let maintenance = Task {
+            try await harness.store.evictIfNeeded()
+        }
+        try await bulk.requireHeldUnits(atLeast: 1)
+        let candidates = try #require(await bulk.heldUnits.first)
+        var entries = EvictionOverlapTests.assets.map(\.entry)
+        entries[9].checksum = entries[8].checksum
+        let moved = entries
+        let report = try await CleanupSteps.run(bulk, keeping: [candidates]) {
+            try await harness.store.apply(CoreFixture.manifest(moved, etagSeed: "moved"), etag: nil, eviction: nil)
+        }.value
+        #expect(report.reused == [EvictionOverlapTests.assets[9].id], "o9 adopts o8's bytes")
+        await bulk.setHolding(false)
+        let result = try await maintenance.value
+        #expect(result == CleanupResult(bytesFreed: 500, filesRemoved: 5), "o9's old 100 bytes count: 450 of the 550 bytes it measured were still needed")
+        #expect(await EvictionOverlapTests.evicted(harness) == Array(0..<5))
+        #expect(try await harness.store.freeSpace().usedBytes == 400)
+        #expect(await CoreInvariants.violations(of: harness).isEmpty)
+    }
+
     /// Stage 3 S3B-9, close-out cycle 2: the same holds across `apply` calls. One sync prunes `o9` (its 100 bytes
     /// counted as released), the next lists it again and adopts its blob back from its doom before the eviction resumes:
     /// the bytes are in `usedBytes` again, so they no longer count toward the need.
