@@ -248,7 +248,7 @@ extension AssetStore {
                 self.state.core.presentTable[id] = nil
                 pruned.append(id)
                 if let blob = record.referencedBlob {
-                    self.releaseReference(blob, dooming: .unreferenced)
+                    self.releaseCountingBytes(blob)
                 }
             }
             // REENTRANCY: b-7 (proposed) — behind the fence (see `pace`); the next id is removed only if still present.
@@ -257,10 +257,28 @@ extension AssetStore {
         return pruned
     }
 
+    /// `releaseReference(_:dooming: .unreferenced)` for the releases `apply` and `admit` make: when the release dooms a
+    /// live blob, its bytes left `FreeSpace.usedBytes` in this turn, so they count toward the need of a quota eviction
+    /// that measured before (`EvictionState.releasedBytes`, as eviction, purge, quarantine and recorded failures count
+    /// theirs). Otherwise a maintenance run overlapping a pruning `apply` freed up to the pruned bytes more than needed,
+    /// each extra asset to be downloaded again (OI-14; Stage 3 S3B-9).
+    private func releaseCountingBytes(_ key: BlobKey) {
+        // Whether `usedBytes` counts the blob, and its bytes, read before the release.
+        var wasLive = false
+        if case .live? = self.state.core.blobTable[key] {
+            wasLive = true
+        }
+        let bytes = self.state.core.blobBytes[key] ?? 0
+        self.releaseReference(key, dooming: .unreferenced)
+        if wasLive, case .doomed? = self.state.core.blobTable[key] {
+            self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+        }
+    }
+
     /// A new record, absent until fetched or adopted.
     private func insertRecord(for entry: ManifestEntry, now: Date) {
         if let previous = self.state.core.records[entry.identifier]?.referencedBlob {
-            self.releaseReference(previous, dooming: .unreferenced)
+            self.releaseCountingBytes(previous)
         }
         self.state.core.records[entry.identifier] = AssetRecord(
             entry: entry,
@@ -342,7 +360,7 @@ extension AssetStore {
         record.storedAt = now
         self.state.core.records[id] = record
         if let previous, previous != key {
-            self.releaseReference(previous, dooming: .unreferenced)
+            self.releaseCountingBytes(previous)
         }
         self.state.core.commits.dirtyFanOuts.insert(key.hash.fanOut)
         self.refreshPresentEntry(id)
