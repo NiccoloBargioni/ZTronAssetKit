@@ -72,4 +72,49 @@ extension EngineEventsTests {
             #expect(started < progress, "run \(run2.runID.rawValue)'s syncProgress at \(progress) precedes its syncStarted at \(started): \(events.map { String(describing: EventSlot($0)) })")
         }
     }
+
+    /// A subscriber that registers while a run is in progress is first given the run's `syncStarted` and then the run's
+    /// latest `syncProgress`, the one the rate limit last saw (sync.md §10.5, R-SYN-12's replay), so a progress bar
+    /// opened mid-run starts from the run's state instead of waiting for its next event.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress", .timeLimit(.minutes(1)))
+    func lateSubscriberGetsRunReplay() async throws {
+        let harness = EngineHarness.make(tuning: SyncTuning(progressInterval: 0))
+        let catalog = EngineSyncTests.catalog(2, prefix: "replay")
+        let first = catalog[0].0
+        let second = catalog[1].0
+        await harness.serveManifest(catalog.map(\.0))
+        await harness.source.script(first.transferID, [.stage(catalog[0].1)])
+        await harness.source.script(second.transferID, [.hold, .stage(catalog[1].1)])
+        try await harness.start()
+        let engine = harness.engine
+        let run = Task { await engine.sync(.force) }
+        // The first asset commits and the run reports progress while the second waits in flight.
+        await engine.awaitCondition { engine in
+            engine.state.jobs[first.transferID] == nil && engine.state.jobs[second.transferID]?.state == .downloading
+                && engine.state.progress.latestRun != nil
+        }
+        let expected = await engine.readForTests { ($0.state.run?.id, $0.state.progress.latestRun) }
+        let runID = try #require(expected.0, "a run is in progress")
+        let progress = try #require(expected.1, "the run reported progress")
+        let stream = try await engine.subscribe().get()
+        var replayed: [AssetEvent] = []
+        for await event in stream {
+            replayed.append(event)
+            if case .syncProgress = event {
+                break
+            }
+        }
+        let started = replayed.firstIndex { if case .syncStarted(runID, _) = $0 { return true } else { return false } }
+        let replayedProgress = replayed.firstIndex { if case .syncProgress(runID, _) = $0 { return true } else { return false } }
+        #expect(started != nil && replayedProgress != nil, "\(replayed)")
+        if let started, let replayedProgress {
+            #expect(started < replayedProgress, "syncStarted comes first: \(replayed)")
+            #expect(replayed[replayedProgress] == progress, "the run's latest progress is replayed: \(replayed[replayedProgress])")
+        }
+        await harness.source.release(second.transferID, with: .progress(received: 0, expected: nil))
+        #expect(await EngineHarness.value(of: run).completeReport?.fetched == 2)
+        await engine.shutdown()
+    }
 }
+
