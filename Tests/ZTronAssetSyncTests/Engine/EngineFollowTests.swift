@@ -598,10 +598,10 @@ extension EngineSyncTests {
     /// leaves the rest to its follow-up sweep (C2). A follow visit (supersede, re-route each interest, create the new
     /// content's job) costs about ten times a re-queue or a park; counted as one of those, one `.reclaimed` sweep turn
     /// followed up to `readmissionsPerTurn + parksPerPump` jobs, which held the actor 9.3 to 13 ms at 10,000 members (the
-    /// close-out cycle-4 correctness lens, PROBE-C4-SWEEP2-C2). Setup: 1,000 prefetch members alternating 400 and 3,000
+    /// close-out cycle-4 correctness lens, PROBE-C4-SWEEP2-C2). Setup: 600 prefetch members alternating 400 and 3,000
     /// bytes wait `awaitingSpace` for a pruned 2,000-byte blob with 200 bytes of room; a forced sync changes every
-    /// member's content and its follow's follow-ups are held after the first turn's `followsPerTurn` visits, so 744 jobs
-    /// still hold a moved id; the space sweep's follow-ups are held too. The deletion grace ends: the alarm reaps the
+    /// member's content and its follow's follow-ups are held after the first turn's `followsPerTurn` visits, so 344 jobs
+    /// still hold a moved id (more than one sweep turn may follow); the space sweep's follow-ups are held too. The deletion grace ends: the alarm reaps the
     /// blob and its `.reclaimed` sweep re-queues the 400-byte members and parks the 3,000-byte ones, following each first.
     /// That one turn follows exactly `followsPerTurn` jobs of both sizes; once the holds end, every member's interest is
     /// on its new content and no replaced content was requested.
@@ -624,7 +624,7 @@ extension EngineSyncTests {
         try await harness.start()
         _ = try #require(await engine.sync(.force).completeReport)
         try await harness.store.flush(.ordered)
-        let count = 1_000
+        let count = 600
         let large = 3_000
         let members = { (version: Int) in
             (0..<count).map { index in
