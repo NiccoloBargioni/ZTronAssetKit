@@ -78,7 +78,7 @@ struct ForegroundBackendTests {
     @Test("R-NET-2: cancelling the consumer cancels the URLSession task and reports cancelled by the client", .timeLimit(.minutes(1)))
     func consumerCancellation() async throws {
         let arrivals = Arrivals()
-        let rig = try await LoopbackRig.make { request in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { request in
             arrivals.signal(request.target)
             return LoopbackResponse(body: TransportFixtures.payload(200_000), ending: .stallAfter(bodyBytes: 1_000))
         }
@@ -99,7 +99,7 @@ struct ForegroundBackendTests {
     @Test("R-NET-2: invalidation fails every live transfer and later starts without touching the network", .timeLimit(.minutes(1)))
     func invalidation() async throws {
         let arrivals = Arrivals()
-        let rig = try await LoopbackRig.make { request in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { request in
             arrivals.signal(request.target)
             return LoopbackResponse(body: TransportFixtures.payload(100_000), ending: .stallAfter(bodyBytes: 10))
         }
@@ -124,7 +124,7 @@ struct ForegroundBackendTests {
         // The handle's discard is held, so its task is provably not cancelled yet when the live transfers are listed.
         let staging = FakeStagingSink()
         let sink = HeldDiscardSink(base: staging)
-        let rig = try await LoopbackRig.make(staging: staging, sink: sink) { request in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout, staging: staging, sink: sink) { request in
             arrivals.signal(request.target)
             return LoopbackResponse(body: TransportFixtures.payload(100_000), ending: .stallAfter(bodyBytes: 10))
         }
@@ -153,7 +153,7 @@ struct ForegroundBackendTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-2: cancelling by staging name discards the partial unless it keeps it for a pause", .timeLimit(.minutes(1)))
     func cancelByName() async throws {
-        let rig = try await LoopbackRig.make { _ in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
             LoopbackResponse(body: TransportFixtures.payload(1 << 20), ending: .stallAfter(bodyBytes: 512 * 1_024), rangeETag: "\"v1\"")
         }
         let discarded = rig.request(TransportFixtures.contentID(1), path: "drop.bin", expected: 1 << 20)
@@ -185,7 +185,7 @@ struct ForegroundBackendTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing", .timeLimit(.minutes(1)))
     func handleCancelDiscards() async throws {
-        let rig = try await LoopbackRig.make { request in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { request in
             request.target == "/small.bin"
                 ? LoopbackResponse(body: TransportFixtures.payload(1_000))
                 : LoopbackResponse(

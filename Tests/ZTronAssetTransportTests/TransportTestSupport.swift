@@ -97,10 +97,19 @@ struct LoopbackRig {
     let tap: RecordingLogTap
     let base: URL
 
+    /// The request timeout of a test whose response stalls until the test itself acts on it (pause, cancel, invalidate,
+    /// stop the server): longer than any test's hang guard (`.timeLimit`, at most 5 minutes, SPEC 7.2), so however long a
+    /// loaded host delays that action the stall cannot end in a spurious timeout instead (OI-10, S3-B-055: two such
+    /// tests reported a timeout on the iOS Simulator at a load average of 468.9). A missed event still fails the test, at
+    /// its hang guard. A stall that only detects a missing abort (the abort-while-streaming tests) keeps the short default,
+    /// since there the timeout firing is the failure.
+    static let heldStallTimeout: TimeInterval = 600
+
     /// `requestTimeout` is the sessions' request timeout: short by default, so a missed event fails long before a test's
     /// time limit (transport.md §12); a test that queues many tasks behind few connections passes a longer one, since a
     /// queued task's wall-clock timeout runs while it waits for a connection and a loaded host stretches that wait (ADR draft
-    /// C OI-10: 191 of 500 queued transfers timed out on the iOS Simulator at a load average of 110).
+    /// C OI-10: 191 of 500 queued transfers timed out on the iOS Simulator at a load average of 110), and a test whose
+    /// response stalls until the test acts passes `heldStallTimeout`.
     static func make(
         appKey: AppKey? = TransportFixtures.canaryKey,
         allowedHosts: Set<String> = ["127.0.0.1"],

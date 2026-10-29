@@ -115,7 +115,7 @@ struct SizeAndResumeTests {
         appKey: AppKey,
         id: TransferID = TransportFixtures.contentID(1)
     ) async throws -> (TransferRequest, TransferUpdate?) {
-        let rig = try await LoopbackRig.make(appKey: appKey, staging: staging) { _ in
+        let rig = try await LoopbackRig.make(appKey: appKey, requestTimeout: LoopbackRig.heldStallTimeout, staging: staging) { _ in
             LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: stall), rangeETag: "\"v1\"")
         }
         let first = rig.request(id, attempt: TransportFixtures.attempt(1), path: "video.bin", expected: Int64(body.count))
@@ -162,7 +162,7 @@ struct SizeAndResumeTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar", .timeLimit(.minutes(1)))
     func pauseKeepsThePartial() async throws {
-        let rig = try await LoopbackRig.make { _ in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
             LoopbackResponse(
                 headers: ["Last-Modified": "Wed, 21 Oct 2026 07:28:00 GMT"],
                 body: TransportFixtures.payload(1 << 20),
@@ -202,7 +202,7 @@ struct SizeAndResumeTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: a weak ETag is never the resume validator: a pause keeps Last-Modified instead, or nothing without it", .timeLimit(.minutes(1)), arguments: SizeAndResumeTests.weakTagCases)
     func weakETagIsNeverTheValidator(_ tagCase: WeakTagCase) async throws {
-        let rig = try await LoopbackRig.make { _ in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
             LoopbackResponse(headers: tagCase.headers, body: TransportFixtures.payload(1 << 20), ending: .stallAfter(bodyBytes: 512 * 1_024))
         }
         let request = rig.request(TransportFixtures.contentID(1), path: "a.bin", expected: 1 << 20)
