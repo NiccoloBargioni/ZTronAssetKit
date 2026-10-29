@@ -80,12 +80,25 @@ struct DeadlineHeap {
         self.entries.removeAll { matches($0.reason) }
     }
 
-    /// Removes and returns every entry due at `now`, in `(deadline, seq)` order.
-    mutating func popDue(at now: MonotonicInstant) -> [Deadline] {
-        var due: [Deadline] = []
-        while let first = self.entries.first, first.at <= now {
-            due.append(self.entries.removeFirst())
+    /// Removes and returns the entries due at `now`, in `(deadline, seq)` order, at most `limit` of them: the others stay
+    /// due, so the alarm fires again at once and a later turn takes them (C2). The due entries are a prefix of the sorted
+    /// array, found by a binary search and removed at once: removing the first entry one at a time moved the whole array
+    /// per entry, quadratic in the entries due (10,000 retries falling due together held the actor 64 to 81 ms; Stage 3,
+    /// S3-B-077).
+    mutating func popDue(at now: MonotonicInstant, limit: Int = .max) -> [Deadline] {
+        var low = 0
+        var high = self.entries.count
+        while low < high {
+            let middle = (low + high) / 2
+            if self.entries[middle].at <= now {
+                low = middle + 1
+            } else {
+                high = middle
+            }
         }
+        let count = min(low, max(0, limit))
+        let due = Array(self.entries.prefix(count))
+        self.entries.removeFirst(count)
         return due
     }
 }

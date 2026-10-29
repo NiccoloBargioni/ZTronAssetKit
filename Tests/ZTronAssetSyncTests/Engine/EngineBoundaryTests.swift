@@ -144,3 +144,27 @@ extension EngineRecoveryTests {
         await engine.shutdown()
     }
 }
+
+extension EngineSupportTests {
+    /// One alarm turn takes at most `dueDeadlinesPerTurn` due deadlines, in `(deadline, seq)` order, and never one not
+    /// yet due; the rest stay first in the heap for the alarm's next turn (C2; Stage 3, S3-B-077: 10,000 retries falling
+    /// due together were re-queued in one turn, and the heap removed them one at a time, quadratic in their number).
+    @Test("R-SYN-5: an alarm turn takes at most dueDeadlinesPerTurn due deadlines, in order, and none that is not due")
+    func popDueIsBounded() {
+        var heap = DeadlineHeap()
+        let now = EngineSupportTests.origin
+        let count = SyncEngine.dueDeadlinesPerTurn + 88
+        for index in 0..<count {
+            heap.schedule(.retry(EngineSupportTests.transfer(index), epoch: 1), at: now.adding(seconds: -Double(count - index)))
+        }
+        heap.schedule(.store, at: now.adding(seconds: 1))
+        let first = heap.popDue(at: now, limit: SyncEngine.dueDeadlinesPerTurn)
+        #expect(first.count == SyncEngine.dueDeadlinesPerTurn)
+        #expect(first.map(\.reason) == (0..<SyncEngine.dueDeadlinesPerTurn).map { .retry(EngineSupportTests.transfer($0), epoch: 1) }, "in deadline order")
+        #expect(heap.count == 89 && heap.first?.reason == .retry(EngineSupportTests.transfer(SyncEngine.dueDeadlinesPerTurn), epoch: 1), "the rest stay first")
+        let second = heap.popDue(at: now, limit: SyncEngine.dueDeadlinesPerTurn)
+        #expect(second.count == 88, "the next turn takes the rest and not the store deadline, which is not due")
+        #expect(heap.count == 1 && heap.first?.reason == .store)
+        #expect(heap.popDue(at: now).isEmpty)
+    }
+}

@@ -94,11 +94,16 @@ extension SyncEngine {
         !self.state.heldAlarmTurns.isEmpty
     }
 
-    /// Drains due entries in `(deadline, seq)` order, re-validating each against epochs, then runs the store's due
-    /// work if its deadline was among them, and re-arms.
+    /// The due deadlines one alarm turn takes at most (C2): the rest stay due and the re-armed alarm fires again at once,
+    /// so retries of a 10,000-member group falling due together are re-queued over several turns, as `readmit` bounds its
+    /// re-queues (Stage 3, S3-B-077).
+    static let dueDeadlinesPerTurn = 512
+
+    /// Drains due entries in `(deadline, seq)` order, at most `dueDeadlinesPerTurn`, re-validating each against epochs,
+    /// then runs the store's due work if its deadline was among them, and re-arms.
     func fireDue() async {
         let now = self.environment.time.monotonicNow()
-        let due = self.state.heap.popDue(at: now)
+        let due = self.state.heap.popDue(at: now, limit: Self.dueDeadlinesPerTurn)
         var storeDue = false
         for deadline in due {
             switch deadline.reason {
