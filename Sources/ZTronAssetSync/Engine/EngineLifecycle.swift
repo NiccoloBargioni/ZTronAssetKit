@@ -510,6 +510,11 @@ extension SyncEngine {
             await remote.invalidate()
         }
         if self.state.launch != nil || self.state.startTask != nil {
+            // The order R-SYN-15 rests on (ADR-039): every owned task was joined above. Marked for the condition observers
+            // that check it (Stage 3, S3-B-070), since `close()` drains in-flight work and no store record tells the
+            // orders apart.
+            self.state.closingStore = true
+            self.notifyObservers()
             // REENTRANCY: RE-S22 — terminal: every owned task is joined, so no store call is in flight.
             await self.store.close()
         }

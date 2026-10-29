@@ -95,7 +95,8 @@ struct EngineHarness {
         remote: (any RemoteSource)? = nil,
         factory: (any RemoteSourceFactory)? = nil,
         legacy: LegacyMigrationPolicy = LegacyMigrationPolicy(enabled: false),
-        legacyDefaults: FakeLegacyDefaults = FakeLegacyDefaults()
+        legacyDefaults: FakeLegacyDefaults = FakeLegacyDefaults(),
+        conditionsWrapper: (@Sendable (FakeDeviceConditionsSource) -> any DeviceConditionsSource)? = nil
     ) -> EngineHarness {
         let fileSystem = existing ?? FakeFileSystem(
             disk: disk,
@@ -112,7 +113,7 @@ struct EngineHarness {
             bulkExecutor: bulk ?? InlineBlockingExecutor(),
             time: time,
             random: SeededRandom(seed: seed),
-            conditions: conditionsSource,
+            conditions: conditionsWrapper?(conditionsSource) ?? conditionsSource,
             remoteSources: factory ?? FakeRemoteSourceFactory(source: remote ?? source),
             appVersion: FakeAppVersionSource(version: appVersion),
             legacyDefaults: legacyDefaults,

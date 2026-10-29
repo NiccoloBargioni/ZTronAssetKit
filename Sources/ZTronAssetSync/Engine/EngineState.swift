@@ -36,6 +36,9 @@ struct EngineState {
     var ownedTaskPriorityFloor: TaskPriority?
     /// The start task, while it runs.
     var startTask: UInt64?
+    /// Set when shutdown begins closing the store, after it joined every owned task (R-SYN-15, ADR-039): what a condition
+    /// observer reads to check that order (Stage 3, S3-B-070).
+    var closingStore = false
 
     // MARK: Jobs, interests and continuations (H-3)
 
