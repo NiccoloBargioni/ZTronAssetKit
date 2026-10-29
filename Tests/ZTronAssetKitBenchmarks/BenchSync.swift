@@ -477,6 +477,33 @@ extension ZTronAssetKitBenchmarks {
             #expect(median <= gapMax)
             #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
         }
+
+        /// C2 at SPEC §6's reference scale when the store's reaper frees space during an owed follow (Stage 3 close-out
+        /// cycle 5; the cycle-4 correctness lens, PROBE-C4-SWEEP2-C2): 10,000 prefetch members alternating 400 and 3,000
+        /// bytes wait `awaitingSpace` for a pruned 2,000-byte blob with 100 bytes of room; a forced sync changes every
+        /// member's content and its follow's follow-ups are held (the follow owes its visits, as between two of its turns);
+        /// then the deletion grace ends, and the alarm's `.reclaimed` sweep and its follow-up sweeps re-queue the 400-byte
+        /// members and park the 3,000-byte ones, following each first. While a follow counted as the re-queue or park it
+        /// preceded, one sweep turn followed 1,024 jobs: 10.2 to 10.8 ms with one handle and 13.6 to 14.1 ms with two over
+        /// the same ids (two interests per job). With one handle and with two; medians of three against P-9, the best of
+        /// the three against C2, after a warm-up.
+        @Test("R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func reclaimDuringFollowTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.reclaimDuringFollowWait(members: 1_000, handles: 1)
+            for handles in [1, 2] {
+                var runs: [Double] = []
+                for _ in 0..<3 {
+                    runs.append(try await SyncBench.reclaimDuringFollowWait(members: 10_000, handles: handles))
+                }
+                let median = runs.sorted()[1]
+                print("R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, \(handles) handle(s): longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+                #expect(median <= gapMax, "\(handles) handle(s): \(runs)")
+                #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(handles) handle(s): \(runs)")
+            }
+        }
     }
 }
 
@@ -1771,5 +1798,138 @@ extension SyncBench {
             }
             return nil
         }.max()
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// The heartbeat's longest wait while the deletion grace of a pruned 2,000-byte blob ends under `handles` prefetch
+    /// handles over `count` on-demand members alternating 400 and 3,000 bytes, every one parked `awaitingSpace` with
+    /// 100 bytes of room, during the owed follow of a forced sync that changed every member's content (its follow-ups
+    /// held): the alarm reaps the blob and its `.reclaimed` sweep and follow-up sweeps re-queue the 400-byte members and
+    /// park the 3,000-byte ones, until no sweep is owed. Every member must have left `awaitingSpace`.
+    static func reclaimDuringFollowWait(members count: Int, handles: Int) async throws -> Double {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x11),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        // A 60 s deletion grace and no residency: the pruned blob is reclaimed when the clock passes the grace.
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = SyncBench.entry("x", xBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData([x]), etag: ETag(rawValue: "\"v1\""))])
+        await source.script(x.transferID, [.stage(xBytes)])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        let members = { (seed: UInt64) in
+            (0..<count).map { index in
+                SyncBench.entry(String(format: "s%05d", index), GeneratedPayload.bytes(seed: seed + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+            }
+        }
+        // v2 prunes x: its 2,000 bytes wait for the grace.
+        await source.scriptManifest([.fetched(SyncBench.manifestData(members(0x21_000)), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the pruning sync did not complete")
+        }
+        try await store.flush(.ordered)
+        try await SyncBench.leaveRoom(100, store: store, fileSystem: fileSystem, ballast: "ballast")
+        guard try await store.freeSpace().pendingReclaim == Int64(xBytes.count) else {
+            throw SyncBenchError.incomplete("x's bytes do not wait for the reclaim")
+        }
+        await engine.refreshFreeSpace()
+        let old = members(0x21_000)
+        for _ in 0..<handles {
+            // A second handle over the same ids (another prefetch window over the same catalog): two interests per job.
+            guard case .success = await engine.registerGroup(old.map(\.identifier), lane: .prefetch) else {
+                throw SyncBenchError.incomplete("the prefetch group was refused")
+            }
+        }
+        while !Task.isCancelled, !(await SyncBench.allAwaitingSpace(engine, count: count)) {
+            await Task.yield()
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(members(0x55_000)), etag: ETag(rawValue: "\"v3\""))])
+        await engine.holdFollowFollowUps()
+        let sync = Task { await engine.sync(.force) }
+        while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
+            await Task.yield()
+        }
+        // The apply's index commit may have moved the room: 100 bytes again, with a second ballast.
+        try await store.flush(.ordered)
+        try await SyncBench.leaveRoom(100, store: store, fileSystem: fileSystem, ballast: "ballast-2")
+        _ = try await engine.readFreeSpace()
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        let wait = try await SyncBench.longestWait(on: engine) {
+            time.advance(by: 61)
+            while !Task.isCancelled, !(await SyncBench.reclaimSwept(engine)) {
+                await Task.yield()
+            }
+        }
+        let awaiting = await SyncBench.awaitingSpace(engine)
+        await engine.releaseFollowFollowUps()
+        await engine.shutdown()
+        _ = await sync.value
+        guard awaiting == 0 else {
+            throw SyncBenchError.incomplete("\(awaiting) members still wait for space after the reclaim's sweeps")
+        }
+        return wait
+    }
+
+    /// Takes the room above the reserve on the opportunistic volume down to `room` with the file `ballast`.
+    static func leaveRoom(_ room: Int64, store: AssetStore, fileSystem: FakeFileSystem, ballast: String) async throws {
+        let free = try await store.freeSpace()
+        let excess = free.volumeOpportunistic - free.reserveBytes - room
+        guard excess >= 0 else {
+            throw SyncBenchError.incomplete("the room above the reserve is already below \(room): \(free)")
+        }
+        let file = URL(fileURLWithPath: "/fake-volume/Library/Application Support/\(ballast)")
+        try fileSystem.write(Data(repeating: 1, count: Int(excess)), to: file, mode: .truncate)
+    }
+
+    /// Whether the engine holds `count` jobs, each parked `awaitingSpace`.
+    static func allAwaitingSpace(_ engine: isolated SyncEngine, count: Int) -> Bool {
+        engine.state.jobs.count == count && engine.state.jobs.values.allSatisfy { $0.state == .blocked(.awaitingSpace) }
+    }
+
+    /// Whether the follow's next turn is held (`holdFollowFollowUps()`).
+    static func followWaiting(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.followFollowUpWaiting
+    }
+
+    /// Whether the alarm's store work is over, its read after the reclaim was adopted and no space sweep is owed: O(1).
+    /// The alarm's read and its `.reclaimed` sweep run in one turn, and each sweep owes its follow-up in its own turn.
+    static func reclaimSwept(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.storeWorkRuns == 0 && engine.state.freeSpace?.pendingReclaim == 0 && engine.state.spaceSweepFollowUp == nil
+    }
+
+    /// The jobs parked `awaitingSpace`.
+    static func awaitingSpace(_ engine: isolated SyncEngine) -> Int {
+        engine.state.spaceParked.filter { engine.state.jobs[$0]?.state == .blocked(.awaitingSpace) }.count
     }
 }
