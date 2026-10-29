@@ -335,4 +335,82 @@ struct BackgroundInterleavingTests {
         }
         #expect(await coordinator.keptResumeData(for: older.partialName) == nil)
     }
+
+    // MARK: - Priority order (Stage 3, S3-CONC-01; REENTRANCY row D-9)
+
+    /// The engine promotes a bulk background transfer (a user waiter joined) and, while that change lists the tasks,
+    /// demotes it again (the waiter withdrew). The demotion is the newest request, so the OS task ends at the bulk
+    /// priority 0.25 and the coordinator reports that value: the promotion, whose listing returns last, changes nothing.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps", .timeLimit(.minutes(1)))
+    func newestPriorityChangeWins() async throws {
+        let rig = try Rig("newest-priority-demotion")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let handle = try #require(await coordinator.start(rig.job()) as? BackgroundTransferHandle)
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        // The promotion's listing is held after it was taken...
+        await rig.driver.holdNextSnapshot(.afterListing)
+        let promotion = Task { await coordinator.setPriority(.userInitiated, of: handle.name, token: handle.token) }
+        await rig.awaitSignal("snapshot")
+        // ...while the later demotion runs to its end.
+        await coordinator.setPriority(.bulk, of: handle.name, token: handle.token)
+        await rig.driver.releaseSnapshot()
+        await promotion.value
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes.last == 0.25, "the newest request was bulk (0.25), the OS task ends at \(String(describing: changes.last)); changes \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        withExtendedLifetime(handle) {}
+    }
+
+    /// The direction H-4 depends on: an older demotion whose listing returns after a newer promotion must not leave
+    /// the OS task a user now waits for at the bulk priority.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a newer promotion is kept over an older demotion whose listing returns later", .timeLimit(.minutes(1)))
+    func newestPromotionWins() async throws {
+        let rig = try Rig("newest-priority-promotion")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let handle = try #require(await coordinator.start(rig.job()) as? BackgroundTransferHandle)
+        await coordinator.setPriority(.userInitiated, of: handle.name, token: handle.token)
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.75])
+        await rig.driver.holdNextSnapshot(.afterListing)
+        let demotion = Task { await coordinator.setPriority(.bulk, of: handle.name, token: handle.token) }
+        await rig.awaitSignal("snapshot")
+        await coordinator.setPriority(.userInitiated, of: handle.name, token: handle.token)
+        await rig.driver.releaseSnapshot()
+        await demotion.value
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes.last == 0.75, "the newest request was userInitiated (0.75), the OS task ends at \(String(describing: changes.last)); changes \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.75])
+        withExtendedLifetime(handle) {}
+    }
+
+    /// The engine calls a handle's controls synchronously on every lane change (ADR-021 keeps controls ordered), so
+    /// the handle must deliver them in that order: the second change starts only after the first one, held at its
+    /// listing, reached the OS task, and the task ends at the second change's value.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them", .timeLimit(.minutes(1)))
+    func handleControlsInOrder() async throws {
+        let rig = try Rig("handle-controls-in-order")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let handle = try #require(await coordinator.start(rig.job()) as? BackgroundTransferHandle)
+        await rig.driver.holdNextSnapshot(.afterListing)
+        handle.setPriority(.userInitiated)
+        await rig.awaitSignal("snapshot")
+        handle.setPriority(.bulk)
+        // A whole listing runs through the coordinator and the driver while the first change is held: the second
+        // change, made after it, is not delivered meanwhile.
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        let early = await rig.driver.priorityChanges.map(\.priority)
+        #expect(early.isEmpty, "a later change overtook the held one: \(early)")
+        await rig.driver.releaseSnapshot()
+        await rig.awaitSignal("priority")
+        await rig.awaitSignal("priority")
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes == [0.75, 0.25], "each change reaches the OS task in the order it was made: \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        withExtendedLifetime(handle) {}
+    }
 }
