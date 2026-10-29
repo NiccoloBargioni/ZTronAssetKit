@@ -105,6 +105,42 @@ extension EngineCommandTests {
         await engine.shutdown()
     }
 
+    /// The deadline check after orphan collection keeps eviction from running too: on a store over its byte budget whose
+    /// assets are out of the retention scope, so that eviction would free them, a maintenance whose time budget runs out
+    /// while orphan collection runs evicts nothing and keeps every asset. A maintenance with time to spare then evicts
+    /// them, so the first one stopped before a step that had work to do (the close-out cycle-2 requirements lens: with
+    /// nothing to evict, a maintenance that skipped this check reported the same).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget", .timeLimit(.minutes(1)))
+    func maintenanceStopsBeforeEviction() async throws {
+        let time = ManualTimeSource()
+        let catalog = EngineSyncTests.catalog(2, prefix: "spent")
+        let first = EngineHarness.make(time: time)
+        await first.serve(catalog)
+        try await first.start()
+        _ = try #require(try await first.syncDriven().completeReport)
+        await first.engine.shutdown()
+        time.advance(by: 3_600)
+        let bulk = NextUnitGate()
+        let storage = StoragePolicy(budget: .bytes(64), reserveFreeBytes: 0, minimumResidency: 0)
+        let second = EngineHarness.make(disk: first.fileSystem.survivingDisk(), time: time, storage: storage, bulk: bulk)
+        try await second.start()
+        let engine = second.engine
+        try await engine.setRetentionScope(.tags(["none"])).get()
+        await bulk.holdNext()
+        let maintenance = Task { await engine.performMaintenance(timeBudget: 5) }
+        await bulk.waitForHold()
+        time.advance(by: 6)
+        await bulk.release()
+        let report = try await EngineHarness.value(of: maintenance).get()
+        #expect(report.budgetExhausted && report.evictedBytes == 0, "no eviction ran after the deadline: \(report)")
+        let view = try await second.view()
+        #expect(catalog.allSatisfy { view.records[$0.0.identifier]?.referencedBlob != nil }, "every asset is still present")
+        let full = try await engine.performMaintenance(timeBudget: 600).get()
+        #expect(full.evictedBytes > 0, "with time to spare eviction frees what the stopped maintenance kept: \(full)")
+        await engine.shutdown()
+    }
+
     /// A maintenance step cancelled by shutdown (its orphan collection held on the bulk executor while the shutdown
     /// cancels the engine's tasks) throws `cancelled`: the engine trusts no binding learned during maintenance and
     /// answers `shutDown` once the engine has stopped.
