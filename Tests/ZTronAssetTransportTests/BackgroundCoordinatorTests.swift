@@ -596,6 +596,68 @@ struct BackgroundCoordinatorTests {
         #expect(!relay.hasHandler(for: ours))
     }
 
+    /// S3-CONC-02: UIKit hands a second completion handler for the same session identifier while the first one is
+    /// still held (the facade's first `handleBackgroundEvents` task has not completed it yet). Every handler UIKit
+    /// hands over is called exactly once, and the k-th completion calls the k-th handler: one completion only proves
+    /// that the events of the oldest wake still waiting were staged.
+    @MainActor
+    @Test("R-NET-3: a second background-events handler for one identifier never drops the first one uncalled")
+    func secondHandlerKeepsFirst() {
+        let relay = BackgroundEventsRelay()
+        let ours = Self.identifier.rawValue
+        var calls: [String] = []
+        #expect(relay.accept(identifier: ours) { calls.append("first") })
+        #expect(relay.accept(identifier: ours) { calls.append("second") })
+        // The first handleBackgroundEvents task finishes: the oldest handler runs, the second still waits.
+        relay.complete(identifier: ours)
+        #expect(calls == ["first"], "one completion calls the oldest handler only: \(calls)")
+        #expect(relay.hasHandler(for: ours))
+        // The second task finishes; a stray completion afterwards calls nothing again.
+        relay.complete(identifier: ours)
+        relay.complete(identifier: ours)
+        #expect(calls == ["first", "second"], "each handler UIKit handed over runs once, in order: \(calls)")
+        #expect(!relay.hasHandler(for: ours))
+    }
+
+    /// The facade's flow (`AssetClient.handleBackgroundEvents`: accept, wait for the session's events, complete)
+    /// over the coordinator: a second wake's handler arrives after the first wake's wait returned and before its
+    /// completion reached the main actor. The first completion must call the first handler, whose events were staged,
+    /// and the second handler runs only after its own wake's download was staged.
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-NET-3: a handler handed over while an earlier one still waits runs only after its own wake's events were staged, and the earlier one still runs", .timeLimit(.minutes(1)))
+    func overlappingWakesCompleteInOrder() async throws {
+        let rig = try Rig("overlapping-wakes")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let first = rig.job(1, seed: 1)
+        let second = rig.job(2, seed: 2)
+        let handles = [await coordinator.start(first), await coordinator.start(second)]
+        let relay = BackgroundEventsRelay()
+        let ours = Self.identifier.rawValue
+        let staging = rig.staging
+        var calls: [String] = []
+        // Wake 1: UIKit hands the first handler; the first download finishes and the session ends its events.
+        #expect(relay.accept(identifier: ours) { calls.append("first staged: \(staging.contents[first.partialName] != nil)") })
+        await rig.driver.complete(first.partialName, body: TransportFixtures.payload(4_000, seed: 1))
+        await rig.driver.finishEvents()
+        await coordinator.awaitBackgroundEvents()
+        // Wake 2 begins before wake 1's completion reaches the main actor.
+        #expect(relay.accept(identifier: ours) { calls.append("second staged: \(staging.contents[second.partialName] != nil)") })
+        let secondWake = Task { @MainActor in
+            await coordinator.awaitBackgroundEvents()
+            relay.complete(identifier: ours)
+        }
+        relay.complete(identifier: ours)
+        #expect(calls == ["first staged: true"], "wake 1's completion calls wake 1's handler only: \(calls)")
+        await rig.driver.complete(second.partialName, body: TransportFixtures.payload(4_000, seed: 2))
+        await rig.driver.finishEvents()
+        await secondWake.value
+        #expect(calls == ["first staged: true", "second staged: true"], "each handler runs once, after its wake's events: \(calls)")
+        #expect(!relay.hasHandler(for: ours))
+        withExtendedLifetime(handles) {}
+    }
+
     @Test("R-NET-3: the background task tag round-trips through taskDescription with its continuation flag, rejects foreign or over-long tags, and labels a download")
     func tagCodec() throws {
         let seed: UInt64 = 0x5eed_7a6
