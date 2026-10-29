@@ -170,7 +170,11 @@ extension EngineRegressionTests {
     /// form, §7.3; the `ensureAvailable` form is `ensureMaterialisesInBatches`). The transfers wait unanswered, so the
     /// run never drains its plan; it ends at shutdown. Hang guard (S3-R4): the 100,000-entry manifest is encoded, decoded,
     /// planned and applied in a debug build, 5.7 to 6.4 s alone, and took 59.9 s of its 60 s under TSan in the whole Sync
-    /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard is `.minutes(3)`.
+    /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard is `.minutes(3)`. Under TSan the engine's decode of
+    /// the 21 MB manifest (the model's parser) takes about two thirds of the time, its plan and the store's apply most of
+    /// the rest; the bytes are encoded in slices (1.3 s instead of 2.7 to 8.3 s). Close-out cycle 4 measured 46.1 s alone,
+    /// 68.3 s in the bundle and 104.3 to 104.7 s beside a second TSan process at a load of 16 to 26, over half of three
+    /// minutes: the guard awaits the orchestrator's ruling (`docs/adr-drafts/s3f.md`, cycle 4).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(3)))
     func runMaterialisesAPipelineAtATime() async throws {
@@ -189,7 +193,10 @@ extension EngineRegressionTests {
                 policy: .standard
             )
         }
-        await harness.serveManifest(catalog)
+        // The wire bytes are encoded in slices at once, the same bytes as one `manifestData` call (checked on a prefix).
+        let prefix = Array(catalog.prefix(100))
+        #expect(await EngineFixture.manifestDataInSlices(prefix, chunks: 3) == EngineFixture.manifestData(prefix))
+        await harness.source.scriptManifest([.fetched(await EngineFixture.manifestDataInSlices(catalog), etag: EngineFixture.etag("v1"))])
         let engine = harness.engine
         let peak = Mutex(0)
         let sampler = Task {

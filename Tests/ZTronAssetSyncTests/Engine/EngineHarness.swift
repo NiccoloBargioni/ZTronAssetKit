@@ -43,6 +43,40 @@ enum EngineFixture {
         return (try? encoder.encode(entries)) ?? Data("[]".utf8)
     }
 
+    /// `manifestData(entries)`, encoded in `chunks` slices at once and joined: the reference encoder's array is `[`, its
+    /// elements joined by `,`, then `]`, so the bytes are the same. Encoding S1-15's 100,000 entries in one call took 2.7
+    /// to 8.3 s of the run test's sanitizer time, in slices 1.0 s at a load about 11 (Stage 3 close-out cycle 4, S3-R4:
+    /// each step made cheaper, nothing cut); the run test checks the join against `manifestData` on a prefix.
+    static func manifestDataInSlices(_ entries: [ManifestEntry], chunks: Int = 8) async -> Data {
+        let size = max(1, (entries.count + chunks - 1) / chunks)
+        let parts = await withTaskGroup(of: (Int, Data).self) { group in
+            for (index, start) in stride(from: 0, to: entries.count, by: size).enumerated() {
+                let slice = Array(entries[start..<min(start + size, entries.count)])
+                group.addTask {
+                    (index, Self.manifestData(slice))
+                }
+            }
+            var parts: [Int: Data] = [:]
+            for await (index, data) in group {
+                parts[index] = data
+            }
+            return parts
+        }
+        var out = Data("[".utf8)
+        for index in parts.keys.sorted() {
+            guard let part = parts[index], part.count > 2 else {
+                continue
+            }
+            if out.count > 1 {
+                out.append(UInt8(ascii: ","))
+            }
+            // Each slice's own brackets are dropped.
+            out.append(part.dropFirst().dropLast())
+        }
+        out.append(UInt8(ascii: "]"))
+        return out
+    }
+
     /// A strong ETag for `tag`.
     static func etag(_ tag: String) -> ETag? {
         ETag(rawValue: "\"\(tag)\"")
