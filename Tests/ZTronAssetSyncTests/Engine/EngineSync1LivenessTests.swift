@@ -202,7 +202,13 @@ extension EngineRegressionTests {
         await engine.awaitCondition { engine in
             engine.state.inFlight.count == tuning.maxConcurrentTransfers && engine.state.run?.transferring == true
         }
-        let held = await engine.readForTests { engine in (jobs: engine.state.jobs.count, violations: engine.invariantViolations()) }
+        let held = await engine.readForTests { engine in
+            (
+                jobs: engine.state.jobs.count,
+                downloading: engine.state.jobs.values.filter { $0.state == .downloading }.count,
+                violations: engine.invariantViolations()
+            )
+        }
         await engine.shutdown()
         _ = await EngineHarness.value(of: run)
         sampler.cancel()
@@ -211,6 +217,6 @@ extension EngineRegressionTests {
         #expect(most <= bound, "jobs at once: \(most), bound \(bound)")
         #expect(held.jobs >= tuning.maxConcurrentTransfers, "the run materialised its first fetches: \(held.jobs)")
         #expect(held.violations.isEmpty, "\(held.violations.prefix(3))")
-        #expect(await harness.source.starts.count == tuning.maxConcurrentTransfers, "only the slots' transfers started")
+        #expect(held.downloading == tuning.maxConcurrentTransfers, "only the slots' transfers run: \(held.downloading)")
     }
 }
