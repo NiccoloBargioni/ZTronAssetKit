@@ -108,7 +108,7 @@ extension EngineRegressionTests {
         let waiter = Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) }
         // The backoff's full jitter may make the retry due at once, so the failed state is not awaited: the failure is
         // read from the engine's record of it, and the retry from the waiter's answer.
-        let answer = try await harness.withClock {
+        let answer = await harness.withClock {
             await waiter.value
         }
         #expect((try? answer.get()) != nil, "the retry delivered the asset: \(answer)")

@@ -45,7 +45,7 @@ extension EngineGroupClaimTests {
         // The successor's join finds the same job, which retries once the backoff ends.
         await engine.inOneTurn { engine in engine.spawnJoin(successor, members: [entry.identifier], lane: .prefetch) }
         await engine.awaitCondition { $0.state.jobs[entry.transferID]?.interests[successor] != nil }
-        try await harness.withClock {
+        await harness.withClock {
             await engine.waitUntil { $0.jobsByState.isEmpty }
         }
         #expect(await harness.source.starts.count == 2, "one retry of the same transfer")
