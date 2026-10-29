@@ -1,4 +1,4 @@
-# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 3
+# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 4
 
 Branch `wp/s3f` from tag `s3-base`. Rulings: `.build-orchestrator/s3-rulings-s3f.md`; findings:
 `.build-orchestrator/s3-findings-s3f.json`. WP-F's Stage 2 record is `docs/adr-drafts/f.md` (background only).
@@ -12,7 +12,13 @@ rulings file was re-read: S3-R1 (the blocking finding first, its failing test co
 S3-R2 (the probes PROBE-W1 and PROBE-W4/W4b renamed into `EngineFollowTests`), S3-R3 (every mutant re-applied in place,
 rebuilt, run and reverted), S3-R4 (the hang guards re-measured, below), S3-R5 (the fix keeps the follow's per-turn bound:
 a queue head waiting for the follow is left in place, not followed by the pump), S3-R6 and S3-R7 (only WP-F's files and
-this draft changed) and S3-R8 (P-13 stays `other-wp:b`).
+this draft changed) and S3-R8 (P-13 stays `other-wp:b`). In cycle 4 the rulings file was re-read again (no ruling changed or
+was added): S3-R1 (the blocking correctness finding's failing test `996ac21` committed before its fix `c8f01ca`), S3-R3
+(the fix's two hooks each removed in place and shown to fail the new test), S3-R4 (every hang guard over half its limit
+beside a second TSan process at a load at most about 30 raised to `.minutes(3)` with its measurements; the S1-15 run test,
+which is neither model-based nor exhaustive, stays at `.minutes(3)` over half of it, and a ruling is requested below),
+S3-R5 (the probe-chain benchmark passes C2 at 10,000 on a quiet host), S3-R6/S3-R7 (only WP-F's files and this draft) and
+S3-R8 (P-13 and the store's per-404 index commit routed `other-wp:b`).
 
 - **Orchestrator ruling (close-out) S3-R1, scope and order.** Blocking items first (failing test committed on its own,
   then the fix), then REQUIRED, then OPTIONAL; ADR-RECORD items get an entry here and no code; items not listed are out
@@ -164,6 +170,163 @@ new content's (PROBE-W1b: 44 of 48 starts after the apply at 3,000 members).
   (`changedRefreshTurns` and `followIsBoundedPerTurn` re-run below).
 - **REENTRANCY:** no new `await` in production code (the hooks are synchronous; `spaceFailed`'s existing f-4 comment
   now names the follow re-check after its read). Proposed amendment of row f-4 below.
+
+## Cycle 4: the cycle-3 verification findings
+
+Every finding of the two cycle-3 lenses, with its disposition; the blocking ones first. Mutants were applied in place on
+the committed tree, rebuilt in `.build-s3f`, run and reverted (`git status` clean after each).
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| correct (blocking) | A space sweep during an owed follow answers a listed id's waiter with its replaced content's `insufficientSpace` figures (PROBE-C3-SPACE) | **Fixed** (failing test `996ac21`, fix `c8f01ca`; below) |
+| reqs (blocking) | S1-15's run test (`EngineSync1LivenessTests.swift:175`) timed out under TSan beside a second TSan process (194.17 s at load ~33) | **Setup made cheaper, phases measured; still over half of 3 min paired: orchestrator ruling requested** (below) |
+| reqs (blocking) | `probeChainTurns` over its 3-minute limit on a quiet host | **Fixed** (`7a81bc9`, `07ca8cb`): chains take 1.1 s instead of 6 to 95 s; all 20 `SyncBenchmarks` pass at load 3 (below) |
+| reqs | The S3-R4 record contradicted: the alarm-turn test over half its limit at load ≤ 30; shutdown drain and bounded follow at the threshold | **Fixed** (`2211585`): re-measured beside a second TSan process at load 16–26; all three over 30 s, raised to `.minutes(3)` with their measurements, and seven more over half their limit raised the same way (table below) |
+| reqs | Surviving mutant `noDispatchOwedFlag` (`EngineRuns.swift:947`, `\|\| self.state.pumpWaitsForFollow` in `dispatchOwed`) unrecorded | **Recorded** (no test; reason below) and proposed for §14 |
+| reqs | PROBE-W1 (cycle 2) now hangs: a lane dispatches nothing while its head waits for an owed follow | No change (expected behaviour, already in the proposed §7.10 text) |
+| reqs | other-wp:b: P-13 | **other-wp:b:** `BenchStorage.swift` is WP-B's; not touched |
+| correct | Hang-guard margins of the alarm-turn and the cycle-12 seeded release/re-join tests under TSan | **Fixed** (`2211585`): both `.minutes(3)` with the verifiers' and this cycle's measurements; the seeded loop calls `Task.checkCancellation()` per operation |
+| correct | Load benchmarks: `probeChainTurns` over its limit, the throttle extension 10.66 ms best, P-11 2.94 at load 11–23 | `probeChainTurns` fixed (above); re-run at load 3: throttle extension [7.15, 7.81, 6.75] ms, P-11 3.43, every benchmark passing |
+| correct | The `noFlagPump` survivor (`continueFollow`'s two `\|\| pumpWaitsForFollow` terms) unpinned (optional test) | Kept as recorded in cycle 3 (§14 candidate (a)); no test this cycle |
+| correct | other-wp:b: P-13 | **other-wp:b:** as above |
+| (found here) | other-wp:b: a 404 has the store commit its whole index before the engine goes on | **other-wp:b:** reported below; no WP-F change needed (the benchmark no longer measures it) |
+
+### The blocking correctness finding: a space sweep during an owed follow — **Fixed**
+
+*Finding:* `sweepSpaceParked` (the alarm's `.reclaimed` sweep after reaped bytes, `.settle`, a purge's reclaim) could
+re-park the `awaitingSpace` job of a listed id's replaced content `insufficientSpace` while the bounded follow still owed
+its visit, and `park` → `failFast` answered that id's waiter or ensure member with the replaced content's figures,
+although the copy lists the id at content that fits (F-22, T22, R-CAR-2); the cycle-3 hooks covered `resolveAll`,
+`countFailedAttempt` and `spaceFailed`, not this park.
+
+- **Failing test first** (`996ac21`, `Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`, `extension
+  EngineSyncTests`): `R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before
+  it answers or re-queues the replaced content's job (R-CAR-2)`, arguments `SweptReplacedContent.waiterReparked`,
+  `.ensureReparked` (an `ensureAvailable` member; its fetch-first finds the manifest unchanged) and `.waiterRequeued`.
+  PROBE-C3-SPACE's shape with the hold seam: 4 MB of a pruned blob wait for the reclaim, the target's 5 MB user job is
+  parked `awaitingSpace` against 4 MB of room, a forced sync moves the target to 16 bytes while 2,100 changed entries
+  sort before it (the pass stops before its entry), the test sets the room the reclaim adds to (0.5 MB: re-park; 2 MB:
+  re-queue), and the deletion grace ends. At `996ac21`: `EngineFollowTests.swift:573:9: Expectation failed:
+  answered.fromNewContent` with `failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available:
+  4500000))` for `.waiterReparked` and `.ensureReparked`, and `:569:9: Expectation failed: !afterSweep.holds` (`the
+  replaced content's job no longer holds the id after the sweep: Optional(ZTronAssetSync.JobState.queued)`) for
+  `.waiterRequeued`.
+- **Fix** (`c8f01ca`, `EngineJobs.swift` `sweepSpaceParked`, doc of `followBeforeActing` in `EngineFollow.swift`): the
+  sweep calls `followBeforeActing(transfer)` just before it re-queues a candidate and just before it parks one
+  `insufficientSpace`. A superseded job is skipped and counted against the same per-turn bound as the action it preceded
+  (`readmissionsPerTurn` re-queues, `parksPerPump` parks), so the sweep stays bounded per turn (C2); a job that keeps
+  some ids is read again before its figures (the moved interests may have lowered its lane, which can only shrink the
+  room its figures read, so the verdict holds). A job left waiting (`awaitingSpace` with a wake expected) acts on nothing
+  and is not followed. The verifier's prototype put the hook at the loop's head, which follows every candidate including
+  the waiting ones, unbounded per turn at 10,000 parked jobs; this placement follows only the jobs the turn acts on.
+- **Mutants** (in place on `c8f01ca`, filter `spaceSweepFollowsTheReplacedContent`):
+  - `noSweepParkHook` (`guard let parked = self.state.jobs[transfer] else {`): `EngineFollowTests.swift:573:9: Expectation
+    failed: answered.fromNewContent` for `.ensureReparked` and `.waiterReparked`; `✘ Test run with 1 test in 1 suite
+    failed after 1.111 seconds with 2 issues.`
+  - `noSweepRequeueHook` (`if false, self.followBeforeActing(transfer) {`): `EngineFollowTests.swift:569:9: Expectation
+    failed: !afterSweep.holds` for `.waiterRequeued`; `✘ Test run with 1 test in 1 suite failed after 1.083 seconds with
+    1 issue.`
+- **REENTRANCY:** no new `await` (the hook is synchronous). **C2:** at most one follow per action the turn already
+  bounds; `spaceParking`, `spaceReadmission` and the follow benchmarks re-run below.
+- The test's payloads are repeated bytes (`2211585`), not generated megabytes, which took seconds under TSan: 12.2 s in
+  the bundle at load 4–9, 24.7 s beside a second TSan process at load 12–32 (of 60 s).
+
+### S1-15's run test under TSan — **setup cheaper; ruling requested**
+
+*Finding:* `runMaterialisesAPipelineAtATime` (`.minutes(3)`) exceeded its limit beside a second TSan process; make the
+setup cheaper without cutting entries or assertions, measure the phases, re-measure alone and paired at load ≤ ~30, and
+ask for a ruling if it cannot stay under half of 3 minutes.
+
+- **Phases** (TSan, the test's own steps timed in a scratch copy, never committed; `sample` profiles of the process):
+  at load 5–12 the 100,000 entries' catalog 0.4–0.5 s, their encoding 4.0–4.4 s (a first hand-built encoder; one
+  `JSONEncoder` call took 2.7–8.3 s on its own), then 30.1–36.3 s from the forced sync to the applied copy (56.2 s at
+  load 11–18), of which the engine's decode of the 21 MB manifest (`ManifestDecoder.decode`: `ManifestParser.survey`
+  and `parse`, WP-A's model code, instrumented byte by byte) took about two thirds of the samples, the plan (`PlanBuilder`,
+  mostly formatting 100,000 transfer ids) about an eighth and the store's apply and index commit (WP-B) most of the rest;
+  the shutdown's store close (another index commit) 2.2–2.8 s; the materialisation itself under 5 ms.
+- **Cheaper** (`c745edc`): the wire bytes are encoded in eight slices at once and joined
+  (`EngineFixture.manifestDataInSlices`, byte for byte `manifestData`'s output, which the test checks on a 100-entry
+  prefix): 1.0–1.3 s against 2.7–8.3 s for one `JSONEncoder` call (a hand-built encoder was no faster under TSan:
+  2.9–6.4 s as strings, 10.1–14.6 s as bytes). Entries, operations and assertions are unchanged. A store seeded with the manifest and
+  a 304 run was tried and dropped: it removes the fetch-and-decode operation from the test (G3), and the store's next
+  open read nothing back (the run planned an empty manifest).
+- **Measured after** (TSan, `.build-s3f-tsan`, whole bundle run directly): alone (only it) 32.5 s at load 3.2–3.7 and
+  46.1 s at load 11–18; in the bundle 60.6 s (load 3.7–8.6), 68.3 s (load 16–19), 99.0 s (load 13–30); beside a second
+  TSan process 101.8 s twice (load 12–32) and 104.3–104.7 s (load 16–26); at load 59–464 193.3 s (reported passed:
+  the limit is enforced coarsely). Over half of `.minutes(3)` at a load at most about 30 in every paired run.
+- **Requested ruling (S1-15 guard):** S3-R4 reserves `.minutes(5)` for model-based or exhaustive tests; this one is
+  neither, and its time is the decode of a 100,000-entry manifest it needs (S1-15's catalog size), in another work
+  package's parser, under TSan. Requested: `.minutes(5)` for this test (paired 101.8–104.7 s, 34–35 % of 5 minutes), or
+  another ruling the orchestrator prefers (for example routing the parser's sanitizer cost to WP-A, `other-wp:a`, which is
+  not a defect: release decodes the same manifest in well under a second). Until a ruling, the guard stays `.minutes(3)`
+  and the test's doc comment records the measurements.
+
+### `probeChainTurns` — **Fixed**
+
+*Finding:* WP-F's benchmark exceeded its 3-minute limit at load 4–9; make the chain cheaper without reducing the 10,000
+members, the three runs or the 1,000 warm-up, then show it passing at load ≤ ~10.
+
+- **Cause, measured** (`sample` of the release benchmark mid-chain): with 404 exits each exit had the store record the
+  failure and commit its whole index before the engine went on (`AssetStore.recordFailure` → `persistBookkeeping` →
+  `requireCommitted(.ordered)` → `IndexCommitUnit.run` → `IndexCodec.encode`, ADR-032), about 5 ms at 10,000 records on
+  the store's actor, so 10,000 exits took 50 s or more per chain whatever the engine did. With 400 exits, chains still took
+  6 to 88 s at load 3–14, with the process's threads idle most of the time: each of the 10,000 probes is a handful of hops
+  between the engine's owned tasks (`.medium` follow-ups), which queued behind the `.high` heartbeat's pulses on the
+  actor. Cycle 2's reading of the wall time (the fake source's round trip and the bench's polling) was wrong.
+- **Fix** (`7a81bc9`, `07ca8cb`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift` only): the exits are 400s, which also
+  end a probe without a verdict (`breakerOutcome`: `.neutral`) and re-admit exactly as a 404 does, and write nothing to
+  the store; the bench's O(n) polls on the actor are preceded by O(1) waits on the engine's own notifications
+  (`SyncBench.originQuiet`); the chain's engine runs its owned tasks at the heartbeat's priority
+  (`SyncBench.raiseOwnedTaskPriority`, the `ownedTaskPriorityFloor` seam the engine tests' harness uses, F-17). The engine's
+  turns are the same; the measured figure (the heartbeat's longest wait) does not depend on a task's priority. Members,
+  runs and warm-up unchanged.
+- **Measured:** alone at load 3.5–3.6: totals [1.12, 1.17, 1.13] s and [1.11, 1.12, 1.11] s, waits [0.22, 5.69, 0.93] and
+  [0.19, 0.19, 0.18] ms, `✔ Test run with 1 test in 2 suites passed after 4.038 seconds` and `3.932 seconds`. Whole
+  `SyncBenchmarks` at load 2.95–3.42: `✔ Test run with 20 tests in 2 suites passed after 90.579 seconds`, chain totals
+  [1.13, 1.16, 1.14] s, waits [0.54, 1.21, 0.32] ms. (Before the priority change, with 400 exits: `failed after 190.589
+  seconds` at load 3–4, totals [87.9, 71.6, 22.3] s.)
+- **other-wp:b (new):** a burst of 404s rewrites the store's whole index once per failure (`recordFailure` commits
+  `.ordered` per call): at 10,000 records about 5 ms of CPU and an index-sized write per 404, so 10,000 missing assets
+  rewrite the index 10,000 times. Not on the engine's actor (no C2 breach); a write-amplification question for WP-B
+  (coalescing the failures of one burst into one commit would keep ADR-032's durability).
+
+### Hang guards (S3-R4) — **Fixed**
+
+Measured under TSan in the whole Sync bundle (`.build-s3f-tsan`, run directly): alone at load 16–19 and beside a second
+TSan process (two bundles at once) at load 16–26, at `c8f01ca` plus this cycle's test edits; each raised guard's doc
+comment carries its numbers. Re-measured on the final tree (`07ca8cb`): alone at load 3.7–8.6, paired at load 12–32.
+
+| Test | alone | paired (load 16–26) | final tree: alone / paired (load 12–32) | guard |
+|---|---|---|---|---|
+| `R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn …` (`EngineBoundaryTests.swift`) | 33.8 s | 54.7–55.1 s | 23.3 / 47.5–47.8 s | **3 min** |
+| `R-SYN-3: seeded random releases and re-joins …` (`EngineRegressionCycle12Tests.swift`) | 40.5 s | 67.0–67.4 s | 28.4 / 58.1–58.4 s | **3 min** |
+| `R-SYN-15: a shutdown over more waiters and jobs than one turn takes …` (`EngineShutdownDrainTests.swift`) | 24.2 s | 40.3–42.9 s | 18.1 / 35.2–37.6 s | **3 min** |
+| `R-SYN-2: an apply that moves more jobs than one turn takes …` (`EngineFollowTests.swift`) | 26.7 s | 41.2–41.4 s | 17.5 / 36.1–36.2 s | **3 min** |
+| `R-SYN-5: when a 429 extends the throttle under more user-initiated waiters …` (`EngineRegressionCycle16Tests.swift`) | 26.5 s | 41.2–41.7 s | — | **3 min** |
+| `R-SYN-6: one failing asset among 100 …` (`EngineSyncTests.swift`) | 24.6 s | 35.7–37.5 s | — | **3 min** |
+| `R-SYN-2: a 404 for a prefetch member's replaced content …` (`EngineFollowTests.swift`) | 24.3 s | 37.0–37.2 s | — | **3 min** |
+| `R-SYN-3: never more than maxConcurrentTransfers …` (`EngineLaneTests.swift`) | 22.3 s | 33.1–33.4 s | — | **3 min** |
+| `R-SYN-5: a chain of half-open probes … re-admits one parked job per probe exit …` (`EngineProbeChainTests.swift`) | 22.3 s | 33.0–33.2 s | — | **3 min** |
+| `R-SYN-6: with the default tuning, a run does not download …` (`EngineRegressionCycle3Tests.swift`) | 20.7 s | 30.5–30.9 s | — | **3 min** |
+| `R-STO-13: during legacy migration a bulk sync … install-rate limiter …` (`EngineLegacyMigrationTransferTests.swift`) | 21.1 s | 30.5–30.6 s | — | **3 min** |
+
+The cycle-16 throttle test also timed out (60 s) in both processes of a paired run at load 59–464 (a load miss, as the
+cycle-3 verifier's run 1), which with 41 s paired at load ≤ 30 is why it is in the table. Every other test with a 1-minute
+guard stayed at or under 30 s paired at load 16–26 (the space-sweep test 29.2 s with its old payloads, 24.7 s now). The
+S3F-2 guards hold: `randomOperations` 66.1–79.2 s of 5 min, the four 3-minute ones 47.8–57.4 s.
+
+### The `noDispatchOwedFlag` survivor — **recorded, no test**
+
+Removing `|| self.state.pumpWaitsForFollow` from `dispatchOwed` (`EngineRuns.swift:947`) passes the Sync bundle (the
+cycle-3 requirements verifier: `✔ Test run with 408 tests in 53 suites passed after 57.786 seconds`). The term keeps
+F-41's order (the re-admitted jobs probe before a pending run's manifest fetch) when the job the breaker re-admitted for
+its probe waits at its queue's head for an owed follow. It only matters while a pending run exists, and
+`reconsiderPendingRun` requires `state.run == nil`, while no run settles as long as a follow is owed: so the follow must
+come from an apply that is not a run's (`ensureAvailable`'s fetch-first apply, or a catch-up), the breaker must have
+tripped and a run been refused after that apply, and the cooldown must end, all inside one bounded follow (about 40 turns
+at 10,000). The hold seam makes that orderable, but the test was not written in this cycle (its size: an `ensureAvailable`
+apply, a 5xx trip, a refused run and a cooldown's end around a held follow). Proposed §14 entry below, next to
+`noFlagPump`.
 
 ## Items
 
@@ -562,7 +725,8 @@ S3F-13's; the R-SYN-15 order and S1-09's halves, part of S3-B-070, are S3F-14's)
 
 ## Authorised edits outside WP-F
 
-None, in either cycle. Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
+None, in any cycle (cycle 4 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `EngineFollow.swift`, tests under
+`Tests/ZTronAssetSyncTests/Engine/`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift` and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
 `Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft. No contract signature
 changed (`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
 internal parameter).
@@ -659,6 +823,22 @@ Cycle 3 adds:
   within C2 alone; a turn that combines it with a join batch or a pump's parks is not benchmarked.
 - **DECISIONS / §11:** the R-SYN-2 and R-CAR-2 regression tests of this cycle (names under "Cycle 3"); no hang guard
   changed in cycle 3 (measurements under "Gate evidence (cycle 3)").
+
+Cycle 4 adds:
+
+- **§7.10, the follow (cycle 3's sentence):** replace "(`resolveAll`, an answer at the retry cap, the park after an
+  ENOSPC)" with "(`resolveAll`, an answer at the retry cap, the park after an ENOSPC, and a space sweep's park or
+  re-queue, each counted against that sweep's per-turn bound)".
+- **§10.2:** no new row (no new `await`).
+- **§11:** `R-SYN-5`'s probe-chain benchmark ends each probe with a 400 (a 404's store commit is not the re-admission's
+  cost) and runs the engine's owned tasks at the heartbeat's priority; a 10,000-member chain takes about 1.1 s.
+- **§14:** (c) the `|| pumpWaitsForFollow` term of `dispatchOwed` (F-41's order for a pending run behind a probe-only
+  breaker while the probe candidate waits for an owed follow; reachable only through a follow of a non-run apply; the
+  survivor `noDispatchOwedFlag`), next to (a).
+- **For routing (`other-wp:b`, not a WP-F document change):** `AssetStore.recordFailure` commits the whole index once per
+  call, so a burst of N 404s rewrites the index N times (about 5 ms each at 10,000 records in release).
+- **DECISIONS (L4-R8 precedent):** the cycle-4 hang guards with their measurements (table under "Cycle 4"), and the
+  orchestrator's ruling on the S1-15 run test's guard once given.
 
 ## Gate evidence (cycle 1)
 
@@ -812,6 +992,41 @@ on the shared 8-core host whose load swung from 4 to 360 during the cycle (loads
 - **Mutants of the non-blocking items** (in place, each rebuilt, run and reverted): lines in the "Cycle 3" table; the
   M5, close-only M5 and M6 runs are on `e58a34f` (`closeStore()`).
 
+## Gate evidence (cycle 4)
+
+All runs on this branch at `07ca8cb` (the code's HEAD; the draft's commit changes this file only) unless a step names an
+earlier commit, scratch `.build-s3f*`, on the shared 8-core host whose load swung from 3 to 464 during the cycle (loads
+quoted per step).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`**: see the final run at the end of this section.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (22:09, sources as
+  at `07ca8cb`): `Build complete! (27,92 s)`, exit 0.
+- **Gates:** `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (debug, 22:30, load 36–51): `✔ Test run with 405 tests in 52 suites passed after 13.685
+  seconds`, `14.199 seconds`, `13.518 seconds`.
+- **TSan once** (`.build-s3f-tsan`, the whole bundle run directly, 22:47–22:48, load 3.7–8.6): `✔ Test run with 405
+  tests in 52 suites passed after 60.633 seconds`; beside a second TSan process (22:48–22:50, load 12–32) both `✔ Test
+  run with 405 tests in 52 suites passed after 101.795 seconds` / `101.806 seconds`, no time-limit line. Per-test
+  durations in the tables under "Cycle 4".
+- **Coverage** (`--enable-code-coverage`, all seven test targets passed, 22:31–22:34): `COVERAGE target=ZTronAssetSync
+  lines= 94.03% (9254/9842) min=90.0 OK`, overall `96.68% (25765/26650)`, `COVERAGE: PASS`.
+- **iOS:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-s3f/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` exit 0 (22:10, sources as at `07ca8cb`). **iOS Simulator tests**
+  (simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iOS 27.0; `Test-ZTronAssetKit-2026.10.29_22-50-34-+0100.xcresult`,
+  22:50–22:57, load 27 at the start): `"result" : "Passed"`, `"totalTestCount" : 1359`, `"passedTests" : 1359`, `"failedTests" : 0`,
+  `"skippedTests" : 0` (`** TEST SUCCEEDED **`); the simulator is shut down.
+- **WP-F benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter
+  SyncBenchmarks`, 22:44:57–22:46:27, load 2.95–3.42): `✔ Test run with 20 tests in 2 suites passed after 90.579
+  seconds`. P-4 12.04 ms (budget 20.0), ratio 2.24 (max 2.5); P-7 4.89 / 0.31 MiB; P-11 speedup 3.43 (min 3.0); P-14 0
+  timers, 0 tasks; the stalled prune ratio 1.43. C2, runs in ms: probe chain [0.54, 1.21, 0.32] (totals [1.13, 1.16,
+  1.14] s); throttle extension [7.15, 7.81, 6.75]; refresh changing every member [3.67, 3.71, 3.65]; refresh under a
+  group [1.23, 1.20, 1.21]; shutdown [1.36, 1.43, 1.39]; due retries [0.84, 0.85, 0.83]; prune announcement [5.00, 4.90,
+  4.91]; releases 4.15–4.58 and 4.33–4.48; re-joins 4.57–4.72; space parking 4.02–4.51 and 2.72–3.13; space re-admission
+  3.90–4.28; network edges 1.04–1.10 and 4.14–4.33; cooldown end 0.06–0.12; cancelled resolve 0.02. (At `2211585`,
+  with the 400 exits but before the priority change, the same run at load 3–4 failed only in `probeChainTurns`: `BenchSync.swift:443:10: Time
+  limit was exceeded: 180.000 seconds`, totals [87.9, 71.6, 22.3] s.)
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -823,8 +1038,12 @@ on the shared 8-core host whose load swung from 4 to 360 during the cycle (loads
   before the join; no join).
 - Cycle 3: a catch-up waiter (joined from the store's newer manifest) whose job fails while a follow is owed is not
   followed (its id is unlisted, `holdsMovedID`); no test orders that case, and the `pumpWaitsForFollow` liveness terms
-  survive their mutant (both recorded under "Cycle 3"). The two-TSan-process re-measurement of the hang guards was not
-  run.
-- The probe chain's total wall time at 10,000 (20–48 s across runs and loads) is reported, not budgeted; its scaling is
-  pinned by the structural count of one re-admission per exit, not by the wall time, which the fake source's round trip
-  and the benchmark's polling dominate.
+  survive their mutant (both recorded under "Cycle 3"). Cycle 4 ran the two-TSan-process re-measurement (tables under
+  "Cycle 4").
+- The probe chain's total wall time at 10,000 is reported, not budgeted; its scaling is pinned by the structural count of
+  one re-admission per exit. Cycle 4 corrected the cause of its 20–95 s totals (the store's per-404 index commit and the
+  owned tasks' priority below the heartbeat's, not the fake source or the polling); it is about 1.1 s now.
+- Cycle 4: the S1-15 run test's guard (`.minutes(3)`, 101.8–104.7 s beside a second TSan process at load 12–32) awaits
+  the orchestrator's ruling; the `noDispatchOwedFlag` and `noFlagPump` liveness terms have no test (reasons under "Cycle
+  4" and "Cycle 3"); the 404 path's engine turns are no longer part of the probe-chain benchmark (the 404 path's own C2
+  is not benchmarked at 10,000; its turns are per job, with no catalogue-sized walk).
