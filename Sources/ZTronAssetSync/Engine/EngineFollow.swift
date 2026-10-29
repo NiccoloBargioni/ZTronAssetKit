@@ -119,7 +119,8 @@ extension SyncEngine {
     }
 
     /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
-    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`): the moved ids' interests follow their new content
+    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`, a space sweep's park) or to be re-queued by a space
+    /// sweep (`sweepSpaceParked`): the moved ids' interests follow their new content
     /// first (T22), exactly as the visit would have moved them before the failure arrived, and only the ids the copy
     /// still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to

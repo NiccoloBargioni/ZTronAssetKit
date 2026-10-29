@@ -682,6 +682,13 @@ extension SyncEngine {
     /// jobs are parked and at most `readmissionsPerTurn` re-queued per turn; the rest are left to a follow-up sweep (one
     /// turn that re-admitted 10,000 members when the volume gained room took about 15 ms: review of close-out cycle 8,
     /// C2). A read stops re-checking once the room left cannot admit even the smallest job parked `insufficientSpace`.
+    ///
+    /// A job about to be re-queued or parked `insufficientSpace` that holds an id an owed follow has not moved yet is
+    /// followed first (`followBeforeActing`), as a failure is: its fail-fast would answer that id's waiter or ensure member
+    /// with the replaced content's figures although the copy lists the id at content that may fit, and its re-queue would
+    /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). The follow
+    /// counts against the same per-turn bound as the action it precedes, so a sweep still does at most `parksPerPump`
+    /// parks and `readmissionsPerTurn` re-queues or follows per turn; a job left waiting acts on nothing and is not followed.
     func sweepSpaceParked(_ sweep: SpaceSweep) {
         var ahead = self.spaceAdmittedAhead()
         var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
@@ -716,6 +723,11 @@ extension SyncEngine {
                     self.scheduleSpaceSweepFollowUp(sweep)
                     break
                 }
+                if self.followBeforeActing(transfer) {
+                    // Superseded: the ids went to their new content's jobs, which the gate admits on their own.
+                    requeues += 1
+                    continue
+                }
                 if self.transition(transfer, to: .queued) {
                     self.enqueue(transfer)
                     ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
@@ -735,16 +747,22 @@ extension SyncEngine {
                 self.scheduleSpaceSweepFollowUp(sweep)
                 break
             }
+            // The ids that left this content leave before its fail-fast answers the rest; a job that keeps some is read
+            // again, since the moved interests may have set its lane (and so the volume its figures read).
+            guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
+                parks += 1
+                continue
+            }
             if let space = self.state.freeSpace {
                 // The room is computed before the write: the right side of an optional-chained assignment runs inside
                 // the write's access to `state` (an exclusivity conflict, review of close-out cycle 6).
-                let available = max(0, self.headroom(for: job, in: space).subtractingClamped(ahead))
-                if case .insufficientSpace(let required, _)? = job.lastError {
+                let available = max(0, self.headroom(for: parked, in: space).subtractingClamped(ahead))
+                if case .insufficientSpace(let required, _)? = parked.lastError {
                     // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job.
                     self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: available)
                 } else if ahead > 0 {
                     // The fail-fast answer would report the room without the jobs admitted ahead of this one.
-                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: job.entry.byteSize ?? 0, available: available)
+                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: parked.entry.byteSize ?? 0, available: available)
                 }
             }
             self.park(transfer, reason: .insufficientSpace)
