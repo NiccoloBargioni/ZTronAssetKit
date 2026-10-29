@@ -1614,6 +1614,17 @@ extension SyncEngine {
             if (job.state == .downloading) != (job.active != nil) {
                 violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
             }
+            // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
+            // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
+            if !self.state.unfollowed.contains(transfer), let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer }) {
+                violations.append("job \(transfer) holds \(asset), which the copy maps elsewhere, and is not in unfollowed")
+            }
+            if job.interests.values.contains(where: { $0.kind == .system }), !self.state.systemHeld.contains(transfer) {
+                violations.append("job \(transfer) holds a system interest and is not in systemHeld")
+            }
+            if let run = self.state.run, job.interests[run.token] != nil, !run.held.contains(transfer) {
+                violations.append("job \(transfer) holds the run's interest and is not in its held set")
+            }
             for token in job.interests.keys where job.interests[token]?.kind == .waiter {
                 if let waiter = self.state.waiters[token] {
                     // A waiter's interest is only ever in the job it names (`withdraw` touches that job only).

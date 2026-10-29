@@ -359,6 +359,7 @@ extension SyncEngine {
     /// engine announces never depends on which manifest the store diffed against (L4-R7, L4-R10).
     func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport, since serial: UInt64) {
         let unreported = self.prunesUnreported(by: report, in: manifest)
+        let previous = self.state.applied
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
@@ -383,7 +384,7 @@ extension SyncEngine {
             self.broadcast(.assetRemoved(id, .pruned))
         }
         self.broadcast(.snapshotChanged(generation: self.state.generation))
-        self.followApplied()
+        self.followApplied(from: previous)
     }
 
     /// The ids the engine's copy lists and `manifest` does not that the store's report leaves out, in the copy's order;
@@ -414,20 +415,44 @@ extension SyncEngine {
         return unreported
     }
 
-    /// Moves every job to the engine's copy of the applied manifest: a job none of whose ids still want its content is
-    /// superseded (its interests follow their entries, T22, or end, T21), one some of whose ids moved lets them go.
-    func followApplied() {
-        for transfer in self.state.jobs.keys.sorted() {
+    /// Moves every job to the engine's copy of the applied manifest, which replaced `previous`: a job none of whose ids
+    /// still want its content is superseded (its interests follow their entries, T22, or end, T21), one some of whose ids
+    /// moved lets them go. A job that follows `previous` can only have moved for an id whose transfer differs between
+    /// the two copies, and that id's job is the transfer `previous` named for it; every other job that may not follow
+    /// the copy is in `unfollowed`. So the follow visits those jobs, in transfer order, not the whole table: at SPEC §6's
+    /// 10,000, a sorted walk of every job after every apply held the actor 10 to 12 ms although nothing moved (C2;
+    /// Stage 3, S3-PERF-02). One pass over `previous` with one lookup and a key comparison per id, nothing when the
+    /// copy did not change, and a transfer formatted only for an id that moved. A job verifying or committing is not
+    /// moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next follow.
+    func followApplied(from previous: ValidatedManifest) {
+        var candidates = self.state.unfollowed
+        self.state.unfollowed = []
+        let copy = self.state.applied
+        if !self.state.jobs.isEmpty, previous.digest != copy.digest || previous.count != copy.count {
+            for entry in previous.entries {
+                if let listed = copy.entry(for: entry.identifier), SyncEngine.sameTransfer(entry, listed) {
+                    continue
+                }
+                let transfer = entry.transferID
+                if self.state.jobs[transfer] != nil {
+                    candidates.insert(transfer)
+                }
+            }
+        }
+        for transfer in candidates.sorted() {
             guard let job = self.state.jobs[transfer] else {
                 continue
             }
+            let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
             switch job.state {
             case .verifying, .committing:
+                if !moved.isEmpty {
+                    self.state.unfollowed.insert(transfer)
+                }
                 continue
             default:
                 break
             }
-            let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
             guard !moved.isEmpty else {
                 continue
             }
@@ -484,17 +509,25 @@ extension SyncEngine {
     /// Releases the system interests launch re-attachment created for transfers the run does not plan (sync.md §7.1).
     /// A re-attached transfer the run plans keeps its interest until the run's own joins it (materialisation is bounded
     /// by the pipeline, S1-15): releasing it first would retire the job, cancel the live OS task and start the same
-    /// transfer again (R-NET-3: joined once, never duplicated).
+    /// transfer again (R-NET-3: joined once, never duplicated). Only the jobs a system interest joined are visited
+    /// (`systemHeld`), in transfer order, not the whole table (C2; Stage 3, S3-PERF-02); one left with no system interest
+    /// leaves the index.
     private func releaseSystemReattachments(keeping planned: Set<TransferID>) {
-        for transfer in self.state.jobs.keys.sorted() where !planned.contains(transfer) {
+        for transfer in self.state.systemHeld.sorted() {
             guard let job = self.state.jobs[transfer] else {
+                self.state.systemHeld.remove(transfer)
                 continue
             }
-            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.kind == .system {
-                let healing = interest.assets.contains { self.state.heals[$0] != nil }
-                if !healing {
-                    self.removeInterest(token, from: transfer)
+            if !planned.contains(transfer) {
+                for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.kind == .system {
+                    let healing = interest.assets.contains { self.state.heals[$0] != nil }
+                    if !healing {
+                        self.removeInterest(token, from: transfer)
+                    }
                 }
+            }
+            if self.state.jobs[transfer]?.interests.values.contains(where: { $0.kind == .system }) != true {
+                self.state.systemHeld.remove(transfer)
             }
         }
     }
@@ -820,7 +853,9 @@ extension SyncEngine {
         for transfer in run.outstanding.keys.sorted() {
             self.removeInterest(run.token, from: transfer)
         }
-        for transfer in self.state.jobs.keys.sorted() where self.state.jobs[transfer]?.interests[run.token] != nil {
+        // The jobs the run's interest still holds outside `outstanding` (a follow routed it there): those its joins
+        // reached and it has not left, not a walk of the whole table (C2; Stage 3, S3-PERF-02).
+        for transfer in (self.state.run?.held ?? []).sorted() where self.state.jobs[transfer]?.interests[run.token] != nil {
             self.removeInterest(run.token, from: transfer)
         }
         self.state.run = nil

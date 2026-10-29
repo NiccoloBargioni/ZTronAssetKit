@@ -397,6 +397,8 @@ extension SyncEngine {
             return false
         }
         self.adoptApplied(view.appliedManifest, etag: view.stamp?.manifestETag)
+        // No follow comes with this adoption: a job that exists already is followed by the next one (`unfollowed`).
+        self.state.unfollowed.formUnion(self.state.jobs.keys)
         // REENTRANCY: RE-S28 — the lifecycle; the wanted set is computed off the actor from the view, a value (C2: one
         // pass over up to `maxEntries` entries).
         let wanted = await SyncEngine.wantedTransfers(view)

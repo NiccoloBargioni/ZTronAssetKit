@@ -92,6 +92,7 @@ extension SyncEngine {
     func addInterest(_ token: InterestToken, asset: AssetID, entry: ManifestEntry, lane: AssetPriority, kind: InterestKind) {
         let transfer = entry.transferID
         let now = self.environment.time.monotonicNow()
+        self.noteJoin(transfer, asset: asset, entry: entry, token: token, kind: kind)
         if self.state.jobs[transfer] == nil {
             self.state.lastEpoch += 1
             self.state.jobsCreated += 1
@@ -137,6 +138,41 @@ extension SyncEngine {
             self.reinstate(transfer)
         }
         self.notifyObservers()
+    }
+
+    /// Keeps the indexes a join feeds (Stage 3, S3-PERF-02): a job joined for an entry the engine's copy does not name for
+    /// `asset` may need moving at the next follow (`unfollowed`); a system interest's job is visited by a run's release
+    /// of re-attachments (`systemHeld`); the active run's interest is removed at its end (`RunState.held`). One lookup in
+    /// the copy and a comparison of the two entries' transfer keys, no transfer formatted.
+    private func noteJoin(_ transfer: TransferID, asset: AssetID, entry: ManifestEntry, token: InterestToken, kind: InterestKind) {
+        if let listed = self.state.applied.entry(for: asset), SyncEngine.sameTransfer(listed, entry) {
+            // Follows the copy.
+        } else {
+            self.state.unfollowed.insert(transfer)
+        }
+        switch kind {
+        case .system:
+            self.state.systemHeld.insert(transfer)
+        case .run:
+            if self.state.run?.token == token {
+                self.state.run?.held.insert(transfer)
+            }
+        default:
+            break
+        }
+    }
+
+    /// Whether two entries of the same id are fetched by the same transfer (`ManifestEntry.transferID`) without
+    /// formatting either: the checksum's when both have one, else the remote path when neither has.
+    static func sameTransfer(_ first: ManifestEntry, _ second: ManifestEntry) -> Bool {
+        switch (first.checksum, second.checksum) {
+        case (let one?, let other?):
+            return one == other
+        case (nil, nil):
+            return first.identifier == second.identifier && first.remotePath == second.remotePath
+        default:
+            return false
+        }
     }
 
     /// A new interest in a job that stays parked gets the answer a new job would get when it parks (the fail-fast
@@ -241,6 +277,9 @@ extension SyncEngine {
         }
         let before = job.lane
         job.interests[token] = nil
+        if self.state.run?.token == token {
+            self.state.run?.held.remove(transfer)
+        }
         if job.interests.isEmpty {
             job.heldLane = before
         }
@@ -315,6 +354,9 @@ extension SyncEngine {
         self.state.failedJobs.remove(transfer)
         self.state.edgeOwed.remove(transfer)
         self.state.originOwed.remove(transfer)
+        self.state.unfollowed.remove(transfer)
+        self.state.systemHeld.remove(transfer)
+        self.state.run?.held.remove(transfer)
         self.state.spaceAdmitted[transfer] = nil
         if let adopt = job.adopt {
             // A drained copy nobody will publish now.

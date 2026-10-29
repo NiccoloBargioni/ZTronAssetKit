@@ -41,6 +41,16 @@ struct EngineState {
 
     /// One job per transfer (ADR-020).
     var jobs: [TransferID: Job] = [:]
+    /// The jobs that may hold an id the engine's copy maps to another transfer, or does not list: one joined for an
+    /// entry the copy did not name then (`addInterest`), one a follow skipped while it verified or committed, and every
+    /// job when the copy changed without a follow (launch). Every other job follows the copy, so a follow visits these
+    /// and the jobs of the ids the copy's change moved, not the whole table (`followApplied(from:)`; C2, Stage 3,
+    /// S3-PERF-02). A stale member is harmless: the follow finds nothing to move.
+    var unfollowed: Set<TransferID> = []
+    /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
+    /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
+    /// by that visit; `removeJob` drops it.
+    var systemHeld: Set<TransferID> = []
     /// Attempts the engine cancelled whose driver still drains the stream to its terminal element.
     var draining: [TransferID: DrainingAttempt] = [:]
     /// Transfers whose interests wait for the engine's manifest copy to catch up with the store: the store superseded a
@@ -694,6 +704,10 @@ struct RunState {
     var cursor = 0
     /// Materialised jobs it holds an interest in, with the assets it wants from each.
     var outstanding: [TransferID: Set<AssetID>] = [:]
+    /// Every job its interest was added to and has not left (`addInterest`, `removeInterest`, `removeJob`): the run's
+    /// end removes its interest from these, not from a walk of the whole table (C2, Stage 3, S3-PERF-02). A follow can
+    /// route the run's interest to a job outside `outstanding`.
+    var held: Set<TransferID> = []
     /// What it planned.
     var planned = PlanTotals()
     /// What `apply` did.
