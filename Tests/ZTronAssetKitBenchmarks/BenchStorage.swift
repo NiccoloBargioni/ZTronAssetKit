@@ -283,6 +283,48 @@ extension ZTronAssetKitBenchmarks {
             #expect(ratio <= ratioMax, "reclaim of a doubled set: \(ratio)×")
         }
 
+        /// Stage 3 S3-B-016 (L4-R24(6)): `gainReferenceInPlace` writes one blob-table entry through
+        /// `self.state.core.blobTable[key] = …`; debug and TSan builds were seen to copy the whole table there. This pins
+        /// the release build: 1,000 gains in one actor turn at `maxEntries` (100,000 live blobs) stay far inside the C2
+        /// rule's 10 ms, where a copy per gain (about a millisecond each at this size) would take seconds. The 10,000-blob
+        /// figure is printed beside it.
+        @Test("C2: a reference gained in place never copies the blob table, 1,000 gains at 100,000 blobs inside 10 ms", .timeLimit(.minutes(1)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func gainReferenceInPlace() async throws {
+            let budget = 10.0
+            var best: [Int: Double] = [:]
+            for count in [10_000, 100_000] {
+                let time = ManualTimeSource()
+                let environment = AssetEnvironment(
+                    fileSystem: FakeFileSystem(time: time),
+                    metadataExecutor: InlineBlockingExecutor(),
+                    bulkExecutor: InlineBlockingExecutor(),
+                    time: time,
+                    random: SeededRandom(seed: 9),
+                    conditions: FakeDeviceConditionsSource(),
+                    remoteSources: FakeRemoteSourceFactory(source: FakeRemoteSource()),
+                    appVersion: FakeAppVersionSource(),
+                    legacyDefaults: FakeLegacyDefaults()
+                )
+                let store = AssetStore(
+                    configuration: StoreConfiguration(legacy: LegacyMigrationPolicy(enabled: false)),
+                    environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink())
+                )
+                let keys = (0..<count).map { BlobKey(hash: ContentHash.sha256(of: Data("gain-\($0)".utf8)), ext: AssetFileExtension("png")!) }
+                await store.benchSeedLiveBlobs(keys)
+                var runs: [Double] = []
+                for run in 0..<5 {
+                    let (milliseconds, gained) = await store.benchGainReferences(keys, stride: 97, offset: run, count: 1_000)
+                    #expect(gained == 1_000)
+                    runs.append(milliseconds)
+                }
+                best[count] = runs.min()
+            }
+            let atMax = try #require(best[100_000])
+            print("C2 1,000 in-place reference gains in one turn: \(best.sorted { $0.key < $1.key }.map { "\($0.key) blobs \($0.value) ms" }) (best of 5; budget \(budget) ms)")
+            #expect(atMax <= budget, "1,000 gains at 100,000 blobs took \(atMax) ms")
+        }
+
         @Test("C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch", .timeLimit(.minutes(1)))
         @available(macOS 15.0, iOS 18.0, *)
         func actorStretches() async throws {
@@ -836,5 +878,29 @@ struct ClockedUnlinkFileSystem: FileSystem {
 
     func releaseLock(_ token: FileLockToken) {
         self.base.releaseLock(token)
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension AssetStore {
+    /// Benchmark seam (S3-B-016): a blob table of `keys`, each live with one reference, as `open()` leaves it.
+    func benchSeedLiveBlobs(_ keys: [BlobKey]) {
+        var table: [BlobKey: BlobState] = [:]
+        table.reserveCapacity(keys.count)
+        for key in keys {
+            table[key] = .live(references: 1)
+        }
+        self.state.core.blobTable = table
+    }
+
+    /// Benchmark seam (S3-B-016): `count` in-place reference gains in one actor turn, every `stride`-th key from
+    /// `offset`; returns the turn's duration in milliseconds and how many gains succeeded.
+    func benchGainReferences(_ keys: [BlobKey], stride: Int, offset: Int, count: Int) -> (Double, Int) {
+        let started = ContinuousClock.now
+        var gained = 0
+        for index in 0..<count where self.gainReferenceInPlace(keys[(offset + index * stride) % keys.count]) {
+            gained += 1
+        }
+        return (StorageBench.milliseconds(ContinuousClock.now - started), gained)
     }
 }
