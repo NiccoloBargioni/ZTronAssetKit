@@ -1796,7 +1796,9 @@ extension SyncEngine {
         if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
             violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
         }
-        for token in self.state.releasing.keys where self.state.groups[token] != nil {
+        // A registered group's token is in `releasing` with claims only after a join's large give-up (L5-R15): that is
+        // the follow-up's work, not a release of a registered group, which holds members (L5-R22(4); Stage 3, S3-B-082).
+        for (token, release) in self.state.releasing where self.state.groups[token] != nil && !release.members.isEmpty {
             violations.append("group \(token.rawValue) is released and registered")
         }
         // A job set aside waits in no queue: it must be one only released groups want.
