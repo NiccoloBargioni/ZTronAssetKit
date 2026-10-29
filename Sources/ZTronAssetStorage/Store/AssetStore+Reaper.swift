@@ -158,6 +158,7 @@ extension AssetStore {
         // A cursor over the sorted keys: the keys a time-bounded unit did not attempt stay in place and lead the next
         // batch, so the run is linear in the keys (S3-PERF-04).
         var queue = ReapQueue(self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted())
+        var statistics = ReapStatistics(keys: queue.count)
         let batchSize = max(1, self.configuration.deletionBatchSize)
         let fileSystem = self.environment.fileSystem
         let time = self.environment.time
@@ -204,9 +205,15 @@ extension AssetStore {
                 self.resumeKeyWaiters(key)
             }
             queue.consume(attempted: outcome.attempted)
+            statistics.units += 1
+            statistics.carried += batch.count - outcome.attempted
             budget -= outcome.attempted
             // The processed keys leave DOOMED with the next commit (a lazy mutation).
             self.markDirtyInternal(.lazy)
+        }
+        if statistics.keys > 0 {
+            statistics.reads = queue.reads
+            self.state.core.lastReap = statistics
         }
         for key in self.state.core.blobTable.keys where self.deletionBlocker(key) == .lease {
             result.bytesDeferred += self.state.core.blobBytes[key] ?? 0

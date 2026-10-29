@@ -25,6 +25,11 @@ struct ReapQueue {
         self.keys = keys
     }
 
+    /// How many keys the queue lists.
+    var count: Int {
+        self.keys.count
+    }
+
     /// Whether every key was consumed.
     var isEmpty: Bool {
         self.cursor >= self.keys.count
@@ -60,4 +65,20 @@ struct ReapQueue {
         }
         self.positions.removeAll(keepingCapacity: true)
     }
+}
+
+/// What one `reap` run's work list did, counted (Stage 3 S3B-5, S3-PERF-04): the figures a deterministic test asserts so
+/// that the reaper's handling of the keys a time-bounded unit did not attempt stays linear in the doomed set. Before the
+/// cursor, each such key was put back at the front of the remaining list, one shift of the whole list per key.
+struct ReapStatistics: Sendable, Hashable {
+    /// The keys the run listed as deletable when it began.
+    var keys = 0
+    /// The deletion units it ran.
+    var units = 0
+    /// How many times it read a key for a batch (`ReapQueue.reads`): every key's first read, plus one read again for
+    /// each time a unit left it unattempted.
+    var reads = 0
+    /// The keys its units did not attempt, summed over the units: each leads the next batch where it stands in the
+    /// list, read again and never moved.
+    var carried = 0
 }

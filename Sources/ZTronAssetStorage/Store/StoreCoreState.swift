@@ -182,6 +182,9 @@ struct StoreCoreState: Sendable {
     /// bytes were taken back. If the publication binds nothing and the key is doomed again afresh, they count again;
     /// otherwise the entry is dropped with the provisional reference. Each key here is live.
     var provisionallyRescued: [BlobKey: Int64] = [:]
+    /// The work list of the last `reap` run that listed a key (diagnostics, in memory only): a test pins the reaper's
+    /// linearity with it, structurally (Stage 3 S3B-5).
+    var lastReap: ReapStatistics?
 }
 
 /// The gate that lets one `apply` or `admit` run at a time, and the commit fence of `apply`'s writes.
