@@ -160,8 +160,10 @@ struct EvictionOverlapTests {
         /// new content is gone from the server): the record becomes `failed`, its old blob doomed `unreferenced`. A record
         /// present at the failed content is left unchanged (L4-R16), so the case uses the stale one.
         case failure
-        /// `recordIntegrityFailure(_:identity:)` up to `maxIntegrityAttempts` (three): the record serves its bytes during
-        /// the backoff, then becomes `failed(.integrity)`, its blob doomed `unreferenced`.
+        /// `recordIntegrityFailure(_:identity:)` up to `maxIntegrityAttempts` (three) for a stale record (the entry's
+        /// content changed, and the new content keeps failing verification): the record serves its old bytes during the
+        /// backoff, then becomes `failed(.integrity)`, its old blob doomed `unreferenced`. A record present at the failed
+        /// content is left unchanged (Stage 3 ruling S3C-9, as L4-R16 for `failure`), so the case uses the stale one.
         case integrityFailures
 
         var testDescription: String {
@@ -184,10 +186,11 @@ struct EvictionOverlapTests {
         let bulk = SteppedBlockingExecutor(holding: false)
         let harness = try await EvictionOverlapTests.harness(bulk: bulk)
         let last = EvictionOverlapTests.assets[9]
-        // For a recorded failure, o9's entry changes first (o9 keeps serving its old bytes, stale): a failure for content
-        // the record is present at changes nothing (L4-R16); the old blob's 100 bytes still count as used.
+        // For a recorded failure, and for integrity failures, o9's entry changes first (o9 keeps serving its old bytes,
+        // stale): a failure for content the record is present at changes nothing (L4-R16, S3C-9); the old blob's 100 bytes
+        // still count as used.
         let changed = CleanupFixture.asset("o9", seed: 1_399, count: 100)
-        if release == .failure {
+        if release != .quarantine {
             let entries = EvictionOverlapTests.assets.dropLast().map(\.entry) + [changed.entry]
             _ = try await harness.store.apply(CoreFixture.manifest(entries), etag: nil, eviction: nil)
             #expect(await harness.record(last.id)?.isStale == true, "setup: o9 is stale")
@@ -208,7 +211,7 @@ struct EvictionOverlapTests {
                 try await harness.store.recordFailure([last.id], identity: changed.entry.contentIdentity, reason: .notFound)
             case .integrityFailures:
                 for _ in 0..<harness.configuration.policy.maxIntegrityAttempts {
-                    try await harness.store.recordIntegrityFailure([last.id], identity: last.entry.contentIdentity)
+                    try await harness.store.recordIntegrityFailure([last.id], identity: changed.entry.contentIdentity)
                 }
             }
         }

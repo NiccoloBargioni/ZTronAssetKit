@@ -157,11 +157,12 @@ struct IntegrityTests {
         let mutations = harness.fileSystem.mutationCount
         try await harness.store.recordIntegrityFailure([present.id], identity: present.entry.contentIdentity)
         let after = await harness.record(present.id)
+        let written = harness.fileSystem.mutationCount - mutations
         let presentBlob = await harness.state.core.blobTable[present.key]
         try await harness.store.recordIntegrityFailure([new.id], identity: new.entry.contentIdentity)
 
         #expect(after == before, "a record present at the failed content is left unchanged: \(String(describing: after?.residency))")
-        #expect(harness.fileSystem.mutationCount == mutations, "nothing is written for it")
+        #expect(written == 0, "nothing is written for it: \(written) mutations")
         var live = false
         if case .live? = presentBlob {
             live = true
