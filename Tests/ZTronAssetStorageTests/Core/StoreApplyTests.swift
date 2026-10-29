@@ -190,6 +190,56 @@ struct StoreApplyTests {
         #expect(await CoreInvariants.violations(of: harness).isEmpty)
     }
 
+    /// Stage 3 S3B-9, close-out cycle 2: a record the applied manifest does not list (detached, as a legacy migration
+    /// can leave one) is replaced when a manifest adds its id, and its blob is released like a pruned record's: the
+    /// bytes count toward an overlapping eviction's need when they leave `usedBytes`, and not at all when the same
+    /// `apply` adopts them back for the new record.
+    @Test("R-CLN-4: an apply that replaces a detached record counts its released bytes toward an overlapping eviction's need unless it adopts them back", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func detachedRecordReplacementCounts() async throws {
+        let harness = CoreHarness.make()
+        let bytes = CoreFixture.bytes(175, count: 90)
+        let size = Int64(bytes.count)
+        let key = CoreFixture.key(bytes)
+        let a = CoreFixture.entry("a", bytes)
+        let b = CoreFixture.entry("b", CoreFixture.bytes(176))
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([a, b]), etag: nil, eviction: nil)
+        try await harness.publish(bytes, [a])
+        await harness.store.close()
+        // Detach `a`: the committed index's applied manifest no longer lists it; its record and blob stay.
+        var disk = harness.fileSystem.survivingDisk()
+        let binPath = harness.layout.indexURL(.current).path
+        var content = try IndexCodec.decode(try #require(disk.files[binPath])).get()
+        content.appliedManifest = CoreFixture.manifest([b])
+        let encoded = [UInt8](try #require(IndexCodec.encode(content)))
+        disk.files[binPath] = encoded
+        disk.durableFiles[binPath] = encoded
+        let other = CoreFixture.entry("a", CoreFixture.bytes(177, count: 90))
+        for (label, listed, counted) in [("new bytes", other, size), ("the same bytes", a, Int64(0))] {
+            let reopened = CoreHarness.make(disk: disk)
+            _ = try await reopened.store.open()
+            #expect(await reopened.state.core.records[a.identifier]?.referencedBlob == key, "\(label): the detached record holds its blob")
+            let start = await reopened.state.eviction.releasedBytes
+            let report = try await reopened.store.apply(CoreFixture.manifest([listed, b]), etag: nil, eviction: nil)
+            #expect(report.added == [a.identifier], "\(label)")
+            #expect(await reopened.state.eviction.releasedBytes - start == counted, "\(label): the released bytes count only if they stay released")
+            if counted > 0 {
+                #expect(await reopened.state.core.countedReleases == [key: size], "\(label)")
+                guard case .doomed? = await reopened.state.core.blobTable[key] else {
+                    Issue.record("\(label): the replaced record's blob is doomed")
+                    continue
+                }
+            } else {
+                #expect(report.reused == [a.identifier], "\(label): the new record adopts the blob back")
+                #expect(await reopened.state.core.blobTable[key] == .live(references: 1), "\(label)")
+                #expect(await reopened.state.core.countedReleases.isEmpty, "\(label)")
+            }
+            #expect(await CoreInvariants.violations(of: reopened).isEmpty, "\(label)")
+            await reopened.store.close()
+        }
+    }
+
     /// Stage 3 S3B-9, close-out cycle 2: the count of an `apply`'s release lasts exactly as long as its bytes stay
     /// released, whoever rescues them. A publication that dedupes onto the doomed blob takes the count back with its
     /// provisional reference, counts it again when it binds nothing (the key is doomed afresh), and drops it when it
