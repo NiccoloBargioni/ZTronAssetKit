@@ -240,6 +240,15 @@ struct CoreHarness {
     var mutations: [FSOpRecord] {
         self.fileSystem.operations.filter { $0.kind.isMutation }
     }
+
+    /// Drives the deletion protocol to its end (§4.4): the install that drops the doomed keys (acknowledged), the
+    /// awake-clock grace, then the fresh install and the reap of `runDueWork()`. (WP-C's harness has its own
+    /// `settleDeletions()`; this one keeps WP-B's tests on WP-B's helpers.)
+    func reapAfterGrace() async {
+        _ = await self.store.runDueWork()
+        self.time.advance(by: self.configuration.policy.deletionGrace)
+        _ = await self.store.runDueWork()
+    }
 }
 
 /// Checks I-1, I-2 and I-4 over a reopened store and its disk (store.md §9.1 `InvariantChecker`); the crash tests add

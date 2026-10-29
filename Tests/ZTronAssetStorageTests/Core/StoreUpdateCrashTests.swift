@@ -106,14 +106,6 @@ enum CatalogUpdateRun {
         return harness.fileSystem.survivingDisk()
     }
 
-    /// Drives the deletion protocol to its end: the install that drops the doomed keys (acknowledged), the awake-clock
-    /// grace, then the fresh install and the reap of `runDueWork()` (§4.4).
-    static func settle(_ harness: CoreHarness) async {
-        _ = await harness.store.runDueWork()
-        harness.time.advance(by: harness.configuration.policy.deletionGrace)
-        _ = await harness.store.runDueWork()
-    }
-
     /// What the run achieved before it stopped.
     struct Trace {
         /// a's new bytes were published (the call returned).
@@ -144,7 +136,7 @@ enum CatalogUpdateRun {
                 }
             }
             trace.graceStart = harness.fileSystem.mutationCount
-            await CatalogUpdateRun.settle(harness)
+            await harness.reapAfterGrace()
             try await harness.store.flush(.durable)
             trace.newACommitted = trace.newAReturned
             trace.generation = await harness.state.core.committedGeneration
@@ -170,7 +162,7 @@ enum CatalogUpdateRun {
             let violations = await CoreInvariants.violations(of: harness)
             #expect(violations.isEmpty, "\(label): \(violations)")
             // I-3 and I-2 across the relaunch: its reaper unlinks only what no record references.
-            await CatalogUpdateRun.settle(harness)
+            await harness.reapAfterGrace()
             let afterReap = await CoreInvariants.violations(of: harness)
             #expect(afterReap.isEmpty, "\(label) after the relaunch's reap: \(afterReap)")
             _ = try await harness.store.apply(CoreFixture.manifest(entries, etagSeed: "v2"), etag: nil, eviction: nil)
@@ -181,7 +173,7 @@ enum CatalogUpdateRun {
                 try await harness.publish(bytes, [entry], sequence: 40)
                 downloaded.insert(entry.identifier)
             }
-            await CatalogUpdateRun.settle(harness)
+            await harness.reapAfterGrace()
             try await harness.store.flush(.durable)
             for entry in entries {
                 let location = await harness.store.location(for: entry.identifier, extensions: [], recordingAccess: false)
