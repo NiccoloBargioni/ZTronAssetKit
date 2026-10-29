@@ -429,13 +429,17 @@ extension ZTronAssetKitBenchmarks {
 
         /// The total cost of a chain of half-open probes that each end without a verdict (close-out cycle 21, F-41; the
         /// cycle-20 requirements verifier's ProbeC20RChain): 5xx answers open the breaker under a prefetch group, the open
-        /// breaker parks every queued member, every member then answers 404, and the clock reaches the cooldown's end. Each
+        /// breaker parks every queued member, every member then answers 400, and the clock reaches the cooldown's end. Each
         /// member probes in turn. Until Stage 3 each exit re-admitted every member the breaker still parked while the pump
         /// parked all but the next probe again (F-40), so the chain's total actor work grew with the square of the parked
         /// members (1,000: 2.6 to 7.5 s; 10,000: about 161 s); since S3-B-063 (L4-R22) an exit re-admits only the first
         /// parked member in the pump's order (`readmitForProbe`), so the chain runs at SPEC §6's 10,000. The best of three
         /// runs' longest actor wait against C2, the median against P-9, after a warm-up of 1,000. The totals are reported,
-        /// not checked against a budget: none exists.
+        /// not checked against a budget: none exists. The exits are 400s, not 404s (Stage 3 close-out cycle 4): a 404 has
+        /// the store record the failure and commit its whole index before the engine goes on (ADR-032), about 5 ms at
+        /// 10,000 records on the store's actor, so the 10,000 exits of a chain took 60 to 95 s, over this test's limit on
+        /// a quiet host, measuring that commit rather than the re-admission; a 400 also ends a probe without a verdict
+        /// (`breakerOutcome`: neutral) and re-admits exactly as a 404 does.
         @Test("R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func probeChainTurns() async throws {
@@ -1008,9 +1012,10 @@ enum SyncBench {
     }
 
     /// The heartbeat's longest wait, and the chain's total time in seconds, while the clock reaches the cooldown's end of a
-    /// breaker that parked a prefetch group of `count` on-demand members on a roomy volume, every member answering 404 from
+    /// breaker that parked a prefetch group of `count` on-demand members on a roomy volume, every member answering 400 from
     /// then on: the running members answer 500 until the 5xx breaker opens, as in `cooldownEndWait`, then every member is
-    /// scripted to answer 404, and the clock jumps to the cooldown's end, until no member is parked, queued, downloading or
+    /// scripted to answer 400 (a probe exit without a verdict that writes nothing to the store), and the clock jumps to
+    /// the cooldown's end, until no member is parked, queued, downloading or
     /// owed a re-queue (each probed once and failed, or waits for a retry deadline the clock has not reached).
     @available(macOS 15.0, iOS 18.0, *)
     static func probeChainWait(members count: Int) async throws -> (wait: Double, total: Double) {
@@ -1019,6 +1024,11 @@ enum SyncBench {
         guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the prefetch group was refused")
         }
+        // Each wait below is driven by the engine's own notifications with an O(1) condition, then confirmed once by the
+        // O(n) check: polling the O(n) check on the actor in a loop ran it between the chain's turns at default priority
+        // against the engine's utility-priority tasks, where it took actor time from the chain and sat in the heartbeat's
+        // measured waits.
+        await engine.awaitCondition { $0.state.jobs.count == count }
         while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
             await Task.yield()
         }
@@ -1040,6 +1050,7 @@ enum SyncBench {
                 await Task.yield()
             }
         }
+        await engine.awaitCondition { SyncBench.originQuiet($0) }
         while !Task.isCancelled, !(await SyncBench.originSettled(engine, probing: false)) {
             await Task.yield()
         }
@@ -1047,7 +1058,7 @@ enum SyncBench {
             throw SyncBenchError.incomplete("the breaker closed before its cooldown ended")
         }
         for entry in bench.entries {
-            await bench.source.script(entry.transferID, [.fail(.permanentMissing(httpStatus: 404))])
+            await bench.source.script(entry.transferID, [.fail(.rejected(.unexpectedStatus(400)))])
         }
         let clock = ContinuousClock()
         var total = Duration.zero
@@ -1058,6 +1069,7 @@ enum SyncBench {
             while bench.time.monotonicNow() < until {
                 bench.time.advance(by: 1e-9)
             }
+            await engine.awaitCondition { $0.state.circuitParked.isEmpty && SyncBench.originQuiet($0) }
             while !Task.isCancelled, !(await SyncBench.chainEnded(engine)) {
                 await Task.yield()
             }
@@ -1065,6 +1077,14 @@ enum SyncBench {
         }
         await engine.shutdown()
         return (wait, Double(total.components.seconds) + Double(total.components.attoseconds) / 1e18)
+    }
+
+    /// Whether no transfer is in flight and no re-queue, park, sweep or pump is owed to a later turn: O(1), so a wait on
+    /// it, re-evaluated after every mutation of the engine, adds nothing measurable to a turn. A wait on it precedes the
+    /// O(n) `originSettled(_:probing: false)`, which then confirms that no job is left queued.
+    static func originQuiet(_ engine: isolated SyncEngine) -> Bool {
+        engine.state.inFlight.isEmpty && engine.state.originOwed.isEmpty && !engine.state.readmissionFollowUpScheduled
+            && !engine.state.pumpFollowUpScheduled
     }
 
     /// Whether a chain of probes ended: no job parked by the breaker, queued, downloading or owed a re-queue, and no
