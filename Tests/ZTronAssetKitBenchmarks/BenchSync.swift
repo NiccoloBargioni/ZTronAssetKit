@@ -251,6 +251,27 @@ extension ZTronAssetKitBenchmarks {
             #expect((groupOnly.min() ?? .infinity) <= Self.c2Budget, "group only: \(groupOnly)")
         }
 
+        /// C2 at SPEC §6's reference scale when a sync applies a manifest (one entry added) while a 10,000-member
+        /// prefetch group waits in the queue (Stage 3, S3-PERF-02): `followApplied` sorted and walked the whole job table
+        /// after every apply, and the run's release of launch re-attachments and its end each walked it again, sorted
+        /// (17 to 19 ms). Production's dispatch executors. Medians of three against P-9, the best of the three against
+        /// C2, after a warm-up.
+        @Test("R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func refreshUnderGroupTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.refreshWait(members: 1_000)
+            var runs: [Double] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.refreshWait(members: 10_000))
+            }
+            let median = runs.sorted()[1]
+            print("R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+            #expect(median <= gapMax)
+            #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(runs)")
+        }
+
         /// C2 at SPEC §6's reference scale for a handle registered at user-initiated priority (`AssetClient.prefetch`
         /// accepts it; review of close-out cycle 9, PROBE-C9C-2): its four members run (every slot) and the others wait in
         /// the user queue. The release leaves the members it has not reached yet queued and only the released group
@@ -1535,6 +1556,32 @@ extension SyncBench {
                 throw SyncBenchError.incomplete("a waiting resolve was not answered shutDown")
             }
         }
+        return wait
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// The heartbeat's longest wait while a forced sync applies a manifest with one more entry under a `count`-member
+    /// prefetch group (three run, the others wait in the queue).
+    static func refreshWait(members count: Int) async throws -> Double {
+        let bench = try await SyncBench.dispatchBench(members: count)
+        let engine = bench.engine
+        guard case .success = await engine.registerGroup(bench.entries.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.noneParked(engine, count: count)) {
+            await Task.yield()
+        }
+        await engine.waitForAllHandles()
+        let extra = SyncBench.entry("extra", GeneratedPayload.bytes(seed: 0xE1, offset: 0, length: 400), policy: .onDemand)
+        await bench.source.scriptManifest([.fetched(SyncBench.manifestData(bench.entries + [extra]), etag: ETag(rawValue: "\"v2\""))])
+        let wait = try await SyncBench.longestWait(on: engine) {
+            guard await engine.sync(.force).isComplete else {
+                throw SyncBenchError.incomplete("the refresh did not complete")
+            }
+        }
+        await engine.shutdown()
         return wait
     }
 }
