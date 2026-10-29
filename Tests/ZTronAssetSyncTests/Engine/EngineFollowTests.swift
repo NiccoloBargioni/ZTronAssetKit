@@ -592,3 +592,125 @@ extension EngineSyncTests {
         try fileSystem.write(Data(repeating: 2, count: Int(excess)), to: EngineHarness.base.appendingPathComponent("ballast-2"), mode: .truncate)
     }
 }
+
+extension EngineSyncTests {
+    /// One space sweep turn follows at most `followsPerTurn` of the jobs it re-queues or parks during an owed follow, and
+    /// leaves the rest to its follow-up sweep (C2). A follow visit (supersede, re-route each interest, create the new
+    /// content's job) costs about ten times a re-queue or a park; counted as one of those, one `.reclaimed` sweep turn
+    /// followed up to `readmissionsPerTurn + parksPerPump` jobs, which held the actor 9.3 to 13 ms at 10,000 members (the
+    /// close-out cycle-4 correctness lens, PROBE-C4-SWEEP2-C2). Setup: 1,000 prefetch members alternating 400 and 3,000
+    /// bytes wait `awaitingSpace` for a pruned 2,000-byte blob with 200 bytes of room; a forced sync changes every
+    /// member's content and its follow's follow-ups are held after the first turn's `followsPerTurn` visits, so 744 jobs
+    /// still hold a moved id; the space sweep's follow-ups are held too. The deletion grace ends: the alarm reaps the
+    /// blob and its `.reclaimed` sweep re-queues the 400-byte members and parks the 3,000-byte ones, following each first.
+    /// That one turn follows exactly `followsPerTurn` jobs of both sizes; once the holds end, every member's interest is
+    /// on its new content and no replaced content was requested.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(1)))
+    func spaceSweepFollowsAtMostOneTurnOfJobs() async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = EngineFixture.entry("x", xBytes)
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        let count = 1_000
+        let large = 3_000
+        let members = { (version: Int) in
+            (0..<count).map { index in
+                EngineHarness.onDemand(String(format: "m%05d", index), Self.sweptPayload(index: index, version: version, size: index % 2 == 0 ? 400 : large))
+            }
+        }
+        let old = members(1)
+        // v2 prunes x: its 2,000 bytes wait for the 60 s grace.
+        await harness.serveManifest(old, etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        try await harness.store.flush(.ordered)
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(200, harness: harness, fileSystem: fileSystem)
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for the reclaim")
+        await engine.refreshFreeSpace()
+        let group = try await engine.registerGroup(old.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { engine in
+            engine.state.jobs.count == count && engine.state.jobs.values.allSatisfy { $0.state == .blocked(.awaitingSpace) }
+        }
+        let new = members(2)
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest(new, etag: "v3")
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        await engine.readForTests { $0.holdSpaceSweepFollowUps() }
+        let largeIDs = Set(old.filter { $0.byteSize == Int64(large) }.map(\.identifier))
+        let before = await engine.readForTests { Self.jobsHoldingMovedIDs($0, large: largeIDs) }
+        #expect(before.small + before.large == count - SyncEngine.followsPerTurn, "setup: the follow's first turn visited followsPerTurn jobs: \(before)")
+        // The grace ends: the alarm's due store work reaps x's 2,000 bytes, then its `.reclaimed` sweep runs; the turn
+        // ends with a follow-up sweep owed (held) or, unbounded, with no member left waiting.
+        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+            await engine.awaitCondition { engine in
+                engine.state.spaceSweepFollowUpWaiting || !engine.state.jobs.values.contains { $0.state == .blocked(.awaitingSpace) }
+            }
+        }
+        let after = await engine.readForTests { engine in
+            (
+                owed: Self.jobsHoldingMovedIDs(engine, large: largeIDs),
+                pending: engine.state.freeSpace?.pendingReclaim,
+                followUpHeld: engine.state.spaceSweepFollowUpWaiting
+            )
+        }
+        let followed = (small: before.small - after.owed.small, large: before.large - after.owed.large)
+        #expect(after.pending == 0, "setup: the sweep read the volume after the reclaim: \(String(describing: after.pending))")
+        #expect(followed.small + followed.large == SyncEngine.followsPerTurn, "one sweep turn followed \(followed.small + followed.large) jobs (\(followed.small) re-queued, \(followed.large) parked), at most followsPerTurn = \(SyncEngine.followsPerTurn)")
+        #expect(followed.small > 0 && followed.large > 0, "the turn followed jobs it re-queued and jobs it parked: \(followed)")
+        #expect(after.followUpHeld, "the jobs left over wait for the sweep's follow-up turn")
+        await engine.readForTests { $0.releaseSpaceSweepFollowUps() }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        let settled = await engine.readForTests { engine in
+            (
+                owed: engine.followOwed,
+                moved: new.filter { engine.state.jobs[$0.transferID]?.assets.contains($0.identifier) != true }.count,
+                violations: engine.invariantViolations()
+            )
+        }
+        #expect(!settled.owed, "the follow ended")
+        #expect(settled.moved == 0, "every member's interest is on its new content's job: \(settled.moved) are not")
+        #expect(settled.violations.isEmpty, "\(settled.violations.prefix(3))")
+        let replaced = Set(old.map(\.transferID))
+        #expect(!(await harness.source.starts.map(\.id)).contains { replaced.contains($0) }, "no replaced content was requested")
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
+
+    /// Distinct `size` bytes for member `index` at manifest `version`: a short distinct prefix and one repeated byte (a
+    /// generated payload per member took most of a sanitizer run, S3-R4).
+    static func sweptPayload(index: Int, version: Int, size: Int) -> Data {
+        let prefix = Data("m\(index)-v\(version)-".utf8)
+        return prefix + Data(repeating: 0x2E, count: size - prefix.count)
+    }
+
+    /// The jobs that hold an id the engine's copy lists at another transfer while a follow is owed
+    /// (`SyncEngine.holdsMovedID`), split by whether that id is one of `large`.
+    static func jobsHoldingMovedIDs(_ engine: isolated SyncEngine, large: Set<AssetID>) -> (small: Int, large: Int) {
+        var small = 0
+        var big = 0
+        for job in engine.state.jobs.values where engine.holdsMovedID(job) {
+            if job.assets.contains(where: { large.contains($0) }) {
+                big += 1
+            } else {
+                small += 1
+            }
+        }
+        return (small, big)
+    }
+}
