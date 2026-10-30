@@ -418,12 +418,35 @@ extension SyncEngine {
     /// a group released before the engine runs leaves claims to drop (L5-R1), and a release left for later would stay
     /// for good.
     private func releaseFollowUp() {
+        if self.state.releaseFollowUpsHeld {
+            // Test seam: the remaining members keep their interests and the turn stays scheduled until it is resumed.
+            self.state.releaseFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
         self.state.releaseFollowUpScheduled = false
         guard !self.isShuttingDown, self.continueReleases() else {
             return
         }
         self.pump()
         self.reconcileIdle()
+    }
+
+    /// Test seam: the next release follow-up keeps the members it has not reached until `resumeReleaseFollowUps()`, so a
+    /// test reads the engine while a release is part-way across other turns (a follow's, a drain's), which no
+    /// production path can order (Stage 3 close-out cycle 10: the drain's `.reinstate` replay).
+    func holdReleaseFollowUps() {
+        self.state.releaseFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held release follow-up run in this turn, or disarms a hold nothing reached.
+    func resumeReleaseFollowUps() {
+        self.state.releaseFollowUpsHeld = false
+        guard self.state.releaseFollowUpWaiting else {
+            return
+        }
+        self.state.releaseFollowUpWaiting = false
+        self.releaseFollowUp()
     }
 
     // MARK: Pending claims (L5-R1, CCR-G2)

@@ -400,6 +400,11 @@ struct EngineState {
     var releasing: [InterestToken: Release] = [:]
     /// A later turn is scheduled to continue `releasing`.
     var releaseFollowUpScheduled = false
+    /// Test seam: while set, the scheduled release follow-up stays scheduled instead of running (`holdReleaseFollowUps()`,
+    /// `resumeReleaseFollowUps()`). No production path sets it.
+    var releaseFollowUpsHeld = false
+    /// Test seam: a release follow-up reached the hold and waits for its resumption.
+    var releaseFollowUpWaiting = false
 
     // MARK: Events (R-SYN-12)
 

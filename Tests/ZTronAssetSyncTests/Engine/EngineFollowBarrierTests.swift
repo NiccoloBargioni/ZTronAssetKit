@@ -730,6 +730,70 @@ struct EngineFollowBarrierTests {
         _ = await EngineHarness.value(of: sync)
     }
 
+    /// A released member that user work wants while a follow is owed returns to the place it waited when the follow ends
+    /// (the drain's `.reinstate` replay; the cycle-9 verifiers' coverage finding, mutant "skip the replay"). More
+    /// prefetch members than one release turn releases are queued; the handle is released with its follow-ups held
+    /// (`holdReleaseFollowUps`), so the release stays part-way, and its pump sets the members it has not reached aside.
+    /// Then the follow is owed, and the last member gains a user-lane interest. Visited first, `reinstate` queues it at
+    /// its place in the queue its lane now selects (L4-R24(4), S3-B-065) and the pump starts it in that turn. Behind the
+    /// barrier that place waits for the follow; a drain that skipped it left the member aside, queued in no queue, until
+    /// the release's last turn.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierReinstatesAReleasedMemberWantedAgain(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 963_602)
+        let engine = s.engine
+        let members = (0..<(SyncEngine.releasesPerTurn + 64)).map {
+            EngineHarness.onDemand(String(format: "m%04d", $0), EngineFixture.bytes(963_700 + UInt64($0), count: 16))
+        }
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(764_000) + members, etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        for member in members {
+            await s.harness.source.script(member.transferID, [.hold, .hold])
+        }
+        let token = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { current in members.allSatisfy { current.state.jobs[$0.transferID] != nil } && !current.state.inFlight.isEmpty }
+        await engine.waitForAllHandles()
+        let last = try #require(members.last)
+        let released = await engine.readForTests { engine in
+            engine.holdReleaseFollowUps()
+            engine.performReleaseGroup(token)
+            let aside = engine.state.queues.asideEntries.contains { $0.transfer == last.transferID && engine.isValid($0) }
+            return (aside: aside, releasing: !engine.state.releasing.isEmpty)
+        }
+        #expect(released.aside && released.releasing, "setup: the release is part-way and its pump set the member aside: \(released)")
+        await engine.awaitCondition { $0.state.draining.isEmpty }
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(864_000) + members, s, visit: visit)
+        let turn = await engine.readForTests { engine in
+            engine.addSystemInterest(entry: last, lane: .userInitiated)
+            engine.pump()
+            let waits = engine.state.eventsAfterFollow.contains { event in
+                if case .reinstate(let transfer, _) = event {
+                    return transfer == last.transferID
+                }
+                return false
+            }
+            return (waits: waits, state: engine.state.jobs[last.transferID]?.state)
+        }
+        if visit == .sweepFollowsFirst {
+            #expect(turn.waits && turn.state == .queued, "setup: the member's place waits for the follow: \(turn)")
+        } else {
+            #expect(turn.state == .downloading, "visit-first, the member starts in the turn its new interest arrived: \(turn)")
+        }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { e in !e.followBarrier && e.state.eventsAfterFollow.isEmpty }
+        let after = await engine.readForTests { e in (state: e.state.jobs[last.transferID]?.state, releasing: !e.state.releasing.isEmpty, violations: e.invariantViolations()) }
+        #expect(after.releasing, "setup: the release is still part-way")
+        #expect(after.state == .downloading, "the member wanted again starts once the follow ends, as visit-first: \(after.state.map { "\($0)" } ?? "nil")")
+        #expect(after.violations.isEmpty, "\(after.violations.prefix(3))")
+        await engine.readForTests { $0.resumeReleaseFollowUps() }
+        await engine.awaitCondition { $0.state.releasing.isEmpty }
+        #expect(await engine.readForTests { $0.state.jobs.count } == 1, "only the member the new interest wants keeps a job")
+        await FollowBarrier.finish(s, sync: sync)
+    }
+
     // MARK: Space verdicts (R-SYN-11)
 
     /// A reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons: C
