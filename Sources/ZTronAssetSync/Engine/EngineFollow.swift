@@ -31,13 +31,17 @@ extension SyncEngine {
     /// rest is owed to owned follow-up turns (`followScans`, `followOrder`). The visits go in `unfollowed`'s transfer
     /// order, then in the order the pass finds the moved jobs (the replaced copy's entry order), each job once. A job
     /// waits in `unfollowed` from the pass's finding until its visit, which is what that set means (it may not follow
-    /// the copy); a job the pass has not reached yet follows a copy whose pass is owed. A later apply's follow starts its
-    /// visits over from `unfollowed` and queues its pass behind the owed ones; every pass compares with the copy as it
-    /// stands when it runs. While a follow is owed no admission is made and no space verdict given (`followBarrier`,
-    /// F-28), no run settles (a claim may still move) and no job held for a manifest catch-up is released (it may be one
-    /// the follow moves).
+    /// the copy); a job the pass has not reached yet follows a copy whose pass is owed. A later apply's follow keeps the
+    /// visits still owed in their order and appends the other jobs of `unfollowed`, sorted, then queues its pass behind
+    /// the owed ones; every pass compares with the copy as it stands when it runs. Sorting the owed visits again visited
+    /// them in another order than a follow that had visited first, so the new contents' jobs were created, and served,
+    /// in that other order (Stage 3 close-out cycle 9, amendment (e) of S3-R11). While a follow is owed no admission is
+    /// made and no space verdict given (`followBarrier`, F-28), no run settles (a claim may still move) and no job held
+    /// for a manifest catch-up is released (it may be one the follow moves).
     func followApplied(from previous: ValidatedManifest) {
-        self.state.followOrder = self.state.unfollowed.sorted()
+        let owed = self.state.followOrder[self.state.followNext...]
+        let owedSet = Set(owed)
+        self.state.followOrder = Array(owed) + self.state.unfollowed.subtracting(owedSet).sorted()
         self.state.followNext = 0
         if !self.state.jobs.isEmpty || !self.state.followScans.isEmpty, previous.digest != self.state.applied.digest || previous.count != self.state.applied.count {
             self.state.followScans.append(FollowScan(manifest: previous))
