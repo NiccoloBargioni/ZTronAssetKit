@@ -62,7 +62,8 @@ struct KitHarness {
     let configuration: AssetClientConfiguration
     let client: AssetClient
 
-    /// Builds a client; nothing is started. `fileSystem` lets a second client reopen the first one's disk.
+    /// Builds a client; nothing is started. `fileSystem` lets a second client reopen the first one's disk; `volume`, when
+    /// given, is the file system the client sees, built over the fake one (whose operations the harness still records).
     static func make(
         fileSystem existing: FakeFileSystem? = nil,
         time existingTime: ManualTimeSource? = nil,
@@ -77,7 +78,8 @@ struct KitHarness {
         appVersion: String = "1.0+1",
         metadata: (any BlockingExecutor)? = nil,
         bulk: (any BlockingExecutor)? = nil,
-        withMemoryPressure: Bool = true
+        withMemoryPressure: Bool = true,
+        volume: ((FakeFileSystem) -> any FileSystem)? = nil
     ) -> KitHarness {
         let time = existingTime ?? ManualTimeSource()
         let fileSystem = existing ?? FakeFileSystem(time: time)
@@ -85,7 +87,7 @@ struct KitHarness {
         let pressure = FakeMemoryPressureSource()
         let tap = RecordingLogTap()
         let environment = AssetEnvironment(
-            fileSystem: fileSystem,
+            fileSystem: volume?(fileSystem) ?? fileSystem,
             metadataExecutor: metadata ?? InlineBlockingExecutor(),
             bulkExecutor: bulk ?? InlineBlockingExecutor(),
             time: time,
