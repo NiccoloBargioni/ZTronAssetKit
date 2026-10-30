@@ -71,4 +71,33 @@ struct BackgroundControlTaskTests {
         #expect(cancellations == ([.consumerGone, .handleDropped].contains(ending) ? [false] : []), "cancellations: \(cancellations)")
         withExtendedLifetime(kept) {}
     }
+
+    /// The handle goes away while its update stream is still read, so the attach goes on (close-out cycle 3): the
+    /// handle's `deinit` finishes the control stream, so the control task ends at once, before the transfer's
+    /// terminal, and the reader still gets that terminal. In `controlTaskEndsWithTheAttach`'s `handleDropped` case
+    /// the update stream goes too, so the attach ends with it and that case alone cannot show the `deinit` matters.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-14: a dropped background handle's control task ends at once while its transfer goes on", .timeLimit(.minutes(1)))
+    func droppedHandleEndsItsControlTask() async throws {
+        let rig = try Rig("control-task-dropped-while-read")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let job = rig.job(1)
+        var handle: BackgroundTransferHandle? = try #require(await coordinator.start(job) as? BackgroundTransferHandle)
+        let controlTask = try #require(handle?.controlTask)
+        let updates = try #require(handle).updates
+        let reader = Task { await ForegroundBackendTests.outcomes(of: updates) }
+        handle = nil
+        await withTaskCancellationHandler {
+            await controlTask.value
+        } onCancel: {
+            controlTask.cancel()
+        }
+        #expect(!Task.isCancelled, "the control task outlived its handle")
+        // The attach still holds the name: the control task ended with the handle, not with the attach.
+        #expect(await coordinator.liveTransfers().map(\.name) == [job.partialName])
+        #expect(await rig.driver.cancellations.isEmpty)
+        await rig.driver.complete(job.partialName, body: TransportFixtures.payload(4_000))
+        #expect(await reader.value == [BackgroundInterleavingTests.staged(job)])
+    }
 }
