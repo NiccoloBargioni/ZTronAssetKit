@@ -67,6 +67,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Rulings added** to `s3-rulings-s3f.md`:
     - **S3-R11:** D3 with amendments (a)–(f); R1 option (a), so real-world ledger inputs apply on arrival and L4-R7 is kept; R2 (the R-SYN-2 assertion becomes `.queued`); R3 (one-to-one G3 records); the failing-first test list; C2.
     - **S3-R13:** 0 warnings at tools 6.4, checked in a `git archive` export. Nobody edits `Package.swift`.
+    - **S3-R14** (17:55, before cycle 11's fixer starts): close the class by inventory. The cycle-11 fixer tables every decision site in `Engine/` and how it waits or why it is R1. Verifiers check the table; a missing or wrong row is blocking. In class: the cycle-10 fixer's six recorded residuals, amendment (e) with an incomplete old pass, and a withdrawal that overtakes a deferred answer (the engine's removal waits; the public layer may still answer a cancelled caller at once). Also: tests for the two unreached replay branches, with the mutant shown failing, and kill-or-prove-equivalent for `noDispatchOwedFlag` and `noFlagPump`.
+  - **Cycle 9:** the fix ran 12:34–14:55 (`719ce20`) and verification 14:55–15:55. It found 4 blocking (reqs) and 6 blocking (correct), 8 distinct.
+  - **Cycle 10:** the fix ran 15:55–17:28 (`5203ccb`) and fixed all 8, each with its failing test first. Gates per the fixer:
+    - `VERIFY: PASS`; Sync has 448 tests; the simulator ran 1402 of 1402.
+    - TSan passed (0 warnings; the longest one-minute test took 18.95 s), and the tools-6.4 export has 0 warnings.
+    - C2: follow end 3.3–4.0 ms, drain turn 3.7–4.1 ms. P-13 fails again (WP-B's).
+    - The fixer recorded 6 residuals and amendment (e) as open; S3-R14 rules on them.
+  - **Verification for cycle 10** started 17:28. Weekly usage was 56 % at 17:45 (about 3.5 points per cycle).
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
