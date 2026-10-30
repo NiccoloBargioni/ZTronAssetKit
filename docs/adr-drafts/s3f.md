@@ -1,4 +1,4 @@
-# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 7
+# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 8
 
 Branch `wp/s3f` from tag `s3-base`. Rulings: `.build-orchestrator/s3-rulings-s3f.md`; findings:
 `.build-orchestrator/s3-findings-s3f.json`. WP-F's Stage 2 record is `docs/adr-drafts/f.md` (background only).
@@ -39,7 +39,15 @@ applied: S3-R1 (the blocking correctness finding's failing test `69e209e` commit
 survivors `skipNotFit` and `requeueNoAhead` re-applied in place and shown to fail the strengthened test), S3-R4 (every
 one-minute Sync test over half its guard beside a second TSan process raised to `.minutes(3)` with its measurements,
 nothing cut), S3-R5 (the fix adds one O(1) `spaceBlock` per parked job the sweep follows), S3-R6/S3-R7 (only WP-F's
-files and this draft) and S3-R8 (P-13, the per-404 index commit and the Storage figures stay `other-wp:`).
+files and this draft) and S3-R8 (P-13, the per-404 index commit and the Storage figures stay `other-wp:`). In cycle 8
+the rulings file was re-read (unchanged since 03:00:55; S3-R10 is still the last ruling, and none answers the hang-guard
+requests of cycles 7 and 8): applied: S3-R1 (the blocking correctness finding's failing tests `18e9448` committed before
+its fix `1b771e8`), S3-R2 (PROBE-C7-RANK-ADMIT, -PARK, -PROMOTE and PROBE-C7R-GAIN-AHEAD committed as R-SYN-11 tests in
+the new `EngineSweepOrderTests.swift`, an extension of `EngineSyncTests`), S3-R3 (four mutants of the fix and the
+re-queue's `ahead` count re-applied in place and shown to fail a test), S3-R4 (the four new tests' guards sized from
+paired measurements; the two margins over half at a paired load of about 30 referred to the orchestrator again, nothing
+raised or cut), S3-R5 (the sweep's follows keep their `followsPerTurn` bound; the C2 benchmark re-run), S3-R6/S3-R7
+(only WP-F's files and this draft) and S3-R8 (P-13 stays `other-wp:b`).
 
 - **Orchestrator ruling (close-out) S3-R1, scope and order.** Blocking items first (failing test committed on its own,
   then the fix), then REQUIRED, then OPTIONAL; ADR-RECORD items get an entry here and no code; items not listed are out
@@ -224,6 +232,10 @@ the committed tree, rebuilt in `.build-s3f`, run and reverted (`git status` clea
 
 ### The blocking correctness finding: a space sweep during an owed follow — **Fixed**
 
+*(Superseded in cycle 8: the sweep now follows every job it would judge before it orders them, and judges each once
+at its post-follow place; the in-loop follow, re-judgement and re-queue this entry describes were removed in
+`1b771e8`; see "Cycle 8".)*
+
 *Finding:* `sweepSpaceParked` (the alarm's `.reclaimed` sweep after reaped bytes, `.settle`, a purge's reclaim) could
 re-park the `awaitingSpace` job of a listed id's replaced content `insufficientSpace` while the bounded follow still owed
 its visit, and `park` → `failFast` answered that id's waiter or ensure member with the replaced content's figures,
@@ -382,6 +394,10 @@ holds no ruling on the S1-15 run test's guard. Each mutant was applied in place 
 
 ### The blocking correctness finding: a space sweep's follows per turn — **Fixed**
 
+*(Superseded in cycle 8: the sweep now follows every job it would judge before it orders them, and judges each once
+at its post-follow place; the in-loop follow, re-judgement and re-queue this entry describes were removed in
+`1b771e8`; see "Cycle 8".)*
+
 *Finding:* cycle 4's fix (`c8f01ca`) followed a job just before the sweep re-queued or parked it and counted that
 follow as the re-queue (`readmissionsPerTurn`, 512) or the park (`parksPerPump`, 512) it preceded. A follow (supersede,
 re-route each interest, create the new content's job) costs about 10 to 12 µs, a re-queue about 1 µs and a park about
@@ -493,6 +509,10 @@ rebuilt in `.build-s3f`, run and reverted (`git diff --stat Sources/` empty afte
 | reqs, correct | other-wp:b: P-13 and the per-404 index commit | **other-wp:b:** `BenchStorage.swift` and `AssetStore.recordFailure` are WP-B's; not touched |
 
 ### The blocking correctness finding: a space sweep re-queued a job on its pre-follow lane — **Fixed**
+
+*(Superseded in cycle 8: the sweep now follows every job it would judge before it orders them, and judges each once
+at its post-follow place; the in-loop follow, re-judgement and re-queue this entry describes were removed in
+`1b771e8`; see "Cycle 8".)*
 
 *Finding (correctness lens, PROBE-C5-LANEDROP):* content C (5 MB) is listed by A, which has a user waiter, and by B, a
 prefetch group's member, so its job is user-lane. During an owed follow the reclaim's sweep found C's job fits A's user
@@ -611,6 +631,10 @@ reverted (`git diff --stat Sources/` empty after each).
 | reqs, correct | other-wp:b / other-wp:h: P-13, `AssetStore.recordFailure`'s per-404 index commit, the Storage time-outs | **other-wp:b / other-wp:h:** not WP-F's files, not touched |
 
 ### The blocking correctness finding: a space sweep parked a job its follow had moved onto a volume with room — **Fixed**
+
+*(Superseded in cycle 8: the sweep now follows every job it would judge before it orders them, and judges each once
+at its post-follow place; the in-loop follow, re-judgement and re-queue this entry describes were removed in
+`1b771e8`; see "Cycle 8".)*
 
 *Finding (correctness lens, PROBE-C6-LANEGAIN):* content C (5 MB) is wanted by A (a user waiter) and B (a prefetch
 waiter), so its job is user-lane; it waits `awaitingSpace` with no room for user work, 6 MB for prefetch work (the
@@ -860,6 +884,212 @@ longest 3-minute test 77.5 s (43 %); `stalledSubscriberIsBounded` 92.6 s (39 % o
 - **other-wp:b / other-wp:h:** P-13 (`BenchStorage.swift:249`), `AssetStore.recordFailure`'s per-404 index commit,
   `StoreCrashTests.swift:167` and `LoopbackHTTPServerTests.swift:400` are WP-B's and WP-H's; not touched.
 
+## Cycle 8: the cycle-7 verification findings
+
+Every finding of the two cycle-7 lenses, with its disposition; the blocking ones first. The rulings file was re-read: it
+is unchanged since 03:00:55 (S3-R10 is still its last ruling; none answers the hang-guard request of cycle 7 or the
+verifiers' cycle-7 request), so S3-R4 and S3-R10 apply as written. Each mutant was applied in place on the committed
+tree, rebuilt in `.build-s3f` with `-warnings-as-errors`, run twice and reverted (`cmp` against the saved file after each).
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| correct (blocking) | R-SYN-11, F-28: `sweepSpaceParked` sorted its candidates by their pre-follow `queueRank` and followed each job only as it reached it, so a follow that lowered a job to prefetch, or raised the parked job of a moved id's new content to user work, left it judged at a place the pump does not serve it from; a user waiter's fail-fast reported a shortage the room did not have (PROBE-C7-RANK-ADMIT, -PARK, -PROMOTE) | **Fixed** (failing tests `18e9448`, fix `1b771e8`; below) |
+| reqs (blocking) | S3-R4 / S3-R10, S3F-2 S3-STAB-03: `stalledSubscriberIsBounded` (124.8–125.4 s, 52 % of 4 minutes) and S1-15's run test (166.9–167.1 s, 56 % of 5 minutes) over half their guards in a paired TSan run at a 1-minute load of 17.9–36.1 (mean 29.5), with the ruling requested in cycle 7 still outstanding | **Ruling requested again** (no ruling in the file; nothing raised, nothing cut; re-measured and the steps examined; below) |
+| reqs | Test strength: the cycle-7 park-branch re-queue was not pinned to count the job ahead (mutant `gainNoAhead` survived) | **Fixed** (`4812937`: PROBE-C7R-GAIN-AHEAD committed; the branch itself is gone in `1b771e8`, and the same omission in the one re-queue left, `requeueNoAhead`, fails the new test in both visits; below) |
+| correct | Test strength (recorded): the cycle-7 branch's `readmissionsPerTurn` guard had no test; re-check that every early `break` still schedules the follow-up sweep if the loop is restructured | **Resolved** (the branch is gone; each early exit re-checked, and the new bounded-follow exit pinned; below) |
+| reqs, correct | Survivors `noDispatchOwedFlag` and `noFlagPump` carried over | Kept as recorded (§14 candidates (a) and (c)); no test this cycle |
+| correct | `SyncBenchmarks` misses at load 12–27 after a 5-minute load above 130 (`shutdownTurns`, `refreshUnderGroupTurns`, `changedRefreshTurns`), clean at load 8.9–10.5 | No change (load only, S3-R5); re-run under "Gate evidence (cycle 8)" |
+| reqs, correct | other-wp:b: P-13 (`BenchStorage.swift:249`), `AssetStore.recordFailure` | **other-wp:b:** not WP-F's files, not touched |
+
+### The blocking correctness finding: a space sweep judged followed jobs at their pre-follow places — **Fixed**
+
+*Finding (correctness lens, PROBE-C7-RANK-ADMIT, -PARK and -PROMOTE):* `sweepSpaceParked` built and sorted its
+candidates once, by `queueRank` before any follow, then followed each job as it reached it (`followBeforeActing`). A
+follow changes ranks two ways: the followed job loses the moved user interest and may drop to prefetch, and the parked
+job of the moved id's new content gains it and may rise to user work. Either way the job was judged at its old place:
+prefetch work was admitted, and counted `ahead`, before user work the pump serves first, and the next user job's
+fail-fast answered its waiter with a shortage although the room existed for it. ADMIT (equal readings, just under 6 MB
+after the reclaim): C (5 MB, user through A, prefetch through B) fitted as user work, was followed to prefetch, still
+fitted and was re-queued ahead of K (3 MB, user), whose waiter got `insufficientSpace(required: 3000000, available:
+999000)`. PARK (the cycle-7 park-branch re-queue; 4 MB important, 8 MB opportunistic): K's waiter got
+`insufficientSpace(required: 3900000, available: 0)`. PROMOTE (C wanted only by A; A moved onto P's content; 6 MB):
+P was judged at its prefetch place after R, and A's user waiter got `insufficientSpace(required: 3000000, available:
+2500000)`. Followed first, each sweep serves the user job and parks the prefetch one. ADMIT fails the same way at
+`e3a4c1a` (cycle 6's re-judgement read the new lane's volume, not its place); at `s3-base` the follow moved every job in
+the apply's turn, so no window existed.
+
+- **Failing tests first** (`18e9448`, new file `Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift`,
+  `extension EngineSyncTests`, arguments `LaneDropVisit.allCases`, `.timeLimit(.minutes(1))`):
+  - `R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it
+    is admitted first (F-28)` (`spaceSweepAdmitsUserWorkBeforeAJobItsFollowLowers`, PROBE-C7-RANK-ADMIT);
+  - `R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user
+    job behind it is admitted first (F-28)` (`spaceSweepParkBranchAdmitsUserWorkBeforeAJobItsFollowLowers`,
+    PROBE-C7-RANK-PARK); both share `sweepJudgesALoweredJobAtItsNewPlace`;
+  - `R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch
+    work (F-28)` (`spaceSweepJudgesAJobItsFollowRaisesAtItsUserPlace`, PROBE-C7-RANK-PROMOTE).
+
+  Each asserts its setup per visit (the follow owed or not, the jobs' ranks and tickets, both parked `awaitingSpace`),
+  no invariant violation after the sweep, the user waiter answered from its content, the prefetch waiter answered
+  `insufficientSpace` with its own size against a smaller `available`, A's waiter from its new content, and the sync
+  complete. At `18e9448` (the code of `7426fee`), 3 of 3 runs, every `.followVisitedFirst` case passing:
+  `EngineSweepOrderTests.swift:161:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)` / `K's
+  user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000,
+  available: 999000))` (ADMIT) and `… insufficientSpace(required: 3900000, available: 0))` (PARK), with `:166:25` (B's
+  waiter was served instead); `:270:9` / `A's user waiter, moved onto P, is answered from P's 3 MB:
+  failure(…insufficientSpace(required: 3000000, available: 2500000))` and `:271:9`, `:275:25` (PROMOTE); all with
+  `visit → .sweepFollowsFirst`; `✘ Test run with 3 tests in 1 suite failed after 0.513 seconds with 7 issues.`
+- **Fix** (`1b771e8`, `EngineJobs.swift`, `sweepSpaceParked`; the verifier's "fully faithful alternative", not the
+  side-order prototype): while a follow is owed, the sweep first follows, in its sorted order, every candidate that holds
+  an id the follow has not moved (`followSweptHolders`, which calls `followBeforeActing`: the follow's visit brought
+  forward), at most `followsPerTurn` per turn; when it followed any, it collects and sorts the candidates again
+  (`spaceSweepCandidates`), and only then judges them (`judgeSpaceParked`), each once, as the follow left it. A turn
+  that has more holders than `followsPerTurn` follows that many, judges nothing, and leaves the rest to its follow-up
+  sweep, since a job not followed yet would be judged at a place it may not keep. After the pre-phase no candidate holds
+  a moved id (a candidate is `.blocked`, so `follow` moves every moved id it holds, and an id rerouted to a job is one
+  the copy maps to that job), so the judging loop has no follow left: the in-loop follow, the cycle-5 re-judgement after
+  it, the cycle-7 park-branch re-queue and `followFits` are removed. The prototype's side order was not taken: by its
+  author's own account a job a follow joins whose new place precedes the followed job's is still judged after jobs
+  already judged. With the fix, 3 of 3 runs of the ten space-sweep tests: `✔ Test run with 10 tests in 1 suite passed
+  after 1.847 seconds` (… `1.815`, `1.814 seconds`); the Sync bundle `✔ Test run with 415 tests in 52 suites passed after
+  11.919 seconds.`
+- **Mutants** (in place, two runs each, the ten space-sweep tests):
+  - `noReorder` (after the follows, keep the pre-follow order): 2 of 2 runs fail ADMIT and PARK at
+    `EngineSweepOrderTests.swift:161:9` and PROMOTE at `:270:9`, `:271:9` (`visit → .sweepFollowsFirst`); `✘ Test run
+    with 10 tests in 1 suite failed after 1.877 seconds with 7 issues.`
+  - `noPreFollow` (no pre-phase: candidates holding moved ids are judged unfollowed): 2 of 2 runs fail all 10 tests,
+    among them `EngineFollowTests.swift:596:9` (`!afterSweep.holds`), `:600:9` (`answered.fromNewContent`),
+    `:904:9`, `:905:9`, `:910:9`, `:1157:9`, `:701:9` to `:703:9`, `EngineSweepOrderTests.swift:161:9`, `:271:9`,
+    `:374:9`, and a 180 s time limit at `EngineFollowTests.swift:1181:6`; `✘ Test run with 10 tests in 1 suite failed
+    after 192.013 seconds with 28 issues.`
+  - `boundedJudges` (a turn over `followsPerTurn` judges anyway): 2 of 2 runs fail
+    `EngineFollowTests.swift:703:9: Expectation failed: after.waiting == after.owed.small + after.owed.large &&
+    after.waiting > 0`; `✘ Test run with 10 tests in 1 suite failed after 1.836 seconds with 1 issue.` That assertion
+    is new in `spaceSweepFollowsAtMostOneTurnOfJobs` (`1b771e8`): a turn that could not follow every member judges
+    none, so every member it did not follow still waits `awaitingSpace`. The test's doc comment and two messages now
+    describe the new turn (it follows `followsPerTurn` jobs of both sizes and judges none); its existing assertions are
+    unchanged.
+  - `requeueNoAhead` (`requeueSwept` without adding the job's bytes to `ahead`): below.
+- **Every early exit re-checked** (the correctness lens's recorded item): the two bound exits of the judging loop
+  (`readmissionsPerTurn`, `parksPerPump`) schedule the follow-up sweep as before; the new bounded-follow exit schedules
+  it (pinned by `boundedJudges` above); the read's room exits (before and after the re-collection, and in the loop) do
+  not, as before, since nothing more can change (a follow moves interests, not sizes, and `largestRoom` does not read a
+  job's lane). The cycle-7 branch whose `readmissionsPerTurn` guard had no test no longer exists.
+- **`holdsMovedID`** (`EngineFollow.swift`) compares the copy's entry with the job's own entry by key
+  (`SyncEngine.sameTransfer`, as the follow's pass does) instead of formatting a transfer per id: the pre-phase checks
+  every candidate while a follow is owed, and a formatted transfer costs about 0.75 µs in release (7.5 ms at 10,000).
+  `Job.transfer` and `Job.entry` are `let`s set from one entry (`addInterest`), and `sameTransfer` is true exactly when
+  the two entries' `transferID`s are equal (both checksums equal, or neither has one and the identifier and remote path
+  are equal), so the result is the same.
+- **C2 (S3-R5):** per sweep turn while a follow is owed: one `holdsMovedID` per candidate (a lookup and a key comparison
+  per id), at most `followsPerTurn` follows (as before, now before the judging rather than inside it), and, when it
+  followed any, one more collection and sort of the candidates; the judging loop is unchanged in its bounds and now has
+  no follow in it. Re-measured with the `BenchSync` benchmark `reclaimDuringFollowTurns` (its doc comment updated) under
+  "Gate evidence (cycle 8)".
+- **REENTRANCY:** no new `await` (synchronous); no ledger row.
+- **Not changed (recorded under "Not verified here"):** the pre-phase follows the jobs the sweep judges. A job that is
+  not parked for space (queued behind the follow, or downloading) and holds a moved id whose new content is a parked
+  job is moved by the follow's own visit, not by the sweep: the sweep judges that parked job with the interests it
+  holds when the sweep runs, and the moved interest reaches it later through `addInterest` (`relane` re-queues it if its
+  raised lane fits, `failFastJoiner` answers the joiner with the room at that moment otherwise), as a request made at
+  that moment would be.
+
+### Test strength: a followed job re-queued ahead of the next one — **Fixed**
+
+*Finding (requirements lens, PROBE-C7R-GAIN-AHEAD):* the cycle-7 park-branch re-queue was not pinned to count the job
+ahead or record it in `spaceAdmitted` (mutant `gainNoAhead` survived the Sync bundle). `1b771e8` removes that branch (a
+job is judged once, after its follow); the one re-queue left is `requeueSwept`, which every admitted job takes.
+
+- **Test** (`4812937`, `EngineSweepOrderTests.swift`, arguments `LaneDropVisit.allCases`, `.timeLimit(.minutes(1))`):
+  `R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the
+  sweep's turn when the room left does not hold it (F-22)` (`spaceSweepCountsAFollowedJobAheadOfTheNextOne`): the
+  verifier's probe with its setup asserted per visit, D's job read in the sweep's own turn (`SweepTurnWatch`) and
+  required `nil` or `.blocked(.insufficientSpace)`, no invariant violation, B's waiter answered from C's 5 MB, A's from
+  its 16 bytes, D's `insufficientSpace` with its 7 MB against a smaller `available`, D's content never started, and the
+  sync complete. With the fix: passes in both visits (3 of 3 runs of the ten space-sweep tests above).
+- **Mutant `requeueNoAhead`** (`requeueSwept` does not add the job's bytes to `ahead`; `gainNoAhead`'s omission on the
+  only re-queue left): 2 of 2 runs fail in both visits, `EngineSweepOrderTests.swift:374:9: Expectation failed:
+  watch.state == nil || watch.state == .blocked(.insufficientSpace)` (`visit → .sweepFollowsFirst` and
+  `.followVisitedFirst`); `✘ Test run with 10 tests in 1 suite failed after 1.908 seconds with 2 issues.`
+
+### Hang guards (S3-R4 / S3-R10) — **ruling requested again; nothing raised, nothing cut**
+
+*Finding (requirements lens, blocking; the correctness lens's informational item is the same request):* in the
+verifier's second paired TSan run at `7426fee` (07:25:30–07:28:19; 1-minute load 17.9 → 36.1, mean 29.5 over 34
+samples, at most 31.3 for the first 91 s and 33.4–36.1 for the last 75 s), `R-SYN-12: a stalled subscriber's backlog
+never exceeds one slot per progress key and subject during a 10,000-asset sync` (`EngineEventsTests.stalledSubscriberIsBounded`,
+`.minutes(4)`) took 124.8 / 125.4 s (52.3 % of 4 minutes) and S1-15's `R-SYN-3: a 100,000-entry plan never materialises
+more than the pipeline plus the lookahead as jobs` (`runMaterialisesAPipelineAtATime`, `.minutes(5)`, S3-R10) 166.9 /
+167.1 s (55.7 % of 5 minutes); both bundles passed with no ThreadSanitizer report. Its other runs: paired at load
+16.0–32.4, 111.0 s (46 %) and 118.9–119.0 s (40 %); paired at load 19.6–25.6, 80.2–80.7 s (34 %) and 89.1 s (30 %);
+alone at load 18–25, 92.7 s and 109.7 s; neither test ever timed out. Every other guard stayed under half in all three
+paired runs. The verifier asks the orchestrator for (a) an S3-R10-style ruling (`.minutes(5)` for
+`stalledSubscriberIsBounded`, whose cost is the SPEC-scale 10,000-asset sync under TSan, and S3-R10 amended to accept
+S1-15's run test at 167 s at load 18–36), or (b) a ruling that a paired run whose 1-minute load is above 30 for most of a
+test's duration is not "about 30".
+
+*Disposition:* the rulings file holds no ruling on either test's margin (unchanged since 03:00:55; S3-R10 is its last
+ruling). S3-R4 gives a test that is neither model-based nor exhaustive no step above `.minutes(3)`, S3-R10 fixes S1-15's
+guard at `.minutes(5)`, and G3 forbids cuts, so WP-F changes neither guard and requests the ruling again, in the
+verifier's terms (a) or (b) ("Proposed document changes"). The one option S3-R4 leaves WP-F, making each step cheaper,
+was examined and does not reach the margin:
+
+- **Where `stalledSubscriberIsBounded`'s time goes** (TSan, the test alone, `.build-s3f/c8-profile.sh`: the test
+  process sampled with `sample` for 15 s, 08:20:38–08:21:01, load 1.9–2.4; the test `passed after 20.214 seconds`;
+  inclusive sample counts, outermost frame per path): under the engine's transfer tasks (`closure #1 in
+  SyncEngine.start(_:probe:)`, 16,648 samples) the store's publication (`AssetStore.publish`, WP-B: placement,
+  binding, index records and the file system calls it makes) takes 9,985 and the fake source's transfer 1,443; the
+  shared test fake `FakeFileSystem.perform` 6,235 of them across both. The engine's own work is the remaining third:
+  `committed` 2,474 and `pump` 2,415 (overlapping), `resolveAll` 1,382, and about 950 samples of whole-`EngineState`
+  copies that a debug build makes when an engine extension reads `self.state.<field>` through the `package private(set)`
+  property's getter (`slotCounts` in every pump, `followOwed`, `notifyConditions`). No WP-F step dominates: removing
+  those copies would mean changing how every engine file reads its state for a debug-only cost of about 6 % of the
+  test's busy samples, which would not bring 52 % under 50 % at the verifier's load; the rest is WP-B's store and the
+  shared fakes.
+- **S1-15's run test:** cycle 4's phases stand: about two thirds of it is WP-A's parser decoding the 21 MB manifest
+  under TSan (S3-R10), and WP-F's plan share is mostly formatting 100,000 transfer ids into `PlannedFetch.transfer`, a
+  stored `package` property that S3-R6 forbids changing.
+
+*Re-measured at the cycle's code* (TSan, `.build-s3f-tsan` at `4812937`, bundles run directly with
+`.build-s3f/c8-tsan.sh`, 1-minute load every 5 s; the host stayed at a load of 2 to 19 through this cycle's TSan runs,
+so no paired run near a load of 30 was possible here):
+
+| Run | Load (1 min) | Bundle | `stalledSubscriberIsBounded` (4 min) | S1-15 run test (5 min) |
+|---|---|---|---|---|
+| paired, 08:22:07–08:23:37 | 1.9 → 18.6 (mean 11.8) | `415 tests in 52 suites passed after 87.311 seconds.` / `87.915 seconds.` | 81.9 s (34 %) | 87.3–87.9 s (29 %) |
+| alone in the bundle, 08:24:02–08:24:58 | 9.1–11.2 | `passed after 53.848 seconds` | 49.5 s (21 %) | 53.8 s (18 %) |
+| the test only, 08:20:38–08:21:01 | 1.9–2.4 | — | 20.2 s (8 %) | — |
+
+No ThreadSanitizer report and no time-limit line in any of them. In the paired run every one-minute test took at most
+23.3 s (39 %) except this cycle's four new R-SYN-11 tests (33.8–35.4 s, 58–59 %; their guards are below), and the
+R-SYN-11 space-sweep tests of the same setup (3-minute guards since cycle 7) 30.0–36.7 s (20 %).
+
+### Hang guards of this cycle's new tests (S3-R4) — **sized from measurements**
+
+The four new tests (`EngineSweepOrderTests.swift`) took 33.8–35.4 s beside a second TSan process at load 1.9–18.6
+(58–59 % of 60 s) and 21.9–22.2 s alone in the bundle at load 9–11, as the tests of the same setup in
+`EngineFollowTests` do (33.1–36.7 s in the same paired run). `1b21195` gives each `.timeLimit(.minutes(3))` with its
+figures in its doc comment; the diff is traits and doc lines only (`git diff 4812937 1b21195 -- Tests | grep '^[-+]'`
+shows nothing else). Nothing is cut (G3).
+
+| Test (display name) | alone (load 9–11) | paired (load 1.9–18.6) | guard |
+|---|---|---|---|
+| `R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, …` | 21.9 s | 34.4–35.4 s (59 %) | **3 min** |
+| `R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, …` | 22.1 s | 33.9–35.2 s (59 %) | **3 min** |
+| `R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, …` | 22.2 s | 34.4–34.8 s (58 %) | **3 min** |
+| `R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, …` | 22.2 s | 33.8–34.9 s (58 %) | **3 min** |
+
+### Benchmarks, survivors and `other-wp`
+
+- **`SyncBenchmarks`** (release, the full benchmark command; figures under "Gate evidence (cycle 8)"): every WP-F
+  benchmark within its budget at load 2.4–4.9, the cycle-7 load-only misses (`shutdownTurns`,
+  `refreshUnderGroupTurns`, `changedRefreshTurns`) among them; the reclaim during an owed follow, which now follows
+  before it judges, [7.85, 5.28, 5.13] ms with one handle and [6.27, 6.06, 6.17] ms with two (cycle 7: [5.86, 6.19,
+  7.17] and [6.63, 8.06, 10.96] ms).
+- **Survivors:** `noDispatchOwedFlag` and `noFlagPump` stay §14 candidates (a) and (c) (not re-run).
+- **other-wp:b:** P-13 failed again in this cycle's full benchmark run (`BenchStorage.swift:249:13: Expectation failed:
+  longest <= batchBudget`, at load 2.4–4.9); `AssetStore.recordFailure`'s per-404 index commit. WP-B's files, not
+  touched.
+
 ## Items
 
 ### S3F-1 [BLOCKING] S3-CONC-04 — a satisfied first conditions reading is an edge — **Fixed**
@@ -910,6 +1140,9 @@ process; make steps cheaper where possible; raise a guard only with measurements
   Loads: before, alone 14.7–28.1, paired 24.1–30.1; after, alone 19.8–27.2, paired 27.2–43.1. The paired run takes
   each raised test above half its limit (the ruling's condition); R-CAR-4 is now below half and keeps `.minutes(1)`.
 - **Commit:** `0b76e30` (each raised guard's doc comment carries its measurements).
+- **Cycles 4 to 8:** further guards sized from measurements (each cycle's "Hang guards" entry); in cycle 8 the margins of
+  `stalledSubscriberIsBounded` and S1-15's run test at a paired load of about 30 are referred to the orchestrator
+  (ruling requested; "Cycle 8").
 
 ### S3F-3 [BLOCKING] S3-CONF-03 — a run over an asset failed at the integrity cap — **Fixed (test)**
 
@@ -1264,7 +1497,9 @@ None, in any cycle (cycle 4 changed `Sources/ZTronAssetSync/Engine/EngineJobs.sw
 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`,
 `EngineRegressionCycle8Tests.swift`, `EngineSync1LivenessTests.swift` and this draft; cycle 7 changed
 `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, test files under `Tests/ZTronAssetSyncTests/Engine/` (listed under
-"Cycle 7") and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
+"Cycle 7") and this draft; cycle 8 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `EngineFollow.swift`,
+`Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`, the new `EngineSweepOrderTests.swift`,
+`Tests/ZTronAssetKitBenchmarks/BenchSync.swift` (a doc comment) and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
 `Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft. No contract signature
 changed (`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
 internal parameter).
@@ -1441,6 +1676,40 @@ Cycle 7 adds:
   a load of at most about 30.
 - **Not verified, for §14 or a device test:** whether a device reports an opportunistic free-space reading above the
   important one (the precondition of PROBE-C6-LANEGAIN); the store does not clamp them.
+
+Cycle 8 adds:
+
+- **§7.10, the follow (the cycle-4 to cycle-7 replacement texts):** replace every sentence about a space sweep following
+  a job "before it re-queues or parks it", judging it "again" after its follow, and re-queuing a job the park branch's
+  follow left room for, with: "A space sweep that runs while a follow is owed first follows every job it would judge
+  that holds an id the follow has not moved, as the follow's visit would, at most `followsPerTurn` per turn (a turn
+  with more left judges nothing and leaves them to its follow-up sweep); it then collects and orders the jobs as the
+  follows left them and judges each once, at the place the pump would serve it from (Stage 3 close-out cycle 8,
+  PROBE-C7-RANK-ADMIT, -PARK and -PROMOTE)." The facts the removed clauses recorded stay true and need no text of
+  their own: a job's verdict and figures read its current lane's volume, and the two readings are not ordered.
+- **§7.6, the `insufficientSpace` row:** after "Re-admissions follow the pump's order, each admitted against the room
+  the jobs ahead leave (F-28)" add "; a sweep during an owed follow orders the jobs after the follows it performs, so a
+  follow that lowers a job, or raises the job of a moved id's new content, moves it to its new place before any is
+  judged (Stage 3 close-out cycle 8)".
+- **§11:** the R-SYN-11 regression tests `spaceSweepAdmitsUserWorkBeforeAJobItsFollowLowers`,
+  `spaceSweepParkBranchAdmitsUserWorkBeforeAJobItsFollowLowers`, `spaceSweepJudgesAJobItsFollowRaisesAtItsUserPlace`
+  and `spaceSweepCountsAFollowedJobAheadOfTheNextOne` (both visits each), and the bounded-follow assertion added to
+  `spaceSweepFollowsAtMostOneTurnOfJobs` (a turn that cannot follow every holder judges none).
+- **§1.2:** WP-F's new test file `Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift`.
+- **§10.2:** no new row (no new `await`).
+- **DECISIONS (L4-R8 precedent):** the four new tests' guards (`.minutes(3)`; 33.8–35.4 s paired at load 1.9–18.6,
+  21.9–22.2 s alone; table under "Cycle 8").
+- **Ruling requested (repeated from cycle 7, with the cycle-7 verifier's framing):** either (a)
+  `EngineEventsTests.stalledSubscriberIsBounded` may take `.timeLimit(.minutes(5))` (its cost is SPEC §6's
+  10,000-asset sync, most of it the store's publication and the shared fakes under TSan: 124.8–125.4 s paired at load
+  17.9–36.1, 132.0–132.4 s at load 20–35, 111.0 s at 16.0–32.4, 80.2–80.7 s at 19.6–25.6 and 81.9 s at 1.9–18.6; alone
+  92.7 s at 18–25, 51.5 s at 13–18, 49.5 s at 9–11; nothing cut), and S3-R10 is amended to accept S1-15's run test at
+  166.9–167.1 s paired at load 17.9–36.1 (56 % of 5 minutes; 148.8–148.9 s at load 20–35, 118.9–119.0 s at 16.0–32.4,
+  89.1 s at 19.6–25.6, 87.3–87.9 s at 1.9–18.6); or (b) a paired run whose 1-minute load is above 30 for most of a
+  test's duration is not "about 30" in S3-R4's sense. WP-F makes no change to either guard until a ruling.
+- **Stage 5 residual risks:** add this cycle's figures to the note (the two tests above); the conclusion stands: the
+  TSan Sync bundle's guards are sized for a paired run at load up to about 30 on this 8-core host, and CI should run it
+  alone or at a load of at most about 30.
 
 ## Gate evidence (cycle 1)
 
@@ -1764,6 +2033,53 @@ commit changes this file only).
 - **`git status`:** clean after the draft's commit; `docs/TRACEABILITY.md` untouched (no `--gates-only` or `--full`
   run).
 
+## Gate evidence (cycle 8)
+
+All runs on this branch, scratch `.build-s3f*`, on the shared 8-core host (1-minute load 2 to 19 through the cycle's
+test, TSan and benchmark runs; it reached 50.5 at the end of the simulator run). The code (`Sources/`) is final at `1b771e8`; `4812937` and `1b21195` add a test and change test traits and doc comments
+only. The final-tree runs are at `1b21195` (the draft's commit changes this file only); `.build-s3f/verify-all.sh`
+ran the first six steps in order (08:26–08:35).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (08:26–08:29, load 3.4 → 5.3): `VERIFY: PASS`;
+  `::: SUMMARY mode=--quick steps-failed=0`; Transport 151, Sync 415 (`passed after 12.658 seconds`), Storage 459
+  (`62.830 seconds`), Model 84, Kit 85, Compatibility 71, AppleHosted 104 tests passed.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (08:29, load 5.3):
+  `Build complete! (27,53 s)`, exit 0.
+- **Gates:** `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  08:29–08:31, load 4.6–9.4): `✔ Test run with 415 tests in 52 suites passed after 12.108 seconds.`, `12.132 seconds.`,
+  `12.114 seconds.`
+- **TSan once** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, 08:31–08:32, load 7.5–10.2): `✔ Test run with 415 tests in 52 suites passed after 54.374
+  seconds.`; no `WARNING: ThreadSanitizer` line, no time-limit line; no test over half its guard (the longest one-minute
+  test 14.6 s; `stalledSubscriberIsBounded` 49.8 s, S1-15's run test 54.4 s). Paired and alone runs under "Cycle 8".
+- **Coverage** (`swift test --scratch-path .build-s3f --enable-code-coverage --skip Benchmarks`, 08:32–08:35, every
+  bundle passed; `xcrun llvm-cov export -summary-only -instr-profile .build-s3f/out/Products/Debug/codecov/default.profdata`
+  over every test binary; `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`): `COVERAGE target=ZTronAssetSync
+  lines= 94.02% (9288/9879) min=90.0 OK`, overall `96.66% (25796/26687)`, `COVERAGE: PASS`.
+- **iOS:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-s3f/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, exit 0 (08:36:01–08:36:08, load 5.1; `EngineJobs.o` for `arm64`
+  rebuilt at 08:36). **iOS Simulator tests** (simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iOS 27.0;
+  `Test-ZTronAssetKit-2026.10.30_08-36-12-+0100.xcresult`, 08:36:08–08:39:16, load 4.8 → 50.5): `"result" : "Passed"`,
+  `"totalTestCount" : 1369`, `"passedTests" : 1369`, `"failedTests" : 0`, `"skippedTests" : 0` (`** TEST SUCCEEDED
+  **`; 1,365 in cycle 7 plus this cycle's four); the simulator is shut down.
+- **Benchmarks** (the full command, `swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing
+  --filter Benchmarks`, after its build, at `4812937` (the same `Sources/` and `BenchSync.swift`), 08:13:12–08:18:54,
+  load 2.4–4.9): `✘ Test run with 41 tests in 8 suites failed after 229.955 seconds with 1 issue.`, the issue P-13's
+  (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, WP-B's, `other-wp:b`); `✔ Suite
+  "SyncBenchmarks" passed after 96.124 seconds.`, every WP-F benchmark within its budget: the reclaim during an owed
+  follow [7.85, 5.28, 5.13] ms (one handle) and [6.27, 6.06, 6.17] ms (two handles); P-4 11.40 ms (budget 20.0), ratio
+  2.01 (max 2.5); P-7 0.83 / 0.13 MiB; P-11 speedup 3.76 (min 3.0); P-14 0 timers, 0 tasks; the stalled prune ratio
+  1.41; space parking [4.03, 4.05, 4.02] ms, its ENOSPC read [3.29, 2.95, 2.63] ms; space re-admission [3.87, 4.04,
+  3.74] ms; network edges [1.02, 1.02, 1.06] and [3.92, 4.60, 4.02] ms; releases [4.05, 4.12, 4.15] and [4.23, 4.19,
+  4.31] ms; re-joins [4.61, 4.62, 4.56] and [4.60, 4.63, 4.64] ms; shutdown [1.47, 1.41, 1.43] ms; refresh under a
+  group [1.26, 1.20, 1.20] ms, changing every member [3.74, 3.73, 3.95] ms; prune announcement [4.92, 4.97, 4.91] ms;
+  due retries [0.90, 0.85, 0.84] ms; cancelled resolve 0.02 ms; cooldown end 0.06 ms; probe chain longest wait 0.19 ms
+  (totals about 1.1 s); throttle extension [6.71, 6.61, 6.61] ms.
+- **`git status`:** clean after the draft's commit; `docs/TRACEABILITY.md` untouched (no `--gates-only` or `--full`
+  run).
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -1804,3 +2120,17 @@ commit changes this file only).
   runs on this 8-core host at load up to 35; at load 50–78 a paired TSan run times out about 40 one-minute tests, and
   `stalledSubscriberIsBounded` (4 minutes) is over half its limit at load 20–35 pending a ruling. The survivors
   `noDispatchOwedFlag` and `noFlagPump` still have no test; `other-wp:b` / `other-wp:h` items are not re-run here.
+- Cycle 8: the sweep follows the jobs it judges (the space-parked ones). A job that is not parked for space (queued
+  behind the follow, or downloading) and holds a moved id whose new content is a parked job is moved by the follow's own
+  visit, not by the sweep, so the sweep judges that parked job with the interests it holds when the sweep runs; the
+  moved interest reaches it later through `addInterest` (`relane` re-queues it if its raised lane fits,
+  `failFastJoiner` answers the joiner with the room at that moment otherwise), as a request made at that moment would
+  be. No test orders that case. `holdsMovedID`'s key comparison is argued equal to the formatted one from
+  `ManifestEntry.transferID`'s definition and `Job`'s `let` fields (no differential test). The sweep's follow bound at
+  10,000 is measured by the benchmark on this host only. The margins of `stalledSubscriberIsBounded` and S1-15's run
+  test at a paired load of about 30 await the orchestrator's ruling; no paired run near a load of 30 was made here (the
+  host stayed at 2–19). The survivors `noDispatchOwedFlag` and `noFlagPump` still have no test; `other-wp:b` items
+  (P-13, failed again in this cycle's benchmark run; the per-404 index commit) are not WP-F's. Cycle 7's note that the
+  `.read` sweep and the waiting branch read a job on its pre-follow lane no longer applies (both follow first now), and
+  `checkRunSettled` returns while a follow is owed (`EngineRuns.swift:572`), so its `admittedBySpace` check never runs
+  during one.
