@@ -70,7 +70,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
-- **Tools-6.4 probe (a), running beside it:** background task `b3xp5l89q` in `.worktrees/t64` at `9adfa91`. It runs `verify.sh --quick`, the release build and the iOS build. Logs and `status.txt` / `warnings.txt` go to `.build-orch/t64/`.
+- **Tools-6.4 probe (a): PASS, 0 warnings** (`.worktrees/t64` at `9adfa91`, manifest line 1 = `// swift-tools-version: 6.4`, logs in `.build-orch/t64/`).
+  - `verify.sh --quick`: `VERIFY: PASS`, with the same counts as at tools 6.0: Transport 165, Sync 351, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104.
+  - Release build: complete. iOS generic build: exit 0, with the iOS objects in `Debug-iphoneos`. xcodebuild prints an `IDERunDestination: Supported platforms … is empty` line, which is not a warning.
+  - The grep for `warning:` over every log found 0 lines.
+  - Still to come: (b) after merging `wp/s3f`, and (c) the final `--full`.
 - **Queued after every stage (owner, 30 Oct; choices not settled, the question form was cancelled):**
   - (1) A facade method that decides at run time whether iOS 26+ is served by AWS or Apple-hosted packs. Today `TierSelection.select` decides once, at client build, with a static `awsOnly`.
   - (2) A simple Electron app with these features:
