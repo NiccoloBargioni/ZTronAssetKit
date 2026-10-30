@@ -248,7 +248,8 @@ extension ZTronAssetKitBenchmarks {
         /// S3-PERF-06 (Stage 3 ruling S3G-1): `PrefetchWindowController.update` is a UI-facing call, and its window walk
         /// must cost what the carousel's size costs whatever the radius, because `AssetClientConfiguration.prefetchRadius`
         /// and `init(radius:)` take any `Int` (a radius meant as "the whole carousel" included). Medians of five updates
-        /// over 10 pages, each to another page, per radius, against P-8's `ui_call_ms_max`.
+        /// over 10 pages, each to another page, per radius, against P-8's `ui_call_ms_max`. Before the clamp a radius of
+        /// 10,000,000 took a median of about 11 ms here, and `Int.max` never returned.
         @available(macOS 15.0, iOS 18.0, *)
         @Test("P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel", .timeLimit(.minutes(1)))
         func prefetchWindowHugeRadius() async throws {
@@ -257,7 +258,7 @@ extension ZTronAssetKitBenchmarks {
             let fixture = Fixture()
             let client = fixture.client
             let pages = (0..<10).map { AssetID("page-\($0)") }
-            for radius in [10_000_000] {
+            for radius in [10_000_000, Int.max] {
                 let controller = PrefetchWindowController(client: client, radius: radius)
                 let (samples, targets) = await MainActor.run { () -> ([Double], Int) in
                     let clock = ContinuousClock()
