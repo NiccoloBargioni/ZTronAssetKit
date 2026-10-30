@@ -482,4 +482,105 @@ struct BackgroundInterleavingTests {
         #expect(changes == [0.25, 0.75], "no write follows the late one once the transfer finished: \(changes)")
         #expect(await coordinator.liveTransfers().isEmpty)
     }
+
+    /// A replaced handle's buffered control (close-out cycle 3): the first handle demotes again while its promotion's
+    /// write is in flight, so the demotion waits in its control stream; a start joins the OS task and replaces that
+    /// attach, and the joining handle demotes to bulk. The buffered control reaches the coordinator with the replaced
+    /// attach's token while the joining handle's change lists the tasks. It changes nothing, and it must not become the
+    /// newest request either (the serial is taken only after the entry token check), or the joining handle's change
+    /// would return without writing and the OS task would stay at 0.75 while the engine's lane is bulk.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a replaced handle's buffered control never cancels the joining handle's newer priority change", .timeLimit(.minutes(1)))
+    func staleBufferedControl() async throws {
+        let rig = try Rig("stale-buffered-control")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let first = try #require(await coordinator.start(rig.job(1)) as? BackgroundTransferHandle)
+        await rig.driver.holdNextPriority()
+        first.setPriority(.userInitiated)
+        await rig.awaitSignal("priority held")
+        // Buffered in the first handle's control stream, behind the held write.
+        first.setPriority(.prefetch)
+        let second = try #require(await coordinator.start(rig.job(2)) as? BackgroundTransferHandle)
+        #expect(second.name == first.name)
+        #expect(await run(first).terminal == .failed(.cancelled(.byClient)))
+        await rig.driver.holdNextSnapshot(.afterListing)
+        second.setPriority(.bulk)
+        await rig.awaitSignal("snapshot")
+        // The held write lands; the buffered prefetch then reaches the coordinator with the replaced attach's token.
+        await rig.driver.releasePriority()
+        await Self.controlsDelivered(first)
+        #expect(!Task.isCancelled, "the replaced handle's control task never ended")
+        await rig.driver.releaseSnapshot()
+        // A cancel queued behind the joining handle's change: once its control task ended, the change has returned.
+        second.cancel()
+        #expect(await run(second).terminal == .failed(.cancelled(.byClient)))
+        await Self.controlsDelivered(second)
+        #expect(!Task.isCancelled, "the joining handle's control task never ended")
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes == [0.75, 0.25], "the joining handle's bulk (0.25) must reach the OS task after the replaced handle's promotion: \(changes)")
+    }
+
+    /// The coordinator's side of the same property: a request carrying a replaced attach's token, made while the
+    /// current attach's request lists the tasks, returns at the entry check without becoming the newest request, so the
+    /// current attach's change still lands.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks", .timeLimit(.minutes(1)))
+    func staleRequestNeverSupersedes() async throws {
+        let rig = try Rig("stale-request-never-supersedes")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let first = try #require(await coordinator.start(rig.job(1)) as? BackgroundTransferHandle)
+        let second = try #require(await coordinator.start(rig.job(2)) as? BackgroundTransferHandle)
+        #expect(second.name == first.name)
+        await rig.driver.holdNextSnapshot(.afterListing)
+        let current = Task { await coordinator.setPriority(.userInitiated, of: second.name, token: second.token) }
+        await rig.awaitSignal("snapshot")
+        await coordinator.setPriority(.bulk, of: first.name, token: first.token)
+        await rig.driver.releaseSnapshot()
+        await current.value
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes == [0.75], "the current attach's promotion lands and the replaced handle's demotion changes nothing: \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.75])
+        withExtendedLifetime([first, second]) {}
+    }
+
+    /// The re-check is a loop, not a single pass (close-out cycle 3): the replaced attach's promotion lands after the
+    /// joining handle's demotion, and the rewrite of the demotion it triggers is itself in flight when the joining
+    /// handle makes a newer change (prefetch), which lands first. That rewrite is now the last write to land, so it
+    /// must be followed by the newest value once more, and by nothing else.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value", .timeLimit(.minutes(1)))
+    func rewriteLandsLast() async throws {
+        let rig = try Rig("rewrite-lands-last")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let first = try #require(await coordinator.start(rig.job(1)) as? BackgroundTransferHandle)
+        await rig.driver.holdNextPriority()
+        first.setPriority(.userInitiated)
+        await rig.awaitSignal("priority held")
+        let second = try #require(await coordinator.start(rig.job(2)) as? BackgroundTransferHandle)
+        #expect(second.name == first.name)
+        #expect(await run(first).terminal == .failed(.cancelled(.byClient)))
+        second.setPriority(.bulk)
+        await rig.awaitSignal("priority")
+        // The promotion lands late; the rewrite of the demotion that follows it is held in turn.
+        await rig.driver.holdNextPriority()
+        await rig.driver.releasePriority()
+        await rig.awaitSignal("priority")
+        await rig.awaitSignal("priority held")
+        // A newer change lands while that rewrite is in flight.
+        second.setPriority(.prefetch)
+        await rig.awaitSignal("priority")
+        await rig.driver.releasePriority()
+        await Self.controlsDelivered(first)
+        #expect(!Task.isCancelled, "the replaced handle's control task never ended")
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        // The race was staged: demotion, late promotion, prefetch, then the late rewrite of the demotion.
+        #expect(Array(changes.prefix(4)) == [0.25, 0.75, 0.5, 0.25], "writes in landing order: \(changes)")
+        #expect(changes.last == 0.5, "the newest request was prefetch (0.5), the OS task ends at \(String(describing: changes.last)); changes \(changes)")
+        #expect(changes.count == 5, "one write of the newest value follows the late rewrite, and nothing else: \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.5])
+        withExtendedLifetime(second) {}
+    }
 }
