@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import ZTronAssetModel
 import ZTronAssetTestSupport
-import ZTronAssetTransport
+@testable import ZTronAssetTransport
 
 /// R-NET-3, R-NET-7: the background coordinator's awaits interleaved with controls, starts, the pump and launch
 /// re-attachment (REENTRANCY rows D-2, D-5, D-7), each ordering forced through `FakeBackgroundSessionDriver`'s holds
@@ -412,5 +412,74 @@ struct BackgroundInterleavingTests {
         #expect(changes == [0.75, 0.25], "each change reaches the OS task in the order it was made: \(changes)")
         #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
         withExtendedLifetime(handle) {}
+    }
+
+    /// Awaits `handle`'s control task; past the hang guard it is cancelled, which ends its iteration, so a timed-out
+    /// test ends at once (`Task.value` ignores cancellation, S3-R4).
+    private static func controlsDelivered(_ handle: BackgroundTransferHandle) async {
+        let controlTask = handle.controlTask
+        await withTaskCancellationHandler {
+            await controlTask.value
+        } onCancel: {
+            controlTask.cancel()
+        }
+    }
+
+    /// Two attaches overlap their calls (S3-CONC-01, close-out cycle 2): the first handle's promotion passed every
+    /// check and its write is in flight when a later attempt of the same content joins the OS task, replacing that
+    /// attach, and the joining handle demotes it. The demotion's write lands first and the promotion's after it, as
+    /// the live driver's own listing may order them. The demotion is the newest request, so the OS task must end at
+    /// the bulk priority 0.25, which is what the coordinator reports.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one", .timeLimit(.minutes(1)))
+    func replacedAttachWriteLandsLast() async throws {
+        let rig = try Rig("replaced-attach-write-lands-last")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let first = try #require(await coordinator.start(rig.job(1)) as? BackgroundTransferHandle)
+        await rig.driver.holdNextPriority()
+        first.setPriority(.userInitiated)
+        await rig.awaitSignal("priority held")
+        let second = try #require(await coordinator.start(rig.job(2)) as? BackgroundTransferHandle)
+        #expect(second.name == first.name)
+        #expect(await run(first).terminal == .failed(.cancelled(.byClient)))
+        second.setPriority(.bulk)
+        await rig.awaitSignal("priority")
+        await rig.driver.releasePriority()
+        await Self.controlsDelivered(first)
+        #expect(!Task.isCancelled, "the replaced handle's control task never ended")
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        // The race was staged: the replaced attach's promotion landed after the joining handle's demotion.
+        #expect(Array(changes.prefix(2)) == [0.25, 0.75], "writes in landing order: \(changes)")
+        #expect(changes.last == 0.25, "the newest request was the joining handle's bulk (0.25), the OS task ends at \(String(describing: changes.last)); changes \(changes)")
+        #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
+        withExtendedLifetime(second) {}
+    }
+
+    /// The same overlap, but the OS task finishes before the promotion's write lands: nothing is written after the
+    /// terminal on the late write's account, and the replaced handle's control task ends.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-10: a priority write that lands after its transfer finished is followed by no other write", .timeLimit(.minutes(1)))
+    func lateWriteAfterTheTerminal() async throws {
+        let rig = try Rig("late-write-after-terminal")
+        defer { rig.cleanUp() }
+        let coordinator = rig.coordinator()
+        let job = rig.job(1)
+        let first = try #require(await coordinator.start(job) as? BackgroundTransferHandle)
+        await rig.driver.holdNextPriority()
+        first.setPriority(.userInitiated)
+        await rig.awaitSignal("priority held")
+        let second = try #require(await coordinator.start(rig.job(2)) as? BackgroundTransferHandle)
+        #expect(await run(first).terminal == .failed(.cancelled(.byClient)))
+        second.setPriority(.bulk)
+        await rig.awaitSignal("priority")
+        await rig.driver.complete(job.partialName, body: TransportFixtures.payload(4_000))
+        #expect(await run(second).terminal == Self.staged(job))
+        await rig.driver.releasePriority()
+        await Self.controlsDelivered(first)
+        #expect(!Task.isCancelled, "the replaced handle's control task never ended")
+        let changes = await rig.driver.priorityChanges.map(\.priority)
+        #expect(changes == [0.25, 0.75], "no write follows the late one once the transfer finished: \(changes)")
+        #expect(await coordinator.liveTransfers().isEmpty)
     }
 }
