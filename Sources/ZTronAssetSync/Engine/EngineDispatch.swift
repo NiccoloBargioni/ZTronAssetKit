@@ -462,19 +462,22 @@ extension SyncEngine {
     }
 
     /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4), reading a throttle's wait at `answeredAt`
-    /// when given (`failFast`).
-    func park(_ transfer: TransferID, reason: BlockReason, answeredAt: MonotonicInstant? = nil) {
+    /// against `answerEnd` when given (`failFast`). A throttle's park keeps the origin's alarm at the origin's end, never
+    /// earlier: a park whose 429 waited for the follow carries its own, earlier end while a later 429 extended the
+    /// origin's, and moving the alarm back to the park's end re-admitted the throttle's jobs before the origin's end
+    /// (PROBE-C10-THROTTLE-EXTENDED).
+    func park(_ transfer: TransferID, reason: BlockReason, answeredAt: MonotonicInstant? = nil, answerEnd: MonotonicInstant? = nil) {
         guard self.transition(transfer, to: .blocked(reason)) else {
             return
         }
         if case .throttled(let until) = reason, let origin = self.state.remote?.originID {
-            self.state.heap.schedule(.throttle(origin), at: until)
+            self.state.heap.schedule(.throttle(origin), at: self.throttleEnd(after: until))
             self.rearm()
         }
         if case .circuitOpen = reason {
             self.scheduleBreakerDeadline()
         }
-        self.failFast(transfer, reason: reason, at: answeredAt)
+        self.failFast(transfer, reason: reason, at: answeredAt, answerEnd: answerEnd)
         if reason == .awaitingSpace {
             // Only the store's due work wakes it: make sure something will run that work.
             self.ensureSpaceWake()
@@ -1098,7 +1101,7 @@ extension SyncEngine {
         guard let entry = self.state.applied.entry(for: asset) else {
             switch interest.kind {
             case .waiter:
-                self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound))
+                self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(.notFound))
             case .prefetch, .ensure:
                 self.dropGroupMember(token, asset: asset, from: old)
             case .system:

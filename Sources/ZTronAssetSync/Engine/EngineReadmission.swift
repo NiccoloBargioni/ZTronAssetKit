@@ -105,8 +105,16 @@ extension SyncEngine {
     /// the jobs parked by a lane-wide gate again from their index under the conditions then current, and the jobs an
     /// event owed from what is left of `edgeOwed` and `originOwed`. A job failed with a backoff loses its retry deadline
     /// when it is re-queued (T19). `true` when a job was re-queued.
+    ///
+    /// Behind the follow barrier the turn waits (`EventAfterFollow.readmit`, S3-R14 item 2): its ranks, lanes and places
+    /// are those the visits and the verdicts before it leave, read under the conditions of its arrival.
     @discardableResult
     func readmit(_ passes: Readmissions) -> Bool {
+        if self.defersToFollow {
+            self.deferToFollow(.readmit(passes, self.conditionsSnapshot))
+            self.notifyObservers()
+            return false
+        }
         var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
         if passes.contains(.conditions), !self.state.laneParked.isEmpty {
             // The gate of a lane-wide block reads only the lane: one verdict per lane, not per job, and no pass at all
@@ -182,7 +190,16 @@ extension SyncEngine {
     /// most `readmissionsPerTurn` per turn. A breaker that admits only a probe (a cooldown's end, a watchdog, a probe's
     /// exit without a verdict) re-admits only the first parked job in the pump's order (`readmitForProbe()`): the pump
     /// would park every other one again behind that probe (S3-B-063).
+    ///
+    /// Behind the follow barrier the gate's opening (the clock, the breaker's outcome) applies now and the re-admission
+    /// waits (`EventAfterFollow.unblock`): the jobs it re-queues, and their places, are those the verdicts before it
+    /// park, as on a visit-first engine.
     func unblockOrigin(_ kind: OriginBlock) {
+        if self.defersToFollow {
+            self.deferToFollow(.unblock(kind))
+            self.notifyObservers()
+            return
+        }
         if kind == .circuitOpen, self.breakerAdmitsOnlyProbe() {
             // A cooldown's end, a silent probe's watchdog or a probe's exit without a verdict: one probe to give.
             self.readmitForProbe()

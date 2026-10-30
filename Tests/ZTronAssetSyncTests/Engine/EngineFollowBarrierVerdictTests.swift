@@ -104,7 +104,7 @@ extension EngineFollowBarrierTests {
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .downloading }
         let rWaiter = Task { await engine.awaitAsset(r.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { $0.state.jobs[r.transferID] != nil }
+        await engine.awaitCondition { $0.state.jobs[r.transferID] != nil || FollowBarrier.joinWaits($0, r) }
         let b2Waiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
         if visit == .sweepFollowsFirst {
             await engine.awaitCondition { $0.state.waiters.values.filter { $0.asset == b.identifier }.count == 2 }
@@ -225,12 +225,12 @@ extension EngineFollowBarrierTests {
         let zNew = EngineHarness.onDemand("zz-z", zBytes)
         let k = EngineHarness.onDemand("zz-k", xBytes)
         try #require(k.transferID == aNew.transferID, "setup: zz-k names A's new content X")
-        await s.harness.source.script(aNew.transferID, [.stage(xBytes)])
-        await s.harness.source.script(zNew.transferID, [.stage(zBytes)])
+        await s.harness.source.script(aNew.transferID, [.hold, .stage(xBytes)])
+        await s.harness.source.script(zNew.transferID, [.hold, .stage(zBytes)])
         let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(870_000) + [aNew, zNew, k], s, visit: visit)
         let kWaiter = Task { withK ? await engine.awaitAsset(k.identifier, lane: .prefetch) : .failure(.cancelled) }
         if visit == .sweepFollowsFirst, withK {
-            await engine.awaitCondition { $0.state.placesAfterFollow[aNew.transferID] == 1 }
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, k) }
             kWaiter.cancel()
             await engine.awaitCondition { $0.state.jobs[aNew.transferID] == nil }
             let mid = await engine.readForTests { e in (owed: e.followOwed, violations: e.invariantViolations()) }
@@ -240,12 +240,17 @@ extension EngineFollowBarrierTests {
         }
         _ = await kWaiter.value
         await engine.readForTests { $0.releaseFollowFollowUps() }
+        // The engine's start order, read while both attempts are held: two attempts started in one pump reach the source
+        // in the order their drivers' store reads end, which is no decision of the engine's (Stage 3 close-out cycle 11).
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[aNew.transferID]?.state == .downloading && $0.state.jobs[zNew.transferID]?.state == .downloading }
+        }
+        let order = await engine.readForTests { e in (x: e.state.jobs[aNew.transferID]?.active?.startSequence, z: e.state.jobs[zNew.transferID]?.active?.startSequence) }
+        #expect(order.x != nil && order.z != nil && order.x! < order.z!, "X, created by the follow before Z, starts first (visit-first): \(order)")
+        await s.harness.source.release(aNew.transferID, with: .progress(received: 0, expected: nil))
+        await s.harness.source.release(zNew.transferID, with: .progress(received: 0, expected: nil))
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
         let zResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: zWaiter) }
-        let starts = await s.harness.source.starts.map(\.id)
-        let xIndex = starts.firstIndex(of: aNew.transferID)
-        let zIndex = starts.firstIndex(of: zNew.transferID)
-        #expect(xIndex != nil && zIndex != nil && xIndex! < zIndex!, "X, created by the follow before Z, starts first (visit-first): x=\(String(describing: xIndex)) z=\(String(describing: zIndex))")
         #expect((try? aResult.get())?.byteSize == Int64(xBytes.count), "A is served from X: \(aResult)")
         #expect((try? zResult.get())?.byteSize == Int64(zBytes.count), "Z is served: \(zResult)")
         await FollowBarrier.finish(s, sync: sync)

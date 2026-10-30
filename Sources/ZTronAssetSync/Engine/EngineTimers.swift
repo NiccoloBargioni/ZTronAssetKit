@@ -111,9 +111,13 @@ extension SyncEngine {
                 guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed(.at) = job.state else {
                     continue
                 }
-                if self.transition(transfer, to: .queued) {
-                    self.enqueue(transfer)
+                if self.defersToFollow {
+                    // The backoff's end is the clock's; the re-queue and its place wait as the events before them do
+                    // (`EventAfterFollow.retryDue`, S3-R14).
+                    self.deferToFollow(.retryDue(transfer, epoch: epoch))
+                    continue
                 }
+                self.retryDue(transfer, epoch: epoch)
             case .throttle(let origin):
                 guard let until = self.state.throttles[origin] else {
                     continue
@@ -183,6 +187,17 @@ extension SyncEngine {
         self.pump()
         self.rearm()
         self.reconcileIdle()
+    }
+
+    /// A failed job's backoff ended (the alarm's `.retry`): it is re-queued unless it left that backoff meanwhile (a user
+    /// request skipped it, an edge re-queued it, it ended).
+    func retryDue(_ transfer: TransferID, epoch: UInt64) {
+        guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed(.at) = job.state else {
+            return
+        }
+        if self.transition(transfer, to: .queued) {
+            self.enqueue(transfer)
+        }
     }
 
     /// The pending run's deadline (its debounce or throttle end) fired: the run starts unless conditions refuse bulk work

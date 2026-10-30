@@ -75,25 +75,41 @@ struct EngineState {
     /// `insufficientSpace`, and any other place in a queue, waits for the follow's end while one is owed
     /// (`eventsAfterFollow`, F-28).
     var inFollowVisit = false
-    /// The events that arrived behind the follow barrier and read what the owed visits change, in arrival order (F-28;
-    /// Stage 3 close-out cycle 9, S3-R11 design D3): an ENOSPC's verdict, the failure verdict of a job that held a moved
-    /// id, a join's re-check of a job parked `insufficientSpace`, and a job's place in its queue. They are applied when
-    /// the follow ends, after its own last turn and pump, as a visit-first engine meets them
-    /// (`SyncEngine.drainEventsAfterFollow`). They wait only while a follow is owed, a drain turn is scheduled or a
-    /// drain is in progress (`invariantViolations()`).
+    /// The inputs that arrived behind the follow barrier and are not real-world ledger inputs, in arrival order (F-28;
+    /// Stage 3 close-out cycle 9, S3-R11 design D3, and cycle 11, S3-R14): every attempt's exit verdict, every request's
+    /// join and withdrawal, a group's release and a purge's withdrawals, an ENOSPC's verdict, a conditions element's and
+    /// a re-admission's decisions about jobs, a due retry and a throttle's fail-fast turn. The engine's handling of each
+    /// waits, and is applied when the follow ends, after its own last turn and pump, as a visit-first engine met them
+    /// (`SyncEngine.drainEventsAfterFollow`); the real-world facts each read (the path, the clock, a `Retry-After`) are
+    /// captured when it arrives. They wait only while a follow is owed, a drain turn is scheduled or a drain is in
+    /// progress (`invariantViolations()`).
     var eventsAfterFollow: [EventAfterFollow] = []
-    /// The places in a queue that wait in `eventsAfterFollow` (`.enqueue`, `.reinstate`), counted per transfer: a queued
+    /// The instant each event of `eventsAfterFollow` arrived, in step with it (`SyncEngine.deferToFollow`): the drain
+    /// applies an event at that instant (`replayInstant`), so a place keeps the time it was asked for (bulk aging reads
+    /// it, the cycle-9 amendment (a)), and a backoff and a fail-fast answer count from the event's arrival.
+    var eventsArrivedAt: [MonotonicInstant] = []
+    /// The arrival instant of the event the drain applies now (`SyncEngine.decisionNow`); `nil` outside the drain.
+    var replayInstant: MonotonicInstant?
+    /// The places in a queue that wait in `eventsAfterFollow` (`.enqueue`), counted per transfer: a queued
     /// job counted here waits in no queue until the drain gives it its place, and is no stranded job
     /// (`invariantViolations()`; the cycle-9 amendment (b)).
     var placesAfterFollow: [TransferID: Int] = [:]
-    /// The jobs whose failure verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): a
-    /// join to such a job, a re-lane of it other than the follow's own and a network edge that meets it wait behind the
-    /// verdict (`.join`, `.relane`, `.edge`); `removeJob` forgets it.
+    /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
+    /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
+    /// event that asks for it); `removeJob` forgets it.
     var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
-    /// The joins that wait in `eventsAfterFollow` for a failure verdict (`.join`), by interest and asset, with the
-    /// transfer each joins: the waiter, group member or run fetch they stand for holds no interest until the drain joins
-    /// it (`invariantViolations()`).
-    var joinsAfterVerdict: [InterestToken: [AssetID: TransferID]] = [:]
+    /// The joins that wait in `eventsAfterFollow` (`.join`), by interest and asset, with the transfer each joins: the
+    /// waiter, group member or run fetch they stand for holds no interest until the drain joins it
+    /// (`invariantViolations()`).
+    var joinsAfterFollow: [InterestToken: [AssetID: TransferID]] = [:]
+    /// The latest end the drain's replayed 429 verdicts gave the origin's throttle so far, by origin: a replayed park
+    /// answers with the end a visit-first engine had decided when its 429 arrived, which counts the earlier replayed
+    /// 429s and not the later ones (`SyncEngine.replayThrottle`). Cleared when the drain ends.
+    var throttlesReplayed: [String: MonotonicInstant] = [:]
+    /// The jobs an older follow left in `unfollowed` that a later apply found owed no visit while an older pass was
+    /// still owed: they join `followOrder` once the older passes end, where a visit-first engine, whose older passes had
+    /// ended at that apply, placed them (`FollowScan.carried`; amendment (e) of S3-R11, cycle 11).
+    var followCarried: Set<TransferID> = []
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
@@ -546,6 +562,9 @@ struct FollowScan {
     let manifest: ValidatedManifest
     /// The index of its next entry to compare.
     var next = 0
+    /// The jobs the apply that queued this pass found in `unfollowed` and owed no visit while older passes were owed:
+    /// they join `followOrder`, sorted, when this pass begins (`SyncEngine.followCarried`).
+    var carried: [TransferID] = []
 }
 
 /// One transfer's outstanding work (ARCHITECTURE §7.1).
@@ -606,8 +625,9 @@ struct Waiter {
     let asset: AssetID
     /// The job it is an interest of.
     var transfer: TransferID
-    /// Its continuation.
-    let continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>
+    /// Its continuation; `nil` once the caller withdrew behind the follow barrier: the caller was answered `.cancelled`
+    /// at once, and the record follows the interest's re-routes until the drain removes both (`SyncEngine.withdraw`).
+    var continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>?
     /// Answered by a store read in an owned task instead of a job: the engine knows the asset is bound to `transfer`'s
     /// content (L4-R5). Such a waiter holds no interest; a read that finds nothing puts it on the job path.
     var fromStore = false

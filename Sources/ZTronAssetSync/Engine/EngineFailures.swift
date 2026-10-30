@@ -24,6 +24,15 @@ extension SyncEngine {
             return
         }
         current.resume = resume
+        self.state.jobs[transfer] = current
+        // Behind the follow barrier the decision waits for the lane the visits leave (PROBE-C10-PAUSE-LANE), with the
+        // lane-wide blocks of this instant (`AttemptVerdict.pause`).
+        let blocks = [AssetPriority.prefetch, .bulk].compactMap { lane in self.laneWideBlock(lane).map { LaneBlock(lane: lane, reason: $0) } }
+        if self.defersFailure(transfer, .pause(policy: policyPause != nil, blocks: blocks)) {
+            self.pump()
+            self.reconcileIdle()
+            return
+        }
         current.active = nil
         self.state.jobs[transfer] = current
         if policyPause != nil, current.lane < .userInitiated, let block = self.laneWideBlock(current.lane) {
@@ -217,8 +226,12 @@ extension SyncEngine {
         }
     }
 
-    /// A fresh attempt now: `downloading → queued`, no backoff, the attempt counter unchanged.
+    /// A fresh attempt now: `downloading → queued`, no backoff, the attempt counter unchanged. Behind the follow barrier
+    /// it waits as every exit does (`defersFailure`), so its place comes after the visits' places.
     private func requeue(_ transfer: TransferID, discarding request: TransferRequest?) {
+        if self.defersFailure(transfer, .requeue) {
+            return
+        }
         self.state.jobs[transfer]?.active = nil
         if self.transition(transfer, to: .queued) {
             self.enqueue(transfer)
@@ -256,7 +269,7 @@ extension SyncEngine {
             self.resolveAll(transfer, with: .failed(assetError))
             return
         }
-        let at = self.environment.time.monotonicNow().adding(seconds: delay)
+        let at = self.decisionNow().adding(seconds: delay)
         if self.transition(transfer, to: .failed(.at(at))) {
             self.state.heap.schedule(.retry(transfer, epoch: remaining.epoch), at: at)
             self.rearm()
@@ -323,18 +336,33 @@ extension SyncEngine {
 
     /// A 429 (ARCHITECTURE §7.6): an origin-wide throttle until the clamped deadline (a `Retry-After` above
     /// `maxRetryAfter` defers to the next run); the job parks `throttled`.
+    ///
+    /// Behind the follow barrier the 429's `Retry-After` throttles the origin when it arrives (a real-world input,
+    /// S3-R14), and the rest waits (`AttemptVerdict.throttle`, `replayThrottle`): the backoff without a `Retry-After`
+    /// is the policy of the job's lane, which the visits may change (PROBE-C10-THROTTLE-LANE), and the park's fail-fast
+    /// answers read the interests the visits leave.
     private func throttled(_ transfer: TransferID, retryAfter: RetryAfter?, wall: Date) {
         guard let job = self.state.jobs[transfer], let origin = self.state.remote?.originID else {
             return
         }
-        let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
         let seconds = retryAfter?.seconds(from: wall)
+        let now = self.environment.time.monotonicNow()
+        if self.defersToFollow {
+            let decided = self.state.throttles[origin]
+            if let seconds, seconds <= min(self.tuning.retry.maxRetryAfter, self.tuning.interactiveRetry.maxRetryAfter) {
+                self.state.throttles[origin] = max(decided ?? .zero, now.adding(seconds: seconds))
+                self.throttleExtended(from: decided)
+            }
+            if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, at: now, decided: decided))) {
+                return
+            }
+        }
+        let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
         guard let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) else {
             self.transition(transfer, to: .failed(.nextRun))
             self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: seconds)))
             return
         }
-        let now = self.environment.time.monotonicNow()
         let until = now.adding(seconds: max(delay, seconds ?? 0))
         let previous = self.state.throttles[origin]
         let end = max(previous ?? .zero, until)
@@ -342,12 +370,6 @@ extension SyncEngine {
         self.state.metrics.retries[.throttled] += 1
         self.state.jobs[transfer]?.active = nil
         self.throttleExtended(from: previous)
-        // The origin's throttle is the 429's own, in force at once. Behind the follow barrier the park of a job that
-        // holds a moved id waits for the follow's visit, whose moved interests its fail-fast answered
-        // (PROBE-C9-THROTTLE, PROBE-C9R-THROTTLE-PRESENT); its answers read the wait at this instant.
-        if self.defersFailure(transfer, .throttle(until: end, at: now)) {
-            return
-        }
         self.park(transfer, reason: .throttled(until: end))
     }
 
@@ -395,12 +417,29 @@ extension SyncEngine {
     /// takes the rest. Every interest it answers leaves its job, so each turn makes progress. One pass over the
     /// throttle's index (`throttleParked`), never every job. A pump follows: an `ensureAvailable` group whose members
     /// failed fast materialises its next ones, which the gate parks and answers the same way.
+    ///
+    /// Behind the follow barrier the turn waits (`EventAfterFollow.throttleAnswers`, S3-R14 item 2): the users it answers
+    /// are those the visits leave on throttle-parked jobs, where a visit-first engine's turn found them; answered now, a
+    /// user the visit moves onto present content got the throttle's answer instead.
     private func answerThrottledUsers() {
         self.state.throttleAnswersScheduled = false
+        guard self.isRunning else {
+            return
+        }
+        if self.defersToFollow {
+            self.deferToFollow(.throttleAnswers)
+            self.notifyObservers()
+            return
+        }
+        self.answerThrottledUsersNow()
+    }
+
+    /// The body of `answerThrottledUsers()`, also the drain's replay of a turn that waited.
+    func answerThrottledUsersNow() {
         guard self.isRunning, let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
             return
         }
-        guard end.seconds(since: self.environment.time.monotonicNow()) > self.tuning.interactiveRetry.interactiveMaxWait else {
+        guard end.seconds(since: self.decisionNow()) > self.tuning.interactiveRetry.interactiveMaxWait else {
             // Every user-initiated interest still waits within its bound.
             return
         }
@@ -527,7 +566,7 @@ extension SyncEngine {
         if self.defersToFollow {
             // The verdict reads the room, the bytes in flight and the job's lane, which the owed visits change: it waits
             // for the follow's end (F-28). The read above is adopted already (S3-R11 R1).
-            self.state.eventsAfterFollow.append(.spaceFailure(transfer, epoch: epoch, required: required))
+            self.deferToFollow(.spaceFailure(transfer, epoch: epoch, required: required))
             return
         }
         self.decideSpaceFailure(transfer, required: required)

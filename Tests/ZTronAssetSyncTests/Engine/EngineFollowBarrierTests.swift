@@ -79,6 +79,12 @@ extension EngineSyncTests {
             return (setup, try #require(x))
         }
 
+        /// Whether a request's join for `entry` waits for the follow's end (`EngineState.joinsAfterFollow`): behind the
+        /// barrier a request joins nothing until the drain (Stage 3 close-out cycle 11, S3-R14).
+        static func joinWaits(_ engine: isolated SyncEngine, _ entry: ManifestEntry) -> Bool {
+            engine.state.joinsAfterFollow.values.contains { $0[entry.identifier] == entry.transferID }
+        }
+
         /// Changed on-demand entries without jobs that sort before the scenario's `zz-` ids: the follow's first pass formats
         /// `followFormatsPerTurn` of them and stops before the scenario's entries, so the follow stays owed.
         @available(macOS 15.0, iOS 18.0, *)
@@ -504,13 +510,13 @@ struct EngineFollowBarrierTests {
         _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: slotWaiter) }
         await engine.awaitCondition { $0.state.jobs[slot.transferID] == nil && $0.state.draining.isEmpty }
         let memberWaiters = members.map { member in Task { await engine.awaitAsset(member.identifier, lane: .prefetch) } }
-        await engine.awaitCondition { $0.state.placesAfterFollow.count == count || !$0.followOwed }
+        await engine.awaitCondition { $0.state.joinsAfterFollow.count == count || !$0.followOwed }
         let uWaiter = Task { await engine.awaitAsset(u.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { $0.state.placesAfterFollow.count == count + 1 || !$0.followOwed }
+        await engine.awaitCondition { $0.state.joinsAfterFollow.count == count + 1 || !$0.followOwed }
         let deferred = await engine.readForTests { e in
-            (owed: e.followOwed, places: e.state.placesAfterFollow.count, running: e.state.jobs.values.filter { $0.state == .downloading }.count)
+            (owed: e.followOwed, joins: e.state.joinsAfterFollow.count, running: e.state.jobs.values.filter { $0.state == .downloading }.count)
         }
-        #expect(deferred.owed && deferred.places == count + 1 && deferred.running == 0, "setup: the 513 places wait for the follow and nothing runs: \(deferred)")
+        #expect(deferred.owed && deferred.joins == count + 1 && deferred.running == 0, "setup: the 513 requests' joins wait for the follow and nothing runs: \(deferred)")
         let starts = await s.harness.source.starts.count
         // The follow ends in the release's turn, the drain gives its first 512 places, and the turn pumps again.
         let between = await engine.readForTests { e in
@@ -577,7 +583,7 @@ struct EngineFollowBarrierTests {
         let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(800_000) + [moved, k], s, visit: visit)
         // K's user request (sweep-first: while the follow owes A's visit, which creates A's new-content job N).
         let kWaiter = Task { await engine.awaitAsset(k.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { $0.state.jobs[k.transferID] != nil }
+        await engine.awaitCondition { $0.state.jobs[k.transferID] != nil || FollowBarrier.joinWaits($0, k) }
         await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { e in
             !e.followOwed && e.state.jobs[moved.transferID]?.state == .blocked(.awaitingSpace) && e.state.jobs[k.transferID]?.state == .blocked(.awaitingSpace)
@@ -710,7 +716,7 @@ struct EngineFollowBarrierTests {
         // A bulk request made now, before the clock moves.
         let requestedAt = s.time.monotonicNow()
         let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .bulk) }
-        await engine.awaitCondition { $0.state.jobs[b.transferID] != nil }
+        await engine.awaitCondition { $0.state.jobs[b.transferID] != nil || FollowBarrier.joinWaits($0, b) }
         s.time.advance(by: 10)
         await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { e in !e.followOwed && (e.state.jobs[p.transferID]?.state == .downloading || e.state.jobs[q.transferID]?.state == .downloading) }
@@ -731,13 +737,14 @@ struct EngineFollowBarrierTests {
     }
 
     /// A released member that user work wants while a follow is owed returns to the place it waited when the follow ends
-    /// (the drain's `.reinstate` replay; the cycle-9 verifiers' coverage finding, mutant "skip the replay"). More
+    /// (the drain's replay of the join that wants it, whose `reinstate` gives the place; the cycle-9 verifiers' coverage
+    /// finding, mutant "skip the replay"; since cycle 11 the whole join waits, not only its place). More
     /// prefetch members than one release turn releases are queued; the handle is released with its follow-ups held
     /// (`holdReleaseFollowUps`), so the release stays part-way, and its pump sets the members it has not reached aside.
     /// Then the follow is owed, and the last member gains a user-lane interest. Visited first, `reinstate` queues it at
     /// its place in the queue its lane now selects (L4-R24(4), S3-B-065) and the pump starts it in that turn. Behind the
-    /// barrier that place waits for the follow; a drain that skipped it left the member aside, queued in no queue, until
-    /// the release's last turn.
+    /// barrier the join, and with it that place, waits for the follow; a drain that skipped it left the member aside,
+    /// queued in no queue, until the release's last turn.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierReinstatesAReleasedMemberWantedAgain(_ visit: LaneDropVisit) async throws {
@@ -769,16 +776,11 @@ struct EngineFollowBarrierTests {
         let turn = await engine.readForTests { engine in
             engine.addSystemInterest(entry: last, lane: .userInitiated)
             engine.pump()
-            let waits = engine.state.eventsAfterFollow.contains { event in
-                if case .reinstate(let transfer, _) = event {
-                    return transfer == last.transferID
-                }
-                return false
-            }
+            let waits = FollowBarrier.joinWaits(engine, last)
             return (waits: waits, state: engine.state.jobs[last.transferID]?.state)
         }
         if visit == .sweepFollowsFirst {
-            #expect(turn.waits && turn.state == .queued, "setup: the member's place waits for the follow: \(turn)")
+            #expect(turn.waits && turn.state == .queued, "setup: the member's join, and its place, wait for the follow: \(turn)")
         } else {
             #expect(turn.state == .downloading, "visit-first, the member starts in the turn its new interest arrived: \(turn)")
         }

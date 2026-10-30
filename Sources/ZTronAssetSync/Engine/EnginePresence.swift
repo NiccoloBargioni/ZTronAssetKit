@@ -135,7 +135,7 @@ extension SyncEngine {
             await engine.readPresentLocation(token, asset: asset, lane: lane)
         }
         if spawned == nil {
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(self.isShuttingDown ? .shutDown : .cancelled))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(self.isShuttingDown ? .shutDown : .cancelled))
         }
     }
 
@@ -149,13 +149,13 @@ extension SyncEngine {
         }
         if let location {
             self.state.metrics.resolveHits += 1
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .success(location))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .success(location))
             self.reconcileIdle()
             return
         }
         self.forgetBound([asset])
         guard let entry = self.state.applied.entry(for: asset) else {
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(.notFound))
             self.reconcileIdle()
             return
         }

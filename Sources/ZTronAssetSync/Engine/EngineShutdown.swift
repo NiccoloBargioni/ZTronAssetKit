@@ -53,8 +53,9 @@ extension SyncEngine {
         self.state.waiters = [:]
         drain.waiters.reserveCapacity(waiters.count + self.state.unknownWaiters.count)
         for token in waiters.keys.sorted() {
-            if let waiter = waiters[token] {
-                drain.waiters.append(waiter.continuation)
+            // A waiter withdrawn behind the follow barrier was answered when it withdrew (`withdraw`).
+            if let continuation = waiters[token]?.continuation {
+                drain.waiters.append(continuation)
             }
         }
         let unknown = self.state.unknownWaiters
@@ -114,9 +115,13 @@ extension SyncEngine {
         self.state.followScans = []
         self.state.pumpWaitsForFollow = false
         self.state.eventsAfterFollow = []
+        self.state.eventsArrivedAt = []
+        self.state.replayInstant = nil
         self.state.placesAfterFollow = [:]
         self.state.verdictsAfterFollow = [:]
-        self.state.joinsAfterVerdict = [:]
+        self.state.joinsAfterFollow = [:]
+        self.state.throttlesReplayed = [:]
+        self.state.followCarried = []
         self.state.drainingAfterFollow = false
         self.state.laneParksOwed.removeAll()
         self.state.inFlightBytes = InFlightBytes()

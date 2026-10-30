@@ -98,22 +98,23 @@ extension SyncEngine {
     /// and promoting it (T15, T20). Promotion is issued synchronously, before any start of this actor turn
     /// (sync-1 S1-06).
     ///
-    /// Behind the follow barrier, a join to a job whose failure verdict waits for the follow (`defersFailure`) waits too,
-    /// at its arrival among the events (`EventAfterFollow.join`): a visit-first engine's join came after the verdict, so
-    /// it met the job the verdict left, or no job at all and created a new one, and the verdict never answered it. Joined
-    /// at once, it was answered with the earlier attempt's failure, or re-queued the job at the verdict's place (Stage 3
-    /// close-out cycle 10, PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE). The follow's own re-routed joins are visits:
-    /// a visit-first engine made them while the attempt still ran, so the verdict answers them.
+    /// Behind the follow barrier every join other than the follow's own waits (`EventAfterFollow.join`, F-28): a
+    /// visit-first engine's join came after the visits, so it met the job a visit created, moved or raised, or the job
+    /// a verdict left, or no job at all and created a new one, at the place a visit-first engine gave it. Joined at once,
+    /// a request created a job whose place came after the jobs the visits created (the cycle-10 verifiers' request
+    /// join), was answered with an earlier attempt's failure, or re-queued a job at the verdict's place (Stage 3
+    /// close-out cycle 10, PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE). The follow's own re-routed joins are visits,
+    /// made at once; the drain's are the waiting ones, in arrival order.
     func addInterest(_ token: InterestToken, asset: AssetID, entry: ManifestEntry, lane: AssetPriority, kind: InterestKind) {
         let transfer = entry.transferID
-        if self.defersToFollow, self.state.verdictsAfterFollow[transfer] != nil {
+        if self.defersToFollow {
             let listed = self.state.applied.entry(for: asset).map { SyncEngine.sameTransfer($0, entry) } ?? false
-            self.state.joinsAfterVerdict[token, default: [:]][asset] = transfer
-            self.state.eventsAfterFollow.append(.join(JoinAfterVerdict(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: listed)))
+            self.state.joinsAfterFollow[token, default: [:]][asset] = transfer
+            self.deferToFollow(.join(JoinAfterFollow(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: listed)))
             self.notifyObservers()
             return
         }
-        let now = self.environment.time.monotonicNow()
+        let now = self.decisionNow()
         self.noteJoin(transfer, asset: asset, entry: entry, token: token, kind: kind)
         if self.state.jobs[transfer] == nil {
             self.state.lastEpoch += 1
@@ -153,14 +154,6 @@ extension SyncEngine {
         if job.state.isCircuitParked {
             // The interest may raise the job's rank: its place in the breaker's order moves with it.
             self.noteCircuitParked(job)
-        }
-        if self.defersToFollow, job.state == .blocked(.insufficientSpace) {
-            // The re-check against the room and the joiner's fail-fast read bytes in flight and lanes the owed visits
-            // change (an abandoned download frees its bytes): they wait for the follow's end (F-28,
-            // PROBE-D-JOIN-FREED). The follow's own re-routed joins are visits, decided at once.
-            self.state.eventsAfterFollow.append(.spaceJoin(token, transfer))
-            self.notifyObservers()
-            return
         }
         if wasReleasedOnly {
             // Now that this interest wants it, it is queued again at the place it waited, in the queue its lane now
@@ -277,14 +270,12 @@ extension SyncEngine {
             }
         case .failed(let disposition):
             if self.state.verdictsAfterFollow[transfer] != nil {
-                // The attempt's verdict waits for the follow (`defersFailure`). The follow's own visit met a running
-                // attempt on a visit-first engine, whose re-lane only re-prioritised it: nothing to do (marking the job
-                // joined skipped the retry's backoff, PROBE-C9-SPURIOUS-JOIN). Any other re-lane (an interest withdrawn)
-                // met the job the verdict left: it waits behind the verdict, at its arrival.
-                if !self.state.inFollowVisit {
-                    self.state.eventsAfterFollow.append(.relane(transfer, epoch: job.epoch, from: before))
-                    self.notifyObservers()
-                }
+                // The attempt's verdict waits for the follow (`defersFailure`). Only the follow's own visit, or an event
+                // the drain applies before the verdict, re-lanes such a job: each met a running attempt on a visit-first
+                // engine, whose re-lane only re-prioritised it, so nothing is done (marking the job joined skipped the
+                // retry's backoff, PROBE-C9-SPURIOUS-JOIN). Every other re-lane comes from an input that waits behind
+                // the verdict as an event of its own (a join, a withdrawal), so the cycle-10 `.relane` event is gone
+                // (S3-R14 item 4).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {
@@ -323,7 +314,26 @@ extension SyncEngine {
     /// or the claim ends (`dropClaim` retires it then). The engine's other exits do not pass here and are unchanged
     /// (L5-R1): a content left the manifest or changed (`followApplied`, `supersede`), became present (the pre-transfer
     /// read retires its job directly), failed or was held back (`EngineFailures`), or committed (`resolveAll`).
+    ///
+    /// Behind the follow barrier the removal waits (`EventAfterFollow.removal`, S3-R14 item 3): a withdrawal, a run's end
+    /// or a release of re-attachments is a request, not a real-world ledger input, so a visit-first engine removed the
+    /// interest after the visits, the verdicts and the joins that arrived before it. Removed at once, a job the visits
+    /// then left without an interest was retired before the verdict and the join it followed, and the join's fresh job
+    /// started at once (PROBE-C10-JOIN-RETIRE). The follow's own removals and an answer's (`resolve`) are made at once.
     func removeInterest(_ token: InterestToken, from transfer: TransferID) {
+        guard self.state.jobs[transfer]?.interests[token] != nil else {
+            return
+        }
+        if self.defersToFollow {
+            self.deferToFollow(.removal(token, transfer))
+            self.notifyObservers()
+            return
+        }
+        self.dropInterest(token, from: transfer)
+    }
+
+    /// `removeInterest` now, whatever the barrier: an interest answered (`resolve`) has nothing left to wait for.
+    private func dropInterest(_ token: InterestToken, from transfer: TransferID) {
         guard var job = self.state.jobs[transfer], job.interests[token] != nil else {
             return
         }
@@ -458,11 +468,11 @@ extension SyncEngine {
             return
         }
         if !front, !askedBefore {
-            job.queuedAt = self.environment.time.monotonicNow()
+            job.queuedAt = self.decisionNow()
         }
         if self.defersToFollow {
             self.state.jobs[transfer] = job
-            self.state.eventsAfterFollow.append(.enqueue(transfer, epoch: job.epoch, front: front))
+            self.deferToFollow(.enqueue(transfer, epoch: job.epoch, front: front))
             self.notePlaceWaits(transfer)
             return
         }
@@ -479,15 +489,11 @@ extension SyncEngine {
     /// Queues a job again at the place its entry had (`Job.queuePlace`), with a fresh ticket: its old entry, set aside by
     /// a scan or still in place, goes stale. For a job only released groups wanted that an interest at its own lane
     /// wants again (`addInterest`): pushed to the front, the jobs re-joined in one turn were dispatched in reverse order
-    /// and ahead of work queued before them (review of close-out cycle 10, PROBE-C10R-3; R-SYN-3).
+    /// and ahead of work queued before them (review of close-out cycle 10, PROBE-C10R-3; R-SYN-3). Never behind the
+    /// follow barrier: its only caller, `addInterest`, defers every join but the follow's own and the drain's (cycle 11),
+    /// so the cycle-9 `.reinstate` event is gone.
     func reinstate(_ transfer: TransferID) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
-            return
-        }
-        if self.defersToFollow {
-            // Behind the follow barrier, as `enqueue`'s place (F-28).
-            self.state.eventsAfterFollow.append(.reinstate(transfer, epoch: job.epoch))
-            self.notePlaceWaits(transfer)
             return
         }
         self.state.lastTicket += 1
@@ -531,7 +537,7 @@ extension SyncEngine {
             return
         }
         self.deliver(outcome, to: token, interest: interest, transfer: transfer)
-        self.removeInterest(token, from: transfer)
+        self.dropInterest(token, from: transfer)
     }
 
     /// Delivers `outcome` to the owner of `token` without touching the job.
@@ -544,12 +550,12 @@ extension SyncEngine {
             switch outcome {
             case .committed(let locations):
                 if let location = locations[waiter.asset] {
-                    waiter.continuation.resume(returning: .success(location))
+                    waiter.continuation?.resume(returning: .success(location))
                 } else {
-                    waiter.continuation.resume(returning: .failure(.notFound))
+                    waiter.continuation?.resume(returning: .failure(.notFound))
                 }
             case .failed(let error):
-                waiter.continuation.resume(returning: .failure(error))
+                waiter.continuation?.resume(returning: .failure(error))
             }
         case .prefetch, .ensure:
             guard var group = self.state.groups[token] else {
@@ -570,7 +576,7 @@ extension SyncEngine {
             self.recordRunOutcome(outcome, transfer: transfer, assets: interest.assets)
         case .system:
             // A heal ends with its job, committed or failed (a heal still scheduled for later is kept).
-            let now = self.environment.time.monotonicNow()
+            let now = self.decisionNow()
             for asset in interest.assets {
                 if case .committed = outcome {
                     self.state.heals[asset] = nil
@@ -638,12 +644,13 @@ extension SyncEngine {
 
     /// The fail-fast policy when a job is parked (ARCHITECTURE §7.6/§7.7): which interests get an answer now; `only`
     /// restricts it to one interest (a joiner of a parked job). A throttle's wait is read at `at` when given: a park
-    /// whose verdict waited for the follow answers with the wait its 429 left (`replayVerdict`).
-    func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil, at: MonotonicInstant? = nil) {
+    /// whose verdict waited for the follow answers with the wait its 429 left, against the end `answerEnd` a visit-first
+    /// engine had decided then (`replayThrottle`).
+    func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil, at: MonotonicInstant? = nil, answerEnd: MonotonicInstant? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        let now = at ?? self.environment.time.monotonicNow()
+        let now = at ?? self.decisionNow()
         for token in job.interests.keys.sorted() where only == nil || only == token {
             guard let interest = self.state.jobs[transfer]?.interests[token], interest.kind == .waiter || interest.kind == .ensure else {
                 continue
@@ -656,7 +663,7 @@ extension SyncEngine {
                 error = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
             case .throttled(let until):
                 // The origin's end, not the job's: a later 429 may have extended the throttle after it parked (F-36).
-                let wait = self.throttleEnd(after: until).seconds(since: now)
+                let wait = (answerEnd ?? self.throttleEnd(after: until)).seconds(since: now)
                 let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
                 error = wait > limit ? .serverUnavailable(retryAfter: wait) : nil
             case .insufficientSpace:

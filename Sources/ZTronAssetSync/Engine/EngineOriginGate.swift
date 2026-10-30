@@ -74,7 +74,7 @@ extension SyncEngine {
 
     /// The origin's gates now.
     func originGateNow() -> OriginGate {
-        self.originGate(at: self.environment.time.monotonicNow())
+        self.originGate(at: self.decisionNow())
     }
 
     /// Performs, in this turn, the transitions `gate` shows the clock or an outcome has opened, as the alarm's `.throttle`

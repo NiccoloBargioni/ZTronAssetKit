@@ -168,11 +168,23 @@ extension SyncEngine {
     /// (`Waiter.transfer`, which every reroute moves with it; the model test checks both directions after every
     /// operation), so only that job is touched: a sorted pass over every job held the actor about 6 ms at 10,000 queued
     /// prefetch members (review of close-out cycle 9, PROBE-C9R-1, C2).
+    ///
+    /// Behind the follow barrier the caller is answered at once (R-SYN-4, R-SYN-10), and only the engine's removal of
+    /// the interest waits (`removeInterest`, S3-R14 item 3): the record stays, without its continuation, so it follows
+    /// the interest's re-routes and joins until the drain removes both (`replayRemoval`), and no later answer reaches the
+    /// caller twice.
     func withdraw(_ token: InterestToken) {
-        if let waiter = self.state.waiters.removeValue(forKey: token) {
-            waiter.continuation.resume(returning: .failure(.cancelled))
-            self.removeInterest(token, from: waiter.transfer)
-            self.pump()
+        if let waiter = self.state.waiters[token], waiter.continuation != nil {
+            waiter.continuation?.resume(returning: .failure(.cancelled))
+            if self.defersToFollow, !waiter.fromStore {
+                self.state.waiters[token]?.continuation = nil
+                self.deferToFollow(.removal(token, waiter.transfer))
+                self.notifyObservers()
+            } else {
+                self.state.waiters[token] = nil
+                self.removeInterest(token, from: waiter.transfer)
+                self.pump()
+            }
         } else if let waiter = self.state.unknownWaiters.removeValue(forKey: token) {
             waiter.continuation.resume(returning: .failure(.cancelled))
         }
@@ -303,9 +315,16 @@ extension SyncEngine {
     /// Joins one prefetch member unless it is gone from the manifest, present at its current content, bound to it since
     /// the view was read (L4-R5), or held back (T2). Its pending claim ends afterwards, once its interest, if any, is
     /// in place (L5-R1).
+    ///
+    /// Behind the follow barrier the claim's end waits behind the member's join (`EventAfterFollow.endClaim`): it may
+    /// retire a job only the claim kept, which a visit-first engine retired, or kept for the join, after the visits.
     private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
         defer {
-            self.endClaim(token, member: id)
+            if self.defersToFollow {
+                self.deferToFollow(.endClaim(token, member: id))
+            } else {
+                self.endClaim(token, member: id)
+            }
         }
         guard let entry = self.state.applied.entry(for: id) else {
             return
@@ -333,7 +352,20 @@ extension SyncEngine {
     /// (`continueReleases`); a job only released groups want never starts meanwhile (`gate`). Removing the 10,000
     /// interests of a prefetch handle in one turn, after sorting their transfers, held the engine's actor about 15 ms
     /// (review of close-out cycle 8, C2).
+    ///
+    /// Behind the follow barrier the release waits (`EventAfterFollow.release`, S3-R14 item 3): it is a request, so a
+    /// visit-first engine released the group after the visits and the events before it; the group stays registered
+    /// until the drain, where the joins that arrived before the release are made and then removed with it. An
+    /// `ensureAvailable` caller waiting on the group is answered at once.
     func performReleaseGroup(_ token: InterestToken) {
+        if self.defersToFollow, self.state.groups[token] != nil {
+            let continuation = self.state.groups[token]?.continuation
+            self.state.groups[token]?.continuation = nil
+            continuation?.resume(returning: false)
+            self.deferToFollow(.release(token, entry: false))
+            self.notifyObservers()
+            return
+        }
         guard let group = self.state.groups.removeValue(forKey: token) else {
             return
         }
@@ -425,7 +457,21 @@ extension SyncEngine {
             return
         }
         self.state.releaseFollowUpScheduled = false
-        guard !self.isShuttingDown, self.continueReleases() else {
+        guard !self.isShuttingDown else {
+            return
+        }
+        if self.defersToFollow {
+            // Behind the follow barrier the turn's claim ends and removals wait as the release's own (S3-R14 item 3).
+            self.deferToFollow(.continueReleases)
+            self.notifyObservers()
+            return
+        }
+        self.resumeReleases()
+    }
+
+    /// One release turn (`continueReleases`), then the pump and the idle check once the last member left.
+    func resumeReleases() {
+        guard self.continueReleases() else {
             return
         }
         self.pump()
@@ -452,7 +498,7 @@ extension SyncEngine {
     // MARK: Pending claims (L5-R1, CCR-G2)
 
     /// The group's join reached `id`, its next member in order, and joined or skipped it: the member's claim ends.
-    private func endClaim(_ token: InterestToken, member id: AssetID) {
+    func endClaim(_ token: InterestToken, member id: AssetID) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count, group.members[group.claimCursor] == id else {
             return
         }
@@ -474,8 +520,15 @@ extension SyncEngine {
     /// release of the group drops what is left first. A degraded engine cannot spawn that follow-up, and its start failed
     /// before any job existed, so no claim drop can retire one there: it drops them all in this turn (one table update
     /// each). Internal so a test can give a registered group's claims up in one turn.
+    ///
+    /// Behind the follow barrier the claims' end waits as a claim's end does (`EventAfterFollow.endClaims`).
     func endClaims(of token: InterestToken) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
+            return
+        }
+        if self.defersToFollow {
+            self.deferToFollow(.endClaims(token))
+            self.notifyObservers()
             return
         }
         let claims = group.claimed[group.claimCursor...]
@@ -941,6 +994,31 @@ extension SyncEngine {
         // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
         self.dropBindings()
         self.settleRun(.cancelled)
+        if self.defersToFollow {
+            // A request: its withdrawals wait for the follow and meet the jobs the visits and earlier events leave
+            // (S3-R14 item 3).
+            self.deferToFollow(.purge(request))
+            self.notifyObservers()
+        } else {
+            self.withdrawPurged(request)
+        }
+        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+        let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
+            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+            .purge(await engine.purgeTask(request))
+        }
+        if case .purge(let outcome) = result {
+            return outcome
+        }
+        if case .done(.failure(let error)) = result {
+            return .failure(error)
+        }
+        return .failure(.cancelled)
+    }
+
+    /// Withdraws the non-user interests a purge of `request` removes (user waiters keep theirs and re-queue): a group
+    /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten.
+    func withdrawPurged(_ request: PurgeRequest) {
         for transfer in self.state.jobs.keys.sorted() {
             guard let job = self.state.jobs[transfer] else {
                 continue
@@ -985,18 +1063,6 @@ extension SyncEngine {
                 }
             }
         }
-        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
-        let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
-            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
-            .purge(await engine.purgeTask(request))
-        }
-        if case .purge(let outcome) = result {
-            return outcome
-        }
-        if case .done(.failure(let error)) = result {
-            return .failure(error)
-        }
-        return .failure(.cancelled)
     }
 
     private func purgeTask(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
@@ -1453,20 +1519,35 @@ extension SyncEngine {
         continuation.resume(returning: .done(.failure(.cancelled)))
         if stopWork {
             self.cancelTask(self.state.entryTasks[token])
-            if let group = self.state.groups.removeValue(forKey: token) {
-                group.continuation?.resume(returning: false)
-                // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
-                self.state.unlistedClaims -= group.unlistedClaims
-                for claim in group.claimed[group.claimCursor...] {
-                    self.dropClaim(claim)
-                }
-                for transfer in Set(group.pending.values).sorted() {
-                    self.removeInterest(token, from: transfer)
-                }
-                self.pump()
+            if self.defersToFollow, self.state.groups[token] != nil {
+                // The caller is answered; the group's removal waits for the follow as a release does (S3-R14 item 3).
+                let waiting = self.state.groups[token]?.continuation
+                self.state.groups[token]?.continuation = nil
+                waiting?.resume(returning: false)
+                self.deferToFollow(.release(token, entry: true))
+                self.notifyObservers()
+            } else {
+                self.releaseEntryGroup(token)
             }
         }
         self.reconcileIdle()
+    }
+
+    /// Removes a withdrawn entry's group (`withdrawEntry`): its claims end and its members' interests leave at once.
+    func releaseEntryGroup(_ token: InterestToken) {
+        guard let group = self.state.groups.removeValue(forKey: token) else {
+            return
+        }
+        group.continuation?.resume(returning: false)
+        // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
+        self.state.unlistedClaims -= group.unlistedClaims
+        for claim in group.claimed[group.claimCursor...] {
+            self.dropClaim(claim)
+        }
+        for transfer in Set(group.pending.values).sorted() {
+            self.removeInterest(token, from: transfer)
+        }
+        self.pump()
     }
 
     // MARK: Introspection (R-SYN-14, P-14)
@@ -1625,9 +1706,9 @@ extension SyncEngine {
         if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
             violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
         }
-        // A waiter whose join waits for a failure verdict (`joinsAfterVerdict`) holds no interest until the drain.
+        // A waiter whose join waits for a failure verdict (`joinsAfterFollow`) holds no interest until the drain.
         for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
-            if self.state.joinsAfterVerdict[token]?[waiter.asset] != waiter.transfer {
+            if self.state.joinsAfterFollow[token]?[waiter.asset] != waiter.transfer {
                 violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
             }
         }
@@ -1672,7 +1753,7 @@ extension SyncEngine {
         }
         for (token, group) in self.state.groups {
             for (asset, transfer) in group.pending where self.state.jobs[transfer]?.interests[token] == nil {
-                if self.state.joinsAfterVerdict[token]?[asset] != transfer {
+                if self.state.joinsAfterFollow[token]?[asset] != transfer {
                     violations.append("group \(token.rawValue) member \(asset) without an interest")
                 }
             }
@@ -1703,7 +1784,7 @@ extension SyncEngine {
             violations.append("\(transfer) drains an attempt whose driver ended")
         }
         if let run = self.state.run, run.transferring, run.settlement == nil {
-            let waitingJoins = Set(self.state.joinsAfterVerdict[run.token].map { Array($0.values) } ?? [])
+            let waitingJoins = Set(self.state.joinsAfterFollow[run.token].map { Array($0.values) } ?? [])
             for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil && !waitingJoins.contains(transfer) {
                 violations.append("the run claims \(transfer), whose job does not hold its interest")
             }
@@ -1838,7 +1919,9 @@ extension SyncEngine {
         if !self.state.originOwed.isSubset(of: originParked) {
             violations.append("\(self.state.originOwed.subtracting(originParked).count) jobs owed a re-queue by their origin are not parked by it")
         }
-        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled {
+        // A re-admission turn that waits for the follow (`EventAfterFollow.readmit`) is the turn the owed re-queues wait for.
+        let readmissionWaits = self.state.eventsAfterFollow.contains { if case .readmit = $0 { return true } else { return false } }
+        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled, !readmissionWaits {
             violations.append("re-queues are owed but no turn is scheduled for them")
         }
         if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
@@ -1854,7 +1937,9 @@ extension SyncEngine {
                 violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
             }
         }
-        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
+        // A release turn that waits for the follow (`EventAfterFollow.continueReleases`) is the turn the members wait for.
+        let releaseWaits = self.state.eventsAfterFollow.contains { if case .continueReleases = $0 { return true } else { return false } }
+        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled, !releaseWaits {
             violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
         }
         // A registered group's token is in `releasing` with claims only after a join's large give-up (L5-R15): that is
@@ -1888,9 +1973,10 @@ extension SyncEngine {
 
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
     /// drain is in progress (none, between turns), so none waits for ever; the places counted in `placesAfterFollow` are
-    /// exactly the waiting `.enqueue` and `.reinstate` events; every failure verdict that waits names a failed job with
-    /// its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11); and the joins registered in
-    /// `joinsAfterVerdict` are exactly the waiting `.join` events (cycle 10).
+    /// exactly the waiting `.enqueue` events; every failure verdict that waits names a failed job with
+    /// its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11); the joins registered in
+    /// `joinsAfterFollow` are exactly the waiting `.join` events (cycle 10); and the drain's replayed throttles and the
+    /// carried jobs are gone once the barrier is down (cycle 11).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -1902,7 +1988,7 @@ extension SyncEngine {
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
         for event in events {
             switch event {
-            case .enqueue(let transfer, _, _), .reinstate(let transfer, _):
+            case .enqueue(let transfer, _, _):
                 places[transfer, default: 0] += 1
             case .attemptFailed(let transfer, let epoch, _):
                 if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
@@ -1910,12 +1996,18 @@ extension SyncEngine {
                 }
             case .join(let join):
                 joins[join.token, default: [:]][join.asset] = join.entry.transferID
-            case .spaceFailure, .spaceJoin, .relane, .edge:
+            case .spaceFailure, .endClaim, .endClaims, .removal, .release, .continueReleases, .purge, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers:
                 break
             }
         }
-        if joins != self.state.joinsAfterVerdict {
-            violations.append("\(self.state.joinsAfterVerdict.count) interests' joins wait for a failure verdict, \(joins.count) with their event")
+        if joins != self.state.joinsAfterFollow {
+            violations.append("\(self.state.joinsAfterFollow.count) interests' joins wait for the follow, \(joins.count) with their event")
+        }
+        if events.count != self.state.eventsArrivedAt.count {
+            violations.append("\(events.count) events wait for a follow with \(self.state.eventsArrivedAt.count) arrival instants")
+        }
+        if !self.followBarrier, !self.state.throttlesReplayed.isEmpty || !self.state.followCarried.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.throttlesReplayed.count) replayed throttles and \(self.state.followCarried.count) carried jobs left")
         }
         if places != self.state.placesAfterFollow {
             violations.append("the \(self.state.placesAfterFollow.count) counted places that wait for a follow differ from the \(places.count) the events hold")
