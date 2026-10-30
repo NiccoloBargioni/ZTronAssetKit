@@ -273,8 +273,6 @@ struct ForegroundBackendTests {
         for (reader, item) in zip(readers, expected) {
             #expect(await reader.value == [item.terminal], "\(item.path): exactly one terminal element, then the stream ended")
         }
-        let edges = transferIntervalEdges(rig.tap)
-        #expect(edges.began == expected.count && edges.ended == expected.count)
         #expect(await rig.foreground.liveTransfers().isEmpty)
         let unfinished = await rig.foreground.session.allTasks.filter { $0.state != .completed }
         #expect(unfinished.isEmpty, "\(unfinished.count) URLSession tasks outlived their transfers")
@@ -282,6 +280,12 @@ struct ForegroundBackendTests {
         handles.removeAll()
         #expect(references.allSatisfy { $0.object == nil }, "a task kept a handle alive after its transfer ended")
         await rig.stop()
+        // Read after `stop()`: the interval ends in the update stream's `onTermination`, which `finish()` runs on the
+        // delegate queue after releasing the stream, so a reader may see the end first. `stop()` returns after
+        // `didBecomeInvalidWithError` (T2-04), which that serial queue delivers after every completion, its
+        // `finish()` and that `onTermination` returned.
+        let edges = transferIntervalEdges(rig.tap)
+        #expect(edges.began == expected.count && edges.ended == expected.count)
     }
 
     @available(macOS 15.0, iOS 18.0, *)
