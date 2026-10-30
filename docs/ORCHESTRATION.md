@@ -61,7 +61,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - (R1) Where the class ends. The judges lean to (a): real-world ledger inputs (freed bytes, free-space reads) apply on arrival, D3's `.read` deferral is dropped, L4-R7 is kept, and READ-ORDER, READ-PROMOTE and UNRELATED-FREE are out of the class.
     - (R2) The R-SYN-2 assertion `between.steady == .downloading` becomes `.queued`. Admissions then wait for a multi-turn follow: 131–143 ms at 10,000 on macOS release; not measured on a device.
     - (R3) G3 records for D3's six one-to-one assertion replacements.
-  - **Nothing running at 12:30.** The owner interrupted before the cycle-9 launch and asked for status. Launch only on the owner's go-ahead.
+- **Fix run 3: RUNNING** `wf_87a53c2d-041` (task `wsitz52bo`), launched about 12:55 on the owner's "Launch on D3", at weekly 49 %, with no usage stop.
+  - **Scope:** `s3f` only, from cycle 9 (`fromCycle: 9`, `maxCycle: 12`), with simulator set 1 (897F…/6BE1…/5B94…).
+  - **Inputs:** findings `s3f-c8-issues.json`; the args are saved in `.build-orchestrator/s3-fix-args-run3.json`.
+  - **Rulings added** to `s3-rulings-s3f.md`:
+    - **S3-R11:** D3 with amendments (a)–(f); R1 option (a), so real-world ledger inputs apply on arrival and L4-R7 is kept; R2 (the R-SYN-2 assertion becomes `.queued`); R3 (one-to-one G3 records); the failing-first test list; C2.
+    - **S3-R13:** 0 warnings at tools 6.4, checked in a `git archive` export. Nobody edits `Package.swift`.
+  - **Resume:**
+    - In this session, use `resumeFromRunId` with the same script and the same args.
+    - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
+- **Tools-6.4 probe (a), running beside it:** background task `b3xp5l89q` in `.worktrees/t64` at `9adfa91`. It runs `verify.sh --quick`, the release build and the iOS build. Logs and `status.txt` / `warnings.txt` go to `.build-orch/t64/`.
 - **Queued after every stage (owner, 30 Oct; choices not settled, the question form was cancelled):**
   - (1) A facade method that decides at run time whether iOS 26+ is served by AWS or Apple-hosted packs. Today `TierSelection.select` decides once, at client build, with a static `awsOnly`.
   - (2) A simple Electron app with these features:
@@ -71,10 +80,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - upload correctness checked "in the sense of this package";
     - a log written before every upload.
   - Owner: "All of this is executed by an Opus agent on Medium effort" (`model: "opus"`, `effort: "medium"`; an independent Opus-medium verifier per P4).
-  - **Open owner choices:**
-    - what drives the tier decision, and when a change takes effect;
-    - the app's location, and npm access, which CLAUDE.md's network rule forbids without the owner's explicit override;
-    - models over the 4 GiB `maxAssetBytes` (GGUF shards, a raised cap, or reject).
+  - **Owner answers (30 Oct, about 12:50):**
+    - **What drives the tier decision:** "A method on the interface of the facade". The app chooses AWS or Apple-hosted for iOS 26+. `TierSelection.select` (R-APL-5) gains the choice as one more pure input, and keeps its exhaustive tests and its single `#available`. It is a public-API addition, so it is NEEDS-HUMAN-REVIEW, and it needs a new SPEC row.
+    - **When a change takes effect:** "When I next push an update to the app store for app users, right now in dev mode". So the choice is fixed per app build and read when the client is built. There is no live switch.
+    - **Where the app lives, and npm:** "In Documents folder, you can use NPM only on for the Electron app". Folder: `/Users/admin/Documents/ZTronAssetManager`, its own local git repo. The npm registry is allowed for that folder only; CLAUDE.md's network rule still holds everywhere else, and this Swift package stays dependency-free.
+    - **Qwen models over 4 GiB:** "Planning to use a 500MB model, preserve the 4GB limit for now. If it's not an hard rule enforced by Apple, we might provide a configuration method on the facade of this package".
+      - Keep `maxAssetBytes` at 4 GiB.
+      - It is already configurable on the facade: `AssetClientConfiguration.limits: ManifestLimits`, `maxAssetBytes`, R-MAN-2 and ADR-048.
+      - The agent checks Apple's asset-pack size limits in the Apple developer documentation and records them. If Apple has no hard limit, it proposes a facade configuration method; it does not change the 4 GiB default.
   - **Never in tests:** real uploads or deletions on AWS or App Store Connect. The owner does the first real upload.
 - **Still open for the owner:** the NEEDS-HUMAN-REVIEW list (ADR-050 without P-13, 052, 055, 056).
 
