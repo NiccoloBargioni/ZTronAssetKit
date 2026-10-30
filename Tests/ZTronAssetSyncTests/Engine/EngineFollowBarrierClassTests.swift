@@ -261,6 +261,11 @@ extension EngineFollowBarrierTests {
         }
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .downloading }
+        // Read right after the 429, before the follow's end: the 429 throttles the origin when it arrives, as visit-first
+        // (Stage 3 close-out cycle 12, S3-R15 item 2; the cycle-11 verifiers' THROTTLE-LANE read after the 429).
+        let atArrival = await engine.readForTests { e -> Double? in
+            e.state.remote.flatMap { e.state.throttles[$0.originID] }?.seconds(since: e.environment.time.monotonicNow())
+        }
         await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let figures = await engine.readForTests { e -> (throttle: Double?, background: Double?, interactive: Double?) in
@@ -278,6 +283,11 @@ extension EngineFollowBarrierTests {
             #expect(abs(throttle - background) < 0.000_001, "the origin's throttle is the backoff of C's prefetch lane (visit-first): \(figures)")
         } else {
             Issue.record("the origin is throttled: \(figures)")
+        }
+        if let throttle = atArrival, let background = figures.background {
+            #expect(abs(throttle - background) < 0.000_001, "right after the 429 the origin is throttled for the backoff of C's prefetch lane (visit-first): \(throttle) against \(figures)")
+        } else {
+            Issue.record("the origin is throttled right after the 429 (visit-first): \(String(describing: atArrival)) against \(figures)")
         }
         let mResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: mWaiter) }
         let pResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: pWaiter) }
