@@ -48,9 +48,12 @@ extension AssetStore {
     /// backoff, then `failed(.integrity)` after `maxIntegrityAttempts`. The engine calls it for transport and store
     /// integrity failures alike (ADR-032).
     ///
-    /// Records whose identity changed, failed records and unknown ids are left alone. A record without a blob becomes
-    /// `quarantined(until:)`; a record still serving stale bytes keeps serving them during the backoff (store.md §6.1)
-    /// and loses them only when it becomes `failed(.integrity)`.
+    /// Records whose identity changed, failed records and unknown ids are left alone, and so is a record bound to a live
+    /// blob of `identity`: its bytes were verified when they were bound, so a failed transfer of content the store already
+    /// serves never counts against it (the engine reads presence before the call, but an adoption bound during that read
+    /// is only seen here; the guard `recordFailure` has since L4-R16, Stage 3 ruling S3C-9). A record without a blob
+    /// becomes `quarantined(until:)`; a record still serving stale bytes keeps serving them during the backoff
+    /// (store.md §6.1) and loses them only when it becomes `failed(.integrity)`.
     package func recordIntegrityFailure(_ ids: [AssetID], identity: ContentIdentity) async throws(StoreError) {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()
@@ -63,6 +66,11 @@ extension AssetStore {
                 continue
             }
             if case .failed = record.residency {
+                continue
+            }
+            // A record present at the failed content holds verified bytes of it: the failure was a redundant transfer's.
+            // A stale record's blob is not that content, so it still counts (S3C-9).
+            if record.referencedBlob != nil, !record.isStale {
                 continue
             }
             let step = IntegrityBookkeeping.failure(after: record.integrity, of: identity, at: now, policy: self.configuration.policy)

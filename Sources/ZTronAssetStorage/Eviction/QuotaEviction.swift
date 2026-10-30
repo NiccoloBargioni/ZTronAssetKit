@@ -49,8 +49,8 @@ extension AssetStore {
         }
     }
 
-    /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks, publishes the snapshot without the
-    /// victims and commits. It stops once the bytes released since the measurement, by itself or by any eviction,
+    /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks (a blob of more records than a chunk
+    /// a chunk of its records per turn, `evictAcrossTurns`), publishes the snapshot without the victims and commits. It stops once the bytes released since the measurement, by itself or by any eviction,
     /// `apply`'s plan, purge, quarantine or recorded failure that ran while it awaited (`EvictionState.releasedBytes`),
     /// cover what it measured.
     func performEvictIfNeeded() async throws(StoreError) -> CleanupResult {
@@ -110,15 +110,26 @@ extension AssetStore {
                     rules = self.evictionRules()
                 }
                 // A chunk is whole candidates up to `chunk` records: a turn's cost follows the records it changes, and a
-                // blob's records leave together (C-1), so the chunk ends at the first blob boundary at or past `chunk`.
+                // blob's records leave together (C-1), so the chunk ends at the first blob boundary at or past `chunk`. A
+                // blob of more records than `chunk` is a chunk of its own, taken `chunk` records per turn
+                // (`evictAcrossTurns`; C2 at the reference scale, Stage 3 ruling S3C-2).
                 var records = 0
-                while end < candidates.count, records < chunk {
+                while end < candidates.count, records < chunk, records == 0 || candidates[end].victims.count <= chunk {
                     records += candidates[end].victims.count
                     end += 1
                 }
                 scan = HolderScan(blobs: candidates[index..<end].map(\.key))
             }
-            switch self.evict(candidate.victims[...], rules: rules, scan: &scan) {
+            let outcome: BlobEviction?
+            if candidate.victims.count > chunk {
+                // REENTRANCY: s3c-1 (proposed) — inside, after each release between its turns: the phase, writability and
+                // the blob's remaining holders; the next candidate starts a chunk of its own, after a release, with rules
+                // and a scan read again.
+                outcome = try await self.evictAcrossTurns(candidate.victims, chunk: chunk, rules: rules)
+            } else {
+                outcome = self.evict(candidate.victims[...], rules: rules, scan: &scan)
+            }
+            switch outcome {
             case .doomed(let bytes)?:
                 result.bytesFreed = result.bytesFreed.addingSaturating(bytes)
                 result.filesRemoved += 1
@@ -313,6 +324,96 @@ extension AssetStore {
         self.state.core.metrics.evictedBytes = self.state.core.metrics.evictedBytes.addingSaturating(bytes)
         self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
         return .doomed(bytes: bytes)
+    }
+
+    /// Evicts one blob whose records are more than a chunk, `chunk` of them per actor turn with a no-op metadata unit
+    /// between turns (C2 at the reference scale: one blob that 10,000 ids share held the actor 15.4–16.6 ms in one turn,
+    /// ruling R8 at the L3 close-out; Stage 3 ruling S3C-2). The first turn is the caller's. Each turn re-validates what
+    /// `evict` checks for a whole blob, over the records it has not evicted yet (`acrossTurnsSlice`): the first turn
+    /// checks every victim, as `evict` does, so a blob changed before its first turn is skipped whole; a later turn checks
+    /// that the victims left are exactly the blob's holders, and its own victims. A turn whose check fails stops the blob
+    /// there: the records evicted in earlier turns stay evicted on the still-live blob, the state a publication in flight
+    /// leaves (C-3), and nothing is released (`stillReferenced`); the next run takes the rest once they are evictable
+    /// again. So a change to a later record between the blob's turns splits its records, which one turn never did (C-1);
+    /// C2 is the reason, and only blobs of more records than a chunk are taken this way.
+    func evictAcrossTurns(_ victims: [EvictionVictim], chunk: Int, rules first: EvictionOrder.Rules) async throws(StoreError) -> BlobEviction? {
+        guard let key = victims.first?.blob else {
+            return nil
+        }
+        var rules = first
+        var start = 0
+        var bytes: Int64 = 0
+        while start < victims.count {
+            if start > 0 {
+                // REENTRANCY: s3c-1 (proposed) — the phase and writability, then the turn's checks (`acrossTurnsSlice`): the
+                // blob still live, unleased and not being placed, held by exactly the victims not evicted yet, and this
+                // turn's victims still evictable and not accessed since the selection, under rules whose clock is read
+                // again.
+                await self.runUnit(on: self.environment.metadataExecutor) {}
+                try self.checkLive()
+                try self.checkWritable()
+                rules = self.evictionRules()
+            }
+            let end = min(start + max(1, chunk), victims.count)
+            guard let size = self.acrossTurnsSlice(victims, start..<end, of: key, rules: rules, first: start == 0) else {
+                break
+            }
+            bytes = size
+            for victim in victims[start..<end] {
+                self.setResidency(.absent(.evicted), of: victim.id, dooming: .unreferenced)
+            }
+            self.state.core.metrics.evictions += end - start
+            start = end
+        }
+        guard start > 0 else {
+            return nil
+        }
+        guard start == victims.count, case .doomed? = self.state.core.blobTable[key] else {
+            return .stillReferenced
+        }
+        self.state.core.metrics.evictedBytes = self.state.core.metrics.evictedBytes.addingSaturating(bytes)
+        self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
+        return .doomed(bytes: bytes)
+    }
+
+    /// One turn's check of `evictAcrossTurns`: the blob is still live, unleased and not being placed; the records holding
+    /// it are exactly the victims from `range` on (none left it, none was bound to it since the selection, nor one of
+    /// each); and each victim of `range` (on the `first` turn, every victim) still holds it, is still evictable under
+    /// `rules` and was not accessed since the selection. Returns the blob's recorded size, or `nil` when the turn may not
+    /// evict. The holders are exact because every victim left is read again, in O(victims left), and must still hold the
+    /// blob; the victims being distinct records (`EvictionOrder.plan`), as many references as victims left then leave no
+    /// room for another holder, and another count is settled by the turn's one scan of the records
+    /// (`holders(of:known:scan:)`). A count alone could not tell a victim that left the blob from an id bound to it in
+    /// the same window (one `apply` can prune one and bind another; verification of the S3C-2 fix, cycle 1). A turn costs
+    /// O(victims left) and at most one scan; the first turn O(victims), as `evict`'s one turn did.
+    func acrossTurnsSlice(_ victims: [EvictionVictim], _ range: Range<Int>, of key: BlobKey, rules: EvictionOrder.Rules, first: Bool) -> Int64? {
+        guard case .live(let references)? = self.state.core.blobTable[key],
+            self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
+            self.state.cleanup.leases.isEmpty || self.state.cleanup.leases[key]?.isEmpty ?? true
+        else {
+            return nil
+        }
+        let remaining = victims[range.lowerBound...]
+        guard remaining.allSatisfy({ self.state.core.records[$0.id]?.referencedBlob == key }) else {
+            return nil
+        }
+        if references != remaining.count {
+            // Another count: a publication in flight holds a provisional reference (no record), which leaves the holders
+            // exactly the victims left, or an id was bound to the blob, which does not. Every victim left holds it, so
+            // as many holders as victims left are exactly those victims.
+            var scan = HolderScan(blobs: [key])
+            guard self.holders(of: key, known: remaining.map(\.id), scan: &scan).count == remaining.count else {
+                return nil
+            }
+        }
+        var bytes: Int64 = 0
+        for victim in victims[first ? range.lowerBound..<victims.count : range] {
+            guard let size = EvictionOrder.stillEvictable(victim, of: key, in: self.state.core.records, rules: rules) else {
+                return nil
+            }
+            bytes = size
+        }
+        return bytes
     }
 
     /// Stamps `lastCleanupAt` for a GC, eviction or purge that changed something (persisted with the next commit).

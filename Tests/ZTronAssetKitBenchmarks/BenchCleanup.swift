@@ -104,9 +104,10 @@ extension ZTronAssetKitBenchmarks {
         /// Review of the L3 close-out cycle 5: eviction's chunks counted blobs, so where several ids share each blob a
         /// chunk of 1,000 changed up to ten times as many records in one turn (16.2–16.4 ms of thread CPU at 10,000 records
         /// with ten ids per blob). Quota eviction of the whole store, with five and with ten ids per blob, holds the actor
-        /// at most 10 ms (WP-B's probe, best of three runs); a blob that 10,000 ids share leaves in one turn whatever the
-        /// chunk (its holders go together, C-1), recorded as thread CPU.
-        @Test("C2: quota eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob", .timeLimit(.minutes(5)))
+        /// at most 10 ms (WP-B's probe, best of three runs). A blob that all 10,000 ids share left in one turn (15.4–16.6 ms,
+        /// ruling R8's recorded exception at the L3 close-out); since Stage 3 (ruling S3C-2) quota eviction and both purges
+        /// take its records a chunk per turn, asserted here too.
+        @Test("C2: quota eviction and purges hold the actor at most 10 ms at 10,000 records when five or ten ids share each blob, or all share one", .timeLimit(.minutes(5)))
         @available(macOS 15.0, iOS 18.0, *)
         func sharedBlobHolds() async throws {
             var holds: [String: [Double]] = [:]
@@ -696,16 +697,18 @@ enum CleanupBench {
     static let sharedBlobOperations = [
         "quota eviction of every blob with 5 ids per blob",
         "quota eviction of every blob with 10 ids per blob",
-        "eviction of one blob 10,000 ids share (thread CPU)",
+        "quota eviction of one blob every id shares",
+        "purge(.evictable) of one blob every id shares",
+        "purge(.all) of one blob every id shares",
     ]
 
-    /// The figures of `sharedBlobOperations` asserted against the C2 budget; the last is recorded, an exception to R4
-    /// for Stage 3 (orchestrator ruling R8 at the L3 close-out cycle 7: chunking one blob's holders).
-    static let boundedSharedBlobOperations: Set<String> = [sharedBlobOperations[0], sharedBlobOperations[1]]
+    /// The figures of `sharedBlobOperations` asserted against the C2 budget: all of them since Stage 3 (ruling S3C-2
+    /// ended ruling R8's exception for the blob every id shares).
+    static let boundedSharedBlobOperations = Set(sharedBlobOperations)
 
     /// On stores of `count` records where every 5, then every 10, consecutive ids share one 64-byte blob, with a budget
-    /// of 0 bytes: the longest hold of quota eviction of every blob; then, on a store where all `count` ids share one
-    /// blob, the thread CPU of that blob's eviction in one turn.
+    /// of 0 bytes: the longest hold of quota eviction of every blob; then, each on a store of its own where all `count`
+    /// ids share one blob, the longest hold of that blob's quota eviction and of its two purges.
     static func sharedBlobHolds(count: Int, seed: UInt64) async throws -> [(String, Double)] {
         var holds: [(String, Double)] = []
         for (index, idsPerBlob) in [5, 10].enumerated() {
@@ -718,15 +721,20 @@ enum CleanupBench {
         }
         let (one, _, _, _) = try await CleanupBench.store(count: count, seed: seed + 50_000, idsPerBlob: count, budget: .bytes(0))
         let candidates = await one.evictionCandidatesOffActor()
-        let candidate = try #require(candidates.first)
-        #expect(candidates.count == 1 && candidate.victims.count == count)
-        let evicted = await one.benchThreadCPU { store in
-            var scan = HolderScan(blobs: [candidate.key])
-            return store.evict(candidate.victims[...], rules: store.evictionRules(), scan: &scan)
-        }
-        #expect(evicted.value == .doomed(bytes: 64))
-        holds.append((CleanupBench.sharedBlobOperations[2], evicted.milliseconds))
+        #expect(candidates.count == 1 && candidates.first?.victims.count == count, "premise: one candidate, every id")
+        holds.append((CleanupBench.sharedBlobOperations[2], try await ActorHoldProbe.longestHold(of: one) {
+            let result = try await one.evictIfNeeded()
+            #expect(result == CleanupResult(bytesFreed: 64, filesRemoved: 1))
+        }))
         await one.close()
+        for (index, request) in [(3, PurgeRequest.evictable), (4, .all)] {
+            let (purged, _, _, _) = try await CleanupBench.store(count: count, seed: seed + UInt64(index) * 50_000, idsPerBlob: count)
+            holds.append((CleanupBench.sharedBlobOperations[index], try await ActorHoldProbe.longestHold(of: purged) {
+                let result = try await purged.purge(request)
+                #expect(result.assetsRemoved == count)
+            }))
+            await purged.close()
+        }
         return holds
     }
 

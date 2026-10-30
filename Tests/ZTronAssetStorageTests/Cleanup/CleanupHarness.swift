@@ -233,13 +233,9 @@ enum CleanupSteps {
                 throw error
             }
         }
-        var released: [Int] = []
-        try await CorePoll.until("the driven operation finished") {
-            for unit in await executor.heldUnits where !kept.contains(unit) {
-                await executor.release(unit)
-                released.append(unit)
-            }
-            return await finished.value
+        // The held units are read before the check (S3C-1): nothing submitted after the operation finished is released.
+        let released = try await CorePoll.releasing(executor, .allExcept(kept), until: "the driven operation finished") {
+            await finished.value
         }
         return (try await task.value, released)
     }

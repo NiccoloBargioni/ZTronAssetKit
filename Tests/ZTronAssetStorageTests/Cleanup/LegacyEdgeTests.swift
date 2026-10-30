@@ -414,14 +414,10 @@ struct LegacyEdgeTests {
             try await harness.store.migrateLegacy(maxFiles: 100)
         }
         // Phases 2 and 3 run unit by unit; phase 4 lists the root first (nothing before it lists the legacy tree).
-        try await CorePoll.until("phase 4 listed the legacy root") {
-            if listings() > 0 {
-                return true
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        // The held unit is read before the listings (S3C-1): a unit held while no listing of phase 4 has run cannot follow
+        // the root's listing, so the poll never lets a second listing of phase 4 through.
+        try await CorePoll.releasing(metadata, until: "phase 4 listed the legacy root") {
+            listings() > 0
         }
         try await metadata.requireHeldUnits(atLeast: 1)
         let closing: Task<Void, Never>?

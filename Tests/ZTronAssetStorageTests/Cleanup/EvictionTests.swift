@@ -61,15 +61,11 @@ struct EvictionTests {
             try await harness.store.evictIfNeeded()
         }
         // The space measurement runs, then the first chunk (y0, y1) is marked and eviction yields in a metadata unit.
-        try await CorePoll.until("eviction yields after its first chunk") {
-            if await harness.record(assets[1].id)?.residency == .absent(.evicted) {
-                return await !metadata.heldUnits.isEmpty
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "eviction marked its first chunk") {
+            await harness.record(assets[1].id)?.residency == .absent(.evicted)
         }
+        // The yield after the first chunk, which the poll never releases (S3C-1).
+        try await metadata.requireHeldUnits(atLeast: 1)
         #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "nothing after the chunk is marked yet")
         // Meanwhile the app reads y2 and holds y3 open.
         #expect(await harness.store.location(for: assets[2].id, extensions: [], recordingAccess: true) != nil)
@@ -115,15 +111,11 @@ struct EvictionTests {
         let eviction = Task {
             try await harness.store.evictIfNeeded()
         }
-        try await CorePoll.until("eviction yields after its first chunk") {
-            if await harness.record(pairs[0][1].id)?.residency == .absent(.evicted) {
-                return await !metadata.heldUnits.isEmpty
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "eviction marked its first chunk") {
+            await harness.record(pairs[0][1].id)?.residency == .absent(.evicted)
         }
+        // The yield after the first chunk, which the poll never releases (S3C-1).
+        try await metadata.requireHeldUnits(atLeast: 1)
         let firstChunk = await pairs.flatMap { $0 }.asyncFilter { await harness.record($0.id)?.residency == .absent(.evicted) }
         #expect(firstChunk.map(\.id) == pairs[0].map(\.id), "the first chunk is the first blob's two records")
         await metadata.setHolding(false)
@@ -232,12 +224,9 @@ struct EvictionTests {
             try await harness.store.publish(staged, binding: [c.identifier], expecting: c.contentIdentity, urgency: .bulk)
         }
         // Run the publication's units until it holds a provisional reference on `a`'s blob; its placement unit then waits.
-        try await CorePoll.until("c's publication reuses a's blob") {
+        try await CorePoll.releasing(metadata, until: "c's publication reuses a's blob") {
             if case .live(let references)? = await harness.store.state.core.blobTable[a.key], references == 2 {
                 return true
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
             }
             return false
         }
@@ -550,15 +539,11 @@ struct EvictionTests {
             try await harness.store.apply(CoreFixture.manifest(assets.map(\.entry)), etag: nil, eviction: plan)
         }
         // The first chunk (p0, p1) is evicted, then `apply` releases the actor in a metadata unit, behind its fence.
-        try await CorePoll.until("apply yields after its plan's first chunk") {
-            if await harness.record(assets[1].id)?.residency == .absent(.evicted) {
-                return await !metadata.heldUnits.isEmpty
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "apply evicted its plan's first chunk") {
+            await harness.record(assets[1].id)?.residency == .absent(.evicted)
         }
+        // The yield after the first chunk, which the poll never releases (S3C-1).
+        try await metadata.requireHeldUnits(atLeast: 1)
         #expect(await harness.isPresent(assets[2].id, at: assets[2].key), "nothing after the first chunk is evicted yet")
         // Meanwhile the app reads p2 and holds p3 open.
         harness.time.advance(by: 1)
@@ -612,15 +597,11 @@ struct EvictionTests {
         let applying = Task {
             try await harness.store.apply(manifest, etag: nil, eviction: plan)
         }
-        try await CorePoll.until("apply yields after its plan's first chunk") {
-            if await harness.record(pairs[1][1].id)?.residency == .absent(.evicted) {
-                return await !metadata.heldUnits.isEmpty
-            }
-            if let unit = await metadata.heldUnits.first {
-                await metadata.release(unit)
-            }
-            return false
+        try await CorePoll.releasing(metadata, until: "apply evicted its plan's first chunk") {
+            await harness.record(pairs[1][1].id)?.residency == .absent(.evicted)
         }
+        // The yield after the first chunk, which the poll never releases (S3C-1).
+        try await metadata.requireHeldUnits(atLeast: 1)
         let firstChunk = await pairs.flatMap { $0 }.asyncFilter { await harness.record($0.id)?.residency == .absent(.evicted) }
         #expect(firstChunk.map(\.id) == (pairs[0] + pairs[1]).map(\.id), "the first chunk is the first two blobs' four records")
         await metadata.setHolding(false)
