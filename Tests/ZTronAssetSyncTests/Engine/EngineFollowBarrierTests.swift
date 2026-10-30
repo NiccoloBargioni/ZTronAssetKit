@@ -678,6 +678,8 @@ extension EngineSyncTests {
         await s.harness.source.script(b.transferID, [.hold, .stage(bBytes)])
         let pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
         await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .downloading }
+        // The source records a start when the attempt's driver reaches it, after the job is `downloading`.
+        await engine.waitForHandle(p.transferID)
         let qWaiter = Task { await engine.awaitAsset(q.identifier, lane: .prefetch) }
         await engine.awaitCondition { $0.state.jobs[q.transferID]?.state == .queued }
         let attempt = try #require(await s.harness.source.starts.last { $0.id == p.transferID }, "setup: P's attempt started")
@@ -696,6 +698,7 @@ extension EngineSyncTests {
         s.time.advance(by: 10)
         await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { e in !e.followOwed && (e.state.jobs[p.transferID]?.state == .downloading || e.state.jobs[q.transferID]?.state == .downloading) }
+        await engine.waitForAllHandles()
         let after = await engine.readForTests { e in
             (p: e.state.jobs[p.transferID]?.state, q: e.state.jobs[q.transferID]?.state, bQueuedAt: e.state.jobs[b.transferID]?.queuedAt, violations: e.invariantViolations())
         }

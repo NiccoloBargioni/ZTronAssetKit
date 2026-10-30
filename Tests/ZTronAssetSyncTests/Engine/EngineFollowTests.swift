@@ -469,6 +469,8 @@ extension EngineSyncTests {
         let answer = await EngineHarness.value(of: waiter)
         #expect(answer == .failure(.notFound), "the follow's visit ends the dropped id's interest: \(answer)")
         await engine.awaitCondition { $0.state.jobs[unchanged[0].transferID]?.state != .queued }
+        // The source records a start when the attempt's driver reaches it, after the job is `downloading`.
+        await engine.waitForHandle(unchanged[0].transferID)
         #expect((await harness.source.starts.dropFirst(before).map(\.id)).contains(unchanged[0].transferID), "the unchanged prefetch member started once the follow ended")
         #expect(!(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID), "never requested after the apply")
         await harness.source.release(running[1].transferID, with: .progress(received: 0, expected: nil))
@@ -1157,6 +1159,9 @@ extension EngineSyncTests {
         ballast -= 6_000_000 - (gained.volumeImportant - gained.reserveBytes)
         try fileSystem.write(Data(repeating: 3, count: Int(ballast)), to: ballastURL, mode: .truncate)
         await engine.refreshFreeSpace()
+        // Behind the follow barrier the read's sweep runs the follow and judges in its follow-up sweep, a later turn
+        // (F-28; S3-R11 R3): the read waits for it, as the reclaim tests wait for the job the sweep judges.
+        await engine.awaitCondition { $0.state.spaceSweepFollowUp == nil }
         let after = await engine.readForTests { engine in
             (
                 // The read's sweep runs the owed follow to its end itself (F-28); the follow's own turn is still held (S3-R11 R3).
