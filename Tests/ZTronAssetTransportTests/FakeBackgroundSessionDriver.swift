@@ -78,6 +78,18 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     private(set) var cancellations: [(taskIdentifier: Int, producingResumeData: Bool)] = []
     /// Every `setPriority` call, in the order the writes landed (a held write counts once released).
     private(set) var priorityChanges: [(taskIdentifier: Int, priority: Float)] = []
+    /// What reached the driver, in order: each listing (when `snapshot()` lists the tasks) and each priority write
+    /// as it lands. A handle's priority change lists the tasks first, so the FIFO test reads here that a change's
+    /// listing came only after the previous change's write landed.
+    private(set) var calls: [Call] = []
+
+    /// One entry of `calls`.
+    enum Call: Equatable, Sendable {
+        /// `snapshot()` listed the tasks.
+        case listing
+        /// A `setPriority` write landed with this value.
+        case priority(Float)
+    }
     /// `activate()` calls.
     private(set) var activations = 0
     /// `invalidate()` calls.
@@ -129,6 +141,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
             await self.waitForSnapshotRelease()
         }
         let listing = self.listing()
+        self.calls.append(.listing)
         if hold == .afterListing {
             await self.waitForSnapshotRelease()
         }
@@ -206,6 +219,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
             }
         }
         self.priorityChanges.append((taskIdentifier, priority))
+        self.calls.append(.priority(priority))
         self.tasks[taskIdentifier]?.priority = priority
         self.signal.yield("priority")
     }

@@ -389,6 +389,12 @@ struct BackgroundInterleavingTests {
     /// The engine calls a handle's controls synchronously on every lane change (ADR-021 keeps controls ordered), so
     /// the handle must deliver them in that order: the second change starts only after the first one, held at its
     /// listing, reached the OS task, and the task ends at the second change's value.
+    ///
+    /// Read on the driver's ordered log, the second change's first effect, its listing, must come after the first
+    /// change's write. A delivery that does not wait (a `Task` per change) shows here as soon as its listing reaches
+    /// the driver anywhere between the second change and the first write landing. No test can await such a task
+    /// without the ordered delivery hanging, since there it starts only after the release, so this window is as wide as
+    /// a test can make it (close-out cycle 3).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them", .timeLimit(.minutes(1)))
     func handleControlsInOrder() async throws {
@@ -399,15 +405,19 @@ struct BackgroundInterleavingTests {
         await rig.driver.holdNextSnapshot(.afterListing)
         handle.setPriority(.userInitiated)
         await rig.awaitSignal("snapshot")
+        // What reached the driver so far, ending with the held change's listing.
+        let before = await rig.driver.calls.count
         handle.setPriority(.bulk)
         // A whole listing runs through the coordinator and the driver while the first change is held: the second
-        // change, made after it, is not delivered meanwhile.
+        // change, made after it, is not delivered meanwhile, not even its listing.
         #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
-        let early = await rig.driver.priorityChanges.map(\.priority)
-        #expect(early.isEmpty, "a later change overtook the held one: \(early)")
+        let early = Array(await rig.driver.calls.dropFirst(before))
+        #expect(early == [.listing], "only this check's own listing reached the driver while the first change was held: \(early)")
         await rig.driver.releaseSnapshot()
         await rig.awaitSignal("priority")
         await rig.awaitSignal("priority")
+        let delivered = Array(await rig.driver.calls.dropFirst(before + 1))
+        #expect(delivered == [.priority(0.75), .listing, .priority(0.25)], "the second change listed the tasks only after the first one's write landed: \(delivered)")
         let changes = await rig.driver.priorityChanges.map(\.priority)
         #expect(changes == [0.75, 0.25], "each change reaches the OS task in the order it was made: \(changes)")
         #expect(await coordinator.liveTransfers().map(\.priority) == [0.25])
