@@ -577,6 +577,67 @@ extension EngineSyncTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
+    /// A transfer whose pause completes while a follow is owed resumes at its queue's front, as it does when the follow
+    /// visits first (the cycle-9 amendment (a): a place that waits for the follow keeps `front`). One slot: P (prefetch)
+    /// downloads, Q (prefetch) waits behind it. While the follow is owed (or after it, visit-first), P's attempt ends
+    /// paused (the transport's `.paused`, delivered through `paused`). Visited first, P is queued at the front and starts
+    /// again before Q. And a place taken while the follow is owed keeps the time it was requested at: a bulk request made
+    /// before the clock moves 10 s is queued at that time, not at the follow's end, so bulk aging (`bulkAging`, 30 s)
+    /// counts its whole wait (the clock stays short of it here, so the aged-bulk rule does not reorder the starts read).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierKeepsAPausedTransfersFrontPlace(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 963_502, tuning: SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0))
+        let engine = s.engine
+        let pBytes = EngineFixture.bytes(963_510, count: 16)
+        let qBytes = EngineFixture.bytes(963_511, count: 16)
+        let bBytes = EngineFixture.bytes(963_512, count: 16)
+        let p = EngineHarness.onDemand("zz-p", pBytes)
+        let q = EngineHarness.onDemand("zz-q", qBytes)
+        let b = EngineHarness.onDemand("zz-b", bBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(763_000) + [b, p, q], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        // P's restart holds too: the test reads which transfer the freed slot went to, not a commit.
+        await s.harness.source.script(p.transferID, [.hold, .hold, .stage(pBytes)])
+        await s.harness.source.script(q.transferID, [.hold, .stage(qBytes)])
+        await s.harness.source.script(b.transferID, [.hold, .stage(bBytes)])
+        let pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .downloading }
+        let qWaiter = Task { await engine.awaitAsset(q.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[q.transferID]?.state == .queued }
+        let attempt = try #require(await s.harness.source.starts.last { $0.id == p.transferID }, "setup: P's attempt started")
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(863_000) + [b, p, q], s, visit: visit)
+        let owedAtPause = await engine.readForTests { $0.followOwed }
+        #expect(owedAtPause == (visit == .sweepFollowsFirst), "setup: the pause completes while the follow is owed only sweep-first")
+        // P's attempt ends paused (as a preemption's pause does): `paused` queues it again at its queue's front, and
+        // visit-first its own pump restarts it at once.
+        let starts = await s.harness.source.starts.count
+        let epoch = try #require(await engine.readForTests { $0.state.jobs[p.transferID]?.epoch })
+        await engine.paused(p.transferID, epoch: epoch, request: attempt)
+        // A bulk request made now, before the clock moves.
+        let requestedAt = s.time.monotonicNow()
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .bulk) }
+        await engine.awaitCondition { $0.state.jobs[b.transferID] != nil }
+        s.time.advance(by: 10)
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { e in !e.followOwed && (e.state.jobs[p.transferID]?.state == .downloading || e.state.jobs[q.transferID]?.state == .downloading) }
+        let after = await engine.readForTests { e in
+            (p: e.state.jobs[p.transferID]?.state, q: e.state.jobs[q.transferID]?.state, bQueuedAt: e.state.jobs[b.transferID]?.queuedAt, violations: e.invariantViolations())
+        }
+        let restarted = await s.harness.source.starts.dropFirst(starts).map(\.id)
+        #expect(after.p == .downloading && after.q == .queued, "P, paused, resumes at its queue's front before Q: \(after)")
+        #expect(restarted.first == p.transferID, "the next start is P's: \(restarted)")
+        #expect(after.bQueuedAt == requestedAt, "the bulk request is queued at the time it was made, not when the follow ended: \(String(describing: after.bQueuedAt)) vs \(requestedAt)")
+        #expect(after.violations.isEmpty, "\(after.violations.prefix(3))")
+        await engine.shutdown()
+        _ = await EngineHarness.value(of: pWaiter)
+        _ = await EngineHarness.value(of: qWaiter)
+        _ = await EngineHarness.value(of: bWaiter)
+        _ = await EngineHarness.value(of: sync)
+    }
+
     // MARK: Space verdicts (R-SYN-11)
 
     /// A reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons: C
