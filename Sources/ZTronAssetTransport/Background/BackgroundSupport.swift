@@ -438,7 +438,11 @@ package actor BackgroundTransferCoordinator: TransferBackend {
 
     /// Sets the OS task's priority (R-NET-10). With a `token`, only while that attach still holds `name` (a
     /// handle's control). Of overlapping requests for one name the newest decides: one whose listing returns after
-    /// a later request began changes nothing (the engine never re-applies a lane, so an older value would stay).
+    /// a later request began changes nothing (the engine never re-applies a lane, so an older value would stay), and
+    /// a write that lands after a newer one is followed by the newest value again, so the OS task ends at the newest
+    /// request's priority. Two writes for one name overlap when two attaches' control tasks overlap their calls (a
+    /// start joined the task and replaced the first attach while its write was in flight), and the live driver lists
+    /// the tasks before it writes, so they may land in either order (S3-CONC-01, close-out cycle 2).
     package func setPriority(_ priority: AssetPriority, of name: StagingFileName, token: UInt64? = nil) async {
         if let token, self.waiters[name]?.token != token {
             return
@@ -463,12 +467,21 @@ package actor BackgroundTransferCoordinator: TransferBackend {
         guard !self.processed.contains(name), let task = snapshot.first(where: { $0.name == name }) else {
             return
         }
-        let value = priority.urlSessionTaskPriority
-        self.priorities[name] = value
-        // REENTRANCY: D-9 (proposed, amended at Stage 3) — nothing is read after the last await. Two writes for one
-        // name are in flight together only when their callers overlap the calls, and the one production caller, a
-        // handle's control task, delivers its next control only after this call returned (`BackgroundTransferHandle`).
-        await self.driver.setPriority(taskIdentifier: task.taskIdentifier, value)
+        var written = priority.urlSessionTaskPriority
+        self.priorities[name] = written
+        // REENTRANCY: D-9 (proposed, amended at Stage 3) — `priorities[name]` is re-read after each write: a newer
+        // request (another attach's, after a start replaced this one) may have recorded and written its value
+        // meanwhile, and this write may have landed after it. While the newest recorded value differs from the one
+        // written, it is written again, so the last write to land is the newest; a request that records a value
+        // writes it itself, so each further pass answers one newer request. `.finished` clears the entry and ends
+        // the loop: nothing is written on this request's account once the task's terminal was processed. (Should the
+        // same attempt's name be created anew meanwhile, a pass writes to this request's task, which is gone: no-op.)
+        await self.driver.setPriority(taskIdentifier: task.taskIdentifier, written)
+        while let newest = self.priorities[name], newest != written {
+            written = newest
+            // REENTRANCY: D-9 (proposed, amended at Stage 3) — as above: `priorities[name]` is re-read after it.
+            await self.driver.setPriority(taskIdentifier: task.taskIdentifier, written)
+        }
     }
 
     /// A handle's pause or cancel: acts only while the handle's attach (`token`) still holds `name`, so a handle a
