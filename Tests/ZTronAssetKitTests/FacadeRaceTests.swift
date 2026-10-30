@@ -379,6 +379,67 @@ struct FacadeRaceTests {
         await client.shutdown()
     }
 
+    /// Stage 3 ruling S3G-2 (L5-R22 (1), S3-B-090): the exit `next()` takes when its consumer stopped during the `events`
+    /// registration (`EventForwarder.swift`, the `finished` check after `registerEvents`). The registration returns to a
+    /// stopped forwarder as above; the exit gives the follower entry back and starts no pump. Without it the forwarder would
+    /// start a pump that subscribes to the replacement by itself, and the replacement's replay of its launch snapshot and
+    /// conditions would end that pump soon enough for the test above to pass. So this test takes a census of the
+    /// replacement's registrations: exactly one ever, the subscription its reopen's hand-over made for the follower (and
+    /// dropped at once, because the forwarder had finished).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement", .timeLimit(.minutes(1)))
+    func stoppedRegistrationStartsNoPump() async throws {
+        let harness = KitHarness.make()
+        let client = harness.client
+        try await harness.startAndSettle()
+        let followers = FollowerGauge()
+        await client.lifecycle.setFollowerObserver { count, recorded in
+            followers.set(count, recorded: recorded)
+        }
+        let hold = SeamHold()
+        await client.lifecycle.setSeam { point in
+            if case .replacementBuilt = point {
+                await hold.arrive()
+            }
+        }
+        try harness.vanishRoot()
+        let purge = Task { () -> Result<PurgeResult, AssetError> in
+            do throws(AssetError) {
+                return .success(try await harness.withClock { () throws(AssetError) -> PurgeResult in
+                    try await client.purge(.all)
+                })
+            } catch {
+                return .failure(error)
+            }
+        }
+        await hold.waitUntilParked()
+        let (stops, stopped) = AsyncStream<Void>.makeStream()
+        let stream = EventForwarder.stream(lifecycle: client.lifecycle, stopped: { stopped.yield() })
+        let consumer = Task { () -> Int in
+            var received = 0
+            for await _ in stream {
+                received += 1
+            }
+            return received
+        }
+        await followers.wait(atLeast: 1)
+        consumer.cancel()
+        for await _ in stops {
+            break
+        }
+        await hold.open()
+        let received = await consumer.value
+        #expect((try? await purge.value.get()) != nil, "setup: the purge was repeated on the replacement")
+        let replacement = await client.lifecycle.current()
+        #expect(replacement.generation == 1, "setup: one reopen")
+        #expect(received == 0, "the stopped consumer received nothing: \(received)")
+        let registrations = await replacement.engine.kitRead { $0.state.lastSubscriber }
+        #expect(registrations == 1, "the replacement registered only the hand-over's subscription: \(registrations)")
+        await replacement.engine.waitUntil { $0.subscribers == 0 }
+        #expect(followers.count == 0, "the follower entry was given back")
+        await client.shutdown()
+    }
+
     /// L5-R2's reopen path (L5-V3-05, PROBE-2): the reopen applies the newest memory-pressure request to its replacement
     /// while it is still `created`, so a `shutdown()` before the replacement's start shuts a `created` engine down that
     /// owns an observer. The reopen parks right after that request (`replacementObservesPressure`); the shutdown must

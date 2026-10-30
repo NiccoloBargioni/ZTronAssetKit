@@ -149,4 +149,33 @@ struct PrefetchFacadeTests {
         #expect(cancels == [entries[0].transferID])
         await client.shutdown()
     }
+
+    /// Stage 3 ruling S3G-1 (S3-PERF-06): the window's walk is clamped to the carousel. Its length is the farther side of
+    /// `current` whatever the radius, so `Int.max` (or any radius beyond the carousel) walks only the ids there are, costs
+    /// what a radius of the carousel's size costs, and yields that window: every page once, in priority order. Before the
+    /// clamp the walk ran up to the radius, about 2^63 steps on the main actor for `Int.max` (the release timing is
+    /// `P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel`).
+    @Test("R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once")
+    func hugeRadiusWalksOnlyTheCarousel() {
+        let pages = (0..<10).map { AssetID("p\($0)") }
+        for current in pages.indices {
+            let farther = max(current, pages.count - 1 - current)
+            for radius in [farther, farther + 1, 1_000_000_000, Int.max - 1, Int.max] {
+                // The walk's length first, so an unclamped walk fails here instead of running for 2^63 steps below.
+                let reach = PrefetchWindow.reach(count: pages.count, current: current, radius: radius)
+                guard reach == farther else {
+                    Issue.record("current \(current), radius \(radius): the walk goes \(reach) steps, past the carousel's \(farther)")
+                    return
+                }
+                #expect(PrefetchWindow.targets(ids: pages, current: current, radius: radius) == PrefetchWindow.targets(ids: pages, current: current, radius: farther))
+            }
+            let whole = PrefetchWindow.targets(ids: pages, current: current, radius: .max)
+            #expect(Set(whole.map(\.id)) == Set(pages) && whole.count == pages.count, "current \(current): every page once")
+            #expect(whole.map(\.distance) == whole.map(\.distance).sorted(), "current \(current): closest first")
+            #expect(whole.first?.priority == .userInitiated && whole.dropFirst().allSatisfy { $0.priority == .prefetch })
+        }
+        #expect(PrefetchWindow.reach(count: pages.count, current: 3, radius: 2) == 2, "a radius inside the carousel is kept")
+        #expect(PrefetchWindow.reach(count: pages.count, current: 3, radius: -5) == 0, "a negative radius counts as 0")
+        #expect(PrefetchWindow.reach(count: 1, current: 0, radius: .max) == 0, "one page: no neighbour to walk to")
+    }
 }

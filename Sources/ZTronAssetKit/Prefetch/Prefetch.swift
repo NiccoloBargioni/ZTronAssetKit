@@ -85,29 +85,43 @@ public enum PrefetchWindow {
     /// The targets around `current` in priority order: current, +1, −1, +2, −2, … up to `radius` (negative radii
     /// count as 0). Out-of-range indices are skipped, a repeated id keeps its first (closest) occurrence, the
     /// current page is `.userInitiated` and every neighbour `.prefetch`. An out-of-range `current` yields nothing.
+    /// The walk stops where both sides left `ids`, so it costs what the carousel's size costs whatever the radius
+    /// (P-8: `Int.max` means "the whole carousel"; S3-PERF-06).
     public static func targets(ids: [AssetID], current: Int, radius: Int) -> [PrefetchTarget] {
         guard ids.indices.contains(current) else {
             return []
         }
         var result: [PrefetchTarget] = [PrefetchTarget(id: ids[current], priority: .userInitiated, distance: 0)]
         var seen: Set<AssetID> = [ids[current]]
-        let reach = max(radius, 0)
+        func visit(_ index: Int, at distance: Int) {
+            guard ids.indices.contains(index) else {
+                return
+            }
+            let id = ids[index]
+            if seen.insert(id).inserted {
+                result.append(PrefetchTarget(id: id, priority: .prefetch, distance: distance))
+            }
+        }
+        // Past `reach` neither side has an index left, so neither `current + distance` nor the counter can overflow.
+        let reach = PrefetchWindow.reach(count: ids.count, current: current, radius: radius)
         var distance = 1
         while distance <= reach {
-            for index in [current + distance, current - distance] where ids.indices.contains(index) {
-                let id = ids[index]
-                if seen.insert(id).inserted {
-                    result.append(PrefetchTarget(id: id, priority: .prefetch, distance: distance))
-                }
-            }
+            visit(current + distance, at: distance)
+            visit(current - distance, at: distance)
             distance += 1
         }
         return result
     }
+
+    /// How far the window's walk goes from an in-range `current`: `radius` (0 when negative), but never past the
+    /// farther end of `count` ids. The number of steps `targets` takes, so a structural test can pin it. Pure.
+    static func reach(count: Int, current: Int, radius: Int) -> Int {
+        min(max(radius, 0), max(current, count - 1 - current))
+    }
 }
 
-/// Keeps the carousel's window prefetched (R-CAR-3; WP-G). Main-actor bookkeeping only: O(radius) per update,
-/// no I/O, no await.
+/// Keeps the carousel's window prefetched (R-CAR-3; WP-G). Main-actor bookkeeping only: O(min(radius, ids.count)) per
+/// update, no I/O, no await.
 @MainActor
 public final class PrefetchWindowController {
     private let client: AssetClient
