@@ -475,8 +475,12 @@ struct EngineGateModelTests {
         return violation
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 115.2 to 116.8 s beside a second TSan process at
+    /// a load of 20 to 35 (65 % of its 3 minutes), 77.2 to 77.5 s paired at a load of 6 to 27 and 45.2 s alone at a
+    /// load of 13 to 18 (Stage 3 close-out cycle 7): over half its limit at a load about 30, and a model-based walk, so
+    /// the guard is `.minutes(5)` (S3-R4); no seed, step or check is cut.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving", .timeLimit(.minutes(3)))
+    @Test("R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving", .timeLimit(.minutes(5)))
     func gateModel() async throws {
         // `GATE_MODEL_SEEDS=17,42` replays chosen walks (a failure prints its seed).
         let only = ProcessInfo.processInfo.environment["GATE_MODEL_SEEDS"].map { $0.split(separator: ",").compactMap { UInt64($0) } }
@@ -493,8 +497,12 @@ struct EngineGateModelTests {
     /// freed slot, and the probe, from the run the exit had started).
     static let reservedSeeds: [UInt64] = Array(Self.seeds) + [966]
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 115.5 to 116.7 s beside a second TSan process at
+    /// a load of 20 to 35 (65 % of its 3 minutes), 76.4 to 76.6 s paired at a load of 6 to 27 and 45.2 s alone at a
+    /// load of 13 to 18 (Stage 3 close-out cycle 7): over half its limit at a load about 30, and a model-based walk, so
+    /// the guard is `.minutes(5)` (S3-R4); no seed, step or check is cut.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant", .timeLimit(.minutes(3)))
+    @Test("R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant", .timeLimit(.minutes(5)))
     func gateModelWithReservedSlot() async throws {
         // `GATE_MODEL_RESERVED_SEEDS=966` replays chosen walks (a failure prints its seed).
         let only = ProcessInfo.processInfo.environment["GATE_MODEL_RESERVED_SEEDS"].map { $0.split(separator: ",").compactMap { UInt64($0) } }
