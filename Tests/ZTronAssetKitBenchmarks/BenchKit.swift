@@ -245,6 +245,40 @@ extension ZTronAssetKitBenchmarks {
             await fixture.client.shutdown()
         }
 
+        /// S3-PERF-06 (Stage 3 ruling S3G-1): `PrefetchWindowController.update` is a UI-facing call, and its window walk
+        /// must cost what the carousel's size costs whatever the radius, because `AssetClientConfiguration.prefetchRadius`
+        /// and `init(radius:)` take any `Int` (a radius meant as "the whole carousel" included). Medians of five updates
+        /// over 10 pages, each to another page, per radius, against P-8's `ui_call_ms_max`.
+        @available(macOS 15.0, iOS 18.0, *)
+        @Test("P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel", .timeLimit(.minutes(1)))
+        func prefetchWindowHugeRadius() async throws {
+            let budgets = try QualityBudgets()
+            let callMax = try #require(budgets.value("P-8", "ui_call_ms_max"))
+            let fixture = Fixture()
+            let client = fixture.client
+            let pages = (0..<10).map { AssetID("page-\($0)") }
+            for radius in [10_000_000] {
+                let controller = PrefetchWindowController(client: client, radius: radius)
+                let (samples, targets) = await MainActor.run { () -> ([Double], Int) in
+                    let clock = ContinuousClock()
+                    var samples: [Double] = []
+                    for round in 0..<5 {
+                        let start = clock.now
+                        controller.update(ids: pages, current: (round * 3) % pages.count)
+                        samples.append(KitBenchmarks.microseconds(clock.now - start) / 1_000)
+                    }
+                    let targets = PrefetchWindow.targets(ids: pages, current: 4, radius: radius).count
+                    controller.cancelAll()
+                    return (samples, targets)
+                }
+                let median = KitBenchmarks.quantile(samples, 0.5)
+                print("P-8 prefetch window update over \(pages.count) pages, radius \(radius): median \(median) ms (runs \(samples); budget \(callMax) ms)")
+                #expect(targets == pages.count, "the window covers the whole carousel once: \(targets) targets")
+                #expect(median <= callMax, "radius \(radius): median \(median) ms")
+            }
+            await client.shutdown()
+        }
+
         @available(macOS 15.0, iOS 18.0, *)
         @Test("P-9: 64 concurrent resolves plus hashing keep the heartbeat gap p99 within budget", .timeLimit(.minutes(1)))
         func heartbeatUnderResolves() async throws {
