@@ -133,4 +133,60 @@ extension EngineFollowBarrierTests {
         #expect((try? uwResult.get())?.byteSize == Int64(vBytes.count), "a-w's waiter is served by V's retry: \(uwResult)")
         await FollowBarrier.finish(s, sync: sync)
     }
+
+    // MARK: A join re-routed by a later apply (S3-R14 item 4)
+
+    /// A request that waited for the follow is re-routed at its replay when a later apply moved its id meanwhile: H
+    /// (zz-h) downloads for a user waiter, so the follow has a job to visit; v3 changes the fillers, so the follow owes
+    /// its pass; U then requests zz-m (content M, listed), and v4 moves zz-m onto M′. Visited first, U's request created
+    /// M's job and v4's follow moved U onto M′. Behind the barrier, U's join waited, and its replay met a copy that names
+    /// zz-m elsewhere: `replayJoin` re-routes it as v4's follow would have. Joined to the content it named at its
+    /// arrival, U was answered with M, the content v4 replaced (the cycle-10 verifiers' issue: the branch had no hit).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierReroutesAJoinALaterApplyMoved(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 998_302)
+        let engine = s.engine
+        let hBytes = Data(repeating: 0xB5, count: 100_000)
+        let mBytes = Data(repeating: 0xB6, count: 200_000)
+        let m4Bytes = Data(repeating: 0xB7, count: 300_000)
+        let h = EngineHarness.onDemand("zz-h", hBytes)
+        let m = EngineHarness.onDemand("zz-m", mBytes)
+        let mMoved = EngineHarness.onDemand("zz-m", m4Bytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(720_000) + [h, m], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        await s.harness.source.script(m.transferID, [.hold, .stage(mBytes)])
+        await s.harness.source.script(mMoved.transferID, [.stage(m4Bytes)])
+        let hWaiter = Task { await engine.awaitAsset(h.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[h.transferID]?.state == .downloading }
+        }
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(820_000) + [h, m], s, visit: visit)
+        let uWaiter = Task { await engine.awaitAsset(m.identifier, lane: .userInitiated) }
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, m) }
+        } else {
+            await engine.awaitCondition { $0.state.jobs[m.transferID]?.state == .downloading }
+        }
+        let v4 = try await Self.appliedCopy(of: engine, replacing: mMoved, tag: "v4-reroute")
+        let applied = await engine.applyAndFollow(v4, etag: nil, eviction: nil)
+        #expect((try? applied.get()) != nil, "v4 is applied: \(applied)")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        // A job of M left running for U (the content v4 replaced) is let through, so its answer shows instead of a hang.
+        let held = await engine.readForTests { $0.state.jobs[m.transferID]?.state == .downloading }
+        if held {
+            await s.harness.source.release(m.transferID, with: .progress(received: 0, expected: nil))
+        }
+        let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: uWaiter) }
+        #expect((try? uResult.get())?.byteSize == Int64(m4Bytes.count), "U is served from M′, the content v4 lists (visit-first): \(uResult)")
+        #expect(!held, "no job of M runs once the follow and its events are done: nobody wants the content v4 replaced")
+        await s.harness.source.release(h.transferID, with: .progress(received: 0, expected: nil))
+        let hResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: hWaiter) }
+        #expect((try? hResult.get())?.byteSize == Int64(hBytes.count), "H is served: \(hResult)")
+        await FollowBarrier.finish(s, sync: sync)
+    }
 }
