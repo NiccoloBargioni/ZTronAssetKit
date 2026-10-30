@@ -75,6 +75,18 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - C2: follow end 3.3–4.0 ms, drain turn 3.7–4.1 ms. P-13 fails again (WP-B's).
     - The fixer recorded 6 residuals and amendment (e) as open; S3-R14 rules on them.
   - **Verification for cycle 10** started 17:28. Weekly usage was 56 % at 17:45 (about 3.5 points per cycle).
+    - Results (to 18:47): correct had 5 blocking (two of them regressions from cycle 10's own fixes); reqs had 3 blocking (mostly S3-R14 items still open).
+  - **Cycle 11:** the fix ran 18:47–22:20 and ended at `3a86b92`.
+    - `6cc4d92` defers every barrier decision to the drain in arrival order. The inventory (I1–I38) is in the draft.
+    - Gates: `VERIFY: PASS`; Sync has 460 tests; the simulator ran 1414 of 1414.
+    - The fixer asked for rulings on residuals R-A–R-E and PROBE-C9-THROTTLE.
+    - Correct verifier (to 22:54): 5 blocking, all from one root cause: replays and visits read non-ledger real-world inputs (throttles, conditions, edge) as the drain leaves them. Also: R-A proven, 0-hit replay branches, and wrong inventory rows.
+  - **S3-R15** (23:30, before cycle 12's fixer starts): one view of the world per decision instant, as a single mechanism. Replays read the inputs as of their arrival; visits read them as of the apply.
+    - A 429 throttles on arrival, using the followed lane.
+    - R-A, R-C, R-D and PROBE-C9-THROTTLE are in the class. R-B is split: breaker decisions are in, pure metric counters are out.
+    - R-E (the store-work stall) is to be diagnosed as a liveness defect.
+    - Every replay branch must be reached by a test, with its mutant shown failing.
+  - **Cycle 12 is this run's last** (`maxCycle: 12`). If it still blocks, start a new run from cycle 13 with cycle 12's issues as `findingsFile`. Weekly usage was 63 % at 23:17.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
