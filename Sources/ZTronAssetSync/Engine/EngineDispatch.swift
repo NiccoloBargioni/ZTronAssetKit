@@ -92,7 +92,18 @@ extension SyncEngine {
         }
         self.materializeRun()
         self.materializeEnsures()
-        // Set again below by a queue head that still waits for the follow (`dispatch`).
+        if self.followOwed {
+            // No admission while a follow owes visits (design D3): every start, park and fail-fast answer reads lanes,
+            // ranks, interests and the bytes in flight, which the owed visits change (a visit lowers or supersedes the
+            // job it moves, raises or creates the job of the moved id's new content, abandons a superseded download).
+            // Decided now, a job is judged on a half-followed state, so its answer depended on whether a visit ran
+            // first (the close-out cycles 2 to 8). The queues wait; each follow turn pumps again
+            // (`pumpWaitsForFollow`), and the turn that ends the follow pumps on the state every visit left.
+            self.state.pumpWaitsForFollow = true
+            self.scheduleEnsureRefill()
+            self.notifyObservers()
+            return
+        }
         self.state.pumpWaitsForFollow = false
         let maximum = self.tuning.maxConcurrentTransfers
         let userCap = self.userCap
@@ -108,7 +119,7 @@ extension SyncEngine {
             // round, which follows any start, reads the jobs again.
             var counts = self.slotCounts
             for kind in [LaneQueues.Kind.userSingle, .userBatch] {
-                user: while maximum - counts.running > 0, counts.runningUser < userCap {
+                while maximum - counts.running > 0, counts.runningUser < userCap {
                     guard parks < Self.parksPerPump else {
                         self.schedulePumpFollowUp()
                         break rounds
@@ -122,8 +133,6 @@ extension SyncEngine {
                         counts.started(in: self.state.jobs[transfer]?.lane ?? .userInitiated)
                     case .parked(let count):
                         parks += count
-                    case .waitsForFollow:
-                        break user
                     }
                 }
             }
@@ -135,7 +144,7 @@ extension SyncEngine {
             }
             let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
             let pipelineCap = self.tuning.pipelineDepth * maximum
-            nonUser: while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
+            while maximum - counts.running > 0, counts.running - counts.runningUser < nonUserCap, counts.nonUserPipeline < pipelineCap {
                 guard parks < Self.parksPerPump else {
                     self.schedulePumpFollowUp()
                     break rounds
@@ -149,8 +158,6 @@ extension SyncEngine {
                     counts.started(in: self.state.jobs[transfer]?.lane ?? .bulk)
                 case .parked(let count):
                     parks += count
-                case .waitsForFollow:
-                    break nonUser
                 }
                 self.materializeRun()
             }
@@ -292,10 +299,8 @@ extension SyncEngine {
     }
 
     /// Whether a valid user-initiated entry waits that is not draining, held for a manifest catch-up or wanted only by
-    /// released groups (those are set aside on the way, so each is stepped over once, C2). A queue whose first such entry
-    /// waits for an owed follow (`awaitsFollow`) has none that could start this turn (`dispatch` stops that queue at its
-    /// head), so it neither preempts a running transfer nor keeps the other lanes from a free slot: counting it, every
-    /// pump preempted a prefetch transfer for it, and the next pump gave the slot to another (close-out cycle 3).
+    /// released groups (those are set aside on the way, so each is stepped over once, C2). The pump reads it only when
+    /// no follow is owed (design D3), so no entry it finds waits for a follow's visit.
     private func hasQueuedUser() -> Bool {
         // The queues are taken out of the state while the closures read it (no overlapping access).
         var queues = self.state.queues
@@ -305,7 +310,7 @@ extension SyncEngine {
             let ready = queues.peek(kind, isValid: { self.isValid($0) }, setAside: { self.setsAside($0) }) { entry in
                 self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
             }
-            found = ready.map { entry in self.state.jobs[entry.transfer].map { !self.awaitsFollow($0) } ?? true } ?? false
+            found = ready != nil
         }
         self.state.queues = queues
         return found
@@ -350,26 +355,13 @@ extension SyncEngine {
         /// The job, and with a lane-wide block other jobs of its lane, were parked or left to wait: the count, toward
         /// the pump's `parksPerPump`.
         case parked(Int)
-        /// The job holds an id the copy maps to other content, or no longer lists, while a follow is owed: it is back
-        /// at the head of its queue, and the queue waits for the follow's visit (`awaitsFollow`).
-        case waitsForFollow
     }
 
     /// Starts `transfer` or parks it; a lane-wide block also parks the lane's other queued jobs, at most `parkLimit`
-    /// in all (`parkLane`).
-    ///
-    /// A job that waits for an owed follow (`awaitsFollow`) is neither started nor parked: between two turns of a bounded
-    /// follow the jobs of replaced or dropped content keep their old places ahead of the new content's jobs, and every
-    /// pump started them, requests for content no id wants (the close-out cycle-2 correctness lens, PROBE-W1: 44 of 48
-    /// starts after the apply at 3,000 members). It goes back to the head of its queue, which waits for the follow; each follow turn
-    /// pumps again (`pumpWaitsForFollow`). The check costs one queue head per lane and pump, never a scan, and the visit
-    /// stays the follow's, bounded per turn (C2): following the job here would move up to a queue of jobs per pump.
+    /// in all (`parkLane`). Reached only when no follow is owed (`pump`, design D3): a job whose ids the copy maps
+    /// elsewhere has been visited, so none of the replaced content of the close-out cycle-2 finding (PROBE-W1) is left
+    /// to start.
     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {
-        if let job = self.state.jobs[transfer], self.awaitsFollow(job) {
-            self.enqueue(transfer, front: true)
-            self.state.pumpWaitsForFollow = true
-            return .waitsForFollow
-        }
         switch self.gate(transfer) {
         case .wait:
             self.enqueue(transfer, front: true)

@@ -453,7 +453,9 @@ extension EngineSyncTests {
         let startedBetween = await harness.source.starts.dropFirst(before).map(\.id)
         #expect(!startedBetween.contains(dropped.transferID), "the dropped id's transfer was requested after the apply")
         #expect(between.queued == .queued, "it waits in its queue for the follow: \(between)")
-        #expect(between.steady == .downloading, "the freed slot went to the unchanged prefetch member: \(between)")
+        // No admission behind the follow barrier (F-28; Stage 3 close-out cycle 9, ruling S3-R11 R2): the freed slot waits
+        // for the follow's end, and the unchanged member starts then (below).
+        #expect(between.steady == .queued, "the freed slot waits for the follow's end (F-28, PROBE-D3-PUMP-STALLED-USER): \(between)")
         #expect(between.preemptions == preemptions, "no transfer was preempted for a job that waits for the follow")
         #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
         await engine.readForTests { $0.releaseFollowFollowUps() }
@@ -461,6 +463,8 @@ extension EngineSyncTests {
         #expect(outcome.completeReport != nil, "\(outcome)")
         let answer = await EngineHarness.value(of: waiter)
         #expect(answer == .failure(.notFound), "the follow's visit ends the dropped id's interest: \(answer)")
+        await engine.awaitCondition { $0.state.jobs[unchanged[0].transferID]?.state != .queued }
+        #expect((await harness.source.starts.dropFirst(before).map(\.id)).contains(unchanged[0].transferID), "the unchanged prefetch member started once the follow ended")
         #expect(!(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID), "never requested after the apply")
         await harness.source.release(running[1].transferID, with: .progress(received: 0, expected: nil))
         _ = await EngineHarness.value(of: runningWaiters[1])
@@ -491,7 +495,8 @@ enum SweptReplacedContent: String, CaseIterable, Sendable {
 extension EngineSyncTests {
     /// A space sweep (`sweepSpaceParked`: the alarm's `.reclaimed` sweep after reaped bytes, `.settle`, a purge's
     /// reclaim) reaching the parked job of a listed id's replaced content while a bounded follow still owes its visit
-    /// follows that job before it answers or re-queues it, as a failure does (`followBeforeActing`): the id's interest
+    /// runs the owed follow before it judges any job (the follow barrier, F-28; before Stage 3 close-out cycle 9 it
+    /// followed that job alone, as a failure did): the id's interest
     /// moves to its new content (T22) and is answered from it. Without it the sweep parked the replaced 5 MB content
     /// `insufficientSpace` and its fail-fast answered the waiter, or the ensure member, with that content's figures
     /// although the copy lists the id at 16 bytes that fit (F-22: the figures are the bytes the asset needs), or it
@@ -588,11 +593,12 @@ extension EngineSyncTests {
             (
                 holds: engine.state.jobs[old.transferID]?.assets.contains(old.identifier) == true,
                 state: engine.state.jobs[old.transferID]?.state,
-                owed: engine.followOwed,
+                // The sweep runs the owed follow to its end itself (F-28); the follow's own turn is still held (S3-R11 R3).
+                drove: !engine.followOwed && engine.state.followFollowUpWaiting,
                 violations: engine.invariantViolations()
             )
         }
-        #expect(afterSweep.owed, "the sweep ran while the follow still owed the id's visit")
+        #expect(afterSweep.drove, "the sweep ran while the follow still owed the id's visit, and ran the follow to its end before it judged (F-28): \(afterSweep)")
         #expect(!afterSweep.holds, "the replaced content's job no longer holds the id after the sweep: \(String(describing: afterSweep.state))")
         #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
         await engine.readForTests { $0.releaseFollowFollowUps() }
@@ -768,8 +774,8 @@ enum LaneDropVisit: String, CaseIterable, Sendable {
     /// The follow's held turns are released and end before the reclaim: the sweep finds the job already followed (the
     /// outcome the sweep must give in both cases).
     case followVisitedFirst
-    /// The follow still owes the job's visit when the reclaim's sweep reaches it: the sweep follows it itself
-    /// (`followBeforeActing`) before it acts on it.
+    /// The follow still owes the job's visit when the reclaim's sweep reaches it: the sweep runs the owed follow
+    /// itself (`advanceFollowForSpaceSweep`, the follow barrier, F-28) before it judges.
     case sweepFollowsFirst
 }
 
@@ -894,13 +900,14 @@ extension EngineSyncTests {
         }
         let afterSweep = await engine.readForTests { engine in
             (
-                owed: engine.followOwed,
+                // The sweep runs the owed follow to its end itself (F-28); the follow's own turn is still held (S3-R11 R3).
+                drove: !engine.followOwed && engine.state.followFollowUpWaiting,
                 lane: engine.state.jobs[a.transferID]?.lane,
                 shared: engine.state.jobs[a.transferID]?.state,
                 violations: engine.invariantViolations()
             )
         }
-        #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
+        #expect(afterSweep.drove == (visit == .sweepFollowsFirst), "the sweep found C's visit owed, and ran the follow to its end before it judged (F-28), only when the follow had not visited first: \(afterSweep)")
         #expect(afterSweep.lane == .prefetch && afterSweep.shared != .queued, "C's job, left with B's prefetch interest, waits for room prefetch work has not: \(afterSweep)")
         #expect(watch.state == .blocked(.insufficientSpace), "in the sweep's turn C's job, which does not fit its prefetch lane, is parked insufficientSpace (re-checked at every read), not left awaitingSpace with nothing pending and no wake: \(String(describing: watch.state))")
         #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
@@ -1017,7 +1024,8 @@ extension EngineSyncTests {
         }
         let afterSweep = await engine.readForTests { engine in
             (
-                owed: engine.followOwed,
+                // The sweep runs the owed follow to its end itself (F-28); the follow's own turn is still held (S3-R11 R3).
+                drove: !engine.followOwed && engine.state.followFollowUpWaiting,
                 lane: engine.state.jobs[a.transferID]?.lane,
                 shared: engine.state.jobs[a.transferID]?.state,
                 space: engine.state.freeSpace,
@@ -1027,7 +1035,7 @@ extension EngineSyncTests {
         let important = afterSweep.space.map { $0.volumeImportant - $0.reserveBytes } ?? 0
         let opportunistic = afterSweep.space.map { $0.volumeOpportunistic - $0.reserveBytes } ?? 0
         #expect(afterSweep.space?.pendingReclaim == 0 && important < Int64(cBytes.count) && opportunistic >= Int64(cBytes.count), "setup: after the reclaim C fits the prefetch lane's volume and not the user lane's: \(String(describing: afterSweep.space))")
-        #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
+        #expect(afterSweep.drove == (visit == .sweepFollowsFirst), "the sweep found C's visit owed, and ran the follow to its end before it judged (F-28), only when the follow had not visited first: \(afterSweep)")
         let parked: Bool
         if case .blocked? = afterSweep.shared {
             parked = true
@@ -1146,14 +1154,15 @@ extension EngineSyncTests {
         await engine.refreshFreeSpace()
         let after = await engine.readForTests { engine in
             (
-                owed: engine.followOwed,
+                // The read's sweep runs the owed follow to its end itself (F-28); the follow's own turn is still held (S3-R11 R3).
+                drove: !engine.followOwed && engine.state.followFollowUpWaiting,
                 lane: engine.state.jobs[a.transferID]?.lane,
                 shared: engine.state.jobs[a.transferID]?.state,
                 k: engine.state.jobs[k.transferID]?.state,
                 violations: engine.invariantViolations()
             )
         }
-        #expect(after.owed == (visit == .sweepFollowsFirst), "the read swept while the follow owed C's visit only when the follow had not visited first: \(after)")
+        #expect(after.drove == (visit == .sweepFollowsFirst), "the read's sweep found C's visit owed, and ran the follow to its end before it judged (F-28), only when the follow had not visited first: \(after)")
         #expect(after.k != .blocked(.insufficientSpace), "K (3 MB, user lane) is re-queued for the 6 MB of room user work has: \(String(describing: after.k))")
         #expect(after.lane == .prefetch && after.shared == .blocked(.insufficientSpace), "C's job, left with B's prefetch interest, stays parked for room prefetch work lacks: \(after)")
         #expect(after.violations.isEmpty, "\(after.violations.prefix(3))")

@@ -504,7 +504,21 @@ extension SyncEngine {
         // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot; the ids an
         // owed follow moved (an apply may have landed during the read) leave the job before its park answers them.
         await self.refreshFreeSpace()
-        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), let job = self.state.jobs[transfer] else {
+        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), self.state.jobs[transfer] != nil else {
+            return
+        }
+        if self.defersToFollow {
+            // The verdict reads the room, the bytes in flight and the job's lane, which the owed visits change: it waits
+            // for the follow's end (F-28). The read above is adopted already (S3-R11 R1).
+            self.state.eventsAfterFollow.append(.spaceFailure(transfer, epoch: epoch, required: required))
+            return
+        }
+        self.decideSpaceFailure(transfer, required: required)
+    }
+
+    /// `spaceFailed`'s verdict on the latest read: retry, `awaitingSpace` or `insufficientSpace` with its figures.
+    func decideSpaceFailure(_ transfer: TransferID, required: Int64) {
+        guard let job = self.state.jobs[transfer] else {
             return
         }
         let space = self.state.freeSpace

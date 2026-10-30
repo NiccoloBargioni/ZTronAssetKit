@@ -173,7 +173,8 @@ extension SyncEngine {
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S06 — the lifecycle and the run token; the read became the ledger's base in the turn it
-            // returned (L4-R7), and parked jobs are re-evaluated against it there.
+            // returned (L4-R7, also behind the follow barrier: S3-R11 R1), and parked jobs are re-evaluated against it
+            // there, or, behind the barrier, by the sweep's follow-up once the follow ends (F-28).
             space = try await self.readFreeSpace()
             if self.isRunning {
                 self.reconsiderSpaceBlocked()
@@ -569,7 +570,7 @@ extension SyncEngine {
     /// `checkRunSettled()`; `spaceSwept` once this check has re-checked the space-parked jobs against the ledger.
     private func checkRunSettled(spaceSwept: Bool) {
         // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again.
-        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followOwed else {
+        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier else {
             return
         }
         self.materializeRun()

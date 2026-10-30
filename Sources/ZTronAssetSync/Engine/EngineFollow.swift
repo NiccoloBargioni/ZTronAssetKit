@@ -49,6 +49,18 @@ extension SyncEngine {
         !self.state.followScans.isEmpty || self.state.followNext < self.state.followOrder.count
     }
 
+    /// Whether admissions and space verdicts wait (design D3): a follow is owed, or the events that waited for the last
+    /// one are not all applied yet (`eventsAfterFollow`, drained a bounded batch per turn).
+    var followBarrier: Bool {
+        self.followOwed || !self.state.eventsAfterFollow.isEmpty
+    }
+
+    /// Whether an event arriving now waits for the follow (`eventsAfterFollow`): behind the barrier, unless the follow's
+    /// own visit makes it or the drain of the waiting events applies it.
+    var defersToFollow: Bool {
+        self.followBarrier && !self.state.inFollowVisit && !self.state.drainingAfterFollow
+    }
+
     /// Continues the follow's owed passes, then visits its next `followsPerTurn` jobs; schedules a follow-up turn for the
     /// rest, or ends the follow: the jobs held for a manifest catch-up that no catch-up holds any more are released, and
     /// the run is checked.
@@ -64,7 +76,7 @@ extension SyncEngine {
                 continue
             }
             visited += 1
-            if self.follow(transfer) {
+            if self.visit(transfer) {
                 moved = true
             }
         }
@@ -87,6 +99,78 @@ extension SyncEngine {
         if moved || self.state.pumpWaitsForFollow {
             self.pump()
         }
+        self.drainEventsAfterFollow()
+    }
+
+    /// The events one drain turn applies at most (`drainEventsAfterFollow`): an event costs about what a re-queue or a park
+    /// costs, so a turn stays near 1 ms (C2) whatever arrived during the follow (a 10,000-member group's joins).
+    static let eventsAfterFollowPerTurn = 512
+
+    /// Applies the events that waited for the follow (design D3) as a visit-first engine meets them: after the follow's
+    /// own last turn and its pump, in arrival order, on the state every visit left, at most `eventsAfterFollowPerTurn`
+    /// per turn; the barrier holds (`followBarrier`) until the last is applied, then the run is checked and the queues
+    /// pumped. Each event re-validates what it names (the job, its epoch, the interest): a job that ended or moved
+    /// meanwhile is skipped. A sweep owed meanwhile is a follow-up turn already (`sweepSpaceParked`).
+    func drainEventsAfterFollow() {
+        guard !self.followOwed, !self.state.eventsAfterFollow.isEmpty else {
+            return
+        }
+        let count = min(Self.eventsAfterFollowPerTurn, self.state.eventsAfterFollow.count)
+        let batch = self.state.eventsAfterFollow.prefix(count)
+        self.state.eventsAfterFollow.removeFirst(count)
+        self.state.drainingAfterFollow = true
+        for event in batch {
+            switch event {
+            case .spaceFailure(let transfer, let epoch, let required):
+                guard self.state.jobs[transfer]?.epoch == epoch else {
+                    continue
+                }
+                self.decideSpaceFailure(transfer, required: required)
+            case .spaceJoin(let token, let transfer):
+                guard self.state.jobs[transfer]?.interests[token] != nil else {
+                    continue
+                }
+                self.failFastJoiner(token, of: transfer)
+            case .enqueue(let transfer):
+                self.enqueue(transfer)
+            }
+        }
+        self.state.drainingAfterFollow = false
+        guard self.state.eventsAfterFollow.isEmpty else {
+            self.scheduleDrainFollowUp()
+            return
+        }
+        self.checkRunSettled()
+        self.pump()
+    }
+
+    /// Schedules one later turn for the events a drain turn left (C2).
+    private func scheduleDrainFollowUp() {
+        guard !self.state.drainFollowUpScheduled else {
+            return
+        }
+        self.state.drainFollowUpScheduled = true
+        let spawned = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S44 (proposed) — the follow-up hops onto the actor and re-reads the waiting events and each
+            // job they name (`drainEventsAfterFollow` re-validates every one); a follow begun meanwhile holds them again.
+            await engine.drainFollowUp()
+        }
+        if spawned == nil {
+            // Shutting down: nothing is admitted any more.
+            self.state.drainFollowUpScheduled = false
+            self.state.eventsAfterFollow = []
+        }
+    }
+
+    /// The scheduled continuation of `drainEventsAfterFollow`.
+    private func drainFollowUp() {
+        self.state.drainFollowUpScheduled = false
+        guard self.isRunning else {
+            return
+        }
+        self.drainEventsAfterFollow()
+        self.rearm()
+        self.notifyObservers()
     }
 
     /// Whether `job` waits for the follow before it starts: a follow is owed and the job holds an id the engine's copy
@@ -110,8 +194,7 @@ extension SyncEngine {
     /// legitimately, and the follow would end its interest `.notFound`; a dropped id's interest gets the failure's own
     /// answer instead of the follow's `.notFound`, which no rule forbids. One lookup in the copy and one key comparison
     /// per id of the job (`sameTransfer` against the job's own entry, whose transfer is the job's), no transfer
-    /// formatted: a space sweep checks every job it would judge while a follow is owed (`followSweptHolders`), and a
-    /// formatted transfer costs about 0.75 µs in release, 7.5 ms at SPEC §6's 10,000.
+    /// formatted (a formatted transfer costs about 0.75 µs in release).
     func holdsMovedID(_ job: Job) -> Bool {
         guard self.followOwed else {
             return false
@@ -122,8 +205,7 @@ extension SyncEngine {
     }
 
     /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
-    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`) or to be judged by a space sweep
-    /// (`sweepSpaceParked`, which follows every job it would judge before it orders them): the moved ids' interests
+    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`): the moved ids' interests
     /// follow their new content first (T22), exactly as the visit would have moved them before the failure arrived, and
     /// only the ids the copy still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
@@ -132,7 +214,7 @@ extension SyncEngine {
         guard let job = self.state.jobs[transfer], self.holdsMovedID(job) else {
             return false
         }
-        if self.follow(transfer) {
+        if self.visit(transfer) {
             self.schedulePumpFollowUp()
         }
         return self.state.jobs[transfer]?.epoch != job.epoch
@@ -178,6 +260,15 @@ extension SyncEngine {
         return unscanned
     }
 
+    /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`).
+    private func visit(_ transfer: TransferID) -> Bool {
+        self.state.inFollowVisit = true
+        defer {
+            self.state.inFollowVisit = false
+        }
+        return self.follow(transfer)
+    }
+
     /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job verifying or committing is
     /// not moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next
     /// follow. The caller checks the run and pumps once per turn, not once per job.
@@ -220,6 +311,25 @@ extension SyncEngine {
             }
         }
         return true
+    }
+
+    /// One follow turn run by a space sweep that found the follow owed (design D3, `sweepSpaceParked`): the follow takes
+    /// priority over the sweep's verdicts, and the sweep's own follow-up turns keep the follow moving whether or not the
+    /// follow's own follow-up has run (it finds nothing owed, or continues). Bounded as any follow turn (C2). The deadlines
+    /// are re-read; the idle state too when this turn ended the follow, since the follow's own follow-up then finds
+    /// nothing owed and returns before it would (`followFollowUp`).
+    func advanceFollowForSpaceSweep() {
+        guard self.followOwed else {
+            self.drainEventsAfterFollow()
+            return
+        }
+        self.continueFollow()
+        if self.followOwed {
+            self.rearm()
+            self.notifyObservers()
+        } else {
+            self.reconcileIdle()
+        }
     }
 
     /// Schedules one later turn for the visits a follow turn left after `followsPerTurn`. When none can be spawned
@@ -280,4 +390,15 @@ extension SyncEngine {
         self.state.followFollowUpWaiting = false
         self.followFollowUp()
     }
+}
+
+/// An event that waits for the follow's end (`EngineState.eventsAfterFollow`; F-28, S3-R11 design D3). Real-world
+/// ledger inputs (a free-space read, the bytes an ended transfer frees) apply when they arrive (S3-R11 R1): none waits.
+enum EventAfterFollow: Sendable {
+    /// An ENOSPC whose verdict (`decideSpaceFailure`) waits; `epoch` is the job's at the failure.
+    case spaceFailure(TransferID, epoch: UInt64, required: Int64)
+    /// A join to a job parked `insufficientSpace`, whose re-check and fail-fast answer (`failFastJoiner`) wait.
+    case spaceJoin(InterestToken, TransferID)
+    /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues.
+    case enqueue(TransferID)
 }

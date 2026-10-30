@@ -618,7 +618,8 @@ extension SyncEngine {
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation; the measured read became the ledger's
-            // base in the turn it returned (L4-R7), and parked jobs are re-evaluated against it there.
+            // base in the turn it returned (L4-R7, also behind the follow barrier: S3-R11 R1), and parked jobs are
+            // re-evaluated against it there, or, behind the barrier, by the sweep's follow-up once the follow ends (F-28).
             measured = try await self.readFreeSpace()
             if self.isRunning {
                 self.reconsiderSpaceBlocked()
