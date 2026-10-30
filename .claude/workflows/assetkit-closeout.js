@@ -86,9 +86,19 @@ ${A.bar === 'converge' ? CONVERGE : ''}
 Return structured issues (blocking vs non-blocking) with file:line and a concrete fix, a status paragraph, and evidence lines.${A.cleanScratch ? `
 Before you return, delete your own scratch paths inside the worktree (rm -rf .build-verify-${A.wp}-c${cycle}-${lens} .build-verify-${A.wp}-c${cycle}-${lens}-perf .build-verify-${A.wp}-c${cycle}-${lens}-tsan); copy any probe a finding cites to ${ROOT}/.build-orchestrator/${A.wp}-probes-c${cycle}/ first.` : ''}`
 
+// A verifier that returns nothing (API or network failure) is run again, at most twice, under a ':retryN' label; a
+// cycle still missing a lens after that ends the close-out (out.incomplete) instead of fixing from a partial list.
+const verifyLens = async (l, cycle, prev) => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await agent(verifyPrompt(l, cycle, prev), withModel('verify', { label: 'verify:' + A.wp + ':' + l + ':c' + cycle + (attempt ? ':retry' + attempt : ''), phase: 'Verify', schema: VERIFY_SCHEMA }))
+    if (r) return { lens: l, ...r }
+    log(A.name + ' verify ' + cycle + ' ' + l + ': no result (attempt ' + (attempt + 1) + ' of 3)')
+  }
+  return null
+}
 const verifyBoth = async (cycle, prev) => {
   if (!(await gate('verify:' + cycle))) return null
-  const rs = (await parallel(['reqs', 'correct'].map(l => () => agent(verifyPrompt(l, cycle, prev), withModel('verify', { label: 'verify:' + A.wp + ':' + l + ':c' + cycle, phase: 'Verify', schema: VERIFY_SCHEMA })).then(r => r ? { lens: l, ...r } : null)))).filter(Boolean)
+  const rs = (await parallel(['reqs', 'correct'].map(l => () => verifyLens(l, cycle, prev)))).filter(Boolean)
   return { issues: rs.flatMap(r => r.issues.map(x => ({ lens: r.lens, ...x }))), status: rs.map(r => ({ lens: r.lens, status: r.status })), missing: 2 - rs.length }
 }
 
@@ -101,6 +111,7 @@ for (let cycle = FROM; cycle <= MAXC; cycle++) {
     const v0 = await verifyBoth(cycle, null)
     out.cycles.push({ cycle, fix: null, verify: v0 })
     if (!v0) break
+    if (v0.missing) { out.incomplete = { cycle, missing: v0.missing }; log(A.name + ' verify ' + cycle + ': ' + v0.missing + ' lens(es) missing after retries; close-out ended'); break }
     log(A.name + ' verify ' + cycle + ' (committed fixes): ' + v0.issues.filter(i => i.blocking).length + ' blocking / ' + v0.issues.length)
     if (!v0.issues.filter(i => i.blocking).length && !v0.missing) break
     prev = v0.issues
@@ -112,6 +123,7 @@ for (let cycle = FROM; cycle <= MAXC; cycle++) {
   const v = await verifyBoth(cycle, prev)
   out.cycles.push({ cycle, fix: fx && { summary: fx.summary, quick: fx.quick_line, sim: fx.sim_line, declined: fx.declined, contract: fx.contract_changes_made }, verify: v })
   if (!v) break
+  if (v.missing) { out.incomplete = { cycle, missing: v.missing }; log(A.name + ' verify ' + cycle + ': ' + v.missing + ' lens(es) missing after retries; close-out ended'); break }
   const blocking = v.issues.filter(i => i.blocking)
   log(A.name + ' verify ' + cycle + ': ' + blocking.length + ' blocking / ' + v.issues.length)
   if (!blocking.length && !v.missing) break
