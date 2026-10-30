@@ -1,10 +1,18 @@
 # Stage 3 WP-D close-out (`s3d`): transport
 
-Stage 3 hardening, close-out cycle 1. Branch `wp/s3d` from tag `s3-base`, worktree `.worktrees/s3d`, scratch paths
+Stage 3 hardening, close-out cycles 1 and 2. Branch `wp/s3d` from tag `s3-base`, worktree `.worktrees/s3d`, scratch paths
 `.build-s3d`, `.build-s3d-tsan`, `.build-s3d-perf`. The items and their levels come from the orchestrator's rulings
 (`.build-orchestrator/s3-rulings-s3d.md`), their evidence from `.build-orchestrator/s3-findings-s3d.json`. WP-D's
 Stage 2 record is `docs/adr-drafts/d.md`; the REENTRANCY rows cited here are those of ARCHITECTURE §10.4 (D-n) and
 §10.2 (RE-Snn).
+
+**Cycle 2.** The cycle-2 task listed no findings (`FINDINGS TO FIX: []`): the cycle-1 verification returned no report.
+Its correctness verifier's scratch path (`.build-verify-s3d-c1-correct/`, left in this worktree) held a probe,
+"a replaced handle's in-flight write never lands over the joining handle's newer priority", failing on `851c543` in
+all its runs (`probe1.log`, `stress-1.log` … `stress-10.log`), and a proposed loop. That is evidence, not a ruling:
+the defect was reproduced here with a test of this close-out's own (S3D-1, "Cycle 2"), committed failing, then fixed.
+The verifier's other logs show nothing else failing (three transport runs and TSan passed; its mutants MA, MB, MD,
+ME, MF and MG were killed, MI never ran).
 
 ## Orchestrator rulings (close-out)
 
@@ -13,7 +21,8 @@ Recorded as given; each item below follows its ruling.
 - **Orchestrator ruling (close-out) S3-R1, scope and order.** BLOCKING first (failing test committed on its own, then
   the fix), then REQUIRED, then OPTIONAL; an ADR-RECORD item gets an entry and no code; items not listed are out of
   scope. *Followed:* S3D-1 first (failing tests `b287a88`, fix `e7b9377`), then S3D-2 (failing tests `1e3bee2`, fix
-  `fdf5a3d`), S3D-3, S3D-4, S3D-5; S3D-6 recorded only.
+  `fdf5a3d`), S3D-3, S3D-4, S3D-5; S3D-6 recorded only. Cycle 2: the rest of S3D-1 (failing tests `c1395d3`, fix
+  `a51f37f`).
 - **Orchestrator ruling (close-out) S3-R2, probes.** Probes may be copied and adapted; committed tests follow SPEC 7.2
   (requirement ID first, `.timeLimit` on anything that awaits, `ManualTimeSource` only, no sleeps, ADR-051 gating);
   probe suites are renamed into the owning suites; replays of a bug's old ordering are not committed. *Followed:* both
@@ -46,7 +55,8 @@ Recorded as given; each item below follows its ruling.
 `.finished`), and a handle's controls are delivered in FIFO order (one stream per handle drained by one task, not a
 `Task` per call); commit both probes as regression tests; propose the D-9 ledger amendment.
 
-- **Disposition: fixed.** Failing tests first (`b287a88`), fix (`e7b9377`), control-task lifetime test (`0269a1a`).
+- **Disposition: fixed.** Failing tests first (`b287a88`), fix (`e7b9377`), control-task lifetime test (`0269a1a`);
+  cycle 2: failing tests (`c1395d3`), fix (`a51f37f`), below.
 - **Fix** (`Sources/ZTronAssetTransport/Background/BackgroundSupport.swift`):
   1. `BackgroundTransferCoordinator.setPriority(_:of:token:)` takes a serial from `lastPriorityRequest` and stores it
      in `priorityRequests[name]` before its first await (after the entry token check, so a stale handle never
@@ -99,20 +109,55 @@ Recorded as given; each item below follows its ruling.
   directly; against the mutant it recorded the time limit at 60 s but never returned, and the run had to be stopped by
   hand at 9 min. The committed version cancels the control task when the test is cancelled; against the same mutant
   the run ended on its own (130 s, the rebuild included).
-- **Considered and not taken: a single writer per name.** The confirmer's third reorder point is the live driver:
-  `LiveBackgroundSessionDriver.setPriority` lists the tasks again before it writes, so two calls in flight for one name
-  may land in either order. With the fix two writes are in flight together only if their callers overlap the calls.
-  The one production caller is a handle's control task, which awaits each call before the next (grep: the only
-  production call of `coordinator.setPriority` is in `BackgroundTransferHandle`). A loop that keeps one write in flight
-  per name and re-applies the newest wanted value would also cover overlapping direct callers. It would add a second
-  table, a loop and a task-identifier check for a name re-created after its terminal, with no production caller that
-  needs them. Recorded here so a later direct caller knows to add it.
+- **Cycle 2: a replaced attach's write that lands last.** Cycle 1 recorded that two writes for one name are in flight
+  together only when their callers overlap the calls, and that no production caller does. That premise was wrong:
+  each attach has its own control task, so when a start joins the OS task and replaces the first attach while that
+  attach's write is past every check and in flight, the joining handle's control task writes too. The live driver
+  lists the tasks before it writes (`LiveBackgroundSessionDriver.setPriority`), so the two writes may land in either
+  order; when the older lands last, the OS task stays at the older priority while `liveTransfers()` reports the newer.
+  - **Fix** (`a51f37f`, body only): after its write, `setPriority(_:of:token:)` re-reads `priorities[name]` and, while
+    it differs from the value written, writes the newest value again (`while let newest = self.priorities[name],
+    newest != written`). The last write to land is then always followed by its writer's check, so it is the newest
+    recorded value. Each further pass answers one newer request (a request that records a value also writes it), so
+    the loop is bounded by the requests made; `.finished` clears the entry and ends it, so nothing is written on the
+    request's account after the terminal. This is the loop the verifier proposed; the single-writer variant cycle 1
+    considered (one write in flight per name, with a second table) was not taken: a request would then return before
+    its value reached the OS task, so a handle's next control (a pause) could reach the driver before its priority.
+    If the same attempt's name were created anew meanwhile, a pass would write to the old, gone task identifier,
+    which the live driver ignores (it looks the identifier up among the session's tasks).
+  - **Seam** (test-only): `FakeBackgroundSessionDriver.holdNextPriority()` / `releasePriority()` hold one write after
+    its caller's checks, before it lands (signal `"priority held"`); `priorityChanges` records writes in landing order.
+  - **Tests added** (`BackgroundInterleavingTests`, which now imports `ZTronAssetTransport` `@testable` to await the
+    replaced handle's `controlTask`, cancelled past the hang guard as in `BackgroundControlTaskTests`):
+    - `R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than
+      the joining handle's newer one` (`replacedAttachWriteLandsLast`): the first handle's promotion is held in flight,
+      a second start joins, the joining handle demotes; the demotion lands, then the promotion. It checks the race was
+      staged (`changes.prefix(2) == [0.25, 0.75]`), that the OS task ends at 0.25, and `liveTransfers()` reports 0.25.
+    - `R-NET-10: a priority write that lands after its transfer finished is followed by no other write`
+      (`lateWriteAfterTheTerminal`): as above, but the OS task finishes before the held promotion lands: the writes are
+      exactly `[0.25, 0.75]`, the replaced handle's control task ends, nothing is live.
+  - **Evidence, failing before the fix** (`c1395d3`, tests only; load average 19.7):
+    ```
+    ✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:454:9: Expectation failed: changes.last == 0.25
+    ↳ the newest request was the joining handle's bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]
+    ```
+    After the fix the 50 tests of the three background suites pass, and so does the verifier's probe file
+    (`S3DVerifyCorrectProbeTests.swift`, run in a scratch copy, not committed): `✔ Test run with 25 tests in 2 suites
+    passed`.
+  - **Mutants** (scratch copy `.build-s3d/mutpkg`, whole `ZTronAssetTransportTests`):
+    - M1, the loop removed (the cycle-1 code): `✘ ... BackgroundInterleavingTests.swift:454:9: Expectation failed:
+      changes.last == 0.25` / `↳ ... the OS task ends at Optional(0.75); changes [0.25, 0.75]` (1 issue of 161 tests).
+    - M2, `process(.finished)` no longer clears `priorities[name]`: `✘ Test "R-NET-10: a priority write that lands
+      after its transfer finished is followed by no other write" recorded an issue at
+      BackgroundInterleavingTests.swift:482:9: Expectation failed: changes == [0.25, 0.75]` / `↳ no write follows the
+      late one once the transfer finished: [0.25, 0.75, 0.25]`. Before cycle 2 that clear only bounded the table; the
+      loop's end now depends on it, and this test pins it.
 - **Equivalent by design.** The two clears of `priorityRequests` (by the newest request after its listing, and on
   `.finished`) only bound the table. An entry lives only while a request lists the tasks, and a request whose
   terminal was processed meanwhile is stopped by the `processed` check either way. Removing either clear changes no
   observable behaviour, so a mutant of either survives as an equivalent mutant. The `.finished` clear is kept as ruled.
 - **Contract file.** `Background/BackgroundSupport.swift` is a contract file whose bodies WP-D implements. No public or
-  package signature changed. Added: the private stored properties `priorityRequests` and `lastPriorityRequest`, the
+  package signature changed (cycle 2 changed only the body and doc comment of `setPriority(_:of:token:)`). Added: the private stored properties `priorityRequests` and `lastPriorityRequest`, the
   private `Waiter.controls` and `Waiter.end(with:)`, the internal `BackgroundTransferHandle.Control` and
   `BackgroundTransferHandle.controlTask`, the handle's `deinit`, and the internal `init`'s `controls:` parameter.
   Removed: the handle's private `coordinator` property, since only the control task uses it now.
@@ -121,9 +166,10 @@ Recorded as given; each item below follows its ruling.
   join the task and replace the attach meanwhile, review round 2); **the request's serial, taken before the first
   await, is checked after the listing to be still the newest for the name, so of overlapping requests the newest
   decides whichever listing returns first (Stage 3, S3-CONC-01)**; after the listing the name is re-checked against
-  the processed terminals, so `priorities` is written only for a task still live; nothing is read after the last
-  await (two writes for one name overlap only when their callers overlap the calls, and a handle delivers its next
-  control only after the previous call returned)". And the paragraph under the table: replace "Control hops from
+  the processed terminals, so `priorities` is written only for a task still live; **after each write `priorities[name]`
+  is re-read and, while it differs from the value written, written again, so the last write to land is the newest
+  recorded value even when a replaced attach's write in flight, or the live driver's own listing, lands it after a
+  newer one; `.finished` clears the entry and ends the loop (Stage 3, close-out cycle 2)**". And the paragraph under the table: replace "Control hops from
   `BackgroundTransferHandle` and the stream's `onTermination` are unstructured tasks outside the actor." by "Each
   `BackgroundTransferHandle` owns one control task outside the actor, which delivers its controls in the order they
   were made, each after the previous call returned, and ends with the attach (terminal, replacement, consumer gone,
@@ -261,35 +307,41 @@ stay as ratified. No code was changed for any of them.
 | S3-B-054 | Device plan: R-NET-3's run-time half, an app that attests `BackgroundTransferPolicy.enabled` without wiring the hook, stays undetected (CCR-G1 declined, L5-R5); revisit only with a detection that cannot misfire on an early finish. S3D-2 does not change this: a relay that holds several handlers still sees only the handlers it was given. | ADR-054; `Tests/ZTronAssetKitTests/CompositionTests.swift:39-44`; L5-R5 | Accepted deviation; device-only. |
 | S3-B-056 | Declined options stay declined: D-17.5 (apply the joining job's lane priority when `start` joins a live task), D-17.6 (prove "without polling" inside the conditions test), D-18.3 (change the failure of a direct start of an unbounded job). | d.md D-17.5, D-17.6, D-18.3 | Declined at review rounds 2 and 3 for the reasons given there. S3D-1 keeps D-17.5's premise: a join still asks for the task's creation priority, and the newest-request check orders only explicit changes. |
 
-## Gates and runs on the final tree (this session, 2026-10-30)
+## Gates and runs on the final tree (2026-10-30)
 
-Eight commits on `wp/s3d` before this record (`b287a88` … `0269a1a`); the runs below are of that tree.
+**Cycle 2** (this session): the tree after `a51f37f` (eleven commits on `wp/s3d`), with this record uncommitted.
+Load average 13 at the start, up to 196 during `--quick`, 9 to 88 afterwards.
 
-- `SWIFTPM_SCRATCH=.build-s3d bash Scripts/verify.sh --quick` → `VERIFY: PASS` (harness unchanged since
-  `harness-frozen`; Transport 159, Sync 351, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104 tests;
-  load average up to 140 during the run).
-- `swift build -c release --scratch-path .build-s3d -Xswiftc -warnings-as-errors` → `Build complete! (34,68 s)`.
-- `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` /
-  `DOCS: PASS`; `TRACE: PASS` (run without `--write`, so `docs/TRACEABILITY.md` is untouched); `SELFTEST: PASS`.
-- `ZTronAssetTransportTests` three times: `✔ Test run with 159 tests in 17 suites passed` each time (0.477 s,
-  0.507 s, 0.451 s; load 13.9 to 14.7). Under TSan (`.build-s3d-tsan`): `✔ Test run with 159 tests in 17 suites passed
-  after 3.847 seconds`, no ThreadSanitizer report.
-- Coverage (all 8 bundles merged, as `verify.sh` does): `COVERAGE target=ZTronAssetTransport lines= 99.10% (2418/2440)
-  min=70.0 OK`, `COVERAGE overall lines=96.56% (25176/26073) min=80.0 OK`, `COVERAGE device-only-excluded lines=177
-  share=0.67% max=3.0% OK`, `COVERAGE: PASS`. `BackgroundSupport.swift` 592 of 593 lines.
+- `SWIFTPM_SCRATCH=.build-s3d bash Scripts/verify.sh --quick` → `VERIFY: PASS` (`::: SUMMARY mode=--quick
+  steps-failed=0`; Transport 161, Sync 351, Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104 tests).
+- `swift build -c release --scratch-path .build-s3d -Xswiftc -warnings-as-errors` → `Build complete! (44,84 s)`.
+- `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%` / `DOCS: PASS`; `SELFTEST: PASS`; `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1191`
+  / `TRACE: PASS` (no `--write`; `docs/TRACEABILITY.md` untouched).
+- `ZTronAssetTransportTests` three times: `✔ Test run with 161 tests in 17 suites passed` (0.871 s, 0.531 s, 0.590 s;
+  load 116 to 123). Under TSan (`.build-s3d-tsan`): `✔ Test run with 161 tests in 17 suites passed after 17.060
+  seconds`, no ThreadSanitizer report.
+- Coverage (all bundles merged, as `verify.sh` does): `COVERAGE target=ZTronAssetTransport lines= 99.10% (2427/2449)
+  min=70.0 OK`, `COVERAGE overall lines=96.56% (25186/26082) min=80.0 OK`, `COVERAGE device-only-excluded lines=177
+  share=0.67% max=3.0% OK`, `COVERAGE: PASS`. `BackgroundSupport.swift` 601 of 602 lines.
 - iOS: `xcodebuild … -destination 'generic/platform=iOS' … OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` exits 0
-  with no warning or error.
+  (its only output is xcodebuild's `IDERunDestination: Supported platforms … is empty` notice; `BackgroundSupport.o`
+  for `Debug-iphoneos` was rebuilt from the cycle-2 source).
 - iOS Simulator (iPhone 17e, iOS 27.0, `02CE21B4-…`; ADR-051): `** TEST SUCCEEDED **`; xcresult summary `result:
-  Passed, totalTestCount: 1313, passedTests: 1313, failedTests: 0, skippedTests: 0` (387 s; load average 270 at the
-  end). The simulator was shut down afterwards.
+  Passed, totalTestCount: 1315, passedTests: 1315, failedTests: 0, skippedTests: 0` (the two new tests included; 3 min
+  48 s). The simulator is shut down (`simctl` reports `Shutdown`).
 - WP-D's benchmark (release, `.build-s3d-perf`, `--filter TransportBenchmarks`): `P-10 500 assets: 8 TCP connections
-  (max 8), 500 requests, 0.156532125 seconds`, passed (load 190.6 before, 34.6 after).
+  (max 8), 500 requests, 0.049872209 seconds`, passed (load 42.5).
+
+**Cycle 1** (the tree after `0269a1a`): `VERIFY: PASS`; release build complete; UNSAFE 0, DOCS 100%, TRACE and
+SELFTEST pass; transport 159 tests three times and under TSan; Transport coverage 99.10% (2418/2440); iOS build exit 0;
+Simulator 1313 of 1313 passed; P-10 passed (0.157 s, load 190.6 before).
 
 ## Authorised edits outside WP-D
 
 None. Every file changed is WP-D's (ARCHITECTURE §1.2): `Sources/ZTronAssetTransport/Background/BackgroundSupport.swift`
 (a contract file whose bodies WP-D implements; no public or package signature changed, see S3D-1 "Contract file"),
-`Tests/ZTronAssetTransportTests/{BackgroundInterleavingTests,BackgroundCoordinatorTests,BackgroundControlTaskTests,SizeAndResumeTests,ForegroundBackendTests,ArithmeticSafetyTests,TransportTestSupport}.swift`
+`Tests/ZTronAssetTransportTests/{BackgroundInterleavingTests,BackgroundCoordinatorTests,BackgroundControlTaskTests,SizeAndResumeTests,ForegroundBackendTests,ArithmeticSafetyTests,TransportTestSupport,FakeBackgroundSessionDriver}.swift`
 (not `TransportContractTests.swift`), and this file.
 
 ## Proposed document changes (for the orchestrator at the Stage 3 merge)
@@ -301,7 +353,8 @@ None. Every file changed is WP-D's (ARCHITECTURE §1.2): `Sources/ZTronAssetTran
    handler it is handed, oldest first; one completion calls the oldest still waiting, S3-CONC-02)"; in **Coordinator
    (D-9)** after "Controls act only while the handle's attach token still holds the name", add "and reach the
    coordinator in the order they were made, through the handle's one control task; of overlapping priority changes
-   for one name the newest decides (S3-CONC-01)".
+   for one name the newest decides, also across a join that replaced the attach whose write was in flight
+   (S3-CONC-01)".
 4. **ARCHITECTURE §12.4:** S2-19's status as in S3D-4.
 5. **ARCHITECTURE §14 "Not verified here":** add the two device questions below.
 6. **DECISIONS (ADR-050, D-10):** the background handle's controls travel through one control task per handle in FIFO
@@ -316,7 +369,9 @@ None. Every file changed is WP-D's (ARCHITECTURE §1.2): `Sources/ZTronAssetTran
   (S3-CONC-02's trigger). The relay now keeps both and completes them oldest first, but whether UIKit ever does this is
   device-only and never ran here.
 - **The live driver's priority writes (S3-CONC-01, the confirmer's third point).** `LiveBackgroundSessionDriver.setPriority`
-  lists the tasks again before writing `task.priority`; with the fix two writes for one name are in flight together
-  only if direct callers overlap them, which no production code does. That the OS applies the last
-  `URLSessionTask.priority` written to a background task (and what it does with the hint) is device-only.
+  lists the tasks again before writing `task.priority`, so two writes for one name (two attaches' control tasks across
+  a join) may land in either order; since cycle 2 the coordinator writes the newest value again after a write that
+  may have landed late, so the order no longer decides the final value (proven with the fake driver only). That the
+  OS applies the last `URLSessionTask.priority` written to a background task (and what it does with the hint) is
+  device-only.
 - Everything listed under "Not verified here" in `docs/adr-drafts/d.md` stays unverified (S3D-6).
