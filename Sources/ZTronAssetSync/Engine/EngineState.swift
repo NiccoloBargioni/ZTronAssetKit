@@ -87,8 +87,8 @@ struct EngineState {
     /// (`invariantViolations()`; the cycle-9 amendment (b)).
     var placesAfterFollow: [TransferID: Int] = [:]
     /// The jobs whose failure verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): a
-    /// join to such a job and a re-lane of it other than the follow's own wait behind the verdict (`.join`, `.relane`);
-    /// `removeJob` forgets it.
+    /// join to such a job, a re-lane of it other than the follow's own and a network edge that meets it wait behind the
+    /// verdict (`.join`, `.relane`, `.edge`); `removeJob` forgets it.
     var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
     /// The joins that wait in `eventsAfterFollow` for a failure verdict (`.join`), by interest and asset, with the
     /// transfer each joins: the waiter, group member or run fetch they stand for holds no interest until the drain joins

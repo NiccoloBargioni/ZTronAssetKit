@@ -1887,7 +1887,7 @@ extension SyncEngine {
                 }
             case .join(let join):
                 joins[join.token, default: [:]][join.asset] = join.entry.transferID
-            case .spaceFailure, .spaceJoin, .relane:
+            case .spaceFailure, .spaceJoin, .relane, .edge:
                 break
             }
         }

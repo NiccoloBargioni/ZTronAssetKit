@@ -164,6 +164,8 @@ extension SyncEngine {
                     continue
                 }
                 self.relane(transfer, from: before)
+            case .edge(let transfer, let epoch):
+                self.replayEdge(transfer, epoch: epoch)
             }
         }
         self.state.drainingAfterFollow = false
@@ -244,7 +246,8 @@ extension SyncEngine {
     /// a 429's park with its fail-fast answers too (Stage 3 close-out cycle 10, PROBE-C9-OFFLINE, PROBE-C9-THROTTLE,
     /// PROBE-C9R-THROTTLE-PRESENT): decided before the visit, they answered an interest the visit moves. While the
     /// verdict waits, the job is inert as a visit-first engine's job is after it: a join waits for the drain
-    /// (`addInterest`), and so does a re-lane other than the follow's own (`relane`).
+    /// (`addInterest`), so does a re-lane other than the follow's own (`relane`), and so does a satisfied network edge's
+    /// re-queue (`EventAfterFollow.edge`).
     func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
         guard self.defersToFollow, let job = self.state.jobs[transfer], self.holdsMovedID(job) else {
             return false
@@ -268,8 +271,9 @@ extension SyncEngine {
     /// Gives a deferred failure verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
     /// or was superseded meanwhile: the exit the attempt's end would have taken once the follow had visited first. The
     /// verdict stays recorded while the drain's own visit of the job runs (`followedForVerdict`), so that visit's re-lane
-    /// is the follow's, as it would have been while the attempt still ran (`relane`). A join or a re-lane that met the job
-    /// meanwhile waits behind this event, at its own arrival (`EventAfterFollow.join`, `.relane`), and meets the job as the verdict leaves it, as it met a visit-first engine's job after its verdict
+    /// is the follow's, as it would have been while the attempt still ran (`relane`). A join, a re-lane or a network edge
+    /// that met the job meanwhile waits behind this event, at its own arrival (`EventAfterFollow.join`, `.relane`,
+    /// `.edge`), and meets the job as the verdict leaves it, as it met a visit-first engine's job after its verdict
     /// (PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE).
     private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) {
         guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
@@ -341,6 +345,20 @@ extension SyncEngine {
             return self.state.run?.token == join.token && self.state.run?.outstanding[transfer]?.contains(join.asset) == true
         case .system:
             return true
+        }
+    }
+
+    /// The re-queue a satisfied network edge owed a job whose verdict waited (`EventAfterFollow.edge`): when the verdict
+    /// left the job waiting for an edge (`failed(.whenOnline)`, or a transient failure's backoff), it is re-queued at the
+    /// edge's arrival place, as the edge's re-admission re-queued it on a visit-first engine (T19, R-SYN-13); without it
+    /// the job waited for a later edge that may never come.
+    private func replayEdge(_ transfer: TransferID, epoch: UInt64) {
+        guard let job = self.state.jobs[transfer], job.epoch == epoch, job.state.owedOnEdge(transient: job.transientFailure) else {
+            return
+        }
+        self.state.heap.remove(.retry(transfer, epoch: epoch))
+        if self.transition(transfer, to: .queued) {
+            self.enqueue(transfer)
         }
     }
 
@@ -565,6 +583,8 @@ enum EventAfterFollow: Sendable {
     /// A re-lane of a job whose failure verdict waits (`relane`), other than the follow's own; `before` is the job's lane
     /// before the change that asked for it.
     case relane(TransferID, epoch: UInt64, from: AssetPriority)
+    /// A satisfied network edge that met a job whose failure verdict waits (`SyncEngine.apply(_:)`).
+    case edge(TransferID, epoch: UInt64)
 }
 
 /// A failure verdict that waits for the follow (`EventAfterFollow.attemptFailed`).

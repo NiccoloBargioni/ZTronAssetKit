@@ -107,6 +107,7 @@ extension SyncEngine {
                 }
                 self.state.edgeOwed.insert(transfer)
             }
+            self.noteEdgeForWaitingVerdicts()
             passes.insert(.edge)
         }
         self.readmit(passes)
@@ -114,5 +115,28 @@ extension SyncEngine {
         self.pump()
         self.rearm()
         self.notifyObservers()
+    }
+
+    /// A satisfied edge met the jobs whose failure verdict waits for the follow (`defersFailure`): each is
+    /// `failed(.nextRun)` until its verdict, which no edge re-queues, while a visit-first engine's verdict had left it
+    /// waiting for this very edge (`failed(.whenOnline)`, or a transient failure's backoff, T19). The edge's re-queue waits
+    /// behind the verdict (`EventAfterFollow.edge`), in the order the edge's re-admission reads jobs (`readmit`): without
+    /// it the job waited for a later edge that may never come (R-SYN-13; Stage 3 close-out cycle 10). One pass over the
+    /// waiting verdicts, not over the jobs.
+    private func noteEdgeForWaitingVerdicts() {
+        guard !self.state.verdictsAfterFollow.isEmpty else {
+            return
+        }
+        var waiting: [(rank: Int, ticket: UInt64, transfer: TransferID, epoch: UInt64)] = []
+        for (transfer, wait) in self.state.verdictsAfterFollow {
+            guard let job = self.state.jobs[transfer], job.epoch == wait.epoch else {
+                continue
+            }
+            waiting.append((self.queueRank(job), job.ticket, transfer, wait.epoch))
+        }
+        waiting.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+        for item in waiting {
+            self.state.eventsAfterFollow.append(.edge(item.transfer, epoch: item.epoch))
+        }
     }
 }
