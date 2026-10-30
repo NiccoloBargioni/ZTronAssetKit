@@ -240,8 +240,11 @@ extension SyncEngine {
     /// created, and served, before an earlier one (PROBE-J-FAIL-TICKET). Returns `true` when the verdict waits. A job not
     /// in flight or failed is decided now: only an attempt's end is deferred.
     ///
-    /// While the verdict waits, the job is inert as a visit-first engine's job is after it: a join waits for the drain
-    /// (`addInterest`), and so does a re-lane other than the follow's own (`relane`) (Stage 3 close-out cycle 10).
+    /// Every exit of the attempt is deferred so, the offline exit's wait for the next edge with its fail-fast answers and
+    /// a 429's park with its fail-fast answers too (Stage 3 close-out cycle 10, PROBE-C9-OFFLINE, PROBE-C9-THROTTLE,
+    /// PROBE-C9R-THROTTLE-PRESENT): decided before the visit, they answered an interest the visit moves. While the
+    /// verdict waits, the job is inert as a visit-first engine's job is after it: a join waits for the drain
+    /// (`addInterest`), and so does a re-lane other than the follow's own (`relane`).
     func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
         guard self.defersToFollow, let job = self.state.jobs[transfer], self.holdsMovedID(job) else {
             return false
@@ -282,6 +285,20 @@ extension SyncEngine {
             self.resolveAll(transfer, with: .failed(answer))
         case .retry(let error, let answer):
             self.retryLater(transfer, error: error, answer: answer)
+        case .offline(let requeue):
+            if requeue {
+                // An edge passed while the attempt ran (`failed`'s offline exit): a fresh attempt, no answer.
+                if self.transition(transfer, to: .queued) {
+                    self.enqueue(transfer)
+                }
+            } else if self.transition(transfer, to: .failed(.whenOnline)) {
+                self.failFast(transfer, reason: .offline)
+            }
+        case .throttle(let until, let at):
+            // The park the 429 gave, its fail-fast answers read at the 429's instant.
+            if self.transition(transfer, to: .queued) {
+                self.park(transfer, reason: .throttled(until: until), answeredAt: at)
+            }
         }
     }
 
@@ -557,6 +574,13 @@ enum AttemptVerdict: Sendable, Equatable {
     /// The attempt counts toward the retry caps and the job backs off (`retryLater`), `answer` being the engine's own
     /// figures when it has them.
     case retry(TransferError, answer: AssetError?)
+    /// The attempt failed offline: a fresh attempt when `requeue` (an edge passed while it ran and the path is
+    /// satisfied), else a wait for the next edge with the offline fail-fast (`failed(.whenOnline)`). Both read when the
+    /// failure arrived (R-SYN-13).
+    case offline(requeue: Bool)
+    /// A 429 parked the job until `until` (the origin's throttle, set when the 429 arrived); the fail-fast answers are
+    /// read at `at`, the 429's instant.
+    case throttle(until: MonotonicInstant, at: MonotonicInstant)
 }
 
 /// What the drain needs of a job whose failure verdict waits (`EngineState.verdictsAfterFollow`).

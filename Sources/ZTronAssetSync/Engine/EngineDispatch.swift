@@ -461,8 +461,9 @@ extension SyncEngine {
         return nil
     }
 
-    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4).
-    func park(_ transfer: TransferID, reason: BlockReason) {
+    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4), reading a throttle's wait at `answeredAt`
+    /// when given (`failFast`).
+    func park(_ transfer: TransferID, reason: BlockReason, answeredAt: MonotonicInstant? = nil) {
         guard self.transition(transfer, to: .blocked(reason)) else {
             return
         }
@@ -473,7 +474,7 @@ extension SyncEngine {
         if case .circuitOpen = reason {
             self.scheduleBreakerDeadline()
         }
-        self.failFast(transfer, reason: reason)
+        self.failFast(transfer, reason: reason, at: answeredAt)
         if reason == .awaitingSpace {
             // Only the store's due work wakes it: make sure something will run that work.
             self.ensureSpaceWake()

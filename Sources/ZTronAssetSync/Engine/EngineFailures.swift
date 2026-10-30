@@ -84,7 +84,13 @@ extension SyncEngine {
             let edgePassed = job.active.map { $0.edgeSerial != self.state.networkEdgeSerial } ?? false
             self.state.jobs[transfer]?.active = nil
             self.state.jobs[transfer]?.transientFailure = true
-            if edgePassed, self.state.conditions?.network.satisfied == true {
+            let retryNow = edgePassed && self.state.conditions?.network.satisfied == true
+            // Behind the follow barrier a job that holds a moved id takes this exit after the follow's visit (its
+            // fail-fast answered an interest the visit moves, PROBE-C9-OFFLINE); the edge and the path are read now.
+            if self.defersFailure(transfer, .offline(requeue: retryNow)) {
+                break
+            }
+            if retryNow {
                 self.requeue(transfer, discarding: request)
             } else if self.transition(transfer, to: .failed(.whenOnline)) {
                 self.failFast(transfer, reason: .offline)
@@ -328,13 +334,20 @@ extension SyncEngine {
             self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: seconds)))
             return
         }
-        let until = self.environment.time.monotonicNow().adding(seconds: max(delay, seconds ?? 0))
+        let now = self.environment.time.monotonicNow()
+        let until = now.adding(seconds: max(delay, seconds ?? 0))
         let previous = self.state.throttles[origin]
         let end = max(previous ?? .zero, until)
         self.state.throttles[origin] = end
         self.state.metrics.retries[.throttled] += 1
         self.state.jobs[transfer]?.active = nil
         self.throttleExtended(from: previous)
+        // The origin's throttle is the 429's own, in force at once. Behind the follow barrier the park of a job that
+        // holds a moved id waits for the follow's visit, whose moved interests its fail-fast answered
+        // (PROBE-C9-THROTTLE, PROBE-C9R-THROTTLE-PRESENT); its answers read the wait at this instant.
+        if self.defersFailure(transfer, .throttle(until: end, at: now)) {
+            return
+        }
         self.park(transfer, reason: .throttled(until: end))
     }
 
