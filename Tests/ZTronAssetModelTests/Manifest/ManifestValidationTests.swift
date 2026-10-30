@@ -362,8 +362,10 @@ extension ModelSuites {
 
         @Test("R-MAN-2: remotePath must be relative, without parent segments, scheme, authority, control characters, query or fragment")
         func remotePathRules() throws {
-            let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "a/./b", "dir/%41.png", "a/%3F.png",
-                "a/%2e%2e.png", "a/..%2"]
+            // `a/./b` moved to the rejected paths in Stage 3 (S3AH-1): the transport refuses a `.` segment on every fetch.
+            // A percent-encoded slash or backslash is a literal character to the transport, which accepts it.
+            let accepted = ["media/ab/x.png", "ZTronMedia/images/a.b.c.heic", "a..b/c", "x/.../y", "dir/%41.png", "a/%3F.png",
+                "a/%2e%2e.png", "a/..%2", "a/.b/c.", "a/%2E.png", "a/%2E%2Fb", "a/%5Cb"]
             for path in accepted {
                 #expect(ManifestDecoder.violations(of: Self.entry(remotePath: path), limits: ManifestLimits()).isEmpty, "\(path)")
             }
@@ -397,6 +399,12 @@ extension ModelSuites {
                 ("a\\..\\b", [.parentSegment]),
                 ("a%5C..%5cb", [.parentSegment]),
                 ("..\\x", [.parentSegment]),
+                // Stage 3 (S3AH-1): a segment the transport refuses on every fetch is reported as `parentSegment` too,
+                // after the leading slashes `absolute` and `authority` already report.
+                ("a/./b", [.parentSegment]),
+                ("///x", [.authority, .absolute, .parentSegment]),
+                ("https:///x", [.scheme, .authority, .parentSegment]),
+                ("a/?x", [.parentSegment, .queryOrFragment]),
             ]
             for (path, violations) in rejected {
                 #expect(
@@ -409,6 +417,74 @@ extension ModelSuites {
             let manifest = try ManifestDecoder.decode(Self.payload([Self.entryJSON(remotePath: "m/a.png?v=2"), Self.entryJSON(identifier: "ok")]))
             #expect(manifest.quarantined.map(\.violation) == [.remotePathInvalid(.queryOrFragment)])
             #expect(manifest.entries.map(\.identifier) == ["ok"])
+        }
+
+        /// Stage 3 (S3AH-1, S3-SECU-02): the transport's `RemoteURL.make` refuses an empty segment, a `.` segment (also
+        /// percent-encoded) and a backslash on every fetch (ADR draft D-6), so the decoder quarantines them with a
+        /// diagnostic instead of accepting an entry that would fail every run as a server problem.
+        @Test(
+            "R-MAN-2: a remote path with an empty or dot segment (also %2E), a backslash or a trailing slash is quarantined, the rest applied",
+            arguments: [
+                "media//a.png", "media/./a.png", "./a.png", "media/%2E/a.png", "media/%2e/a.png", "media\\a.png", "media/",
+                "media/a.png/", ".", "%2E", "a/.", "\\a", "a\\", "a/.?v=1",
+            ]
+        )
+        func unfetchableRemotePathsAreQuarantined(_ path: String) throws {
+            let expected: [ManifestEntryViolation] =
+                path.contains("?") ? [.remotePathInvalid(.parentSegment), .remotePathInvalid(.queryOrFragment)] : [.remotePathInvalid(.parentSegment)]
+            #expect(ManifestDecoder.violations(of: Self.entry(remotePath: path), limits: ManifestLimits()) == expected, "\(path.debugDescription)")
+            let manifest = try ManifestDecoder.decode(Self.payload([Self.entryJSON(identifier: "x", remotePath: path), Self.entryJSON(identifier: "ok")]))
+            #expect(manifest.entries.map(\.identifier) == ["ok"], "\(path.debugDescription)")
+            #expect(manifest.quarantinedCount == 1, "\(path.debugDescription)")
+            #expect(manifest.quarantined == [QuarantinedEntry(index: 0, identifier: "x", violation: .remotePathInvalid(.parentSegment))], "\(path.debugDescription)")
+        }
+
+        /// The decoder and the transport agree: over seeded paths built from names, dots, percent-encoded dots and
+        /// backslashes, the decoder accepts exactly the paths `RemoteURL.make` can join (`transportAccepts`); with
+        /// schemes, queries and percent-encoded separators mixed in, every path it accepts is still one the transport
+        /// can join (the Model is stricter there by design, ADR draft A-4.7).
+        @Test("R-MAN-2: over seeded remote paths the decoder accepts only paths the transport can fetch, exactly so without schemes, queries or encoded separators")
+        func acceptedRemotePathsAreFetchable() {
+            let narrow = ["a", "b.png", ".", "..", "%2E", "%2e", "\\", "a.", ".a", "%2E%2e"]
+            let wide = narrow + ["%2F", "%5C", "%2f", ":", "?", "#", "%3F", "%", "//"]
+            var random = SplitMix64(seed: 0x5EED_5EC0_0002)
+            var refusedByBoth = 0
+            var acceptedByBoth = 0
+            for round in 0..<8_000 {
+                let pieces = round.isMultiple(of: 2) ? narrow : wide
+                let segments = (0..<Int.random(in: 1...4, using: &random)).map { _ in
+                    (0..<Int.random(in: 0...2, using: &random)).map { _ in pieces[Int.random(in: 0..<pieces.count, using: &random)] }.joined()
+                }
+                let path = segments.joined(separator: "/")
+                guard !path.isEmpty else {
+                    continue
+                }
+                let decoderAccepts = ManifestDecoder.violations(of: Self.entry(remotePath: path), limits: ManifestLimits()).isEmpty
+                let transportAccepts = Self.transportAccepts(path)
+                if round.isMultiple(of: 2) {
+                    #expect(decoderAccepts == transportAccepts, "\(path.debugDescription): decoder \(decoderAccepts), transport \(transportAccepts)")
+                } else {
+                    #expect(!decoderAccepts || transportAccepts, "\(path.debugDescription) is accepted but the transport refuses it")
+                }
+                if decoderAccepts, transportAccepts {
+                    acceptedByBoth += 1
+                } else if !decoderAccepts, !transportAccepts {
+                    refusedByBoth += 1
+                }
+            }
+            // Both outcomes occur, so the agreement is not vacuous.
+            #expect(acceptedByBoth > 100 && refusedByBoth > 1_000, "accepted \(acceptedByBoth), refused \(refusedByBoth)")
+        }
+
+        /// The transport's join rule, `RemoteURL.make` (`Sources/ZTronAssetTransport/Policy/RequestFactory.swift`, ADR
+        /// draft D-6), restated for the Model's test target, which cannot import the transport: every `/`-separated
+        /// component is non-empty, does not percent-decode to `.` or `..`, and contains no `?`, `#` or `\`.
+        private static func transportAccepts(_ path: String) -> Bool {
+            path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { component in
+                let text = String(component)
+                let decoded = text.removingPercentEncoding ?? text
+                return !text.isEmpty && decoded != "." && decoded != ".." && !text.contains("?") && !text.contains("#") && !text.contains("\\")
+            }
         }
 
         @Test("R-MAN-2: violations(of:) reports every rule an entry breaks, in field order")
@@ -581,8 +657,9 @@ extension ModelSuites {
             let bridgedID = NSString(string: "bo7.ri.\u{85}map") as String
             let bridgedPath = NSString(string: String(repeating: "p/", count: 600)) as String
             let entry = ManifestEntry(identifier: AssetID(bridgedID), fileExtension: NSString(string: "PNG") as String, remotePath: bridgedPath)
+            // The bridged path ends with `/`: since Stage 3 (S3AH-1) its empty last segment is `parentSegment` as well.
             #expect(ManifestDecoder.violations(of: entry, limits: ManifestLimits()) == [
-                .identifierControlCharacter, .remotePathInvalid(.tooLong(bytes: 1_200)),
+                .identifierControlCharacter, .remotePathInvalid(.tooLong(bytes: 1_200)), .remotePathInvalid(.parentSegment),
             ])
             let native = AssetID(String("bo7.ri.map".unicodeScalars.map(Character.init)))
             let bridged = AssetID(NSString(string: "bo7.ri.map") as String)

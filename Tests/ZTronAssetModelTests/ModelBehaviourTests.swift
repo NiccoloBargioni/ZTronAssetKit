@@ -111,12 +111,77 @@ extension ModelSuites {
             }
         }
 
+        /// Stage 3 (S3AH-2, S3-SECU-03): a name the module never writes (an attempt token with a leading zero) is
+        /// foreign. Parsed leniently, `c-<h>.01-2.part` became `c-<h>.1-2.part`, another file: staging GC kept it under
+        /// the age rules instead of removing it as foreign, and two directory entries collapsed onto one inventory key.
+        @Test(
+            "R-SEC-2: staging names and attempt tokens parse only in the canonical spelling the module writes",
+            arguments: ["01-2", "1-02", "00-0", "0-00", "007-1", "1-0010", "00000000000000000001-1"]
+        )
+        func nonCanonicalTokensAreForeign(_ token: String) {
+            let hash = String(repeating: "a", count: 64)
+            #expect(TransferAttempt(token: token) == nil, "\(token)")
+            for kind in StagingFileName.Kind.allCases {
+                let fileName = "c-\(hash).\(token).\(kind.rawValue)"
+                #expect(StagingFileName(parsing: fileName) == nil, "\(fileName) parsed as \(StagingFileName(parsing: fileName)?.rawValue ?? "nil")")
+            }
+        }
+
+        /// The converse: every token and staging name that parses names exactly the text it was parsed from, over a
+        /// seeded set of digit-and-dash strings and every canonical edge (zero, the largest epoch and sequence).
+        @Test("R-SEC-2: every staging name that parses round-trips to the same file name, and every attempt token to the same text")
+        func parsedNamesRoundTrip() throws {
+            let transfer = TransferID.content(ContentHash.sha256(of: Data([3])))
+            for attempt in [TransferAttempt(epoch: 0, sequence: 0), TransferAttempt(epoch: 10, sequence: 20), TransferAttempt(epoch: .max, sequence: .max)] {
+                #expect(TransferAttempt(token: attempt.token) == attempt)
+                let name = StagingFileName(transfer: transfer, attempt: attempt, kind: .partial)
+                #expect(StagingFileName(parsing: name.rawValue) == name)
+            }
+            #expect(try #require(StagingFileName(parsing: "c-zz.1-2.part")).rawValue == "c-zz.1-2.part")
+            var random = SplitMix64(seed: 0x5EED_5EC0_0003)
+            let alphabet = Array("0123456789-")
+            var parsed = 0
+            for _ in 0..<20_000 {
+                let token = String((0..<Int.random(in: 1...6, using: &random)).map { _ in alphabet[Int.random(in: 0..<alphabet.count, using: &random)] })
+                guard let attempt = TransferAttempt(token: token) else {
+                    continue
+                }
+                parsed += 1
+                #expect(attempt.token == token, "\(token) parsed as \(attempt.token)")
+                let fileName = "\(transfer.rawValue).\(token).resume"
+                #expect(StagingFileName(parsing: fileName)?.rawValue == fileName, "\(fileName)")
+            }
+            #expect(parsed > 1_000)
+        }
+
         @Test("R-ENV-1: monotonic instants measure elapsed seconds and never report negative time")
         func monotonicSeconds() {
             let start = MonotonicInstant(nanoseconds: 1_000)
             #expect(MonotonicInstant(nanoseconds: 2_500_001_000).seconds(since: start) == 2.5)
             #expect(start.seconds(since: MonotonicInstant(nanoseconds: 9_000)) == 0)
             #expect(start.seconds(since: start) == 0)
+        }
+
+        /// Stage 3 (S3AH-3, L4-R24(2)): `adding(seconds:)` rounds to the nearest nanosecond, so moving by the seconds
+        /// between two instants lands on the later one. Truncation landed 1 ns short for about 3 % of gaps, and a
+        /// deadline computed that way missed the instant it was derived from. A gap below 2^50 ns (13 days) survives
+        /// the two roundings of `seconds(since:)` and the product (relative error at most 2^-52 each, so under 0.5 ns).
+        @Test("R-ENV-1: adding the seconds between two instants lands exactly on the later one for every seeded gap below 2^50 ns")
+        func secondsRoundTripExactly() {
+            var random = SplitMix64(seed: 0x5EED_0000_0104)
+            var gaps: [UInt64] = [0, 1, 999_999_999, 1_000_000_001, 1 << 50 - 1]
+            for _ in 0..<20_000 {
+                gaps.append(UInt64.random(in: 0..<(1 << UInt64.random(in: 1...50, using: &random)), using: &random))
+            }
+            var shortfalls = 0
+            for gap in gaps {
+                let start = MonotonicInstant(nanoseconds: UInt64.random(in: 0..<(1 << 62), using: &random))
+                let target = MonotonicInstant(nanoseconds: start.nanoseconds + gap)
+                if start.adding(seconds: target.seconds(since: start)) != target {
+                    shortfalls += 1
+                }
+            }
+            #expect(shortfalls == 0, "\(shortfalls) of \(gaps.count) gaps missed their target")
         }
 
         @Test("R-ENV-1: the live clock's readings never go backwards and a deadline already passed returns without sleeping", .timeLimit(.minutes(1)))

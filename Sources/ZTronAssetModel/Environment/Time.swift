@@ -27,8 +27,11 @@ public struct MonotonicInstant: Hashable, Comparable, Sendable, Codable, CustomS
         guard !seconds.isNaN, seconds > 0 else {
             return self
         }
-        let delta = seconds * 1_000_000_000
-        // 1.8e19 < 2^64 ≈ 1.8447e19, so every finite value below the guard converts to UInt64 exactly-or-below.
+        // Rounded, not truncated (Stage 3, S3AH-3): `b.seconds(since: a)` times 1e9 can come out a hair below the
+        // integer it was computed from, and truncation then landed 1 ns short of `b` for about 3 % of gaps. Rounding
+        // lands exactly for every gap below 2^50 ns, where the two roundings' error stays under half a nanosecond.
+        let delta = (seconds * 1_000_000_000).rounded()
+        // 1.8e19 < 2^64 ≈ 1.8447e19, so every finite value below the guard converts to UInt64 exactly.
         guard delta.isFinite, delta < 1.8e19 else {
             return MonotonicInstant(nanoseconds: UInt64.max)
         }

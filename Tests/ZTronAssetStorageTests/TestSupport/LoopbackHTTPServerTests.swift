@@ -397,9 +397,15 @@ struct TestSupportLoopbackHTTPServerTests {
     /// a port or with `.stopped`, and the stopped server never starts again. The stop is spread over the listener's
     /// start-up by a growing number of `Task.yield()`s (scheduling points, not sleeps), so both outcomes occur, but
     /// the test does not count them: their mix depends on the machine.
-    @Test("Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs", .timeLimit(.minutes(1)))
+    ///
+    /// Its hang guard is three minutes (Stage 3, S3AH-5, ruling S3-R4): alone it takes about 0.25 s, but its 79,800
+    /// yields queue behind every other job on the cooperative pool, and in whole-target Thread Sanitizer runs at loads
+    /// of about 7–11 it took 36–42 s, more than half of one minute (`docs/adr-drafts/s3ah.md`, S3AH-5).
+    @Test("Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs", .timeLimit(.minutes(3)))
     func startRacingStop() async throws {
         for round in 0..<400 {
+            // A run past its time limit ends at the next round instead of finishing all 400 (S3-R4).
+            try Task.checkCancellation()
             let server = LoopbackHTTPServer { _ in LoopbackResponse(status: 204) }
             let starts = (0..<2).map { _ in Task { try await server.start() } }
             let stopping = Task {
