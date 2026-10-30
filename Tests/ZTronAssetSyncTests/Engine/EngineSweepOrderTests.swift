@@ -37,8 +37,13 @@ extension EngineSyncTests {
     /// Sorted before its follow, C fitted as user work, was followed to prefetch, still fitted, and was re-queued and
     /// counted ahead of K, whose waiter was answered `insufficientSpace(required: 3000000, available: 999000)` (the
     /// close-out cycle-7 correctness lens, PROBE-C7-RANK-ADMIT; it fails the same way on the cycle-6 code).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 34.4 to 35.4 s beside a second TSan
+    /// process at a load of 1.9 to 18.6 (59 % of 60 s) and 21.9 s alone at a load of 9 to 11 (Stage 3
+    /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+    /// `EngineFollowTests`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepAdmitsUserWorkBeforeAJobItsFollowLowers(_ visit: LaneDropVisit) async throws {
         try await Self.sweepJudgesALoweredJobAtItsNewPlace(
             visit,
@@ -55,8 +60,13 @@ extension EngineSyncTests {
     /// `insufficientSpace(required: 3900000, available: 0)` (the close-out cycle-7 correctness lens, PROBE-C7-RANK-PARK:
     /// the cycle-7 park-branch re-queue traded PROBE-C6-LANEGAIN's contradictory figures for a shortage answered to user
     /// work).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.9 to 35.2 s beside a second TSan
+    /// process at a load of 1.9 to 18.6 (59 % of 60 s) and 22.1 s alone at a load of 9 to 11 (Stage 3
+    /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+    /// `EngineFollowTests`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepParkBranchAdmitsUserWorkBeforeAJobItsFollowLowers(_ visit: LaneDropVisit) async throws {
         try await Self.sweepJudgesALoweredJobAtItsNewPlace(
             visit,
@@ -179,8 +189,13 @@ extension EngineSyncTests {
     /// before the follow, P was judged at its prefetch place after R, R took the room, and A's user waiter was answered
     /// `insufficientSpace(required: 3000000, available: 2500000)` (the close-out cycle-7 correctness lens,
     /// PROBE-C7-RANK-PROMOTE).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 34.4 to 34.8 s beside a second TSan
+    /// process at a load of 1.9 to 18.6 (58 % of 60 s) and 22.2 s alone at a load of 9 to 11 (Stage 3
+    /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+    /// `EngineFollowTests`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepJudgesAJobItsFollowRaisesAtItsUserPlace(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -287,8 +302,13 @@ extension EngineSyncTests {
     /// 5 MB, so D is parked `insufficientSpace` in the sweep's own turn and its fail-fast answers D's waiter with D's 7 MB
     /// against that room. A re-queue that did not count C ahead re-queued D too, over-admitting the room until the gate
     /// parked it again (the close-out cycle-7 requirements lens, PROBE-C7R-GAIN-AHEAD, mutant `gainNoAhead`).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.8 to 34.9 s beside a second TSan
+    /// process at a load of 1.9 to 18.6 (58 % of 60 s) and 22.2 s alone at a load of 9 to 11 (Stage 3
+    /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+    /// `EngineFollowTests`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepCountsAFollowedJobAheadOfTheNextOne(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
