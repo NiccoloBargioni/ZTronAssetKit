@@ -1602,8 +1602,11 @@ extension SyncEngine {
         if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
             violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
         }
+        // A waiter whose join waits for a failure verdict (`joinsAfterVerdict`) holds no interest until the drain.
         for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
-            violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
+            if self.state.joinsAfterVerdict[token]?[waiter.asset] != waiter.transfer {
+                violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
+            }
         }
         // A job the owed passes of a follow have not reached follows the copy they replaced (`followScans`).
         let unscanned = self.state.followScans.isEmpty ? [:] : self.unscannedFollowEntries()
@@ -1646,7 +1649,9 @@ extension SyncEngine {
         }
         for (token, group) in self.state.groups {
             for (asset, transfer) in group.pending where self.state.jobs[transfer]?.interests[token] == nil {
-                violations.append("group \(token.rawValue) member \(asset) without an interest")
+                if self.state.joinsAfterVerdict[token]?[asset] != transfer {
+                    violations.append("group \(token.rawValue) member \(asset) without an interest")
+                }
             }
         }
         violations.append(contentsOf: self.claimViolations())
@@ -1675,7 +1680,8 @@ extension SyncEngine {
             violations.append("\(transfer) drains an attempt whose driver ended")
         }
         if let run = self.state.run, run.transferring, run.settlement == nil {
-            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil {
+            let waitingJoins = Set(self.state.joinsAfterVerdict[run.token].map { Array($0.values) } ?? [])
+            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil && !waitingJoins.contains(transfer) {
                 violations.append("the run claims \(transfer), whose job does not hold its interest")
             }
         }
@@ -1859,8 +1865,9 @@ extension SyncEngine {
 
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
     /// drain is in progress (none, between turns), so none waits for ever; the places counted in `placesAfterFollow` are
-    /// exactly the waiting `.enqueue` and `.reinstate` events; and every failure verdict that waits names a failed job
-    /// with its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11).
+    /// exactly the waiting `.enqueue` and `.reinstate` events; every failure verdict that waits names a failed job with
+    /// its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11); and the joins registered in
+    /// `joinsAfterVerdict` are exactly the waiting `.join` events (cycle 10).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -1869,6 +1876,7 @@ extension SyncEngine {
         }
         var places: [TransferID: Int] = [:]
         var verdicts: Set<TransferID> = []
+        var joins: [InterestToken: [AssetID: TransferID]] = [:]
         for event in events {
             switch event {
             case .enqueue(let transfer, _, _), .reinstate(let transfer, _):
@@ -1877,9 +1885,14 @@ extension SyncEngine {
                 if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
                     verdicts.insert(transfer)
                 }
-            case .spaceFailure, .spaceJoin:
+            case .join(let join):
+                joins[join.token, default: [:]][join.asset] = join.entry.transferID
+            case .spaceFailure, .spaceJoin, .relane:
                 break
             }
+        }
+        if joins != self.state.joinsAfterVerdict {
+            violations.append("\(self.state.joinsAfterVerdict.count) interests' joins wait for a failure verdict, \(joins.count) with their event")
         }
         if places != self.state.placesAfterFollow {
             violations.append("the \(self.state.placesAfterFollow.count) counted places that wait for a follow differ from the \(places.count) the events hold")

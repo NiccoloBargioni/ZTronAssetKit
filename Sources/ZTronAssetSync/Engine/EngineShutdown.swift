@@ -115,6 +115,7 @@ extension SyncEngine {
         self.state.eventsAfterFollow = []
         self.state.placesAfterFollow = [:]
         self.state.verdictsAfterFollow = [:]
+        self.state.joinsAfterVerdict = [:]
         self.state.drainingAfterFollow = false
         self.state.laneParksOwed.removeAll()
         self.state.inFlightBytes = InFlightBytes()

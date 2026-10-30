@@ -87,8 +87,13 @@ struct EngineState {
     /// (`invariantViolations()`; the cycle-9 amendment (b)).
     var placesAfterFollow: [TransferID: Int] = [:]
     /// The jobs whose failure verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): a
-    /// join leaves such a job failed (`relane`), and `removeJob` forgets it.
+    /// join to such a job and a re-lane of it other than the follow's own wait behind the verdict (`.join`, `.relane`);
+    /// `removeJob` forgets it.
     var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
+    /// The joins that wait in `eventsAfterFollow` for a failure verdict (`.join`), by interest and asset, with the
+    /// transfer each joins: the waiter, group member or run fetch they stand for holds no interest until the drain joins
+    /// it (`invariantViolations()`).
+    var joinsAfterVerdict: [InterestToken: [AssetID: TransferID]] = [:]
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.

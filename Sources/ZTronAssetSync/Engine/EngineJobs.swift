@@ -97,8 +97,22 @@ extension SyncEngine {
     /// Adds (or widens) interest `token` in the job of `entry`'s content for `asset`, creating the job (T1) or joining
     /// and promoting it (T15, T20). Promotion is issued synchronously, before any start of this actor turn
     /// (sync-1 S1-06).
+    ///
+    /// Behind the follow barrier, a join to a job whose failure verdict waits for the follow (`defersFailure`) waits too,
+    /// at its arrival among the events (`EventAfterFollow.join`): a visit-first engine's join came after the verdict, so
+    /// it met the job the verdict left, or no job at all and created a new one, and the verdict never answered it. Joined
+    /// at once, it was answered with the earlier attempt's failure, or re-queued the job at the verdict's place (Stage 3
+    /// close-out cycle 10, PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE). The follow's own re-routed joins are visits:
+    /// a visit-first engine made them while the attempt still ran, so the verdict answers them.
     func addInterest(_ token: InterestToken, asset: AssetID, entry: ManifestEntry, lane: AssetPriority, kind: InterestKind) {
         let transfer = entry.transferID
+        if self.defersToFollow, self.state.verdictsAfterFollow[transfer] != nil {
+            let listed = self.state.applied.entry(for: asset).map { SyncEngine.sameTransfer($0, entry) } ?? false
+            self.state.joinsAfterVerdict[token, default: [:]][asset] = transfer
+            self.state.eventsAfterFollow.append(.join(JoinAfterVerdict(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: listed)))
+            self.notifyObservers()
+            return
+        }
         let now = self.environment.time.monotonicNow()
         self.noteJoin(transfer, asset: asset, entry: entry, token: token, kind: kind)
         if self.state.jobs[transfer] == nil {
@@ -263,8 +277,14 @@ extension SyncEngine {
             }
         case .failed(let disposition):
             if self.state.verdictsAfterFollow[transfer] != nil {
-                // The attempt's verdict waits for the follow (`defersFailure`): the drain gives it, then re-runs this.
-                self.state.verdictsAfterFollow[transfer]?.joined = true
+                // The attempt's verdict waits for the follow (`defersFailure`). The follow's own visit met a running
+                // attempt on a visit-first engine, whose re-lane only re-prioritised it: nothing to do (marking the job
+                // joined skipped the retry's backoff, PROBE-C9-SPURIOUS-JOIN). Any other re-lane (an interest withdrawn)
+                // met the job the verdict left: it waits behind the verdict, at its arrival.
+                if !self.state.inFollowVisit {
+                    self.state.eventsAfterFollow.append(.relane(transfer, epoch: job.epoch, from: before))
+                    self.notifyObservers()
+                }
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {

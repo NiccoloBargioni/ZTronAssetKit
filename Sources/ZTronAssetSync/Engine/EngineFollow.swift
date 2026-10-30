@@ -157,6 +157,13 @@ extension SyncEngine {
                     continue
                 }
                 self.reinstate(transfer)
+            case .join(let join):
+                self.replayJoin(join)
+            case .relane(let transfer, let epoch, let before):
+                guard self.state.jobs[transfer]?.epoch == epoch else {
+                    continue
+                }
+                self.relane(transfer, from: before)
             }
         }
         self.state.drainingAfterFollow = false
@@ -186,6 +193,7 @@ extension SyncEngine {
             self.state.eventsAfterFollow = []
             self.state.placesAfterFollow = [:]
             self.state.verdictsAfterFollow = [:]
+            self.state.joinsAfterVerdict = [:]
         }
     }
 
@@ -231,6 +239,9 @@ extension SyncEngine {
     /// content beside the bytes of a download an earlier visit abandons (PROBE-J-FAIL-REROUTE), or a new content's job was
     /// created, and served, before an earlier one (PROBE-J-FAIL-TICKET). Returns `true` when the verdict waits. A job not
     /// in flight or failed is decided now: only an attempt's end is deferred.
+    ///
+    /// While the verdict waits, the job is inert as a visit-first engine's job is after it: a join waits for the drain
+    /// (`addInterest`), and so does a re-lane other than the follow's own (`relane`) (Stage 3 close-out cycle 10).
     func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
         guard self.defersToFollow, let job = self.state.jobs[transfer], self.holdsMovedID(job) else {
             return false
@@ -245,22 +256,25 @@ extension SyncEngine {
         case .queued, .blocked:
             return false
         }
-        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch, lane: job.lane)
+        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch)
         self.state.eventsAfterFollow.append(.attemptFailed(transfer, epoch: job.epoch, verdict: verdict))
         self.notifyObservers()
         return true
     }
 
     /// Gives a deferred failure verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
-    /// or was superseded meanwhile. A join made while the verdict waited left the job failed (`relane`); it gets the
-    /// verdict's answer with the others, and a retry's backoff is then skipped for user work, as T20 does for a join
-    /// that arrives after the verdict.
+    /// or was superseded meanwhile: the exit the attempt's end would have taken once the follow had visited first. The
+    /// verdict stays recorded while the drain's own visit of the job runs (`followedForVerdict`), so that visit's re-lane
+    /// is the follow's, as it would have been while the attempt still ran (`relane`). A join or a re-lane that met the job
+    /// meanwhile waits behind this event, at its own arrival (`EventAfterFollow.join`, `.relane`), and meets the job as the verdict leaves it, as it met a visit-first engine's job after its verdict
+    /// (PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE).
     private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) {
-        guard let wait = self.state.verdictsAfterFollow[transfer], wait.epoch == epoch else {
+        guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
             return
         }
+        let followed = self.followedForVerdict(transfer, epoch: epoch)
         self.state.verdictsAfterFollow[transfer] = nil
-        guard self.followedForVerdict(transfer, epoch: epoch), case .failed? = self.state.jobs[transfer]?.state else {
+        guard followed, case .failed? = self.state.jobs[transfer]?.state else {
             return
         }
         switch verdict {
@@ -268,9 +282,48 @@ extension SyncEngine {
             self.resolveAll(transfer, with: .failed(answer))
         case .retry(let error, let answer):
             self.retryLater(transfer, error: error, answer: answer)
-            if wait.joined {
-                self.relane(transfer, from: wait.lane)
+        }
+    }
+
+    /// Joins an interest that waited for a deferred verdict (`addInterest`; `EventAfterFollow.join`) at its arrival
+    /// place in the drain, after the verdict: to the job the verdict left, or to a new job of the content when the verdict
+    /// ended the job, which a visit-first engine's request would have created (PROBE-C9-JOIN-RESOLVE). A request withdrawn
+    /// or answered meanwhile (a waiter cancelled, a group released, a run ended) joins nothing. An id a later apply moved
+    /// meanwhile is re-routed as that apply's follow would have (`reroute`).
+    private func replayJoin(_ join: JoinAfterVerdict) {
+        let transfer = join.entry.transferID
+        guard self.state.joinsAfterVerdict[join.token]?[join.asset] == transfer else {
+            return
+        }
+        self.state.joinsAfterVerdict[join.token]?[join.asset] = nil
+        if self.state.joinsAfterVerdict[join.token]?.isEmpty == true {
+            self.state.joinsAfterVerdict[join.token] = nil
+        }
+        guard self.stillWants(join) else {
+            return
+        }
+        if join.listed, self.state.applied.entry(for: join.asset).map({ !SyncEngine.sameTransfer($0, join.entry) }) ?? true {
+            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer)
+            return
+        }
+        self.addInterest(join.token, asset: join.asset, entry: join.entry, lane: join.lane, kind: join.kind)
+    }
+
+    /// Whether the owner of a waiting join still waits for its asset in the join's transfer.
+    private func stillWants(_ join: JoinAfterVerdict) -> Bool {
+        let transfer = join.entry.transferID
+        switch join.kind {
+        case .waiter:
+            guard let waiter = self.state.waiters[join.token] else {
+                return false
             }
+            return !waiter.fromStore && waiter.asset == join.asset && waiter.transfer == transfer
+        case .prefetch, .ensure:
+            return self.state.groups[join.token]?.pending[join.asset] == transfer
+        case .run:
+            return self.state.run?.token == join.token && self.state.run?.outstanding[transfer]?.contains(join.asset) == true
+        case .system:
+            return true
         }
     }
 
@@ -490,6 +543,11 @@ enum EventAfterFollow: Sendable {
     case enqueue(TransferID, epoch: UInt64, front: Bool)
     /// A queued job's return to the place its entry had (`reinstate`); `epoch` as for `enqueue`.
     case reinstate(TransferID, epoch: UInt64)
+    /// A join to a job whose failure verdict waits (`addInterest`), made after the verdict's own event.
+    case join(JoinAfterVerdict)
+    /// A re-lane of a job whose failure verdict waits (`relane`), other than the follow's own; `before` is the job's lane
+    /// before the change that asked for it.
+    case relane(TransferID, epoch: UInt64, from: AssetPriority)
 }
 
 /// A failure verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
@@ -505,8 +563,21 @@ enum AttemptVerdict: Sendable, Equatable {
 struct VerdictAfterFollow: Sendable, Equatable {
     /// The job's epoch at the failure.
     let epoch: UInt64
-    /// The job's lane at the failure.
+}
+
+/// A join that waits for a deferred failure verdict (`EventAfterFollow.join`): what `addInterest` was called with.
+struct JoinAfterVerdict: Sendable {
+    /// The interest.
+    let token: InterestToken
+    /// The asset it joins for.
+    let asset: AssetID
+    /// The entry it joins for (`transferID` names the job).
+    let entry: ManifestEntry
+    /// Its lane.
     let lane: AssetPriority
-    /// Whether an interest joined while the verdict waited.
-    var joined = false
+    /// Its kind.
+    let kind: InterestKind
+    /// Whether the engine's copy listed `asset` at `entry`'s transfer when it joined (a waiter joined from the store's
+    /// newer manifest may name another), so a later apply that moved it is followed at the drain.
+    let listed: Bool
 }
