@@ -1002,8 +1002,10 @@ extension EngineSyncTests {
         try await Self.leaveRoom(5_000_000, harness: s.harness, fileSystem: s.fileSystem)
         let shrunk = try await s.harness.store.freeSpace().volumeImportant
         await s.harness.source.release(e.transferID, with: .progress(received: 0, expected: nil))
-        // The ENOSPC's own free-space read is adopted when it returns (its verdict, or its wait, is in the same turn).
-        await engine.awaitCondition { $0.state.jobs[e.transferID]?.state != .downloading && $0.state.freeSpace?.volumeImportant == shrunk }
+        // The ENOSPC's own free-space read is adopted when it returns (its verdict, or its wait, is in the same turn). It
+        // reads at most `shrunk`: visit-first, A's 16-byte replacement and the settled run may still commit to the volume
+        // after it was measured (under TSan in the whole Sync bundle an exact match never came, cycle 9).
+        await engine.awaitCondition { $0.state.jobs[e.transferID]?.state != .downloading && ($0.state.freeSpace?.volumeImportant ?? .max) <= shrunk }
         let between = await engine.readForTests { engine in engine.invariantViolations() }
         #expect(between.isEmpty, "\(between.prefix(3))")
         await engine.readForTests { $0.releaseFollowFollowUps() }
