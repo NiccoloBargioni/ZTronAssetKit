@@ -65,14 +65,10 @@ extension AssetStore {
         }
         for entry in self.state.core.appliedManifest.entries where scope.contains(entry) {
             report.total += 1
-            guard let record = self.state.core.records[entry.identifier] else {
-                report.missing += 1
-                report.bytesMissing += entry.byteSize ?? 0
-                continue
-            }
-            switch record.residency {
-            case .present(_, _, let integrity):
-                if record.isStale {
+            let record = self.state.core.records[entry.identifier]
+            switch record?.residency {
+            case .present(_, _, let integrity)?:
+                if record?.isStale == true {
                     report.stale += 1
                 } else {
                     report.present += 1
@@ -80,10 +76,13 @@ extension AssetStore {
                 if integrity == .unverified {
                     report.unverified += 1
                 }
-            case .absent, .needsHeal:
+            case .absent?, .needsHeal?, nil:
+                // The sizes are the manifest's, and `maxAssetBytes = Int64.max` is a supported cap, so the sum saturates
+                // as every other figure built from manifest sizes does (S3-SECU-01, R-MAN-2): a hostile manifest must
+                // not trap the process.
                 report.missing += 1
-                report.bytesMissing += entry.byteSize ?? 0
-            case .quarantined, .failed:
+                report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0))
+            case .quarantined?, .failed?:
                 report.failed += 1
             }
         }

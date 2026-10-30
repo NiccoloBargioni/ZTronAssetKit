@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ZTronAssetModel
+import ZTronAssetTestSupport
 
 @testable import ZTronAssetStorage
 
@@ -93,5 +94,60 @@ struct LaunchReconciliationTests {
         #expect(recreated.osPurgeDetected && recreated.missingBlobs == 0)
         let fresh = LaunchReconciliation.reconcile(content: IndexContent.empty(storeID: .zero), onDisk: [:], blobsRecreated: true, openGeneration: 1, now: LaunchReconciliationTests.now)
         #expect(!fresh.osPurgeDetected)
+    }
+
+    /// store-1 S1-03's missing half (Stage 3 S3-CRAS-05): the end-to-end test of R-CLN-6 covers a purged record, which
+    /// never accepts adoption, so the doom-reason guard of launch adoption (7c) was never reached for `purged`. Here a
+    /// manifest re-adds the purged bytes under another id while the purge waits out its grace, and the process is
+    /// killed before the reaper unlinks them: neither `apply` nor the next launch binds the new record to the purged
+    /// name; the bytes are fetched again.
+    @Test(
+        "R-CLN-6: a purged doom is never rescued by launch adoption, even for another record that expects its bytes after a kill before the reap",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func purgedDoomNeverRescuedAtLaunch() async throws {
+        let harness = CoreHarness.make()
+        let xBytes = CoreFixture.bytes(4_701, count: 300)
+        let yBytes = CoreFixture.bytes(4_702, count: 280)
+        let x = CoreFixture.entry("x", xBytes)
+        let y = CoreFixture.entry("y", yBytes)
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(CoreFixture.manifest([x, y]), etag: nil, eviction: nil)
+        try await harness.publish(xBytes, [x], sequence: 1)
+        try await harness.publish(yBytes, [y], sequence: 2)
+        try await harness.store.flush(.durable)
+        let key = CoreFixture.key(xBytes)
+        // The purge dooms x's blob `purged` and waits out the deletion grace in its caller's task.
+        let purge = Task {
+            try await harness.store.purge(.scope(.identifiers(["x"])))
+        }
+        try await harness.time.requireSleepers(atLeast: 1)
+        #expect(StoreRecoveryTests.isDoomed(await harness.state.core.blobTable[key], .purged))
+        // A manifest re-adds the purged bytes under z: `apply` does not adopt the purged doom either.
+        let z = CoreFixture.entry("z", xBytes)
+        _ = try await harness.store.apply(CoreFixture.manifest([x, y, z], etagSeed: "z"), etag: nil, eviction: nil)
+        #expect(await harness.store.location(for: "z", extensions: [], recordingAccess: false) == nil)
+        // The process is killed now, before the reaper unlinked the purged bytes.
+        let killed = harness.fileSystem.survivingDisk()
+        #expect(killed.files[CoreFixture.blobPath(key)] != nil, "the purged bytes are still on disk")
+        harness.time.advance(by: harness.configuration.policy.deletionGrace)
+        _ = try await purge.value
+        await harness.store.close()
+        // The next launch: the purged name is listed, z expects it and accepts adoption, and still nothing binds.
+        let reopened = CoreHarness.make(disk: killed)
+        _ = try await reopened.store.open()
+        #expect(await reopened.state.core.records["z"]?.residency == .absent(.neverFetched), "a purged doom was rescued at launch")
+        #expect(await reopened.store.location(for: "z", extensions: [], recordingAccess: false) == nil)
+        #expect(StoreRecoveryTests.isDoomed(await reopened.state.core.blobTable[key], .purged))
+        #expect(await CoreInvariants.violations(of: reopened).isEmpty)
+        // The reaper removes the purged bytes; z is fetched again and served from its own verified publication.
+        await reopened.reapAfterGrace()
+        #expect(!reopened.exists(reopened.layout.blobURL(key)), "the purged bytes were reaped")
+        try await reopened.publish(xBytes, [z], sequence: 3)
+        let served = try #require(await reopened.store.location(for: "z", extensions: [], recordingAccess: false))
+        #expect(reopened.content(served.url) == xBytes)
+        #expect(await CoreInvariants.violations(of: reopened).isEmpty)
+        await reopened.store.close()
     }
 }

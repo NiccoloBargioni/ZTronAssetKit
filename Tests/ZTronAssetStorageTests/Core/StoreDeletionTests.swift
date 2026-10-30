@@ -238,13 +238,122 @@ struct DeletionUnitTests {
         let removed = fake.operations.filter { $0.kind == .removeItem && $0.url.path.contains("/blobs/") }.map(\.url)
         #expect(removed == payloads.map { CoreFixture.layout.blobURL(CoreFixture.key($0)) }.sorted { $0.lastPathComponent < $1.lastPathComponent })
     }
+
+    /// Stage 3 S3-PERF-04: the reaper's queue is read through a cursor, so the keys a time-bounded unit did not attempt
+    /// stay in place instead of being put back at the front of the remaining queue (one shift of the whole queue per
+    /// key). Pinned structurally: the reads per key are the same at every size, at most about `batch / attempted` (here
+    /// 64 / 20, as a 1 ms unit on the reference volume), and every key is consumed exactly once, in sorted order, the
+    /// unattempted ones first in the next batch.
+    @Test("P-13: the reaper reads each doomed key a bounded number of times whatever the size of the set, so a reclaim in time-bounded units is linear")
+    func reapQueueIsLinear() {
+        var readsPerKey: [Int: Double] = [:]
+        for count in [1_000, 10_000, 40_000] {
+            let keys = (0..<count).map { BlobKey(hash: ContentHash.sha256(of: Data("reap-\($0)".utf8)), ext: AssetFileExtension("png")!) }.sorted()
+            var queue = ReapQueue(keys)
+            var consumed: [BlobKey] = []
+            var units = 0
+            while !queue.isEmpty {
+                let batch = queue.nextBatch(limit: 64) { _ in true }
+                let attempted = min(20, batch.count)
+                if let first = batch.first, units > 0 {
+                    #expect(first == keys[consumed.count], "the first key the last unit left is first in line")
+                }
+                consumed += batch.prefix(attempted)
+                queue.consume(attempted: attempted)
+                units += 1
+            }
+            #expect(consumed == keys, "every key exactly once, in sorted order")
+            #expect(units == (count + 19) / 20)
+            readsPerKey[count] = Double(queue.reads) / Double(count)
+        }
+        // 64 / 20 = 3.2 reads per key, a little less for the short windows of the last units.
+        #expect(readsPerKey.values.allSatisfy { $0 > 3.1 && $0 <= 64.0 / 20.0 }, "reads per key do not depend on the size: \(readsPerKey)")
+    }
+
+    /// Stage 3 S3B-5 (S3-PERF-04), close-out cycle 2: the store's own reaper, not only `ReapQueue` on its own. 10,000
+    /// doomed blobs are reclaimed in units that each stop after 20 of their 64 keys (every unlink is seen to take 50 µs
+    /// of the 1 ms budget, as `ReapScalingBench`'s volume): every key is read once, plus once more each time a unit
+    /// leaves it unattempted, at most 64 / 20 reads per key, and none is moved. A reaper that puts the unattempted keys
+    /// back into its list, as `s3-base`'s did, records no statistics and fails here.
+    @Test("P-13: the reaper reclaims 10,000 doomed blobs in 20-unlink units reading each key at most batch / attempted times, so its work is linear in the keys", .timeLimit(.minutes(1)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func reaperWorkListIsLinear() async throws {
+        let count = 10_000
+        let clock = SteppingClock(step: 0.000_05)
+        let configuration = CoreFixture.configuration()
+        let first = CoreHarness.make(configuration: configuration, time: clock.base)
+        _ = try await first.store.open()
+        await first.store.close()
+        // Blobs a previous launch left behind: the next open lists them as launch orphans, and orphan GC dooms them.
+        var disk = first.fileSystem.survivingDisk()
+        for index in 0..<count {
+            let bytes = CoreFixture.bytes(UInt64(30_000 + index), count: 16)
+            let key = CoreFixture.key(bytes)
+            let fanOut = CoreFixture.layout.fanOutDirectory(for: key.hash).path
+            disk.directories.insert(fanOut)
+            disk.durableDirectories.insert(fanOut)
+            disk.files[CoreFixture.blobPath(key)] = [UInt8](bytes)
+            disk.durableFiles[CoreFixture.blobPath(key)] = [UInt8](bytes)
+        }
+        let fake = FakeFileSystem(disk: disk, time: clock.base)
+        let store = AssetStore(configuration: configuration, environment: CoreHarness.environment(fileSystem: fake, time: clock))
+        _ = try await store.open()
+        let orphans = await store.state.core.orphans
+        #expect(orphans.count == count)
+        #expect(await store.doomOrphans(orphans).count == count)
+        clock.base.advance(by: configuration.policy.deletionGrace)
+        await store.runDueWorkInstallOnly()
+        clock.setStepping(true)
+        let result = await store.reapDeletable(maxKeys: .max)
+        clock.setStepping(false)
+        #expect(result.filesRemoved == count)
+        #expect(await store.state.core.blobTable.isEmpty)
+        let statistics = try #require(await store.state.core.lastReap, "the reaper records its work list")
+        #expect(statistics.keys == count)
+        #expect(statistics.units == (count + 19) / 20, "every 64-key unit stops after 20 unlinks")
+        // Unit k starts with the 10,000 − 20k keys not yet consumed and batches up to 64 of them: it leaves 44 while
+        // 64 or more remain, then 40 and 20, and none in the last.
+        let leftByUnit = (0..<statistics.units).map { unit in
+            let batch = min(64, count - 20 * unit)
+            return batch - min(20, batch)
+        }
+        #expect(statistics.carried == leftByUnit.reduce(0, +), "each unit leaves its unattempted keys for the next, once")
+        #expect(statistics.reads == statistics.keys + statistics.carried, "a key is read once, and again only where a unit left it")
+        #expect(Double(statistics.reads) <= 64.0 / 20.0 * Double(count), "at most batch / attempted reads per key: \(statistics)")
+        await store.close()
+    }
+
+    @Test("P-13: a key the reaper's re-validation refuses is passed over, and the keys before the first unattempted one are consumed")
+    func reapQueuePassesOverRefusedKeys() {
+        let keys = (0..<10).map { BlobKey(hash: ContentHash.sha256(of: Data("refuse-\($0)".utf8)), ext: AssetFileExtension("png")!) }.sorted()
+        let refused = Set([keys[1], keys[6]])
+        var queue = ReapQueue(keys)
+        let first = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(first == [keys[0], keys[2], keys[3], keys[4]])
+        queue.consume(attempted: 2)
+        let second = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(second == [keys[3], keys[4], keys[5], keys[7]], "the unattempted keys lead, unchanged")
+        queue.consume(attempted: 4)
+        let third = queue.nextBatch(limit: 4) { !refused.contains($0) }
+        #expect(third == [keys[8], keys[9]])
+        queue.consume(attempted: 2)
+        #expect(queue.isEmpty && queue.nextBatch(limit: 4) { _ in true }.isEmpty)
+        #expect(queue.reads == 5 + 5 + 2, "each window's reads, refused keys included, and nothing for an empty queue")
+    }
 }
 
-/// A clock whose monotonic reads advance 1 ms each while stepping (a slow volume, seen from inside a unit).
+/// A clock whose monotonic reads advance `step` each while stepping, 1 ms by default (a slow volume, seen from inside a
+/// unit: a deletion unit reads the clock once per unlink).
 @available(macOS 15.0, iOS 18.0, *)
 final class SteppingClock: TimeSource {
     let base = ManualTimeSource()
     private let stepping = Mutex(false)
+    private let step: TimeInterval
+
+    /// A clock that advances `step` seconds per monotonic read while stepping.
+    init(step: TimeInterval = 0.001) {
+        self.step = step
+    }
 
     func setStepping(_ value: Bool) {
         self.stepping.withLock { $0 = value }
@@ -257,7 +366,7 @@ final class SteppingClock: TimeSource {
     func monotonicNow() -> MonotonicInstant {
         let value = self.base.monotonicNow()
         if self.stepping.withLock({ $0 }) {
-            self.base.advance(by: 0.001)
+            self.base.advance(by: self.step)
         }
         return value
     }

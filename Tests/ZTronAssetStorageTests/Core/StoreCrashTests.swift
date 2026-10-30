@@ -163,7 +163,11 @@ struct StoreCrashTests {
     }
 
     /// The pairs are enumerated in full; the work is split by power-loss mode and by kill point modulo
-    /// `StoreCrashTests.slices`, so every test case stays far inside its time limit, sanitizers included.
+    /// `StoreCrashTests.slices`, so every test case stays far inside its time limit, sanitizers included. Many pairs
+    /// leave the same surviving disk (a power loss reverts to the same synced state from several of the second
+    /// lifetime's boundaries), and the reopen that checks I-1…I-5 and converges is a deterministic function of that disk
+    /// alone (a fresh clock, a fixed seed and an empty trace), so each distinct disk is reopened and checked once and
+    /// every pair is judged on its result (Stage 3 S3-B-017: cheaper steps, every pair and every check kept).
     @Test(
         "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5",
         .timeLimit(.minutes(1)),
@@ -175,6 +179,7 @@ struct StoreCrashTests {
         _ = await FirstSync.run(clean)
         let total = clean.fileSystem.mutationCount
         var pairs = 0
+        var converged: [DiskImage: Set<AssetID>] = [:]
         for point in stride(from: slice, to: total, by: StoreCrashTests.slices) {
             await Task.yield()
             let first = CoreHarness.make(crashBefore: point, mode: .processKill)
@@ -192,12 +197,19 @@ struct StoreCrashTests {
                 let label = "kill at \(point), \(mode) at \(secondPoint)"
                 #expect(CoreInvariants.blobRemovals(second.fileSystem.operations, layout: second.layout).isEmpty, "\(label)")
                 // What a commit of the first lifetime covered survives the second lifetime's power loss.
-                let downloaded = await FirstSync.reopenAndConverge(second.fileSystem.survivingDisk(), after: FirstSync.Trace(), mode: mode, label: label)
+                let survivor = second.fileSystem.survivingDisk()
+                let downloaded: Set<AssetID>
+                if let known = converged[survivor] {
+                    downloaded = known
+                } else {
+                    downloaded = await FirstSync.reopenAndConverge(survivor, after: FirstSync.Trace(), mode: mode, label: label)
+                    converged[survivor] = downloaded
+                }
                 #expect(downloaded.isDisjoint(with: trace.committed), "\(label): \(downloaded)")
                 pairs += 1
             }
         }
-        print("R-STO-5 kill→power-loss pairs, \(mode), slice \(slice): \(pairs)")
+        print("R-STO-5 kill→power-loss pairs, \(mode), slice \(slice): \(pairs), \(converged.count) distinct surviving disks reopened")
         #expect(pairs >= total / StoreCrashTests.slices)
     }
 

@@ -104,6 +104,34 @@ struct StoreSnapshotTests {
         #expect(await harness.store.metrics().acknowledgedInstalls >= 3)
     }
 
+    /// S3-SECU-01 (Stage 3): `maxAssetBytes = Int64.max` is a supported "unlimited" cap, so a manifest the real decoder
+    /// accepts can declare missing entries whose sizes sum past `Int64.max`; the sum saturates as every other figure
+    /// built from manifest sizes does, instead of trapping the process.
+    @Test(
+        "R-MAN-2: availability saturates bytesMissing at Int64.max instead of trapping when missing entries declare sizes summing past it",
+        .timeLimit(.minutes(1))
+    )
+    @available(macOS 15.0, iOS 18.0, *)
+    func availabilitySaturatesBytesMissing() async throws {
+        let limits = ManifestLimits(maxAssetBytes: .max)
+        let half = Int64(1) << 62
+        let json = """
+            [{"identifier":"a","fileExtension":"png","remotePath":"media/a.png","localPathComponents":[],"byteSize":\(half)},
+             {"identifier":"b","fileExtension":"png","remotePath":"media/b.png","localPathComponents":[],"byteSize":\(half)},
+             {"identifier":"c","fileExtension":"png","remotePath":"media/c.png","localPathComponents":[],"byteSize":\(half)}]
+            """
+        let manifest = try ManifestDecoder.decode(Data(json.utf8), options: ManifestDecodingOptions(limits: limits))
+        #expect(manifest.entries.count == 3 && manifest.quarantinedCount == 0, "the decoder accepts every entry")
+        let harness = CoreHarness.make(configuration: CoreFixture.configuration(limits: limits))
+        _ = try await harness.store.open()
+        _ = try await harness.store.apply(manifest, etag: nil, eviction: nil)
+        let report = await harness.store.availability(of: .all)
+        #expect(report.total == 3 && report.missing == 3)
+        #expect(report.bytesMissing == .max, "the sum saturates as every other manifest-size figure does")
+        let one = await harness.store.availability(of: .identifiers(["a"]))
+        #expect(one.missing == 1 && one.bytesMissing == half, "a sum below Int64.max is exact")
+    }
+
     @Test("R-STO-7: the store's availability counts present, missing, stale, failed and unverified entries of a scope without I/O", .timeLimit(.minutes(1)))
     @available(macOS 15.0, iOS 18.0, *)
     func availabilityCounts() async throws {

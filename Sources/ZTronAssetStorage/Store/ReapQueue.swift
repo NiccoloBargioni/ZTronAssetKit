@@ -1,0 +1,84 @@
+/// The reaper's work list for one `reap` run (ARCHITECTURE §4.4, ADR draft B-10): the keys deletable when the run began,
+/// in sorted order, read through a cursor.
+///
+/// A deletion unit is bounded by time as well as by count, so it may attempt only a prefix of its batch; the keys it did
+/// not attempt lead the next batch, unchanged. They stay where they are in the list and the cursor stops at the first
+/// of them, instead of being put back at the front of the remaining queue one by one: each such insertion shifted the
+/// whole remaining queue, so a reclaim in units that attempt 20 of 64 keys cost O(n² / 20) element moves (Stage 3
+/// S3-PERF-04). Now every key is read a bounded number of times however long the list is.
+struct ReapQueue {
+    /// The keys, sorted; never mutated.
+    private let keys: [BlobKey]
+    /// The first key not yet consumed.
+    private var cursor = 0
+    /// Where the keys of the last batch sit in `keys`, in batch order.
+    private var positions: [Int] = []
+    /// One past the last key the last batch's scan read.
+    private var scanEnd = 0
+    /// How many times a key was read for a batch over the run. A key is read again only while it is not yet consumed
+    /// and inside the next batch's window, so this is at most about `batch size / keys attempted per unit` reads per key
+    /// (the structural bound the tests pin), never a function of the list's length.
+    private(set) var reads = 0
+
+    /// A queue over `keys`, which the caller sorted.
+    init(_ keys: [BlobKey]) {
+        self.keys = keys
+    }
+
+    /// How many keys the queue lists.
+    var count: Int {
+        self.keys.count
+    }
+
+    /// Whether every key was consumed.
+    var isEmpty: Bool {
+        self.cursor >= self.keys.count
+    }
+
+    /// The next batch: up to `limit` keys from the cursor that `admit` takes, in list order. `admit` re-validates a key
+    /// against the state as it is now (and marks it when it takes it); a key it refuses is passed over. Nothing is
+    /// consumed until `consume(attempted:)`.
+    mutating func nextBatch(limit: Int, admit: (BlobKey) -> Bool) -> [BlobKey] {
+        var batch: [BlobKey] = []
+        self.positions.removeAll(keepingCapacity: true)
+        var scan = self.cursor
+        while scan < self.keys.count, batch.count < limit {
+            let key = self.keys[scan]
+            self.reads += 1
+            if admit(key) {
+                batch.append(key)
+                self.positions.append(scan)
+            }
+            scan += 1
+        }
+        self.scanEnd = scan
+        return batch
+    }
+
+    /// Consumes the last batch's first `attempted` keys and the keys its scan passed over before the first key the unit
+    /// did not attempt; that key and the rest of the window lead the next batch, in their order.
+    mutating func consume(attempted: Int) {
+        if attempted < self.positions.count {
+            self.cursor = self.positions[max(0, attempted)]
+        } else {
+            self.cursor = self.scanEnd
+        }
+        self.positions.removeAll(keepingCapacity: true)
+    }
+}
+
+/// What one `reap` run's work list did, counted (Stage 3 S3B-5, S3-PERF-04): the figures a deterministic test asserts so
+/// that the reaper's handling of the keys a time-bounded unit did not attempt stays linear in the doomed set. Before the
+/// cursor, each such key was put back at the front of the remaining list, one shift of the whole list per key.
+struct ReapStatistics: Sendable, Hashable {
+    /// The keys the run listed as deletable when it began.
+    var keys = 0
+    /// The deletion units it ran.
+    var units = 0
+    /// How many times it read a key for a batch (`ReapQueue.reads`): every key's first read, plus one read again for
+    /// each time a unit left it unattempted.
+    var reads = 0
+    /// The keys its units did not attempt, summed over the units: each leads the next batch where it stands in the
+    /// list, read again and never moved.
+    var carried = 0
+}
