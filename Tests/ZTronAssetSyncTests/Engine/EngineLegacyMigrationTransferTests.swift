@@ -746,9 +746,11 @@ struct EngineLegacyMigrationTransferTests {
     // MARK: No hot loop around a store call (L5K-R17)
 
     @available(macOS 15.0, iOS 18.0, *)
-    /// Hang guard `.minutes(3)` (Stage 3, S3-STAB-03; ruling S3-R4): 16.3 s beside the Sync suite under TSan, 37.4 to
-    /// 37.7 s with a second TSan process of the suite (load 27 to 43). The observation window stops at cancellation.
-    @Test("R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)", .timeLimit(.minutes(3)))
+    /// Hang guard `.minutes(5)` (Stage 3, S3-STAB-03; rulings S3-R4 and S3-R12): 16.3 s beside the Sync suite under
+    /// TSan, 37.4 to 37.7 s with a second TSan process of the suite (load 27 to 43); 89.0 to 90.2 s in the close-out
+    /// cycle-8 verifier's paired TSan runs at 40ecd95 (load means 30.7 and 34.7), half of the earlier `.minutes(3)`, so
+    /// S3-R12 item 3 raised it one step in cycle 9. Nothing was cut (G3). The observation window stops at cancellation.
+    @Test("R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)", .timeLimit(.minutes(5)))
     func migrationLoopWaitsForTheLastAdoption() async throws {
         let time = ManualTimeSource()
         // Three files: the batch holds the first pending one at its hash; a prefetch job adopts the last pending one,
