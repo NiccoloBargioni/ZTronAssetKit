@@ -882,6 +882,89 @@ extension EngineSyncTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
+    /// A later apply's follow, begun while the follow still owes visits, keeps the owed visits in their order and appends
+    /// the jobs it adds, sorted (the cycle-9 amendment (e)). 300 prefetch group members and two user holders, C1 (zz-a1)
+    /// and C2 (zz-a2), wait for the one slot a user transfer holds; v3 changes every member's content and moves A1 and A2
+    /// to new 3.5 MB contents, of which one fits the 6 MB of room. The follow's pass finds the members, then C1, then C2
+    /// (entry order), and its first turn visits 256 of them. A second follow (`followApplied`, as a manifest catch-up's
+    /// apply runs it) then restarts the visits. C2's transfer sorts before C1's. Visited first (the first follow ended
+    /// before the second), C1's visit creates N1 before N2 and A1 is served; a restart that sorted the owed visits again
+    /// visited C2 first and served A2 (SECOND-APPLY-REORDER).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierKeepsTheOwedVisitsOrderAcrossASecondFollow(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 962_502, tuning: SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0))
+        let engine = s.engine
+        let slotBytes = EngineFixture.bytes(962_510, count: 16)
+        let slot = EngineHarness.onDemand("zs", slotBytes)
+        let a1 = EngineHarness.onDemand("zz-a1", EngineFixture.bytes(962_511, count: 16))
+        // C2's transfer sorts before C1's, so a follow that sorts its owed visits visits C2 first.
+        let a2 = try #require((0..<256).lazy.map { EngineHarness.onDemand("zz-a2", EngineFixture.bytes(962_600 + UInt64($0), count: 16)) }.first { $0.transferID < a1.transferID })
+        let members = (0..<300).map { EngineHarness.onDemand(String(format: "g%03d", $0), EngineFixture.bytes(963_000 + UInt64($0), count: 16)) }
+        let movedMembers = (0..<300).map { EngineHarness.onDemand(String(format: "g%03d", $0), EngineFixture.bytes(964_000 + UInt64($0), count: 16)) }
+        await s.harness.serveManifest([s.q] + members + [slot, a1, a2], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        // 6 MB of room: N1 or N2 (3.5 MB each), not both.
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(6_000_000, harness: s.harness, fileSystem: s.fileSystem)
+        await engine.refreshFreeSpace()
+        await s.harness.source.script(slot.transferID, [.hold, .stage(slotBytes)])
+        for entry in members + movedMembers {
+            await s.harness.source.script(entry.transferID, [.hold])
+        }
+        let slotWaiter = Task { await engine.awaitAsset(slot.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[slot.transferID]?.state == .downloading }
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { e in members.allSatisfy { e.state.jobs[$0.transferID]?.state == .queued } }
+        let a1Waiter = Task { await engine.awaitAsset(a1.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a1.transferID]?.state == .queued }
+        let a2Waiter = Task { await engine.awaitAsset(a2.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a2.transferID]?.state == .queued }
+        let n1Bytes = Data(repeating: 0xA5, count: 3_500_000)
+        let n2Bytes = Data(repeating: 0xA6, count: 3_500_000)
+        let n1 = EngineHarness.onDemand("zz-a1", n1Bytes)
+        let n2 = EngineHarness.onDemand("zz-a2", n2Bytes)
+        await s.harness.source.script(n1.transferID, [.stage(n1Bytes)])
+        await s.harness.source.script(n2.transferID, [.stage(n2Bytes)])
+        let sync = await FollowBarrier.apply([s.q] + movedMembers + [slot, n1, n2], s, visit: visit)
+        let before = await engine.readForTests { e in
+            (owed: e.followOwed, c1: e.state.unfollowed.contains(a1.transferID), c2: e.state.unfollowed.contains(a2.transferID))
+        }
+        switch visit {
+        case .followVisitedFirst:
+            #expect(!before.owed && !before.c1 && !before.c2, "setup: the follow visited C1 and C2: \(before)")
+        case .sweepFollowsFirst:
+            #expect(before.owed && before.c1 && before.c2, "setup: the follow still owes C1's and C2's visits after its first turn: \(before)")
+        }
+        // A second follow restarts the visits from `unfollowed` while the first still owes them.
+        let second = await engine.readForTests { e in
+            e.followApplied(from: e.state.applied)
+            return e.invariantViolations()
+        }
+        #expect(second.isEmpty, "\(second.prefix(3))")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { e in !e.followOwed && e.state.jobs[n1.transferID] != nil && e.state.jobs[n2.transferID] != nil }
+        let tickets = await engine.readForTests { e in (n1: e.state.jobs[n1.transferID]?.ticket, n2: e.state.jobs[n2.transferID]?.ticket) }
+        #expect((tickets.n1 ?? .max) < (tickets.n2 ?? .max), "the follow created N1 before N2, as visit-first: \(tickets)")
+        // The slot frees: the user queue's head starts, and the other new content does not fit beside it.
+        await s.harness.source.release(slot.transferID, with: .progress(received: 0, expected: nil))
+        _ = await EngineHarness.value(of: slotWaiter)
+        let a1Result = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: a1Waiter) }
+        let a2Result = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: a2Waiter) }
+        #expect((try? a1Result.get())?.byteSize == Int64(n1Bytes.count), "A1 is served from N1, created first in the follow's order: \(a1Result)")
+        if case .failure(.insufficientSpace(let required, let available)) = a2Result {
+            #expect(required == Int64(n2Bytes.count) && available < required, "A2's figures: \(a2Result)")
+        } else {
+            Issue.record("A2 gets insufficientSpace: N2 does not fit beside N1 (visit-first): \(a2Result)")
+        }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+        _ = await EngineHarness.value(of: sync)
+    }
+
     /// An ENOSPC during an owed follow is decided on the room the follow's visits leave: D (4 MB, wanted only by A's user
     /// waiter) downloads and E (1.5 MB, U's user waiter) downloads beside it in 6 MB of room. v3 moves A to a 16-byte
     /// content while the follow owes D's visit; the volume then shrinks to 5 MB and E's attempt fails ENOSPC. Visited
