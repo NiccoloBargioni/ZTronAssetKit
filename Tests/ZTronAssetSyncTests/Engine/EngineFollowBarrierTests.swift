@@ -113,6 +113,22 @@ extension EngineSyncTests {
             await engine.shutdown()
         }
     }
+}
+
+/// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+/// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+/// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+/// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+@Suite("Engine follow barrier (F-28)", .serialized)
+struct EngineFollowBarrierTests {
+    /// The shared setup of the follow-barrier tests.
+    typealias FollowBarrier = EngineSyncTests.FollowBarrier
+
+    /// `EngineSyncTests.leaveRoom`: the room above the reserve taken down to `room` with a second ballast file.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func leaveRoom(_ room: Int64, harness: EngineHarness, fileSystem: FakeFileSystem) async throws {
+        try await EngineSyncTests.leaveRoom(room, harness: harness, fileSystem: fileSystem)
+    }
 
     // MARK: The pump (R-SYN-2)
 

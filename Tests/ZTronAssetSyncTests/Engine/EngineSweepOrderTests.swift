@@ -421,54 +421,6 @@ extension EngineSyncTests {
         case keepsPrefetchHolder
     }
 
-    /// A space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it: C (5 MB) is
-    /// wanted only by A's user waiter and ranked before K (3 MB, a user waiter) with the earlier ticket; both wait
-    /// `awaitingSpace` for 4 MB of a pruned blob. v3 drops A's id while the bounded follow owes C's visit. Visited first,
-    /// C's job ends (A is answered `.notFound`) and the reclaim's sweep serves K. A sweep that followed only the jobs
-    /// holding a moved id (`holdsMovedID` ignores a dropped id) judged C at its user place and admitted it ahead of K, whose
-    /// waiter was answered with a shortage (the close-out cycle-8 correctness lens, PROBE-C8-DROPPED).
-    @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func spaceSweepDoesNotAdmitAJobWhoseOnlyIDWasDropped(_ visit: LaneDropVisit) async throws {
-        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
-            visit,
-            .onlyHolder,
-            LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
-        )
-    }
-
-    /// A space sweep judges a job whose user lane came only from a dropped id at its prefetch place: C (5 MB) is wanted by
-    /// A (user) and B (prefetch); v3 drops A's id and keeps B's while the follow owes C's visit. Visited first, C is
-    /// prefetch work judged after K (3 MB, user): K fits, and C's 5 MB do not fit the room K leaves, so B is answered with
-    /// that shortage. Judged at its pre-follow user place, C was admitted ahead of K and K's waiter got the shortage (the
-    /// close-out cycle-8 correctness lens, PROBE-C8-DROPPED-KEEP).
-    @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace(_ visit: LaneDropVisit) async throws {
-        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
-            visit,
-            .keepsPrefetchHolder,
-            LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
-        )
-    }
-
-    /// A space sweep judges a job whose user lane came only from a dropped id on its own lane's volume: the setup of
-    /// `spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace` with 4 MB of important room and 12 MB of opportunistic room
-    /// after the reclaim. Visited first, C is prefetch work judged after K: K fits the important room, and C fits the
-    /// opportunistic room, so B is served. Judged at its pre-follow user place, C did not fit the important room and was
-    /// parked: B's prefetch waiter was answered `insufficientSpace` although C's own lane had room (the close-out cycle-8
-    /// correctness lens, PROBE-C8-DROPPED-LANE).
-    @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func spaceSweepJudgesADroppedUserLaneOnItsOwnVolume(_ visit: LaneDropVisit) async throws {
-        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
-            visit,
-            .keepsPrefetchHolder,
-            LoweredRank(importantExtra: 26_000_000, opportunisticExtra: 34_000_000, leave: 0, leaveAgain: nil, kSize: 3_000_000),
-            bServed: true
-        )
-    }
-
     /// The scenario of the three dropped-id tests: the setup, every waiter's answer and the invariants. `bServed` is the
     /// visit-first answer to B's prefetch waiter: C's 5 MB, or the shortage C meets in the room K leaves.
     @available(macOS 15.0, iOS 18.0, *)
@@ -566,6 +518,58 @@ extension EngineSyncTests {
         let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
         #expect(outcome.completeReport != nil, "\(outcome)")
         await engine.shutdown()
+    }
+}
+
+/// The cycle-9 tests of this file run in the follow barrier's serialized suite (`EngineFollowBarrierTests`): they share
+/// its setup cost (S3-R12; Stage 3 close-out cycle 10).
+extension EngineFollowBarrierTests {
+    /// A space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it: C (5 MB) is
+    /// wanted only by A's user waiter and ranked before K (3 MB, a user waiter) with the earlier ticket; both wait
+    /// `awaitingSpace` for 4 MB of a pruned blob. v3 drops A's id while the bounded follow owes C's visit. Visited first,
+    /// C's job ends (A is answered `.notFound`) and the reclaim's sweep serves K. A sweep that followed only the jobs
+    /// holding a moved id (`holdsMovedID` ignores a dropped id) judged C at its user place and admitted it ahead of K, whose
+    /// waiter was answered with a shortage (the close-out cycle-8 correctness lens, PROBE-C8-DROPPED).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepDoesNotAdmitAJobWhoseOnlyIDWasDropped(_ visit: LaneDropVisit) async throws {
+        try await EngineSyncTests.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .onlyHolder,
+            EngineSyncTests.LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
+        )
+    }
+
+    /// A space sweep judges a job whose user lane came only from a dropped id at its prefetch place: C (5 MB) is wanted by
+    /// A (user) and B (prefetch); v3 drops A's id and keeps B's while the follow owes C's visit. Visited first, C is
+    /// prefetch work judged after K (3 MB, user): K fits, and C's 5 MB do not fit the room K leaves, so B is answered with
+    /// that shortage. Judged at its pre-follow user place, C was admitted ahead of K and K's waiter got the shortage (the
+    /// close-out cycle-8 correctness lens, PROBE-C8-DROPPED-KEEP).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace(_ visit: LaneDropVisit) async throws {
+        try await EngineSyncTests.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .keepsPrefetchHolder,
+            EngineSyncTests.LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
+        )
+    }
+
+    /// A space sweep judges a job whose user lane came only from a dropped id on its own lane's volume: the setup of
+    /// `spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace` with 4 MB of important room and 12 MB of opportunistic room
+    /// after the reclaim. Visited first, C is prefetch work judged after K: K fits the important room, and C fits the
+    /// opportunistic room, so B is served. Judged at its pre-follow user place, C did not fit the important room and was
+    /// parked: B's prefetch waiter was answered `insufficientSpace` although C's own lane had room (the close-out cycle-8
+    /// correctness lens, PROBE-C8-DROPPED-LANE).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepJudgesADroppedUserLaneOnItsOwnVolume(_ visit: LaneDropVisit) async throws {
+        try await EngineSyncTests.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .keepsPrefetchHolder,
+            EngineSyncTests.LoweredRank(importantExtra: 26_000_000, opportunisticExtra: 34_000_000, leave: 0, leaveAgain: nil, kSize: 3_000_000),
+            bServed: true
+        )
     }
 
     /// A space sweep judges the parked job of a moved id's new content at the user place the follow gives it, also when
