@@ -170,14 +170,19 @@ extension EngineRegressionTests {
     /// form, §7.3; the `ensureAvailable` form is `ensureMaterialisesInBatches`). The transfers wait unanswered, so the
     /// run never drains its plan; it ends at shutdown. Hang guard (S3-R4): the 100,000-entry manifest is encoded, decoded,
     /// planned and applied in a debug build, 5.7 to 6.4 s alone, and took 59.9 s of its 60 s under TSan in the whole Sync
-    /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard is `.minutes(3)`. Under TSan the engine's decode of
+    /// bundle at load 11 to 18 (Stage 3 close-out cycle 2), so the guard became `.minutes(3)`. Under TSan the engine's decode of
     /// the 21 MB manifest (the model's parser) takes about two thirds of the time, its plan and the store's apply most of
     /// the rest; the bytes are encoded in slices (1.3 s instead of 2.7 to 8.3 s). Close-out cycle 4 measured 46.1 s alone,
     /// 68.3 s in the bundle and 104.3 to 104.7 s beside a second TSan process at a load of 16 to 26, and its verifier
-    /// 129.9 and 130.1 s beside a second TSan process at a load of 10.5 to 25.9, over half of three minutes: the guard
-    /// awaits the orchestrator's ruling (`docs/adr-drafts/s3f.md`, cycles 4 and 5).
+    /// 129.9 and 130.1 s beside a second TSan process at a load of 10.5 to 25.9, over half of three minutes. The guard is
+    /// `.minutes(5)` by the orchestrator's ruling S3-R10: the cost is the SPEC's scale (S1-15's 100,000 entries) decoded
+    /// by the model's parser under TSan, not the engine's own work (a release build decodes the manifest in well under a
+    /// second). Its figures: 101.8 to 130.1 s beside a second TSan process at a load of 10 to 32 (34 to 43 % of five
+    /// minutes) and 47.5 to 72.3 s alone; close-out cycle 5's verifiers measured 94.8 and 95.6 s beside a second TSan
+    /// process at a load of 8.8 to 20.8 and 66.1 s alone at 14 to 24 (a 71.5 s alone at 18 to 31). Every entry,
+    /// operation, assertion and cancellation check stays (G3; `docs/adr-drafts/s3f.md`, cycles 4 to 6).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(3)))
+    @Test("R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs", .timeLimit(.minutes(5)))
     func runMaterialisesAPipelineAtATime() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0, pipelineDepth: 2, runLookahead: 4)
         let bound = tuning.pipelineDepth * tuning.maxConcurrentTransfers + tuning.runLookahead
