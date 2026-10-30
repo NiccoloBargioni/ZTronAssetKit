@@ -48,6 +48,8 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     private var holdSnapshot: SnapshotHold?
     private var cancelGate: CheckedContinuation<Void, Never>?
     private var holdCancel: CancelHold?
+    private var priorityGate: CheckedContinuation<Void, Never>?
+    private var holdPriority = false
 
     /// Where the next `snapshot` waits for `releaseSnapshot()`.
     enum SnapshotHold: Sendable {
@@ -65,8 +67,8 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
         case afterReporting
     }
 
-    /// Signals the test awaits instead of polling: `"snapshot"` and `"cancel"` when a held call is waiting,
-    /// `"priority"` after every `setPriority`, `"cancelled"` after every `cancel`.
+    /// Signals the test awaits instead of polling: `"snapshot"`, `"cancel"` and `"priority held"` when a held call is
+    /// waiting, `"priority"` after every `setPriority`, `"cancelled"` after every `cancel`.
     nonisolated let signals: AsyncStream<String>
     private let signal: AsyncStream<String>.Continuation
 
@@ -74,8 +76,20 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     private(set) var starts: [Start] = []
     /// Every `cancel` call: the task and whether resume data was asked for.
     private(set) var cancellations: [(taskIdentifier: Int, producingResumeData: Bool)] = []
-    /// Every `setPriority` call.
+    /// Every `setPriority` call, in the order the writes landed (a held write counts once released).
     private(set) var priorityChanges: [(taskIdentifier: Int, priority: Float)] = []
+    /// What reached the driver, in order: each listing (when `snapshot()` lists the tasks) and each priority write
+    /// as it lands. A handle's priority change lists the tasks first, so the FIFO test reads here that a change's
+    /// listing came only after the previous change's write landed.
+    private(set) var calls: [Call] = []
+
+    /// One entry of `calls`.
+    enum Call: Equatable, Sendable {
+        /// `snapshot()` listed the tasks.
+        case listing
+        /// A `setPriority` write landed with this value.
+        case priority(Float)
+    }
     /// `activate()` calls.
     private(set) var activations = 0
     /// `invalidate()` calls.
@@ -127,6 +141,7 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
             await self.waitForSnapshotRelease()
         }
         let listing = self.listing()
+        self.calls.append(.listing)
         if hold == .afterListing {
             await self.waitForSnapshotRelease()
         }
@@ -195,7 +210,16 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     }
 
     func setPriority(taskIdentifier: Int, _ priority: Float) async {
+        if self.holdPriority {
+            // The write is in flight past every check of its caller, as the live driver's own listing leaves it.
+            self.holdPriority = false
+            await withCheckedContinuation { continuation in
+                self.priorityGate = continuation
+                self.signal.yield("priority held")
+            }
+        }
         self.priorityChanges.append((taskIdentifier, priority))
+        self.calls.append(.priority(priority))
         self.tasks[taskIdentifier]?.priority = priority
         self.signal.yield("priority")
     }
@@ -233,6 +257,18 @@ actor FakeBackgroundSessionDriver: BackgroundSessionDriver {
     func releaseCancel() {
         self.cancelGate?.resume()
         self.cancelGate = nil
+    }
+
+    /// Makes the next `setPriority` wait for `releasePriority()` before it writes (after signalling
+    /// `"priority held"`).
+    func holdNextPriority() {
+        self.holdPriority = true
+    }
+
+    /// Lets a held `setPriority` write.
+    func releasePriority() {
+        self.priorityGate?.resume()
+        self.priorityGate = nil
     }
 
     /// `didBecomeInvalidWithError`: the session is gone.

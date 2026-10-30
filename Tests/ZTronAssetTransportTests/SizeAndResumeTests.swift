@@ -115,7 +115,7 @@ struct SizeAndResumeTests {
         appKey: AppKey,
         id: TransferID = TransportFixtures.contentID(1)
     ) async throws -> (TransferRequest, TransferUpdate?) {
-        let rig = try await LoopbackRig.make(appKey: appKey, staging: staging) { _ in
+        let rig = try await LoopbackRig.make(appKey: appKey, requestTimeout: LoopbackRig.heldStallTimeout, staging: staging) { _ in
             LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: stall), rangeETag: "\"v1\"")
         }
         let first = rig.request(id, attempt: TransportFixtures.attempt(1), path: "video.bin", expected: Int64(body.count))
@@ -162,7 +162,7 @@ struct SizeAndResumeTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar", .timeLimit(.minutes(1)))
     func pauseKeepsThePartial() async throws {
-        let rig = try await LoopbackRig.make { _ in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
             LoopbackResponse(
                 headers: ["Last-Modified": "Wed, 21 Oct 2026 07:28:00 GMT"],
                 body: TransportFixtures.payload(1 << 20),
@@ -180,6 +180,39 @@ struct SizeAndResumeTests {
         #expect(sidecar.receivedBytes == 512 * 1_024)
         #expect(sidecar.validator == .lastModified("Wed, 21 Oct 2026 07:28:00 GMT"))
         #expect(rig.staging.contents[request.partialName]?.count == 512 * 1_024)
+        await rig.stop()
+    }
+
+    /// A response's validators and the one a pause may keep for `If-Range` (RFC 9110 §13.1.5).
+    struct WeakTagCase: Sendable, CustomTestStringConvertible {
+        var headers: [String: String]
+        var kept: ResumeValidator?
+        var testDescription: String
+    }
+
+    static let lastModified = "Wed, 21 Oct 2026 07:28:00 GMT"
+    static let weakTagCases = [
+        WeakTagCase(headers: ["ETag": "W/\"v1\"", "Last-Modified": lastModified], kept: .lastModified(lastModified), testDescription: "weak ETag and Last-Modified"),
+        WeakTagCase(headers: ["ETag": "W/\"v1\""], kept: nil, testDescription: "weak ETag only"),
+    ]
+
+    /// Mutant M-N-22: a weak tag taken as the validator would make the next attempt send a weak `If-Range`, which an
+    /// origin must ignore, so the whole file would be fetched again, and a response with only a weak tag would claim a
+    /// resumable pause it cannot continue.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-NET-8: a weak ETag is never the resume validator: a pause keeps Last-Modified instead, or nothing without it", .timeLimit(.minutes(1)), arguments: SizeAndResumeTests.weakTagCases)
+    func weakETagIsNeverTheValidator(_ tagCase: WeakTagCase) async throws {
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
+            LoopbackResponse(headers: tagCase.headers, body: TransportFixtures.payload(1 << 20), ending: .stallAfter(bodyBytes: 512 * 1_024))
+        }
+        let request = rig.request(TransportFixtures.contentID(1), path: "a.bin", expected: 1 << 20)
+        let handle = await rig.source.transfer(request)
+        var iterator = handle.updates.makeAsyncIterator()
+        #expect(await awaitProgress(&iterator, reaching: 512 * 1_024))
+        handle.pause()
+        #expect(await iterator.next() == .paused(resumable: tagCase.kept != nil))
+        #expect(await iterator.next() == nil)
+        #expect(rig.staging.sidecars[request.partialName]?.validator == tagCase.kept, "sidecar: \(String(describing: rig.staging.sidecars[request.partialName]))")
         await rig.stop()
     }
 

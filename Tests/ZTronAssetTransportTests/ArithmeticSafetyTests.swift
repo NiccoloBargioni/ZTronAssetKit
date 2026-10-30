@@ -158,7 +158,7 @@ struct ArithmeticSafetyTests {
         // exactly when the server stalls: the staged size is known when the live transfer is listed.
         let quantum = 262_144
         let body = TransportFixtures.payload(600_000)
-        let rig = try await LoopbackRig.make { _ in
+        let rig = try await LoopbackRig.make(requestTimeout: LoopbackRig.heldStallTimeout) { _ in
             LoopbackResponse(body: body, ending: .stallAfter(bodyBytes: continued ? quantum - 1_000 : quantum), rangeETag: "\"v1\"")
         }
         let id = TransportFixtures.contentID(1)
