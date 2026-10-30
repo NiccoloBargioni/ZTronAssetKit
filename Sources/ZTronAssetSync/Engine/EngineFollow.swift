@@ -112,9 +112,11 @@ extension SyncEngine {
 
     /// Applies the events that waited for the follow (F-28) as a visit-first engine meets them: after the follow's
     /// own last turn and its pump, in arrival order, on the state every visit left, at most `eventsAfterFollowPerTurn`
-    /// per turn; the barrier holds (`followBarrier`) until the last is applied, then the run is checked and the queues
-    /// pumped. Each event re-validates what it names (the job, its epoch, the interest): a job that ended or moved
-    /// meanwhile is skipped. A sweep owed meanwhile is a follow-up turn already (`sweepSpaceParked`).
+    /// per turn; the barrier holds (`followBarrier`) until the last is applied, and no pump runs during a batch or
+    /// between two (`pump`: a slot freed between two batches went to work queued before the user work a later batch
+    /// queues, the cycle-9 amendment (d)); after the last, the run is checked and the queues pumped. Each event
+    /// re-validates what it names (the job, its epoch, the interest): a job that ended or moved meanwhile is skipped. A
+    /// sweep owed meanwhile is a follow-up turn already (`sweepSpaceParked`).
     func drainEventsAfterFollow() {
         guard !self.followOwed, !self.state.eventsAfterFollow.isEmpty else {
             return

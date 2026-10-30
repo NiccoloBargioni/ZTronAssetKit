@@ -92,13 +92,15 @@ extension SyncEngine {
         }
         self.materializeRun()
         self.materializeEnsures()
-        if self.followOwed {
-            // No admission while a follow owes visits (F-28): every start, park and fail-fast answer reads lanes, ranks,
+        if self.followBarrier || self.state.drainingAfterFollow {
+            // No admission behind the follow barrier (F-28): every start, park and fail-fast answer reads lanes, ranks,
             // interests and the bytes in flight, which the owed visits change (a visit lowers or supersedes the job it
             // moves, raises or creates the job of the moved id's new content, abandons a superseded download). Decided
             // now, a job is judged on a half-followed state, so its answer depended on whether a visit ran first (the
-            // close-out cycles 2 to 8). The queues wait; each follow turn pumps again (`pumpWaitsForFollow`), and the
-            // turn that ends the follow pumps on the state every visit left.
+            // close-out cycles 2 to 8). Nor while the events that waited for the follow are drained, during a batch or
+            // between two: the places a later batch gives come before work a pump would start meanwhile (the cycle-9
+            // amendment (d)). The queues wait; each follow turn pumps again (`pumpWaitsForFollow`), and the drain's last
+            // batch pumps on the state every visit and event left.
             self.state.pumpWaitsForFollow = true
             self.scheduleEnsureRefill()
             self.notifyObservers()

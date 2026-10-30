@@ -67,8 +67,8 @@ struct EngineState {
     var followFollowUpsHeld = false
     /// Test seam: a follow-up turn reached the hold and waits for its release.
     var followFollowUpWaiting = false
-    /// A pump found a follow owed (F-28) and admitted nothing: every follow turn pumps again, and the turn that ends the
-    /// follow pumps (Stage 3, close-out cycles 3 and 9).
+    /// A pump found the follow barrier up (`SyncEngine.followBarrier`, F-28) and admitted nothing: every follow turn
+    /// pumps again, and the drain's last batch pumps once the barrier is down (Stage 3, close-out cycles 3 and 9).
     var pumpWaitsForFollow = false
     /// Set while the follow moves one job (`SyncEngine.follow`): a join it makes (a moved id's interest re-routed to its
     /// new content) is the follow's own, whose space verdict is given at once; any other join's verdict on a job parked
@@ -89,7 +89,7 @@ struct EngineState {
     /// The jobs whose failure verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): a
     /// join leaves such a job failed (`relane`), and `removeJob` forgets it.
     var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
-    /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again.
+    /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false
