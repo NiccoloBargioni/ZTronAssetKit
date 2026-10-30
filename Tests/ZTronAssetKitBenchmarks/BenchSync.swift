@@ -486,10 +486,9 @@ extension ZTronAssetKitBenchmarks {
         /// (at most `followsPerTurn` per turn, judging none while any is left to follow) and then re-queue the 400-byte
         /// members and park the 3,000-byte ones. While a follow counted as the re-queue or park it preceded, one sweep turn
         /// followed 1,024 jobs: 10.2 to 10.8 ms with one handle and 13.6 to 14.1 ms with two over the same ids (two
-        /// interests per job). Since the close-out cycle 8 the sweep follows every job it would judge before it orders them
-        /// (PROBE-C7-RANK), checking each for a moved id while the follow is owed (`holdsMovedID`, a key comparison per id,
-        /// no transfer formatted). With one handle and with two; medians of three against P-9, the best of the three
-        /// against C2, after a warm-up.
+        /// interests per job). Since the close-out cycle 9 a sweep that meets the follow barrier (F-28) runs one follow turn
+        /// and judges nothing; its follow-up sweep judges once nothing is owed (`sweepSpaceParked`). With one handle and
+        /// with two; medians of three against P-9, the best of the three against C2, after a warm-up.
         @Test("R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func reclaimDuringFollowTurns() async throws {
@@ -506,6 +505,91 @@ extension ZTronAssetKitBenchmarks {
                 #expect(median <= gapMax, "\(handles) handle(s): \(runs)")
                 #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(handles) handle(s): \(runs)")
             }
+        }
+
+        /// C2 when the reclaim's sweep meets an owed follow that moved few members (VERIFY-C8-C2-MIXED, the close-out
+        /// cycle-8 verifier): as `reclaimDuringFollowTurns`, but the forced sync changes one member in 20, so after the
+        /// apply's turn the follow still owes about 244 visits and the sweep has every one of the 10,000 members left to
+        /// judge once they are made. Cycle 8's sweep followed the owed holders and then collected, sorted and judged all
+        /// 10,000 in one turn: 10.0 to 12.0 ms best with one handle, against 6.7 ms at `7426fee`. Behind the follow barrier
+        /// (S3-R11) a sweep turn either follows or judges: the design panel measured 5.7 to 6.0 ms. With one handle and
+        /// with two; medians of three against P-9, the best of the three against C2, after a warm-up.
+        @Test("R-SYN-11: a reclaim of space during an owed follow that changed one member in 20 of a 10,000-member prefetch group, its sweeps following the owed visits and then judging every member, holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func reclaimDuringMixedFollowTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.reclaimDuringFollowWait(members: 1_000, handles: 1, changeEvery: 2)
+            for handles in [1, 2] {
+                var runs: [Double] = []
+                for _ in 0..<3 {
+                    runs.append(try await SyncBench.reclaimDuringFollowWait(members: 10_000, handles: handles, changeEvery: 20))
+                }
+                let median = runs.sorted()[1]
+                print("R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, \(handles) handle(s): longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(runs)")
+                #expect(median <= gapMax, "\(handles) handle(s): \(runs)")
+                #expect((runs.min() ?? .infinity) <= Self.c2Budget, "\(handles) handle(s): \(runs)")
+            }
+        }
+
+        /// C2 of the follow barrier's drain (F-28; S3-R11 design D3's probe VERIFY-D3-DRAIN-C2): while a follow over a
+        /// 10,000-member prefetch group whose every member changed content is owed (its follow-ups held), a second prefetch
+        /// window registers 10,000 other members, and each new job's place in its queue waits for the follow's end
+        /// (`EventAfterFollow.enqueue`). The release runs the follow's remaining turns, then the drain gives the 10,000
+        /// places at most `eventsAfterFollowPerTurn` per turn. The heartbeat's longest wait over every follow and drain
+        /// turn: medians of three against P-9, the best of the three against C2, after a warm-up. The time from the
+        /// release to the follow's end and to the drain's end is printed: no admission is made meanwhile (S3-R11 R2, a
+        /// Stage 5 residual risk).
+        @Test("R-SYN-11: the end of an owed follow that changed every member of a 10,000-member prefetch group, and the drain of 10,000 places in a queue that waited for it, hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func followDrainTurns() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            _ = try await SyncBench.followDrainWait(members: 1_000, changed: 1_000)
+            var runs: [FollowDrainRun] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.followDrainWait(members: 10_000, changed: 10_000))
+            }
+            let waits = runs.map(\.wait)
+            let median = waits.sorted()[1]
+            print("R-SYN-11 follow end and drain of 10,000 places under 10,000 changed prefetch members: longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(waits); follow ended \(runs.map(\.followEnded)) ms and drain ended \(runs.map(\.drainEnded)) ms after the release")
+            #expect(median <= gapMax, "\(waits)")
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
+        }
+
+        /// C2 of the follow's last turn plus the drain's first batch (S3-R11 amendment (f)): the follow's last turn visits
+        /// up to `followsPerTurn` jobs, checks the run and pumps, and then applies the first `eventsAfterFollowPerTurn`
+        /// events that waited for it in the same turn (`continueFollow`). Here a 10,000-member prefetch group waits for space
+        /// and a forced sync changes `2 × followsPerTurn` of its members, so with the follow-ups held the follow owes exactly
+        /// one full turn of visits; a second window of 10,000 members registers meanwhile, leaving 10,000 places waiting.
+        /// The replaced copy lists both groups (20,000 entries, more than `followScansPerTurn`), so the same turn also ends
+        /// the follow's pass over it. The release runs that combined turn, timed inside the actor (`releaseHeldFollow`),
+        /// and the test checks it was the combined one: a full turn of visits owed, nothing owed after it, and one full
+        /// batch drained. The heartbeat's longest wait over every turn up to the drain's end is asserted too. Medians of
+        /// three against P-9, the best of the three against C2, after a warm-up.
+        @Test("R-SYN-11: an owed follow's last turn, a full turn of visits under a 10,000-member prefetch group plus the first batch of 10,000 places that waited for it, holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(3)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func followEndTurn() async throws {
+            let budgets = try QualityBudgets()
+            let gapMax = try #require(budgets.value("P-9", "heartbeat_gap_ms_p99_max"))
+            let changed = 2 * SyncEngine.followsPerTurn
+            _ = try await SyncBench.followDrainWait(members: 1_000, changed: changed)
+            var runs: [FollowDrainRun] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.followDrainWait(members: 10_000, changed: changed))
+            }
+            for run in runs {
+                #expect(run.release.owedVisits == SyncEngine.followsPerTurn, "\(run.release)")
+                #expect(!run.release.followOwedAfter, "\(run.release)")
+                #expect(run.release.drained == SyncEngine.eventsAfterFollowPerTurn, "\(run.release)")
+            }
+            let turns = runs.map(\.release.milliseconds)
+            let waits = runs.map(\.wait)
+            let median = waits.sorted()[1]
+            print("R-SYN-11 follow's last turn plus the drain's first batch under 10,000 prefetch members and 10,000 waiting places: the turn \(turns) ms; longest actor wait \(median) ms (budgets \(gapMax) ms median, \(Self.c2Budget) ms best); runs \(waits)")
+            #expect(median <= gapMax, "\(waits)")
+            #expect((turns.min() ?? .infinity) <= Self.c2Budget, "\(turns)")
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
         }
     }
 }
@@ -1810,8 +1894,10 @@ extension SyncBench {
     /// handles over `count` on-demand members alternating 400 and 3,000 bytes, every one parked `awaitingSpace` with
     /// 100 bytes of room, during the owed follow of a forced sync that changed every member's content (its follow-ups
     /// held): the alarm reaps the blob and its `.reclaimed` sweep and follow-up sweeps re-queue the 400-byte members and
-    /// park the 3,000-byte ones, until no sweep is owed. Every member must have left `awaitingSpace`.
-    static func reclaimDuringFollowWait(members count: Int, handles: Int) async throws -> Double {
+    /// park the 3,000-byte ones, until no sweep is owed. Every member must have left `awaitingSpace`. With `changeEvery`
+    /// above 1, only the members whose index it divides change content (VERIFY-C8-C2-MIXED): the follow owes few visits
+    /// and the sweep that follows them has every member left to judge.
+    static func reclaimDuringFollowWait(members count: Int, handles: Int, changeEvery: Int = 1) async throws -> Double {
         let time = ManualTimeSource()
         let source = FakeRemoteSource()
         let conditions = FakeDeviceConditionsSource()
@@ -1877,7 +1963,9 @@ extension SyncBench {
         while !Task.isCancelled, !(await SyncBench.allAwaitingSpace(engine, count: count)) {
             await Task.yield()
         }
-        await source.scriptManifest([.fetched(SyncBench.manifestData(members(0x55_000)), etag: ETag(rawValue: "\"v3\""))])
+        let changed = members(0x55_000)
+        let v3 = (0..<count).map { $0 % changeEvery == 0 ? changed[$0] : old[$0] }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(v3), etag: ETag(rawValue: "\"v3\""))])
         await engine.holdFollowFollowUps()
         let sync = Task { await engine.sync(.force) }
         while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
@@ -1934,5 +2022,192 @@ extension SyncBench {
     /// The jobs parked `awaitingSpace`.
     static func awaitingSpace(_ engine: isolated SyncEngine) -> Int {
         engine.state.spaceParked.filter { engine.state.jobs[$0]?.state == .blocked(.awaitingSpace) }.count
+    }
+}
+
+/// One release of held follow follow-ups, timed inside the actor turn that runs it (`SyncBench.releaseHeldFollow`).
+struct FollowReleaseTurn: CustomStringConvertible {
+    /// The turn's duration in milliseconds.
+    let milliseconds: Double
+    /// The visits the follow still owed when the turn began.
+    let owedVisits: Int
+    /// Whether the follow still owed a pass over a replaced copy when the turn began.
+    let owedPass: Bool
+    /// The events that waited for the follow and were applied in the turn.
+    let drained: Int
+    /// Whether the follow was still owed when the turn ended.
+    let followOwedAfter: Bool
+
+    var description: String {
+        "\(self.milliseconds) ms, \(self.owedVisits) visits owed, pass owed \(self.owedPass), \(self.drained) drained, owed after \(self.followOwedAfter)"
+    }
+}
+
+/// One run of `SyncBench.followDrainWait`.
+struct FollowDrainRun {
+    /// The heartbeat's longest wait, in milliseconds, from the release to the drain's end.
+    let wait: Double
+    /// The release's own turn.
+    let release: FollowReleaseTurn
+    /// Milliseconds from the release to the follow's end.
+    let followEnded: Double
+    /// Milliseconds from the release to the drain's end: no admission is made before it.
+    let drainEnded: Double
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// A held follow's release and the drain after it (F-28; S3-R11 design D3, VERIFY-D3-DRAIN-C2, and amendment (f)):
+    /// a prefetch group of `count` on-demand members alternating 400 and 3,000 bytes waits `awaitingSpace` with 100 bytes
+    /// of room; a forced sync changes the content of `changed` of them, spread evenly, and its follow's follow-ups are
+    /// held after the apply's turn; a second prefetch group of `count` other 400-byte members registers then, and each
+    /// new job's place waits for the follow (`EventAfterFollow.enqueue`). The release's turn is timed inside the actor,
+    /// and the heartbeat's longest wait runs from it until every follow and drain turn has run.
+    static func followDrainWait(members count: Int, changed: Int) async throws -> FollowDrainRun {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x11),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        // A 60 s deletion grace and no residency, as `reclaimDuringFollowWait`: the pruned blob keeps the members
+        // `awaitingSpace`, and the clock never passes the grace here.
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = SyncBench.entry("x", xBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData([x]), etag: ETag(rawValue: "\"v1\""))])
+        await source.script(x.transferID, [.stage(xBytes)])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        let members = { (seed: UInt64) in
+            (0..<count).map { index in
+                SyncBench.entry(String(format: "s%05d", index), GeneratedPayload.bytes(seed: seed + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+            }
+        }
+        let extras = (0..<count).map { index in
+            SyncBench.entry(String(format: "t%05d", index), GeneratedPayload.bytes(seed: 0x77_000 + UInt64(index), offset: 0, length: 400), policy: .onDemand)
+        }
+        let old = members(0x21_000)
+        // v2 prunes x: its 2,000 bytes wait for the grace.
+        await source.scriptManifest([.fetched(SyncBench.manifestData(old + extras), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the pruning sync did not complete")
+        }
+        try await store.flush(.ordered)
+        try await SyncBench.leaveRoom(100, store: store, fileSystem: fileSystem, ballast: "ballast")
+        await engine.refreshFreeSpace()
+        guard case .success = await engine.registerGroup(old.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.allAwaitingSpace(engine, count: count)) {
+            await Task.yield()
+        }
+        let renewed = members(0x55_000)
+        let stride = count / changed
+        let v3 = (0..<count).map { $0 % stride == 0 && $0 / stride < changed ? renewed[$0] : old[$0] }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(v3 + extras), etag: ETag(rawValue: "\"v3\""))])
+        await engine.holdFollowFollowUps()
+        let sync = Task { await engine.sync(.force) }
+        while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
+            await Task.yield()
+        }
+        // A second prefetch window registers `count` other members while the follow is owed: each new job's place waits.
+        guard case .success = await engine.registerGroup(extras.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the second prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.eventsWaiting(engine, atLeast: count)) {
+            await Task.yield()
+        }
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        let clock = ContinuousClock()
+        var release: FollowReleaseTurn?
+        var followEnded = Duration.zero
+        var drainEnded = Duration.zero
+        let wait = try await SyncBench.longestWait(on: engine) {
+            let start = clock.now
+            release = await SyncBench.releaseHeldFollow(engine)
+            while !Task.isCancelled, await engine.followOwed {
+                await Task.yield()
+            }
+            followEnded = clock.now - start
+            while !Task.isCancelled, !(await SyncBench.followDrained(engine)) {
+                await Task.yield()
+            }
+            drainEnded = clock.now - start
+        }
+        let placesLeft = await SyncBench.placesWaiting(engine)
+        await engine.shutdown()
+        _ = await sync.value
+        guard let release else {
+            throw SyncBenchError.incomplete("the held follow was not released")
+        }
+        guard placesLeft == 0 else {
+            throw SyncBenchError.incomplete("\(placesLeft) places still wait for the follow after its drain")
+        }
+        return FollowDrainRun(wait: wait, release: release, followEnded: SyncBench.milliseconds(followEnded), drainEnded: SyncBench.milliseconds(drainEnded))
+    }
+
+    /// Releases the held follow follow-up and times the turn that runs it, inside that turn: the follow's next turn and,
+    /// when it is the last, the drain's first batch (`continueFollow`).
+    static func releaseHeldFollow(_ engine: isolated SyncEngine) -> FollowReleaseTurn {
+        let clock = ContinuousClock()
+        let owedVisits = engine.state.followOrder.count - engine.state.followNext
+        let owedPass = !engine.state.followScans.isEmpty
+        let waiting = engine.state.eventsAfterFollow.count
+        let start = clock.now
+        engine.releaseFollowFollowUps()
+        let span = clock.now - start
+        return FollowReleaseTurn(
+            milliseconds: SyncBench.milliseconds(span),
+            owedVisits: owedVisits,
+            owedPass: owedPass,
+            drained: waiting - engine.state.eventsAfterFollow.count,
+            followOwedAfter: engine.followOwed
+        )
+    }
+
+    /// Whether at least `count` events wait for the follow.
+    static func eventsWaiting(_ engine: isolated SyncEngine, atLeast count: Int) -> Bool {
+        engine.state.eventsAfterFollow.count >= count
+    }
+
+    /// The follow ended, every event that waited for it is applied, and no drain or pump follow-up is owed.
+    static func followDrained(_ engine: isolated SyncEngine) -> Bool {
+        !engine.followOwed && engine.state.eventsAfterFollow.isEmpty && !engine.state.drainFollowUpScheduled && !engine.state.pumpFollowUpScheduled
+    }
+
+    /// The transfers whose place in a queue still waits for the follow.
+    static func placesWaiting(_ engine: isolated SyncEngine) -> Int {
+        engine.state.placesAfterFollow.count
+    }
+
+    /// `duration` in milliseconds.
+    static func milliseconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) * 1_000 + Double(duration.components.attoseconds) / 1e15
     }
 }
