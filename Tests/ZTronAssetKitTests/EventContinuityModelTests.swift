@@ -28,11 +28,17 @@ import ZTronAssetTestSupport
 ///   other, L5-R19) and every other terminal event the oracle saw, or a later one of the same subject, inside that
 ///   generation's own part of the stream: the parts are delimited by the received markers and the generations'
 ///   `clientStarted`, counted rather than looked up by value, because replacements announce equal values. Progress
-///   events coalesce in place and are not checked.
+///   events coalesce in place and are not checked. From the generation it registered with (Stage 3 ruling S3G-2,
+///   L5-R22 (2)): that generation's `clientStarted` when the walk saw the registration land while the engine had not
+///   started yet (the engine's lifecycle read in the turn that registered the stream), and the terminal event of every
+///   `performMaintenance` and `sync(.force)` call that generation served after the registration (the calls are stamped
+///   like the markers), or a later one of its subject, inside that generation's part.
 /// - **I2 order.** The markers a consumer receives never go back a generation and none arrives twice; no
 ///   `clientShutDown` arrives before the real shutdown began (a retired engine's is never forwarded), at most one arrives,
 ///   and it is the last event; every consumer live at the shutdown ends with it; no more `clientStarted` events arrive
-///   between two received markers than the generations between them published.
+///   between two received markers than the generations between them published, the registration generation's own
+///   counted in the first gap only when the walk could not tell its start from the registration (a `subscribe()` that
+///   started that engine itself, or one made while a reopen was parked before its install).
 /// - **I3 no leak.** At idle, after every stream ended: the lifecycle has no follower entry (a forwarder whose pump
 ///   started is removed only when that pump ends, so none also means no pump task is left), and no engine the walk saw has
 ///   a subscriber.
@@ -417,6 +423,11 @@ final class ModelOracles: Sendable {
         self.taps.withLock { $0[core.generation] = tap }
     }
 
+    /// The tap of `generation`, if one is attached.
+    func tap(_ generation: UInt64) -> ModelTap? {
+        self.taps.withLock { $0[generation] }
+    }
+
     /// Every tap, by generation.
     var all: [ModelTap] {
         self.taps.withLock { taps in
@@ -570,6 +581,39 @@ extension SyncEngine {
     private func cancelModelWait(_ id: UInt64) {
         self.state.conditionObservers.removeValue(forKey: id)?.continuation.resume()
     }
+
+    /// The lifecycle in the turn that registered the first subscriber after `key` (Stage 3 ruling S3G-2), or, when that
+    /// registration came before this call, the lifecycle now; `nil` when the wait ended without one (the engine shut
+    /// down, or the caller was cancelled).
+    @available(macOS 15.0, iOS 18.0, *)
+    func lifecycleAtRegistration(after key: UInt64) async -> EngineLifecycle? {
+        let seen = ModelLifecycleProbe()
+        // REENTRANCY: nothing is re-read — a terminal test wait; its condition records the lifecycle in the turn it holds.
+        await self.awaitCondition { engine in
+            guard engine.state.lastSubscriber > key else {
+                return false
+            }
+            seen.note(engine.state.lifecycle)
+            return true
+        }
+        return seen.value
+    }
+}
+
+/// The first lifecycle an engine-turn condition saw (`SyncEngine.lifecycleAtRegistration(after:)`).
+@available(macOS 15.0, iOS 18.0, *)
+final class ModelLifecycleProbe: Sendable {
+    private let seen = Mutex<EngineLifecycle?>(nil)
+
+    /// Records `lifecycle` unless one was recorded already.
+    func note(_ lifecycle: EngineLifecycle) {
+        self.seen.withLock { $0 = $0 ?? lifecycle }
+    }
+
+    /// The recorded lifecycle.
+    var value: EngineLifecycle? {
+        self.seen.withLock { $0 }
+    }
 }
 
 // MARK: - The walk
@@ -598,7 +642,66 @@ private final class ModelWalk {
         /// then): every generation installed after it was handed to it from its first event (orchestrator rulings L5-R13,
         /// L5-R19; L5-R21 stamps an `events` stream here rather than at its first event, L5-C2-04).
         var followedAt: Int?
+        /// The generation serving when it registered: the engine its stream reads first (`nil` until known).
+        var registeredWith: UInt64?
+        /// Whether that engine's `clientStarted` came after the registration (owed), before it (never delivered), or
+        /// either (the walk could not tell; Stage 3 ruling S3G-2, L5-R22 (2)).
+        var startOrder = StartOrder.unknown
         var status = Status.live
+    }
+
+    /// The registration engine's start against the registration, as the walk observed it.
+    enum StartOrder {
+        /// The engine had broadcast its `clientStarted` before the action that registered the stream began.
+        case before
+        /// The engine had not started in the turn that registered the stream: its `clientStarted` is owed.
+        case after
+        /// Not observed.
+        case unknown
+    }
+
+    /// A `performMaintenance` or `sync(.force)` call that the walk awaited (not one started while a reopen was parked
+    /// before its install): the generation serving it, the oracle log's length for that generation when it began, and
+    /// the terminal event its result names.
+    struct Call {
+        let label: String
+        let startedAt: Int
+        let generation: UInt64
+        let logStart: Int
+        let published: Published
+    }
+
+    /// The terminal event a call's result names: `maintenanceFinished` with the returned report, published in the turn
+    /// that returned it; `syncFinished` with the returned outcome of a run (a run resumes its joiners in the turn that
+    /// publishes it; `.failed` and `.notDue` can return without a run, so they name nothing).
+    enum Published {
+        case maintenance(MaintenanceReport)
+        case sync(SyncOutcome)
+
+        func matches(_ event: AssetEvent) -> Bool {
+            switch (self, event) {
+            case (.maintenance(let report), .maintenanceFinished(let published)):
+                return report == published
+            case (.sync(let outcome), .syncFinished(_, let published)):
+                return outcome == published
+            default:
+                return false
+            }
+        }
+    }
+
+    /// What a consumer is owed by the generation it registered with, beyond the markers (Stage 3 ruling S3G-2).
+    struct Registration {
+        let generation: UInt64?
+        let log: [AssetEvent]
+        /// Its `clientStarted` is owed in the first gap.
+        let owesStart: Bool
+        /// Its `clientStarted` may arrive in the first gap (the walk could not tell).
+        let mayStart: Bool
+        /// The calls it served after the registration.
+        let calls: [Call]
+
+        static let none = Registration(generation: nil, log: [], owesStart: false, mayStart: false, calls: [])
     }
 
     /// A marker call and the action it began in.
@@ -641,6 +744,9 @@ private final class ModelWalk {
     var consumers: [Consumer] = []
     var markers: [Marker] = []
     var nextMarker = 0
+    var calls: [Call] = []
+    /// The generation installed now: the one a registration or a call made now reaches.
+    var serving: UInt64 = 0
     var pending: [Pending] = []
     /// The action stamped no later than each replacement's installation: its reopen's first action, or, for a reopen
     /// parked before its install, the action that releases it (L5-R21: generations are owed by installation).
@@ -824,14 +930,35 @@ private final class ModelWalk {
         }
     }
 
-    private func addConsumer(_ kind: ModelConsumer.Kind, _ stream: AsyncStream<AssetEvent>, registered: Bool) -> Int {
+    private func addConsumer(
+        _ kind: ModelConsumer.Kind,
+        _ stream: AsyncStream<AssetEvent>,
+        registered: Bool,
+        startOrder: StartOrder = .unknown
+    ) -> Int {
         let consumer = ModelConsumer(id: self.consumers.count, kind: kind, stream: stream, clock: self.clock)
         let registeredAt = registered ? self.clock.tick() : nil
         // A `subscribe()` stream follows in its call, before it returns (or, started while a reopen was parked before its
         // install, after that reopen, once the call settled): its registration stamp is its follow stamp too.
-        self.consumers.append(Consumer(consumer: consumer, registeredAt: registeredAt, followedAt: registeredAt))
-        self.note("consumer \(consumer.id) (\(kind)) added, registered \(registeredAt.map(String.init) ?? "later")")
+        var state = Consumer(consumer: consumer, registeredAt: registeredAt, followedAt: registeredAt)
+        state.registeredWith = self.serving
+        state.startOrder = startOrder
+        self.consumers.append(state)
+        self.note("consumer \(consumer.id) (\(kind)) added, registered \(registeredAt.map(String.init) ?? "later") with generation \(self.serving) (start \(startOrder))")
         return self.consumers.count - 1
+    }
+
+    /// The serving engine's lifecycle and the key of its newest subscriber, read in one engine turn.
+    private func servingState() async -> (lifecycle: EngineLifecycle, lastSubscriber: UInt64)? {
+        guard let tap = self.oracles.tap(self.serving) else {
+            return nil
+        }
+        return await tap.engine.kitRead { ($0.state.lifecycle, $0.state.lastSubscriber) }
+    }
+
+    /// Whether `lifecycle` is before the turn that broadcasts `clientStarted` (that turn makes the engine `running`).
+    private static func isUnstarted(_ lifecycle: EngineLifecycle) -> Bool {
+        lifecycle == .created || lifecycle == .starting
     }
 
     private func subscribe() async {
@@ -855,9 +982,13 @@ private final class ModelWalk {
             self.note("subscribe() started while parked at \(self.parked.map(String.init(describing:)) ?? "")")
             return
         }
+        // An engine already started had broadcast its clientStarted before this call registered; an unstarted one is
+        // started by the call itself (`subscribe()` awaits `start()`), which the walk does not see from outside.
+        let before = await self.servingState()
+        let order: StartOrder = before.map { ModelWalk.isUnstarted($0.lifecycle) ? .unknown : .before } ?? .unknown
         switch await call() {
         case .success(let stream):
-            _ = self.addConsumer(.subscribed, stream, registered: true)
+            _ = self.addConsumer(.subscribed, stream, registered: true, startOrder: order)
         case .failure(let error):
             self.violation("subscribe() failed before the shutdown: \(error)")
         }
@@ -869,6 +1000,7 @@ private final class ModelWalk {
         }
         self.clock.tick()
         let recorded = self.gauge.recorded
+        let before = await self.servingState()
         let index = self.addConsumer(.events, self.client.events, registered: false)
         self.consumers[index].consumer.send(.pull(1))
         // Its first pull makes it a follower, in a lifecycle turn that also runs while a reopen is parked (the walk's
@@ -877,6 +1009,19 @@ private final class ModelWalk {
         await self.gauge.wait(recordedAtLeast: recorded + 1)
         self.consumers[index].followedAt = self.clock.tick()
         self.note("consumer \(index) followed")
+        // The serving engine's clientStarted against the registration (S3G-2): broadcast already, or not yet in the turn
+        // that registered this stream. An unstarted serving engine is an installed replacement whose reopen is parked
+        // before its start finished. The registration lands at once, and the walk awaited every earlier action (and the
+        // registration of every earlier stream that met the engine unstarted), so nothing else registers with that engine
+        // meanwhile: the first subscriber after the one read before is this stream's.
+        if let before {
+            if !ModelWalk.isUnstarted(before.lifecycle) {
+                self.consumers[index].startOrder = .before
+            } else if let tap = self.oracles.tap(self.serving), let atRegistration = await tap.engine.lifecycleAtRegistration(after: before.lastSubscriber) {
+                self.consumers[index].startOrder = ModelWalk.isUnstarted(atRegistration) ? .after : .unknown
+                self.note("consumer \(index) registered with unstarted generation \(self.serving): \(atRegistration)")
+            }
+        }
         if self.parked != nil {
             // Its first event may need the parked reopen to finish.
             self.pending.append(.firstEvent(index))
@@ -957,21 +1102,47 @@ private final class ModelWalk {
     }
 
     private func maintain() async {
-        self.clock.tick()
+        let startedAt = self.clock.tick()
         let harness = self.harness
         let client = self.client
-        await self.invoke("performMaintenance") {
-            _ = try? await harness.withClock { () throws(AssetError) -> MaintenanceReport in
+        let call = { @Sendable () async -> MaintenanceReport? in
+            try? await harness.withClock { () throws(AssetError) -> MaintenanceReport in
                 try await client.performMaintenance(timeBudget: 1)
             }
+        }
+        guard self.parked?.beforeInstall != true else {
+            await self.invoke("performMaintenance") {
+                _ = await call()
+            }
+            return
+        }
+        let logStart = self.oracles.tap(self.serving)?.record.entries.count
+        let report = await call()
+        self.note("performMaintenance: \(report.map { _ in "a report" } ?? "failed")")
+        if let report, let logStart {
+            self.calls.append(Call(label: "performMaintenance", startedAt: startedAt, generation: self.serving, logStart: logStart, published: .maintenance(report)))
         }
     }
 
     private func forceSync() async {
-        self.clock.tick()
+        let startedAt = self.clock.tick()
         let harness = self.harness
-        await self.invoke("sync(.force)") {
-            _ = await harness.syncDriven(.force)
+        guard self.parked?.beforeInstall != true else {
+            await self.invoke("sync(.force)") {
+                _ = await harness.syncDriven(.force)
+            }
+            return
+        }
+        let logStart = self.oracles.tap(self.serving)?.record.entries.count
+        let outcome = await harness.syncDriven(.force)
+        self.note("sync(.force): \(outcome)")
+        switch outcome {
+        case .complete, .completeWithFailures, .blocked:
+            if let logStart {
+                self.calls.append(Call(label: "sync(.force)", startedAt: startedAt, generation: self.serving, logStart: logStart, published: .sync(outcome)))
+            }
+        case .failed, .notDue:
+            break
         }
     }
 
@@ -1011,6 +1182,10 @@ private final class ModelWalk {
         var shutdown: Task<Void, Never>?
         if park != nil, let hold, await self.parks() {
             self.parked = park
+            if park?.beforeInstall == false {
+                // Parked after the install: the replacement serves every registration and call made while parked.
+                self.serving = retiring + 1
+            }
             for _ in 0..<self.random.below(4) {
                 await self.innerAction()
                 // I4 after every action, the ones made while parked included.
@@ -1036,6 +1211,7 @@ private final class ModelWalk {
         await self.settlePending()
         let now = await self.client.lifecycle.current().generation
         self.installed.insert(now)
+        self.serving = now
         self.note("reopen finished: \(result), generation \(now)")
         if self.shutdownAt == nil {
             if case .failure(let error) = result {
@@ -1252,8 +1428,27 @@ private final class ModelWalk {
                 }
                 return (generation, log)
             }
-            self.checkGenerations(owed, events: events, markerGeneration: markerGeneration, name: name)
+            let registration = self.registration(of: state, registeredAt: registeredAt, owed: owed.map(\.generation), logs: logs)
+            self.checkGenerations(owed, events: events, markerGeneration: markerGeneration, name: name, registration: registration)
         }
+    }
+
+    /// What the generation `state` registered with owes it beyond the markers (Stage 3 ruling S3G-2, L5-R22 (2)): its
+    /// `clientStarted` when that engine had not started in the turn that registered the stream (or may arrive, when the
+    /// walk could not tell), and the terminal events of the calls it served after the registration. Nothing when that
+    /// generation is also owed from its first event (handed over), which already covers all of it.
+    private func registration(of state: Consumer, registeredAt: Int, owed: [UInt64], logs: [UInt64: [AssetEvent]]) -> Registration {
+        guard let generation = state.registeredWith, !owed.contains(generation), let log = logs[generation] else {
+            return .none
+        }
+        let announced = log.contains(where: ModelWalk.isClientStarted)
+        return Registration(
+            generation: generation,
+            log: log,
+            owesStart: announced && state.startOrder == .after,
+            mayStart: announced && state.startOrder == .unknown,
+            calls: self.calls.filter { $0.generation == generation && $0.startedAt > registeredAt }
+        )
     }
 
     private static func isClientStarted(_ event: AssetEvent) -> Bool {
@@ -1281,7 +1476,8 @@ private final class ModelWalk {
         _ owed: [(generation: UInt64, log: [AssetEvent])],
         events: [AssetEvent],
         markerGeneration: [AssetID: UInt64],
-        name: String
+        name: String,
+        registration: Registration
     ) {
         var cuts: [(index: Int, generation: UInt64?)] = [(-1, nil)]
         for (index, event) in events.enumerated() {
@@ -1310,12 +1506,17 @@ private final class ModelWalk {
             case (nil, nil):
                 place = "with no marker"
             }
-            if found.count < expected.count {
-                self.violation("I1: \(name) lost a clientStarted: generations \(expected) each published one, and \(found.count) arrived \(place): \(found.map { events[$0] })")
+            // The first gap also holds the registration generation's own clientStarted when it is owed (S3G-2), and may hold
+            // it when the walk could not tell its start from the registration; never otherwise.
+            let required = expected.count + (gap == 0 && registration.owesStart ? 1 : 0)
+            let spare = gap == 0 && registration.mayStart ? 1 : 0
+            let own = gap == 0 && registration.owesStart ? ", and the registration generation \(registration.generation.map(String.init) ?? "") its own after the registration," : ""
+            if found.count < required {
+                self.violation("I1: \(name) lost a clientStarted: generations \(expected) each published one\(own) and \(found.count) arrived \(place): \(found.map { events[$0] })")
                 continue
             }
-            if found.count - expected.count > (gap == 0 ? 1 : 0) {
-                self.violation("I2: \(name) received \(found.count) clientStarted events \(place), where only generations \(expected) published one: \(found.map { events[$0] })")
+            if found.count - required > spare {
+                self.violation("I2: \(name) received \(found.count) clientStarted events \(place), where only generations \(expected) published one\(own): \(found.map { events[$0] })")
             }
             for (generation, index) in zip(expected, found.suffix(expected.count)) {
                 startIndex[generation] = index
@@ -1350,6 +1551,21 @@ private final class ModelWalk {
                         self.violation("I1: \(name) lost \(event) of generation \(item.generation), and no later event of its subject arrived in that generation's part of its stream")
                     }
                 }
+            }
+        }
+        // The registration generation's part runs from the start of the stream to the first owed generation's
+        // clientStarted (S3G-2): each call it served after the registration published its terminal event there, or a
+        // later one of the same subject. The oracle's first event at or after the call's start that the result names
+        // stands for it: the call's own event is that one or a later equal one, so the check never asks for more.
+        let upper = owed.lazy.compactMap { startIndex[$0.generation] }.first ?? events.count
+        let part = events[..<upper]
+        for call in registration.calls {
+            guard let anchor = registration.log.indices.first(where: { $0 >= call.logStart && call.published.matches(registration.log[$0]) }) else {
+                continue
+            }
+            let slot = EventSlot(registration.log[anchor])
+            if !registration.log[anchor...].contains(where: { EventSlot($0) == slot && part.contains($0) }) {
+                self.violation("I1: \(name) lost \(registration.log[anchor]) of its registration generation \(registration.generation.map(String.init) ?? ""), from \(call.label) begun at t\(call.startedAt) after its registration, and no later event of its subject arrived in that generation's part of its stream")
             }
         }
     }
