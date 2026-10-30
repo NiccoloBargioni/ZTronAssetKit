@@ -1871,7 +1871,7 @@ extension SyncEngine {
         var verdicts: Set<TransferID> = []
         for event in events {
             switch event {
-            case .enqueue(let transfer, _), .reinstate(let transfer):
+            case .enqueue(let transfer, _, _), .reinstate(let transfer, _):
                 places[transfer, default: 0] += 1
             case .attemptFailed(let transfer, let epoch, _):
                 if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {

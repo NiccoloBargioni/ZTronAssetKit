@@ -442,7 +442,7 @@ extension SyncEngine {
         }
         if self.defersToFollow {
             self.state.jobs[transfer] = job
-            self.state.eventsAfterFollow.append(.enqueue(transfer, front: front))
+            self.state.eventsAfterFollow.append(.enqueue(transfer, epoch: job.epoch, front: front))
             self.notePlaceWaits(transfer)
             return
         }
@@ -466,7 +466,7 @@ extension SyncEngine {
         }
         if self.defersToFollow {
             // Behind the follow barrier, as `enqueue`'s place (F-28).
-            self.state.eventsAfterFollow.append(.reinstate(transfer))
+            self.state.eventsAfterFollow.append(.reinstate(transfer, epoch: job.epoch))
             self.notePlaceWaits(transfer)
             return
         }

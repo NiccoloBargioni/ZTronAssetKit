@@ -143,11 +143,19 @@ extension SyncEngine {
                     continue
                 }
                 self.failFastJoiner(token, of: transfer)
-            case .enqueue(let transfer, let front):
+            case .enqueue(let transfer, let epoch, let front):
                 self.notePlaceTaken(transfer)
+                // A place belongs to the job that asked for it: one removed meanwhile, and re-created by the follow's
+                // visit, has its own place (PROBE-C9-STALE-PLACE).
+                guard self.state.jobs[transfer]?.epoch == epoch else {
+                    continue
+                }
                 self.enqueue(transfer, front: front, askedBefore: true)
-            case .reinstate(let transfer):
+            case .reinstate(let transfer, let epoch):
                 self.notePlaceTaken(transfer)
+                guard self.state.jobs[transfer]?.epoch == epoch else {
+                    continue
+                }
                 self.reinstate(transfer)
             }
         }
@@ -477,10 +485,11 @@ enum EventAfterFollow: Sendable {
     /// A join to a job parked `insufficientSpace`, whose re-check and fail-fast answer (`failFastJoiner`) wait.
     case spaceJoin(InterestToken, TransferID)
     /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues, at
-    /// the front when `front` (a pause's resume, a gate's wait), with the time the place was asked for.
-    case enqueue(TransferID, front: Bool)
-    /// A queued job's return to the place its entry had (`reinstate`).
-    case reinstate(TransferID)
+    /// the front when `front` (a pause's resume, a gate's wait), with the time the place was asked for; `epoch` is the
+    /// job's when it asked, and a later job of the transfer does not take it.
+    case enqueue(TransferID, epoch: UInt64, front: Bool)
+    /// A queued job's return to the place its entry had (`reinstate`); `epoch` as for `enqueue`.
+    case reinstate(TransferID, epoch: UInt64)
 }
 
 /// A failure verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
