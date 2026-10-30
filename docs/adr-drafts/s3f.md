@@ -1,4 +1,4 @@
-# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 5
+# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 6
 
 Branch `wp/s3f` from tag `s3-base`. Rulings: `.build-orchestrator/s3-rulings-s3f.md`; findings:
 `.build-orchestrator/s3-findings-s3f.json`. WP-F's Stage 2 record is `docs/adr-drafts/f.md` (background only).
@@ -19,12 +19,20 @@ beside a second TSan process at a load at most about 30 raised to `.minutes(3)` 
 which is neither model-based nor exhaustive, stays at `.minutes(3)` over half of it, and a ruling is requested below),
 S3-R5 (the probe-chain benchmark passes C2 at 10,000 on a quiet host), S3-R6/S3-R7 (only WP-F's files and this draft) and
 S3-R8 (P-13 and the store's per-404 index commit routed `other-wp:b`). In cycle 5 the rulings file was re-read again: no ruling changed
-or was added, and it holds no ruling on the S1-15 run test's guard (requested in cycle 4), so that guard stays
-`.minutes(3)` (S3-R4 reserves `.minutes(5)` for model-based or exhaustive tests) and the request stands; S3-R1 (the
+or was added, and at that time it held no ruling on the S1-15 run test's guard (requested in cycle 4), so that guard stayed
+`.minutes(3)` (S3-R4 reserves `.minutes(5)` for model-based or exhaustive tests) and the request stood; S3-R1 (the
 blocking correctness finding's failing test `04ae782` committed before its fix `e18d5aa`), S3-R3 (each branch's budget
 removed in place and shown to fail the new test), S3-R5 (the fix bounds the sweep's follows per turn, pinned by a
 structural test and a `c2Budget` benchmark), S3-R6/S3-R7 (only WP-F's files and this draft) and S3-R8 (P-13 and the
-per-404 index commit stay `other-wp:b`).
+per-404 index commit stay `other-wp:b`). The statement that no ruling exists on that guard is no longer true: the
+orchestrator added **S3-R10** to the rulings file on 2026-10-30 (the file was saved at 03:00:55, after cycle 5's last
+commit `39dadd4` at 01:18:56), and cycle 6 applies it. In cycle 6 the rulings file was re-read: S3-R1 to S3-R9 are
+unchanged and S3-R10 is new; applied: S3-R1 (the blocking correctness finding's failing test `48c8dfc` committed before
+its fix `b94fd27`), S3-R2 (PROBE-C5-LANEDROP renamed into `EngineFollowTests`), S3-R3 (the fix's re-judgement and the
+sweep's park bound each mutated in place and shown to fail a test), S3-R4/S3-R10 (S1-15's run test guard raised to
+`.minutes(5)`, nothing cut, figures recorded; the other guards re-measured), S3-R5 (the re-judgement is O(1) per
+re-queued job; the cycle-5 C2 benchmark re-run), S3-R6/S3-R7 (only WP-F's files and this draft) and S3-R8 (P-13, the
+per-404 index commit and the Storage time-outs at load 100–540 reported `other-wp:`).
 
 - **Orchestrator ruling (close-out) S3-R1, scope and order.** Blocking items first (failing test committed on its own,
   then the fix), then REQUIRED, then OPTIONAL; ADR-RECORD items get an entry here and no code; items not listed are out
@@ -58,6 +66,16 @@ per-404 index commit stay `other-wp:b`).
   consider.
 - **Orchestrator ruling (close-out) S3-R9, records.** This file: one entry per item, then "Authorised edits outside
   WP-F", "Proposed document changes" and "Not verified here".
+- **Orchestrator ruling (close-out) S3-R10 — Orchestrator ruling (Stage 3), added 2026-10-30: S1-15's run test hang
+  guard.** `R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs`
+  (`EngineSync1LivenessTests.swift`, `runMaterialisesAPipelineAtATime`) may take `.timeLimit(.minutes(5))`: its cost is
+  the SPEC-mandated scale (S1-15's 100,000-entry catalog) decoded by WP-A's parser under TSan, not WP-F's own work
+  (101.8–130.1 s beside a second TSan process at load 10–32, 34–43 % of 5 minutes; 47.5–72.3 s alone). Every entry,
+  operation, assertion and cancellation check stays (G3), and the figures go in the test's doc comment and here. The
+  parser's sanitizer cost is not a defect (a release build decodes the manifest in well under a second): it is recorded
+  as a note for Stage 5's residual risks, with no WP-A change. Verifiers judge the guard by S3-R4's rule against 5
+  minutes: blocking only if the test exceeds half of 5 minutes at a load of about 30 or less, or if the raise came with
+  any cut to the test. Applied in cycle 6 (`daa2ba8`; "Cycle 6" below).
 - **Orchestrator ruling (close-out) S3F-1 to S3F-17.** The per-item rulings are quoted at the head of each entry below.
 
 ## Cycle 2: the cycle-1 verification findings
@@ -346,7 +364,7 @@ holds no ruling on the S1-15 run test's guard. Each mutant was applied in place 
 | Lens | Finding | Disposition |
 |---|---|---|
 | correct (blocking) | C2 regression from `c8f01ca`: `sweepSpaceParked` counted each follow as one re-queue or one park, so one sweep turn followed up to `readmissionsPerTurn + parksPerPump` = 1,024 jobs (PROBE-C4-SWEEP2-C2: 9.3 to 13 ms at 10,000) | **Fixed** (failing test `04ae782`, fix `e18d5aa`, C2 benchmark `8cc5940`, test cheaper `72b2ab2`; below) |
-| reqs (blocking) | S1-15's run test (`EngineSync1LivenessTests.swift:179`, `.minutes(3)`) at 129.9 / 130.1 s beside a second TSan process at load 10.5–25.9 (72 %); the ruling requested in cycle 4 not issued | **Open: awaits the orchestrator's ruling.** Guard unchanged (S3-R4 gives `.minutes(5)` only to model-based or exhaustive tests; this one is neither); re-measured (below); the request stands with the verifiers' and this cycle's figures |
+| reqs (blocking) | S1-15's run test (`EngineSync1LivenessTests.swift:179`, `.minutes(3)`) at 129.9 / 130.1 s beside a second TSan process at load 10.5–25.9 (72 %); the ruling requested in cycle 4 not issued | **Open: awaits the orchestrator's ruling.** Guard unchanged (S3-R4 gives `.minutes(5)` only to model-based or exhaustive tests; this one is neither); re-measured (below); the request stands with the verifiers' and this cycle's figures. *Ruled after cycle 5 (S3-R10) and applied in cycle 6 (`daa2ba8`)* |
 | correct | The same test at 108.76 s alone in the TSan bundle at load 26–35 (60 %); ruling pending | As above |
 | reqs | `SyncBenchmarks` misses on a loaded host (P-4 ratio, P-11, network edges, throttle extension), all five passing on the verifier's rerun at load 11–14 | No change (load only); the whole `SyncBenchmarks` re-run under "Gate evidence (cycle 5)" |
 | reqs | Survivor `noDispatchOwedFlag` confirmed (`EngineRuns.swift:947`) | Kept as recorded in cycle 4 (§14 candidate (c)); no test this cycle |
@@ -409,7 +427,10 @@ members, against 6.2–7.3 ms with no follow owed.
   test in 2 suites failed after 7.910 seconds with 2 issues.`
 - **REENTRANCY:** no new `await` (the budget is synchronous); no ledger row.
 
-### S1-15's run test under TSan — **open: the orchestrator's ruling is still requested**
+### S1-15's run test under TSan — **open in cycle 5; Fixed in cycle 6 (ruling S3-R10)**
+
+*Cycle 6:* the orchestrator ruled after this cycle (S3-R10, 2026-10-30) and cycle 6 applied the ruling (`daa2ba8`,
+`.minutes(5)`, nothing cut): see "Cycle 6". The text below is cycle 5's record.
 
 *Findings (both lenses):* the test (`.minutes(3)`) stays over half its limit under TSan; the requirements verifier
 measured 129.863 s and 130.143 s beside a second TSan process at load 10.5–25.9 (72 %) and 61.949 s alone at load 24–49;
@@ -445,6 +466,121 @@ the paired shape.
 - **other-wp:b:** P-13 (`BenchStorage.swift:249`) and `AssetStore.recordFailure`'s whole-index commit per 404 (a burst
   of N 404s rewrites the index N times, about 5 ms each at 10,000 records): routed to WP-B, with the suggestion to
   coalesce one burst's failure records into one ordered commit; P-13 to be re-run on a quiet host.
+
+## Cycle 6: the cycle-5 verification findings
+
+Every finding of the two cycle-5 lenses, with its disposition; the blocking ones first. The rulings file was re-read: it
+now holds S3-R10 (2026-10-30) on the S1-15 run test's guard. Each mutant was applied in place on the committed tree,
+rebuilt in `.build-s3f`, run and reverted (`git diff --stat Sources/` empty after each).
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| correct (blocking) | R-SYN-11, F-22: in a `.reclaimed` or `.settle` sweep during an owed follow, `sweepSpaceParked`'s re-queue branch judged a job on its pre-follow lane; a follow that kept a prefetch id lowered the lane, the job was re-queued anyway and its bytes counted `ahead`, so the next user job was parked `insufficientSpace` and its fail-fast answered its waiter with a shortage that did not exist (PROBE-C5-LANEDROP) | **Fixed** (failing test `48c8dfc`, fix `b94fd27`, the sweep's park bound pinned `7c8d737`; below) |
+| reqs (blocking) | S3-R10 issued but not applied: S1-15's run test still `.minutes(3)`, its doc comment and this draft still say the ruling is pending; 94.8 / 95.6 s paired at load 8.8–20.8 (53 % of 3 minutes) | **Fixed** (`daa2ba8`: the trait alone, `.minutes(5)`; doc comment, this draft, the Stage 5 note; below) |
+| correct | The same guard, non-blocking under S3-R10 (71.47 s alone at load 17.7–30.6) | As above |
+| reqs | `reclaimDuringFollowTurns` missed C2 in one run at load 8.4→16.1 right after load 540, and passed in every other run | No change (load only, S3-R5); re-run under "Gate evidence (cycle 6)" |
+| reqs | `spaceSweepFollowsAtMostOneTurnOfJobs` at 27.4 / 27.8 s paired at load 8.8–20.8 (46 % of 60 s), about 20 other `.minutes(1)` Sync tests at 46–50 % in the same run | Recorded (cycle 5's DECISIONS line now carries the paired figure); no test over half its guard, so none raised (S3-R4); re-measured below |
+| reqs | other-wp:b / other-wp:h: Storage time-outs (`StoreCrashTests.swift:167`, `LoopbackHTTPServerTests.swift:400`) at load 100–540 | **other-wp:b / other-wp:h:** not WP-F's files, not touched; the Storage target passed in the verifier's rerun at load 6–11 and in this cycle's `--quick` (load 12.8 → 178) and simulator runs ("Gate evidence (cycle 6)") |
+| reqs, correct | Survivors `noDispatchOwedFlag` and `noFlagPump` carried over | Kept as recorded (§14 candidates (a) and (c)); no test this cycle |
+| reqs, correct | other-wp:b: P-13 and the per-404 index commit | **other-wp:b:** `BenchStorage.swift` and `AssetStore.recordFailure` are WP-B's; not touched |
+
+### The blocking correctness finding: a space sweep re-queued a job on its pre-follow lane — **Fixed**
+
+*Finding (correctness lens, PROBE-C5-LANEDROP):* content C (5 MB) is listed by A, which has a user waiter, and by B, a
+prefetch group's member, so its job is user-lane. During an owed follow the reclaim's sweep found C's job fits A's user
+lane, followed it (`followBeforeActing`: A moves to its new content, B stays, the job drops to prefetch), and re-queued it
+with its 5 MB counted `ahead`; the next user job K (3 MB) was then judged against 6 − 5 = 1 MB, parked
+`insufficientSpace`, and its fail-fast answered K's waiter `insufficientSpace(required: 3000000, available: 999000)`
+with 6 MB free, while the gate parked C's job and C never took the room. The cycle-4 entry reasoned that a lane drop only
+shrinks the room, which is why the park branch re-reads the job; the re-queue branch did not, and there a drop turns
+"fits" into "does not fit". At `s3-base` the follow moved every job in the apply's turn, so the window did not exist.
+
+- **Failing test first** (`48c8dfc`, `Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`, `extension
+  EngineSyncTests`): `R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so
+  a lane the follow lowered takes no room from the next waiter (F-22)` (`spaceSweepJudgesAFollowedJobOnItsNewLane`,
+  arguments `LaneDropVisit.followVisitedFirst` (the control: the follow visits C's job before the reclaim) and
+  `.sweepFollowsFirst`), the verifier's probe with its setup asserted (the follow owed or not, the job's lane and ids,
+  both jobs `awaitingSpace`), the follow-owed state after the sweep, C's job prefetch-lane and not queued, no invariant
+  violation, K's waiter answered from its 3 MB, A's from its 16-byte content, C never started, and the sync complete. In
+  the control the follow's turns are awaited without the clock driver (they are owned tasks), so the 60 s grace cannot
+  end early. At `48c8dfc`: `EngineFollowTests.swift:845:9: Expectation failed: (try? kResult.get())?.byteSize ==
+  Int64(kBytes.count)` / `K's waiter is answered from its 3 MB, with 6 MB of room for user work:
+  failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))` with `visit →
+  .sweepFollowsFirst`; the control passed; `✘ Test run with 1 test in 1 suite failed after 0.448 seconds with 1 issue.`
+- **Fix** (`b94fd27`, `EngineJobs.swift`, `sweepSpaceParked`): after `followBeforeActing` returns `false` the sweep
+  re-reads the job and judges it again (`spaceBlock(job, ahead: ahead)`) before it re-queues it or counts it in `ahead`;
+  a job that no longer fits falls through to the code of a job that never did, so it stays parked when it was parked
+  `insufficientSpace`, is left waiting (`awaitingSpace` with a wake expected), or is parked `insufficientSpace` with its
+  figures (F-22's convention) against `parksPerPump`, scheduling the follow-up sweep when that bound is spent; it is never
+  added to `ahead` or `spaceAdmitted`. Its follow is done and not counted again (`followFits` counts only a job that holds
+  a moved id). The verifier's prototype (`proto-lanedrop.diff`) handled the drop inline and lacked the park bound; the
+  fall-through shares the wait, the figures and the bound with the park branch instead. The doc comment of
+  `sweepSpaceParked` is corrected. With the fix: `✔ Test "R-SYN-11: a space sweep judges a job again …" with 2 test cases
+  passed after 0.610 seconds`; the Sync bundle `✔ Test run with 407 tests in 52 suites passed after 20.813 seconds`.
+- **Mutants** (S3-R3 style, in place on `b94fd27`, rebuilt with `-warnings-as-errors`, reverted):
+  - `noLaneRejudge` (`verdict = self.spaceBlock(job, ahead: ahead)` → `verdict = nil`, the pre-fix behaviour):
+    `EngineFollowTests.swift:845:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)` / `failure(…
+    insufficientSpace(required: 3000000, available: 999000))`; `✘ Test run with 1 test in 1 suite failed after 0.358
+    seconds with 1 issue.` (Deleting the line instead fails the build: `variable 'verdict' was never mutated`.)
+  - `noParkBound` (`guard parks < Self.parksPerPump, self.followFits(job, follows: &follows) else {` → `guard
+    self.followFits(job, follows: &follows) else {`): the whole Sync bundle passed (`✔ Test run with 407 tests in 52
+    suites passed after 12.075 seconds`); only the release benchmark measured that bound. So `7c8d737` adds
+    `R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)`
+    (`EngineRegressionCycle8Tests.spaceSweepParksAtMostOneTurnOfJobs`: 576 members wait for 300 reaped bytes, the purge
+    path's `.reclaimed` sweep runs with its follow-ups held, its one turn re-queues the first member and parks exactly
+    `parksPerPump`; then every other member ends parked and no invariant breaks). Against `noParkBound`:
+    `EngineRegressionCycle8Tests.swift:306:9: Expectation failed: turn.parked == SyncEngine.parksPerPump` / `one sweep
+    turn parked 575 jobs, at most parksPerPump = 512`, and `:307:9` / `(parked: 575, waiting: 0, followUpHeld: false)`;
+    `✘ Test run with 2 tests in 2 suites failed after 0.511 seconds with 2 issues.` With the bound: `passed after 0.130
+    seconds`. The lane-drop park goes through that same guard line.
+- **C2 (S3-R5):** the re-judgement adds one dictionary read and the ledger's O(1) `spaceBlock` per re-queued job (at
+  most `readmissionsPerTurn` per turn); `reclaimDuringFollowTurns` re-run under "Gate evidence (cycle 6)".
+- **REENTRANCY:** no new `await` (synchronous); no ledger row.
+
+### S1-15's run test under TSan — **Fixed (ruling S3-R10)**
+
+- **`daa2ba8`** (`EngineSync1LivenessTests.swift`): the trait alone becomes `.timeLimit(.minutes(5))`; outside the doc
+  comment the diff is that one line (`git diff 39dadd4 daa2ba8 -- …EngineSync1LivenessTests.swift`), so the 100,000
+  entries, every operation, every assertion and the cancellation checks stay (G3). The doc comment's last sentence (the
+  guard awaiting a ruling) is replaced by S3-R10 and its figures: 101.8–130.1 s beside a second TSan process at load
+  10–32 (34–43 % of 5 minutes), 47.5–72.3 s alone, and the cycle-5 verifiers' 94.8 / 95.6 s paired at load 8.8–20.8
+  and 66.1 s alone at load 14–24 (71.5 s alone at 18–31); its earlier "so the guard is `.minutes(3)`" now reads "became".
+- **Measured this cycle** (TSan, `.build-s3f-tsan` at `daa2ba8`): alone in the bundle (04:41:08–04:42:28, load
+  10.9–23.5) `✔ Test "R-SYN-3: a 100,000-entry plan …" passed after 49.787 seconds` (17 % of 5 minutes); beside a second
+  TSan process (`.build-s3f/run-direct.sh`, two bundles at once; 05:15:31–05:16:59, load 6.1–25.6) 84.583 s and 84.821 s
+  (28 % of 5 minutes; both bundles `passed after 84.589` / `84.829 seconds`). An earlier paired run (04:42:51–04:45:47)
+  is not a moderate-load measurement: two other close-outs' verifiers started their test bundles during it and the load
+  rose from 7.9 to 54.7 (above 30 from 04:44:01, about 70 s into the run); there the test took 175.718 s and 175.840 s
+  (59 % of 5 minutes), both bundles passed, no ThreadSanitizer report. By S3-R10's rule (half of 5 minutes at a load of
+  about 30 or less) the guard holds: no measurement at a load of about 30 or less reaches half of 5 minutes (the highest
+  is 130.1 s, the ruling's own figure, at load 10–32).
+- **Stage 5 residual-risk note (S3-R10):** under ThreadSanitizer, WP-A's manifest parser (`ManifestDecoder`,
+  `ManifestParser.survey` and `parse`) takes about two thirds of this test's 47–130 s decoding S1-15's 21 MB,
+  100,000-entry manifest. It is not a defect: a release build decodes that manifest in well under a second, and no WP-A
+  change is made. The risk carried to Stage 5 is the test's wall time on a loaded CI host: the guard is 5 minutes, and a
+  paired TSan run at load above about 30 has not been measured.
+
+### Hang-guard margins, load-only misses and `other-wp`
+
+- **`spaceSweepFollowsAtMostOneTurnOfJobs` (`.minutes(1)`):** the cycle-5 verifier measured 27.371 and 27.816 s beside a
+  second TSan process at load 8.8–20.8 (46 % of 60 s), and about 20 other `.minutes(1)` Sync tests at 46–50 % in that run
+  (the highest `R-STO-1: a cancelled, paused or failed foreground …` at 29.809 s); none over half its limit, so S3-R4
+  raises none. This cycle, paired at load 6.1–25.6: 23.710 s and 23.661 s (39 %); the
+  new tests of this cycle 22.540 / 22.243 s (lane drop) and 20.981 / 20.627 s (park bound); the highest `.minutes(1)`
+  Sync test was `R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels` at 26.770 s (45 %), and no
+  Sync test exceeded half its guard (both bundles `passed after 84.6 seconds`). In the earlier paired run at load 7.9 →
+  54.7 (other verifiers' bundles started during it; not moderate) every one of these took 50–77 % of its guard
+  (`spaceSweepFollowsAtMostOneTurnOfJobs` 39.3 s, the two new tests 34–38 s, the 100-caller cancel test 46.4 s); all
+  passed. Recorded rule: if a paired run at a load of about 30 or less takes this test over
+  30 s, its guard is raised to `.minutes(3)` under S3-R4 with the measurements.
+- **`reclaimDuringFollowTurns`:** the verifier's single miss (one handle [12.04, 12.07, 12.53] ms, two [13.03, 21.00,
+  20.57] ms) came at load 8.4→16.1 straight after a period at load 540; its other runs passed (5.47–7.55 ms). Load only
+  (S3-R5); re-run below.
+- **other-wp:b / other-wp:h:** the Storage time-outs at load 100–540 (`StoreCrashTests.swift:167`, `R-STO-5: a process
+  kill followed by a power loss …`; `LoopbackHTTPServerTests.swift:400`) are WP-B's and WP-H's files: if they return at a
+  moderate load, the orchestrator routes them to those work packages.
+- **Survivors and `other-wp:b`:** `noDispatchOwedFlag` and `noFlagPump` stay §14 candidates (a) and (c); P-13 and
+  `AssetStore.recordFailure`'s per-404 index commit stay routed to WP-B (not re-run).
 
 ## Items
 
@@ -970,10 +1106,32 @@ Cycle 5 adds:
   prefetch group, with one handle and with two (`reclaimDuringFollowTurns`); and the structural test
   `spaceSweepFollowsAtMostOneTurnOfJobs` (one sweep turn follows exactly `followsPerTurn` of 344 owed jobs).
 - **§10.2:** no new row (no new `await`).
-- **DECISIONS (L4-R8 precedent):** still pending: the S1-15 run test's guard, once the orchestrator rules (figures under
-  "Cycle 5"). The new cycle-5 test keeps `.minutes(1)` (19.2–21.3 s paired at load 4–14).
+- **DECISIONS (L4-R8 precedent):** the S1-15 run test's guard, ruled after this cycle (S3-R10) and applied in cycle 6:
+  see "Cycle 6 adds". The new cycle-5 test keeps `.minutes(1)` (19.2–21.3 s paired at load 4–14 here; 27.4–27.8 s
+  paired at load 8.8–20.8 in the cycle-5 verification, 46 % of 60 s).
 - **For routing (`other-wp:b`, unchanged from cycle 4):** `AssetStore.recordFailure`'s whole-index commit per 404, and
   P-13.
+
+Cycle 6 adds:
+
+- **§7.10, the follow (cycle 5's replacement text):** after "and leaves the rest to its follow-up sweep (Stage 3
+  close-out cycle 5, PROBE-C4-SWEEP2-C2)" add "; a job a sweep follows before re-queuing it is judged again on the lane
+  the follow left it, and one that no longer fits is treated as one that never did (left parked, left waiting, or parked
+  within `parksPerPump`), never re-queued nor counted ahead of the jobs behind it (Stage 3 close-out cycle 6,
+  PROBE-C5-LANEDROP)".
+- **§11:** the R-SYN-11 regression test `spaceSweepJudgesAFollowedJobOnItsNewLane` (both visits) and the structural test
+  `spaceSweepParksAtMostOneTurnOfJobs` (one sweep turn parks exactly `parksPerPump` of 575 jobs that do not fit).
+- **§10.2:** no new row (no new `await`).
+- **DECISIONS (L4-R8 precedent):** S1-15's run test guard (`EngineSync1LivenessTests.swift`,
+  `runMaterialisesAPipelineAtATime`) is `.minutes(5)` by the orchestrator's ruling S3-R10: the SPEC-mandated scale
+  (100,000 entries) decoded by WP-A's parser under TSan; 101.8–130.1 s beside a second TSan process at load 10–32 (34–43 %
+  of 5 minutes), 47.5–72.3 s alone, and this cycle's figures under "Cycle 6"; nothing cut (G3).
+- **Stage 5 residual risks:** WP-A's manifest parser under ThreadSanitizer costs about two thirds of S1-15's run test
+  (47–130 s for the 21 MB, 100,000-entry manifest); not a defect (release decodes it in well under a second); no WP-A
+  change; the guard is 5 minutes and a paired TSan run at load above about 30 is unmeasured.
+- **For routing:** `other-wp:b` / `other-wp:h`, the Storage time-outs at load 100–540 (`StoreCrashTests.swift:167`,
+  `LoopbackHTTPServerTests.swift:400`), only if they return at a moderate load; `other-wp:b` P-13 and the per-404 index
+  commit, unchanged.
 
 ## Gate evidence (cycle 1)
 
@@ -1208,6 +1366,48 @@ quoted per step, 1-minute averages).
   0.00–0.28; cancelled resolve 0.00–0.14. The new benchmark alone at load 4.6–7.4: [5.60, 6.02, 5.42] and [6.62, 6.47,
   6.55] ms.
 
+## Gate evidence (cycle 6)
+
+All runs on this branch at `daa2ba8` (the code's HEAD; the draft's commit changes this file only), scratch
+`.build-s3f*`, on the shared 8-core host, where other close-outs' verifiers drove the load from 6 to 571 during the cycle
+(loads quoted per step, 1-minute averages).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (04:33:17–04:37:52, load 12.8 → 178): `VERIFY: PASS`;
+  `::: SUMMARY mode=--quick steps-failed=0`; Transport 151, Sync 408, Storage 459 (`passed after 73.124 seconds`), Model
+  84, Kit 85, Compatibility 71, AppleHosted 104 tests passed.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (04:38–04:39, load
+  143 → 94): `Build complete! (46,91 s)`, exit 0.
+- **Gates:** `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  04:40–04:41, load 87 → 27): `✔ Test run with 408 tests in 52 suites passed after 15.033 seconds`, `12.214 seconds`,
+  `11.380 seconds`.
+- **TSan once** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, 04:41:08–04:42:28, load 10.9–23.5): `✔ Test run with 408 tests in 52 suites passed after
+  49.793 seconds`; no `WARNING: ThreadSanitizer` line, no time-limit line. Beside a second TSan process
+  (`.build-s3f/run-direct.sh`, 05:15:31–05:16:59, load 6.1–25.6): `passed after 84.589 seconds` / `84.829 seconds`,
+  no report; the earlier paired run at load 7.9 → 54.7: `passed after 175.722 seconds` / `175.847 seconds`, no report.
+  Per-test figures under "Cycle 6".
+- **Coverage:** the `--quick` run above is `swift test --scratch-path .build-s3f --enable-code-coverage --skip
+  Benchmarks` (every target passed); exported with `xcrun llvm-cov export -summary-only -instr-profile
+  .build-s3f/out/Products/Debug/codecov/default.profdata` over the eight test binaries: `COVERAGE target=ZTronAssetSync
+  lines= 93.96% (9271/9867) min=90.0 OK`, overall `96.65% (25782/26675)`, `COVERAGE: PASS`.
+- **iOS:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-s3f/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` exit 0 (04:46). **iOS Simulator tests** (simulator
+  897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iOS 27.0; `Test-ZTronAssetKit-2026.10.30_04-46-59-+0100.xcresult`,
+  04:46:52–04:53:33, load 46 → 571): `"result" : "Passed"`, `"totalTestCount" : 1362`, `"passedTests" : 1362`,
+  `"failedTests" : 0`, `"skippedTests" : 0` (`** TEST SUCCEEDED **`); the simulator is shut down.
+- **WP-F benchmarks** (`swift test -c release --skip-build --scratch-path .build-s3f-perf --filter SyncBenchmarks` after
+  `swift build -c release --build-tests --scratch-path .build-s3f-perf -Xswiftc -enable-testing`, 05:14:21–05:15:21, load
+  7.4–11.8): `✔ Test run with 21 tests in 2 suites passed after 56.821 seconds`, every one within its budget. The reclaim
+  during an owed follow [6.54, 6.61, 6.38] ms (one handle) and [7.26, 6.97, 6.76] ms (two handles); P-4 11.61 ms
+  (budget 20.0), ratio 2.02 (max 2.5); P-7 3.97 / 1.53 MiB; P-11 speedup 3.25 (min 3.0); P-14 0 timers, 0 tasks; the
+  stalled prune ratio 1.44; space parking [4.13, 4.39, 4.33] ms; space re-admission [4.64, 4.76, 4.76] ms; network edges
+  1.13–1.15 and 4.47–4.56 ms; releases 4.88–5.14 and 4.90–5.22 ms; re-joins 5.09–5.49 and 5.06–5.67 ms; shutdown [1.54,
+  1.44, 2.39] ms; refresh under a group 1.25–1.29 ms, changing every member 3.74–3.82 ms; prune announcement 5.07–5.08 ms;
+  due retries 0.93–0.95 ms; cancelled resolve 0.02–0.05 ms; cooldown end 0.04–0.07 ms; probe chain longest wait 0.25 ms
+  (totals 1.12–1.16 s); throttle extension [6.62, 6.91, 7.43] ms.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -1224,12 +1424,18 @@ quoted per step, 1-minute averages).
 - The probe chain's total wall time at 10,000 is reported, not budgeted; its scaling is pinned by the structural count of
   one re-admission per exit. Cycle 4 corrected the cause of its 20–95 s totals (the store's per-404 index commit and the
   owned tasks' priority below the heartbeat's, not the fake source or the polling); it is about 1.1 s now.
-- Cycle 4: the S1-15 run test's guard (`.minutes(3)`, 101.8–104.7 s beside a second TSan process at load 12–32) awaits
-  the orchestrator's ruling; the `noDispatchOwedFlag` and `noFlagPump` liveness terms have no test (reasons under "Cycle
+- Cycle 4: the S1-15 run test's guard (`.minutes(3)`, 101.8–104.7 s beside a second TSan process at load 12–32) awaited
+  the orchestrator's ruling (given after cycle 5 as S3-R10 and applied in cycle 6); the `noDispatchOwedFlag` and `noFlagPump` liveness terms have no test (reasons under "Cycle
   4" and "Cycle 3"); the 404 path's engine turns are no longer part of the probe-chain benchmark (the 404 path's own C2
   is not benchmarked at 10,000; its turns are per job, with no catalogue-sized walk).
-- Cycle 5: the S1-15 run test's guard still awaits the orchestrator's ruling (it is under half of 3 minutes paired at
+- Cycle 5: the S1-15 run test's guard still awaited the orchestrator's ruling (S3-R10, applied in cycle 6; it was under half of 3 minutes paired at
   load up to about 14, 79.2–79.5 s, and was over it paired at load 10.5–25.9 in the verifier's run, 129.9–130.1 s; no
   paired run at load about 30 was made here); the survivors `noDispatchOwedFlag` and `noFlagPump` still have no test;
   the sweep's follow budget is pinned at 10,000 by the benchmark on this host only (no device run); `other-wp:b` items
   not re-run (P-13, the per-404 index commit).
+- Cycle 6: S1-15's run test is judged against 5 minutes (S3-R10); a paired TSan run at a load above about 30 took it to 175.7–175.8 s (59 %), which the
+  ruling does not judge, and no paired run at a load of 26–30 was made here (the moderate one reached 25.6). The lane-drop fix is pinned by one two-member
+  scenario (A and B on one content) and the sweep's park bound by a 576-member count; a lane drop in a `.settle` sweep
+  or the purge path's `.reclaimed` one runs the same code but has no test of its own. The survivors `noDispatchOwedFlag` and `noFlagPump` still
+  have no test; `other-wp:b` (P-13, the per-404 index commit) and `other-wp:b` / `other-wp:h` (the Storage time-outs at
+  load 100–540) are not re-run here.
