@@ -306,48 +306,52 @@ extension EngineFollowBarrierTests {
     }
 
     /// A 429's park answers only the interests the job holds once the follow moved its ids: C (1 MB) is the content of
-    /// zz-a and zz-b, one user waiter each; v3 moves zz-a to N (16 bytes, held once started) while the follow owes C's
-    /// visit. C's attempt gets a 429 with Retry-After 60 s (beyond the interactive 2 s wait). Visited first, A's interest
-    /// is on N, and N serves it once the throttle ends; the park's fail-fast answers B only. Parked before the visit, the
-    /// fail-fast answered A too (PROBE-C9-THROTTLE).
+    /// zz-a and zz-b, one user waiter each; N (16 bytes) downloads for W's user waiter of zz-n (held). v3 moves zz-a onto
+    /// N's content while the follow owes C's visit. C's attempt gets a 429 with Retry-After 60 s (beyond the interactive
+    /// 2 s wait). Visited first, A's interest joined N's running job, which serves it; the park's fail-fast answers B
+    /// only. Parked before the visit, the fail-fast answered A too (PROBE-C9-THROTTLE). N runs before the apply in both
+    /// orders, so no admission waits for the follow: the probe's own N was created by the visit and, behind the barrier,
+    /// admitted only after the 429's throttle was in force (R2's accepted admission wait, under a real-world input).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierAnswersAThrottleParkOnTheFollowedState(_ visit: LaneDropVisit) async throws {
         let (s, _) = try await FollowBarrier.setUp(seed: 996_002)
         let engine = s.engine
         let cBytes = Data(repeating: 0xC5, count: 1_000_000)
+        let nBytes = EngineFixture.bytes(996_004, count: 16)
         let a = EngineHarness.onDemand("zz-a", cBytes)
         let b = EngineHarness.onDemand("zz-b", cBytes)
+        let n = EngineHarness.onDemand("zz-n", nBytes)
         try #require(a.transferID == b.transferID, "setup: A and B share C")
-        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(760_000) + [a, b], etag: "v2")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(760_000) + [a, b, n], etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
         await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(60))), .stage(cBytes)])
+        await s.harness.source.script(n.transferID, [.hold, .stage(nBytes)])
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .downloading }
         let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
-        let nBytes = EngineFixture.bytes(996_004, count: 16)
+        let wWaiter = Task { await engine.awaitAsset(n.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[n.transferID]?.state == .downloading }
         let aMoved = EngineHarness.onDemand("zz-a", nBytes)
-        await s.harness.source.script(aMoved.transferID, [.hold, .stage(nBytes)])
-        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(860_000) + [aMoved, b], s, visit: visit)
-        if visit == .followVisitedFirst {
-            await engine.awaitCondition { $0.state.jobs[aMoved.transferID]?.state == .downloading }
+        try #require(aMoved.transferID == n.transferID, "setup: zz-a's new content is N's")
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(860_000) + [aMoved, b, n], s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            let before = await engine.readForTests { e in (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state) }
+            #expect(before.owed && before.c == .downloading, "setup: C runs and its visit is owed: \(before)")
         }
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .downloading }
         await engine.readForTests { $0.releaseFollowFollowUps() }
-        // N starts once the throttle ends (the clock is driven), unless A was answered before the visit moved it.
-        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
-            await engine.awaitCondition { e in
-                e.state.jobs[aMoved.transferID]?.state == .downloading || !e.state.waiters.values.contains { $0.asset == a.identifier }
-            }
-        }
-        await s.harness.source.release(aMoved.transferID, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { !$0.followBarrier }
+        await s.harness.source.release(n.transferID, with: .progress(received: 0, expected: nil))
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let wResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: wWaiter) }
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
-        #expect((try? aResult.get())?.byteSize == 16, "A, moved to N, is served from N, not answered with C's throttle (visit-first): \(aResult)")
+        #expect((try? aResult.get())?.byteSize == 16, "A, moved onto N's running job, is served from N, not answered with C's throttle (visit-first): \(aResult)")
+        #expect((try? wResult.get())?.byteSize == 16, "W is served from N: \(wResult)")
         if case .failure(.serverUnavailable(let retryAfter?)) = bResult {
             #expect(retryAfter > 2, "B's answer carries the throttle's wait: \(bResult)")
         } else {
