@@ -1858,8 +1858,9 @@ extension SyncEngine {
     }
 
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
-    /// drain is in progress (none, between turns), so none waits for ever; and the places counted in `placesAfterFollow`
-    /// are exactly the waiting `.enqueue` and `.reinstate` events (Stage 3 close-out cycle 9, amendment (b) of S3-R11).
+    /// drain is in progress (none, between turns), so none waits for ever; the places counted in `placesAfterFollow` are
+    /// exactly the waiting `.enqueue` and `.reinstate` events; and every failure verdict that waits names a failed job
+    /// with its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -1867,16 +1868,33 @@ extension SyncEngine {
             violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
         }
         var places: [TransferID: Int] = [:]
+        var verdicts: Set<TransferID> = []
         for event in events {
             switch event {
             case .enqueue(let transfer), .reinstate(let transfer):
                 places[transfer, default: 0] += 1
+            case .attemptFailed(let transfer, let epoch, _):
+                if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
+                    verdicts.insert(transfer)
+                }
             case .spaceFailure, .spaceJoin:
                 break
             }
         }
         if places != self.state.placesAfterFollow {
             violations.append("the \(self.state.placesAfterFollow.count) counted places that wait for a follow differ from the \(places.count) the events hold")
+        }
+        if verdicts != Set(self.state.verdictsAfterFollow.keys) {
+            violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")
+        }
+        let unfailed = self.state.verdictsAfterFollow.keys.filter { transfer in
+            guard case .failed? = self.state.jobs[transfer]?.state else {
+                return true
+            }
+            return false
+        }
+        if !unfailed.isEmpty {
+            violations.append("\(unfailed.count) jobs whose failure verdict waits for a follow are not failed")
         }
         return violations
     }

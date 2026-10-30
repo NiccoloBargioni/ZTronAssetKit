@@ -67,25 +67,28 @@ struct EngineState {
     var followFollowUpsHeld = false
     /// Test seam: a follow-up turn reached the hold and waits for its release.
     var followFollowUpWaiting = false
-    /// A pump left a queue's head in place because its job holds an id the copy maps to other content, or no longer
-    /// lists, while a follow is owed (`SyncEngine.awaitsFollow`): every follow turn pumps again, so the queue moves on
-    /// once that job's visit has followed it (Stage 3, close-out cycle 3).
+    /// A pump found a follow owed (F-28) and admitted nothing: every follow turn pumps again, and the turn that ends the
+    /// follow pumps (Stage 3, close-out cycles 3 and 9).
     var pumpWaitsForFollow = false
     /// Set while the follow moves one job (`SyncEngine.follow`): a join it makes (a moved id's interest re-routed to its
     /// new content) is the follow's own, whose space verdict is given at once; any other join's verdict on a job parked
     /// `insufficientSpace`, and any other place in a queue, waits for the follow's end while one is owed
-    /// (`eventsAfterFollow`, design D3).
+    /// (`eventsAfterFollow`, F-28).
     var inFollowVisit = false
     /// The events that arrived behind the follow barrier and read what the owed visits change, in arrival order (F-28;
-    /// Stage 3 close-out cycle 9, S3-R11 design D3): an ENOSPC's verdict, a join's re-check of a job parked
-    /// `insufficientSpace`, and a job's place in its queue. They are applied when the follow ends, after its own last
-    /// turn and pump, as a visit-first engine meets them (`SyncEngine.drainEventsAfterFollow`). They wait only while a
-    /// follow is owed, a drain turn is scheduled or a drain is in progress (`invariantViolations()`).
+    /// Stage 3 close-out cycle 9, S3-R11 design D3): an ENOSPC's verdict, the failure verdict of a job that held a moved
+    /// id, a join's re-check of a job parked `insufficientSpace`, and a job's place in its queue. They are applied when
+    /// the follow ends, after its own last turn and pump, as a visit-first engine meets them
+    /// (`SyncEngine.drainEventsAfterFollow`). They wait only while a follow is owed, a drain turn is scheduled or a
+    /// drain is in progress (`invariantViolations()`).
     var eventsAfterFollow: [EventAfterFollow] = []
     /// The places in a queue that wait in `eventsAfterFollow` (`.enqueue`, `.reinstate`), counted per transfer: a queued
     /// job counted here waits in no queue until the drain gives it its place, and is no stranded job
     /// (`invariantViolations()`; the cycle-9 amendment (b)).
     var placesAfterFollow: [TransferID: Int] = [:]
+    /// The jobs whose failure verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): a
+    /// join leaves such a job failed (`relane`), and `removeJob` forgets it.
+    var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again.
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.

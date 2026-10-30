@@ -265,10 +265,11 @@ extension EngineSyncTests {
         }
         #expect(before.listed && before.old == .downloading && before.owed, "the copy lists the id at its new content and the old job still downloads, its visit owed: \(before)")
         await harness.source.release(target.transferID, with: failure.update)
-        // The old job ends (followed, or answered) or, without the follow, parks for lack of space.
+        // The old job ends (followed, or answered), leaves flight failed with its verdict waiting for the follow's visit
+        // (F-28, `defersFailure`; S3-R11 R3), or, without the follow, parks for lack of space.
         await engine.awaitCondition { engine in
             switch engine.state.jobs[target.transferID]?.state {
-            case nil, .blocked?:
+            case nil, .blocked?, .failed?:
                 return true
             default:
                 return false
@@ -322,6 +323,10 @@ extension EngineSyncTests {
         }
         #expect(unreached, "the follow's pass has not reached the member when its old content fails")
         await harness.source.release(target.transferID, with: .failed(.permanentMissing(httpStatus: 404)))
+        // The 404's verdict waits for the follow, whose pass and visit move the member first (F-28, `defersFailure`;
+        // S3-R11 R3): the follow's turns are released once it waits.
+        await engine.awaitCondition { $0.state.verdictsAfterFollow[target.transferID] != nil }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { $0.state.jobs[target.transferID] == nil }
         let after = await engine.readForTests { engine in
             (

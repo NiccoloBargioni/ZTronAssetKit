@@ -223,6 +223,9 @@ extension SyncEngine {
     /// `answer`, the engine's own figures), the rest wait for `failed(.at)` (the alarm re-queues, T18) or a satisfied
     /// edge (T19). The interactive policy applies while the job's lane is user-initiated (sync.md §8.2).
     func retryLater(_ transfer: TransferID, error: TransferError, answer: AssetError? = nil) {
+        if self.defersFailure(transfer, .retry(error, answer: answer)) {
+            return
+        }
         let wall = self.environment.time.now()
         let assetError = answer ?? error.assetError(now: wall)
         guard let remaining = self.countFailedAttempt(transfer, error: error, assetError: assetError) else {
@@ -262,9 +265,9 @@ extension SyncEngine {
     /// `retryLater` and by an ENOSPC that parks `awaitingSpace` (L4-R4), so a wait for the store's reclaim joins the
     /// same budget as a backoff.
     private func countFailedAttempt(_ transfer: TransferID, error: TransferError, assetError: AssetError) -> Job? {
-        // The ids an owed follow moved leave first (`followBeforeActing`): the attempt, and an answer at the cap, are not
-        // theirs.
-        guard !self.followBeforeActing(transfer), var job = self.state.jobs[transfer] else {
+        // A job that held a moved id behind the follow barrier is not counted here: its verdict waited for the follow,
+        // which moved those ids first (`defersFailure`), so the attempt, and an answer at the cap, are not theirs.
+        guard var job = self.state.jobs[transfer] else {
             return nil
         }
         let claimOnly = job.interests.isEmpty
@@ -501,10 +504,11 @@ extension SyncEngine {
     /// room above the reserve (F-22), re-evaluated at every later read (T17).
     func spaceFailed(_ transfer: TransferID, epoch: UInt64, required: Int64) async {
         self.state.jobs[transfer]?.active = nil
-        // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot; the ids an
-        // owed follow moved (an apply may have landed during the read) leave the job before its park answers them.
+        // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot; behind the
+        // follow barrier (an apply may have landed during the read) the verdict waits for the follow, whose visits move
+        // the ids it moved before the park answers the rest.
         await self.refreshFreeSpace()
-        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), self.state.jobs[transfer] != nil else {
+        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
             return
         }
         if self.defersToFollow {

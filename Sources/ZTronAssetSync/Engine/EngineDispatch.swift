@@ -93,12 +93,12 @@ extension SyncEngine {
         self.materializeRun()
         self.materializeEnsures()
         if self.followOwed {
-            // No admission while a follow owes visits (design D3): every start, park and fail-fast answer reads lanes,
-            // ranks, interests and the bytes in flight, which the owed visits change (a visit lowers or supersedes the
-            // job it moves, raises or creates the job of the moved id's new content, abandons a superseded download).
-            // Decided now, a job is judged on a half-followed state, so its answer depended on whether a visit ran
-            // first (the close-out cycles 2 to 8). The queues wait; each follow turn pumps again
-            // (`pumpWaitsForFollow`), and the turn that ends the follow pumps on the state every visit left.
+            // No admission while a follow owes visits (F-28): every start, park and fail-fast answer reads lanes, ranks,
+            // interests and the bytes in flight, which the owed visits change (a visit lowers or supersedes the job it
+            // moves, raises or creates the job of the moved id's new content, abandons a superseded download). Decided
+            // now, a job is judged on a half-followed state, so its answer depended on whether a visit ran first (the
+            // close-out cycles 2 to 8). The queues wait; each follow turn pumps again (`pumpWaitsForFollow`), and the
+            // turn that ends the follow pumps on the state every visit left.
             self.state.pumpWaitsForFollow = true
             self.scheduleEnsureRefill()
             self.notifyObservers()
@@ -299,8 +299,8 @@ extension SyncEngine {
     }
 
     /// Whether a valid user-initiated entry waits that is not draining, held for a manifest catch-up or wanted only by
-    /// released groups (those are set aside on the way, so each is stepped over once, C2). The pump reads it only when
-    /// no follow is owed (design D3), so no entry it finds waits for a follow's visit.
+    /// released groups (those are set aside on the way, so each is stepped over once, C2). The pump reads it only behind
+    /// no follow barrier (F-28), so no entry it finds waits for a follow's visit.
     private func hasQueuedUser() -> Bool {
         // The queues are taken out of the state while the closures read it (no overlapping access).
         var queues = self.state.queues
@@ -358,7 +358,7 @@ extension SyncEngine {
     }
 
     /// Starts `transfer` or parks it; a lane-wide block also parks the lane's other queued jobs, at most `parkLimit`
-    /// in all (`parkLane`). Reached only when no follow is owed (`pump`, design D3): a job whose ids the copy maps
+    /// in all (`parkLane`). Reached only behind no follow barrier (`pump`, F-28): a job whose ids the copy maps
     /// elsewhere has been visited, so none of the replaced content of the close-out cycle-2 finding (PROBE-W1) is left
     /// to start.
     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {

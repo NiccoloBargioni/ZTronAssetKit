@@ -142,8 +142,8 @@ extension SyncEngine {
         }
         if self.defersToFollow, job.state == .blocked(.insufficientSpace) {
             // The re-check against the room and the joiner's fail-fast read bytes in flight and lanes the owed visits
-            // change (an abandoned download frees its bytes): they wait for the follow's end (design D3,
-            // PROBE-D3-JOIN-ABANDON). The follow's own re-routed joins are visits, decided at once.
+            // change (an abandoned download frees its bytes): they wait for the follow's end (F-28,
+            // PROBE-D-JOIN-FREED). The follow's own re-routed joins are visits, decided at once.
             self.state.eventsAfterFollow.append(.spaceJoin(token, transfer))
             self.notifyObservers()
             return
@@ -262,6 +262,11 @@ extension SyncEngine {
                 self.pauseIfRefused(transfer)
             }
         case .failed(let disposition):
+            if self.state.verdictsAfterFollow[transfer] != nil {
+                // The attempt's verdict waits for the follow (`defersFailure`): the drain gives it, then re-runs this.
+                self.state.verdictsAfterFollow[transfer]?.joined = true
+                return
+            }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {
                 if self.transition(transfer, to: .queued) {
                     self.state.heap.remove(.retry(transfer, epoch: job.epoch))
@@ -391,6 +396,7 @@ extension SyncEngine {
         self.state.edgeOwed.remove(transfer)
         self.state.originOwed.remove(transfer)
         self.state.unfollowed.remove(transfer)
+        self.state.verdictsAfterFollow[transfer] = nil
         self.state.systemHeld.remove(transfer)
         self.state.run?.held.remove(transfer)
         self.state.spaceAdmitted[transfer] = nil
@@ -566,11 +572,11 @@ extension SyncEngine {
 
     /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job; `follow` runs once
     /// the job is gone and before the run is checked for settling (interests that move to a fresh job of the transfer).
-    /// A failure is not delivered to an id the copy moved while a follow is owed: the job is followed first
-    /// (`followBeforeActing`), so that id's interest waits for its new content, never `.notFound` while it is listed
-    /// (F-20; the close-out cycle-2 correctness lens, PROBE-W4).
+    /// A failure is not delivered to an id the copy moved while a follow is owed: behind the follow barrier the verdict
+    /// waits for the follow, whose visit moves that id first (`defersFailure`, F-28), so its interest waits for its new
+    /// content, never `.notFound` while it is listed (F-20; the close-out cycle-2 correctness lens, PROBE-W4).
     func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, then follow: () -> Void = {}) {
-        if case .failed = outcome, self.followBeforeActing(transfer) {
+        if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
         }
         guard let job = self.state.jobs[transfer] else {
@@ -704,13 +710,14 @@ extension SyncEngine {
     /// turn that re-admitted 10,000 members when the volume gained room took about 15 ms: review of close-out cycle 8,
     /// C2). A read stops re-checking once the room left cannot admit even the smallest job parked `insufficientSpace`.
     ///
-    /// While a follow is owed the sweep judges nothing (design D3): every verdict it gives (re-queue, park, the bytes
-    /// counted ahead, a park's figures and fail-fast answers) reads ranks, lanes, interests and bytes in flight that the
-    /// owed visits change, so a verdict given before them depends on whether they ran first, which cycles 2 to 8 patched
-    /// case by case (PROBE-C5-LANEDROP, -C6-LANEGAIN, -C7-RANK-*, -C8-DROPPED*, -C8R-INFLIGHT-PROMOTE). The follow takes
-    /// priority instead: the sweep's turn runs one follow turn (`advanceFollowForSpaceSweep`, bounded as every follow
-    /// turn, C2) and owes itself to a follow-up sweep, which judges once no visit is owed, every job as the whole follow
-    /// left it. A turn that follows judges nothing, and a turn that judges follows nothing (VERIFY-C8-C2-MIXED).
+    /// Behind the follow barrier the sweep judges nothing (F-28; S3-R11 design D3): every verdict it gives (re-queue,
+    /// park, the bytes counted ahead, a park's figures and fail-fast answers) reads ranks, lanes, interests and bytes in
+    /// flight that the owed visits change, so a verdict given before them depends on whether they ran first, which
+    /// cycles 2 to 8 patched case by case (PROBE-C5-LANEDROP, -C6-LANEGAIN, -C7-RANK-*, -C8-DROPPED*,
+    /// -C8R-INFLIGHT-PROMOTE). The follow takes priority instead: the sweep's turn runs one follow turn, or one drain
+    /// turn of the events that waited for it (`advanceFollowForSpaceSweep`, bounded as every such turn, C2), and owes
+    /// itself to a follow-up sweep, which judges once the barrier is down, every job as the whole follow left it. A turn
+    /// that follows judges nothing, and a turn that judges follows nothing (VERIFY-C8-C2-MIXED).
     func sweepSpaceParked(_ sweep: SpaceSweep) {
         if self.followBarrier {
             self.advanceFollowForSpaceSweep()
