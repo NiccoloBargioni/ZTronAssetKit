@@ -340,6 +340,14 @@ struct EngineState {
     var alarmTurnsHeld = false
     /// Test seam: the alarm turns the hold keeps, by alarm token; a replaced alarm's is resumed by `rearm`.
     var heldAlarmTurns: [UInt64: CheckedContinuation<Void, Never>] = [:]
+    /// Test seam (Stage 3 close-out cycle 11): while set, an attempt's driver that received the terminal element waits
+    /// before it applies it (`heldAttemptTerminals`) until a test releases it (`holdAttemptTerminals()`,
+    /// `releaseAttemptTerminals()`), so the test can let other engine work, such as a follow's next turn, run between a
+    /// transfer's end and the engine's verdict on it, an order production leaves to the driver's hop onto the actor. No
+    /// production path sets it.
+    var attemptTerminalsHeld = false
+    /// Test seam: the drivers the hold keeps, in the order their terminal elements arrived.
+    var heldAttemptTerminals: [CheckedContinuation<Void, Never>] = []
     /// Test seam (close-out cycle 19): while set, a run's settlement waits before it reaches the run's task
     /// (`heldRunSettlements`) until a test releases it (`holdRunSettlementDelivery()`, `releaseRunSettlementDelivery()`),
     /// so the test can let other engine work, such as a transfer's 429, run between a run's settling turn and its answer,

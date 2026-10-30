@@ -827,10 +827,55 @@ extension SyncEngine {
         guard !Task.isCancelled, self.isRunning else {
             return
         }
+        if self.state.attemptTerminalsHeld {
+            // REENTRANCY: RE-S47 (proposed) — the lifecycle, re-checked right below; `finishAttempt` re-validates the job
+            // epoch and the attempt.
+            await self.awaitAttemptTerminalRelease()
+            guard self.isRunning else {
+                return
+            }
+        }
         // A stream that ends without a terminal element fails the job (sync-1 S1-11).
         let update = terminal ?? .failed(.transient(.incompleteCallbackSequence, retryAfter: nil))
         // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
         await self.finishAttempt(transfer, epoch: epoch, request: request, update: update)
+    }
+
+    /// Test seam: the driver waits for `releaseAttemptTerminals()` or for shutdown; it registers synchronously, so a hold
+    /// released before it registered lets it pass at once.
+    private func awaitAttemptTerminalRelease() async {
+        // REENTRANCY: RE-S47 (proposed) — nothing: the body registers synchronously; the caller re-validates the
+        // lifecycle, and `finishAttempt` the job epoch and the attempt.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if self.state.attemptTerminalsHeld, self.isRunning {
+                self.state.heldAttemptTerminals.append(continuation)
+                self.notifyObservers()
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Test seam: from now on, a driver that received its attempt's terminal element waits before it applies it, until
+    /// `releaseAttemptTerminals()` (Stage 3 close-out cycle 11). A test uses it to let a follow's next turn run between a
+    /// transfer's end and the engine's verdict on it, an order production leaves to the scheduler.
+    func holdAttemptTerminals() {
+        self.state.attemptTerminalsHeld = true
+    }
+
+    /// Test seam: disarms the hold and lets every held driver go on, in arrival order; shutdown calls it too.
+    func releaseAttemptTerminals() {
+        self.state.attemptTerminalsHeld = false
+        let held = self.state.heldAttemptTerminals
+        self.state.heldAttemptTerminals.removeAll()
+        for continuation in held {
+            continuation.resume()
+        }
+    }
+
+    /// Test seam: how many drivers wait for `releaseAttemptTerminals()`.
+    var heldAttemptTerminalCount: Int {
+        self.state.heldAttemptTerminals.count
     }
 
     /// Records transfer progress: counters, run bytes, and a rate-limited `transferProgress` for non-bulk lanes.

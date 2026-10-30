@@ -86,6 +86,7 @@ extension SyncEngine {
         self.releaseManifestOutcomeDelivery()
         self.releaseRunSettlementDelivery()
         self.releaseAlarmTurns()
+        self.releaseAttemptTerminals()
         self.releaseApplyQueue()
         drain.jobs = self.state.jobs
         self.state.jobs = [:]
