@@ -851,3 +851,129 @@ extension EngineSyncTests {
         await engine.shutdown()
     }
 }
+
+extension EngineSyncTests {
+    /// A space sweep that follows a job before parking it judges the job again on the lane the follow leaves it, and
+    /// re-queues it when it fits there. The two free-space readings are not ordered (neither the store nor the ledger
+    /// clamps them, and `largestRoom` takes the larger), so a lane the follow lowered may read the larger room. Content C
+    /// (5 MB) is listed by A, which has a user waiter, and by B, which has a prefetch waiter, so its job is user-lane. It
+    /// waits `awaitingSpace`: no room for user work, 6 MB for prefetch work (the important volume is 6 MB smaller), and 4
+    /// MB of a pruned blob pending the reclaim. A forced sync moves A to a 16-byte content while 2,100 changed entries sort
+    /// before it, so the bounded follow owes C's visit (its turns held). The reclaim leaves 4 MB for user work and 10 MB
+    /// for prefetch work. Followed first, C's job is prefetch-lane, fits, and is fetched for B's waiter. Judged on its
+    /// pre-follow user lane, the sweep found that C does not fit, followed it (A left, B stayed: prefetch) and parked it
+    /// `insufficientSpace` anyway, so its fail-fast answered B's waiter `insufficientSpace(required: 5000000, available:
+    /// 10000003)`: figures that contradict themselves (F-22: `required` exceeds `available` whenever a job is parked;
+    /// the close-out cycle-6 correctness lens, PROBE-C6-LANEGAIN). At `s3-base` the follow moved every job in the apply's
+    /// turn, so no sweep could act between the two.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    func spaceSweepRequeuesAFollowedJobItsNewLaneFits(_ visit: LaneDropVisit) async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 26_000_000, opportunisticCapacity: reserve + 32_000_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let engine = harness.engine
+        // Megabytes of one repeated byte: generated payloads of this size took seconds of the sanitizer run (S3-R4).
+        let xBytes = Data(repeating: 0x79, count: 4_000_000)
+        let qBytes = EngineFixture.bytes(893_002, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let q = EngineFixture.entry("q", qBytes)
+        await harness.serveManifest([x, q])
+        await harness.scriptTransfers([(x, xBytes), (q, qBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // Changed on-demand entries without jobs that sort before A: the follow's first pass formats
+        // `followFormatsPerTurn` of them and stops before A's entry.
+        let fillers = { (seed: UInt64) in
+            (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "f%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
+        }
+        let cBytes = Data(repeating: 0x65, count: 5_000_000)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        try #require(a.transferID == b.transferID, "setup: A and B share one content")
+        // v2 prunes x (its 4 MB wait for the 60 s grace) and lists C under A and B.
+        await harness.serveManifest([q] + fillers(730_000) + [a, b], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        try await harness.store.flush(.ordered)
+        // No room for user work, 6 MB for prefetch work: C's 5 MB do not fit its user lane before the reclaim.
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(0, harness: harness, fileSystem: fileSystem)
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for the reclaim")
+        await engine.refreshFreeSpace()
+        await harness.source.script(a.transferID, [.stage(cBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .blocked(.awaitingSpace) }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.assets.count == 2 }
+        // v3 moves A to a 16-byte content; B keeps C.
+        let replacementBytes = EngineFixture.bytes(893_004, count: 16)
+        let replacement = EngineHarness.onDemand("zz-a", replacementBytes)
+        await harness.source.script(replacement.transferID, [.stage(replacementBytes)])
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest([q] + fillers(830_000) + [replacement, b], etag: "v3")
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        if visit == .followVisitedFirst {
+            // The follow's turns are owned tasks, not timers: the clock stays before the grace's end.
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followOwed }
+        }
+        let before = await engine.readForTests { engine in
+            (
+                owed: engine.followOwed,
+                lane: engine.state.jobs[a.transferID]?.lane,
+                ids: engine.state.jobs[a.transferID]?.assets.count,
+                shared: engine.state.jobs[a.transferID]?.state
+            )
+        }
+        switch visit {
+        case .followVisitedFirst:
+            #expect(!before.owed && before.lane == .prefetch && before.ids == 1, "setup: the follow moved A and left B on C's job: \(before)")
+        case .sweepFollowsFirst:
+            #expect(before.owed && before.lane == .userInitiated && before.ids == 2, "setup: C's job still holds A, whose visit the follow owes: \(before)")
+        }
+        #expect(before.shared == .blocked(.awaitingSpace), "setup: \(before)")
+        // The grace ends: the alarm reaps x's 4 MB (4 MB of room for user work, 10 MB for prefetch work) and runs its
+        // `.reclaimed` sweep.
+        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .blocked(.awaitingSpace) }
+        }
+        let afterSweep = await engine.readForTests { engine in
+            (
+                owed: engine.followOwed,
+                lane: engine.state.jobs[a.transferID]?.lane,
+                shared: engine.state.jobs[a.transferID]?.state,
+                space: engine.state.freeSpace,
+                violations: engine.invariantViolations()
+            )
+        }
+        let important = afterSweep.space.map { $0.volumeImportant - $0.reserveBytes } ?? 0
+        let opportunistic = afterSweep.space.map { $0.volumeOpportunistic - $0.reserveBytes } ?? 0
+        #expect(afterSweep.space?.pendingReclaim == 0 && important < Int64(cBytes.count) && opportunistic >= Int64(cBytes.count), "setup: after the reclaim C fits the prefetch lane's volume and not the user lane's: \(String(describing: afterSweep.space))")
+        #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
+        let parked: Bool
+        if case .blocked? = afterSweep.shared {
+            parked = true
+        } else {
+            parked = false
+        }
+        #expect(!parked && (afterSweep.lane == nil || afterSweep.lane == .prefetch), "C's job, left with B's prefetch interest, is re-queued for the room prefetch work has: \(afterSweep)")
+        #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
+        let bResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let aResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        #expect((try? bResult.get())?.byteSize == Int64(cBytes.count), "B's prefetch waiter is answered from C's 5 MB, with 10 MB of room for prefetch work: \(bResult)")
+        #expect((try? aResult.get())?.byteSize == 16, "A's waiter is answered from its 16-byte new content: \(aResult)")
+        #expect(await harness.source.starts.map(\.id).contains(a.transferID), "C's content was fetched")
+        let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        await engine.shutdown()
+    }
+}
