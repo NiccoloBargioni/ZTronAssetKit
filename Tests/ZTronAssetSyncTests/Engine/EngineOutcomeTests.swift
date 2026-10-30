@@ -123,8 +123,11 @@ struct EngineOutcomeTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 38.2 to 39.0 s beside a second TSan process at a
+    /// load of 20 to 35 (65 % of 60 s) and 16.6 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest", .timeLimit(.minutes(3)))
     func runWhileBreakerOpen() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let catalog = EngineSyncTests.catalog(6)
@@ -157,8 +160,11 @@ struct EngineOutcomeTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.9 to 32.2 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes", .timeLimit(.minutes(3)))
     func transferProbePublishesHalfOpen() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let failing = (0..<5).map { EngineHarness.onDemand("f\($0)", EngineFixture.bytes(UInt64(495 + $0))) }

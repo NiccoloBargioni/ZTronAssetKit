@@ -11,8 +11,11 @@ import ZTronAssetTestSupport
 struct EngineStoreTests {
     static let packSource = RemoteSourceCapabilities(tier: .appleHosted, supportsPriority: false, supportsResume: false, supportsBackground: false, keepsSourceCopies: true)
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.7 to 32.3 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-10: availability counts present, missing, stale and failed without any network request", .timeLimit(.minutes(1)))
+    @Test("R-SYN-10: availability counts present, missing, stale and failed without any network request", .timeLimit(.minutes(3)))
     func availabilityCounts() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(4)
@@ -71,8 +74,11 @@ struct EngineStoreTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.1 to 30.2 s beside a second TSan process at a
+    /// load of 20 to 35 (50 % of 60 s) and 13.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: with eviction not permitted a run that does not fit evicts nothing", .timeLimit(.minutes(1)))
+    @Test("R-SYN-11: with eviction not permitted a run that does not fit evicts nothing", .timeLimit(.minutes(3)))
     func evictionNotPermitted() async throws {
         func run(permitted: Bool) async throws -> (SyncOutcome, StorePlanningView) {
             let storage = StoragePolicy(budget: .bytes(1_000), reserveFreeBytes: 0, minimumResidency: 0, admitLargestFittingPrefix: false, evictionPermitted: permitted)
@@ -129,8 +135,11 @@ struct EngineStoreTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 32.3 to 35.0 s beside a second TSan process at a
+    /// load of 20 to 35 (58 % of 60 s) and 15.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CAR-5: the retention scope bounds bulk runs and evicts excluded entries first without deleting anything by itself", .timeLimit(.minutes(1)))
+    @Test("R-CAR-5: the retention scope bounds bulk runs and evicts excluded entries first without deleting anything by itself", .timeLimit(.minutes(3)))
     func retentionScopeBoundsRunsAndEviction() async throws {
         let time = ManualTimeSource()
         let kept = (0..<2).map { index -> (ManifestEntry, Data) in
@@ -277,8 +286,11 @@ struct EngineStoreTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.1 to 30.5 s beside a second TSan process at a
+    /// load of 20 to 35 (51 % of 60 s) and 13.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-16: maintenance stops at its time budget on ManualTimeSource and resumes verification where it stopped", .timeLimit(.minutes(1)))
+    @Test("R-SYN-16: maintenance stops at its time budget on ManualTimeSource and resumes verification where it stopped", .timeLimit(.minutes(3)))
     func maintenanceResumesVerification() async throws {
         let harness = EngineHarness.make()
         let catalog = (0..<5).map { index -> (ManifestEntry, Data) in

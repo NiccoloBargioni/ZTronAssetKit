@@ -291,8 +291,13 @@ struct EngineRunPathTests {
     /// cycle 9: two attempts still running at the cooldown's end, the breaker reopened, then closed by a probe, and the
     /// run completed). Every 500 reaches the engine without the clock, and the open breaker starts nothing, so once no
     /// transfer runs only the clock moves the run. Then past the cooldown: the pending run's probe closes the breaker.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 46.5 to 48.1 s beside a second TSan process at a
+    /// load of 20 to 35 (80 % of 60 s) and 19.4 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.8 to 35.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it", .timeLimit(.minutes(3)))
     func serverBreakerBlocksRun() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let catalog = EngineSyncTests.catalog(6)
@@ -336,8 +341,11 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.5 to 35.8 s beside a second TSan process at a
+    /// load of 20 to 35 (60 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied", .timeLimit(.minutes(3)))
     func offlineRunResumes() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(2)
@@ -506,8 +514,11 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.7 to 31.2 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-OBS-3: the diagnostics keep the last 32 errors", .timeLimit(.minutes(1)))
+    @Test("R-OBS-3: the diagnostics keep the last 32 errors", .timeLimit(.minutes(3)))
     func errorRingIsBounded() async throws {
         let harness = EngineHarness.make()
         let catalog = (0..<40).map { EngineHarness.onDemand("m\($0)", EngineFixture.bytes(UInt64(430 + $0))) }

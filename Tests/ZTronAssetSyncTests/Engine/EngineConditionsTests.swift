@@ -46,8 +46,11 @@ struct EngineConditionsTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.9 to 36.7 s beside a second TSan process at a
+    /// load of 20 to 35 (61 % of 60 s) and 16.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-7: bulk pauses on Low Data Mode and resumes when it is turned off", .timeLimit(.minutes(1)))
+    @Test("R-SYN-7: bulk pauses on Low Data Mode and resumes when it is turned off", .timeLimit(.minutes(3)))
     func lowDataModePausesBulk() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(3)

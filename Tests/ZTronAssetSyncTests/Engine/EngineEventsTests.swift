@@ -61,8 +61,12 @@ struct EngineEventsTests {
         #expect(slots.last == .clientEnd)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 42.4 to 45.6 s beside a second TSan process at a
+    /// load of 20 to 35 (76 % of 60 s) and 18.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 33.0 to 33.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource", .timeLimit(.minutes(3)))
     func progressIsRateLimited() async throws {
         let harness = EngineHarness.make()
         let bytes = EngineFixture.bytes(160)

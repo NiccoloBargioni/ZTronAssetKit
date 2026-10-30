@@ -77,10 +77,14 @@ struct EngineRegressionCycle10Tests {
     /// PROBE-C9C-1b: the same flap through the conditions source, two elements sent back to back (Low Data Mode switched
     /// on and off, which `NWPathMonitor` reports as two path updates); the verifier saw the member left parked in 50 of 50
     /// rounds. Twenty rounds on one member: each must end with the member running (a new attempt when it was paused).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.8 to 49.8 s beside a second TSan process at a
+    /// load of 20 to 35 (83 % of 60 s) and 20.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-7: a Low Data Mode flap reported as two conditions elements never leaves a paused prefetch member parked (20 rounds)",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func lowDataModeFlapLeavesNoMemberParked() async throws {
         let (harness, transfer) = try await Self.runningPrefetchMember(seed: 11_002)
@@ -199,10 +203,14 @@ struct EngineRegressionCycle10Tests {
     /// last turn while a live interest wants it. More members than one turn releases wait behind three running ones; in
     /// one actor turn the handle is released (its pump sets the remaining members aside), then the last member gains an
     /// interest and the engine pumps: that member must start in this turn.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 41.0 to 42.1 s beside a second TSan process at a
+    /// load of 20 to 35 (70 % of 60 s) and 17.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-CAR-4: a member of a released handle that another interest wants while the release continues starts at once",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func releasedMemberWantedAgainStartsAtOnce() async throws {
         let count = SyncEngine.releasesPerTurn + 64
@@ -237,10 +245,14 @@ struct EngineRegressionCycle10Tests {
     /// user-initiated priority, the synchronous stand-in for a resolve) arrives and takes the freed slot at the next
     /// pump. The lane park that stopped at the bound must still reach every queued member, though no slot frees for a
     /// prefetch dispatch any more (`laneParksOwed`; mutant M-LANEOWED, which leaves 64 members queued).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.0 to 39.4 s beside a second TSan process at a
+    /// load of 20 to 35 (66 % of 60 s) and 16.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-7: a lane-wide policy park that stops at its turn's bound reaches every queued member even when user work takes the freed slot",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func lanePolicyParkReachesEveryMemberBehindUserWork() async throws {
         let count = SyncEngine.parksPerPump + 64
@@ -344,10 +356,14 @@ struct EngineRegressionCycle10Tests {
     /// them. In one actor turn the large handle is released (64 members stay to a later turn), the network drops (no slot
     /// is free, so nothing parks), and the one-member handle is released: its slot frees, the pump dispatches the next
     /// member of the 16, which the lane parks offline with the rest of the queue.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.1 to 44.4 s beside a second TSan process at a
+    /// load of 20 to 35 (74 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-CAR-4: a lane-wide park during a handle's release parks every other queued member and neither parks nor starts the released ones",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func laneParkDuringAReleaseSetsReleasedMembersAside() async throws {
         let released = SyncEngine.releasesPerTurn + 64

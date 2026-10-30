@@ -112,8 +112,13 @@ extension EngineFailurePathTests {
     /// bound; a user-initiated group joins the third member, raising its rank, and is released again, lowering it. At the
     /// cooldown's end the first member in the pump's order (prefetch rank, oldest ticket) is the one re-admitted for the
     /// probe, not the third member's stale user-initiated place.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.7 to 49.9 s beside a second TSan process at a
+    /// load of 20 to 35 (83 % of 60 s) and 20.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 37.2 to 37.4 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded", .timeLimit(.minutes(3)))
     func parkedOrderFollowsRanks() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)

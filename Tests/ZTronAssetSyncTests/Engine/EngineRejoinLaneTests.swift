@@ -30,10 +30,14 @@ extension EngineLaneTests {
     /// queued after them: a re-join that changes lane, or comes from user work, goes back to its place in the queue its
     /// lane selects (R-SYN-3: a request for a queued asset jumps the queue), not to the back. The dispatch order is the
     /// engine's own (`startSequence`).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.4 to 40.8 s beside a second TSan process at a
+    /// load of 20 to 35 (68 % of 60 s) and 17.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: RejoinCase.allCases
     )
     func rejoinedMembersKeepTheirPlacesAcrossLanes(rejoin: RejoinCase) async throws {

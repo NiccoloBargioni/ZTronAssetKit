@@ -257,8 +257,12 @@ struct EngineRegressionCycle3Tests {
     /// PROBE-C2-7: `x` and `y` share one blob. `reportUnreadable("x")` made the store quarantine both, but the engine
     /// forgot, announced and healed only `x`: the run, reaching `y`, counted it fetched from the stale binding and ended
     /// `.complete` (stamp written) while `y` stayed quarantined and unserved.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.8 to 35.2 s beside a second TSan process at a
+    /// load of 20 to 35 (59 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again", .timeLimit(.minutes(1)))
+    @Test("R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again", .timeLimit(.minutes(3)))
     func siblingQuarantine() async throws {
         let time = ManualTimeSource()
         let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 1, pipelineDepth: 1, runLookahead: 0)

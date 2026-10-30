@@ -29,10 +29,14 @@ struct EngineRegressionCycle4Tests {
     /// the second report and announced nothing for `z`; the catch-up owed by the first then read a view equal to the
     /// copy, so `assetRemoved(z, .pruned)` never arrived although `z` left the store and the engine's copy. The same
     /// holds when the second ensure applies a later manifest that does not list `z` either.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.5 to 34.5 s beside a second TSan process at a
+    /// load of 20 to 35 (57 % of 60 s) and 15.7 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: SecondManifest.allCases
     )
     func pruneOfFailedApplyAnnouncedByConcurrentApply(_ second: SecondManifest) async throws {

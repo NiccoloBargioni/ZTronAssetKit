@@ -38,8 +38,12 @@ struct EngineRegressionCycle20Tests {
     /// the alarm's turn started a second run whose manifest fetch was the probe (PROBE-C19R-WATCHDOG and
     /// PROBE-C19C-HALFWATCH; 192 to 198 of 200 without a seam at `d5191e2`). The alarm's turn is held here, so the order is
     /// fixed.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.1 to 35.8 s beside a second TSan process at a
+    /// load of 20 to 35 (60 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose last working claim ends after a half-open probe's watchdog but before the alarm's turn neither settles blocked by the breaker nor starts a second run", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose last working claim ends after a half-open probe's watchdog but before the alarm's turn neither settles blocked by the breaker nor starts a second run", .timeLimit(.minutes(3)))
     func silentProbesWatchdogKeepsTheRun() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 3, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)
@@ -154,8 +158,12 @@ struct EngineRegressionCycle20Tests {
     /// its manifest fetch probed (a 304, neutral again), its first claim probed and 404'd, and so on: one run and one
     /// manifest request per parked missing asset, the clock never moving (PROBE-C19C-HALFNIL-NATURAL: 7 runs for 6 parked
     /// claims, 23 for 19). Each exit without a verdict now lets the next parked job probe, so one run fetches them all.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.0 to 39.4 s beside a second TSan process at a
+    /// load of 20 to 35 (66 % of 60 s) and 17.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a half-open probe that ends without a verdict lets the next parked job probe, so the run neither settles blocked nor starts further runs without the clock moving", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a half-open probe that ends without a verdict lets the next parked job probe, so the run neither settles blocked nor starts further runs without the clock moving", .timeLimit(.minutes(3)))
     func probeWithoutVerdictReadmitsParkedClaims() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)

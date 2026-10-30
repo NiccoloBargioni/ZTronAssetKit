@@ -11,8 +11,13 @@ extension EngineGroupClaimTests {
     /// stays registered leaves the rest to the release follow-up (`releasing` holds the registered token with claims
     /// only, L5-R15): that is no violation, in the give-up's own turn or later. A `Release` that still holds members
     /// while its group is registered is one, and is still reported.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.7 to 44.6 s beside a second TSan process at a
+    /// load of 20 to 35 (74 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 33.0 to 33.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims", .timeLimit(.minutes(1)))
+    @Test("R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims", .timeLimit(.minutes(3)))
     func giveUpLeftoverClaimsAreNoViolation() async throws {
         let count = SyncEngine.releasesPerTurn + 24
         let entries = (0..<count).map { EngineHarness.onDemand(String(format: "g%04d", $0), EngineFixture.bytes(UInt64(6_800 + $0), count: 32)) }

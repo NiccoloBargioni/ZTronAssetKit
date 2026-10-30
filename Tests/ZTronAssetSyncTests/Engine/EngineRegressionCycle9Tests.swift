@@ -138,10 +138,14 @@ struct EngineRegressionCycle9Tests {
     /// `readmissionsPerTurn` per turn (one turn re-queued 10,000 in about 22 ms); the follow-up turns must reach every
     /// one. More members than that wait behind three running ones; the network drops, the three fail offline and the
     /// others park `offline`; the network returns on a roomy volume.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.7 to 44.9 s beside a second TSan process at a
+    /// load of 20 to 35 (75 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-13: when the network returns under more members parked offline than one turn re-queues, every member is re-queued",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func networkReturnRequeuesEveryMember() async throws {
         let count = Self.members
@@ -178,10 +182,14 @@ struct EngineRegressionCycle9Tests {
     /// 10,000 in about 15 ms) and owes a follow-up sweep the rest; the follow-ups must reach every one. More members than
     /// that are parked `insufficientSpace` on a volume with room for two (the third non-user slot stays free, so the pump
     /// gates and parks each); the volume then gains room for all of them.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 40.1 to 41.4 s beside a second TSan process at a
+    /// load of 20 to 35 (69 % of 60 s) and 17.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-11: when the volume gains room for more members parked for space than one turn re-admits, every one is re-queued",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func roomReadmitsEveryParkedMember() async throws {
         let count = Self.members
@@ -242,10 +250,14 @@ struct EngineRegressionCycle9Tests {
     /// 10,000 in about 15 ms); the follow-up turns must reach every member, and a member only the released handle wants
     /// must not start meanwhile (R-CAR-4: no transfer runs for nobody). More members than that wait behind three running
     /// ones on a roomy volume; the release cancels the three, and no member starts.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.1 to 42.0 s beside a second TSan process at a
+    /// load of 20 to 35 (70 % of 60 s) and 17.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-CAR-4: releasing a prefetch handle of more members than one turn releases leaves no job and starts none of its members meanwhile",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func releaseRemovesEveryMemberAndStartsNone() async throws {
         let count = Self.members
@@ -274,10 +286,14 @@ struct EngineRegressionCycle9Tests {
     /// preempt and stopped before the prefetch queue, and other work started only after the release's last turn. Four
     /// members of such a handle run (every slot); a two-member prefetch handle waits; the release, in one actor turn,
     /// cancels the four and must start the two.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 37.1 to 38.7 s beside a second TSan process at a
+    /// load of 20 to 35 (65 % of 60 s) and 16.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-CAR-4: releasing a user-initiated handle of more members than one turn releases lets queued prefetch work start in that turn",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func releasedUserMembersDoNotHoldBackOtherWork() async throws {
         let count = Self.members

@@ -227,8 +227,13 @@ extension EngineSyncTests {
     /// follow-up, which production allows) with that job's visit still owed; then the transfer fails. Without the
     /// on-demand follow the waiter was answered `failure(notFound)` (the 404), the 503's error, or the ENOSPC figures
     /// (the close-out cycle-2 correctness lens, PROBE-W4).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 46.2 to 47.2 s beside a second TSan process at a
+    /// load of 20 to 35 (79 % of 60 s) and 19.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.1 to 35.2 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content", .timeLimit(.minutes(1)), arguments: ReplacedContentFailure.allCases)
+    @Test("R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content", .timeLimit(.minutes(3)), arguments: ReplacedContentFailure.allCases)
     func replacedContentFailureFollowsTheWaiter(_ failure: ReplacedContentFailure) async throws {
         let count = 600
         let harness = failure.harness()
@@ -343,8 +348,13 @@ extension EngineSyncTests {
     /// abandoned them in the apply's turn). 700 members whose content all changed, two slots; the follow-up is held so
     /// the drains' and freed slots' pumps run between the follow's turns. Without the check each pump started replaced
     /// content (the close-out cycle-2 correctness lens, PROBE-W1: two of two starts, PROBE-W1b: 44 of 48 at 3,000).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.3 to 49.5 s beside a second TSan process at a
+    /// load of 20 to 35 (82 % of 60 s) and 19.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 36.3 to 37.0 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job", .timeLimit(.minutes(1)))
+    @Test("R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job", .timeLimit(.minutes(3)))
     func noReplacedContentStartsDuringTheFollow() async throws {
         let count = 700
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0))
@@ -391,8 +401,13 @@ extension EngineSyncTests {
     /// freed slot goes to the first member of an unchanged prefetch group, and no running transfer is preempted for it.
     /// The follow's visit then ends the waiter's interest with `.notFound` (T21), as the cycle-1 one-turn follow did in
     /// the apply's turn.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.5 to 49.0 s beside a second TSan process at a
+    /// load of 20 to 35 (82 % of 60 s) and 20.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 36.6 to 36.7 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit", .timeLimit(.minutes(1)))
+    @Test("R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit", .timeLimit(.minutes(3)))
     func droppedUserJobWaitsForTheFollow() async throws {
         let count = 700
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0))
@@ -485,8 +500,13 @@ extension EngineSyncTests {
     /// 5 MB content is parked `awaitingSpace`; a forced sync moves the target to a 16-byte content while 2,100 changed
     /// entries sort before it, so the follow's first pass stops before its entry (`holdFollowFollowUps()`); then the
     /// deletion grace ends and the alarm's reaper frees the 4 MB.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 44.4 to 46.2 s beside a second TSan process at a
+    /// load of 20 to 35 (77 % of 60 s) and 18.7 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.7 to 35.2 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)", .timeLimit(.minutes(1)), arguments: SweptReplacedContent.allCases)
+    @Test("R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)", .timeLimit(.minutes(3)), arguments: SweptReplacedContent.allCases)
     func spaceSweepFollowsTheReplacedContent(_ swept: SweptReplacedContent) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -606,8 +626,13 @@ extension EngineSyncTests {
     /// blob and its `.reclaimed` sweep re-queues the 400-byte members and parks the 3,000-byte ones, following each first.
     /// That one turn follows exactly `followsPerTurn` jobs of both sizes; once the holds end, every member's interest is
     /// on its new content and no replaced content was requested.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.5 to 49.0 s beside a second TSan process at a
+    /// load of 20 to 35 (82 % of 60 s) and 19.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 37.0 to 37.0 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(1)))
+    @Test("R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(3)))
     func spaceSweepFollowsAtMostOneTurnOfJobs() async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -761,8 +786,13 @@ extension EngineSyncTests {
     /// in both cases: a sweep that skipped the job once its re-judgement failed left it `awaitingSpace` with nothing
     /// pending and no wake until the store's settle read parked it a turn later (the close-out cycle-6 requirements
     /// lens, mutant `skipNotFit`).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.7 to 47.0 s beside a second TSan process at a
+    /// load of 20 to 35 (78 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.0 to 35.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepJudgesAFollowedJobOnItsNewLane(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -897,8 +927,13 @@ extension EngineSyncTests {
     /// 10000003)`: figures that contradict themselves (F-22: `required` exceeds `available` whenever a job is parked;
     /// the close-out cycle-6 correctness lens, PROBE-C6-LANEGAIN). At `s3-base` the follow moved every job in the apply's
     /// turn, so no sweep could act between the two.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 44.2 to 45.5 s beside a second TSan process at a
+    /// load of 20 to 35 (76 % of 60 s) and 18.7 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.0 to 35.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepRequeuesAFollowedJobItsNewLaneFits(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -1020,8 +1055,12 @@ extension EngineSyncTests {
     /// Judged on its pre-follow user lane, the read found that C fits, followed it (A left, B stayed: prefetch),
     /// re-queued it and counted its 5 MB ahead, so K was judged against 1 MB and stayed parked with 6 MB free (the
     /// close-out cycle-6 correctness lens, PROBE-C6-READDROP; it fails on the code before the cycle-6 re-judgement).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 37.7 to 38.5 s beside a second TSan process at a
+    /// load of 20 to 35 (64 % of 60 s) and 16.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func readSweepJudgesAFollowedJobOnItsNewLane(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
@@ -1130,8 +1169,12 @@ extension EngineSyncTests {
     /// than the important one, which has 6 MB of room after the reclaim), whether the follow visited first or the sweep
     /// followed the job itself. K's waiter is answered from its 3 MB and A's from its 16-byte content (the close-out
     /// cycle-6 correctness lens, PROBE-C6-PARKFIGURES).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.7 to 47.2 s beside a second TSan process at a
+    /// load of 20 to 35 (79 % of 60 s) and 19.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func spaceSweepParksAFollowedJobWithItsNewLanesFigures(_ visit: LaneDropVisit) async throws {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes

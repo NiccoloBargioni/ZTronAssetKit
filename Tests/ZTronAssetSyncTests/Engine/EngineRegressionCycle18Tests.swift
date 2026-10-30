@@ -383,8 +383,12 @@ struct EngineRegressionCycle18Tests {
     /// ledger admits the claim on its own, the re-check does not, and the run must settle in the same turn. Every slot
     /// stays taken by transfers of unknown size (which hold no ledger bytes), and a user-initiated job takes the slot the
     /// run's other claim frees, so no later dispatch checks the run.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.9 to 36.6 s beside a second TSan process at a
+    /// load of 20 to 35 (61 % of 60 s) and 16.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose claim parked for space the ledger admits alone but not behind a re-queued job waiting for a slot settles blocked for lack of space at once", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose claim parked for space the ledger admits alone but not behind a re-queued job waiting for a slot settles blocked for lack of space at once", .timeLimit(.minutes(3)))
     func runSettlesWhenRequeuedJobWaitsAhead() async throws {
         let reserve = StoragePolicy().reserveFreeBytes
         let time = ManualTimeSource()

@@ -166,8 +166,11 @@ struct EngineLegacyMigrationTransferTests {
 
     // MARK: Every path that creates a job adopts instead of downloading
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.4 to 32.2 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: an explicit sync during legacy migration adopts every prior-art file still pending and downloads none (CCR-K1)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: an explicit sync during legacy migration adopts every prior-art file still pending and downloads none (CCR-K1)", .timeLimit(.minutes(3)))
     func explicitSyncDuringMigration() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(6, seed: 7_100)
@@ -196,8 +199,11 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 36.2 to 37.5 s beside a second TSan process at a
+    /// load of 20 to 35 (63 % of 60 s) and 16.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a prefetch group joined during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: a prefetch group joined during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)", .timeLimit(.minutes(3)))
     func prefetchJoinDuringMigration() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(6, seed: 7_200)
@@ -228,8 +234,11 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 32.4 to 33.3 s beside a second TSan process at a
+    /// load of 20 to 35 (55 % of 60 s) and 13.4 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: ensureAvailable during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: ensureAvailable during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)", .timeLimit(.minutes(3)))
     func ensureAvailableDuringMigration() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(6, seed: 7_300)
@@ -256,8 +265,12 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.1 to 44.5 s beside a second TSan process at a
+    /// load of 20 to 35 (74 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 33.4 to 33.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a later launch that resumes an interrupted legacy migration adopts, never downloads, the prior-art files an explicit sync asks for (L5K-V3-06)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: a later launch that resumes an interrupted legacy migration adopts, never downloads, the prior-art files an explicit sync asks for (L5K-V3-06)", .timeLimit(.minutes(3)))
     func resumedMigrationSync() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(8, seed: 7_400)
@@ -312,8 +325,11 @@ struct EngineLegacyMigrationTransferTests {
 
     // MARK: The parked launch run (EngineRuns.swift, the migration loop's `defer`)
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.2 to 35.4 s beside a second TSan process at a
+    /// load of 20 to 35 (59 % of 60 s) and 15.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a run that starts while the launch run waits for legacy migration takes its place, so no launch run follows once migration ends", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: a run that starts while the launch run waits for legacy migration takes its place, so no launch run follows once migration ends", .timeLimit(.minutes(3)))
     func explicitRunTakesTheParkedLaunchRunsPlace() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 7_500)
@@ -343,8 +359,12 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 40.3 to 42.7 s beside a second TSan process at a
+    /// load of 20 to 35 (71 % of 60 s) and 18.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 29.8 to 30.5 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: when legacy migration ends while the run that took the launch run's place is active, no launch run follows it and no flag is left", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: when legacy migration ends while the run that took the launch run's place is active, no launch run follows it and no flag is left", .timeLimit(.minutes(3)))
     func migrationEndsWhileThatRunIsActive() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 7_600)
@@ -545,8 +565,11 @@ struct EngineLegacyMigrationTransferTests {
         return joins
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 28.6 to 30.2 s beside a second TSan process at a
+    /// load of 20 to 35 (50 % of 60 s) and 12.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a user-initiated prefetch group's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: a user-initiated prefetch group's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(3)))
     func userInitiatedPrefetchReachesTheJoin() async throws {
         let time = ManualTimeSource()
         let (harness, bulk, metadata, catalog) = try await EngineLegacyMigrationTransferTests.heldJoinLaunch(seed: 9_300, time: time)
@@ -576,8 +599,11 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.9 to 31.6 s beside a second TSan process at a
+    /// load of 20 to 35 (53 % of 60 s) and 13.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: ensureAvailable's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: ensureAvailable's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)", .timeLimit(.minutes(3)))
     func ensureAvailableReachesTheJoin() async throws {
         let time = ManualTimeSource()
         let (harness, bulk, metadata, catalog) = try await EngineLegacyMigrationTransferTests.heldJoinLaunch(seed: 9_400, time: time)
@@ -675,8 +701,11 @@ struct EngineLegacyMigrationTransferTests {
 
     // MARK: A job promoted during its adoption (L5K-R18)
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 36.9 to 38.6 s beside a second TSan process at a
+    /// load of 20 to 35 (64 % of 60 s) and 16.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: a prefetch job promoted to the user-initiated lane while its pre-transfer adoption runs answers its user-initiated asker only once the readers' snapshot holds the asset (L5K-R18)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: a prefetch job promoted to the user-initiated lane while its pre-transfer adoption runs answers its user-initiated asker only once the readers' snapshot holds the asset (L5K-R18)", .timeLimit(.minutes(3)))
     func promotedAdoptionInstallsAtOnce() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_200)
@@ -846,8 +875,12 @@ struct EngineLegacyMigrationTransferTests {
         }
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.1 to 40.9 s beside a second TSan process at a
+    /// load of 20 to 35 (68 % of 60 s) and 19.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 29.8 to 30.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)", .timeLimit(.minutes(3)))
     func syncAdoptionsReachTheReaders() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(20, seed: 8_500)
@@ -892,8 +925,12 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.5 to 47.0 s beside a second TSan process at a
+    /// load of 20 to 35 (78 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.7 to 34.7 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at once, and the neighbours a prefetch group's jobs adopt reach it once the install window has passed (L5K-R16, PR14b)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at once, and the neighbours a prefetch group's jobs adopt reach it once the install window has passed (L5K-R16, PR14b)", .timeLimit(.minutes(3)))
     func prefetchedNeighboursReachTheReaders() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(12, seed: 8_600)
@@ -945,8 +982,11 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 36.3 to 38.8 s beside a second TSan process at a
+    /// load of 20 to 35 (65 % of 60 s) and 16.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, PR14c, probes I and J)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, PR14c, probes I and J)", .timeLimit(.minutes(3)))
     func migrationAdoptionsReachTheReaders() async throws {
         let time = ManualTimeSource()
         let standard = EngineLegacyMigrationTransferTests.catalog(12, seed: 8_700)
@@ -1023,8 +1063,11 @@ struct EngineLegacyMigrationTransferTests {
         await second.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 36.4 to 37.7 s beside a second TSan process at a
+    /// load of 20 to 35 (63 % of 60 s) and 16.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)", .timeLimit(.minutes(3)))
     func crossedDeadlineReadsKeepTheTrailingInstall() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 8_900)
@@ -1117,8 +1160,11 @@ struct EngineLegacyMigrationTransferTests {
         return true
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.9 to 35.2 s beside a second TSan process at a
+    /// load of 20 to 35 (59 % of 60 s) and 15.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: the prior-art files a migration batch adopted reach the readers' snapshot within about two install intervals while the migration waits for an adopt-on-demand of the last claimed file (L5K-R20, KC3-WAITWINDOW)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: the prior-art files a migration batch adopted reach the readers' snapshot within about two install intervals while the migration waits for an adopt-on-demand of the last claimed file (L5K-R20, KC3-WAITWINDOW)", .timeLimit(.minutes(3)))
     func batchAdoptionsReachTheReadersWhileTheMigrationWaits() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(4, seed: 9_600)
@@ -1249,8 +1295,11 @@ struct EngineLegacyMigrationTransferTests {
         }
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.8 to 37.1 s beside a second TSan process at a
+    /// load of 20 to 35 (62 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: ensureAvailable that joins a prefetch job while the job's pre-transfer read re-arms the store's deadline after a bulk adoption returns only once the readers' snapshot holds the asset (L5K-R21, PE5)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: ensureAvailable that joins a prefetch job while the job's pre-transfer read re-arms the store's deadline after a bulk adoption returns only once the readers' snapshot holds the asset (L5K-R21, PE5)", .timeLimit(.minutes(3)))
     func promotionDuringTheReArmInstallsBeforeTheAnswer() async throws {
         let time = ManualTimeSource()
         let catalog = EngineLegacyMigrationTransferTests.catalog(2, seed: 9_700)
@@ -1311,8 +1360,11 @@ struct EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.0 to 36.6 s beside a second TSan process at a
+    /// load of 20 to 35 (61 % of 60 s) and 15.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: a job of two ids promoted while its read of the second id runs answers its user-initiated asker of the first id, adopted at bulk urgency, only once the readers' snapshot holds it (L5K-R21)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: a job of two ids promoted while its read of the second id runs answers its user-initiated asker of the first id, adopted at bulk urgency, only once the readers' snapshot holds it (L5K-R21)", .timeLimit(.minutes(3)))
     func promotionDuringALaterReadInstallsBeforeTheAnswer() async throws {
         let time = ManualTimeSource()
         let bytes = EngineFixture.bytes(9_800)
@@ -1458,8 +1510,11 @@ extension EngineLegacyMigrationTransferTests {
         return (harness, bulk)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.9 to 32.6 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 13.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: when a job's adoption of the last claimed prior-art file ends while the migration batch's install is held, the migration still finishes in that launch instead of backing off to the next maintenance window with every file adopted (L5K-R23, KC4-STALELAST)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: when a job's adoption of the last claimed prior-art file ends while the migration batch's install is held, the migration still finishes in that launch instead of backing off to the next maintenance window with every file adopted (L5K-R23, KC4-STALELAST)", .timeLimit(.minutes(3)))
     func lastAdoptionDuringTheBatchsInstallFinishesTheMigration() async throws {
         let time = ManualTimeSource()
         // Three files: the batch holds the first pending one at its hash; a prefetch job adopts the last pending one,
@@ -1546,8 +1601,11 @@ extension EngineLegacyMigrationTransferTests {
         return ids.allSatisfy { view.records[$0]?.referencedBlob != nil && view.records[$0]?.isStale == false }
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 32.3 to 35.0 s beside a second TSan process at a
+    /// load of 20 to 35 (58 % of 60 s) and 15.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-13: a job of two ids schedules the trailing install of its first id's bulk-urgency adoption before it reads the second id, so the readers see the first id once the install window has passed while that read is still held (L5K-R23, KC4-MULTIID)", .timeLimit(.minutes(1)))
+    @Test("R-STO-13: a job of two ids schedules the trailing install of its first id's bulk-urgency adoption before it reads the second id, so the readers see the first id once the install window has passed while that read is still held (L5K-R23, KC4-MULTIID)", .timeLimit(.minutes(3)))
     func earlierAdoptionReachesTheReadersDuringALaterRead() async throws {
         let time = ManualTimeSource()
         let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_980, time: time)
@@ -1601,8 +1659,12 @@ extension EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 39.4 to 41.1 s beside a second TSan process at a
+    /// load of 20 to 35 (68 % of 60 s) and 17.6 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 30.1 to 30.6 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)", .timeLimit(.minutes(1)), arguments: [false, true])
+    @Test("R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)", .timeLimit(.minutes(3)), arguments: [false, true])
     func idJoiningDuringTheReadIsAskedToo(viaEnsure: Bool) async throws {
         let time = ManualTimeSource()
         let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_970, time: time)
@@ -1664,8 +1726,12 @@ extension EngineLegacyMigrationTransferTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 40.1 to 40.8 s beside a second TSan process at a
+    /// load of 20 to 35 (68 % of 60 s) and 17.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 30.7 to 31.9 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: an id of the same content that joins a job during the answer site's user-initiated publication is asked too before the answer, so its prior-art file is adopted and nothing is downloaded (L5K-R23)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: an id of the same content that joins a job during the answer site's user-initiated publication is asked too before the answer, so its prior-art file is adopted and nothing is downloaded (L5K-R23)", .timeLimit(.minutes(3)))
     func idJoiningDuringTheAnswerSitesPublicationIsAskedToo() async throws {
         let time = ManualTimeSource()
         let bytes = EngineFixture.bytes(9_950)
@@ -1761,8 +1827,11 @@ extension EngineLegacyMigrationTransferTests {
 
     // MARK: No request for a retired attempt (L5K-R25)
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.7 to 31.2 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-11: a job whose last group is released while its pre-transfer read adopts a later id sends no transfer request for the retired attempt, and its draining record ends (L5K-R25, KC4-MULTIID release variant)", .timeLimit(.minutes(1)))
+    @Test("R-STO-11: a job whose last group is released while its pre-transfer read adopts a later id sends no transfer request for the retired attempt, and its draining record ends (L5K-R25, KC4-MULTIID release variant)", .timeLimit(.minutes(3)))
     func releasedDuringALaterReadSendsNoRequest() async throws {
         let time = ManualTimeSource()
         let (harness, bulk, first, second) = try await EngineLegacyMigrationTransferTests.twoIDLaunch(seed: 9_960, time: time)

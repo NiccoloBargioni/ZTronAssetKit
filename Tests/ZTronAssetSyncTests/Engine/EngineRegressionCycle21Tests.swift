@@ -43,8 +43,13 @@ struct EngineRegressionCycle21Tests {
     /// blocked: 11 runs after the cooldown, the clock never moving. The pending run now waits for the pump that dispatches
     /// the re-admitted jobs, at the cooldown's end as after each exit, and starts once none is left to take the probe: one
     /// run follows the cooldown, its manifest request the only one, and it completes.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 47.5 to 48.9 s beside a second TSan process at a
+    /// load of 20 to 35 (82 % of 60 s) and 19.7 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.4 to 36.4 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock does not move", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock does not move", .timeLimit(.minutes(3)))
     func prefetchProbesStartNoRunEach() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)
@@ -127,8 +132,12 @@ struct EngineRegressionCycle21Tests {
     /// probe, so the alarm's turn starts that run, whose manifest fetch probes. A pending-run gate that read any half-open
     /// breaker with a probe as armed (mutant PEND, the reading before close-out cycle 20) left it waiting for a probe
     /// already abandoned, with no deadline left to wake it, until that probe's attempt ended.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.0 to 31.1 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.6 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a pending run that waits for a half-open breaker starts once its silent probe's watchdog passes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a pending run that waits for a half-open breaker starts once its silent probe's watchdog passes", .timeLimit(.minutes(3)))
     func pendingRunStartsAtSilentProbesWatchdog() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 3, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)

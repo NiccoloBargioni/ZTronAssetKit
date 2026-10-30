@@ -321,8 +321,11 @@ struct EngineRegressionRound2Tests {
         harness.time.advance(by: CircuitBreakerPolicy().serverCooldownBase + 1)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.1 to 31.8 s beside a second TSan process at a
+    /// load of 20 to 35 (53 % of 60 s) and 13.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a half-open probe whose publication fails the store's hash check frees the probe slot", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a half-open probe whose publication fails the store's hash check frees the probe slot", .timeLimit(.minutes(3)))
     func probeIntegrityFreesSlot() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let failing = (0..<5).map { EngineHarness.onDemand("f\($0)", EngineFixture.bytes(UInt64(2_500 + $0))) }
@@ -346,8 +349,11 @@ struct EngineRegressionRound2Tests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.6 to 35.9 s beside a second TSan process at a
+    /// load of 20 to 35 (60 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a half-open probe superseded by an apply frees the probe slot", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a half-open probe superseded by an apply frees the probe slot", .timeLimit(.minutes(3)))
     func probeSupersededFreesSlot() async throws {
         let bulk = NextUnitGate()
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0), bulk: bulk)
@@ -586,8 +592,11 @@ struct EngineRegressionRound2Tests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.2 to 36.0 s beside a second TSan process at a
+    /// load of 20 to 35 (60 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-10: an ensureAvailable whose members fail fast as they become jobs still settles, a batch per actor turn", .timeLimit(.minutes(1)))
+    @Test("R-SYN-10: an ensureAvailable whose members fail fast as they become jobs still settles, a batch per actor turn", .timeLimit(.minutes(3)))
     func ensureSettlesWhenMembersFailFast() async throws {
         let bulk = NextUnitGate()
         let tuning = SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0, pipelineDepth: 1, runLookahead: 3)

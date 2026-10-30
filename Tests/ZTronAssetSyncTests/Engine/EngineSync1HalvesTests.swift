@@ -169,8 +169,12 @@ extension EngineRegressionTests {
     /// drains in-flight work, so the store's own record cannot tell the orders apart afterwards (`f.md`, the level-4
     /// verifier's mutants M5 and M6); the store is read while the shutdown joins the held task instead, and must still
     /// be open, which a close moved alone before the joins fails (the close-out cycle-2 requirements lens).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.3 to 31.2 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-15: shutdown joins every owned task before it begins closing the store", .timeLimit(.minutes(1)))
+    @Test("R-SYN-15: shutdown joins every owned task before it begins closing the store", .timeLimit(.minutes(3)))
     func shutdownJoinsBeforeClosing() async throws {
         let bulk = NextUnitGate()
         let harness = EngineHarness.make(bulk: bulk)

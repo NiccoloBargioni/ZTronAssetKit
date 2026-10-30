@@ -46,10 +46,14 @@ struct EngineRegressionCycle8Tests {
     /// the others park `offline`; the volume then fills to the reserve. When the network returns, every member is
     /// re-queued at once (the parked ones, and the failed ones on the edge, R-SYN-13), and the gate parks each
     /// `insufficientSpace` (the store counts no pending reclaim): more than one pump's worth, and nothing starts again.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 41.7 to 42.7 s beside a second TSan process at a
+    /// load of 20 to 35 (71 % of 60 s) and 18.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-11: when the network returns under more queued members than one pump turn parks, every member the volume cannot hold ends parked for lack of space",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func pumpParksEveryMemberAcrossTurns() async throws {
         let count = Self.members
@@ -141,10 +145,14 @@ struct EngineRegressionCycle8Tests {
     /// fires. The store call that may have reclaimed bytes (the purge path) then reads 300 bytes of room and no pending
     /// reclaim: the first member is re-admitted, and every other one is parked `insufficientSpace` (nothing is left to
     /// reclaim for it), more than one turn's worth.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 42.2 to 43.0 s beside a second TSan process at a
+    /// load of 20 to 35 (72 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-11: once the store reclaimed what jobs waited for, every one the room does not hold is parked insufficientSpace, more than one turn's worth",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func reclaimedSweepReachesEveryWaitingMember() async throws {
         let count = Self.members
@@ -195,10 +203,14 @@ struct EngineRegressionCycle8Tests {
     /// once the rest is reclaimed. `x` and `z` (300 bytes each) are doomed 30 s apart; `y` (500 bytes, on demand) needs
     /// both reclaimed on a volume with no other room above the reserve. Only the store's clock moves; the store's due
     /// work reaps, and the purge path (`spaceMayHaveBeenReclaimed`) re-checks the engine's parked jobs.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.8 to 32.1 s beside a second TSan process at a
+    /// load of 20 to 35 (53 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-11: a job waiting for space keeps waiting after a reclaim that leaves it short while more is pending, and starts once the rest is reclaimed",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func reclaimedSweepKeepsWaitingWhileMoreIsPending() async throws {
         let time = ManualTimeSource()
@@ -257,8 +269,13 @@ extension EngineRegressionCycle8Tests {
     /// 300 bytes on a volume with no other room above the reserve; the store reaps `x` and the purge path's `.reclaimed`
     /// sweep runs with its follow-ups held (`holdSpaceSweepFollowUps()`): its one turn re-queues the first member into
     /// the 300 bytes and parks exactly `parksPerPump` of the others `insufficientSpace` (nothing is left to reclaim).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 41.7 to 43.1 s beside a second TSan process at a
+    /// load of 20 to 35 (72 % of 60 s) and 18.4 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 32.2 to 32.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(1)))
+    @Test("R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(3)))
     func spaceSweepParksAtMostOneTurnOfJobs() async throws {
         let count = Self.members
         let time = ManualTimeSource()

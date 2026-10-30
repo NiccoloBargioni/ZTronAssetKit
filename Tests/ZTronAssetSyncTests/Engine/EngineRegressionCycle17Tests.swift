@@ -116,8 +116,13 @@ struct EngineRegressionCycle17Tests {
     /// the latest read admits its bulk claim: the claim's job was retired, no pending run was set, and the sync caller
     /// was told the volume lacks space (the cycle-16 correctness verifier's PROBE-SPACEOWED). The follow-up is held here
     /// (`holdSpaceSweepFollowUps()`), so the order is fixed.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.7 to 47.1 s beside a second TSan process at a
+    /// load of 20 to 35 (79 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.7 to 35.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose claim parked for space a follow-up free-space sweep still owes a re-check waits for it instead of settling blocked for lack of space", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose claim parked for space a follow-up free-space sweep still owes a re-check waits for it instead of settling blocked for lack of space", .timeLimit(.minutes(3)))
     func runWaitsForSpaceSweepFollowUp() async throws {
         let owed = try await Self.spaceOwed()
         let engine = owed.harness.engine
@@ -151,8 +156,13 @@ struct EngineRegressionCycle17Tests {
     /// itself must check the run. A sweep that neither parks nor re-queues anything (here the volume lost its room again
     /// before the sweep ran, so the read's room cannot hold even the smallest parked job) checked nothing, and the run
     /// stayed open with nothing left to settle it.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.4 to 47.0 s beside a second TSan process at a
+    /// load of 20 to 35 (78 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.6 to 35.0 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose claim parked for space the owed follow-up sweep does not admit settles blocked for lack of space once that sweep ran", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose claim parked for space the owed follow-up sweep does not admit settles blocked for lack of space once that sweep ran", .timeLimit(.minutes(3)))
     func runSettlesAfterSpaceSweepFollowUpAdmitsNothing() async throws {
         let owed = try await Self.spaceOwed()
         let engine = owed.harness.engine
@@ -307,14 +317,22 @@ struct EngineRegressionCycle17Tests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.7 to 47.0 s beside a second TSan process at a
+    /// load of 20 to 35 (78 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 34.7 to 35.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose failed-whenOnline claim a network-edge re-admission turn still owes a re-queue waits for it instead of settling offline", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose failed-whenOnline claim a network-edge re-admission turn still owes a re-queue waits for it instead of settling offline", .timeLimit(.minutes(3)))
     func runWaitsForEdgeOwedClaim() async throws {
         try await Self.runWaitsForReadmissionOwedClaim(edge: true)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 46.0 to 47.2 s beside a second TSan process at a
+    /// load of 20 to 35 (79 % of 60 s) and 19.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.2 to 35.2 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose claim a lane-wide park left that a conditions re-admission turn still owes a re-queue waits for it instead of settling blocked by the policy", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: a run whose claim a lane-wide park left that a conditions re-admission turn still owes a re-queue waits for it instead of settling blocked by the policy", .timeLimit(.minutes(3)))
     func runWaitsForConditionsOwedClaim() async throws {
         try await Self.runWaitsForReadmissionOwedClaim(edge: false)
     }

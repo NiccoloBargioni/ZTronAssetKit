@@ -194,8 +194,12 @@ struct EngineLiveTransportTests {
         }
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 40.0 to 40.8 s beside a second TSan process at a
+    /// load of 20 to 35 (68 % of 60 s) and 17.6 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 32.7 to 33.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh", .timeLimit(.minutes(1)))
+    @Test("R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh", .timeLimit(.minutes(3)))
     func invalidResumeStartsFresh() async throws {
         let paused = GeneratedPayload.bytes(seed: 0xB0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
         let page = GeneratedPayload.bytes(seed: 0xB1, offset: 0, length: 4 * 1_024)
@@ -250,8 +254,12 @@ struct EngineLiveTransportTests {
         await harness.tearDown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.8 to 44.9 s beside a second TSan process at a
+    /// load of 20 to 35 (75 % of 60 s) and 19.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 36.9 to 37.0 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the store root", .timeLimit(.minutes(1)))
+    @Test("R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the store root", .timeLimit(.minutes(3)))
     func transfersStayInsideTheRoot() async throws {
         let temporaries = LiveEngineHarness.networkTemporaries()
         let cancelled = GeneratedPayload.bytes(seed: 0xC0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 128 * 1_024))
@@ -321,8 +329,12 @@ struct EngineLiveTransportTests {
         await harness.tearDown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.5 to 31.8 s beside a second TSan process at a
+    /// load of 20 to 35 (53 % of 60 s) and 14.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 28.3 to 33.6 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-15: no foreground staging write lands after the store is closed", .timeLimit(.minutes(1)))
+    @Test("R-SYN-15: no foreground staging write lands after the store is closed", .timeLimit(.minutes(3)))
     func noStagingWriteAfterClose() async throws {
         let body = GeneratedPayload.bytes(seed: 0xD0, offset: 0, length: EngineLiveTransportTests.bodyLength(extra: 256 * 1_024))
         let entry = ManifestEntry(identifier: "streamed", fileExtension: "bin", remotePath: "media/streamed.bin", byteSize: Int64(body.count), checksum: ContentHash.sha256(of: body), policy: .onDemand)

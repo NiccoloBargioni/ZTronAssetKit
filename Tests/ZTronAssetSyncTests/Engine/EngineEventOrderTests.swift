@@ -35,8 +35,12 @@ extension EngineEventsTests {
 
     /// The same through the engine: a subscriber that reads nothing while two runs with fetches complete, then reads its
     /// backlog (R-SYN-12; Stage 3, S3-CONC-03).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 31.2 to 32.5 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 14.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress", .timeLimit(.minutes(3)))
     func engineDeliversStartBeforeProgress() async throws {
         let harness = EngineHarness.make()
         let first = EngineSyncTests.catalog(2, prefix: "a", seed: 1)
