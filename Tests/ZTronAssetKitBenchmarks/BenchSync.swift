@@ -534,9 +534,10 @@ extension ZTronAssetKitBenchmarks {
 
         /// C2 of the follow barrier's drain (F-28; S3-R11 design D3's probe VERIFY-D3-DRAIN-C2): while a follow over a
         /// 10,000-member prefetch group whose every member changed content is owed (its follow-ups held), a second prefetch
-        /// window registers 10,000 other members, and each new job's place in its queue waits for the follow's end
-        /// (`EventAfterFollow.enqueue`). The release runs the follow's remaining turns, then the drain gives the 10,000
-        /// places at most `eventsAfterFollowPerTurn` per turn. The heartbeat's longest wait over every follow and drain
+        /// window registers 10,000 other members, and each member's join waits for the follow's end
+        /// (`EventAfterFollow.join`; Stage 3 close-out cycles 11 and 12, the cycle-9 `.enqueue` place is gone). The
+        /// release runs the follow's remaining turns, then the drain makes the 10,000 joins and their places at most
+        /// `eventsAfterFollowPerTurn` per turn. The heartbeat's longest wait over every follow and drain
         /// turn: medians of three against P-9, the best of the three against C2, after a warm-up. The time from the
         /// release to the follow's end and to the drain's end is printed: no admission is made meanwhile (S3-R11 R2, a
         /// Stage 5 residual risk).
@@ -2061,7 +2062,7 @@ extension SyncBench {
     /// a prefetch group of `count` on-demand members alternating 400 and 3,000 bytes waits `awaitingSpace` with 100 bytes
     /// of room; a forced sync changes the content of `changed` of them, spread evenly, and its follow's follow-ups are
     /// held after the apply's turn; a second prefetch group of `count` other 400-byte members registers then, and each
-    /// new job's place waits for the follow (`EventAfterFollow.enqueue`). The release's turn is timed inside the actor,
+    /// member's join waits for the follow (`EventAfterFollow.join`). The release's turn is timed inside the actor,
     /// and the heartbeat's longest wait runs from it until every follow and drain turn has run.
     static func followDrainWait(members count: Int, changed: Int) async throws -> FollowDrainRun {
         let time = ManualTimeSource()
@@ -2136,7 +2137,7 @@ extension SyncBench {
         while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
             await Task.yield()
         }
-        // A second prefetch window registers `count` other members while the follow is owed: each new job's place waits.
+        // A second prefetch window registers `count` other members while the follow is owed: each member's join waits.
         guard case .success = await engine.registerGroup(extras.map(\.identifier), lane: .prefetch) else {
             throw SyncBenchError.incomplete("the second prefetch group was refused")
         }
@@ -2160,14 +2161,14 @@ extension SyncBench {
             }
             drainEnded = clock.now - start
         }
-        let placesLeft = await SyncBench.placesWaiting(engine)
+        let placesLeft = await SyncBench.barrierLeftovers(engine)
         await engine.shutdown()
         _ = await sync.value
         guard let release else {
             throw SyncBenchError.incomplete("the held follow was not released")
         }
         guard placesLeft == 0 else {
-            throw SyncBenchError.incomplete("\(placesLeft) places still wait for the follow after its drain")
+            throw SyncBenchError.incomplete("\(placesLeft) joins and views of the follow barrier are left after its drain")
         }
         return FollowDrainRun(wait: wait, release: release, followEnded: SyncBench.milliseconds(followEnded), drainEnded: SyncBench.milliseconds(drainEnded))
     }
@@ -2201,9 +2202,11 @@ extension SyncBench {
         !engine.followOwed && engine.state.eventsAfterFollow.isEmpty && !engine.state.drainFollowUpScheduled && !engine.state.pumpFollowUpScheduled
     }
 
-    /// The transfers whose place in a queue still waits for the follow.
-    static func placesWaiting(_ engine: isolated SyncEngine) -> Int {
-        engine.state.placesAfterFollow.count
+    /// What the follow barrier still holds: the joins that wait for the drain and the views of its world history
+    /// (Stage 3 close-out cycle 12: no place waits for the follow any more, its group's joins do, S3-R14; the history ends
+    /// with the barrier, S3-R15).
+    static func barrierLeftovers(_ engine: isolated SyncEngine) -> Int {
+        engine.state.joinsAfterFollow.count + engine.state.worldHistory.count
     }
 
     /// `duration` in milliseconds.

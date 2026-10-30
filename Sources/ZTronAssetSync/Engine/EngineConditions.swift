@@ -106,7 +106,7 @@ extension SyncEngine {
             self.state.networkEdgeSerial += 1
         }
         if self.defersToFollow {
-            self.deferToFollow(.conditions(self.conditionsSnapshot, edge: edge))
+            self.deferToFollow(.conditions(edge: edge))
         } else {
             self.applyConditionsToJobs(edge: edge)
         }

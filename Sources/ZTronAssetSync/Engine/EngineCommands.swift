@@ -1958,12 +1958,11 @@ extension SyncEngine {
             violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
         }
         // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
-        // released groups want it (the rule above), or its place waits for the follow barrier's drain
-        // (`placesAfterFollow`); a job with none would wait for ever (review of close-out cycle 10; Stage 3 close-out
-        // cycle 9, amendment (b) of S3-R11).
+        // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+        // Behind the follow barrier no place waits any more (Stage 3 close-out cycle 12: the `.enqueue` event is gone).
         let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
         let stranded = self.state.jobs.values.filter { job in
-            job.state == .queued && !reachable.contains(job.transfer) && self.state.placesAfterFollow[job.transfer] == nil
+            job.state == .queued && !reachable.contains(job.transfer)
         }.count
         if stranded > 0 {
             violations.append("\(stranded) queued jobs wait in no queue")
@@ -1972,24 +1971,26 @@ extension SyncEngine {
     }
 
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
-    /// drain is in progress (none, between turns), so none waits for ever; the places counted in `placesAfterFollow` are
-    /// exactly the waiting `.enqueue` events; every failure verdict that waits names a failed job with
-    /// its event (Stage 3 close-out cycle 9, amendments (b) and (c) of S3-R11); the joins registered in
-    /// `joinsAfterFollow` are exactly the waiting `.join` events (cycle 10); and the drain's replayed throttles and the
-    /// carried jobs are gone once the barrier is down (cycle 11).
+    /// drain is in progress (none, between turns), so none waits for ever; every failure verdict that waits names a
+    /// failed job with its event (Stage 3 close-out cycle 9, amendment (c) of S3-R11); the joins registered in
+    /// `joinsAfterFollow` are exactly the waiting `.join` events (cycle 10); the carried jobs are gone once the barrier
+    /// is down (cycle 11); every waiting event has its decision instant in the world history, every waiting commit names
+    /// a committing job that owes the follow its visit, and once the barrier is down the history, the visits' and the
+    /// places' decision instants and the marks of publications that owe a visit are gone (cycle 12, S3-R15).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
         if self.isRunning, !events.isEmpty, !self.followOwed, !self.state.drainFollowUpScheduled, !self.state.drainingAfterFollow {
             violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
         }
-        var places: [TransferID: Int] = [:]
         var verdicts: Set<TransferID> = []
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
         for event in events {
             switch event {
-            case .enqueue(let transfer, _, _):
-                places[transfer, default: 0] += 1
+            case .committed(let commit):
+                if self.state.jobs[commit.transfer]?.epoch == commit.epoch, self.state.jobs[commit.transfer]?.state != .committing {
+                    violations.append("a commit waits for the follow for a job that is not committing")
+                }
             case .attemptFailed(let transfer, let epoch, _):
                 if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
                     verdicts.insert(transfer)
@@ -2003,14 +2004,14 @@ extension SyncEngine {
         if joins != self.state.joinsAfterFollow {
             violations.append("\(self.state.joinsAfterFollow.count) interests' joins wait for the follow, \(joins.count) with their event")
         }
-        if events.count != self.state.eventsArrivedAt.count {
-            violations.append("\(events.count) events wait for a follow with \(self.state.eventsArrivedAt.count) arrival instants")
+        if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
+            violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")
         }
-        if !self.followBarrier, !self.state.throttlesReplayed.isEmpty || !self.state.followCarried.isEmpty {
-            violations.append("the follow barrier is down with \(self.state.throttlesReplayed.count) replayed throttles and \(self.state.followCarried.count) carried jobs left")
+        if !self.followBarrier, !self.state.followCarried.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
         }
-        if places != self.state.placesAfterFollow {
-            violations.append("the \(self.state.placesAfterFollow.count) counted places that wait for a follow differ from the \(places.count) the events hold")
+        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty || !self.state.placeStamps.isEmpty || !self.state.publishedOwingVisit.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views, \(self.state.followStamps.count) visits' and \(self.state.placeStamps.count) places' decision instants and \(self.state.publishedOwingVisit.count) publications owing a visit left")
         }
         if verdicts != Set(self.state.verdictsAfterFollow.keys) {
             violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")

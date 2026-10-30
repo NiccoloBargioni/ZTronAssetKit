@@ -115,12 +115,14 @@ extension SyncEngine {
         self.state.followScans = []
         self.state.pumpWaitsForFollow = false
         self.state.eventsAfterFollow = []
-        self.state.eventsArrivedAt = []
-        self.state.replayInstant = nil
-        self.state.placesAfterFollow = [:]
+        self.state.eventStamps = []
+        self.state.reading = nil
+        self.state.worldHistory = []
+        self.state.followStamps = [:]
+        self.state.placeStamps = [:]
+        self.state.publishedOwingVisit = []
         self.state.verdictsAfterFollow = [:]
         self.state.joinsAfterFollow = [:]
-        self.state.throttlesReplayed = [:]
         self.state.followCarried = []
         self.state.drainingAfterFollow = false
         self.state.laneParksOwed.removeAll()

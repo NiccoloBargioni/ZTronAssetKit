@@ -370,7 +370,19 @@ extension SyncEngine {
             return .parked(1)
         case .block(let reason):
             let lane = self.state.jobs[transfer]?.lane
-            self.park(transfer, reason: reason)
+            if let stamp = self.state.placeStamps[transfer] {
+                // A place given behind the barrier is parked as at its decision instant (S3-R15 item 3): its fail-fast
+                // answers read the wait then, against the throttle's end of that instant's view.
+                let end: MonotonicInstant?
+                if case .throttled(let until) = reason {
+                    end = until
+                } else {
+                    end = nil
+                }
+                self.park(transfer, reason: reason, answeredAt: stamp.at, answerEnd: end)
+            } else {
+                self.park(transfer, reason: reason)
+            }
             switch reason {
             case .offline, .policy:
                 guard let lane else {
@@ -471,7 +483,8 @@ extension SyncEngine {
             return
         }
         if case .throttled(let until) = reason, let origin = self.state.remote?.originID {
-            self.state.heap.schedule(.throttle(origin), at: self.throttleEnd(after: until))
+            // The live origin's end, whatever decision instant the park reads its answers at (S3-R15 item 1).
+            self.state.heap.schedule(.throttle(origin), at: max(self.state.throttles[origin] ?? .zero, until))
             self.rearm()
         }
         if case .circuitOpen = reason {
@@ -505,6 +518,28 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
+        // A place a visit or a replay gave while the follow barrier held reads the origin's gates as they stood at its
+        // decision instant (`placeStamps`; S3-R15 item 3, PROBE-C9-THROTTLE): a visit-first engine's pump read them at
+        // that place. A later throttle or a breaker opened since stops no transfer that runs, so admitting on that view
+        // is the visit-first admission, late by the barrier (R2's accepted latency). A probe's admission is the live
+        // breaker's own (`start` records it), so a view that admits only a probe reads the live gates.
+        if let stamp = self.state.placeStamps[transfer] {
+            let view = self.state.worldHistory[stamp.view]
+            if let until = OriginGate.inForce(view.throttle, at: stamp.at) {
+                return .block(.throttled(until: until))
+            }
+            switch view.breaker?.admission(of: transfer, at: stamp.at) {
+            case .reject(let cause, _)?:
+                return .block(.circuitOpen(cause))
+            case .allow?, nil:
+                if job.adopt == nil, let reason = self.spaceBlock(job) {
+                    return .block(reason)
+                }
+                return .start(probe: false)
+            case .probe?:
+                break
+            }
+        }
         // The origin's gates through the pure functions every other decision reads too (`OriginGate`, F-40), each read
         // once per job: this runs for every job a pump dispatches or parks.
         if let until = OriginGate.inForce(self.state.throttles[remote.originID], at: now) {
@@ -721,7 +756,8 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
-        job.active?.edgeSerial = self.state.networkEdgeSerial
+        // A place given behind the barrier started, visit-first, under its decision instant's edge (S3-R15 item 1).
+        job.active?.edgeSerial = self.state.placeStamps[transfer].map { self.state.worldHistory[$0.view].edgeSerial } ?? self.state.networkEdgeSerial
         // A publication of a file an earlier attempt staged has no stream: nothing is left to drain if its job is
         // retired before its driver runs (`publish` then discards the file).
         job.active?.terminalReceived = adopt != nil
@@ -1003,6 +1039,12 @@ extension SyncEngine {
         job = self.state.jobs[transfer] ?? job
         job.active = nil
         self.state.jobs[transfer] = job
+        if self.holdsMovedID(job) {
+            // A visit-first engine visited this job while it downloaded (S3-R15 item 3, residual R-A).
+            self.state.publishedOwingVisit.insert(transfer)
+        } else {
+            self.state.publishedOwingVisit.remove(transfer)
+        }
         self.pump()
         let ids = job.assets.sorted()
         let identity = job.identity
@@ -1037,9 +1079,29 @@ extension SyncEngine {
         self.transition(transfer, to: .committing)
         self.state.committedSinceRead = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
         self.state.committedTotal = PlanBuilder.adding(self.state.committedTotal, file.byteCount)
-        self.committed(transfer, binding: ids, locations: locations, since: serial)
+        if !self.deferCommit(CommitAfterFollow(transfer: transfer, epoch: epoch, ids: ids, locations: locations, serial: serial)) {
+            self.committed(transfer, binding: ids, locations: locations, since: serial)
+        }
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()
+    }
+
+    /// Defers a commit until the follow's owed visit of its job (`EventAfterFollow.committed`; S3-R15 item 3, residual
+    /// R-A, PROBE-C11-COMMIT-PLACE, PROBE-C11R-COMMIT-REROUTE): the job's publication began while it owed that visit
+    /// (`publishedOwingVisit`) and it still holds an id the visit moves. A visit-first engine's visit re-routed those
+    /// ids' interests while the job downloaded, at the follow's place, and the commit answered the rest; re-routed by the
+    /// commit, their joins waited behind requests that arrived after the apply. The job stays `committing` (the ledger
+    /// counted the bytes on arrival, S3-R11 R1) until the drain replays the commit after the follow's visit of it.
+    /// `false` when the commit is not deferred.
+    private func deferCommit(_ commit: CommitAfterFollow) -> Bool {
+        guard self.defersToFollow, self.state.publishedOwingVisit.contains(commit.transfer), let job = self.state.jobs[commit.transfer],
+              job.assets.contains(where: { self.state.applied.entry(for: $0)?.transferID != commit.transfer }) else {
+            self.state.publishedOwingVisit.remove(commit.transfer)
+            return false
+        }
+        self.deferToFollow(.committed(commit))
+        self.notifyObservers()
+        return true
     }
 
     /// Delivers a commit to every interest. Interests in assets the store did not bind first follow their content, so a
@@ -1048,7 +1110,8 @@ extension SyncEngine {
     /// copy still maps to this content moves to a fresh job of it once this one is gone, because it joined after the
     /// publication's binding was captured (the next publication binds it; the store deduplicates the bytes, ADR-020),
     /// or because the store refused it while holding a newer manifest than the copy (held until the copy catches up).
-    private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
+    func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
+        self.state.publishedOwingVisit.remove(transfer)
         guard let job = self.state.jobs[transfer] else {
             return
         }
@@ -1149,9 +1212,16 @@ extension SyncEngine {
         // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
         // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
         self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
+        // The follow's visit of a job whose publication failed is an ordinary one (its exit waits as any other).
+        self.state.publishedOwingVisit.remove(transfer)
         switch error {
         case .superseded:
-            // The ids no longer want this content (T22/T11): their interests follow their current entries.
+            // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the
+            // follow barrier this exit waits as any other (`AttemptVerdict.supersede`; S3-R15 item 3, residual R-A): the
+            // re-routes are the interests the visits leave, at the drain's place.
+            if self.defersFailure(transfer, .supersede) {
+                break
+            }
             self.transition(transfer, to: .queued)
             self.supersede(transfer)
         case .integrity:
@@ -1161,9 +1231,13 @@ extension SyncEngine {
             await self.integrityFailed(transfer, epoch: epoch, ids: job.assets.sorted(), identity: job.identity)
         case .fileSystem(.notFound) where cancelledAttempt:
             // ENOENT for an attempt the engine cancelled is that cancellation (ARCHITECTURE §7.6, D-13): a fresh
-            // attempt, no failure, no backoff.
+            // attempt, no failure, no backoff. Behind the follow barrier the re-queue waits as any other exit
+            // (`AttemptVerdict.requeue`; S3-R15 item 3, residual R-A): its place is the drain's, after the visits'.
+            self.state.jobs[transfer]?.resume = nil
+            if self.defersFailure(transfer, .requeue) {
+                break
+            }
             if self.transition(transfer, to: .queued) {
-                self.state.jobs[transfer]?.resume = nil
                 self.enqueue(transfer)
             }
             self.pump()

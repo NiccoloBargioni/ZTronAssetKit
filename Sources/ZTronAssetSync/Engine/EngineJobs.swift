@@ -427,6 +427,8 @@ extension SyncEngine {
         self.state.originOwed.remove(transfer)
         self.state.unfollowed.remove(transfer)
         self.state.verdictsAfterFollow[transfer] = nil
+        self.state.publishedOwingVisit.remove(transfer)
+        self.state.placeStamps[transfer] = nil
         self.state.systemHeld.remove(transfer)
         self.state.run?.held.remove(transfer)
         self.state.spaceAdmitted[transfer] = nil
@@ -456,25 +458,23 @@ extension SyncEngine {
         }
     }
 
-    /// Puts a queued job (back) into its lane's queue with a fresh ticket.
+    /// Puts a queued job (back) into its lane's queue with a fresh ticket, asked for at `decisionNow()` (bulk aging reads
+    /// it, the cycle-9 amendment (a)).
     ///
-    /// Behind the follow barrier the place waits for the follow's end (`EventAfterFollow.enqueue`, F-28): it comes after
-    /// the places of the jobs the owed visits queue, which a visit-first engine queued at the apply (PROBE-D3-TICKET);
-    /// nothing dispatches meanwhile (`pump`). The place keeps `front` (a paused transfer resumes first in its lane) and
-    /// the time it was asked for, which bulk aging reads (the cycle-9 amendment (a)): the drain gives it with
-    /// `askedBefore`, which keeps the job's `queuedAt`.
-    func enqueue(_ transfer: TransferID, front: Bool = false, askedBefore: Bool = false) {
+    /// Behind the follow barrier a place is given only by a follow's visit or by the drain's replay of an event, each in
+    /// the visit-first order (F-28): every other path that queues a job waits as an event of its own (a join, a verdict, a
+    /// re-admission), so the cycle-9 `.enqueue` event is gone (Stage 3 close-out cycle 12; its last other caller, a
+    /// publication's ENOENT re-queue, waits as a verdict). Such a place records its decision instant (`placeStamps`):
+    /// the barrier-end pump reads the job's origin gates as they stood then (S3-R15 item 3).
+    func enqueue(_ transfer: TransferID, front: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return
         }
-        if !front, !askedBefore {
+        if !front {
             job.queuedAt = self.decisionNow()
         }
-        if self.defersToFollow {
-            self.state.jobs[transfer] = job
-            self.deferToFollow(.enqueue(transfer, epoch: job.epoch, front: front))
-            self.notePlaceWaits(transfer)
-            return
+        if let stamp = self.state.reading {
+            self.state.placeStamps[transfer] = stamp
         }
         self.state.lastTicket += 1
         job.ticket = self.state.lastTicket
@@ -686,8 +686,11 @@ extension SyncEngine {
     /// the job (F-35): the origin's end when it is later, else `until`. Every reader of a parked job's end, the fail-fast
     /// answer, a run's blocked outcome (in the run task's answering turn, close-out cycle 19) and whether the block
     /// cleared, reads it here, so each tells the caller the end a fresh request would get (close-out cycle 16, F-36).
+    ///
+    /// While the barrier holds, a visit or a replay reads the origin's end as it stood at its decision instant
+    /// (`throttleRecorded`, S3-R15 item 1): a later 429's extension answers in its own turn (PROBE-C11-JOIN-THROTTLE-EXT).
     func throttleEnd(after until: MonotonicInstant) -> MonotonicInstant {
-        guard let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
+        guard let end = self.throttleRecorded() else {
             return until
         }
         return max(end, until)

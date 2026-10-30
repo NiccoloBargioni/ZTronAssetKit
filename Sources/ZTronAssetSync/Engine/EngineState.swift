@@ -84,16 +84,34 @@ struct EngineState {
     /// captured when it arrives. They wait only while a follow is owed, a drain turn is scheduled or a drain is in
     /// progress (`invariantViolations()`).
     var eventsAfterFollow: [EventAfterFollow] = []
-    /// The instant each event of `eventsAfterFollow` arrived, in step with it (`SyncEngine.deferToFollow`): the drain
-    /// applies an event at that instant (`replayInstant`), so a place keeps the time it was asked for (bulk aging reads
-    /// it, the cycle-9 amendment (a)), and a backoff and a fail-fast answer count from the event's arrival.
-    var eventsArrivedAt: [MonotonicInstant] = []
-    /// The arrival instant of the event the drain applies now (`SyncEngine.decisionNow`); `nil` outside the drain.
-    var replayInstant: MonotonicInstant?
-    /// The places in a queue that wait in `eventsAfterFollow` (`.enqueue`), counted per transfer: a queued
-    /// job counted here waits in no queue until the drain gives it its place, and is no stranded job
-    /// (`invariantViolations()`; the cycle-9 amendment (b)).
-    var placesAfterFollow: [TransferID: Int] = [:]
+    /// The decision instant of each event of `eventsAfterFollow`, in step with it (`SyncEngine.deferToFollow`): its
+    /// arrival and the view of the world then (`worldHistory`). The drain applies an event under it (`reading`), so a
+    /// place keeps the time it was asked for (bulk aging reads it, the cycle-9 amendment (a)), a backoff and a fail-fast
+    /// answer count from the event's arrival, and the throttle, the breaker and the conditions are read as they stood
+    /// then (Stage 3 close-out cycle 12, S3-R15 item 1).
+    var eventStamps: [WorldStamp] = []
+    /// The views of the non-ledger real-world inputs (the origin's throttle and breaker, the conditions, the network
+    /// edge) at the decision instants of the follow barrier, oldest first: one is appended when a deferred event or an
+    /// apply reads a view that differs from the last (`SyncEngine.worldStamp()`), so it grows with the inputs' changes,
+    /// not with the events. Empty while the barrier is down (`invariantViolations()`): after the drain's last batch the
+    /// live state is what applying every input on arrival gave, and no decision reads an older view.
+    var worldHistory: [WorldView] = []
+    /// The decision instant the engine decides at now (`SyncEngine.decisionNow`, `SyncEngine.withReading`): the event
+    /// the drain applies, or the apply a follow's visit belongs to; `nil` otherwise, when every read is live.
+    var reading: WorldStamp?
+    /// The decision instant of each job a follow's visit is owed to: the apply whose pass found it (or whose follow
+    /// carried it), whose instant a visit-first engine visited it at (S3-R15 item 1). Set when the job joins
+    /// `followOrder`, taken by its visit; cleared with `worldHistory`.
+    var followStamps: [TransferID: WorldStamp] = [:]
+    /// The decision instant of each queue place a visit or a replay gave while the barrier held: the barrier-end pump
+    /// reads the origin's gates of such a job as they stood then, which a visit-first engine's pump read at that place
+    /// (S3-R15 item 3, PROBE-C9-THROTTLE; R2 accepts only the admission's latency). Cleared with `worldHistory`.
+    var placeStamps: [TransferID: WorldStamp] = [:]
+    /// The jobs whose publication began while a follow owed the visit of an id they hold that the engine's copy lists at
+    /// another transfer: a visit-first engine had visited them while they downloaded, so the follow visits them while
+    /// they verify or commit, and a commit that arrives before that visit waits for it (`EventAfterFollow.committed`;
+    /// S3-R15 item 3, residual R-A). `removeJob` forgets them.
+    var publishedOwingVisit: Set<TransferID> = []
     /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
     /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
     /// event that asks for it); `removeJob` forgets it.
@@ -102,10 +120,6 @@ struct EngineState {
     /// waiter, group member or run fetch they stand for holds no interest until the drain joins it
     /// (`invariantViolations()`).
     var joinsAfterFollow: [InterestToken: [AssetID: TransferID]] = [:]
-    /// The latest end the drain's replayed 429 verdicts gave the origin's throttle so far, by origin: a replayed park
-    /// answers with the end a visit-first engine had decided when its 429 arrived, which counts the earlier replayed
-    /// 429s and not the later ones (`SyncEngine.replayThrottle`). Cleared when the drain ends.
-    var throttlesReplayed: [String: MonotonicInstant] = [:]
     /// The jobs an older follow left in `unfollowed` that a later apply found owed no visit while an older pass was
     /// still owed: they join `followOrder` once the older passes end, where a visit-first engine, whose older passes had
     /// ended at that apply, placed them (`FollowScan.carried`; amendment (e) of S3-R11, cycle 11).
@@ -565,6 +579,9 @@ struct FollowScan {
     /// The jobs the apply that queued this pass found in `unfollowed` and owed no visit while older passes were owed:
     /// they join `followOrder`, sorted, when this pass begins (`SyncEngine.followCarried`).
     var carried: [TransferID] = []
+    /// The decision instant of the apply that queued this pass: the jobs it finds or carries are visited under it
+    /// (`EngineState.followStamps`).
+    let stamp: WorldStamp
 }
 
 /// One transfer's outstanding work (ARCHITECTURE §7.1).

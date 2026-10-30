@@ -120,6 +120,11 @@ extension SyncEngine {
                 self.retryDue(transfer, epoch: epoch)
             case .throttle(let origin):
                 guard let until = self.state.throttles[origin] else {
+                    // A park read at an earlier decision instant (`placeStamps`, S3-R15 item 3) waits for a throttle that
+                    // ended since: its jobs are re-admitted as the throttle's end would have.
+                    if !self.state.throttleParked.isEmpty {
+                        self.unblockOrigin(.throttled)
+                    }
                     continue
                 }
                 guard until <= now else {

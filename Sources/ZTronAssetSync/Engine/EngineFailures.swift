@@ -337,23 +337,42 @@ extension SyncEngine {
     /// A 429 (ARCHITECTURE §7.6): an origin-wide throttle until the clamped deadline (a `Retry-After` above
     /// `maxRetryAfter` defers to the next run); the job parks `throttled`.
     ///
-    /// Behind the follow barrier the 429's `Retry-After` throttles the origin when it arrives (a real-world input,
-    /// S3-R14), and the rest waits (`AttemptVerdict.throttle`, `replayThrottle`): the backoff without a `Retry-After`
-    /// is the policy of the job's lane, which the visits may change (PROBE-C10-THROTTLE-LANE), and the park's fail-fast
-    /// answers read the interests the visits leave.
+    /// Behind the follow barrier the 429 throttles the origin when it arrives, with or without a `Retry-After`, as a
+    /// visit-first engine's did (Stage 3 close-out cycle 12, S3-R15 item 2): readers that are no replay (a manifest fetch
+    /// for unknown ids, `ensureAvailable`, a pending run) see it at once (PROBE-C11-MANIFEST-THROTTLE). The backoff
+    /// without a `Retry-After` is the policy of the lane the owed visits leave the job (`followedLane`, the visit's own
+    /// rule without the visit; PROBE-C10-THROTTLE-LANE). The park and its fail-fast answers wait
+    /// (`AttemptVerdict.throttle`, `replayThrottle`): they read the interests the visits leave.
     private func throttled(_ transfer: TransferID, retryAfter: RetryAfter?, wall: Date) {
         guard let job = self.state.jobs[transfer], let origin = self.state.remote?.originID else {
             return
         }
         let seconds = retryAfter?.seconds(from: wall)
         let now = self.environment.time.monotonicNow()
-        if self.defersToFollow {
+        if self.defersToFollow, self.exitDefers(job) {
             let decided = self.state.throttles[origin]
-            if let seconds, seconds <= min(self.tuning.retry.maxRetryAfter, self.tuning.interactiveRetry.maxRetryAfter) {
-                self.state.throttles[origin] = max(decided ?? .zero, now.adding(seconds: seconds))
-                self.throttleExtended(from: decided)
+            let decision: ThrottleDecision
+            if let lane = self.followedLane(job) {
+                let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+                if let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) {
+                    let until = now.adding(seconds: max(delay, seconds ?? 0))
+                    self.state.throttles[origin] = max(decided ?? .zero, until)
+                    self.state.metrics.retries[.throttled] += 1
+                    self.throttleExtended(from: decided)
+                    decision = .until(until)
+                } else {
+                    decision = .exhausted
+                }
+            } else {
+                // Every id moves: a visit-first engine had cancelled this attempt. Only the origin's own `Retry-After`
+                // within the caps is a fact about the origin (S3-R14); no lane gives a backoff.
+                if let seconds, seconds <= min(self.tuning.retry.maxRetryAfter, self.tuning.interactiveRetry.maxRetryAfter) {
+                    self.state.throttles[origin] = max(decided ?? .zero, now.adding(seconds: seconds))
+                    self.throttleExtended(from: decided)
+                }
+                decision = .undecided
             }
-            if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, at: now, decided: decided))) {
+            if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, at: now, decision: decision))) {
                 return
             }
         }
@@ -434,9 +453,10 @@ extension SyncEngine {
         self.answerThrottledUsersNow()
     }
 
-    /// The body of `answerThrottledUsers()`, also the drain's replay of a turn that waited.
+    /// The body of `answerThrottledUsers()`, also the drain's replay of a turn that waited, which reads the origin's end
+    /// as it stood at the turn's arrival (`throttleRecorded`, S3-R15 item 1).
     func answerThrottledUsersNow() {
-        guard self.isRunning, let origin = self.state.remote?.originID, let end = self.state.throttles[origin] else {
+        guard self.isRunning, self.state.remote != nil, let end = self.throttleRecorded() else {
             return
         }
         guard end.seconds(since: self.decisionNow()) > self.tuning.interactiveRetry.interactiveMaxWait else {
@@ -632,6 +652,26 @@ extension SyncEngine {
         return space
     }
 
+    /// The lane the owed follow visits leave `job` (S3-R15 item 2): the highest lane of the interests one of whose ids
+    /// the engine's copy still maps to the job's content, the visit's own rule (`follow`) without the visit; the held lane
+    /// (or bulk) when only ids without an interest stay; `nil` when every id moves (the visit supersedes the job). A job
+    /// no visit is owed to keeps its lane. An interest another job's visit moves onto this content is not counted: the
+    /// visits are not performed (recorded in the WP-F draft, cycle 12).
+    func followedLane(_ job: Job) -> AssetPriority? {
+        let stays: (AssetID) -> Bool = { self.state.applied.entry(for: $0)?.transferID == job.transfer }
+        guard self.followOwed, self.state.unfollowed.contains(job.transfer) || job.assets.contains(where: { !stays($0) }) else {
+            return job.lane
+        }
+        var lane: AssetPriority?
+        for interest in job.interests.values where interest.assets.contains(where: stays) {
+            lane = max(lane ?? interest.lane, interest.lane)
+        }
+        if let lane {
+            return lane
+        }
+        return job.assets.contains(where: stays) ? job.heldLane ?? .bulk : nil
+    }
+
     // MARK: Breaker bookkeeping (ARCHITECTURE §7.7)
 
     /// Records an outcome on the origin's breaker; a state change emits `circuitChanged`, counts a trip, re-arms
@@ -645,6 +685,13 @@ extension SyncEngine {
         let probing = breaker.probe != nil
         breaker.record(outcome, at: self.environment.time.monotonicNow(), seed: self.environment.random.seed)
         self.state.breakers[origin] = breaker
+        // A visit's outcome (an abandon) under a reading is the visit-first engine's at that instant: its view records
+        // it too, so the places the visit then gives read the breaker it left (S3-R15 items 1 and 4).
+        self.changeReadingView { view in
+            var viewed = view.breaker ?? CircuitBreaker(policy: self.tuning.breaker)
+            viewed.record(outcome, at: self.decisionNow(), seed: self.environment.random.seed)
+            view.breaker = viewed
+        }
         self.breakerChanged(origin, from: before)
         if probing, breaker.probe == nil, case .halfOpen = breaker.state {
             self.probeEndedWithoutVerdict()

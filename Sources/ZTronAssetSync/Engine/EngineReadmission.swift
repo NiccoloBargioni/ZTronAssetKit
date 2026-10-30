@@ -111,7 +111,7 @@ extension SyncEngine {
     @discardableResult
     func readmit(_ passes: Readmissions) -> Bool {
         if self.defersToFollow {
-            self.deferToFollow(.readmit(passes, self.conditionsSnapshot))
+            self.deferToFollow(.readmit(passes))
             self.notifyObservers()
             return false
         }
@@ -283,13 +283,14 @@ extension SyncEngine {
 // MARK: Lazy re-admission for the breaker's probe (S3-B-063, L4-R22)
 
 extension SyncEngine {
-    /// Whether the origin's breaker admits a job it parked only as its probe at `now` (open past its cooldown, half-open
-    /// without a probe or past a silent probe's watchdog; `CircuitBreaker.admission(of:at:)`).
+    /// Whether the origin's breaker admits a job it parked only as its probe at the decision instant (open past its
+    /// cooldown, half-open without a probe or past a silent probe's watchdog; `CircuitBreaker.admission(of:at:)`): the
+    /// breaker as it stood then under a reading (`breakerRecorded`, S3-R15 items 1 and 4), else now.
     func breakerAdmitsOnlyProbe() -> Bool {
-        guard let origin = self.state.remote?.originID, let breaker = self.state.breakers[origin] else {
+        guard let breaker = self.breakerRecorded() else {
             return false
         }
-        return breaker.admission(of: nil, at: self.environment.time.monotonicNow()) == .probe
+        return breaker.admission(of: nil, at: self.decisionNow()) == .probe
     }
 
     /// Re-queues the first job the breaker parked in the pump's order (`circuitOrder`) for the probe a breaker that admits

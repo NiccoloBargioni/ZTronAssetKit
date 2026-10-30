@@ -41,23 +41,28 @@ extension SyncEngine {
     /// this apply and placed its finds first, and appending them now put them ahead of the older pass's later finds
     /// (cycle 11, S3-R14 item 2). While a follow is owed no admission is made and no space verdict given
     /// (`followBarrier`, F-28), no run settles (a claim may still move) and no job held for a manifest catch-up is
-    /// released (it may be one the follow moves).
+    /// released (it may be one the follow moves). Every job this apply's follow visits is visited under the apply's
+    /// decision instant (`followStamps`, S3-R15 item 1), the instant a visit-first engine visited it at.
     func followApplied(from previous: ValidatedManifest) {
+        let stamp = self.worldStamp()
         let owed = self.state.followOrder[self.state.followNext...]
         let owedSet = Set(owed)
         let others = self.state.unfollowed.subtracting(owedSet).subtracting(self.state.followCarried).sorted()
         let changed = previous.digest != self.state.applied.digest || previous.count != self.state.applied.count
         if self.state.followScans.isEmpty {
             self.state.followOrder = Array(owed) + others
+            for transfer in others where self.state.followStamps[transfer] == nil {
+                self.state.followStamps[transfer] = stamp
+            }
             if !self.state.jobs.isEmpty, changed {
-                self.state.followScans.append(FollowScan(manifest: previous))
+                self.state.followScans.append(FollowScan(manifest: previous, stamp: stamp))
             }
         } else {
             self.state.followOrder = Array(owed)
             self.state.followCarried.formUnion(others)
             // A pass over an unchanged copy compares every entry and finds nothing; it is queued only to carry `others`.
             if changed || !others.isEmpty {
-                self.state.followScans.append(FollowScan(manifest: changed ? previous : self.state.applied, carried: others))
+                self.state.followScans.append(FollowScan(manifest: changed ? previous : self.state.applied, carried: others, stamp: stamp))
             }
         }
         self.state.followNext = 0
@@ -94,12 +99,13 @@ extension SyncEngine {
         while visited < Self.followsPerTurn, self.state.followNext < self.state.followOrder.count {
             let transfer = self.state.followOrder[self.state.followNext]
             self.state.followNext += 1
+            let stamp = self.state.followStamps.removeValue(forKey: transfer)
             // A job owed a visit stays in `unfollowed` until it; one that left it was removed meanwhile (`removeJob`).
             guard self.state.unfollowed.remove(transfer) != nil else {
                 continue
             }
             visited += 1
-            if self.visit(transfer) {
+            if self.visit(transfer, at: stamp ?? self.worldStamp()) {
                 moved = true
             }
         }
@@ -123,6 +129,7 @@ extension SyncEngine {
             self.pump()
         }
         self.drainEventsAfterFollow()
+        self.endWorldHistory()
     }
 
     /// The events one drain turn applies at most (`drainEventsAfterFollow`): an event costs about what a re-queue or a park
@@ -149,36 +156,137 @@ extension SyncEngine {
                 break
             }
         }
-        let batch = Array(zip(self.state.eventsAfterFollow.prefix(count), self.state.eventsArrivedAt.prefix(count)))
+        let batch = Array(zip(self.state.eventsAfterFollow.prefix(count), self.state.eventStamps.prefix(count)))
         self.state.eventsAfterFollow.removeFirst(count)
-        self.state.eventsArrivedAt.removeFirst(min(count, self.state.eventsArrivedAt.count))
+        self.state.eventStamps.removeFirst(min(count, self.state.eventStamps.count))
         self.state.drainingAfterFollow = true
-        for (event, arrived) in batch {
-            self.state.replayInstant = arrived
-            self.replay(event)
+        for (event, stamp) in batch {
+            self.withReading(stamp) {
+                self.replay(event)
+            }
         }
-        self.state.replayInstant = nil
         self.state.drainingAfterFollow = false
         guard self.state.eventsAfterFollow.isEmpty else {
             self.scheduleDrainFollowUp()
             return
         }
-        self.state.throttlesReplayed = [:]
         self.checkRunSettled()
         self.pump()
+        self.endWorldHistory()
     }
 
-    /// Defers `event` to the follow's end (`eventsAfterFollow`), with the instant it arrived.
+    /// Defers `event` to the follow's end (`eventsAfterFollow`), with its decision instant (`worldStamp()`).
     func deferToFollow(_ event: EventAfterFollow) {
         self.state.eventsAfterFollow.append(event)
-        self.state.eventsArrivedAt.append(self.environment.time.monotonicNow())
+        self.state.eventStamps.append(self.worldStamp())
     }
 
-    /// The instant a decision is taken at: the arrival of the event the drain applies (`replayInstant`), or now. A
-    /// visit-first engine took the decision when the event arrived, so a place's request time, a backoff's start and a
-    /// fail-fast answer's wait count from then.
+    /// The instant a decision is taken at: the decision instant the engine reads under (`EngineState.reading`: the
+    /// arrival of the event the drain applies, or the apply a follow's visit belongs to), or now. A visit-first engine
+    /// took the decision then, so a place's request time, a backoff's start and a fail-fast answer's wait count from it.
     func decisionNow() -> MonotonicInstant {
-        self.state.replayInstant ?? self.environment.time.monotonicNow()
+        self.state.reading?.at ?? self.environment.time.monotonicNow()
+    }
+
+    // MARK: One view of the world per decision instant (Stage 3 close-out cycle 12, S3-R15 item 1)
+
+    /// The decision instant now: the instant and the view of the non-ledger real-world inputs as they stand
+    /// (`WorldView`), appended to `worldHistory` when it differs from the last view. Under a reading (a visit or a
+    /// replay) it is that reading: nothing a visit or a replay decides is an input of its own.
+    func worldStamp() -> WorldStamp {
+        if let reading = self.state.reading {
+            return reading
+        }
+        let origin = self.state.remote?.originID
+        let view = WorldView(
+            throttle: origin.flatMap { self.state.throttles[$0] },
+            breaker: origin.flatMap { self.state.breakers[$0] },
+            conditions: ConditionsSnapshot(conditions: self.state.conditions, pausedForThermal: self.state.pausedForThermal),
+            edgeSerial: self.state.networkEdgeSerial
+        )
+        if self.state.worldHistory.last != view {
+            self.state.worldHistory.append(view)
+        }
+        return WorldStamp(at: self.environment.time.monotonicNow(), view: self.state.worldHistory.count - 1)
+    }
+
+    /// Runs `body` under the decision instant `stamp` (`EngineState.reading`): `decisionNow()` is its instant, the
+    /// origin's throttle and breaker are read from its view (`throttleRecorded()`, `breakerRecorded()`), and the
+    /// lane-wide conditions are its view's for the body's duration (the cycle-11 `withConditions`, folded in). Every
+    /// replayed event and every follow visit runs under one, so each reads the world as it stood at its visit-first
+    /// instant, whatever arrived since. Synchronous: no other turn sees the swap; the inputs themselves are applied on
+    /// arrival only, so nothing the body does writes the swapped conditions.
+    func withReading<T>(_ stamp: WorldStamp, _ body: () -> T) -> T {
+        let previous = self.state.reading
+        let conditions = self.state.conditions
+        let thermal = self.state.pausedForThermal
+        let view = self.state.worldHistory[stamp.view]
+        self.state.reading = stamp
+        self.state.conditions = view.conditions.conditions
+        self.state.pausedForThermal = view.conditions.pausedForThermal
+        let result = body()
+        self.state.reading = previous
+        self.state.conditions = conditions
+        self.state.pausedForThermal = thermal
+        return result
+    }
+
+    /// The view the engine reads under, if any (`withReading`).
+    var readingView: WorldView? {
+        self.state.reading.map { self.state.worldHistory[$0.view] }
+    }
+
+    /// The origin's recorded throttle end at the decision instant: the reading's view, else the live end.
+    func throttleRecorded() -> MonotonicInstant? {
+        if let view = self.readingView {
+            return view.throttle
+        }
+        return self.state.remote.flatMap { self.state.throttles[$0.originID] }
+    }
+
+    /// The origin's breaker at the decision instant: the reading's view, else the live breaker.
+    func breakerRecorded() -> CircuitBreaker? {
+        if let view = self.readingView {
+            return view.breaker
+        }
+        return self.state.remote.flatMap { self.state.breakers[$0.originID] }
+    }
+
+    /// A throttle a decision under a reading found ended at its instant (`readmitOpenedOriginGates`): the reading's view
+    /// shows it cleared from then on. The live throttle is cleared only when it has ended by the reading's instant too: a
+    /// later 429 may have extended it since (`endThrottle`).
+    func readingClearedThrottle() {
+        self.changeReadingView { $0.throttle = nil }
+    }
+
+    /// Applies a change the decision under a reading makes to the origin's throttle or breaker (a visit's abandon, a
+    /// throttle it found ended) to the reading's view as well, so the rest of that decision, and the places it gives,
+    /// read the world as a visit-first engine's decision left it at that instant: a new view, so the events that share
+    /// the old one keep it. Nothing without a reading.
+    func changeReadingView(_ change: (inout WorldView) -> Void) {
+        guard let stamp = self.state.reading else {
+            return
+        }
+        var view = self.state.worldHistory[stamp.view]
+        change(&view)
+        guard view != self.state.worldHistory[stamp.view] else {
+            return
+        }
+        self.state.worldHistory.append(view)
+        self.state.reading = WorldStamp(at: stamp.at, view: self.state.worldHistory.count - 1)
+    }
+
+    /// Ends the world history once the barrier is down (`EngineState.worldHistory`): the barrier-end pump has read the
+    /// places' gates, and no decision reads an older view any more. A publication still marked as owing a visit
+    /// (`publishedOwingVisit`) owes none now: the follow that owed it ended, and its commit is answered when it arrives.
+    func endWorldHistory() {
+        guard !self.followBarrier, self.state.reading == nil else {
+            return
+        }
+        self.state.worldHistory = []
+        self.state.followStamps = [:]
+        self.state.placeStamps = [:]
+        self.state.publishedOwingVisit = []
     }
 
     /// Applies one event that waited for the follow (`drainEventsAfterFollow`).
@@ -191,14 +299,8 @@ extension SyncEngine {
             self.decideSpaceFailure(transfer, required: required)
         case .attemptFailed(let transfer, let epoch, let verdict):
             self.replayVerdict(transfer, epoch: epoch, verdict)
-        case .enqueue(let transfer, let epoch, let front):
-            self.notePlaceTaken(transfer)
-            // A place belongs to the job that asked for it: one removed meanwhile, and re-created by the follow's
-            // visit, has its own place (PROBE-C9-STALE-PLACE).
-            guard self.state.jobs[transfer]?.epoch == epoch else {
-                return
-            }
-            self.enqueue(transfer, front: front, askedBefore: true)
+        case .committed(let commit):
+            self.replayCommit(commit)
         case .join(let join):
             self.replayJoin(join)
         case .endClaim(let token, let member):
@@ -217,14 +319,10 @@ extension SyncEngine {
             self.resumeReleases()
         case .purge(let request):
             self.withdrawPurged(request)
-        case .conditions(let conditions, let edge):
-            self.withConditions(conditions) {
-                self.applyConditionsToJobs(edge: edge)
-            }
-        case .readmit(let passes, let conditions):
-            self.withConditions(conditions) {
-                self.readmit(passes)
-            }
+        case .conditions(let edge):
+            self.applyConditionsToJobs(edge: edge)
+        case .readmit(let passes):
+            self.readmit(passes)
         case .unblock(let kind):
             self.unblockOrigin(kind)
         case .retryDue(let transfer, let epoch):
@@ -232,24 +330,6 @@ extension SyncEngine {
         case .throttleAnswers:
             self.answerThrottledUsersNow()
         }
-    }
-
-    /// Runs `body` with the lane-wide conditions an event captured when it arrived (`ConditionsSnapshot`): the lane
-    /// verdicts it reads are those a visit-first engine read at that event, whatever arrived after it. Synchronous: no
-    /// other turn sees the swap.
-    private func withConditions(_ snapshot: ConditionsSnapshot, _ body: () -> Void) {
-        let conditions = self.state.conditions
-        let thermal = self.state.pausedForThermal
-        self.state.conditions = snapshot.conditions
-        self.state.pausedForThermal = snapshot.pausedForThermal
-        body()
-        self.state.conditions = conditions
-        self.state.pausedForThermal = thermal
-    }
-
-    /// The lane-wide conditions now (`withConditions`).
-    var conditionsSnapshot: ConditionsSnapshot {
-        ConditionsSnapshot(conditions: self.state.conditions, pausedForThermal: self.state.pausedForThermal)
     }
 
     /// Schedules one later turn for the events a drain turn left (C2).
@@ -268,11 +348,13 @@ extension SyncEngine {
             // Shutting down: nothing is admitted any more.
             self.state.drainFollowUpScheduled = false
             self.state.eventsAfterFollow = []
-            self.state.eventsArrivedAt = []
-            self.state.placesAfterFollow = [:]
+            self.state.eventStamps = []
             self.state.verdictsAfterFollow = [:]
             self.state.joinsAfterFollow = [:]
-            self.state.throttlesReplayed = [:]
+            self.state.worldHistory = []
+            self.state.followStamps = [:]
+            self.state.placeStamps = [:]
+            self.state.publishedOwingVisit = []
         }
     }
 
@@ -300,7 +382,7 @@ extension SyncEngine {
     }
 
     /// Whether `job` holds an id the engine's copy lists at another transfer (`holdsMovedID` without its follow).
-    private func holdsIDListedElsewhere(_ job: Job) -> Bool {
+    func holdsIDListedElsewhere(_ job: Job) -> Bool {
         job.assets.contains { asset in
             self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? false
         }
@@ -321,7 +403,7 @@ extension SyncEngine {
     /// follow's own visit may move its ids or join it (its re-lane then does nothing, `relane`), and every other input
     /// that meets it (a join, a withdrawal, a conditions element, an edge) waits behind the verdict as an event of its own.
     func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
-        guard self.defersToFollow, let job = self.state.jobs[transfer] else {
+        guard self.defersToFollow, let job = self.state.jobs[transfer], self.exitDefers(job) else {
             return false
         }
         switch job.state {
@@ -338,6 +420,17 @@ extension SyncEngine {
         self.deferToFollow(.attemptFailed(transfer, epoch: job.epoch, verdict: verdict))
         self.notifyObservers()
         return true
+    }
+
+    /// Whether an exit of `job` would wait for the follow (`defersFailure`): only an attempt's end, of a job in flight or
+    /// failed, waits.
+    func exitDefers(_ job: Job) -> Bool {
+        switch job.state {
+        case .failed, .downloading, .verifying, .committing:
+            return true
+        case .queued, .blocked:
+            return false
+        }
     }
 
     /// Gives a deferred exit verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
@@ -385,33 +478,50 @@ extension SyncEngine {
             if self.transition(transfer, to: .queued) {
                 self.enqueue(transfer)
             }
+        case .supersede:
+            // The store superseded the publication (`publicationFailed`): the interests the visits left follow their
+            // current entries.
+            if self.transition(transfer, to: .queued) {
+                self.supersede(transfer, settling: false)
+            }
         }
     }
 
-    /// A 429's park decided after the follow (`EngineFailures.throttled`): the backoff of the lane the visits left
-    /// (R-SYN-5, PROBE-C10-THROTTLE-LANE) from the 429's instant, or its `Retry-After` when longer, which already
-    /// throttled the origin when it arrived (a real-world input, S3-R14). The origin's throttle keeps the later end. The
-    /// park's fail-fast answers read the wait at the 429's instant against the end a visit-first engine had decided
-    /// then: the throttle in force when the 429 arrived and the ends the earlier replayed 429s gave, not a later 429's
-    /// (PROBE-C10-THROTTLE-EXTENDED; `throttlesReplayed`). The origin's alarm stays at the origin's end (`park`).
+    /// A 429's park decided after the follow (`EngineFailures.throttled`). The 429 throttled the origin when it arrived,
+    /// for the backoff of the lane the owed visits leave the job (S3-R15 item 2, `followedLane`; R-SYN-5,
+    /// PROBE-C10-THROTTLE-LANE), or ended the job's attempts there (`ThrottleDecision.exhausted`); the replay only parks
+    /// the job the visits left and answers its users. Its fail-fast answers read the wait at the 429's instant against the
+    /// origin's end in the event's view (the reading), which counts this 429 and the earlier ones, not a later 429's
+    /// (PROBE-C10-THROTTLE-EXTENDED). The origin's alarm stays at the live origin's end (`park`).
     private func replayThrottle(_ transfer: TransferID, _ facts: ThrottleFacts) {
         guard let job = self.state.jobs[transfer], let origin = self.state.remote?.originID else {
             return
         }
-        let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-        guard let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: facts.retryAfter, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) else {
+        let until: MonotonicInstant
+        switch facts.decision {
+        case .exhausted:
             self.transition(transfer, to: .failed(.nextRun))
             self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: facts.retryAfter)))
             return
+        case .until(let end):
+            until = end
+        case .undecided:
+            // No interest of the job kept an id at its content when the 429 arrived (`followedLane`), yet the job kept
+            // ids the visits left it: its backoff is decided here, on the lane the visits left, from the 429's instant.
+            let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+            guard let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: facts.retryAfter, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) else {
+                self.transition(transfer, to: .failed(.nextRun))
+                self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: facts.retryAfter)))
+                return
+            }
+            until = facts.at.adding(seconds: max(delay, facts.retryAfter ?? 0))
+            let previous = self.state.throttles[origin]
+            self.state.throttles[origin] = max(previous ?? .zero, until)
+            self.changeReadingView { $0.throttle = max($0.throttle ?? .zero, until) }
+            self.state.metrics.retries[.throttled] += 1
+            self.throttleExtended(from: previous)
         }
-        let until = facts.at.adding(seconds: max(delay, facts.retryAfter ?? 0))
-        let previous = self.state.throttles[origin]
-        self.state.throttles[origin] = max(previous ?? .zero, until)
-        self.state.metrics.retries[.throttled] += 1
-        self.throttleExtended(from: previous)
-        let replayed = self.state.throttlesReplayed[origin]
-        let end = max(facts.decided ?? .zero, replayed ?? .zero, until)
-        self.state.throttlesReplayed[origin] = max(replayed ?? .zero, until)
+        let end = self.throttleEnd(after: until)
         if self.transition(transfer, to: .queued) {
             self.park(transfer, reason: .throttled(until: end), answeredAt: facts.at, answerEnd: end)
         }
@@ -479,27 +589,28 @@ extension SyncEngine {
     /// The follow's visits moved them already, unless the follow passed the job while it verified or committed (it is
     /// visited again only by the next follow) or the job was joined for a replaced entry after the follow's pass; the
     /// cycles before brought that visit forward to the failure. The drain's last batch pumps for any job it creates.
-    private func followedForVerdict(_ transfer: TransferID, epoch: UInt64) -> Bool {
+    private func followedForVerdict(_ transfer: TransferID, epoch: UInt64, publishing: Bool = false) -> Bool {
         guard let job = self.state.jobs[transfer], job.epoch == epoch else {
             return false
         }
         if self.holdsIDListedElsewhere(job) {
-            _ = self.visit(transfer)
+            _ = self.visit(transfer, at: nil, publishing: publishing)
         }
         return self.state.jobs[transfer]?.epoch == epoch
     }
 
-    /// Records that a place in a queue (`EventAfterFollow.enqueue`) waits for the drain.
-    func notePlaceWaits(_ transfer: TransferID) {
-        self.state.placesAfterFollow[transfer, default: 0] += 1
-    }
-
-    /// Records that the drain gives a waiting place (`notePlaceWaits`).
-    private func notePlaceTaken(_ transfer: TransferID) {
-        guard let count = self.state.placesAfterFollow[transfer] else {
+    /// A commit that waited for the follow's visit of its job (`EventAfterFollow.committed`, `deferCommit`): the visit
+    /// re-routed the moved ids' interests at the follow's place, as a visit-first engine's visit did while the job
+    /// downloaded, and the commit now answers the interests it left (`committed`), unless the job ended or was replaced
+    /// meanwhile (the store's bindings stand whatever became of the job).
+    private func replayCommit(_ commit: CommitAfterFollow) {
+        guard self.state.jobs[commit.transfer]?.epoch == commit.epoch, self.state.jobs[commit.transfer]?.state == .committing,
+              self.followedForVerdict(commit.transfer, epoch: commit.epoch, publishing: true) else {
+            // The store bound these ids whatever became of the job.
+            self.bind(commit.locations.keys, to: commit.transfer, since: commit.serial)
             return
         }
-        self.state.placesAfterFollow[transfer] = count > 1 ? count - 1 : nil
+        self.committed(commit.transfer, binding: commit.ids, locations: commit.locations, since: commit.serial)
     }
 
     /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
@@ -517,6 +628,7 @@ extension SyncEngine {
                 for transfer in scan.carried where self.state.followCarried.remove(transfer) != nil {
                     if self.state.jobs[transfer] != nil, self.state.unfollowed.contains(transfer) {
                         self.state.followOrder.append(transfer)
+                        self.state.followStamps[transfer] = scan.stamp
                     }
                 }
                 scan.carried = []
@@ -536,6 +648,7 @@ extension SyncEngine {
                 }
                 if self.state.unfollowed.insert(transfer).inserted || self.state.followCarried.remove(transfer) != nil {
                     self.state.followOrder.append(transfer)
+                    self.state.followStamps[transfer] = scan.stamp
                 }
             }
             if scan.next < entries.count {
@@ -556,29 +669,42 @@ extension SyncEngine {
         return unscanned
     }
 
-    /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`).
-    private func visit(_ transfer: TransferID) -> Bool {
+    /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`), under the decision
+    /// instant `stamp` of the apply it belongs to (`withReading`; S3-R15 item 1, the cycle-11 residual R-D), or under the
+    /// current reading when `nil` (a drain's visit before a verdict, `followedForVerdict`).
+    private func visit(_ transfer: TransferID, at stamp: WorldStamp?, publishing: Bool = false) -> Bool {
         self.state.inFollowVisit = true
         defer {
             self.state.inFollowVisit = false
         }
-        return self.follow(transfer)
+        guard let stamp else {
+            return self.follow(transfer, publishing: publishing)
+        }
+        return self.withReading(stamp) {
+            self.follow(transfer, publishing: publishing)
+        }
     }
 
     /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job verifying or committing is
     /// not moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next
-    /// follow. The caller checks the run and pumps once per turn, not once per job.
-    private func follow(_ transfer: TransferID) -> Bool {
+    /// follow. The caller checks the run and pumps once per turn, not once per job. The exception is a job whose
+    /// publication began while it owed this visit (`publishedOwingVisit`): a visit-first engine visited it while it
+    /// downloaded, so its moved ids' interests are re-routed here, at the follow's place, and a job none of whose ids
+    /// stay is superseded; its publication's outcome then answers the interests the visit left (S3-R15 item 3, R-A).
+    /// `publishing` is the drain's visit of such a job before its commit (`replayCommit`).
+    private func follow(_ transfer: TransferID, publishing: Bool = false) -> Bool {
         guard let job = self.state.jobs[transfer] else {
             return false
         }
         let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
         switch job.state {
         case .verifying, .committing:
-            if !moved.isEmpty {
-                self.state.unfollowed.insert(transfer)
+            guard self.state.publishedOwingVisit.remove(transfer) != nil || publishing else {
+                if !moved.isEmpty {
+                    self.state.unfollowed.insert(transfer)
+                }
+                return false
             }
-            return false
         default:
             break
         }
@@ -698,10 +824,9 @@ enum EventAfterFollow: Sendable {
     /// The exit verdict of an attempt that ended behind the barrier (`SyncEngine.defersFailure`); `epoch` is the job's
     /// at the exit.
     case attemptFailed(TransferID, epoch: UInt64, verdict: AttemptVerdict)
-    /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues, at
-    /// the front when `front` (a pause's resume, a gate's wait), with the time the place was asked for; `epoch` is the
-    /// job's when it asked, and a later job of the transfer does not take it.
-    case enqueue(TransferID, epoch: UInt64, front: Bool)
+    /// A commit that arrived before the follow's owed visit of its job, which holds an id the copy lists elsewhere
+    /// (`SyncEngine.deferCommit`; S3-R15 item 3, residual R-A): the visit re-routes those ids first, at the follow's place.
+    case committed(CommitAfterFollow)
     /// A request's join (`addInterest`), other than the follow's own.
     case join(JoinAfterFollow)
     /// The end of a prefetch member's pending claim that the group's join reached (`joinMember`), after its join.
@@ -719,11 +844,12 @@ enum EventAfterFollow: Sendable {
     /// A purge's withdrawals of non-user interests (`withdrawPurged`).
     case purge(PurgeRequest)
     /// A conditions element's decisions about jobs (`applyConditionsToJobs`): the pauses of refused running work, the
-    /// re-queues a satisfied edge owes and the conditions' re-admissions, read under the element's own conditions; the
-    /// element itself, its edge serial and the pending run's reading applied when it arrived.
-    case conditions(ConditionsSnapshot, edge: Bool)
+    /// re-queues a satisfied edge owes and the conditions' re-admissions, read under the element's own conditions (its
+    /// decision instant's view); the element itself, its edge serial and the pending run's reading applied when it
+    /// arrived.
+    case conditions(edge: Bool)
     /// A re-admission turn (`readmit`) under the conditions of its arrival.
-    case readmit(Readmissions, ConditionsSnapshot)
+    case readmit(Readmissions)
     /// The re-admission of the jobs an origin gate parked, once the gate opened (`unblockOrigin`).
     case unblock(OriginBlock)
     /// A failed job's backoff ended (the alarm's `.retry`, `retryDue`).
@@ -737,7 +863,7 @@ enum EventAfterFollow: Sendable {
         switch self {
         case .release, .continueReleases, .purge, .conditions, .readmit, .unblock, .throttleAnswers:
             return true
-        case .spaceFailure, .attemptFailed, .enqueue, .join, .endClaim, .endClaims, .removal, .retryDue:
+        case .spaceFailure, .attemptFailed, .committed, .join, .endClaim, .endClaims, .removal, .retryDue:
             return false
         }
     }
@@ -760,8 +886,10 @@ enum AttemptVerdict: Sendable, Equatable {
     /// visits leave has one in `blocks` (the blocks when the pause arrived), any other resumes first in its queue.
     case pause(policy: Bool, blocks: [LaneBlock])
     /// A fresh attempt now, no backoff (`requeue`: a cancel the engine did not ask for, a rejected resume, a background
-    /// session that cannot be used).
+    /// session that cannot be used, a publication's ENOENT after the engine's own cancellation).
     case requeue
+    /// The store superseded the publication (`publicationFailed`): the interests follow their current entries.
+    case supersede
 }
 
 /// A lane's lane-wide block when a pause arrived (`AttemptVerdict.pause`).
@@ -778,11 +906,61 @@ struct ThrottleFacts: Sendable, Equatable {
     let retryAfter: TimeInterval?
     /// The 429's instant.
     let at: MonotonicInstant
-    /// The origin's throttle end in force just before the 429 arrived.
-    let decided: MonotonicInstant?
+    /// What the 429 decided when it arrived (S3-R15 item 2).
+    let decision: ThrottleDecision
 }
 
-/// The lane-wide conditions an event read when it arrived (`SyncEngine.withConditions`).
+/// The throttle a 429 that arrived behind the barrier decided on arrival (`EngineFailures.throttled`).
+enum ThrottleDecision: Sendable, Equatable {
+    /// The origin was throttled until this end for the job's backoff on the lane the owed visits leave it.
+    case until(MonotonicInstant)
+    /// The backoff's caps were exhausted on that lane: the job fails with the throttle's answer.
+    case exhausted
+    /// No interest of the job kept an id at its content (the owed visits move every one): only a `Retry-After` within
+    /// the caps throttled the origin, and a job the visits leave decides its backoff when the drain replays it.
+    case undecided
+}
+
+/// The non-ledger real-world inputs as they stood at one decision instant while the follow barrier held (S3-R15 item
+/// 1; `EngineState.worldHistory`): the origin's throttle end and breaker, the lane-wide conditions and the network
+/// edge's serial. The ledger inputs (free-space reads, the bytes an ended transfer frees, S3-R11 R1) are not in it:
+/// everyone reads them live.
+struct WorldView: Sendable, Equatable {
+    /// The origin's recorded throttle end.
+    var throttle: MonotonicInstant?
+    /// The origin's breaker.
+    var breaker: CircuitBreaker?
+    /// The lane-wide conditions.
+    let conditions: ConditionsSnapshot
+    /// `EngineState.networkEdgeSerial`.
+    let edgeSerial: UInt64
+}
+
+/// A decision instant while the follow barrier holds: when, and the view of the world then (an index into
+/// `EngineState.worldHistory`).
+struct WorldStamp: Sendable, Equatable {
+    /// The instant.
+    let at: MonotonicInstant
+    /// The view's index in `EngineState.worldHistory`.
+    let view: Int
+}
+
+/// A commit that waits for the follow's visit of its job (`EventAfterFollow.committed`): what `committed` is called
+/// with.
+struct CommitAfterFollow: Sendable {
+    /// The job.
+    let transfer: TransferID
+    /// Its epoch at the commit.
+    let epoch: UInt64
+    /// The ids the publication bound for.
+    let ids: [AssetID]
+    /// The store's locations of the ids it bound.
+    let locations: [AssetID: AssetLocation]
+    /// `EngineState.ledgerForgets` when the publication began.
+    let serial: UInt64
+}
+
+/// The lane-wide conditions an event read when it arrived (`WorldView.conditions`).
 struct ConditionsSnapshot: Sendable, Equatable {
     /// The conditions element in force.
     let conditions: DeviceConditions?

@@ -58,17 +58,19 @@ struct OriginGate: Equatable {
 }
 
 extension SyncEngine {
-    /// The origin's gates at `now` (`OriginGate`); without a remote source nothing is gated.
+    /// The origin's gates at `now` (`OriginGate`); without a remote source nothing is gated. Under a reading (a visit or
+    /// a replay while the follow barrier holds) the throttle and the breaker are those of its decision instant
+    /// (`throttleRecorded`, `breakerRecorded`; S3-R15 item 1, PROBE-C11-JOIN-THROTTLE-END).
     func originGate(at now: MonotonicInstant) -> OriginGate {
-        guard let origin = self.state.remote?.originID else {
+        guard self.state.remote != nil else {
             return OriginGate(now: now, throttledUntil: nil, throttleEnded: false, breaker: nil)
         }
-        let end = self.state.throttles[origin]
+        let end = self.throttleRecorded()
         return OriginGate(
             now: now,
             throttledUntil: OriginGate.inForce(end, at: now),
             throttleEnded: end.map { $0 <= now } ?? false,
-            breaker: self.state.breakers[origin]?.admission(of: nil, at: now)
+            breaker: self.breakerRecorded()?.admission(of: nil, at: now)
         )
     }
 
@@ -116,8 +118,15 @@ extension SyncEngine {
     }
 
     /// Clears the origin's ended throttle and re-queues the jobs it parked: the `.throttle` deadline's work, shared by its
-    /// alarm turn and `readmitOpenedOriginGates`.
+    /// alarm turn and `readmitOpenedOriginGates`. Under a reading the throttle ended at the reading's instant: the reading
+    /// sees it cleared from then on, and the live throttle is cleared only when it has ended by then too, since a later
+    /// 429 may have extended it (`readingClearedThrottle`, S3-R15 item 1).
     func endThrottle(_ origin: String) {
+        self.readingClearedThrottle()
+        if let end = self.state.throttles[origin], end > self.decisionNow() {
+            self.unblockOrigin(.throttled)
+            return
+        }
         self.state.throttles[origin] = nil
         if self.state.heap.deadline(for: .throttle(origin)) != nil {
             self.state.heap.remove(.throttle(origin))
