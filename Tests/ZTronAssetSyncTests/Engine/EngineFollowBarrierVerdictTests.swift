@@ -305,6 +305,75 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
+    /// A satisfied network edge that meets an offline failure whose verdict waits for the follow retries it after the
+    /// verdict, as it does when the follow visits first: the offline scenario above, with the path dropping and returning
+    /// after C's attempt failed and before the follow's visits run. Visited first, C waited `failed(.whenOnline)` when
+    /// the edge came, so the edge re-queued it and its next attempt served the prefetch member. With the verdict waiting,
+    /// C was failed for the run when the edge came, which re-queues no such job, and the verdict then left it waiting for
+    /// an edge that had already passed (R-SYN-13), the member never served (Stage 3 close-out cycle 10).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierRetriesAWaitingOfflineFailureOnAnEdgeItMet(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 994_006)
+        let engine = s.engine
+        let cBytes = Data(repeating: 0xC6, count: 1_000_000)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        try #require(a.transferID == b.transferID, "setup: A and B share C")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(760_000) + [a, b], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(a.transferID, [.hold, .fail(.offline(.noConnection)), .stage(cBytes)])
+        let group = try await engine.registerGroup([b.identifier], lane: .prefetch).get()
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 3 }
+        let serial = await engine.readForTests { e in e.state.jobs[a.transferID]?.active?.edgeSerial == e.state.networkEdgeSerial }
+        try #require(serial, "setup: no network edge since C's attempt started")
+        let nBytes = EngineFixture.bytes(994_008, count: 16)
+        let aMoved = EngineHarness.onDemand("zz-a", nBytes)
+        await s.harness.source.script(aMoved.transferID, [.stage(nBytes)])
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(860_000) + [aMoved, b], s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            let before = await engine.readForTests { e in (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state) }
+            #expect(before.owed && before.c == .downloading, "setup: C runs and its visit is owed: \(before)")
+        }
+        await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .downloading }
+        for conditions in [EngineRegressionCycle10Tests.offline, DeviceConditions.unrestricted] {
+            await s.harness.conditions.send(conditions)
+            await engine.awaitCondition { $0.state.conditions == conditions }
+        }
+        if visit == .sweepFollowsFirst {
+            let waits = await engine.readForTests { e in e.state.verdictsAfterFollow[a.transferID] != nil }
+            #expect(waits, "setup: the edge met C while its verdict waited")
+        }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect((try? aResult.get())?.byteSize == 16, "A, moved to N, is served from N: \(aResult)")
+        #expect(bResult == .failure(.offline), "B gets C's offline failure, given before the edge: \(bResult)")
+        // Either C's retry ends (the member served, the job gone) or C waits for an edge that already passed.
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in
+                !e.followBarrier && e.state.eventsAfterFollow.isEmpty
+                    && (e.state.jobs[a.transferID].map { $0.state == .failed(.whenOnline) } ?? true)
+            }
+        }
+        let c = await engine.readForTests { e in e.state.jobs[a.transferID]?.state }
+        #expect(c == nil, "C, met by the edge after its failure, was retried and served the member: \(String(describing: c))")
+        let starts = await s.harness.source.starts.filter { $0.id == a.transferID }.count
+        #expect(starts == 2, "C's content started twice: the offline attempt and the edge's retry: \(starts)")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.releaseGroup(group)
+        await FollowBarrier.finish(s, sync: sync)
+    }
+
     /// A 429's park answers only the interests the job holds once the follow moved its ids: C (1 MB) is the content of
     /// zz-a and zz-b, one user waiter each; N (16 bytes) downloads for W's user waiter of zz-n (held). v3 moves zz-a onto
     /// N's content while the follow owes C's visit. C's attempt gets a 429 with Retry-After 60 s (beyond the interactive
