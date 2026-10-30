@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZTronAssetModel
 import ZTronAssetStorage
@@ -715,6 +716,23 @@ extension EngineSyncTests {
     }
 }
 
+/// The state of the job of the content shared by a moved id and a kept one (C), read in the first turn whose condition
+/// check sees the job behind it (K) leave its wait for space: the reclaim's sweep turn.
+@available(macOS 15.0, iOS 18.0, *)
+final class SweepTurnWatch: Sendable {
+    private let seen = Mutex<JobState?>(nil)
+
+    /// Records C's job state once, in the turn the condition is first met.
+    func record(_ state: JobState?) {
+        self.seen.withLock { $0 = state }
+    }
+
+    /// C's job state in that turn; `nil` when the job was gone or the condition was never met.
+    var state: JobState? {
+        self.seen.withLock { $0 }
+    }
+}
+
 /// When the follow visits the job of content shared by a moved id and a kept one, relative to the space sweep that
 /// re-admits it.
 enum LaneDropVisit: String, CaseIterable, Sendable {
@@ -739,7 +757,10 @@ extension EngineSyncTests {
     /// `insufficientSpace`, and its fail-fast answered K's waiter `insufficientSpace(required: 3000000, available:
     /// 999000)` although 6 MB were free and the gate then parked C's job (F-22: the figures are the room the asset
     /// lacks; the close-out cycle-5 correctness lens, PROBE-C5-LANEDROP). At `s3-base` the follow moved every job in the
-    /// apply's turn, so no sweep could act between the two.
+    /// apply's turn, so no sweep could act between the two. In the sweep's own turn C's job is parked `insufficientSpace`
+    /// in both cases: a sweep that skipped the job once its re-judgement failed left it `awaitingSpace` with nothing
+    /// pending and no wake until the store's settle read parked it a turn later (the close-out cycle-6 requirements
+    /// lens, mutant `skipNotFit`).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)", .timeLimit(.minutes(1)), arguments: LaneDropVisit.allCases)
     func spaceSweepJudgesAFollowedJobOnItsNewLane(_ visit: LaneDropVisit) async throws {
@@ -824,9 +845,18 @@ extension EngineSyncTests {
         // Just under 2 MB in both cases: a follow that visited first may already have committed A's 16 bytes.
         try await Self.leaveRoom(1_999_000, harness: harness, fileSystem: fileSystem)
         // The grace ends: the alarm reaps x's 4 MB (6 MB of room for user work, none for prefetch work) and runs its
-        // `.reclaimed` sweep.
+        // `.reclaimed` sweep. C's job is also read in the first turn that sees K leave its wait, the sweep's (a condition
+        // is evaluated in every turn that notifies): the settle read that follows that turn decides a job the sweep left
+        // waiting, so a later read cannot tell a job the sweep parked from one it left `awaitingSpace` with no wake.
+        let watch = SweepTurnWatch()
         await EngineRegressionCycle6Tests.driving([time], fence: engine) {
-            await engine.awaitCondition { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
+            await engine.awaitCondition { engine in
+                guard engine.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) else {
+                    return false
+                }
+                watch.record(engine.state.jobs[a.transferID]?.state)
+                return true
+            }
         }
         let afterSweep = await engine.readForTests { engine in
             (
@@ -838,6 +868,7 @@ extension EngineSyncTests {
         }
         #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
         #expect(afterSweep.lane == .prefetch && afterSweep.shared != .queued, "C's job, left with B's prefetch interest, waits for room prefetch work has not: \(afterSweep)")
+        #expect(watch.state == .blocked(.insufficientSpace), "in the sweep's turn C's job, which does not fit its prefetch lane, is parked insufficientSpace (re-checked at every read), not left awaitingSpace with nothing pending and no wake: \(String(describing: watch.state))")
         #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
         await engine.readForTests { $0.releaseFollowFollowUps() }
         let kResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: kWaiter) }
