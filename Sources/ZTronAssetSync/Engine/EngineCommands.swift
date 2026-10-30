@@ -1818,6 +1818,7 @@ extension SyncEngine {
         if self.isRunning, self.state.pumpWaitsForFollow, !self.followOwed {
             violations.append("a pump waits for a follow that nothing owes")
         }
+        violations.append(contentsOf: self.followBarrierViolations())
         if self.followOwed {
             let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
             if unmarked > 0 {
@@ -1843,11 +1844,39 @@ extension SyncEngine {
             violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
         }
         // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
-        // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+        // released groups want it (the rule above), or its place waits for the follow barrier's drain
+        // (`placesAfterFollow`); a job with none would wait for ever (review of close-out cycle 10; Stage 3 close-out
+        // cycle 9, amendment (b) of S3-R11).
         let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
-        let stranded = self.state.jobs.values.filter { $0.state == .queued && !reachable.contains($0.transfer) }.count
+        let stranded = self.state.jobs.values.filter { job in
+            job.state == .queued && !reachable.contains(job.transfer) && self.state.placesAfterFollow[job.transfer] == nil
+        }.count
         if stranded > 0 {
             violations.append("\(stranded) queued jobs wait in no queue")
+        }
+        return violations
+    }
+
+    /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
+    /// drain is in progress (none, between turns), so none waits for ever; and the places counted in `placesAfterFollow`
+    /// are exactly the waiting `.enqueue` and `.reinstate` events (Stage 3 close-out cycle 9, amendment (b) of S3-R11).
+    private func followBarrierViolations() -> [String] {
+        var violations: [String] = []
+        let events = self.state.eventsAfterFollow
+        if self.isRunning, !events.isEmpty, !self.followOwed, !self.state.drainFollowUpScheduled, !self.state.drainingAfterFollow {
+            violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
+        }
+        var places: [TransferID: Int] = [:]
+        for event in events {
+            switch event {
+            case .enqueue(let transfer), .reinstate(let transfer):
+                places[transfer, default: 0] += 1
+            case .spaceFailure, .spaceJoin:
+                break
+            }
+        }
+        if places != self.state.placesAfterFollow {
+            violations.append("the \(self.state.placesAfterFollow.count) counted places that wait for a follow differ from the \(places.count) the events hold")
         }
         return violations
     }

@@ -132,7 +132,11 @@ extension SyncEngine {
                 }
                 self.failFastJoiner(token, of: transfer)
             case .enqueue(let transfer):
+                self.notePlaceTaken(transfer)
                 self.enqueue(transfer)
+            case .reinstate(let transfer):
+                self.notePlaceTaken(transfer)
+                self.reinstate(transfer)
             }
         }
         self.state.drainingAfterFollow = false
@@ -159,6 +163,7 @@ extension SyncEngine {
             // Shutting down: nothing is admitted any more.
             self.state.drainFollowUpScheduled = false
             self.state.eventsAfterFollow = []
+            self.state.placesAfterFollow = [:]
         }
     }
 
@@ -186,6 +191,19 @@ extension SyncEngine {
             return false
         }
         return job.assets.contains { self.state.applied.entry(for: $0)?.transferID != job.transfer }
+    }
+
+    /// Records that a place in a queue (`EventAfterFollow.enqueue`, `.reinstate`) waits for the drain.
+    func notePlaceWaits(_ transfer: TransferID) {
+        self.state.placesAfterFollow[transfer, default: 0] += 1
+    }
+
+    /// Records that the drain gives a waiting place (`notePlaceWaits`).
+    private func notePlaceTaken(_ transfer: TransferID) {
+        guard let count = self.state.placesAfterFollow[transfer] else {
+            return
+        }
+        self.state.placesAfterFollow[transfer] = count > 1 ? count - 1 : nil
     }
 
     /// Whether `job` holds an id the engine's copy lists at another transfer while a follow is owed: a failure of the
@@ -401,4 +419,6 @@ enum EventAfterFollow: Sendable {
     case spaceJoin(InterestToken, TransferID)
     /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues.
     case enqueue(TransferID)
+    /// A queued job's return to the place its entry had (`reinstate`).
+    case reinstate(TransferID)
 }

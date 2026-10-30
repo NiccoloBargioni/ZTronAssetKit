@@ -79,8 +79,13 @@ struct EngineState {
     /// The events that arrived behind the follow barrier and read what the owed visits change, in arrival order (F-28;
     /// Stage 3 close-out cycle 9, S3-R11 design D3): an ENOSPC's verdict, a join's re-check of a job parked
     /// `insufficientSpace`, and a job's place in its queue. They are applied when the follow ends, after its own last
-    /// turn and pump, as a visit-first engine meets them (`SyncEngine.drainEventsAfterFollow`).
+    /// turn and pump, as a visit-first engine meets them (`SyncEngine.drainEventsAfterFollow`). They wait only while a
+    /// follow is owed, a drain turn is scheduled or a drain is in progress (`invariantViolations()`).
     var eventsAfterFollow: [EventAfterFollow] = []
+    /// The places in a queue that wait in `eventsAfterFollow` (`.enqueue`, `.reinstate`), counted per transfer: a queued
+    /// job counted here waits in no queue until the drain gives it its place, and is no stranded job
+    /// (`invariantViolations()`; the cycle-9 amendment (b)).
+    var placesAfterFollow: [TransferID: Int] = [:]
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again.
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.

@@ -429,6 +429,7 @@ extension SyncEngine {
             // A place taken while a follow is owed comes after the places of the jobs its visits queue (design D3,
             // PROBE-D3-TICKET): a visit-first engine queued those at the apply. Nothing dispatches meanwhile (`pump`).
             self.state.eventsAfterFollow.append(.enqueue(transfer))
+            self.notePlaceWaits(transfer)
             return
         }
         self.state.lastTicket += 1
@@ -450,6 +451,12 @@ extension SyncEngine {
     /// and ahead of work queued before them (review of close-out cycle 10, PROBE-C10R-3; R-SYN-3).
     func reinstate(_ transfer: TransferID) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
+            return
+        }
+        if self.defersToFollow {
+            // Behind the follow barrier, as `enqueue`'s place (F-28).
+            self.state.eventsAfterFollow.append(.reinstate(transfer))
+            self.notePlaceWaits(transfer)
             return
         }
         self.state.lastTicket += 1
