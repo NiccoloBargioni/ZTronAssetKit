@@ -736,6 +736,9 @@ package final class BackgroundTransferHandle: TransferHandle {
     /// Which attach of `name` this handle is (the coordinator's control check).
     package let token: UInt64
     private let controls: AsyncStream<Control>.Continuation
+    /// The task that delivers the controls. It ends once the attach ended or the handle went away and the controls
+    /// made before were delivered (R-SYN-14: no task outlives its transfer); tests await it to prove that.
+    let controlTask: Task<Void, Never>
 
     init(
         coordinator: BackgroundTransferCoordinator,
@@ -753,7 +756,7 @@ package final class BackgroundTransferHandle: TransferHandle {
         self.controls = controls.continuation
         let pending = controls.stream
         // The control task captures the stream, never `self`, so dropping the handle still ends it (deinit).
-        Task { [coordinator, name, token] in
+        self.controlTask = Task { [coordinator, name, token] in
             for await control in pending {
                 switch control {
                 case .priority(let priority):
