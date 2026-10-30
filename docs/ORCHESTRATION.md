@@ -43,7 +43,39 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 - **Gates on the partial merge `d97e4e7`** (clean detached worktree `.worktrees/s3m-gates`, logs `.build-orch/s3m/`): `--quick` `VERIFY: PASS` (Transport 165, Sync 351, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104); `--gates-only` `VERIFY: PASS` (trace: 1,247 tests with ids). A gates worktree must not sit under a `.build*` path: `gates.py` skips every path containing `/.build`, so trace then finds 0 tests and fails (first attempt, `.build-orch-gates-wt`).
 - **Uncommitted `Package.swift` in the main checkout** (`swift-tools-version: 6.0` → `6.3`, modified 29 Oct 20:29; no agent transcript touches it). **Owner, 30 Oct: the owner made it by hand to see whether the latest tools version gives concurrency warnings.** Leave it as it is: do not commit it and do not revert it. Commit only explicit paths (never `git add -A` or `git commit -a`) so it stays out of every commit. The orchestrator's gates run in the clean detached worktree `.worktrees/s3m-gates` at the committed `Package.swift` (tools 6.0, logs `.build-orch/s3m/`). The decision waits for step 6 (the tools-version 6.4 pass).
 - **Rulings added to `s3-rulings-s3f.md`:** S3-R10 (S1-15 guard `.minutes(5)`), S3-R12 (hang guards: steady-state load reading from 60 s after the later bundle's start; blocking only on a time-out at mean ≤ 50 or over half in a paired run at mean ≤ 30; raises now: `stalledSubscriberIsBounded` 4 → 6 min, the R-SYN-14 migration-loop wait and the R-SYN-6 owed re-queue 3 → 5 min; the 29 one-minute tests at 50–55 % in the first 35 s are not raised).
-- **WP-F design panel: RUNNING** `wf_8bbbb235-852` (task `wfkrkxnq8`), launched 09:52: three designers prototype (D1 defer every space decision while a follow is owed; D2 an exact pre-phase within a per-turn budget; D3 root cause, free choice, including whether the pump has the same class), each in a detached worktree at `40ecd95`, outputs in `.build-orchestrator/s3f-design/`; then two judges (adversarial correctness; C2, liveness and conformance). Next: rule the design as S3-R11 in `s3-rulings-s3f.md` and continue `s3f` from cycle 9 (`fromCycle: 9`, findings = `s3f-c8-issues.json`, `maxCycle` about 12) with a new run.
+- **WP-F design panel: DONE** `wf_8bbbb235-852` (09:52–11:44, 5 agents, ~2.0 M subagent tokens; weekly 49 % at 12:30): three designers prototype (D1 defer every space decision while a follow is owed; D2 an exact pre-phase within a per-turn budget; D3 root cause, free choice, including whether the pump has the same class), each in a detached worktree at `40ecd95`, outputs in `.build-orchestrator/s3f-design/`; then two judges (adversarial correctness; C2, liveness and conformance). Next: rule the design as S3-R11 in `s3-rulings-s3f.md` and continue `s3f` from cycle 9 (`fromCycle: 9`, findings = `s3f-c8-issues.json`, `maxCycle` about 12) with a new run.
+- **Panel verdict:** both judges ("break", "c2live") recommend **D3 "root"** as the base, with amendments.
+  - **Results:**
+    - D3 is the only design with no wrong answer across the 29 cross-design probe tests in both orders.
+    - D1 fails TICKET, READ-PROMOTE and READ-ORDER, and needs 11 test adaptations.
+    - D2 fails 12 tests (5 even with its pump extension).
+    - All three meet C2 at 10,000: 7.4–8.8 ms best-of-3, against 13.2–14.2 ms at base.
+  - **Amendments before the fixer starts** (`j-break`, `j-c2live` results in the run's `journal.jsonl`):
+    - A deferred `.enqueue` keeps `front:` and `queuedAt`, and `reinstate` goes through the event list.
+    - The "queued jobs wait in no queue" invariant exempts pending `.enqueue` jobs (`j-break/d3-amendment-A1-invariant.diff`, 415/415).
+    - FAILURE-ORDER becomes `.attemptFailed` events (PROBE-J-FAIL-REROUTE and -FAIL-TICKET).
+    - The pump is barred on `followBarrier` during a multi-turn drain.
+    - SECOND-APPLY-REORDER keeps `followOrder[followNext...]` in order.
+    - Every designer and judge probe is committed failing-first.
+  - **Orchestrator rulings needed (S3-R11):**
+    - (R1) Where the class ends. The judges lean to (a): real-world ledger inputs (freed bytes, free-space reads) apply on arrival, D3's `.read` deferral is dropped, L4-R7 is kept, and READ-ORDER, READ-PROMOTE and UNRELATED-FREE are out of the class.
+    - (R2) The R-SYN-2 assertion `between.steady == .downloading` becomes `.queued`. Admissions then wait for a multi-turn follow: 131–143 ms at 10,000 on macOS release; not measured on a device.
+    - (R3) G3 records for D3's six one-to-one assertion replacements.
+  - **Nothing running at 12:30.** The owner interrupted before the cycle-9 launch and asked for status. Launch only on the owner's go-ahead.
+- **Queued after every stage (owner, 30 Oct; choices not settled, the question form was cancelled):**
+  - (1) A facade method that decides at run time whether iOS 26+ is served by AWS or Apple-hosted packs. Today `TierSelection.select` decides once, at client build, with a static `awsOnly`.
+  - (2) A simple Electron app with these features:
+    - browse the remote manifest's assets, update or delete parts, and add assets;
+    - `.gguf` support for Qwen LLMs;
+    - one interface that uploads to both Apple-hosted packs and AWS (CloudFront + S3);
+    - upload correctness checked "in the sense of this package";
+    - a log written before every upload.
+  - Owner: "All of this is executed by an Opus agent on Medium effort" (`model: "opus"`, `effort: "medium"`; an independent Opus-medium verifier per P4).
+  - **Open owner choices:**
+    - what drives the tier decision, and when a change takes effect;
+    - the app's location, and npm access, which CLAUDE.md's network rule forbids without the owner's explicit override;
+    - models over the 4 GiB `maxAssetBytes` (GGUF shards, a raised cap, or reject).
+  - **Never in tests:** real uploads or deletions on AWS or App Store Connect. The owner does the first real upload.
 - **Still open for the owner:** the NEEDS-HUMAN-REVIEW list (ADR-050 without P-13, 052, 055, 056).
 
 ## Stage 2 — COMPLETE (`wpi-merged` = `0554b8f`, 24 Oct 15:20 CEST). Next session: start here
