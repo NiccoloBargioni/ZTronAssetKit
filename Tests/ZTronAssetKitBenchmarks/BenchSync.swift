@@ -482,11 +482,14 @@ extension ZTronAssetKitBenchmarks {
         /// cycle 5; the cycle-4 correctness lens, PROBE-C4-SWEEP2-C2): 10,000 prefetch members alternating 400 and 3,000
         /// bytes wait `awaitingSpace` for a pruned 2,000-byte blob with 100 bytes of room; a forced sync changes every
         /// member's content and its follow's follow-ups are held (the follow owes its visits, as between two of its turns);
-        /// then the deletion grace ends, and the alarm's `.reclaimed` sweep and its follow-up sweeps re-queue the 400-byte
-        /// members and park the 3,000-byte ones, following each first. While a follow counted as the re-queue or park it
-        /// preceded, one sweep turn followed 1,024 jobs: 10.2 to 10.8 ms with one handle and 13.6 to 14.1 ms with two over
-        /// the same ids (two interests per job). With one handle and with two; medians of three against P-9, the best of
-        /// the three against C2, after a warm-up.
+        /// then the deletion grace ends, and the alarm's `.reclaimed` sweep and its follow-up sweeps follow the members
+        /// (at most `followsPerTurn` per turn, judging none while any is left to follow) and then re-queue the 400-byte
+        /// members and park the 3,000-byte ones. While a follow counted as the re-queue or park it preceded, one sweep turn
+        /// followed 1,024 jobs: 10.2 to 10.8 ms with one handle and 13.6 to 14.1 ms with two over the same ids (two
+        /// interests per job). Since the close-out cycle 8 the sweep follows every job it would judge before it orders them
+        /// (PROBE-C7-RANK), checking each for a moved id while the follow is owed (`holdsMovedID`, a key comparison per id,
+        /// no transfer formatted). With one handle and with two; medians of three against P-9, the best of the three
+        /// against C2, after a warm-up.
         @Test("R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(3)))
         @available(macOS 15.0, iOS 18.0, *)
         func reclaimDuringFollowTurns() async throws {

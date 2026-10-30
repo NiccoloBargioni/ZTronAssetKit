@@ -623,9 +623,11 @@ extension EngineSyncTests {
     /// bytes wait `awaitingSpace` for a pruned 2,000-byte blob with 200 bytes of room; a forced sync changes every
     /// member's content and its follow's follow-ups are held after the first turn's `followsPerTurn` visits, so 344 jobs
     /// still hold a moved id (more than one sweep turn may follow); the space sweep's follow-ups are held too. The deletion grace ends: the alarm reaps the
-    /// blob and its `.reclaimed` sweep re-queues the 400-byte members and parks the 3,000-byte ones, following each first.
-    /// That one turn follows exactly `followsPerTurn` jobs of both sizes; once the holds end, every member's interest is
-    /// on its new content and no replaced content was requested.
+    /// blob and its `.reclaimed` sweep follows the members before it judges any (since the close-out cycle 8, PROBE-C7-RANK:
+    /// a job is judged at its post-follow place). That one turn follows exactly `followsPerTurn` jobs of both sizes and,
+    /// with members left to follow, judges none: every member it did not follow still waits `awaitingSpace` for the
+    /// follow-up sweep (a job judged before its follow is judged at a place it may not keep). Once the holds end, every
+    /// member's interest is on its new content and no replaced content was requested.
     ///
     /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 48.5 to 49.0 s beside a second TSan process at a
     /// load of 20 to 35 (82 % of 60 s) and 19.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
@@ -690,13 +692,15 @@ extension EngineSyncTests {
             (
                 owed: Self.jobsHoldingMovedIDs(engine, large: largeIDs),
                 pending: engine.state.freeSpace?.pendingReclaim,
-                followUpHeld: engine.state.spaceSweepFollowUpWaiting
+                followUpHeld: engine.state.spaceSweepFollowUpWaiting,
+                waiting: old.filter { engine.state.jobs[$0.transferID]?.state == .blocked(.awaitingSpace) }.count
             )
         }
         let followed = (small: before.small - after.owed.small, large: before.large - after.owed.large)
         #expect(after.pending == 0, "setup: the sweep read the volume after the reclaim: \(String(describing: after.pending))")
-        #expect(followed.small + followed.large == SyncEngine.followsPerTurn, "one sweep turn followed \(followed.small + followed.large) jobs (\(followed.small) re-queued, \(followed.large) parked), at most followsPerTurn = \(SyncEngine.followsPerTurn)")
-        #expect(followed.small > 0 && followed.large > 0, "the turn followed jobs it re-queued and jobs it parked: \(followed)")
+        #expect(followed.small + followed.large == SyncEngine.followsPerTurn, "one sweep turn followed \(followed.small + followed.large) jobs (\(followed.small) of 400 bytes, \(followed.large) of 3,000), at most followsPerTurn = \(SyncEngine.followsPerTurn)")
+        #expect(followed.small > 0 && followed.large > 0, "the turn followed jobs of both sizes: \(followed)")
+        #expect(after.waiting == after.owed.small + after.owed.large && after.waiting > 0, "a turn that could not follow every member judged none: the \(after.owed.small + after.owed.large) members it did not follow still wait, \(after.waiting) do")
         #expect(after.followUpHeld, "the jobs left over wait for the sweep's follow-up turn")
         await engine.readForTests { $0.releaseSpaceSweepFollowUps() }
         await engine.readForTests { $0.releaseFollowFollowUps() }
