@@ -247,3 +247,72 @@ struct EngineRegressionCycle8Tests {
         await engine.shutdown()
     }
 }
+
+extension EngineRegressionCycle8Tests {
+    /// One turn of a space sweep parks at most `parksPerPump` jobs and leaves the rest to its follow-up sweep (C2). The
+    /// park of a job whose follow lowered its lane during the sweep (`sweepSpaceParked`, PROBE-C5-LANEDROP, close-out
+    /// cycle 6) goes through the same bound, so this count pins both; the turn's length is measured by the release
+    /// benchmarks of parking a 10,000-member group and of a reclaim during an owed follow. The setup is
+    /// `reclaimedSweepReachesEveryWaitingMember`'s: more members than one turn parks wait `awaitingSpace` for `x`'s
+    /// 300 bytes on a volume with no other room above the reserve; the store reaps `x` and the purge path's `.reclaimed`
+    /// sweep runs with its follow-ups held (`holdSpaceSweepFollowUps()`): its one turn re-queues the first member into
+    /// the 300 bytes and parks exactly `parksPerPump` of the others `insufficientSpace` (nothing is left to reclaim).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)", .timeLimit(.minutes(1)))
+    func spaceSweepParksAtMostOneTurnOfJobs() async throws {
+        let count = Self.members
+        let time = ManualTimeSource()
+        let storeTime = ManualTimeSource()
+        let (harness, fileSystem) = EngineRegressionCycle6Tests.harness(time: time, storeTime: storeTime)
+        let engine = harness.engine
+        let xBytes = EngineFixture.bytes(10_921, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let entries = (0..<count).map { index in
+            EngineHarness.onDemand("m\(index)", EngineFixture.bytes(10_922 + UInt64(index), count: 300))
+        }
+        await harness.serveManifest([x])
+        await harness.scriptTransfers([(x, xBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // v2 prunes x (doomed for the 60 s grace) and lists the on-demand members.
+        await harness.serveManifest(entries, etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for reclaim")
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(0, harness: harness, fileSystem: fileSystem)
+        await engine.refreshFreeSpace()
+        _ = try await engine.registerGroup(entries.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.spaceParked.count == count }
+        #expect(await Self.states(engine).allSatisfy { $0 == .blocked(.awaitingSpace) }, "setup: every member waits for x's bytes")
+        storeTime.advance(by: 61)
+        let reaped = await harness.store.runDueWork().reapedBytes
+        #expect(reaped == Int64(xBytes.count), "setup: the store reaped x")
+        await engine.readForTests { $0.holdSpaceSweepFollowUps() }
+        await engine.spaceMayHaveBeenReclaimed()
+        // The turn ends with a follow-up sweep owed (held) or, unbounded, with no member left waiting.
+        await engine.awaitCondition { engine in
+            engine.state.spaceSweepFollowUpWaiting || !engine.state.jobs.values.contains { $0.state == .blocked(.awaitingSpace) }
+        }
+        let turn = await engine.readForTests { engine in
+            let states = engine.state.jobs.values.map(\.state)
+            return (
+                parked: states.filter { $0 == .blocked(.insufficientSpace) }.count,
+                waiting: states.filter { $0 == .blocked(.awaitingSpace) }.count,
+                followUpHeld: engine.state.spaceSweepFollowUpWaiting
+            )
+        }
+        #expect(turn.parked == SyncEngine.parksPerPump, "one sweep turn parked \(turn.parked) jobs, at most parksPerPump = \(SyncEngine.parksPerPump)")
+        #expect(turn.waiting == count - 1 - SyncEngine.parksPerPump && turn.followUpHeld, "the rest wait for the turn's follow-up sweep: \(turn)")
+        await engine.readForTests { $0.releaseSpaceSweepFollowUps() }
+        await engine.awaitCondition { engine in
+            engine.state.spaceParked.count == count - 1 && engine.state.spaceSweepFollowUp == nil
+                && engine.state.spaceParked.allSatisfy { engine.state.jobs[$0]?.state == .blocked(.insufficientSpace) }
+        }
+        let started = await harness.source.starts.map(\.id).filter { $0 != x.transferID }
+        #expect(started == [entries[0].transferID], "the room holds one member, the first in the queue: \(started)")
+        #expect(await engine.invariantViolations().isEmpty)
+        await engine.shutdown()
+    }
+}
