@@ -687,6 +687,13 @@ extension SyncEngine {
     /// followed first (`followBeforeActing`), as a failure is: its fail-fast would answer that id's waiter or ensure member
     /// with the replaced content's figures although the copy lists the id at content that may fit, and its re-queue would
     /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). A follow
+    /// that keeps some of the job's ids may lower its lane, since the moved interests may have set it, and with it the
+    /// volume its verdict read; so a job admitted before its follow is judged again after it, and one that no longer
+    /// fits is treated as one that never did (left parked `insufficientSpace`, left waiting, or parked within
+    /// `parksPerPump`): never re-queued, never counted ahead of the jobs behind it. Re-queued on its pre-follow user lane,
+    /// its bytes counted ahead took the room the next user job was judged against, whose fail-fast answered that job's
+    /// waiter with a shortage that did not exist, while the gate parked the followed job again (the close-out cycle-5
+    /// correctness lens, PROBE-C5-LANEDROP; at `s3-base` the follow moved every job in the apply's turn). A follow
     /// costs what a follow turn's visit costs (`followsPerTurn`), about ten times a re-queue or a park, so the sweep gives
     /// it its own bound: at most `followsPerTurn` follows per turn besides `parksPerPump` parks and `readmissionsPerTurn`
     /// re-queues, the rest left to the follow-up sweep. Counted as the re-queue or park it preceded, one turn followed up
@@ -719,10 +726,11 @@ extension SyncEngine {
                 break
             }
             let transfer = candidate.transfer
-            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
+            guard var job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
                 continue
             }
-            guard let verdict = self.spaceBlock(job, ahead: ahead) else {
+            var verdict = self.spaceBlock(job, ahead: ahead)
+            if verdict == nil {
                 guard requeues < Self.readmissionsPerTurn, self.followFits(job, follows: &follows) else {
                     self.scheduleSpaceSweepFollowUp(sweep)
                     break
@@ -732,6 +740,16 @@ extension SyncEngine {
                     requeues += 1
                     continue
                 }
+                // A follow that kept some ids may have lowered the job's lane (the moved interests may have set it),
+                // and with it the volume the verdict read: the job is judged again before it is re-queued and its bytes
+                // counted ahead of the jobs behind it (PROBE-C5-LANEDROP). Without a follow it is the same job.
+                guard let followed = self.state.jobs[transfer] else {
+                    continue
+                }
+                job = followed
+                verdict = self.spaceBlock(job, ahead: ahead)
+            }
+            guard let block = verdict else {
                 if self.transition(transfer, to: .queued) {
                     self.enqueue(transfer)
                     ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
@@ -740,10 +758,13 @@ extension SyncEngine {
                 }
                 continue
             }
+            // A job that does not fit, or no longer fits on the lane its follow left it: an `insufficientSpace` one
+            // stays parked; an `awaitingSpace` one waits or is parked within this turn's bound (its follow, if any, is
+            // done and not counted again).
             guard reason == .awaitingSpace else {
                 continue
             }
-            if verdict == .awaitingSpace, sweep == .reclaimed || self.spaceWakeExpected {
+            if block == .awaitingSpace, sweep == .reclaimed || self.spaceWakeExpected {
                 waiting = true
                 continue
             }
