@@ -989,6 +989,12 @@ struct EngineFollowBarrierTests {
     /// content while the follow owes D's visit; the volume then shrinks to 5 MB and E's attempt fails ENOSPC. Visited
     /// first, D is superseded, E's room is 5 MB and the ENOSPC is retried: U is served. Decided first, E's room was 1 MB
     /// (D's 4 MB in flight) and E was parked `insufficientSpace`, U answered with that shortage (PROBE-D-ENOSPC).
+    ///
+    /// The ENOSPC's own free-space read runs a space sweep, and a sweep behind the barrier runs one follow turn
+    /// (`advanceFollowForSpaceSweep`) before the verdict is reached in the same turn. So that D's visit is still owed when
+    /// the verdict is reached, 300 prefetch members, whose contents v3 also changes, come before zz-a in the copies: that
+    /// turn visits 256 of them and stops before D. Without them the read's own follow turn visited D first, and the test
+    /// passed with the verdict's deferral removed (the cycle-9 verifiers' mutant `enospcNoDefer`).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierDecidesAnENOSPCOnTheFollowedState(_ visit: LaneDropVisit) async throws {
@@ -998,7 +1004,9 @@ struct EngineFollowBarrierTests {
         let eBytes = Data(repeating: 0x96, count: 1_500_000)
         let a = EngineHarness.onDemand("zz-a", dBytes)
         let e = EngineHarness.onDemand("zz-e", eBytes)
-        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(790_000) + [a, e], etag: "v2")
+        let members = (0..<300).map { EngineHarness.onDemand(String(format: "g%03d", $0), EngineFixture.bytes(995_100 + UInt64($0), count: 16)) }
+        let movedMembers = (0..<300).map { EngineHarness.onDemand(String(format: "g%03d", $0), EngineFixture.bytes(995_500 + UInt64($0), count: 16)) }
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(790_000) + members + [a, e], etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
@@ -1006,29 +1014,44 @@ struct EngineFollowBarrierTests {
         await engine.refreshFreeSpace()
         await s.harness.source.script(a.transferID, [.hold, .stage(dBytes)])
         await s.harness.source.script(e.transferID, [.hold, .fail(.insufficientSpace(requiredBytes: Int64(eBytes.count))), .stage(eBytes)])
+        for entry in members + movedMembers {
+            await s.harness.source.script(entry.transferID, [.hold])
+        }
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .downloading }
         let uWaiter = Task { await engine.awaitAsset(e.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[e.transferID]?.state == .downloading }
+        let group = try await engine.registerGroup(members.map(\.identifier), lane: .prefetch).get()
+        await engine.awaitCondition { current in members.allSatisfy { current.state.jobs[$0.transferID] != nil } }
         let replacementBytes = EngineFixture.bytes(994_004, count: 16)
         let replacement = EngineHarness.onDemand("zz-a", replacementBytes)
         await s.harness.source.script(replacement.transferID, [.stage(replacementBytes)])
-        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(890_000) + [replacement, e], s, visit: visit)
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(890_000) + movedMembers + [replacement, e], s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            let before = await engine.readForTests { engine in (owed: engine.followOwed, d: engine.state.jobs[a.transferID]?.state, found: engine.state.unfollowed.contains(a.transferID)) }
+            #expect(before.owed && before.d == .downloading && !before.found, "setup: the follow's pass has not reached D's entry yet: \(before)")
+        }
         // The volume shrinks to 5 MB above the reserve, then E's attempt fails ENOSPC.
         try await Self.leaveRoom(5_000_000, harness: s.harness, fileSystem: s.fileSystem)
-        let shrunk = try await s.harness.store.freeSpace().volumeImportant
         await s.harness.source.release(e.transferID, with: .progress(received: 0, expected: nil))
-        // The ENOSPC's own free-space read is adopted when it returns (its verdict, or its wait, is in the same turn). It
-        // reads at most `shrunk`: visit-first, A's 16-byte replacement and the settled run may still commit to the volume
-        // after it was measured (under TSan in the whole Sync bundle an exact match never came, cycle 9).
-        await engine.awaitCondition { $0.state.jobs[e.transferID]?.state != .downloading && ($0.state.freeSpace?.volumeImportant ?? .max) <= shrunk }
-        let between = await engine.readForTests { engine in engine.invariantViolations() }
-        #expect(between.isEmpty, "\(between.prefix(3))")
+        // The verdict: a retry (`failed(.at)`) on the followed state; a park (`blocked`) on the state before D's visit.
+        await engine.awaitCondition { engine in
+            switch engine.state.jobs[e.transferID]?.state {
+            case .failed(.at)?, .blocked?:
+                return true
+            default:
+                return false
+            }
+        }
+        let between = await engine.readForTests { engine in (violations: engine.invariantViolations(), dGone: engine.state.jobs[a.transferID] == nil) }
+        #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
+        #expect(between.dGone, "D was superseded before the verdict was given")
         await engine.readForTests { $0.releaseFollowFollowUps() }
         let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: uWaiter) }
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
         #expect((try? uResult.get())?.byteSize == Int64(eBytes.count), "the ENOSPC is retried in the room the follow frees, and U is served: \(uResult)")
         #expect((try? aResult.get())?.byteSize == 16, "A: \(aResult)")
+        await engine.releaseGroup(group)
         await FollowBarrier.finish(s, sync: sync)
     }
 
