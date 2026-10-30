@@ -410,4 +410,276 @@ extension EngineSyncTests {
         #expect(outcome.completeReport != nil, "\(outcome)")
         await engine.shutdown()
     }
+
+    // MARK: Dropped ids and holders in flight (Stage 3 close-out cycle 9, S3-R11 item 6)
+
+    /// Which ids a dropped-id scenario's copies list (`sweepJudgesADroppedHolderAtItsFollowedPlace`).
+    enum DroppedID: Sendable {
+        /// C is wanted only by A (user); v3 drops A's id.
+        case onlyHolder
+        /// C is wanted by A (user) and B (prefetch); v3 drops A's id and keeps B's.
+        case keepsPrefetchHolder
+    }
+
+    /// A space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it: C (5 MB) is
+    /// wanted only by A's user waiter and ranked before K (3 MB, a user waiter) with the earlier ticket; both wait
+    /// `awaitingSpace` for 4 MB of a pruned blob. v3 drops A's id while the bounded follow owes C's visit. Visited first,
+    /// C's job ends (A is answered `.notFound`) and the reclaim's sweep serves K. A sweep that followed only the jobs
+    /// holding a moved id (`holdsMovedID` ignores a dropped id) judged C at its user place and admitted it ahead of K, whose
+    /// waiter was answered with a shortage (the close-out cycle-8 correctness lens, PROBE-C8-DROPPED).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepDoesNotAdmitAJobWhoseOnlyIDWasDropped(_ visit: LaneDropVisit) async throws {
+        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .onlyHolder,
+            LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
+        )
+    }
+
+    /// A space sweep judges a job whose user lane came only from a dropped id at its prefetch place: C (5 MB) is wanted by
+    /// A (user) and B (prefetch); v3 drops A's id and keeps B's while the follow owes C's visit. Visited first, C is
+    /// prefetch work judged after K (3 MB, user): K fits, and C's 5 MB do not fit the room K leaves, so B is answered with
+    /// that shortage. Judged at its pre-follow user place, C was admitted ahead of K and K's waiter got the shortage (the
+    /// close-out cycle-8 correctness lens, PROBE-C8-DROPPED-KEEP).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace(_ visit: LaneDropVisit) async throws {
+        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .keepsPrefetchHolder,
+            LoweredRank(importantExtra: 32_000_000, opportunisticExtra: 32_000_000, leave: 2_000_000, leaveAgain: 1_999_000, kSize: 3_000_000)
+        )
+    }
+
+    /// A space sweep judges a job whose user lane came only from a dropped id on its own lane's volume: the setup of
+    /// `spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace` with 4 MB of important room and 12 MB of opportunistic room
+    /// after the reclaim. Visited first, C is prefetch work judged after K: K fits the important room, and C fits the
+    /// opportunistic room, so B is served. Judged at its pre-follow user place, C did not fit the important room and was
+    /// parked: B's prefetch waiter was answered `insufficientSpace` although C's own lane had room (the close-out cycle-8
+    /// correctness lens, PROBE-C8-DROPPED-LANE).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepJudgesADroppedUserLaneOnItsOwnVolume(_ visit: LaneDropVisit) async throws {
+        try await Self.sweepJudgesADroppedHolderAtItsFollowedPlace(
+            visit,
+            .keepsPrefetchHolder,
+            LoweredRank(importantExtra: 26_000_000, opportunisticExtra: 34_000_000, leave: 0, leaveAgain: nil, kSize: 3_000_000),
+            bServed: true
+        )
+    }
+
+    /// The scenario of the three dropped-id tests: the setup, every waiter's answer and the invariants. `bServed` is the
+    /// visit-first answer to B's prefetch waiter: C's 5 MB, or the shortage C meets in the room K leaves.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func sweepJudgesADroppedHolderAtItsFollowedPlace(_ visit: LaneDropVisit, _ dropped: DroppedID, _ scenario: LoweredRank, bServed: Bool = false) async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + scenario.importantExtra, opportunisticCapacity: reserve + scenario.opportunisticExtra)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = Data(repeating: 0x71, count: 4_000_000)
+        let qBytes = EngineFixture.bytes(987_002, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let q = EngineFixture.entry("q", qBytes)
+        await harness.serveManifest([x, q])
+        await harness.scriptTransfers([(x, xBytes), (q, qBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        let fillers = { (seed: UInt64) in
+            (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "f%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
+        }
+        let cBytes = Data(repeating: 0x72, count: 5_000_000)
+        let kBytes = Data(repeating: 0x73, count: scenario.kSize)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let k = EngineHarness.onDemand("zz-k", kBytes)
+        try #require(a.transferID == b.transferID, "setup: A and B share one content")
+        let withB = dropped == .keepsPrefetchHolder
+        // v2 prunes x (its 4 MB wait for the 60 s grace) and lists C under A (and B), and K.
+        await harness.serveManifest([q] + fillers(741_000) + (withB ? [a, b, k] : [a, k]), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        try await harness.store.flush(.ordered)
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(scenario.leave, harness: harness, fileSystem: fileSystem)
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for the reclaim")
+        await engine.refreshFreeSpace()
+        await harness.source.script(a.transferID, [.stage(cBytes)])
+        await harness.source.script(k.transferID, [.stage(kBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .blocked(.awaitingSpace) }
+        var bWaiter: Task<Result<AssetLocation, AssetError>, Never>?
+        if withB {
+            bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .prefetch) }
+            await engine.awaitCondition { $0.state.jobs[a.transferID]?.assets.count == 2 }
+        }
+        let kWaiter = Task { await engine.awaitAsset(k.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[k.transferID]?.state == .blocked(.awaitingSpace) }
+        // v3 drops A's id; B and K keep theirs.
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest([q] + fillers(841_000) + (withB ? [b, k] : [k]), etag: "v3")
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        if visit == .followVisitedFirst {
+            // The follow's turns are owned tasks, not timers: the clock stays before the grace's end.
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followOwed }
+        }
+        let before = await engine.readForTests { engine in
+            (owed: engine.followOwed, c: engine.state.jobs[a.transferID]?.state, k: engine.state.jobs[k.transferID]?.state)
+        }
+        #expect(before.k == .blocked(.awaitingSpace), "setup: K waits for the reclaim: \(before)")
+        if visit == .sweepFollowsFirst {
+            #expect(before.owed && before.c == .blocked(.awaitingSpace), "setup: C still holds A's dropped id: \(before)")
+        }
+        if let again = scenario.leaveAgain {
+            // Just under the room in both orders.
+            try await Self.leaveRoom(again, harness: harness, fileSystem: fileSystem)
+        }
+        // The grace ends: the alarm reaps x's 4 MB and runs its `.reclaimed` sweep.
+        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
+        }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let kResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: kWaiter) }
+        let aResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        #expect((try? kResult.get())?.byteSize == Int64(kBytes.count), "K's user waiter is answered from its content: \(kResult)")
+        #expect(aResult == .failure(.notFound), "A's dropped id is answered notFound: \(aResult)")
+        if let bWaiter {
+            let bResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+            if bServed {
+                #expect((try? bResult.get())?.byteSize == Int64(cBytes.count), "B's prefetch waiter is answered from C's 5 MB on the opportunistic room: \(bResult)")
+            } else if case .failure(.insufficientSpace(let required, let available)) = bResult {
+                #expect(required == Int64(cBytes.count) && available < required, "B's figures are C's 5 MB against the room K leaves: \(bResult)")
+            } else {
+                Issue.record("B's prefetch waiter is answered insufficientSpace: C's 5 MB do not fit beside K: \(bResult)")
+            }
+        }
+        let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        await engine.shutdown()
+    }
+
+    /// A space sweep judges the parked job of a moved id's new content at the user place the follow gives it, also when
+    /// the moved id's holder is downloading rather than parked: C (5 MB) downloads for A (user) and B (prefetch, same
+    /// content), so the follow keeps it running as prefetch work; R (3.5 MB) and P (3 MB), both prefetch, wait
+    /// `awaitingSpace` behind C's bytes in flight, R with the earlier ticket. v3 moves A onto P's content while the bounded
+    /// follow owes C's visit. The reclaim leaves 6 MB beside C's 5 MB in flight. Visited first, P is user work, judged
+    /// first and fits, and R is parked with R's 3.5 MB against the room P leaves. A sweep that followed only its parked
+    /// candidates judged P at its prefetch place after R (the close-out cycle-8 requirements lens,
+    /// PROBE-C8R-INFLIGHT-PROMOTE).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func spaceSweepJudgesAJobRaisedFromAHolderInFlightAtItsUserPlace(_ visit: LaneDropVisit) async throws {
+        let time = ManualTimeSource()
+        let reserve = StoragePolicy().reserveFreeBytes
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
+        )
+        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), fileSystem: fileSystem)
+        let engine = harness.engine
+        let xBytes = Data(repeating: 0x74, count: 4_000_000)
+        let qBytes = EngineFixture.bytes(978_002, count: 300)
+        let x = EngineFixture.entry("x", xBytes)
+        let q = EngineFixture.entry("q", qBytes)
+        await harness.serveManifest([x, q])
+        await harness.scriptTransfers([(x, xBytes), (q, qBytes)])
+        try await harness.start()
+        _ = try #require(await engine.sync(.force).completeReport)
+        try await harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        let fillers = { (seed: UInt64) in
+            (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "f%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
+        }
+        let cBytes = Data(repeating: 0x75, count: 5_000_000)
+        let rBytes = Data(repeating: 0x76, count: 3_500_000)
+        let pBytes = Data(repeating: 0x77, count: 3_000_000)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let r = EngineHarness.onDemand("zz-r", rBytes)
+        let p = EngineHarness.onDemand("zz-p", pBytes)
+        try #require(a.transferID == b.transferID, "setup: A and B share one content")
+        await harness.serveManifest([q] + fillers(760_000) + [a, b, p, r], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && $0.state.storeDeadline != nil && !$0.state.storeWorkInFlight }
+        try await harness.store.flush(.ordered)
+        // 7 MB of room: C (5 MB) starts; R and P wait for x's 4 MB behind C's bytes in flight.
+        _ = try await EngineRegressionCycle6Tests.leaveRoom(7_000_000, harness: harness, fileSystem: fileSystem)
+        #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes wait for the reclaim")
+        await engine.refreshFreeSpace()
+        await harness.source.script(a.transferID, [.hold, .stage(cBytes)])
+        await harness.source.script(r.transferID, [.stage(rBytes)])
+        await harness.source.script(p.transferID, [.stage(pBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .downloading }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        let rWaiter = Task { await engine.awaitAsset(r.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[r.transferID]?.state == .blocked(.awaitingSpace) }
+        let pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
+        await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .blocked(.awaitingSpace) }
+        // v3 moves A onto P's content; B keeps C's, P and R keep theirs.
+        let moved = EngineHarness.onDemand("zz-a", pBytes)
+        try #require(moved.transferID == p.transferID, "setup: A's new content is P's")
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        await harness.serveManifest([q] + fillers(860_000) + [moved, b, p, r], etag: "v3")
+        let sync = Task { await engine.sync(.force) }
+        await engine.awaitCondition { $0.state.followFollowUpWaiting }
+        if visit == .followVisitedFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followOwed }
+        }
+        let before = await engine.readForTests { engine in
+            (
+                owed: engine.followOwed,
+                c: engine.state.jobs[a.transferID].map { (state: $0.state, holdsA: $0.assets.contains(a.identifier)) },
+                r: engine.state.jobs[r.transferID].map { (state: $0.state, rank: engine.queueRank($0), ticket: $0.ticket) },
+                p: engine.state.jobs[p.transferID].map { (state: $0.state, rank: engine.queueRank($0), ticket: $0.ticket) }
+            )
+        }
+        let rJob = try #require(before.r, "setup: R's job waits")
+        let pJob = try #require(before.p, "setup: P's job waits")
+        let cJob = try #require(before.c, "setup: C's job runs")
+        #expect(cJob.state == .downloading, "setup: C downloads: \(before)")
+        #expect(rJob.state == .blocked(.awaitingSpace) && pJob.state == .blocked(.awaitingSpace) && rJob.ticket < pJob.ticket, "setup: \(before)")
+        switch visit {
+        case .followVisitedFirst:
+            #expect(!before.owed && !cJob.holdsA && pJob.rank < rJob.rank, "setup: the follow moved A off C and raised P: \(before)")
+        case .sweepFollowsFirst:
+            #expect(before.owed && cJob.holdsA && pJob.rank == rJob.rank, "setup: C still holds A, and P ranks as prefetch work: \(before)")
+        }
+        // The grace ends: the alarm reaps x's 4 MB (6 MB of room beside C's 5 MB in flight) and runs its sweep.
+        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[r.transferID]?.state != .blocked(.awaitingSpace) }
+        }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        let aResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let rResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: rWaiter) }
+        await harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        let bResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        let pResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: pWaiter) }
+        #expect((try? aResult.get())?.byteSize == Int64(pBytes.count), "A's user waiter, moved onto P, is answered from P's 3 MB: \(aResult)")
+        #expect((try? pResult.get())?.byteSize == Int64(pBytes.count), "P's prefetch waiter is answered from its 3 MB: \(pResult)")
+        #expect((try? bResult.get())?.byteSize == Int64(cBytes.count), "B's waiter is answered from C's 5 MB: \(bResult)")
+        if case .failure(.insufficientSpace(let required, let available)) = rResult {
+            #expect(required == Int64(rBytes.count) && available < required, "R's figures are its 3.5 MB against the room P leaves: \(rResult)")
+        } else {
+            Issue.record("R's prefetch waiter is answered insufficientSpace: R does not fit beside P and C: \(rResult)")
+        }
+        let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome.completeReport != nil, "\(outcome)")
+        await engine.shutdown()
+    }
 }
