@@ -139,9 +139,9 @@ extension SyncEngine {
                     continue
                 }
                 self.failFastJoiner(token, of: transfer)
-            case .enqueue(let transfer):
+            case .enqueue(let transfer, let front):
                 self.notePlaceTaken(transfer)
-                self.enqueue(transfer)
+                self.enqueue(transfer, front: front, askedBefore: true)
             case .reinstate(let transfer):
                 self.notePlaceTaken(transfer)
                 self.reinstate(transfer)
@@ -472,8 +472,9 @@ enum EventAfterFollow: Sendable {
     case attemptFailed(TransferID, epoch: UInt64, verdict: AttemptVerdict)
     /// A join to a job parked `insufficientSpace`, whose re-check and fail-fast answer (`failFastJoiner`) wait.
     case spaceJoin(InterestToken, TransferID)
-    /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues.
-    case enqueue(TransferID)
+    /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues, at
+    /// the front when `front` (a pause's resume, a gate's wait), with the time the place was asked for.
+    case enqueue(TransferID, front: Bool)
     /// A queued job's return to the place its entry had (`reinstate`).
     case reinstate(TransferID)
 }

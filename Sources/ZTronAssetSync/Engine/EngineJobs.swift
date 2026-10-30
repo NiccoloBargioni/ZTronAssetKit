@@ -427,22 +427,27 @@ extension SyncEngine {
     }
 
     /// Puts a queued job (back) into its lane's queue with a fresh ticket.
-    func enqueue(_ transfer: TransferID, front: Bool = false) {
+    ///
+    /// Behind the follow barrier the place waits for the follow's end (`EventAfterFollow.enqueue`, F-28): it comes after
+    /// the places of the jobs the owed visits queue, which a visit-first engine queued at the apply (PROBE-D3-TICKET);
+    /// nothing dispatches meanwhile (`pump`). The place keeps `front` (a paused transfer resumes first in its lane) and
+    /// the time it was asked for, which bulk aging reads (the cycle-9 amendment (a)): the drain gives it with
+    /// `askedBefore`, which keeps the job's `queuedAt`.
+    func enqueue(_ transfer: TransferID, front: Bool = false, askedBefore: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return
         }
+        if !front, !askedBefore {
+            job.queuedAt = self.environment.time.monotonicNow()
+        }
         if self.defersToFollow {
-            // A place taken while a follow is owed comes after the places of the jobs its visits queue (design D3,
-            // PROBE-D3-TICKET): a visit-first engine queued those at the apply. Nothing dispatches meanwhile (`pump`).
-            self.state.eventsAfterFollow.append(.enqueue(transfer))
+            self.state.jobs[transfer] = job
+            self.state.eventsAfterFollow.append(.enqueue(transfer, front: front))
             self.notePlaceWaits(transfer)
             return
         }
         self.state.lastTicket += 1
         job.ticket = self.state.lastTicket
-        if !front {
-            job.queuedAt = self.environment.time.monotonicNow()
-        }
         self.state.jobs[transfer] = job
         let kind = self.queueKind(job)
         let entry = LaneQueues.Entry(ticket: job.ticket, transfer: transfer, queuedAt: job.queuedAt)
