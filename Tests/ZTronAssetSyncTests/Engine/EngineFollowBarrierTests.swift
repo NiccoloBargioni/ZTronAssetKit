@@ -452,6 +452,79 @@ extension EngineSyncTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
+    /// No transfer starts between two turns of the drain that gives the places an owed follow deferred, so work queued in
+    /// a later drain turn is not passed by work a pump started meanwhile (the cycle-9 amendment (d)): the only slot is
+    /// free; while the follow is owed 512 prefetch requests and then a user request U are made, so 513 places wait and
+    /// the drain's first turn gives the prefetch requests' 512 (`eventsAfterFollowPerTurn`). An event between the
+    /// two drain turns pumps (here, the release's own turn pumps again). Pumped there, the slot went to the first member
+    /// and U waited behind it; held until the drain's last batch, the pump serves U, user work, first (R-SYN-2). The
+    /// follow barrier has no visit-first counterpart for the slot (a request made after the follow starts at once), so
+    /// the test runs in one order.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)", .timeLimit(.minutes(3)))
+    func barrierAdmitsNothingBetweenDrainTurns() async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 960_502, tuning: SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0))
+        let engine = s.engine
+        let count = SyncEngine.eventsAfterFollowPerTurn
+        let members = (0..<count).map { EngineHarness.onDemand(String(format: "zm%04d", $0), EngineFixture.bytes(960_600 + UInt64($0), count: 16)) }
+        let uBytes = EngineFixture.bytes(960_510, count: 16)
+        let u = EngineHarness.onDemand("zz-u", uBytes)
+        let slotBytes = EngineFixture.bytes(960_511, count: 16)
+        let slot = EngineHarness.onDemand("zs", slotBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(760_500) + members + [slot, u], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        for member in members {
+            await s.harness.source.script(member.transferID, [.hold])
+        }
+        await s.harness.source.script(u.transferID, [.hold, .stage(uBytes)])
+        await s.harness.source.script(slot.transferID, [.hold, .stage(slotBytes)])
+        // A job exists at the apply (a follow with no job owes no pass): S holds the slot until the follow is owed.
+        let slotWaiter = Task { await engine.awaitAsset(slot.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[slot.transferID]?.state == .downloading }
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(860_500) + members + [slot, u], s, visit: .sweepFollowsFirst)
+        await s.harness.source.release(slot.transferID, with: .progress(received: 0, expected: nil))
+        _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: slotWaiter) }
+        await engine.awaitCondition { $0.state.jobs[slot.transferID] == nil && $0.state.draining.isEmpty }
+        let memberWaiters = members.map { member in Task { await engine.awaitAsset(member.identifier, lane: .prefetch) } }
+        await engine.awaitCondition { $0.state.placesAfterFollow.count == count || !$0.followOwed }
+        let uWaiter = Task { await engine.awaitAsset(u.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.placesAfterFollow.count == count + 1 || !$0.followOwed }
+        let deferred = await engine.readForTests { e in
+            (owed: e.followOwed, places: e.state.placesAfterFollow.count, running: e.state.jobs.values.filter { $0.state == .downloading }.count)
+        }
+        #expect(deferred.owed && deferred.places == count + 1 && deferred.running == 0, "setup: the 513 places wait for the follow and nothing runs: \(deferred)")
+        let starts = await s.harness.source.starts.count
+        // The follow ends in the release's turn, the drain gives its first 512 places, and the turn pumps again.
+        let between = await engine.readForTests { e in
+            e.releaseFollowFollowUps()
+            e.pump()
+            return (
+                owed: e.followOwed,
+                waiting: e.state.eventsAfterFollow.count,
+                running: e.state.jobs.values.filter { $0.state == .downloading }.map(\.transfer),
+                violations: e.invariantViolations()
+            )
+        }
+        #expect(!between.owed && between.waiting == 1, "setup: the follow ended and U's place waits for the drain's next turn: \(between.owed), \(between.waiting)")
+        #expect(between.running.isEmpty, "no transfer starts between two drain turns: \(between.running)")
+        #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
+        await engine.awaitCondition { e in e.state.eventsAfterFollow.isEmpty && e.state.jobs.values.contains { $0.state == .downloading } }
+        let after = await engine.readForTests { e in e.state.jobs.values.filter { $0.state == .downloading }.map(\.transfer) }
+        let started = await s.harness.source.starts.dropFirst(starts).map(\.id)
+        #expect(after == [u.transferID], "the drain's last batch pumps, and the slot goes to U, user work: \(after)")
+        #expect(started.first == nil || started.first == u.transferID, "no member started before U: \(started.prefix(3))")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
+        await engine.shutdown()
+        _ = await EngineHarness.value(of: uWaiter)
+        for waiter in memberWaiters {
+            _ = await EngineHarness.value(of: waiter)
+        }
+        _ = await EngineHarness.value(of: sync)
+    }
+
     // MARK: Queue places (R-SYN-3)
 
     /// A user request made while the follow owes the visit that creates another user waiter's new-content job queues
