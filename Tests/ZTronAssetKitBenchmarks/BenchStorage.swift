@@ -16,9 +16,12 @@ extension ZTronAssetKitBenchmarks {
     /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
     /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
     /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
-    /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
-    /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
-    /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+    /// alive. P-13: SPEC §6 bounds the batches between suspension points on the **p99** of the deletion-unit
+    /// durations (the owner's ruling of 2026-10-29, ADR-050 option A): one `unlink` in about every 850–1,060 stalls in
+    /// the kernel for 5–11 ms whatever the store does (Stage 3 S3-PERF-03), so no unit size bounds the maximum. The
+    /// p99 is asserted against `batch_ms_max`, and the maximum, p50 and p95 are printed beside it; the unit's time
+    /// budget (ADR draft B-10) makes a unit without a stalled unlink fit by design, and an unlink profile of this volume
+    /// is printed as the justification. Figures
     /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
     /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
     /// runs, against the rule's own 10 ms.
@@ -237,16 +240,17 @@ extension ZTronAssetKitBenchmarks {
             let onCPU = timer.onCPUDurations
             await store.close()
             let longest = units.max() ?? 0
+            let p99 = StorageBench.percentile(units, 0.99)
             let reclaimUnlinks = blobUnlinks.values.suffix(work.reapedKeys)
             let stalledUnlinks = reclaimUnlinks.filter { $0 > batchBudget - BlobDeletionUnit.budget * 1_000 }
             let slowUnits = units.indices.filter { units[$0] > batchBudget }.map { "\(units[$0]) ms wall, \(onCPU[$0]) ms on CPU" }
             let unlinks = try StorageBench.unlinkProfile(count: 2_000)
             print(
-                "P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit max \(longest) ms (p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(StorageBench.percentile(units, 0.95)) ms); budgets \(totalBudget) s, \(batchBudget) ms per batch; unit time budget \(BlobDeletionUnit.budget * 1_000) ms; unlink profile of this volume: p50 \(StorageBench.percentile(unlinks, 0.5)) ms, p99 \(StorageBench.percentile(unlinks, 0.99)) ms, max \(unlinks.max() ?? 0) ms; unit on-CPU max \(onCPU.max() ?? 0) ms; units over the batch budget: \(slowUnits); blob unlinks inside the reclaim: max \(reclaimUnlinks.max() ?? 0) ms, \(stalledUnlinks.count) over \(batchBudget - BlobDeletionUnit.budget * 1_000) ms \(stalledUnlinks)"
+                "P-13 reclaim of \(work.reapedKeys) blobs: \(total) s in \(units.count) units, unit p99 \(p99) ms, max \(longest) ms (p50 \(StorageBench.percentile(units, 0.5)) ms, p95 \(StorageBench.percentile(units, 0.95)) ms); budgets \(totalBudget) s, \(batchBudget) ms per batch; unit time budget \(BlobDeletionUnit.budget * 1_000) ms; unlink profile of this volume: p50 \(StorageBench.percentile(unlinks, 0.5)) ms, p99 \(StorageBench.percentile(unlinks, 0.99)) ms, max \(unlinks.max() ?? 0) ms; unit on-CPU max \(onCPU.max() ?? 0) ms; units over the batch budget: \(slowUnits); blob unlinks inside the reclaim: max \(reclaimUnlinks.max() ?? 0) ms, \(stalledUnlinks.count) over \(batchBudget - BlobDeletionUnit.budget * 1_000) ms \(stalledUnlinks)"
             )
             #expect(work.reapedKeys == count && work.reapedBytes == Int64(64 * count))
             #expect(total <= totalBudget)
-            #expect(longest <= batchBudget, "every batch between suspension points: the longest deletion unit took \(longest) ms")
+            #expect(p99 <= batchBudget, "the batches between suspension points on their p99 (ADR-050 option A): p99 \(p99) ms, the longest deletion unit \(longest) ms")
             #expect(units.count >= count / StoreConfiguration().deletionBatchSize)
         }
 
