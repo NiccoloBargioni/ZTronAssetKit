@@ -141,7 +141,9 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
   package builds and tests with 0 warnings when `Package.swift`'s first line is `// swift-tools-version: 6.4`; the
   committed manifest stays at 6.0 and the iOS 15.0 floor stays; nobody edits `Package.swift`; the fixer checks in an
   export (`git archive HEAD`, line 1 set to 6.4, `swift build --build-tests -Xswiftc -warnings-as-errors`, `grep -c
-  'warning:'`). Applied in cycle 9 (figures under "Gate evidence (cycle 9)").
+  'warning:'`). Applied in cycle 9 (figures under "Gate evidence (cycle 9)") and cycle 10 ("Gate evidence (cycle 10)").
+- **Cycle 10: no new ruling.** The rulings file still ends with S3-R11 to S3-R13; cycle 10 applies S3-R11 item 3 and R1
+  to the cycle-9 findings, S3-R12 to the TSan run and S3-R13 to the export ("Cycle 10" below).
 
 ## Cycle 2: the cycle-1 verification findings
 
@@ -1262,7 +1264,8 @@ order by construction):
 | D-REFOLLOW / D-SHUTDOWN | `barrierHoldsAcrossASecondFollow` / `barrierAnswersEveryWaiterAtShutdown` (the latter passes at `40ecd95`: a guard) |
 | amendment (a) / (d) / (e) | `barrierKeepsAPausedTransfersFrontPlace` / `barrierAdmitsNothingBetweenDrainTurns` / `barrierKeepsTheOwedVisitsOrderAcrossASecondFollow` |
 
-*Residuals, recorded for the verifiers and the orchestrator (not fixed in cycle 9):*
+*Residuals, recorded for the verifiers and the orchestrator (not fixed in cycle 9; cycle 10 fixed the first two and
+re-measured the last two, see "Cycle 10" and "Gate evidence (cycle 10)"):*
 - **A join while a `.resolve` verdict waits** (open; a decision that differs by visit order, so blocking by R1's
   criterion unless ruled otherwise). A job that holds a moved id fails with a final answer during the owed follow; its
   verdict waits. A new interest that joins that job before the drain (same content) stays on it, and the drain's
@@ -1331,7 +1334,20 @@ removed it.
   (89.0–90.2 s); `runWaitsForOwedClaims` (R-SYN-6) `.minutes(3)` → `.minutes(5)` (88.9–91.0 s). S1-15's run test stays
   `.minutes(5)`. Nothing was cut.
 - Not raised (S3-R12 item 4), non-blocking: the 29 one-minute tests at 50.3–55.0 % in the cycle-8 verifier's pair2
-  (`.build-orchestrator/s3f-probes-c8/reqs/logs/pair2-1min-overhalf.txt`), all in the bundles' first 35 s.
+  (`.build-orchestrator/s3f-probes-c8/reqs/logs/pair2-1min-overhalf.txt`), all in the bundles' first 35 s. They are, by
+  file and line (the share of the guard in brackets): `EngineRegressionCycle3Tests.swift:169` R-INT-3 (55.0 %) and `:83`
+  R-SYN-6 (54.2 %); `EngineFollowTests.swift:142` R-SYN-2 (54.7 %); `EngineRegressionRound2Tests.swift:495` R-SYN-16
+  (54.7 %); `EngineLegacyMigrationTransferTests.swift:1214` R-STO-13 (54.5 %) and `:797` R-STO-11 (52.7 %);
+  `EngineSyncTests.swift:107` R-SYN-8 (54.5 %), `:133` R-SYN-9 (53.1 %) and `:20` R-NET-1 (50.8 %);
+  `EngineRecoveryTests.swift:219` R-SYN-6 (54.4 %) and `:175` R-SYN-5 (52.5 %); `EngineRegressionCycle18Tests.swift:232`
+  and `:302` R-SYN-6 (54.0 %, 54.0 %); `EngineConditionsTests.swift:167` R-SYN-5 (53.9 %);
+  `EngineRegressionCycle6Tests.swift:209` R-SYN-11 (53.1 %); `EngineRegressionCycle7Tests.swift:69` R-SYN-11 (53.1 %);
+  `EngineRegressionTests.swift:133` R-SYN-10 (52.8 %); `EngineRegressionCycle14Tests.swift:20` R-SYN-2 (52.5 %);
+  `EngineRegressionCloseOutTests.swift:55` R-SYN-10 (52.4 %); `EngineRunPathTests.swift:88` R-MAN-2 (52.3 %);
+  `EngineMaintenanceStepTests.swift:114` R-SYN-16 (52.0 %); `EngineSync1LivenessTests.swift:119` R-SYN-10 (51.8 %);
+  `EngineRegressionCycle22Tests.swift:344` R-SYN-6 (51.8 %); `EngineCommandTests.swift:37` R-SYN-9 (51.6 %) and `:264`
+  R-CLN-4 (51.6 %); `EngineIdleTests.swift:175` R-SYN-12 (51.5 %); `EngineRegressionCycle19Tests.swift:103` R-SYN-6
+  (51.5 %); `EngineRegressionRound3Tests.swift:201` R-SYN-6 (50.3 %); `EngineStoreTests.swift:183` R-CLN-5 (50.3 %).
 - The new tests (19 in `EngineFollowBarrierTests`, 4 in `EngineSweepOrderTests`) take `.minutes(3)`: they share
   `EngineSweepOrderTests`' setup (2,100 changed entries, two forced syncs over 32 MB volumes), measured at 33.8–35.4 s
   under TSan beside a second TSan process in cycle 8. This cycle's TSan figures are under "Gate evidence (cycle 9)".
@@ -1341,6 +1357,125 @@ removed it.
 `git archive` of the branch head into `.build-s3f/t64`, line 1 set to `// swift-tools-version: 6.4` there only:
 `swift build --build-tests -Xswiftc -warnings-as-errors` and `swift build -c release` both complete with 0 `warning:`
 lines (figures under "Gate evidence (cycle 9)"). `Package.swift` is not edited in the worktree.
+
+## Cycle 10: the cycle-9 verification findings
+
+Every finding of the two cycle-9 lenses (17 issues, the cycle-10 task's findings list), with its disposition; the
+blocking ones first. No ruling was added after S3-R13: the cycle is judged under S3-R11 (item 3: a decision that
+differs from visit-first is blocking unless it rests on a real-world ledger input, R1), S3-R12 and S3-R13, each recorded
+above as an "Orchestrator ruling (close-out)". Work went in the ruled order: the suite change first (`ae4cc97`), every
+probe as a failing test (`801f483`, `6f80827`), the ENOSPC test's strengthening with its mutant (`95a019c`), then one
+fix per group of findings, each after its failing test (`69eec26`, `f858048`, `e195e2d`; `b97368a` then `25081cd`),
+then the non-blocking test strength (`a206500`).
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| reqs 0, correct 6 (blocking) | A user request that joins a job whose final (`.resolve`) verdict waits for the follow is answered with that failure; visit-first it creates a new job and is served (PROBE-C9-JOIN-RESOLVE, PROBE-C9R-JOIN-RESOLVE) | **Fixed** in `f858048`: `barrierServesARequestMadeAfterAWaitingFinalFailure` (both visits; sweep-first failing at `6f80827`'s tests on `801f483`'s sources, `EngineFollowBarrierVerdictTests.swift:68`, `:69`) |
+| correct 7 (blocking) | A join of a job whose retry verdict waits is re-queued at the verdict's place in the drain, not at its own arrival (PROBE-C9-JOIN-RETRY-PLACE) | **Fixed** in `f858048`: `barrierPlacesAJoinOfAWaitingRetryAtItsArrival` (failing at `:126`) |
+| correct 8 (blocking) | The follow's own visit marked a job whose retry verdict waits as joined, so the retry skipped its backoff (PROBE-C9-SPURIOUS-JOIN) | **Fixed** in `f858048`: `barrierKeepsAWaitingRetrysBackoffThroughTheVisit` (failing at `:170`, `:172`) |
+| correct 11 (blocking) | `.enqueue` and `.reinstate` events carried no epoch, so a job removed and re-created by the visit took the removed job's place (PROBE-C9-STALE-PLACE) | **Fixed** in `69eec26`: `barrierGivesNoPlaceOfARemovedJobToItsSuccessor` (failing at `:248`) and its control `barrierStartsNewContentsInTheFollowsOrder` (passes in both orders before and after: the stale event is the cause) |
+| correct 9 (blocking) | An offline exit's fail-fast answered an interest the owed visit moves (PROBE-C9-OFFLINE) | **Fixed** in `e195e2d`: `barrierAnswersAnOfflineExitOnTheFollowedState` (failing at `:300`, `:303`) |
+| correct 10 (blocking) | A 429's park answered an interest the owed visit moves (PROBE-C9-THROTTLE) | **Fixed** in `e195e2d`: `barrierAnswersAThrottleParkOnTheFollowedState` (failing at `:353`) |
+| reqs 1 (blocking) | The same for an interest the visit moves onto present content (PROBE-C9R-THROTTLE-PRESENT) | **Fixed** in `e195e2d`: `barrierLetsTheFollowAnswerAThrottledHoldersMovedInterest` (failing at `:406`) |
+| reqs 2 (blocking) | The mutant `enospcNoDefer` survived `barrierDecidesAnENOSPCOnTheFollowedState` | **Fixed** in `95a019c`: the test keeps D's visit owed past the read's own follow turn; the mutant fails it 2/2 (below) |
+| reqs 3 (blocking) | TSan: 43 time-outs at an S3-R12 mean of 40.45 | **Fixed** in `ae4cc97`: the F-28 tests run in a `.serialized` suite of their own; a TSan bundle with no time-out under "Gate evidence (cycle 10)" |
+| reqs 4 | The simulator suite and the benchmarks were not completed by the verifier | **Done** here: under "Gate evidence (cycle 10)", the C2 figures against S3-R5 |
+| reqs 5, correct 13 | Draft records: residuals proposed for §14 although S3-R11 item 3 makes them blocking; the 29 one-minute tests cited by file; cycle 9 missing from "Authorised edits"; the §7.10 claim overstated | **Fixed** in this draft: the cycle-9 residuals are closed below (and removed from §14 (d)/(e)); the 29 tests are listed under "Hang guards" of cycle 9; cycles 9 and 10 are named under "Authorised edits"; the §7.10 text is restated (cycle 10's entry under "Proposed document changes") |
+| correct 12 | Test strength: the ENOSPC deferral (1, 2), the `.reinstate` replay (3), the `<= shrunk` read wait (4) | (1, 2) as reqs 2. (3) **Fixed** in `a206500`: `barrierReinstatesAReleasedMemberWantedAgain`, with a test seam that holds a release part-way (below). (4) **Fixed** in `95a019c`: the test no longer waits for a free-space figure; it waits for E's verdict itself (`failed(.at)` on the followed state, `blocked` on the state before D's visit), so an unrelated read cannot end the wait |
+| correct 14 | TSan under extreme load (mean 684.54) | **No code change** (the finding says so); the re-run at a low load is under "Gate evidence (cycle 10)" |
+| correct 15 | P-13's wall-time miss | **other-wp:b**: WP-B's file, not touched; re-run in this cycle's benchmark command |
+| correct 16 | Unproven: amendment (e) with an incomplete old pass | **Analysed, not probed** (below); recorded for the next verification |
+
+### The fixes — **Fixed**
+
+All seven failing tests are in `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierVerdictTests.swift` (new, an
+extension of the serialized `EngineFollowBarrierTests`), each in both orders, expecting the visit-first outcome. At
+`6f80827`'s tests on `801f483`'s sources: `✘ Test run with 31 tests in 1 suite failed after 28.318 seconds with 10
+issues.`, every issue in a `.sweepFollowsFirst` case (`.build-s3f/head-run.log`). After `69eec26`: 6 tests failing (9
+issues); after `f858048`: 3 (4 issues); after `e195e2d`: `✔ Test run with 31 tests in 1 suite passed`.
+
+- *Epochs on places* (`69eec26`). `EventAfterFollow.enqueue` and `.reinstate` carry the asking job's epoch; the drain
+  counts the place taken (`notePlaceTaken`) and skips it when the job is gone or re-created.
+- *Joins and re-lanes behind a waiting verdict* (`f858048`). While a job's failure verdict waits (`verdictsAfterFollow`),
+  a join (`addInterest`) waits too, as a `.join` event at its arrival, registered by interest and asset in
+  `joinsAfterVerdict` (the invariants exempt exactly those from "holds an interest", and check the registry against
+  the events). The drain replays it after the verdict: to the job the verdict left, or to a new job of the content when
+  the verdict ended the job, which is what a visit-first engine's request met; a waiter cancelled, a group released or a
+  run ended meanwhile joins nothing (`stillWants`), and an id a later apply moved is re-routed (`reroute`). A re-lane of
+  such a job other than the follow's own (an interest withdrawn) waits as `.relane`; the follow's own visit of a failed
+  job is a no-op, as it was on the running attempt visit-first (it set `joined` before, which skipped the backoff). The
+  verdict reads `followedForVerdict` before it clears its marker, so that visit's re-lane is the follow's. The `joined`
+  flag and the verdict's lane are gone from `VerdictAfterFollow`.
+- *The offline exit and the 429's park* (`e195e2d`). Both are attempt verdicts now (`AttemptVerdict.offline(requeue:)`,
+  `.throttle(until:at:)`), deferred by `defersFailure` like the four of S3-R11 (c). What arrives from the world is read
+  on arrival (R1): whether an edge passed during the attempt and whether the path is satisfied, and the origin's throttle
+  (`state.throttles`, set at once; `throttleExtended` runs at once). The replay gives the exit the attempt's end gave:
+  a fresh attempt, or `failed(.whenOnline)` with the offline fail-fast; or the park with fail-fast answers read at the
+  429's instant (`failFast(at:)`, `park(answeredAt:)`), so a waiter's `retryAfter` is the one the 429 gave.
+- *An edge that meets a waiting verdict* (`b97368a`, then `25081cd`; found while fixing the offline exit, which created
+  it). A satisfied edge re-queues `failed(.whenOnline)` and transient-backoff jobs (T19); a job whose offline verdict
+  waits is `failed(nextRun)` then, which no edge re-queues, and the verdict then left it waiting for an edge that had
+  passed (R-SYN-13). The edge now appends an `.edge` event per waiting verdict (in the order the edge's re-admission
+  reads jobs), and the drain re-queues the job if the verdict left it owed on an edge.
+  `barrierRetriesAWaitingOfflineFailureOnAnEdgeItMet` fails at `e195e2d` in the sweep-first order (C stays
+  `failed(.whenOnline)`, one start: `EngineFollowBarrierVerdictTests.swift:369`, `:371`) and passes from `25081cd`.
+
+The throttle tests' setup changed once before the fix commits (`6f80827`, test only): in `801f483`'s version the other
+holder N was admitted after the barrier, under the real 429's throttle, so its admission waited (R2) and its own park
+answered A even with the fix. N now runs for a user waiter before the apply; the test still fails at the pre-fix
+sources (`:353`).
+
+*The ENOSPC test* (`95a019c`). The read the ENOSPC triggers runs a space sweep, and a sweep behind the barrier runs one
+follow turn (`advanceFollowForSpaceSweep`); with 52 fillers that turn visited D before the verdict, so the deferral
+was never needed. 300 prefetch members whose contents v3 also changes now come before D in the copies, so that turn
+visits 256 of them and stops; the sweep-first setup checks that D is still running and unvisited. The mutant
+`enospcNoDefer` (the deferral removed, in a copy under `.build-s3f/mut`): `✘ … with 2 test cases failed` in both runs
+(`.build-s3f/mut-enospc-1.log`, `-2.log`), each in `.sweepFollowsFirst`, U answered `insufficientSpace(required:
+1500000, available: 1000000)` (`EngineFollowBarrierTests.swift:1052` then) after the 180 s limit at `:999`; the visit-first
+order cannot fail it (nothing waits). Fixed and pre-fix sources both pass it.
+
+*The `.reinstate` replay* (`a206500`). Behind the barrier no pump runs, so no released member is set aside, and the
+release's later withdrawal re-queues a member a user request joined: a drain that skipped the replay gave the same
+outcome (a first version of the test, without the seam, passed under that mutant). The
+test seam `holdReleaseFollowUps()` / `resumeReleaseFollowUps()` (`EngineCommands.swift`, beside the other follow-up
+holds; no production path sets it) keeps the release part-way, so the member is set aside before the follow and stays
+released-only through it. Under the mutant: `✘ … with 2 test cases failed`, `.sweepFollowsFirst`, the member `queued`
+(`EngineFollowBarrierTests.swift:789`) and the invariant "1 queued jobs wait set aside for a release, but other
+interests want them" (`:790`).
+
+*Suite* (`ae4cc97`). `EngineFollowBarrierTests` is a `@Suite(.serialized)` of its own; the 19 barrier tests and the 4
+cycle-9 sweep-order tests moved into it (unchanged; the latter call `EngineSyncTests`' helpers), and this cycle's 10
+join it: 33 tests, 66 cases, one at a time.
+
+### Amendment (e) with an incomplete old pass — **analysed, not probed**
+
+`followApplied` builds the order `owed + (unfollowed − owed).sorted()` and appends the new pass's scan after the old
+one. `unfollowed − owed` holds jobs no pass found: joined for an entry the copy does not name (`noteJoin`), passed while
+verifying or committing, or left by an adoption. If the old pass is incomplete, its remaining finds are appended after
+them; visit-first, the old follow ends with those finds, and only the next follow visits the others (first, sorted).
+So the visit order differs by construction when both sets are non-empty, and the new contents' jobs are created in a
+different order (R-SYN-3 places). No probe was built in this cycle. A fix would hold `unfollowed − owed` until the old
+scans in `followScans` at the apply are exhausted (for example a list carried by the new `FollowScan` and appended when
+it starts). For the next verification: the probe as the finding describes it.
+
+### Residuals found while fixing — **open, for the orchestrator**
+
+Each is a decision taken while a follow is owed that can differ from visit-first (S3-R11 item 3), none probed:
+- `answerThrottledUsers` (a scheduled turn after a throttle extension) answers the user interests of throttle-parked
+  jobs while the barrier holds, including an interest the owed visit moves off such a job.
+- A policy pause: `pauseIfRefused` (on a conditions element) and `paused`'s park read the job's pre-visit lane; a visit
+  that raises the lane (a moved user interest) would have kept it running or re-queued it.
+- `readmit` orders the deferred places (`.enqueue`) by pre-visit ranks; the throttle's delay without a `Retry-After`
+  reads the job's pre-visit lane.
+- The `.edge` events are appended before the deferred re-admissions of the same edge, whatever their ranks.
+- A follow visit that re-lanes a queued job whose place still waits gives it a place in the visit and again at the drain.
+- A withdrawal (a waiter cancelled) that arrives during the barrier overtakes the deferred answer it would have followed
+  visit-first; arguably a real-world input (R1).
+
+### Hang guards (S3-R12) — **unchanged**
+
+No guard was raised or cut. The 10 new tests take `.minutes(3)` like the suite's others (0.6–3.8 s each alone, debug). TSan
+figures under "Gate evidence (cycle 10)".
 
 ## Items
 
@@ -1751,10 +1886,20 @@ changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `Tests/ZTronAssetSyncT
 `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, test files under `Tests/ZTronAssetSyncTests/Engine/` (listed under
 "Cycle 7") and this draft; cycle 8 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `EngineFollow.swift`,
 `Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`, the new `EngineSweepOrderTests.swift`,
-`Tests/ZTronAssetKitBenchmarks/BenchSync.swift` (a doc comment) and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
+`Tests/ZTronAssetKitBenchmarks/BenchSync.swift` (a doc comment) and this draft; cycle 9 changed
+`Sources/ZTronAssetSync/Engine/EngineCommands.swift`, `EngineDispatch.swift`, `EngineFailures.swift`, `EngineFollow.swift`,
+`EngineJobs.swift`, `EngineRuns.swift`, `EngineShutdown.swift`, `EngineState.swift`,
+`Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, `Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift`, the new
+`EngineFollowBarrierTests.swift`, `EngineFollowTests.swift`, `EngineLegacyMigrationTransferTests.swift`,
+`EngineRegressionCycle16Tests.swift`, `EngineSweepOrderTests.swift` and this draft; cycle 10 changed
+`Sources/ZTronAssetSync/Engine/EngineCommands.swift`, `EngineConditions.swift`, `EngineDispatch.swift`,
+`EngineFailures.swift`, `EngineFollow.swift`, `EngineJobs.swift`, `EngineShutdown.swift`, `EngineState.swift`,
+`Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierTests.swift`, the new `EngineFollowBarrierVerdictTests.swift`,
+`EngineSweepOrderTests.swift` and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
 `Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft. No contract signature
 changed (`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
-internal parameter).
+internal parameter; in cycle 10 `park(_:reason:)` and `failFast(_:reason:only:)` gained defaulted internal parameters,
+`answeredAt:` and `at:`, and the test seams `holdReleaseFollowUps()` / `resumeReleaseFollowUps()` are internal).
 
 ## Proposed document changes (for the orchestrator at the Stage 3 merge)
 
@@ -1999,18 +2144,40 @@ Cycle 9 adds (S3-R11 to S3-R13):
   `BenchSync` C2 benchmarks `reclaimDuringMixedFollowTurns`, `followDrainTurns` and `followEndTurn`.
 - **§1.2:** WP-F's new test file `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierTests.swift`.
 - **§14:** (a) and (c) stay (the `pumpWaitsForFollow` terms; with the barrier the flag is how a barred pump is repeated
-  at the follow's end); add (d) a `.resolve` verdict that waits answers an interest that joined meanwhile (visit-first,
-  that join creates a new job), and a retry verdict's user joiner is re-queued at the verdict's place in the drain, not
-  at the join's, unless the orchestrator rules them outside the class; (e) the offline and throttle exits of a job that
-  holds a moved id are not deferred (S3-R11 (c) names the other four); (f) the `.reclaimed` sweep's follow-up turns each
-  collect and sort every parked candidate again (4.0–11.8 ms per turn at 10,000 in a scratch probe, load not sampled;
-  keeping the order across follow-ups would bound them).
+  at the follow's end); add (d) the `.reclaimed` sweep's follow-up turns each collect and sort every parked candidate
+  again (4.0–11.8 ms per turn at 10,000 in a scratch probe, load not sampled; keeping the order across follow-ups would
+  bound them). (Cycle 9 also proposed two residuals here, a join while a verdict waits and the offline and throttle
+  exits; cycle 10 fixed both, so they are withdrawn.)
 - **DECISIONS (L4-R8 precedent):** S3-R12's raises with their figures (under "Cycle 9"); the new tests' guards
   (`.minutes(3)`, figures under "Gate evidence (cycle 9)").
 - **Stage 5 residual risks:** the admission wait of a multi-turn follow (S3-R11 R2): no admission for 141–149 ms after
   the release of a follow over 10,000 changed members with 10,000 waiting places (macOS release, load 7.5–8.9; the
   design and the judges: 131–143 ms to the follow's end); not measured on a device. S3-R13: the package builds at
   tools 6.4 with 0 warnings in an export; the committed manifest stays at 6.0.
+
+Cycle 10 adds:
+
+- **§7.10, "Follow barrier (F-28)"**, replacing cycle 9's paragraph: "While a follow is owed, nothing is admitted and no
+  space verdict is given: the pump starts and parks nothing; a space sweep runs one follow turn (or one drain turn) and
+  judges in a follow-up sweep once the barrier is down. What a decision would read from the jobs waits, in arrival
+  order: a join's re-check of a job parked `insufficientSpace`, an ENOSPC's verdict, a job's place in its queue (with
+  its `front`, the time it was asked for and the asking job's epoch), and every exit of an attempt by a job that still
+  holds an id the follow moves (a final answer, a retry, a count toward the caps, an ENOSPC, the offline exit and a
+  429's park, each with its fail-fast answers); while such a verdict waits, a join to the job, a re-lane other than the
+  follow's own and a satisfied network edge that meets it wait behind it. The follow's last turn pumps and then applies
+  them, at most 512 per turn, on the state every visit left; no pump runs during or between those turns, the last one
+  checks the run and pumps, and no run settles before it. A failure that waits leaves its job `failed(nextRun)` with no
+  answer; the follow's own visit moves the ids it moves, in its order, and the verdict is then given to the ids left,
+  unless the job was superseded. A second apply keeps the visits still owed in their order and appends the newly
+  unfollowed jobs. What arrives from the world applies when it arrives: a free-space read and the bytes an ended
+  transfer frees (L4-R7), whether a network edge passed during an attempt and whether the path is satisfied, and an
+  origin's throttle (Stage 3 close-out cycles 9 and 10, S3-R11; design D3)." The claim is the list, not "every
+  decision": the cycle-10 residuals ("Cycle 10", "Residuals found while fixing") await the orchestrator.
+- **§10.2, row f-4:** unchanged from cycle 9's text. No new `await` in an actor this cycle (the new code is synchronous).
+- **§11:** the cycle-10 tests (the table under "Cycle 10"), all in `EngineFollowBarrierTests` (serialized).
+- **§1.2:** WP-F's new test file `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierVerdictTests.swift`.
+- **§14:** nothing added; cycle 9's (d) and (e) are withdrawn (fixed). The amendment-(e) ordering question and the
+  cycle-10 residuals are for the orchestrator, not proposed as accepted limitations.
 
 ## Gate evidence (cycle 1)
 
@@ -2459,6 +2626,70 @@ bundle ×3 and the release build in that order (14:40:05–14:46:38).
 - **`git status`:** clean after the draft's commit; `docs/TRACEABILITY.md` untouched (no `--gates-only` or `--full`
   run).
 
+## Gate evidence (cycle 10)
+
+All runs on this branch, scratch `.build-s3f*`, on the shared 8-core host, at `a206500` (the code and tests are final
+there; the draft's commit changes this file only).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (16:45:15–16:51:02; 1-minute load read at 16:45,
+  16:46, 16:47 and 16:50: 16.5, 24.2, 40.5, 13.4): `VERIFY: PASS`; `::: SUMMARY mode=--quick steps-failed=0`; Transport
+  151, Sync 448 (`passed after 52.338 seconds`; 438 in cycle 9 plus this cycle's 10), Storage 459 (`111.852 seconds`),
+  Model 84 (`76.120 seconds`), Kit 85, Compatibility 71, AppleHosted 104 tests passed.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (16:55:11–16:55:43,
+  load 18.7): `Build complete! (31,21 s)`, exit 0, 0 `warning:` lines.
+- **Gates** (`python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md && python3
+  Scripts/gates.py docs --sources "$PWD/Sources"`, 16:55:43): `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS
+  public declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  16:51:13–16:55:11, the first after the rebuild without coverage; load mean 18.96, min 9.58, max 27.78 over 48
+  samples): `✔ Test run with 448 tests in 53 suites passed after 39.799 seconds.`, `58.524 seconds.`, `39.493 seconds.`
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, alone, 16:58:49–17:03:54; S3-R12 rule-1 load from 60 s after the start: mean 24.02, min 12.95,
+  max 48.93 over 49 samples): `✔ Test run with 448 tests in 53 suites passed after 265.095 seconds.`; 0 `WARNING:
+  ThreadSanitizer` lines, 0 `Time limit was exceeded` lines; `✔ Suite "Engine follow barrier (F-28)" passed after
+  265.093 seconds.` (its 66 cases one at a time, so the suite spans the bundle). No test took more than half its guard:
+  the 242 one-minute tests at most 18.95 s (31.6 %); the 3-minute tests of the barrier and sweep-order files 3.4–40.8 s
+  (at most 22.7 %); the longest of all, the R-SYN-3 100,000-entry plan, 96.7 s, under half its guard. This is the run
+  reqs issue 3 asked for: no time-out at a rule-1 mean of 50 or less (a single run, so S3-R12 2(ii) does not apply).
+- **Coverage** (from `--quick`'s profile, `bash .build-s3f/c6-cov.sh`: `xcrun llvm-cov export -summary-only` over every
+  test binary, then `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`): `COVERAGE target=ZTronAssetSync
+  lines= 93.70% (9624/10271) min=90.0 OK`, overall `96.46% (26121/27079)`, `COVERAGE: PASS`. The drain's replays,
+  counted over the barrier suite alone (`swift test --enable-code-coverage --filter EngineFollowBarrierTests`, then
+  `llvm-cov show` of `EngineFollow.swift`): `.spaceFailure`'s `decideSpaceFailure` 1 hit (0 in the cycle-9 verifier's
+  count), `.spaceJoin` 1, `.enqueue` 519, `.reinstate` 1 (0 before), `.join` 2, `.edge` 1, the throttle park's replay 2;
+  `.relane`'s replay and `replayJoin`'s re-route 0 (under "Not verified here").
+- **S3-R13** (`.build-s3f/c10-t64.sh`, 17:12–17:15: `git archive` of `a206500` into `.build-s3f/t64`, line 1 set to `//
+  swift-tools-version: 6.4` there only; Apple Swift version 6.4 (swiftlang-6.4.0.34.1)): `swift build --build-tests
+  --scratch-path ../t64-build -Xswiftc -warnings-as-errors` exit 0, `Build complete! (115,74 s)`, 0 `warning:` and 0
+  `error:` lines; `swift build -c release --scratch-path ../t64-build` exit 0, `Build complete! (72,55 s)`, 0 `warning:`
+  lines. `Package.swift` is not edited in the worktree.
+- **iOS:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath .build-s3f/xcode build
+  OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, exit 0, 0 `warning:` lines (17:04:24–17:04:44; `EngineFollow.o` and
+  `EngineConditions.o` for `arm64` rebuilt at 17:04). **iOS Simulator tests** (simulator
+  897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iPhone 18 Pro, iOS 27.0; `Test-ZTronAssetKit-2026.10.30_17-04-52-+0100.xcresult`,
+  17:04:44–17:11:51, load 33.7 at the start, up to 219 during the run from other work on the host): `"result" :
+  "Passed"`, `"totalTestCount" : 1402`, `"passedTests" : 1402`, `"failedTests" : 0`, `"skippedTests" : 0` (`** TEST
+  SUCCEEDED **`; cycle 9's 1,392 plus this cycle's 10; the log's four `warning:` lines are
+  `appintentsmetadataprocessor`'s "Metadata extraction skipped"); the simulator is shut down.
+- **Benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks`
+  after a release build of the tests, 17:20:26–17:27:13; 1-minute load mean 11.65, min 3.94, max 25.00 over 82 samples):
+  `✘ Test run with 44 tests in 8 suites failed after 225.387 seconds with 1 issue.`, the issue P-13's
+  (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 10.29 ms against 5.0 ms, WP-B's,
+  `other-wp:b`); `✔ Suite "SyncBenchmarks" passed after 71.407 seconds.`, every WP-F benchmark within S3-R5's budgets
+  (best of three ≤ 10 ms, median ≤ 50 ms). The follow barrier's C2 figures (reqs issue 4): the reclaim during an owed
+  follow [3.23, 3.39, 3.16] ms (one handle) and [4.40, 4.58, 4.46] ms (two); the mixed reclaim (1 member in 20 changed)
+  [8.17, 7.15, 7.48] ms and [7.81, 8.13, 8.02] ms; `followDrainTurns` [4.05, 3.74, 3.80] ms, the follow ended [152.7,
+  146.3, 148.1] ms and the drain [154.3, 148.2, 148.1] ms after the release (R2's admission wait); `followEndTurn` the
+  combined turn [3.32, 3.96, 3.36] ms. The rest: space parking [4.80, 4.23, 10.91] ms, its ENOSPC read 4.36 ms; space
+  re-admission [5.45, 5.62, 15.10] ms; network edges [1.19, 1.11, 1.20] and 5.01 ms best; releases [5.27, 5.46, 4.75]
+  and [5.79, 5.25, 5.02] ms; re-joins [5.38, 5.30, 5.69] and [12.06, 5.77, 5.74] ms; shutdown [1.88, 1.58, 14.26] ms;
+  refresh under a group [1.24, 1.31, 1.29] ms, changing every member [3.97, 3.69, 3.81] ms; prune announcement [5.12,
+  5.04, 5.16] ms; due retries [1.99, 0.96, 1.06] ms; cancelled resolve 0.02 ms; cooldown end 0.07 ms; probe chain [0.34,
+  0.77, 0.35] ms (totals about 1.16 s); throttle extension [7.60, 8.78, 10.25] ms; P-9 p99 13.4 ms (budget 50.0). The
+  runs over 10 ms (one of three in five benchmarks) fit the convention (best and median within) and the host's load.
+- **`git status`:** clean after the draft's commit; `docs/TRACEABILITY.md` untouched (no `--gates-only` or `--full`
+  run).
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -2523,3 +2754,13 @@ bundle ×3 and the release build in that order (14:40:05–14:46:38).
   still have no test. The judging turns of the `.reclaimed` sweep's follow-ups (4.0–11.8 ms each at 10,000, measured by
   a scratch probe only) have no benchmark of their own; `reclaimDuringMixedFollowTurns` measures the longest. `other-wp:b`
   items are WP-B's.
+- Cycle 10: cycle 9's open members (the joins while a verdict waits, the offline and throttle exits) are fixed with
+  tests (above). Not probed: the residuals listed under "Cycle 10" ("Residuals found while fixing": the throttle
+  extension's later answers, a policy pause, `readmit`'s pre-visit ranks, the `.edge` events' place among the same
+  edge's re-admissions, a visit's re-lane of a job whose place waits, a withdrawal that overtakes a deferred answer) and
+  amendment (e) with an incomplete old pass (analysed, not probed). The `.edge` replay is pinned by one scenario (an
+  offline failure, then one edge); a transient failure's backoff met by an edge while its verdict waits runs the same
+  replay with no test of its own. Two replay branches have no hit in the barrier suite: `.relane` (a withdrawal from a
+  job whose verdict waits) and `replayJoin`'s re-route (a later apply that moved a waiting join's id). The survivors
+  `noDispatchOwedFlag` and `noFlagPump` still have no test. The R1 boundary probes were not re-run. `other-wp:b` items
+  are WP-B's.
