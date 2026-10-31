@@ -536,20 +536,17 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
-        // A place a visit or a replay gave while the follow barrier held is refused by the origin's gates as they stood
-        // at its decision instant (`placeStamps`; S3-R15 item 3): a visit-first engine's pump refused it there, and its
-        // fail-fast answers read that instant (`dispatch`). The view never admits: a start is a request, and a request
-        // reads the live throttle, breaker and slots below (R-SYN-5; ruling S3-R16 items 1(b) and 3). Admitted on the
-        // view, a place whose slot was busy at the view's instant started under a throttle a 429 set since
-        // (PROBE-C12-PLACE-SLOT, the cycle-12 residual R-I).
-        if let stamp = self.state.placeStamps[transfer] {
-            let view = self.state.worldHistory[stamp.view]
-            if let until = OriginGate.inForce(view.throttle, at: stamp.at) {
-                return .block(.throttled(until: until))
-            }
-            if case .reject(let cause, _)? = view.breaker?.admission(of: transfer, at: stamp.at) {
-                return .block(.circuitOpen(cause))
-            }
+        // A place a visit or a replay gave while the follow barrier held, at an instant a visit-first engine's pump had a
+        // slot for it (`placeStamps`, `enqueue`), is refused by the origin's throttle as it stood then (S3-R15 item 3):
+        // that pump refused it there, and its fail-fast answers read that instant (`dispatch`). The view never admits: a
+        // start is a request, and a request reads the live throttle, breaker and slots below (R-SYN-5; ruling S3-R16 items
+        // 1(b) and 3). Admitted on the view, a place whose slot was busy at the view's instant started under a throttle a
+        // 429 set since (PROBE-C12-PLACE-SLOT, the cycle-12 residual R-I). The view's breaker is not read: refused on it
+        // after the breaker's close had re-admitted its parked jobs in the drain, a place parked `circuitOpen` behind a
+        // closed breaker that nothing re-admits (PROBE-C13R-STAMP-BREAKER; Stage 3 close-out cycle 14, S3-R16 items 1(c)
+        // and 3, S3-R17 item 2: the breaker is a live origin gate).
+        if let stamp = self.state.placeStamps[transfer], let until = OriginGate.inForce(self.state.worldHistory[stamp.view].throttle, at: stamp.at) {
+            return .block(.throttled(until: until))
         }
         // The origin's gates through the pure functions every other decision reads too (`OriginGate`, F-40), each read
         // once per job: this runs for every job a pump dispatches or parks.

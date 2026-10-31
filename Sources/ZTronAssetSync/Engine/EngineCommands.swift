@@ -1775,6 +1775,9 @@ extension SyncEngine {
         if let stranded = self.strandedBreakerParks() {
             violations.append(stranded)
         }
+        if let unwakeable = self.unwakeableBreakerParks() {
+            violations.append(unwakeable)
+        }
         if let unwakeable = self.unwakeableThrottleParks() {
             violations.append(unwakeable)
         }
@@ -2057,6 +2060,36 @@ extension SyncEngine {
             return nil
         }
         return "nothing re-admits the \(self.state.circuitParked.count) jobs the breaker parked for the probe it admits"
+    }
+
+    /// Why the jobs the breaker parked may never be re-admitted while the live breaker is closed, if so. A breaker that
+    /// closes re-admits every job it parked (`unblockOrigin(.circuitOpen)`; behind the follow barrier at that event's
+    /// replay, `EventAfterFollow.unblock`; the jobs one turn cannot re-queue are owed a follow-up, `originOwed`), and with
+    /// no deadline left (`scheduleBreakerDeadline`) nothing else wakes them. A job parked `circuitOpen` behind a closed
+    /// breaker, neither owed a re-queue nor behind a waiting re-admission or the breaker's deadline, waits for ever: the
+    /// state a place refused on the breaker of its decision instant, after the close's re-admission had run in the drain,
+    /// left (PROBE-C13R-STAMP-BREAKER; Stage 3 close-out cycle 14).
+    private func unwakeableBreakerParks() -> String? {
+        guard self.isRunning, let origin = self.state.remote?.originID, self.state.heap.deadline(for: .breaker(origin)) == nil else {
+            return nil
+        }
+        if let breaker = self.state.breakers[origin], breaker.state != .closed {
+            return nil
+        }
+        let waiting = self.state.circuitParked.subtracting(self.state.originOwed)
+        guard !waiting.isEmpty else {
+            return nil
+        }
+        let readmissionWaits = self.state.eventsAfterFollow.contains { event in
+            if case .unblock(.circuitOpen) = event {
+                return true
+            }
+            return false
+        }
+        guard !readmissionWaits else {
+            return nil
+        }
+        return "nothing will re-admit the \(waiting.count) jobs the breaker parked while it is closed"
     }
 
     /// Why the jobs a throttle parked may never be re-admitted, if so. Only the origin's `.throttle` deadline re-admits
