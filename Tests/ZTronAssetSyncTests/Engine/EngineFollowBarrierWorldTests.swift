@@ -264,11 +264,12 @@ extension EngineFollowBarrierTests {
 
     /// The new content a follow's visit queues is admitted on the throttle in force at the apply, also when that
     /// throttle ended while the visit was owed: T (1 MB, zz-t) downloads for a prefetch member; D (1 MB, content W)
-    /// downloads for U's user waiter (zz-u). Between v3's fetch and its apply, T gets a 429 with Retry-After 10 s; v3
-    /// moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends. Visited first, D's visit created N at the apply
-    /// under the 10 s throttle: N parked and U was answered `serverUnavailable(10)`. Visited after the throttle's end, N
-    /// started and U was served from it (the cycle-11 residual R-D, "a visit reads inputs that arrived after it was
-    /// owed").
+    /// downloads for U's user waiter and a prefetch member (zz-u). Between v3's fetch and its apply, T gets a 429 with
+    /// Retry-After 10 s; v3 moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends. Visited first, D's visit
+    /// created N at the apply under the 10 s throttle: N parked and U was answered `serverUnavailable(10)`; the throttle's
+    /// alarm then re-admitted N for the member. Visited after the throttle's end, N started and U was served from it (the
+    /// cycle-11 residual R-D, "a visit reads inputs that arrived after it was owed"). Parked on the apply's throttle once
+    /// no live throttle is left, N waits for that alarm alone (`fireDue`'s `.throttle` without a live throttle).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply(_ visit: LaneDropVisit) async throws {
@@ -288,7 +289,7 @@ extension EngineFollowBarrierTests {
         await s.harness.source.script(t.transferID, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(10))), .stage(tBytes)])
         await s.harness.source.script(u.transferID, [.hold, .stage(wBytes)])
         await s.harness.source.script(uMoved.transferID, [.stage(nBytes)])
-        let group = try await engine.registerGroup([t.identifier], lane: .prefetch).get()
+        let group = try await engine.registerGroup([t.identifier, u.identifier], lane: .prefetch).get()
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[t.transferID]?.state == .downloading }
         }
@@ -325,9 +326,13 @@ extension EngineFollowBarrierTests {
         } else {
             Issue.record("U gets the throttle's fail-fast answer of the apply's instant (visit-first serverUnavailable(10)): \(uResult)")
         }
+        // N, parked on the apply's throttle after it had ended, is re-admitted by the throttle's alarm (no live throttle
+        // is left to end) and served for the group's member.
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
-            await engine.awaitCondition { $0.state.jobs[t.transferID] == nil }
+            await engine.awaitCondition { $0.state.jobs[t.transferID] == nil && $0.state.jobs[uMoved.transferID] == nil }
         }
+        let nStarted = await s.harness.source.starts.contains { $0.id == uMoved.transferID }
+        #expect(nStarted, "N starts for the group's member zz-u once the apply's throttle ended")
         await engine.releaseGroup(group)
         await FollowBarrier.finish(s, sync: sync)
     }
