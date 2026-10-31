@@ -120,7 +120,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Simplification is preferred:** for example, removing the place stamps behind R-I. One-to-one test records apply (G3).
   - ADR-057 records S3-R16 as the owner's decision.
 - **Fix run 4** (args in `.build-orchestrator/s3-fix-args-run4.json`): `s3f` from cycle 13 to 16, findings `s3f-c12-issues.json`, simulator set 1, no usage stop. **RUNNING** `wf_94baddee-151` (task `wybwtb9zp`), launched 31 Oct 09:46 (the owner's answer came in the morning) at weekly 66 %.
-  - **Owner, 31 Oct ~10:00: "No cap".** WP-F runs until it converges under S3-R16. If cycle 16 still blocks, rule and start a new run from cycle 17. Do not offer the cap again. To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
+  - **Owner, 31 Oct ~10:00: "No cap".** WP-F runs until it converges under S3-R16. If cycle 16 still blocks, rule and start a new run from cycle 17. Do not offer the cap again.
+  - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
