@@ -120,6 +120,16 @@ extension EngineFollowBarrierTests {
             await engine.shutdown()
             return
         }
+        // The invariant check names the jobs the breaker parked that nothing re-admits while it is closed: the state a
+        // place refused on its stamp's breaker, after the close's re-admission had run, left (no breaker deadline, no
+        // owed re-queue, no waiting re-admission). Behind the open breaker and its deadline, it names none.
+        let whileOpen = await engine.invariantViolations()
+        #expect(whileOpen.isEmpty, "\(whileOpen.prefix(3))")
+        let unwakeable = await engine.violations { state in
+            state.heap.remove(.breaker(origin))
+            state.breakers[origin] = nil
+        }
+        #expect(unwakeable.contains("nothing will re-admit the 2 jobs the breaker parked while it is closed"), "\(unwakeable)")
         EngineRegressionCycle21Tests.advance(s.time, to: cooldownEnd)
         await engine.awaitCondition { $0.state.jobs[m.transferID]?.state == .downloading || $0.state.jobs[k.transferID]?.state == .downloading }
         let mProbes = await engine.readForTests { $0.state.jobs[m.transferID]?.state == .downloading }
