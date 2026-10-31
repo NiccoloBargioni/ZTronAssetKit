@@ -153,7 +153,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Mutants:** two survive (`laneJobsWalkAlways`, `spaceFailureEpochDropped`).
     - **Put back:** a verdict that waits across a later apply; the publication failure's await window; a drain-turn seam.
   - **Cycle 15 verification** started 18:29. Weekly usage was 74 % at 18:35.
-  - **S3-R19** (18:45) rules on cycle 15's put-backs:
+  - **S3-R19** (18:36) rules on cycle 15's put-backs:
     - the two analysed items are probed first and are blocking only if item 1 breaks (smallest fix);
     - a cost-only mutant is equivalent;
     - the defensive check is removed, turned into an invariant, or recorded as pre-existing and out of class.
