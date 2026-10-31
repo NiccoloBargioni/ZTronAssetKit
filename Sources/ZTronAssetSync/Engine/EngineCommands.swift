@@ -1724,6 +1724,11 @@ extension SyncEngine {
             if (job.state == .downloading) != (job.active != nil) {
                 violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
             }
+            // An attempt carries nothing of the one before it (`start`): a visit reads the end and the re-route set as
+            // this attempt's (`rerouteOnVisit`, `recordDeferredVerdict`; Stage 3 close-out cycle 16, ruling S3-R19 item 3).
+            if job.state == .downloading, job.attemptEnd != nil || job.rerouteOnPass != nil {
+                violations.append("job \(transfer) downloads with an earlier attempt's end or re-route set")
+            }
             // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
             // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
             if !self.state.unfollowed.contains(transfer), let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true }) {

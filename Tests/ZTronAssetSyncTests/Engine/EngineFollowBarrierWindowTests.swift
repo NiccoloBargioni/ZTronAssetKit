@@ -178,4 +178,46 @@ extension EngineFollowBarrierTests {
         #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
         #expect((try? bResult.get())?.byteSize == 16, "B is served N: v3's visit met C failed, its verdict not given (visit-first): \(bResult)")
     }
+
+    /// A retry downloads with nothing of the publication that failed before it (`invariantViolations()`; cycle 16, ruling
+    /// S3-R19 item 3): C's publication fails its verification read (EIO) with no follow owed, so the end it recorded
+    /// (`recordPublicationEnd`) stays on the job through the backoff its verdict, given at once, sets; the retry's `start`
+    /// resets it, and the re-route set. A later visit reads both as the retry's own (`rerouteOnVisit`). No apply is made:
+    /// the property is the attempt's own bookkeeping, the same in both `LaneDropVisit` orders.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)", .timeLimit(.minutes(3)))
+    func barrierRetriesAFailedPublicationWithNothingOfItsEnd() async throws {
+        let seed: UInt64 = 1_616_102
+        let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(a.transferID, [.stage(cBytes), .hold, .stage(cBytes)])
+        s.fileSystem.addFault(FaultRule(operation: .read, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .io))
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        // The publication fails (EIO): retried after a backoff, its end recorded.
+        await engine.awaitCondition { e in
+            if case .failed(.at) = e.state.jobs[a.transferID]?.state {
+                return true
+            }
+            return false
+        }
+        let backingOff = await engine.readForTests { e in (owed: e.followOwed, end: e.state.jobs[a.transferID]?.attemptEnd) }
+        try #require(!backingOff.owed && backingOff.end != nil, "setup: the failed publication's end stays on C through its backoff: \(backingOff)")
+        // The retry downloads, held.
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .downloading && $0.state.jobs[a.transferID]?.attempts == 1 }
+        }
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "the retry downloads with nothing of the publication before it: \(violations.prefix(3))")
+        await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        #expect((try? aResult.get())?.byteSize == Int64(cBytes.count), "A is served C by the retry: \(aResult)")
+        await Self.finishHeld(s)
+    }
 }
