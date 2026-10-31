@@ -82,6 +82,9 @@ struct EngineState {
     /// `insufficientSpace`, and any other place in a queue, waits for the follow's end while one is owed
     /// (`eventsAfterFollow`, F-28).
     var inFollowVisit = false
+    /// Set while an attempt's end brings onto its job the interests an owed visit moves there (`SyncEngine.bringInbound`):
+    /// their joins are made at once, on the job as the attempt left it, never behind its verdict (`addInterest`).
+    var bringingInbound = false
     /// The inputs that arrived behind the follow barrier and are not real-world ledger inputs, in arrival order (F-28;
     /// Stage 3 close-out cycle 9, S3-R11 design D3, and cycle 11, S3-R14): every attempt's exit verdict, every request's
     /// join and withdrawal, a group's release and a purge's withdrawals, an ENOSPC's verdict, a conditions element's and

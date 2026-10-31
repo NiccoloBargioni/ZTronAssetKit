@@ -114,6 +114,14 @@ extension SyncEngine {
             self.notifyObservers()
             return
         }
+        if self.state.inFollowVisit, !self.state.bringingInbound, let waiting = self.state.jobs[transfer], waiting.attemptEnd?.deferredAfter != nil {
+            // A visit that moves an interest onto a job whose exit verdict waits: every id the copy mapped to this content
+            // when the verdict deferred was brought onto it then (`bringInbound`), so this one was moved here by a later
+            // apply, whose visit on a visit-first engine met the job as the verdict left it (Stage 3 close-out cycle 17).
+            self.deferBehindVerdict(JoinAfterFollow(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: true), of: waiting)
+            self.notifyObservers()
+            return
+        }
         let now = self.decisionNow()
         self.noteJoin(transfer, asset: asset, entry: entry, token: token, kind: kind)
         if self.state.jobs[transfer] == nil {
@@ -269,13 +277,15 @@ extension SyncEngine {
                 self.pauseIfRefused(transfer)
             }
         case .failed(let disposition):
-            if self.state.verdictsAfterFollow[transfer] != nil {
-                // The attempt's verdict waits for the follow (`defersFailure`). Only the follow's own visit, or an event
-                // the drain applies before the verdict, re-lanes such a job: each met a running attempt on a visit-first
-                // engine, whose re-lane only re-prioritised it, so nothing is done (marking the job joined skipped the
-                // retry's backoff, PROBE-C9-SPURIOUS-JOIN). Every other re-lane comes from an input that waits behind
-                // the verdict as an event of its own (a join, a withdrawal), so the cycle-10 `.relane` event is gone
-                // (S3-R14 item 4).
+            if job.attemptEnd?.deferredAfter != nil {
+                // The attempt's verdict waits for the follow (`defersFailure`, or an ENOSPC's in `spaceFailed`;
+                // `recordDeferredVerdict`). Only the follow's own visit, an attempt's end that brings a visit's interests
+                // forward (`bringInbound`), or an event the drain applies before the verdict, re-lanes such a job: each
+                // met a running attempt on a visit-first engine, whose re-lane only re-prioritised it, so nothing is done
+                // (marking the job joined skipped the retry's backoff, PROBE-C9-SPURIOUS-JOIN; an ENOSPC's verdict was
+                // skipped for the re-queue until Stage 3 close-out cycle 17). Every other re-lane comes from an input
+                // that waits behind the verdict as an event of its own (a join, a withdrawal), so the cycle-10 `.relane`
+                // event is gone (S3-R14 item 4).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {
@@ -641,32 +651,38 @@ extension SyncEngine {
         }
         let now = self.decisionNow()
         for token in job.interests.keys.sorted() where only == nil || only == token {
-            guard let interest = self.state.jobs[transfer]?.interests[token], interest.kind == .waiter || interest.kind == .ensure else {
+            guard let interest = self.state.jobs[transfer]?.interests[token], let error = self.failFastError(reason, for: interest, of: job, at: now) else {
                 continue
             }
-            let error: AssetError?
-            switch reason {
-            case .offline:
-                error = .offline
-            case .circuitOpen(let cause):
-                error = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
-            case .throttled(let until):
-                // The origin's end, not the job's: a later 429 may have extended the throttle after it parked (F-36).
-                let wait = self.throttleEnd(after: until).seconds(since: now)
-                let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
-                error = wait > limit ? .serverUnavailable(retryAfter: wait) : nil
-            case .insufficientSpace:
-                if case .insufficientSpace? = job.lastError {
-                    error = job.lastError
-                } else {
-                    error = .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace.map { self.headroom(for: job, in: $0) } ?? 0)
-                }
-            case .policy, .awaitingSpace:
-                error = nil
+            self.resolve(token, of: transfer, with: .failed(error))
+        }
+    }
+
+    /// The fail-fast answer `interest` of `job` gets when the job parks for `reason` at the decision instant `now`
+    /// (`failFast`), or `nil` when it keeps waiting: only a waiter or an ensure is answered, a throttle only for a wait
+    /// beyond the interest's lane's limit. Shared by `failFast` and `verdictAnswers`, which reads whom a waiting verdict's
+    /// park answers (Stage 3 close-out cycle 17, PROBE-C16C-THROTTLE-FAILFAST-LANE).
+    func failFastError(_ reason: BlockReason, for interest: JobInterest, of job: Job, at now: MonotonicInstant) -> AssetError? {
+        guard interest.kind == .waiter || interest.kind == .ensure else {
+            return nil
+        }
+        switch reason {
+        case .offline:
+            return .offline
+        case .circuitOpen(let cause):
+            return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
+        case .throttled(let until):
+            // The origin's end, not the job's: a later 429 may have extended the throttle after it parked (F-36).
+            let wait = self.throttleEnd(after: until).seconds(since: now)
+            let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
+            return wait > limit ? .serverUnavailable(retryAfter: wait) : nil
+        case .insufficientSpace:
+            if case .insufficientSpace? = job.lastError {
+                return job.lastError
             }
-            if let error {
-                self.resolve(token, of: transfer, with: .failed(error))
-            }
+            return .insufficientSpace(required: job.entry.byteSize ?? 0, available: self.state.freeSpace.map { self.headroom(for: job, in: $0) } ?? 0)
+        case .policy, .awaitingSpace:
+            return nil
         }
     }
 

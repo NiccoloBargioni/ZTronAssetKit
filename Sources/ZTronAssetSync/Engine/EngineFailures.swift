@@ -250,21 +250,7 @@ extension SyncEngine {
         guard let remaining = self.countFailedAttempt(transfer, error: error, assetError: assetError) else {
             return
         }
-        let attempts = remaining.attempts
-        let policy = remaining.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-        let retryAfter: TimeInterval?
-        if case .transient(_, let hint?) = error {
-            retryAfter = hint.seconds(from: wall)
-        } else {
-            retryAfter = nil
-        }
-        guard let delay = Backoff.delay(
-            attempt: attempts,
-            retryAfter: retryAfter,
-            policy: policy,
-            seed: self.environment.random.seed,
-            key: StableHash.fnv1a64(transfer.rawValue)
-        ) else {
+        guard let delay = self.retryDelay(transfer, error: error, attempts: remaining.attempts, lane: remaining.lane, wall: wall) else {
             self.transition(transfer, to: .failed(.nextRun))
             self.resolveAll(transfer, with: .failed(assetError))
             return
@@ -303,8 +289,7 @@ extension SyncEngine {
             guard let interest = self.state.jobs[transfer]?.interests[token] else {
                 continue
             }
-            let policy = interest.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-            if attempts >= max(1, policy.maxAttemptsPerRun) {
+            if self.reachesCap(interest.lane, attempts: attempts) {
                 self.deliver(.failed(assetError), to: token, interest: interest, transfer: transfer)
                 self.state.jobs[transfer]?.interests[token] = nil
             }
@@ -330,8 +315,7 @@ extension SyncEngine {
         guard let lane = job.heldLane, self.state.claims[ClaimKey(job: job)] != nil else {
             return false
         }
-        let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-        return attempts < max(1, policy.maxAttemptsPerRun)
+        return !self.reachesCap(lane, attempts: attempts)
     }
 
     /// A 429 (ARCHITECTURE §7.6): an origin-wide throttle until the clamped deadline (a `Retry-After` above
@@ -355,8 +339,7 @@ extension SyncEngine {
         if self.defersToFollow, self.exitDefers(job) {
             let decided = self.state.throttles[origin]
             let decision: ThrottleDecision
-            let lane = self.followedLane(job)
-            let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+            let policy = self.retryPolicy(for: self.followedLane(job))
             if let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) {
                 let until = now.adding(seconds: max(delay, seconds ?? 0))
                 self.state.throttles[origin] = max(decided ?? .zero, until)
@@ -370,7 +353,7 @@ extension SyncEngine {
                 return
             }
         }
-        let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+        let policy = self.retryPolicy(for: job.lane)
         guard let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) else {
             self.transition(transfer, to: .failed(.nextRun))
             self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: seconds)))
@@ -583,6 +566,7 @@ extension SyncEngine {
             // read above is adopted already (S3-R11 R1).
             self.recordDeferredVerdict(transfer)
             self.deferToFollow(.spaceFailure(transfer, epoch: epoch, required: required))
+            self.bringInbound(transfer)
             return
         }
         self.decideSpaceFailure(transfer, required: required)
@@ -593,20 +577,18 @@ extension SyncEngine {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        let space = self.state.freeSpace
-        let reclaiming = (space?.pendingReclaim ?? 0) > 0
-        // The bytes the attempt needed and the job's room above the reserve (the planner's convention, §7.10).
-        let figures = AssetError.insufficientSpace(required: required, available: space.map { self.headroom(for: job, in: $0) } ?? 0)
+        let figures = self.spaceFigures(job, required: required)
         self.state.jobs[transfer]?.lastError = figures
-        guard case .failed = job.state else {
+        guard case .failed = job.state, let measured = self.state.jobs[transfer] else {
             // A user request re-queued it meanwhile (T20): the gate's ledger decides with the figures just read.
             return
         }
-        if !reclaiming, let measured = self.state.jobs[transfer], self.spaceBlock(measured) == nil {
+        let verdict = self.spaceVerdict(measured)
+        switch verdict {
+        case .retry:
             self.retryLater(transfer, error: .insufficientSpace(requiredBytes: required), answer: figures)
             return
-        }
-        if reclaiming {
+        case .awaitReclaim:
             // The wait for the reclaim stands where the backoff would, but the attempt joins the retry budget all the
             // same (L4-R4): when nothing reclaims on time, the settlement's fresh read re-queues a job the volume holds
             // at once, so a volume that keeps answering ENOSPC while it reads roomy would otherwise start the transfer
@@ -614,12 +596,64 @@ extension SyncEngine {
             guard self.countFailedAttempt(transfer, error: .insufficientSpace(requiredBytes: required), assetError: figures) != nil else {
                 return
             }
+        case .insufficient:
+            break
         }
         guard self.transition(transfer, to: .queued) else {
             return
         }
-        self.park(transfer, reason: reclaiming ? .awaitingSpace : .insufficientSpace)
+        self.park(transfer, reason: verdict == .awaitReclaim ? .awaitingSpace : .insufficientSpace)
         self.checkRunSettled()
+    }
+
+    /// The figures of an ENOSPC of `job` on the latest free-space read: the bytes the attempt needed and the job's room
+    /// above the reserve (the planner's convention, §7.10).
+    func spaceFigures(_ job: Job, required: Int64) -> AssetError {
+        .insufficientSpace(required: required, available: self.state.freeSpace.map { self.headroom(for: job, in: $0) } ?? 0)
+    }
+
+    /// What an ENOSPC's verdict decides on the latest free-space read for `measured`, the job with the attempt's figures
+    /// as its last error (`spaceFigures`): a wait for the store's pending reclaim, a retry when the volume holds what the
+    /// job needs after all (the ENOSPC was transient), else a park for lack of space with its fail-fast. Shared by
+    /// `decideSpaceFailure`, which acts on it, and `verdictAnswers`, which reads whom a waiting ENOSPC verdict answers
+    /// (Stage 3 close-out cycle 17).
+    func spaceVerdict(_ measured: Job) -> SpaceVerdict {
+        if (self.state.freeSpace?.pendingReclaim ?? 0) > 0 {
+            return .awaitReclaim
+        }
+        return self.spaceBlock(measured) == nil ? .retry : .insufficient
+    }
+
+    /// The retry policy of work on `lane`: the interactive policy for user-initiated work (sync.md §8.2).
+    func retryPolicy(for lane: AssetPriority) -> RetryPolicy {
+        lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+    }
+
+    /// Whether `attempts` failed attempts reach the attempt cap of an interest on `lane` (R-SYN-5): the failure that
+    /// counts the last of them answers it (`countFailedAttempt`; read by `verdictAnswers`).
+    func reachesCap(_ lane: AssetPriority, attempts: Int) -> Bool {
+        attempts >= max(1, self.retryPolicy(for: lane).maxAttemptsPerRun)
+    }
+
+    /// The backoff before `transfer`'s next attempt after `attempts` failed ones, on `lane`'s retry policy, with
+    /// `error`'s `Retry-After` read against `wall` as its lower bound; `nil` when that `Retry-After` exceeds the policy's
+    /// `maxRetryAfter` (`Backoff.delay` defers to the next run), which ends the job and answers every interest left.
+    /// Shared by `retryLater`, which backs off or ends the job on it, and `verdictAnswers`, which reads whom a waiting
+    /// retry verdict answers (Stage 3 close-out cycle 17, the WP-F draft's RR-11).
+    func retryDelay(_ transfer: TransferID, error: TransferError, attempts: Int, lane: AssetPriority, wall: Date) -> TimeInterval? {
+        let retryAfter: TimeInterval?
+        if case .transient(_, let hint?) = error {
+            retryAfter = hint.seconds(from: wall)
+        } else {
+            retryAfter = nil
+        }
+        return Backoff.delay(
+            attempt: attempts,
+            retryAfter: retryAfter,
+            policy: self.retryPolicy(for: lane),
+            seed: self.environment.random.seed,
+            key: StableHash.fnv1a64(transfer.rawValue)
+        )
     }
 
     /// Reads the store's free space into the headroom ledger (S2-09: committed bytes stay until the next read).
@@ -656,10 +690,13 @@ extension SyncEngine {
     /// - the interests other jobs hold in ids the copy now maps to its content, which their owed visits move onto it: of
     ///   a job the visit passes (`rerouteOnVisit`), only those in the ids it re-routes (`Job.rerouteOnPass`; Stage 3
     ///   close-out cycle 15, ruling S3-R18 item 2: skipped whole, a publication begun after the apply left out an
-    ///   interest a visit-first engine had moved onto this content, PROBE-C14R-PASSED-LANE, PROBE-C14C-PASSED-LANE);
+    ///   interest a visit-first engine had moved onto this content, PROBE-C14R-PASSED-LANE, PROBE-C14C-PASSED-LANE), and,
+    ///   of a job whose exit verdict waits, every interest in an id that engine's visits had moved off it before the
+    ///   verdict (`AttemptEnd.movedBefore`), which the drain takes off before the verdict if no visit did (cycle 17);
     /// - of a job whose exit verdict waits with an apply followed since (`movesAfterVerdict`), the interests the drain
-    ///   moves onto it after the verdict (`followAfterVerdict`), less those the verdict answers (`verdictAnswers`): a
-    ///   visit-first engine's visit at that apply moved them onto this content (cycle 16, ruling S3-R19 item 1);
+    ///   moves onto it after the verdict (`followAfterVerdict`), less those the verdict answers (`verdictAnswers`, on the
+    ///   job the verdict meets, `jobAtVerdict`, under the verdict's own decision instant): a visit-first engine's visit at
+    ///   that apply moved them onto this content (cycle 16, ruling S3-R19 item 1; cycle 17 for the partial answers);
     /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them).
     ///
     /// The job's own lane when none of these counts: a visit-first engine's job then had no interest left, and was
@@ -681,18 +718,21 @@ extension SyncEngine {
         }
         let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) })
         var withdrawn: Set<InterestToken> = []
-        var verdicts: [TransferID: WaitingVerdict] = [:]
+        var verdicts: [TransferID: (verdict: WaitingVerdict, stamp: WorldStamp?)] = [:]
         // By content, the last one waiting: an earlier job's verdict, which the drain skips, waits before the current
         // job's own, and a current job with none waiting has no deferral on it (`movesAfterVerdict` is false), so an
-        // earlier job's verdict moves nothing here (cycle 16: an epoch filter changed only the walk's cost).
-        for event in self.state.eventsAfterFollow {
+        // earlier job's verdict moves nothing here (cycle 16: an epoch filter changed only the walk's cost). Each with
+        // the decision instant the drain gives it under (`eventStamps`).
+        let stamps = self.state.eventStamps
+        for (index, event) in self.state.eventsAfterFollow.enumerated() {
+            let stamp = index < stamps.count ? stamps[index] : nil
             switch event {
             case .removal(let token, _):
                 withdrawn.insert(token)
             case .attemptFailed(let transfer, _, let verdict):
-                verdicts[transfer] = .attempt(verdict)
-            case .spaceFailure(let transfer, _, _):
-                verdicts[transfer] = .space
+                verdicts[transfer] = (.attempt(verdict), stamp)
+            case .spaceFailure(let transfer, _, let required):
+                verdicts[transfer] = (.space(required: required), stamp)
             default:
                 break
             }
@@ -709,15 +749,24 @@ extension SyncEngine {
                 // What its owed visit moves (`nil`: every moved id), and the verdict after which the drain moves the rest.
                 let visit = self.followOwed ? self.rerouteOnVisit(other) : []
                 let after = self.movesAfterVerdict(other) ? verdicts[transfer] : nil
+                // The ids the drain takes off before the verdict and re-routes after it (`takeOffMovedBefore`).
+                let movedBefore = other.attemptEnd?.movedBefore ?? []
+                // The job the verdict meets, read once and only for a job with an interest it may leave to move here.
+                var met: Job?
                 for (token, interest) in other.interests where !withdrawn.contains(token) {
                     let moves = interest.assets.contains { asset in
                         guard here(asset) else {
                             return false
                         }
-                        if visit?.contains(asset) ?? true {
+                        if visit?.contains(asset) ?? true || movedBefore.contains(asset) {
                             return true
                         }
-                        return after.map { !self.verdictAnswers($0, interest, of: other) } ?? false
+                        guard let after else {
+                            return false
+                        }
+                        let verdictJob = met ?? self.jobAtVerdict(other, withdrawn: withdrawn)
+                        met = verdictJob
+                        return !self.verdictAnswers(after.verdict, interest, of: verdictJob, at: after.stamp)
                     }
                     guard moves else {
                         continue
@@ -748,23 +797,83 @@ extension SyncEngine {
         return lane ?? job.lane
     }
 
-    /// Whether `verdict`, waiting for `job`, answers `interest` when the drain gives it (`replayVerdict`), which then
-    /// leaves nothing of it to move (`followedLane`): a resolution and a 429 beyond the caps answer every interest, a retry
-    /// those whose lane's cap the attempt reaches (`countFailedAttempt`). The other verdicts leave every interest, except
-    /// three partial answers counted as none, recorded as residual risks in the WP-F draft (cycle 16): an offline exit's
-    /// fail-fast (`failFast`), a retry whose `Retry-After` exceeds the remaining lane's cap (`Backoff.delay`), and an
-    /// ENOSPC's verdict (`decideSpaceFailure`).
-    func verdictAnswers(_ verdict: WaitingVerdict, _ interest: JobInterest, of job: Job) -> Bool {
+    /// The job a verdict waiting for `job` meets when the drain gives it, as `followedLane` reads it: `job` less the
+    /// interests a waiting withdrawal removes and those all of whose ids leave it before the verdict, the ids a
+    /// visit-first engine's visits had moved off it before the verdict arrived (`AttemptEnd.movedBefore`: re-routed by its
+    /// owed visit, or taken off by the drain, `takeOffMovedBefore`). The interests another visit or a waiting join adds
+    /// before the verdict are not counted: they change only the lane a retry's policy and an ENOSPC's room are read on,
+    /// and only when none of the job's own interests is user-initiated (a residual of Stage 3 close-out cycle 17, in the
+    /// WP-F draft).
+    func jobAtVerdict(_ job: Job, withdrawn: Set<InterestToken>) -> Job {
+        let leaving = job.attemptEnd?.movedBefore ?? []
+        var met = job
+        met.interests = job.interests.filter { token, interest in
+            !withdrawn.contains(token) && !interest.assets.isSubset(of: leaving)
+        }
+        return met
+    }
+
+    /// Whether `verdict`, waiting for `job` (the job it meets, `jobAtVerdict`), answers `interest` when the drain gives it
+    /// (`replayVerdict`, `.spaceFailure`'s replay) under its decision instant `stamp`, which then leaves nothing of it to
+    /// move (`followedLane`). Each verdict's answers are read through the function its replay acts on, so the two cannot
+    /// part (Stage 3 close-out cycle 17; the cycle-16 verifiers' PROBE-C16R-RR11-RETRY-AFTER and
+    /// PROBE-C16C-THROTTLE-FAILFAST-LANE):
+    /// - a resolution and a 429 beyond the caps answer every interest;
+    /// - a retry answers those whose lane's cap the attempt reaches (`reachesCap`), and every one when its `Retry-After`
+    ///   exceeds the cap of the lane the job keeps (`retryDelay`, read against the clock now, as `retryLater` reads it);
+    /// - a 429's park, an offline exit that waits for the next edge and a policy pause that parks on an offline lane
+    ///   answer those the park's fail-fast answers (`failFastError`; a throttle's wait read at the verdict's instant);
+    /// - an ENOSPC's verdict (`spaceVerdict`) answers those at their cap when it retries or waits for the reclaim, and
+    ///   those the fail-fast answers when it parks for lack of space;
+    /// - a re-queue, an edge's fresh attempt and any other pause answer nobody.
+    func verdictAnswers(_ verdict: WaitingVerdict, _ interest: JobInterest, of job: Job, at stamp: WorldStamp?) -> Bool {
+        guard let stamp else {
+            return self.verdictAnswers(verdict, interest, of: job)
+        }
+        return self.withReading(stamp) {
+            self.verdictAnswers(verdict, interest, of: job)
+        }
+    }
+
+    /// `verdictAnswers(_:_:of:at:)` under the reading in force.
+    private func verdictAnswers(_ verdict: WaitingVerdict, _ interest: JobInterest, of job: Job) -> Bool {
+        let attempts = job.attempts + 1
+        let now = self.decisionNow()
         switch verdict {
         case .attempt(.resolve):
             return true
+        case .attempt(.retry(let error, _)):
+            if self.reachesCap(interest.lane, attempts: attempts) {
+                return true
+            }
+            // The lane `retryLater` reads: the job's, less the interests the count answers (this one is not among them).
+            let kept = job.interests.values.filter { !self.reachesCap($0.lane, attempts: attempts) }.map(\.lane).max() ?? interest.lane
+            return self.retryDelay(job.transfer, error: error, attempts: attempts, lane: kept, wall: self.environment.time.now()) == nil
         case .attempt(.throttle(let facts)):
-            return facts.decision == .exhausted
-        case .attempt(.retry):
-            let policy = interest.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-            return job.attempts + 1 >= max(1, policy.maxAttemptsPerRun)
-        case .attempt(.offline), .attempt(.pause), .attempt(.requeue), .space:
+            switch facts.decision {
+            case .exhausted:
+                return true
+            case .until(let end):
+                return self.failFastError(.throttled(until: end), for: interest, of: job, at: now) != nil
+            }
+        case .attempt(.offline(let requeue)):
+            return !requeue && self.failFastError(.offline, for: interest, of: job, at: now) != nil
+        case .attempt(.pause(let policy, let blocks)):
+            guard policy, job.lane < .userInitiated, let block = blocks.first(where: { $0.lane == job.lane })?.reason else {
+                return false
+            }
+            return self.failFastError(block, for: interest, of: job, at: now) != nil
+        case .attempt(.requeue):
             return false
+        case .space(let required):
+            var measured = job
+            measured.lastError = self.spaceFigures(job, required: required)
+            switch self.spaceVerdict(measured) {
+            case .retry, .awaitReclaim:
+                return self.reachesCap(interest.lane, attempts: attempts)
+            case .insufficient:
+                return self.failFastError(.insufficientSpace, for: interest, of: measured, at: now) != nil
+            }
         }
     }
 

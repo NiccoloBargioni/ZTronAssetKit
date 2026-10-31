@@ -82,7 +82,7 @@ extension EngineFollowBarrierTests {
     }
 
     /// An id a later apply maps back to the content whose verdict waits joins that content after the verdict, not before
-    /// it (`mappedBack`; PROBE-C16C-VERDICT-MAPPED-BACK, `rejoinAfterVerdict`, and the join a visit makes onto a job whose
+    /// it (`mappedBack`; PROBE-C16C-VERDICT-MAPPED-BACK, `takeOffMovedBefore`, and the join a visit makes onto a job whose
     /// verdict waits, `addInterest`): visited first, the 404 answered A alone, and B, moved back by v4 after it, was
     /// served by a fresh job of C's content.
     @available(macOS 15.0, iOS 18.0, *)

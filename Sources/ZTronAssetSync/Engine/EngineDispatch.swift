@@ -1012,6 +1012,9 @@ extension SyncEngine {
         guard self.transition(transfer, to: .verifying) else {
             return
         }
+        // The interests a visit-first engine's visits had moved onto this content are the job's before its publication
+        // binds its ids (`bringInbound`; Stage 3 close-out cycle 17, PROBE-C16C-INTERMEDIATE-HOP-SERVED).
+        self.bringInbound(transfer)
         job = self.state.jobs[transfer] ?? job
         job.active = nil
         // The ids a visit-first engine moved before this publication began: an owed follow's visit, which meets the job
