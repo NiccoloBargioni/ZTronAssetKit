@@ -250,6 +250,46 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
 
   Applied in cycle 14 ("Cycle 14" below): the two changes are confirmed, RR-7 is recorded as S3-R17 items 1 and 2
   describe it, and the stamp's breaker refusal is removed (item 2: the breaker is a live origin gate).
+- **Orchestrator ruling (close-out) S3-R18 — added 2026-10-31 16:30 (cycle 14's verification and the cycle-14
+  fixer's put-backs): place stamps go; a passed publication re-routes its moved ids at once.** The cycle-14 verifiers'
+  five blocking items fall in three groups: the place stamp's slot view (PROBE-C14C-STAMP-AHEAD), the passed-publication
+  mark (PROBE-C14C-MARK-TWO-APPLIES, PROBE-C14C-PASSED-LANE, PROBE-C14R-PASSED-LANE, PROBE-C14R-PASSED-FAIL), and G4 for
+  `followedLane`'s new branches.
+  1. *Place stamps are removed (S3-R16 item 3, S3-R17 item 2).* The barrier-end pump admits every place on the live
+     throttle, breaker and slots, and on nothing else. The stamp's throttle refusal, `freeSlots`, and every branch, flag
+     or invariant that exists only for them go; the draft names each removal and the branches and tests it affects. An
+     answer difference this causes is caused only by a live origin gate changing during the barrier: non-blocking under
+     S3-R17 item 2, recorded as a residual risk. *G3, an exception like S3-R17 item 3:* a sweep-first answer assertion
+     that expects a stamp's past view may change one to one to the live gate's correct SPEC answer, the scenario, its
+     operations and every visit-first assertion unchanged; the draft lists each change (test, old assertion, new
+     assertion, this ruling). No other answer assertion changes.
+  2. *A passed publication re-routes at once (S3-R16 1(a) and item 3).* The passed-publication answer differences are
+     blocking, and RR-1's remainder is not a residual risk. Preferred fix: where `follow` passes a verifying or
+     committing job whose publication began at or after the visit's apply, it re-routes the moved ids' interests to
+     their new content at once, leaving the job's bytes, ledger entry and publication untouched. The `publishedAfterApply`
+     mark, `followPassedPublication`, the parts of `followedForVerdict` that serve it, and `followedLane`'s skip of
+     publishing jobs go. Fallback, only if a probe shows the re-route breaks a MUST or an invariant: per-pass id lists.
+     The four cases the verifiers named (the 429 and the 404, each behind the barrier and after the drain) and the
+     two-applies case are tests in both orders; whatever stays in `followedLane` is killed or removed (1(e)).
+  3. *Put-backs.* The nested-drain re-entrancy change (cycle-13 finding 11) is accepted as non-blocking and recorded as
+     a residual risk with its reason. `failureMoveBehindBarrier` is moot if item 2 removes the mover. RR-2 and RR-4 are
+     probed if the cycle has room, otherwise left marked. Routing P-5, P-13 and P-9 to their benchmark owners is
+     accepted.
+  4. *Verifiers.* Judge by items 1 to 3. A request to a gated origin, a wrong SPEC answer for the live state, a liveness
+     gap, or an answer difference with any cause other than a live origin gate changing during the barrier is reported.
+
+  Applied in cycle 15 ("Cycle 15" below).
+- **Orchestrator ruling (close-out) S3-R18a — amendment to S3-R18, added 2026-10-31 16:42 (before run 5's cycle-15
+  fixer).** Cycle 15 starts again under S3-R18 in run 5.
+  1. *Two applies.* Item 2's re-route must also be right when a later apply lands while the earlier apply's follow
+     still owes the publishing job's visit: only the ids moved as of the apply the publication began after are
+     re-routed; ids a later apply moved while the job already published are passed, as in visit-first. The case is a
+     test in both orders, next to MARK-TWO-APPLIES.
+  2. *Inputs.* `wip/s3f-c15a` (`5a87864`) holds the stopped fixer's unfinished tests, reused where they fit (its
+     SlotTests fix-by-counting is ruled out by item 1; its scenario is the STAMP-AHEAD test). The findings are
+     `.build-orchestrator/s3f-c14-issues.json`, the probes `.build-orchestrator/s3f-probes-c14/`.
+
+  Applied in cycle 15 ("Cycle 15" below): the ids are recorded when the publication begins (`Job.rerouteOnPass`).
 
 ## Cycle 2: the cycle-1 verification findings
 
@@ -2768,6 +2808,320 @@ These rows replace I1's gate clause and rows I8, I12 and I33 as cycle 13 left th
   `barrierAnswersAJobPublishingAtTheApplyAsVisitedFirst`. Mutants: `verdictVisitDropped`, `passedAtApplyVisited`,
   `publishedBoundary`, `appliesNotCounted`, `passedMarkKept` killed.
 
+## Cycle 15: rulings S3-R18 and S3-R18a
+
+Cycle 15 applies **S3-R18** and its amendment **S3-R18a**, both recorded above as an "Orchestrator ruling (close-out)",
+to the cycle-14 verifiers' 14 findings (`.build-orchestrator/s3f-c14-issues.json`). The work went in this order:
+
+1. `b461450`: the failing tests, committed on their own, in both `LaneDropVisit` orders, with `.timeLimit(.minutes(3))`,
+   in the serialized `EngineFollowBarrierTests` suite. The new files are `EngineFollowBarrierSlotTests.swift`,
+   `EngineFollowBarrierPublicationTests.swift` and `EngineFollowBarrierLaneTests.swift`.
+   `EngineFollowBarrierAnswerTests.swift` gained the `tuning:` and `failBeforeVisit` parameters and finding 10's
+   assertion. What fitted from `wip/s3f-c15a` (`5a87864`) was copied, file by file and hunk by hunk, never merged:
+   SlotTests' STAMP-AHEAD scenario (its fix-by-counting left out, S3-R18a item 2), the passed-lane helper,
+   `setUpHeldPublications`'s `tuning:` and `barrierDecidesA429OnTheOwnLaneOfAJobNothingKeeps`.
+   - On cycle 14's sources (`388f744`), 12 tests fail sweep-first, 2/2 (`.build-s3f/c15/failing-run{1,2}.log`):
+     `✘ Test run with 12 tests in 1 suite failed after 11.989 seconds with 17 issues.` and `✘ Test run with 12 tests in
+     1 suite failed after 11.981 seconds with 17 issues.` Every visit-first case passes.
+   - The failing lines (at `b461450`): SlotTests `:75` (STAMP-AHEAD); PublicationTests `:107` (six times, the
+     `serverUnavailable` helper), `:125` (twice), `:138`, `:152`, `:162` (the four PASSED-LANE and PASSED-FAIL cases),
+     `:272` (MARK-TWO-APPLIES), `:286` (S3-R18a item 1) and `:301` (a case found this cycle, below); LaneTests `:60`,
+     `:61` (finding 9's fallback).
+   - `barrierDecidesA429WithoutTheInterestAJobPublishingAtTheApplyKeeps` and
+     `barrierDecidesA429WithoutAWaitingRequestThatDoesNotJoinIt` pass on those sources: they are G4 tests for branches
+     that stay, not failing tests.
+2. `0f32845`: the removals and the re-route (below). Barrier suite after it: `✔ Test run with 91 tests in 1 suite passed
+   after 66.849 seconds.` (`.build-s3f/c15/barrier-3.log`); whole Sync bundle: `✔ Test run with 506 tests in 53 suites
+   passed after 74.066 seconds.` (`.build-s3f/c15/sync-1.log`, before the last edit to `follow`, which drops a guard
+   the code after it made redundant; the barrier run is after it).
+3. `9673e2f`: tests for the first mutant round's survivors (G4, below).
+4. This draft.
+
+**Found this cycle (blocking under S3-R16 1(a), with its failing run above):** PublicationTests `:301`,
+`barrierAnswersAPublicationFailedBeforeItsVisitAsPassed`. C verifies when v3 moves zz-b, and its bytes fail while the
+follow is owed, before the turn that finds C. Visited first, the follow passed C at the apply, and the failure answered
+both users `integrityFailure`. Cycle 14 met C failed, with its verdict waiting, and visited it as any failed job: B was
+moved onto N and served N. The waiting verdict now says whether the attempt reached its publication
+(`VerdictAfterFollow.published`), and such a job is passed (`passesOnVisit`).
+
+| Finding | Disposition |
+|---|---|
+| 1 (correct, blocking): PROBE-C14C-MARK-TWO-APPLIES | **Fixed** in `0f32845` (S3-R18 item 2, S3-R18a item 1). The mark is gone. The ids are recorded when the publication begins (`Job.rerouteOnPass`). Tests: `barrierAnswersALaterApplysPassedIdWithThePublicationsFailure` (v4 after v3's follow) and `barrierAnswersAnIdALaterApplyMovedWhileTheVisitWasOwedWithThePublication` (v4 while v3's follow still owes C's visit, S3-R18a item 1) |
+| 2 (correct, blocking): PROBE-C14C-PASSED-LANE | **Fixed** in `0f32845`. `followedLane` counts a passing job's interests in the ids it re-routes. Test: `barrierDecidesA429OnTheLaneAPublicationBegunAfterTheApplyGives` with W at the prefetch lane (the correctness verifier's probe) |
+| 3 (correct, blocking): PROBE-C14C-STAMP-AHEAD | **Fixed by removal** (S3-R18 item 1). Place stamps are gone, and the barrier-end pump admits on the live throttle, breaker and slots. Test: `barrierWaitsForTheSlotAnEarlierPlaceTook`: K1 served 16 B and K2 served 20 B in both orders |
+| 4 (correct): the merged profile's 0-hit line | **Recorded.** No Scripts/ edit (G1). Every G4 claim this cycle cites a drop-mutant run, not a profile count (table below). `breakerExclusionDropped` covers the line the verifier named (`unwakeableBreakerParks`' exclusion) |
+| 5, 13 (correct, reqs): nested drain re-entrancy | **Accepted as non-blocking** (S3-R18 item 3). Recorded as RR-9 with its reason (below) |
+| 6 (correct): C2 margins | **Recorded.** `worldStamp()` no longer calls `freeSlots()` per deferred event (removed). This cycle's benchmark figures and load are under "Gate evidence (cycle 15)" |
+| 7, 14 (correct, reqs; other-wp:b): P-13 | **Routed** to WP-B (S3-R18 item 3). Not touched |
+| 8 (reqs, blocking): PROBE-C14R-PASSED-LANE, PROBE-C14R-PASSED-FAIL | **Fixed** in `0f32845`: the visit re-routes at once the moved ids of a publication begun after the apply. Tests, both orders: `barrierDecidesA429OnTheLaneAPublicationBegunAfterTheApplyGives` (W a user's, the requirements verifier's probe), `barrierDecidesA429AfterTheDrainOnTheLaneAPublicationBegunAfterTheApplyGives`, `barrierAnswersA404WithTheIdAPublicationBegunAfterTheApplyMoved`, `barrierAnswersA404AfterTheDrainWithTheIdAPublicationBegunAfterTheApplyMoved` |
+| 9 (reqs, blocking, G4): `followedLane`'s fallback and joins filters | **Fixed.** The fallback is simplified to the job's own lane, the finding's second option. A job no interest keeps was retired by a visit-first engine, so no 429 reached it. The bulk fallback throttled the origin where nothing should have been throttled. Test: `barrierDecidesA429OnTheOwnLaneOfAJobNothingKeeps`, failing on cycle 14's sources (LaneTests `:60`, `:61`). Joins filters: `barrierDecidesA429WithoutAWaitingRequestThatDoesNotJoinIt` (other content, a released group, a withdrawn waiter). Every branch that stays in `followedLane` has a mutant killed 2/2 except `laneJobsWalkAlways`, the walk's C2 guard (table and reason below) |
+| 10 (reqs): the breaker invariant's exclusion | **Done** in `b461450`. `barrierStartsAVisitsPlaceOnceTheBreakerCloses` asserts, sweep-first, that `invariantViolations()` is empty while the close's `.unblock(.circuitOpen)` still waits with parked jobs. Mutant `breakerExclusionDropped` (table) |
+| 11 (reqs): C2 of `followedLane`'s walk | **Recorded.** The verifier's figure: best 2.41–2.69 ms per call at 10,000 owed jobs (release, load 95–106); 13.3–16.8 ms in debug. This cycle adds, per job of the walk, `passesOnVisit` (a switch, and for a failed job one dictionary lookup) and, for a passing job only, one set lookup per id. No benchmark was added (the finding marks it optional) |
+| 12 (reqs): RR-2 and RR-4 | **Not probed** (S3-R18 item 3: not blocking). The blocking items, G4 and the gates took the cycle |
+
+### What cycle 15 removes (S3-R18 item 1)
+
+Line numbers at `388f744` (cycle 14), under `Sources/ZTronAssetSync/Engine/`.
+
+- **The stamp's throttle refusal** in `EngineDispatch.gate` (`:548`), which refused a place on the throttle of its
+  decision instant's view.
+  - Affected tests: WorldTests `barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply` and AnswerTests
+    `barrierRefusesAUserPlaceInAReservedSlotOnItsThrottle`, whose sweep-first answers change (Test changes, below).
+  - Moot mutants: `placeStampsIgnored`. Cycle 14 already removed the stamp's breaker refusal, so `stampBreakerBack`
+    is moot too.
+- **`dispatch`'s stamped park** (`:391`), which parked a refused place at its stamp's instant against its view's
+  throttle end. With it go `park(_:reason:answeredAt:answerEnd:)`'s two parameters and `failFast`'s `at:` and
+  `answerEnd:`, which only that park passed; a replayed 429's park still reads its reading's instant and end
+  (`decisionNow()`, `throttleEnd(after:)`). Moot mutant: `stampParkLive`. RR-6 goes with it.
+- **The stamping in `enqueue`** (`:471`), and `EngineState.placeStamps` with its clears in `removeJob`,
+  `endWorldHistory`, `scheduleDrainFollowUp` and shutdown, and its clause in `followBarrierViolations`. Moot mutant:
+  `slotIgnored`.
+- **`freeSlots()`** (`:82`), **`FreeSlots`** and **`WorldStamp.freeSlots`**. Moot mutant: `slotLaneBlind`. Finding 6's
+  profiling target goes too.
+- **`start`'s edge serial from the stamp's view** (`:768`). A start now records the live edge serial
+  (`networkEdgeSerial`): the place starts on the live gates, so an edge before that start is not one its attempt
+  missed. No test distinguished the two (no mutant existed); recorded as RR-10.
+
+### What cycle 15 removes and adds (S3-R18 item 2, S3-R18a)
+
+Removed:
+
+- `PassedPublication`, `Job.passedPublishing`, `Job.publishingSince`, `EngineState.appliesFollowed` and
+  `WorldStamp.apply`, which counted the followed applies.
+- `followPassedPublication` and its call in `publicationFailed` (`:1206`).
+- `followedForVerdict`, the drain's visit before a waiting verdict (`:563`).
+- `follow(_:publicationEnded:)`'s parameter, `visit(_:at:)`'s nil-stamp path, and `holdsIDListedElsewhere`, which is
+  folded back into `holdsMovedID`.
+- In `followedLane`: the skip of verifying and committing jobs, the dead `followBarrier` guard (its only caller,
+  `throttled`, reads it behind the barrier), the optional result and the held-lane-or-bulk fallback.
+- Moot mutants, their code gone: `verdictVisitDropped`, `passedAtApplyVisited`, `publishedBoundary`,
+  `appliesNotCounted`, `passedMarkKept`, `failureMoveDropped`, `publicationEndedIgnored`, `failureMoveNoPump` and
+  `failureMoveBehindBarrier`. The last survived in cycle 14; S3-R18 item 3 makes it moot with the mover.
+
+Added (line numbers at `0f32845`):
+
+- **`Job.rerouteOnPass`** (`EngineState` `:618`). `publish` (`EngineDispatch` `:1018`) sets it when the publication
+  begins. While a follow is owed, it is the ids the copy maps elsewhere: a visit-first engine visited the job at that
+  follow's apply while it still downloaded, and moved them then. Otherwise it is empty: every visit has run, and an id
+  the copy maps elsewhere is one a visit passed. `start` (`:731`) clears it to `nil`: a new attempt's publication is a
+  new one.
+- **`VerdictAfterFollow.published`** (`EngineFollow` `:398`): whether the failed attempt reached its publication
+  (`rerouteOnPass != nil`, read when the verdict is deferred). The publication failure paths set the job `failed`
+  before they defer, so the job's state cannot tell.
+- **`passesOnVisit`** (`:622`). A visit passes a verifying or committing job, and a failed job whose waiting verdict is
+  a publication's.
+- **`follow`** (`:645`). For a job it passes, the visit re-routes at once the moved ids in `rerouteOnPass`, leaving the
+  job's bytes, ledger entry and publication untouched. It passes the others; the job stays in `unfollowed` while any
+  stays passed. A job it does not pass is followed as before.
+- **`replayVerdict`** (`:423`). The drain gives the verdict to whatever the job still holds after the visits.
+- **`followedLane`** (`EngineFailures` `:671`). A passing job's interests count only in the ids it re-routes, and the
+  job's own lane is the fallback.
+
+**The fallback (per-pass id lists) is not needed.** No probe shows the re-route breaking a MUST or an invariant:
+- The commit binds only the ids the copy maps to the job (R-SYN-11). A re-routed id has left `assets`, so the commit
+  never binds it.
+- The bytes and the ledger entry stay with the publication, so the space accounting is unchanged.
+- `invariantViolations()` is checked at the end of every barrier test. "A job holds an id the copy maps elsewhere
+  and is not in `unfollowed`" holds: re-routed ids leave `assets`, and passed ids keep the job in `unfollowed`.
+- A passing job whose ids all re-route keeps no asset. `retire` keeps a verifying or committing job until its
+  publication ends, and its commit binds nothing.
+
+### Test changes (S3-R18 item 1's G3 exception; S3-R16 item 4)
+
+Two sweep-first answer assertions change one to one, as S3-R18 item 1 authorises. In each, the difference is caused
+only by the origin's throttle ending during the barrier. The scenario, its operations and every visit-first
+assertion are unchanged.
+
+| Test | Old assertion (sweep-first) | New assertion (sweep-first) | Ruling |
+|---|---|---|---|
+| WorldTests `barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply` | `uResult` is `.failure(.serverUnavailable(retryAfter: r))` with `abs(r - 10) < 0.5` (the apply's 10 s throttle, which ended during the barrier) | `(try? uResult.get())?.byteSize == 16`: U is served N, admitted on the live gates once the throttle had ended | S3-R18 item 1 |
+| AnswerTests `barrierRefusesAUserPlaceInAReservedSlotOnItsThrottle` | `kResult` is `.failure(.serverUnavailable)` (K refused on its arrival's throttle) | `(try? kResult.get())?.byteSize == 16`: K is served, admitted once the live throttle had ended | S3-R18 item 1 |
+
+Display names follow the change. The first becomes "R-SYN-5: the new content an owed follow's visit queues is gated on
+the live throttle, the apply's when visited first (F-28)" (it read "R-SYN-11: … gated on the throttle in force at the
+apply, though it ended since"). The second becomes "… is gated on the live throttle, its arrival's when visited first
+(F-28)". The comments after the first test's answers are corrected the same way.
+
+Setup assertions of cycle 14's own tests read the removed mark, so they now read the state that replaces it. These
+are not answer assertions:
+
+- `passedPublication` (AnswerTests, sweep-first):
+  - old: `passed.owed && passed.c == .verifying && passed.passed`, with `passed` meaning "in `unfollowed` and visited";
+  - new: `… && passed.visited && rerouted`, where `rerouted` is `holdsB && unfollowed` when C published at the apply
+    and `!holdsB && !unfollowed` when it began after.
+- `barrierAnswersAPassedJobsRetryAsVisitedFirst`:
+  - the setup assertion becomes `… && passed.visited && !passed.holdsB && !passed.unfollowed`;
+  - `passedAgain` changes from `mark == .publishingAtApply` to `c == .verifying && holdsC && unfollowed`.
+
+No other pre-existing assertion changed.
+
+### Mutants (S3-R16 1(e))
+
+Setup:
+- `.build-s3f/c15/mut.py` (cycle 14's `mutB.py` with cycle-15 paths) copies `Sources/` and `Tests/` into
+  `.build-s3f/mutsrc{,2,3,4}` and applies each edit there with a count check.
+- It builds in `.build-s3f/mutbuild{,2,3,4}`, runs the filter `EngineFollowBarrier|probeSupersededFreesSlot` twice,
+  reverts, and diffs the copy's `Sources/` against the worktree. Every revert printed "none".
+- The worktree is never edited. Definitions: `.build-s3f/c15/mutants.json`.
+
+| Round (logs) | Sources and tests | Tests in the filter |
+|---|---|---|
+| 1 (`mut-{a,b,c,d}.log`, `mut{,2,3,4}/`) | `0f32845` | 92 |
+| 2 (`mut2-{b,c,d}.log`, `mut{2,3,4}/`) | sources `0f32845`, tests `9673e2f` | 97 |
+
+Every failure is sweep-first except where "both" is written; (t) marks a time limit. Lines are each round's commit's.
+
+| Mutant | Branch | Round, result | Killed by |
+|---|---|---|---|
+| **The re-route (S3-R18 item 2, S3-R18a)** | | | |
+| `passNone` | `follow` re-routes every moved id of a passing job | 1, 2/2 | PublicationTests `:272`, `:286` (two applies), `:301` (both); AnswerTests `:708`, `:791`, `:798` (both); ApplyTests `:103`, `:125` |
+| `passAll` | `follow` passes every moved id (no re-route) | 1, 2/2 | PublicationTests `:107`, `:138`, `:152`, `:162`; AnswerTests `:650`, `:686`, `:696`, `:721` (t), `:770`, `:781`; ReachTests `:210` |
+| `passedNotUnfollowed` | a passed id leaves the job out of `unfollowed` | 1, 2/2 | AnswerTests `:650`, `:791` (both); ApplyTests `:103` |
+| `publishRerouteNone` | `publish` records no ids | 1, 2/2 | as `passAll`, and PublicationTests `:125` |
+| `publishOwedDropped` | `publish` records the moved ids also while no follow is owed | 1 **passed** 2/2; 2, 2/2 | RetryTests `:88`, `:96` (both; `barrierPassesAgainTheIdARetriedPublicationCarries`: zz-b re-routed at v4's visit, B served N) |
+| `startClearDropped` | `start` keeps the last publication's ids | 1 **passed** 2/2; 2, 2/2 | RetryTests `:164`, `:170` (`barrierVisitsARetryThatFailsBeforeItsVisitAsADownload`: the verdict reads `published`, B gets the 404) |
+| `passesFailedFalse` | a failed job is never passed | 1, 2/2 | PublicationTests `:301` (`barrierAnswersAPublicationFailedBeforeItsVisitAsPassed`) |
+| `passesFailedTrue` | every failed job is passed | 1, 2/2 | ClassTests `:220`, `:430`–`:433`, `:626`; VerdictTests `:66`, `:305`, `:308`, `:364`, `:427`, `:480` |
+| `spaceFailureEpochDropped` | the `.spaceFailure` replay without its epoch check | 1 **passed** 2/2 | None (below) |
+| **`followedLane` (finding 9)** | | | |
+| `laneCountsPassing` | a passing job's interests count in every id | 1, 2/2 | PublicationTests `:176`, `:177` (`…WithoutTheInterestAJobPublishingAtTheApplyKeeps`), `:107` |
+| `laneSkipsPassing` | a passing job's interests never count | 1, 2/2 | PublicationTests `:125`, `:107` (`…OnTheLaneAPublicationBegunAfterTheApplyGives`) |
+| `laneFallbackHeld` | cycle 14's fallback (held lane or bulk) | 1, 2/2 | LaneTests `:60`, `:61` (`barrierDecidesA429OnTheOwnLaneOfAJobNothingKeeps`) |
+| `laneOwnWithdrawnIgnored` | own interests counted though their withdrawal waits | 1, 2/2 | AnswerTests `:588`, `:589` |
+| `laneOwnVisitedIgnored` | own interests counted though none of their ids stays | 1, 2/2 | ClassTests `:283`, `:288` |
+| `laneJobsWithdrawnIgnored` | other jobs' interests counted though their withdrawal waits | 1 **passed** 2/2; 2, 2/2 | LaneTests `:207`, `:208` (`barrierDecidesA429WithoutAMovedInterestWithdrawn`) |
+| `laneJobsWalkAlways` | the walk over other jobs also while no follow is owed | 1 **passed** 2/2 | None (below) |
+| `laneJoinTokenWithdrawnIgnored` | a waiting join counted though its owner's withdrawal waits | 1, 2/2 | LaneTests `:149`, `:150` (`withdrawnWaiter`) |
+| `laneJoinWithdrawnFlagIgnored` | a join a purge withdrew still counted | 1 **passed** 2/2; 2, 2/2 | LaneTests `:140`, `:141` (`barrierDecidesA429WithoutAPurgedHealsJoin`) |
+| `laneJoinTargetIgnored` | a waiting join for other content counted | 1, 2/2 | LaneTests `:149`, `:150` (`otherContent`); PublicationTests `:107` |
+| `laneJoinListedTargetIgnored` | a waiting join read at its own entry, not the copy's | 1 **passed** 2/2; 2, 2/2 | LaneTests `:271` (`barrierDecidesA429OnTheLaneAJoinALaterApplyMovedGives`); PublicationTests `:107` (its `serverUnavailable` helper) |
+| `laneJoinStillWantsIgnored` | a released group's join counted | 1, 2/2 | LaneTests `:149`, `:150` (`releasedGroup`) |
+| **Finding 10** | | | |
+| `breakerExclusionDropped` | `unwakeableBreakerParks` without its waiting-re-admission exclusion | 2, 2/2 | AnswerTests `:158` (`barrierStartsAVisitsPlaceOnceTheBreakerCloses`: `invariantViolations()` while the close's `.unblock` waits) |
+
+Round 2's tests (`9673e2f`), each in both orders, each passing on `0f32845`'s sources:
+
+- `barrierPassesAgainTheIdARetriedPublicationCarries` (RetryTests). v3's follow passes C, publishing, with zz-b. C's
+  verification read fails (EIO) and C is retried. The retry's publication begins while no follow is owed, and v4's
+  follow passes it with zz-b and zz-c. All three users get `integrityFailure`, as visited first.
+- `barrierVisitsARetryThatFailsBeforeItsVisitAsADownload` (RetryTests). C's first publication fails (EIO) and C is
+  retried. v3 moves zz-b while the retry downloads; the retry gets a 404 before the follow's turn that finds C. B is
+  served N, A gets `notFound`. The test also asserts the waiting verdict's `published == false`.
+- `barrierDecidesA429WithoutAMovedInterestWithdrawn` (LaneTests). Y's visit moves U onto C, and U withdraws before C's
+  429. The origin is throttled for prefetch work and P is served by C's retry.
+- `barrierDecidesA429WithoutAPurgedHealsJoin` (LaneTests). A heal's join of C's content waits, withdrawn by a purge,
+  while C's only user withdraws. Nothing is throttled, and a later user request is served.
+- `barrierDecidesA429OnTheLaneAJoinALaterApplyMovedGives` (LaneTests). A user's join waits with Y's entry, and v4,
+  applied while v3's follow is still owed, moves the id onto C's content. C is user work at the 429: nothing is
+  throttled, and P and U get `serverUnavailable`.
+
+**Two survivors stay, with reasons.**
+
+- **`laneJobsWalkAlways`.** The barrier holds with no follow owed only between two drain turns, when more than 512
+  events wait. No test and no seam reaches a 429 there.
+  - There, the only jobs the walk could add are jobs that hold an id an earlier visit passed and that no longer
+    publish: a passed publication that failed and was retried.
+  - A visit-first engine left that id on the job until the next follow, so it did not count its interest. The guard is
+    the right program there, and the mutant is the wrong one.
+  - The guard also keeps the walk, which is O(jobs) (finding 11), off the drain's turns.
+  - Killing it needs a seam that holds a drain turn; one is proposed to the orchestrator (§14, below).
+- **`spaceFailureEpochDropped`.** The epoch check predates this cycle: it was `followedForVerdict`'s first guard, and
+  only the visit after it is removed.
+  - A job's epoch changes only at `start`, and no start runs behind the barrier. A job removed meanwhile leaves
+    `jobs[transfer]` `nil`, which `decideSpaceFailure` checks itself.
+  - So the mutant differs only where a join replayed earlier in the same drain created a new job for the same
+    transfer. That job is `queued`, and the mutant only writes its `lastError`. No test builds it.
+
+### Residual risks (cycle 15)
+
+- **RR-1 is closed.** `followedLane` now counts the interests a passing job's visit re-routes (cycle 14's remainder,
+  PROBE-C14R-PASSED-LANE and PROBE-C14C-PASSED-LANE, fixed). No remainder is known.
+- **RR-6 is removed.** No place is stamped, so no place answers at a stamp's instant.
+- **RR-8. A place given behind the barrier is admitted on the live gates** (S3-R18 item 1, S3-R17 item 2).
+  - Where the throttle a visit-first pump met at the apply ended during the barrier, the place starts and its users are
+    served: the two changed sweep-first assertions are its probes.
+  - Where a throttle set during the barrier is live, the place parks and is answered with the live wait.
+  - Only a live origin gate changing during the barrier causes the difference, so it is non-blocking.
+- **RR-9. A space sweep started inside a drain replay runs a nested drain** (cycle-13 finding 11; cycle-14 findings 5
+  and 13; S3-R18 item 3).
+  - Through `checkRunSettled`'s `.read` sweep, `advanceFollowForSpaceSweep` can call `drainEventsAfterFollow` while a
+    drain replays.
+  - No test reaches it: it needs a run's claim parked `insufficientSpace` that the ledger admits while the drain
+    replays.
+  - The suggested change, judging at once inside the drain, would be a branch with no killing test (S3-R16 1(e)).
+  - Accepted as non-blocking by S3-R18 item 3.
+- **RR-10. A start's edge serial is the live one** (removal 1).
+  - A place given behind the barrier before a network edge that arrived during the barrier starts after that edge.
+    Its attempt does not count the edge as one it missed, so a transient failure is not re-queued early on it.
+  - Visited first, the attempt started before the edge, and that failure would have been re-queued on the edge.
+  - Only the timing of a re-queue differs. Not probed.
+
+### Put to the orchestrator (found while fixing; not changed this cycle)
+
+These were found by analysis while writing the re-route. Neither was probed this cycle, and both predate it.
+
+- **A verdict that waits across a later apply.**
+  - Behind the barrier, a failure verdict deferred while v3's follow is owed is replayed after the visits of every
+    later apply that lands before the drain (v4).
+  - A visit-first engine answered that verdict before v4 existed.
+  - Example: C downloads for A and B, a 404 arrives behind v3's barrier, then v4 moves zz-b. Visit-first, B was answered
+    `notFound` with A. Behind the barrier, v4's visit meets C failed with a download's verdict (`published == false`),
+    moves zz-b, and serves B its new content.
+  - The same class covers a publication's verdict met by a later apply's visit. `published` is one flag per verdict,
+    not per apply.
+  - A fix would compare the verdict's arrival with the visit's apply: a verdict that arrived before the apply leaves the
+    job to the verdict. That is new machinery that S3-R16 item 3 asks the orchestrator to weigh.
+- **The publication failure's await window.**
+  - `integrityFailed` sets the job `failed` and then awaits the store (`sparePresent`, `recordIntegrityFailure`). It
+    defers its verdict only at `resolveAll`.
+  - A follow turn that runs inside that window meets a failed job with no waiting verdict and visits it as a download:
+    it moves the ids the copy maps elsewhere, though a visit-first engine that visited at that follow's apply, while the
+    job published, passed them.
+  - The window is the store's integrity record. Not probed.
+- **A seam to hold a drain turn**, which would let a test kill `laneJobsWalkAlways` (above).
+
+### The inventory, corrected (cycle 15)
+
+These rows replace cycle 14's I1, I8, I12 and its "New, `followedForVerdict`" row. Line numbers at `0f32845`.
+
+- **I1, `EngineDispatch.gate` `:490`, `dispatch`.**
+  - Every place, a visit's and a drain replay's included, is admitted on the live throttle, breaker, slots and space.
+  - A refused place parks and is answered at the decision instant (`decisionNow()`); a replayed 429's park reads its
+    reading's instant and end.
+  - Tests: `barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply`, `barrierGatesAPlaceWithoutASlotOnTheLiveThrottle`,
+    `barrierRefusesAUserPlaceInAReservedSlotOnItsThrottle`, `barrierStartsAVisitsPlaceOnceTheBreakerCloses`,
+    `barrierWaitsForTheSlotAnEarlierPlaceTook`.
+  - The stamp mutants are moot (their code is removed).
+- **I8, `EngineDispatch.publicationFailed` `:1162`.**
+  - Nothing moves at a publication's failure. The visit that passed the publication re-routed its ids in
+    `rerouteOnPass`, and the publication's outcome answers the others.
+  - Behind the barrier, its verdict waits with `published == true`, so a visit that meets the failed job passes it.
+  - Tests: `barrierAnswersAPassedJobsFailureAfterItsVisit`, `barrierAnswersAPassedJobsLaterFailureAsVisitedFirst`,
+    `barrierAnswersAJobPublishingAtTheApplyAsVisitedFirst`, `barrierAnswersAPassedJobsRetryAsVisitedFirst`,
+    `barrierAnswersAPublicationFailedBeforeItsVisitAsPassed`, the two two-applies tests and the two RetryTests.
+  - Mutants: the re-route rows of the table.
+- **I12, `EngineFailures.throttled` `:349`, `followedLane` `:671`.**
+  - Behind the barrier, a 429 is decided on the lane a visit-first engine's job had. That lane is the highest of:
+    - its own interests, less those a waiting withdrawal removes, and, when the job is owed a visit, less those none of
+      whose ids the copy still maps to it;
+    - the interests other jobs' owed visits move onto it, counting a passing job's only in the ids it re-routes;
+    - the waiting joins that join it at the drain.
+  - The job's own lane when none counts.
+  - Tests: cycle 13's and cycle 14's, the five 429 tests of PublicationTests, and LaneTests' six.
+  - Mutants: the `followedLane` rows, `laneJobsWalkAlways` surviving with its reason.
+- **New, `EngineFollow.follow` `:645`, `passesOnVisit` `:622`, `defersFailure` `:384`, `replayVerdict` `:423`.**
+  - The visit passes a publishing job, or a failed one whose waiting verdict is a publication's.
+  - It re-routes at once the ids in `rerouteOnPass` and passes the rest.
+  - The drain gives a waiting verdict to what the job holds after the visits.
+  - Tests and mutants: the re-route rows.
+
+### Hang guards and re-entrancy
+
+- The new tests use `.minutes(3)`, as the suite's do.
+- No `await` was added in an actor: `git diff 388f744..HEAD -- Sources | grep '^+.*await '` is empty. So no
+  `// REENTRANCY:` comment and no ledger row is proposed.
+- 0 unsafe escapes (gate below).
+
 ## Items
 
 ### S3F-1 [BLOCKING] S3-CONC-04 — a satisfied first conditions reading is an edge — **Fixed**
@@ -3603,6 +3957,32 @@ Cycle 14 adds:
 - **§1.2:** WP-F's new test file `EngineFollowBarrierAnswerTests.swift` under `Tests/ZTronAssetSyncTests/Engine/`.
 - **§14:** finding 11 (nested drain re-entrancy) and the RR-1 remainder are for the orchestrator.
 
+Cycle 15 adds:
+
+- **§7.10, "Follow barrier (F-28)"**, changes to cycle 14's paragraph:
+  - "A place given there, at an instant a visit-first pump had a slot for its lane, is refused by its view's throttle
+    (the breaker is read live, S3-R17)" becomes "A place given there is admitted at the barrier-end pump on the live
+    throttle, breaker, slots and space, like any other (S3-R18)".
+  - "A job the follow passed while it verified or committed is answered as a visit-first engine answered it: its moved
+    ids move before its failure's exit when its publication began after the visit's apply, and keep its outcome when it
+    began before" becomes "A visit that meets a job publishing, or failed with its publication's verdict waiting, keeps
+    the job's bytes and publication. It re-routes at once the moved ids the copy listed elsewhere when that publication
+    began while a follow was owed (a visit-first engine visited the job at that apply, while it downloaded). It passes
+    the others, which the publication's outcome answers (S3-R18, S3-R18a)".
+  - In the 429 sentence, after "the interests other jobs' owed visits move onto it", add "(of a job the visit passes,
+    only those in the ids it re-routes)", and "else of the job's own lane" stays.
+  - "RR-1 to RR-7" becomes "RR-2 to RR-5 and RR-7 to RR-10" (RR-1 closed and RR-6 removed in cycle 15).
+- **`docs/RESIDUAL-RISKS.md` (Stage 5):** RR-2 to RR-5 and RR-7 to RR-10, with RR-8 to RR-10 as written under
+  "Cycle 15".
+- **§10.2:** no new row. No new `await` in an actor this cycle.
+- **§11:** the cycle-15 tests (`b461450`, `9673e2f`), all in `EngineFollowBarrierTests` (serialized).
+- **§1.2:** WP-F's new test files `EngineFollowBarrierSlotTests.swift`, `EngineFollowBarrierPublicationTests.swift`,
+  `EngineFollowBarrierLaneTests.swift` and `EngineFollowBarrierRetryTests.swift` under
+  `Tests/ZTronAssetSyncTests/Engine/`.
+- **§14:** three items found while fixing go to the orchestrator: a verdict that waits across a later apply, the
+  publication failure's await window, and a drain-turn seam for `laneJobsWalkAlways` (all under "Cycle 15", "Put to the
+  orchestrator").
+
 ## Gate evidence (cycle 1)
 
 All runs on this branch at `60eab9c`/HEAD (tests only changed after `60eab9c`: two `try` markers), scratch
@@ -4430,6 +4810,97 @@ there, committed 14:19:20; the draft's commit changes this file only), one at a 
 - **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch); `docs/TRACEABILITY.md`
   untouched (no `--gates-only` or `--full` run).
 
+## Gate evidence (cycle 15)
+
+All runs were made on this branch at `9673e2f`, the last code and test commit (17:38:27). The draft's commit changes
+this file only. Scratch was `.build-s3f*` on the shared 8-core host, one run at a time, after the mutants (under
+"Cycle 15"). Logs are under `.build-s3f/c15/`.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (about 17:51–17:56:03; `quick.log`).
+  - 1-minute load: 3.93 during the tests step, 3.45 at the end.
+  - Result: `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`.
+  - Tests passed: Transport 151, Sync 511 (`passed after 77.798 seconds`: cycle 14's 495, this cycle's 11 in `b461450`
+    and 5 in `9673e2f`), Storage 459 (`61.332 seconds`), Model 84 (`59.722 seconds`), Kit 85, Compatibility 71,
+    AppleHosted 104.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (ended 17:56:46,
+  `release.log`): `Build complete! (28,95 s)`, exit 0, 0 `warning:` lines.
+- **Gates** (`python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md && python3
+  Scripts/gates.py docs --sources "$PWD/Sources"`, 17:56:46, `gates.log`):
+  - `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`;
+  - `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  17:56–18:01:44; `syncx-{1,2,3}.log`, `syncx-{1,2,3}.load`).
+  - 1-minute load before each run: 3.45, 4.20 and 3.23; 2.93 after the last.
+  - Results: `✔ Test run with 511 tests in 53 suites passed after 77.176 seconds.`, `… after 76.663 seconds.`,
+    `… after 77.025 seconds.`
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, alone, 18:01:44–18:09:25, `tsan.log`).
+  - Load (S3-R12 rule 1, from 60 s after the start): mean 2.93, min 1.79, max 5.60 over 39 samples (`tsan-load.txt`).
+  - Result: `✔ Test run with 511 tests in 53 suites passed after 389.760 seconds.`; 0 `ThreadSanitizer` lines, 0
+    `Time limit` lines.
+  - Durations against guards (`python3 .build-s3f/c13/durations.py .build-s3f/c15/tsan.log`; 455 of the 511 reported
+    names have a guard): none over a quarter of its guard.
+    - Largest: 23.3 % (`R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has
+      ended`, 14.00 s of 1 minute).
+    - The 242 one-minute tests at most 14.00 s; the 205 three-minute tests at most 35.54 s (19.7 %); the 7 five-minute
+      tests at most 57.28 s (19.1 %); the six-minute stalled-subscriber test 54.70 s (15.2 %).
+  - This cycle's 16 tests all reported, 2.26–10.16 s of 3 minutes (at most 5.6 %, the waiting-request lane test).
+- **Coverage** (`swift test --scratch-path .build-s3f --enable-code-coverage --skip Benchmarks` with `TMPDIR`,
+  `CLANG_MODULE_CACHE_PATH` and `LLVM_PROFILE_FILE` under `.build-s3f/tmp`, 18:09:48–18:14:13; `cov-test.log`).
+  - 1-minute load 3.63 at the start, 5.65 at the end.
+  - Every bundle passed: 151, 511, 459, 84, 85, 71 and 104 tests.
+  - Then `xcrun llvm-cov export -summary-only` of `.build-s3f/out/Products/Debug/codecov/default.profdata` over the 8
+    `.xctest` bundles into `.build-s3f/cov.json`, and `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`
+    (`cov-gate.log`).
+  - Result: `COVERAGE target=ZTronAssetSync lines= 93.84% (10062/10723) min=90.0 OK`, overall `96.52% (26573/27531)`,
+    `COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK`, `COVERAGE: PASS`.
+- **iOS build:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` (ended 17:57:02, `ios-build.log`): exit 0,
+  0 `warning:` and 0 `error:` lines. The products under `.build-s3f/xcode/Build/Products/Debug-iphoneos` are from this
+  run.
+- **iOS Simulator tests** (simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iPhone 18 Pro, iOS 27.0;
+  `Test-ZTronAssetKit-2026.10.31_18-14-37-+0100.xcresult`, 18:14:32–18:19:53; `.build-s3f/sim.log`, `sim-summary.json`).
+  - 1-minute load 4.48 at the start, 14.36 at the end (the 5-minute 36.54).
+  - Result: `"result" : "Passed"`, `"totalTestCount" : 1465`, `"passedTests" : 1465`, `"failedTests" : 0`,
+    `"skippedTests" : 0` (`** TEST SUCCEEDED **`; cycle 14's 1,449 plus this cycle's 16).
+  - The log's four `warning:` lines are `appintentsmetadataprocessor`'s "Metadata extraction skipped, no
+    AppIntents.framework dependency found".
+  - The simulator is shut down. `xcodebuild` left it so, the `simctl shutdown` that followed answered "Unable to
+    shutdown device in current state: Shutdown", and `simctl list` shows `(Shutdown)`.
+- **Benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks`,
+  18:21:24–18:27:32, started once the 1-minute load had fallen under 5 after the simulator run; load mean 3.61, min
+  2.58, max 6.46 over 37 samples, `bench-load.txt`; `bench.log`).
+  - Result: `✘ Test run with 44 tests in 8 suites failed after 250.932 seconds with 1 issue.` The issue is P-13's
+    (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 8.86 ms against 5.0 ms; WP-B's,
+    `other-wp:b`, routed).
+  - `✔ Suite "SyncBenchmarks" passed after 116.752 seconds.`: every WP-F benchmark is within S3-R5's budgets (best of
+    three ≤ 10 ms, median ≤ 50 ms).
+  - The follow barrier's C2 figures (cycle 14's in brackets):
+    - The reclaim during an owed follow: [4.27, 3.91, 3.87] ms with one handle ([4.20, 4.12, 4.27]) and [4.90, 4.97,
+      4.98] ms with two ([5.10, 5.26, 5.15]).
+    - The mixed reclaim (1 member in 20 changed): [6.26, 6.43, 6.33] ms ([7.02, 6.94, 7.34]); with two handles [7.89,
+      7.54, 7.50] ms ([8.09, 8.03, 8.39]). Best of three is 6.26 and 7.50 ms. Finding 6's thin two-handle margin
+      widened by about 0.5 ms; `worldStamp()` no longer runs `freeSlots()` per decision instant.
+    - The follow end and drain of 10,000 places: [4.72, 4.79, 4.77] ms ([5.90, 6.04, 5.64]). The follow ended [191.1,
+      194.8, 193.7] ms and the drain [191.1, 195.2, 193.7] ms after the release.
+    - The follow's last turn plus the drain's first batch: the turn [4.69, 4.70, 4.66] ms, the longest wait [4.77,
+      4.79, 4.75] ms.
+    - Throttle extension: [6.58, 6.61, 6.54] ms ([38.78, 6.99, 7.45] in cycle 14's full run).
+  - The rest:
+    - Space parking [4.20, 4.04, 4.08] ms, its ENOSPC read best 3.20 ms; space re-admission [4.61, 4.15, 4.13] ms.
+    - Network edges [1.31, 1.30, 1.30] and [4.22, 4.24, 4.30] ms.
+    - Releases [4.49, 4.49, 4.39] and [4.58, 4.57, 4.61] ms; re-joins [4.83, 4.84, 4.79] and [5.14, 4.89, 4.76] ms.
+    - Shutdown [1.57, 1.51, 1.50] ms.
+    - Refresh under a group [1.20, 1.20, 1.20] ms, changing every member [4.27, 4.27, 4.29] ms.
+    - Prune announcement [4.86, 4.80, 5.02] ms; due retries [1.13, 1.10, 1.13] ms.
+    - Cancelled resolve 0.02 ms; cooldown end [0.06, 0.09, 0.06] ms; probe chain best 0.22 ms (totals about 1.13 s).
+    - P-9 p99 15.2 ms (budget 50.0, `BenchKit.swift`, WP-G's); P-4 plan 10,000 11.3 ms (budget 20.0), ratio 2.07 (max
+      2.5).
+- **Mutants:** under "Cycle 15" (`.build-s3f/c15/mut-{a,b,c,d}.log`, `mut2-{b,c,d}.log`, `mutants.json`). The
+  failing-test runs of `b461450` are `.build-s3f/c15/failing-run{1,2}.log`.
+- **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
+  untouched: no `--gates-only` or `--full` run was made.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -4535,3 +5006,9 @@ there, committed 14:19:20; the draft's commit changes this file only), one at a 
   `freeSlots()` (S3-R17 item 2 accepts the live gates there); no test orders that case. The cycle-13 verifier's TSan
   figures (finding 4) are recorded as reported; no TSan run at their load (mean 25) was made here. The R1 boundary
   probes were not re-run. `other-wp:b` (P-13, P-5) and `other-wp:g` (P-9) are not WP-F's.
+- Cycle 15: RR-2 and RR-4 (finding 12) are still analysed, not probed. RR-10 (a start's live edge serial) is not probed.
+  The three items put to the orchestrator under "Cycle 15" (a verdict that waits across a later apply, the publication
+  failure's await window, a drain-turn seam) are analysed, not probed. `laneJobsWalkAlways` and
+  `spaceFailureEpochDropped` survive with the reasons given there. Finding 11's C2 figure is the verifier's; no
+  `followedLane` benchmark at 10,000 was added. The R1 boundary probes were not re-run. `other-wp:b` (P-13) is not
+  WP-F's.
