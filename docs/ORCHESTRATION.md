@@ -156,6 +156,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - It is already configurable on the facade: `AssetClientConfiguration.limits: ManifestLimits`, `maxAssetBytes`, R-MAN-2 and ADR-048.
       - The agent checks Apple's asset-pack size limits in the Apple developer documentation and records them. If Apple has no hard limit, it proposes a facade configuration method; it does not change the 4 GiB default.
   - **Never in tests:** real uploads or deletions on AWS or App Store Connect. The owner does the first real upload.
+  - **Owner, 31 Oct ~14:20:** "I don't need the Electron App to run on UltraCode, medium effort is ok". So the two items run differently:
+    - **(2) The Electron app:**
+      - No workflow fan-out and no close-out cycles.
+      - One Opus agent at `effort: "medium"` in `/Users/admin/Documents/ZTronAssetManager`, which is outside this repo, so P4 does not bind it.
+      - The orchestrator then runs the app's own build and tests itself and reports the output.
+      - No separate verifier, unless that check fails.
+    - **(1) The facade tier method:** it changes this package, so CLAUDE.md applies (P4, gates). It runs as one Opus-medium fixer plus one independent Opus-medium verifier pass. Ultracode does not apply.
+    - **Estimated cost:** about 4–7 weekly points for both items, against the earlier 6–11.
 - **Still open for the owner:** the NEEDS-HUMAN-REVIEW list (ADR-050 without P-13, 052, 055, 056).
 
 ## Stage 2 — COMPLETE (`wpi-merged` = `0554b8f`, 24 Oct 15:20 CEST). Next session: start here
