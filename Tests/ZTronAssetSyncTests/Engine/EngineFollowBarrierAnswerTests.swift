@@ -676,8 +676,9 @@ extension EngineFollowBarrierTests {
     /// A job the follow passed while it verified, whose publication began after the apply, answers its moved id's user
     /// with the id's new content when its bytes fail behind the barrier: visited first, C's visit at the apply moved B
     /// onto N while C downloaded, so B was served N and A answered `integrityFailure`. Behind the barrier the follow's
-    /// visit came after C's publication began and passed C; the failure's verdict waits, and the drain's own visit of C
-    /// (`followedForVerdict`) moves B onto N before the answer.
+    /// visit came after C's publication began and passed C, re-routing B onto N at once (`Job.rerouteOnPass`; ruling
+    /// S3-R18 item 2, which replaced the cycle-14 drain visit `followedForVerdict`), so the failure's waiting verdict
+    /// answers A alone.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierAnswersAPassedJobsFailureAfterItsVisit(_ visit: LaneDropVisit) async throws {
@@ -715,8 +716,9 @@ extension EngineFollowBarrierTests {
     /// interactive policy retries. Visited first, B was moved onto N at the apply and served N; C's retry downloaded
     /// bytes that fail their checksum, and v4, applied while that second publication verified, moved zz-c to N2 (24
     /// bytes): its follow passed C, publishing, so A and zz-c's user were answered `integrityFailure`. Behind the barrier,
-    /// left to C's retry, B rode it and was answered C's failure; and a pass's mark kept from the first publication
-    /// would move zz-c onto N2 at the second failure, which a visit-first engine never did (`Job.passedPublishing`).
+    /// left to C's retry, B rode it and was answered C's failure; and a re-route kept from the first publication would
+    /// move zz-c onto N2 at the second failure, which a visit-first engine never did (`Job.rerouteOnPass` and
+    /// `Job.attemptEnd` are reset at the retry's start).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierAnswersAPassedJobsRetryAsVisitedFirst(_ visit: LaneDropVisit) async throws {
@@ -770,6 +772,11 @@ extension EngineFollowBarrierTests {
             #expect(passed.owed && passed.c == .verifying && passed.visited && !passed.holdsB && !passed.unfollowed, "setup: the follow's second turn visited C while it verified and stays owed: \(passed)")
             await engine.readForTests { $0.releaseFollowFollowUps() }
             await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+            // N, admitted once the barrier is down, publishes before the fault below exists: its own verification read
+            // must not be the one that fails (the cycle-15 verifier's PROBE-C15C-RETRY-FAULT-RACE).
+            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[bMoved.transferID] == nil }
+            }
         }
         releaser.cancel()
         await releaser.value
