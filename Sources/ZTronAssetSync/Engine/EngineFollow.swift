@@ -520,8 +520,9 @@ extension SyncEngine {
         self.addInterest(join.token, asset: join.asset, entry: join.entry, lane: join.lane, kind: join.kind)
     }
 
-    /// Whether the owner of a waiting join still waits for its asset in the join's transfer.
-    private func stillWants(_ join: JoinAfterFollow) -> Bool {
+    /// Whether the owner of a waiting join still waits for its asset in the join's transfer (`replayJoin`, and the lane a
+    /// 429 is decided on, `followedLane`).
+    func stillWants(_ join: JoinAfterFollow) -> Bool {
         let transfer = join.entry.transferID
         switch join.kind {
         case .waiter:
