@@ -157,6 +157,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - the two analysed items are probed first and are blocking only if item 1 breaks (smallest fix);
     - a cost-only mutant is equivalent;
     - the defensive check is removed, turned into an invariant, or recorded as pre-existing and out of class.
+  - **Cycle 15 verification** ran 18:29–19:50. The two lenses found 5 + 6 blocking items; every cycle-14 item is confirmed fixed. The new items:
+    - S3-R19 item 1's two analysed cases, probed in both orders and both real: a verdict waiting across a later apply, and the publication failure's await window;
+    - a re-route answer difference new in `0f32845` (S3-R18a);
+    - `laneJobsWalkAlways` is not cost-only and `spaceFailureEpochDropped` is reachable (G4);
+    - a test race from `0f32845`, which fails the Sync bundle under TSan (flaky).
+  - **Cycle 16 fix** started 19:50. At 22:05 it had 11 commits (`39e18d2` to `d3242d3`) and was running its TSan gate. Weekly usage was 79 % at 22:05.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
