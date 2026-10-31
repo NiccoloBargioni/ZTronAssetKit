@@ -260,4 +260,66 @@ extension EngineFollowBarrierTests {
         #expect(starts == 1, "C's content is asked for once: C was superseded, not re-queued (visit-first): \(starts)")
         await Self.finishHeld(s)
     }
+
+    /// A failed job whose every id an apply moved is superseded by its owed visit even when a pending claim names its
+    /// content, which would keep it once its last interest left (`removeInterest`; cycle 16, ruling S3-R19 item 3): C
+    /// (100 kB, zz-a and zz-b, a user waiter each) downloads; v3 moves both ids to N (16 bytes) and maps zz-g onto C's
+    /// content, which a prefetch group then claims (`recordGroup`, its join not run). Behind the barrier C's attempt
+    /// ends in a 404 before its owed visit (the verdict waits). Visited first, the visit at v3's apply superseded C while
+    /// it downloaded: A and B were served N, and a later request for zz-g fetched C's content afresh and was served it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierSupersedesAFailedJobAClaimWouldKeep(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_616_712
+        let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let nBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let g = EngineHarness.onDemand("zz-g", cBytes)
+        let aMoved = EngineHarness.onDemand("zz-a", nBytes)
+        let bMoved = EngineHarness.onDemand("zz-b", nBytes)
+        try #require(a.transferID == b.transferID && g.transferID == a.transferID && aMoved.transferID == bMoved.transferID, "setup: zz-a and zz-b share C, then N; v3's zz-g is C's content")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        // Only the first attempt is scripted: visited first, it is cancelled at its hold, and the 404 released below
+        // waits for a hold no later attempt reaches.
+        await s.harness.source.script(a.transferID, [.hold])
+        await s.harness.source.script(aMoved.transferID, [.stage(nBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [aMoved, bMoved, g] + Self.laterFillers(seed + 6_000), tag: "v3-claim-\(seed)", s, visit: visit)
+        // A prefetch group names zz-g: its claim on C's content is pending, its join not run.
+        let group = await engine.readForTests { $0.recordGroup([g.identifier], lane: .prefetch).token }
+        // C's attempt ends in a 404: behind the barrier, before C's owed visit.
+        await s.harness.source.release(a.transferID, with: .failed(.permanentMissing(httpStatus: 404)))
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
+            let waiting = await engine.readForTests { e in
+                (owed: e.followOwed, claimed: e.state.jobs[a.transferID].map { e.state.claims[ClaimKey(job: $0)] != nil } ?? false)
+            }
+            try #require(waiting.owed && waiting.claimed, "setup: C's 404 waits for C's owed visit, its content claimed: \(waiting)")
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect((try? aResult.get())?.byteSize == 16, "A is served N (visit-first): \(aResult)")
+        #expect((try? bResult.get())?.byteSize == 16, "B is served N (visit-first): \(bResult)")
+        // C's content again, for a user's request for zz-g.
+        await s.harness.source.script(a.transferID, [.stage(cBytes)])
+        let gWaiter = Task { await engine.awaitAsset(g.identifier, lane: .userInitiated) }
+        let gResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: gWaiter) }
+        #expect((try? gResult.get())?.byteSize == Int64(cBytes.count), "zz-g is served C's content afresh: the visit superseded C, not kept for the claim (visit-first): \(gResult)")
+        await engine.releaseGroup(group)
+        await Self.finishHeld(s)
+    }
 }
