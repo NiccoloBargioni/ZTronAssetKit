@@ -213,6 +213,59 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 
+    // MARK: A group's claims at its registration (the cycle-12 residual R-F; S3-R16 item 5, "probe first")
+
+    /// A group registered while a withdrawal waits for the follow gets its member, and the job ends where a visit-first
+    /// engine's ended: U's user waiter is C's (zz-c's) only interest while the follow owes its visits; U withdraws, then a
+    /// prefetch group registers zz-c. Visited first, the withdrawal retired C and stopped its transfer, and the group's
+    /// join created C again: a second request. Behind the barrier the withdrawal waits (`.removal`) while the group's
+    /// claim is taken at its registration (`recordGroup`); the cycle-12 suspicion R-F was that the claim keeps C through
+    /// the drain. It does not: the drain applies the withdrawal (C retired, its transfer stopped) before the group's
+    /// join, which creates C again, as visited first. U is answered `cancelled` at once in both orders.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierServesAGroupRegisteredAfterAWithdrawal(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 1_311_002)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(1_311_003, count: 100_000)
+        let c = EngineHarness.onDemand("zz-c", cBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(1_311_100) + [c], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(c.transferID, [.hold, .stage(cBytes)])
+        let uWaiter = Task { await engine.awaitAsset(c.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[c.transferID]?.state == .downloading }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(1_311_200) + [c], tag: "v3-claims", s, visit: visit)
+        uWaiter.cancel()
+        let uResult = await uWaiter.value
+        #expect(uResult == .failure(.cancelled), "U's caller is answered at once (R-SYN-4, R-SYN-10): \(uResult)")
+        if visit == .followVisitedFirst {
+            // Visited first, the withdrawal retired C: nothing else wanted it.
+            await engine.awaitCondition { $0.state.jobs[c.transferID] == nil }
+        }
+        let group = try await engine.registerGroup([c.identifier], lane: .prefetch).get()
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, c) }
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        }
+        // The group's member joined and is no longer pending: its job ended.
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in
+                e.state.groups[group].map { $0.joined.contains(c.identifier) && $0.pending.isEmpty } == true && e.state.jobs[c.transferID] == nil
+            }
+        }
+        let stored = await s.harness.store.location(for: c.identifier, extensions: [], recordingAccess: false)
+        #expect(stored != nil, "the group's member is stored when C ends (visit-first)")
+        let starts = await s.harness.source.starts.filter { $0.id == c.transferID }.count
+        #expect(starts == 2, "the withdrawal stopped C and the group's join started it again (visit-first): \(starts) start(s)")
+        await engine.releaseGroup(group)
+        await Self.finishHeld(s)
+    }
+
     // MARK: A join answered on the breaker of its arrival (`breakerRecorded`)
 
     /// A request for a job the breaker parked, made while the follow owes its visits and a half-open breaker's probe
