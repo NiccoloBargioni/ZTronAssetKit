@@ -129,6 +129,18 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **S3-R17** (12:45) answers the fixer's put-back: S3-R16 1(a) conflicts with 1(b) when the visit-first answer needs admission to a live-throttled origin.
     - The MUST wins, and live origin gates (throttle, breaker, reachability and conditions) join R1's real-world inputs.
     - The two changed answer assertions are authorised one-to-one.
+  - **Cycle 13 verification** found 4 + 3 blocking: two were the S3-R17 conflict; the real ones were PURGE-JOIN, STAMP-NO-SLOT, EXHAUST-LANE, STAMP-BREAKER (liveness) and two 0-hit branches.
+  - **Cycle 14 fix** ran 13:10–15:22 and ended at `388f744` (9 commits from `85636a1`). It fixed all of cycle 13's blocking items.
+    - Gates per the fixer: `VERIFY: PASS`, Sync 495 tests; ×3 and TSan clean; simulator 1449/1449; Sync coverage 93.93 %.
+  - **Cycle 14 verification** ran 15:22–16:21. Both lenses confirm every cycle-13 item is fixed and the gates pass. They found 3 + 2 blocking in three groups:
+    - **the place stamp's slot view** (PROBE-C14C-STAMP-AHEAD): a place ahead that visit-first started is not counted, and K2 is refused on a past throttle;
+    - **the passed-publication mark** (C14C-MARK-TWO-APPLIES, C14C/C14R-PASSED-LANE, C14R-PASSED-FAIL): answer differences; RR-1's remainder is not a residual risk;
+    - **G4:** followedLane's new branches have 0 hits.
+  - **S3-R18** (16:40), written after cycle 15's fixer had started (16:21) and delivered to it by message at 16:31; it re-read the ruling before changing any code.
+    - Remove the place stamps' admission: the barrier-end pump reads only the live gates. Sweep-first answer assertions that expected a stamp's past view may change one to one (visit-first assertions never change).
+    - A passed publication re-routes its moved ids at once (the requirements verifier's simplification); the mark, `followPassedPublication` and followedLane's publishing-job skip go. Per-pass id lists are the fallback only if a probe shows a MUST breaks.
+    - Put-backs: finding 11 is accepted as a residual risk; `failureMoveBehindBarrier` is killed or removed; RR-2 and RR-4 are not blocking.
+  - **Cycle 15 fix** started 16:21 (agent `a4dd00bbf756c5b2d`). Weekly usage was 72 % at 16:29.
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
