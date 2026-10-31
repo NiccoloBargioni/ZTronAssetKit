@@ -521,7 +521,7 @@ Level 4 is **complete** (`l4-merged` = `0d3f119`, see "Level 4 — done"). Nothi
 
 ## Forecast for the remaining work (re-estimated 2026-10-17 from Level 4)
 **Calibration:**
-- ~0.065 weekly points per API-equivalent dollar (L4 cycles 11–22, no other use; the main run measured 0.076).
+- ~0.065 weekly points per API-equivalent dollar as measured from transcripts (L4 cycles 11–22, no other use; the main run measured 0.076). Those transcripts undercount by ~23 %: about 0.053 per real dollar (see "Cost — measured", correction of 31 Oct).
 - A strict close-out cycle costs ~$27 (~1.75 points) and ~2.1 h.
 - Level 4 cost 1.3–2.1× its forecast in dollars and took 22 cycles against the forecast 7–10.
 
@@ -552,6 +552,32 @@ Summed from the agents' transcripts with `.claude/tools/cost.py <run dirs>`, at 
 | Level 4 (F, strict, 22 cycles) | ~$753 + orchestration | ~51 of 66 (2 % → 68 %; the rest was the account's other use) |
 
 A full week holds roughly $1,400–1,500 of this workload.
+
+**Correction, measured 31 Oct 18:45 CET: the figures above are about 23 % low.**
+- **Cause:**
+  - Claude Code 2.1.286–2.1.299 (sessions of 4–25 Oct) saved each message's usage before the final output count arrived, on about two thirds of messages. So transcript sums, `cost.py` included, miss output tokens for those sessions.
+  - `cost.py` also prices every cache write at the 5-minute rate; 1-hour writes cost $8/MTok, not $5.
+- **Method now:**
+  - For sessions recorded by those versions, use Claude Code's own `cost-state` record (`totalCostUSD`). It reads each response's final usage; its cache counts match the transcripts exactly, and its prices are the list prices.
+  - Transcripts from 2.1.308 on are accurate: tracker against transcript was 0.996 for this session.
+  - A blind independent recount (`wf_34cda007-ffd`) matched the transcript arithmetic to $1.
+
+| Step | Corrected cost |
+|---|---|
+| Stage 0–1 | $241 |
+| Level 1 | $255 |
+| Level 2 | $526 |
+| Level 3 | $520 |
+| Level 4 | $958 |
+| Level 5 | $892 |
+| WP-I and gaps | $122 |
+| Stage 3 to 31 Oct 18:45 | $1,274 |
+| **Total** | **$4,787** |
+
+- **Split:** workflow agents $4,460, orchestrator $327; Opus 5.5 is 99.6 %.
+- **Weekly points:** about 0.050–0.053 per real dollar; the 0.065 above was per undercounted dollar. A full week holds about $1,900–2,000 of this workload.
+- **A WP-F close-out cycle** costs $50–60, about 3 points.
+- **Forecast to the end, as of 31 Oct:** about $350 more (range $190–570), so the whole project comes to about $5,150 ($5,000–5,350).
 
 ## Trim candidates (owner decides per level)
 - Background URLSession (R-NET-3)
