@@ -468,9 +468,11 @@ extension SyncEngine {
     /// for the backoff of the lane the owed visits leave the job (S3-R15 item 2, `followedLane`, else the job's own lane;
     /// R-SYN-5, PROBE-C10-THROTTLE-LANE, PROBE-C12-UNDECIDED-LANE), or ended the job's attempts there
     /// (`ThrottleDecision.exhausted`); the replay only parks the job the visits left and answers its users. Its fail-fast
-    /// answers read the wait at the 429's instant against the origin's end in the event's view (the reading), which counts
-    /// this 429 and the earlier ones, not a later 429's (PROBE-C10-THROTTLE-EXTENDED). The origin's alarm stays at the live
-    /// origin's end (`park`).
+    /// answers read the wait under the event's reading (`drainEventsAfterFollow`): at the 429's instant (`decisionNow()`),
+    /// against the origin's end in the event's view (`throttleEnd`), which counts this 429 and the earlier ones, not a
+    /// later 429's (PROBE-C10-THROTTLE-EXTENDED). The cycle-12 copies of that instant and end passed to `park` gave the
+    /// same values and are gone (Stage 3 close-out cycle 13, S3-R16 item 3). The origin's alarm stays at the live origin's
+    /// end (`park`).
     private func replayThrottle(_ transfer: TransferID, _ facts: ThrottleFacts) {
         guard self.state.jobs[transfer] != nil else {
             return
@@ -486,7 +488,7 @@ extension SyncEngine {
         }
         let end = self.throttleEnd(after: until)
         if self.transition(transfer, to: .queued) {
-            self.park(transfer, reason: .throttled(until: end), answeredAt: facts.at, answerEnd: end)
+            self.park(transfer, reason: .throttled(until: end))
         }
     }
 
@@ -837,8 +839,6 @@ struct LaneBlock: Sendable, Equatable {
 struct ThrottleFacts: Sendable, Equatable {
     /// The `Retry-After`, in seconds from the 429's instant, if any.
     let retryAfter: TimeInterval?
-    /// The 429's instant.
-    let at: MonotonicInstant
     /// What the 429 decided when it arrived (S3-R15 item 2).
     let decision: ThrottleDecision
 }

@@ -636,9 +636,9 @@ extension SyncEngine {
     }
 
     /// The fail-fast policy when a job is parked (ARCHITECTURE §7.6/§7.7): which interests get an answer now; `only`
-    /// restricts it to one interest (a joiner of a parked job). A throttle's wait is read at `at` when given: a park
-    /// whose verdict waited for the follow answers with the wait its 429 left, against the end `answerEnd` a visit-first
-    /// engine had decided then (`replayThrottle`).
+    /// restricts it to one interest (a joiner of a parked job). A throttle's wait is read at `at` when given: a place
+    /// given behind the barrier answers with the wait at its decision instant, against the end `answerEnd` of that
+    /// instant's view (`dispatch`'s stamped park). A replayed 429's park reads both from its reading (`replayThrottle`).
     func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil, at: MonotonicInstant? = nil, answerEnd: MonotonicInstant? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return

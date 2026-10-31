@@ -366,7 +366,7 @@ extension SyncEngine {
             } else {
                 decision = .exhausted
             }
-            if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, at: now, decision: decision))) {
+            if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, decision: decision))) {
                 return
             }
         }
