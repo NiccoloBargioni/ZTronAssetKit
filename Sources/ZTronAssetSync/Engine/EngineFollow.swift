@@ -907,4 +907,7 @@ struct JoinAfterFollow: Sendable {
     /// Whether the engine's copy listed `asset` at `entry`'s transfer when it joined (a waiter joined from the store's
     /// newer manifest may name another), so a later apply that moved it is followed at the drain.
     let listed: Bool
+    /// Whether a purge withdrew it while it waited (`SyncEngine.withdrawPurgedJoins`): it is no longer in
+    /// `EngineState.joinsAfterFollow`, and its replay joins nothing.
+    var withdrawn = false
 }

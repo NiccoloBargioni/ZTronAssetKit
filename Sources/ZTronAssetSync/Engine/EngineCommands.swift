@@ -987,25 +987,28 @@ extension SyncEngine {
     }
 
     /// Withdraws the non-user interests a purge of `request` removes (user waiters keep theirs and re-queue): a group
-    /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten.
+    /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten. Behind the
+    /// follow barrier the joins of such interests that wait for the follow are withdrawn too (`withdrawPurgedJoins`).
     func withdrawPurged(_ request: PurgeRequest) {
+        let isPurged: (AssetID) -> Bool = { asset in
+            guard let entry = self.state.applied.entry(for: asset) else {
+                return true
+            }
+            switch request {
+            case .all:
+                return true
+            case .evictable:
+                return entry.policy != .essential
+            case .scope(let scope):
+                return scope.contains(entry)
+            }
+        }
+        self.withdrawPurgedJoins(isPurged)
         for transfer in self.state.jobs.keys.sorted() {
             guard let job = self.state.jobs[transfer] else {
                 continue
             }
-            let purged = job.assets.filter { asset in
-                guard let entry = self.state.applied.entry(for: asset) else {
-                    return true
-                }
-                switch request {
-                case .all:
-                    return true
-                case .evictable:
-                    return entry.policy != .essential
-                case .scope(let scope):
-                    return scope.contains(entry)
-                }
-            }
+            let purged = job.assets.filter(isPurged)
             guard !purged.isEmpty else {
                 continue
             }
@@ -1032,6 +1035,40 @@ extension SyncEngine {
                     self.state.jobs[transfer]?.interests[token]?.assets.subtract(withdrawn)
                 }
             }
+        }
+    }
+
+    /// Withdraws the waiting joins (`EventAfterFollow.join`) of the non-user interests a purge removes, as `withdrawPurged`
+    /// withdraws them from jobs: a visit-first engine had made those joins before the purge arrived, and its purge
+    /// withdrew them, so the group stopped waiting for the member, a heal was forgotten, and no job was left for the
+    /// purged id. Applied at once without them (Stage 3 close-out cycle 13, removal 7), the drain made the join after the
+    /// purge, and the purged id was downloaded and stored again (PROBE-C13-PURGE-JOIN; cycle 14). Each such join leaves
+    /// `joinsAfterFollow`, so its replay joins nothing (`replayJoin`), and stays in the queue marked withdrawn
+    /// (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that arrived. One pass
+    /// over the waiting events (C2).
+    private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
+        guard !self.state.joinsAfterFollow.isEmpty else {
+            return
+        }
+        for index in self.state.eventsAfterFollow.indices {
+            guard case .join(var join) = self.state.eventsAfterFollow[index], !join.withdrawn, join.lane < .userInitiated, join.kind != .waiter, isPurged(join.asset) else {
+                continue
+            }
+            if let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) {
+                if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+                    self.state.joinsAfterFollow[join.token] = nil
+                }
+                switch join.kind {
+                case .prefetch, .ensure:
+                    self.dropGroupMember(join.token, asset: join.asset, from: transfer)
+                case .system:
+                    self.state.heals[join.asset] = nil
+                case .run, .waiter:
+                    break
+                }
+            }
+            join.withdrawn = true
+            self.state.eventsAfterFollow[index] = .join(join)
         }
     }
 
@@ -1950,7 +1987,10 @@ extension SyncEngine {
                     verdicts.insert(transfer)
                 }
             case .join(let join):
-                joins[join.token, default: [:]][join.asset] = join.entry.transferID
+                // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
+                if !join.withdrawn {
+                    joins[join.token, default: [:]][join.asset] = join.entry.transferID
+                }
             case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
                 break
             }
