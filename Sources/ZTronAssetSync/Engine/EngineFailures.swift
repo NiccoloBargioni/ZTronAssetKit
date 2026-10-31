@@ -579,7 +579,9 @@ extension SyncEngine {
         }
         if self.defersToFollow {
             // The verdict reads the room, the bytes in flight and the job's lane, which the owed visits change: it waits
-            // for the follow's end (F-28). The read above is adopted already (S3-R11 R1).
+            // for the follow's end (F-28), recorded on the job as an attempt's verdict is (`recordDeferredVerdict`). The
+            // read above is adopted already (S3-R11 R1).
+            self.recordDeferredVerdict(transfer)
             self.deferToFollow(.spaceFailure(transfer, epoch: epoch, required: required))
             return
         }
@@ -652,9 +654,12 @@ extension SyncEngine {
     /// - its own interests, less those a waiting withdrawal removes (`EventAfterFollow.removal`), and, when the job is
     ///   owed a visit, less those none of whose ids the copy still maps to its content;
     /// - the interests other jobs hold in ids the copy now maps to its content, which their owed visits move onto it: of
-    ///   a job the visit passes (`passesOnVisit`), only those in the ids it re-routes (`Job.rerouteOnPass`; Stage 3
+    ///   a job the visit passes (`rerouteOnVisit`), only those in the ids it re-routes (`Job.rerouteOnPass`; Stage 3
     ///   close-out cycle 15, ruling S3-R18 item 2: skipped whole, a publication begun after the apply left out an
     ///   interest a visit-first engine had moved onto this content, PROBE-C14R-PASSED-LANE, PROBE-C14C-PASSED-LANE);
+    /// - of a job whose exit verdict waits with an apply followed since (`movesAfterVerdict`), the interests the drain
+    ///   moves onto it after the verdict (`followAfterVerdict`), less those the verdict answers (`verdictAnswers`): a
+    ///   visit-first engine's visit at that apply moved them onto this content (cycle 16, ruling S3-R19 item 1);
     /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them).
     ///
     /// The job's own lane when none of these counts: a visit-first engine's job then had no interest left, and was
@@ -666,8 +671,9 @@ extension SyncEngine {
     /// by a retry where a visit-first engine deferred to the next run and answered it `serverUnavailable`; and a waiting
     /// withdrawal's interest the reverse (PROBE-C13-EXHAUST-LANE; Stage 3 close-out cycle 14). Only whether the lane is
     /// user-initiated chooses the policy, so the walks stop there. The walk over the jobs runs only while a follow owes
-    /// its visits, and the walk over the events only while events wait: one lookup in the copy per id, no transfer
-    /// formatted (C2).
+    /// its visits or a verdict waits, the only times another job holds an interest it moves (with neither, no job
+    /// contributes: the walk's guard saves its cost and decides nothing), and the walk over the events only while events
+    /// wait: one lookup in the copy per id, no transfer formatted (C2).
     func followedLane(_ job: Job) -> AssetPriority {
         let copy = self.state.applied
         func here(_ asset: AssetID) -> Bool {
@@ -675,9 +681,17 @@ extension SyncEngine {
         }
         let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) })
         var withdrawn: Set<InterestToken> = []
+        var verdicts: [TransferID: WaitingVerdict] = [:]
         for event in self.state.eventsAfterFollow {
-            if case .removal(let token, _) = event {
+            switch event {
+            case .removal(let token, _):
                 withdrawn.insert(token)
+            case .attemptFailed(let transfer, let epoch, let verdict) where self.state.jobs[transfer]?.epoch == epoch:
+                verdicts[transfer] = .attempt(verdict)
+            case .spaceFailure(let transfer, let epoch, _) where self.state.jobs[transfer]?.epoch == epoch:
+                verdicts[transfer] = .space
+            default:
+                break
             }
         }
         var lane: AssetPriority?
@@ -687,10 +701,24 @@ extension SyncEngine {
         for (token, interest) in job.interests where !withdrawn.contains(token) && (!visited || interest.assets.contains(where: here)) {
             raise(interest.lane)
         }
-        if lane != .userInitiated, self.followOwed {
+        if lane != .userInitiated, self.followOwed || !verdicts.isEmpty {
             jobs: for (transfer, other) in self.state.jobs where transfer != job.transfer {
-                let passes = self.passesOnVisit(other)
-                for (token, interest) in other.interests where !withdrawn.contains(token) && interest.assets.contains(where: { here($0) && (!passes || other.rerouteOnPass?.contains($0) == true) }) {
+                // What its owed visit moves (`nil`: every moved id), and the verdict after which the drain moves the rest.
+                let visit = self.followOwed ? self.rerouteOnVisit(other) : []
+                let after = self.movesAfterVerdict(other) ? verdicts[transfer] : nil
+                for (token, interest) in other.interests where !withdrawn.contains(token) {
+                    let moves = interest.assets.contains { asset in
+                        guard here(asset) else {
+                            return false
+                        }
+                        if visit?.contains(asset) ?? true {
+                            return true
+                        }
+                        return after.map { !self.verdictAnswers($0, interest, of: other) } ?? false
+                    }
+                    guard moves else {
+                        continue
+                    }
                     raise(interest.lane)
                     if lane == .userInitiated {
                         break jobs
@@ -715,6 +743,26 @@ extension SyncEngine {
             }
         }
         return lane ?? job.lane
+    }
+
+    /// Whether `verdict`, waiting for `job`, answers `interest` when the drain gives it (`replayVerdict`), which then
+    /// leaves nothing of it to move (`followedLane`): a resolution and a 429 beyond the caps answer every interest, a retry
+    /// those whose lane's cap the attempt reaches (`countFailedAttempt`). The other verdicts leave every interest, except
+    /// three partial answers counted as none, recorded as residual risks in the WP-F draft (cycle 16): an offline exit's
+    /// fail-fast (`failFast`), a retry whose `Retry-After` exceeds the remaining lane's cap (`Backoff.delay`), and an
+    /// ENOSPC's verdict (`decideSpaceFailure`).
+    func verdictAnswers(_ verdict: WaitingVerdict, _ interest: JobInterest, of job: Job) -> Bool {
+        switch verdict {
+        case .attempt(.resolve):
+            return true
+        case .attempt(.throttle(let facts)):
+            return facts.decision == .exhausted
+        case .attempt(.retry):
+            let policy = interest.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+            return job.attempts + 1 >= max(1, policy.maxAttemptsPerRun)
+        case .attempt(.offline), .attempt(.pause), .attempt(.requeue), .space:
+            return false
+        }
     }
 
     // MARK: Breaker bookkeeping (ARCHITECTURE §7.7)

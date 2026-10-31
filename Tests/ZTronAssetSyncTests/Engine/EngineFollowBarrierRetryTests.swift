@@ -104,9 +104,9 @@ extension EngineFollowBarrierTests {
     /// no follow is owed; its verification read fails (EIO), and C is retried. While the retry downloads, v3 moves zz-b
     /// to N (16 bytes); then the retry gets a 404. Visited first, v3's visit moved B onto N while C downloaded, so B was
     /// served N and A answered `notFound`. Behind the barrier the 404 arrives before the follow's turn that finds C, and
-    /// its verdict waits: the visit must meet C as a failed download, not as a passed publication, which it would were
-    /// the first publication's `Job.rerouteOnPass` kept across the retry's start (`VerdictAfterFollow.published`); B
-    /// would then share C's 404.
+    /// its verdict waits: the visit must re-route zz-b, which v3 moved before the 404 arrived, as a download's visit moved
+    /// it, not pass it as the first publication's, which it would were that publication's `Job.rerouteOnPass` and end
+    /// (`Job.attemptEnd`) kept across the retry's start; B would then share C's 404.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierVisitsARetryThatFailsBeforeItsVisitAsADownload(_ visit: LaneDropVisit) async throws {
@@ -157,11 +157,11 @@ extension EngineFollowBarrierTests {
             let unvisited = await engine.readForTests { e in
                 (
                     owed: e.followOwed, found: e.state.followOrder.contains(a.transferID), holdsB: e.state.jobs[a.transferID]?.assets.contains(b.identifier) == true,
-                    published: e.state.verdictsAfterFollow[a.transferID]?.published
+                    reroute: e.state.jobs[a.transferID]?.rerouteOnPass
                 )
             }
             #expect(unvisited.owed && !unvisited.found && unvisited.holdsB, "setup: C's 404 arrived before the follow's turn that finds C: \(unvisited)")
-            #expect(unvisited.published == false, "the waiting verdict is a download's, not a publication's: \(unvisited)")
+            #expect(unvisited.reroute == [b.identifier], "the waiting verdict is a download's: its visit re-routes the id v3 moved before it, not a publication's: \(unvisited)")
             await engine.readForTests { $0.releaseFollowFollowUps() }
         }
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }

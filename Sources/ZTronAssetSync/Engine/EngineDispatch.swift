@@ -727,8 +727,10 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
-        // A new attempt: the last publication's ids and its end are behind it (`Job.rerouteOnPass`).
+        // A new attempt: the last publication's ids, its end and its verdict are behind it (`Job.rerouteOnPass`,
+        // `Job.attemptEnd`).
         job.rerouteOnPass = nil
+        job.attemptEnd = nil
         // The edge in force when the attempt starts, also for a place given behind the barrier: it starts on the live
         // gates (Stage 3 close-out cycle 15, ruling S3-R18 item 1), so an edge before this start is no edge it missed.
         job.active?.edgeSerial = self.state.networkEdgeSerial
@@ -1016,6 +1018,7 @@ extension SyncEngine {
         // publishing, re-routes them at once (`Job.rerouteOnPass`, `follow`). None while no follow is owed: every
         // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits.
         job.rerouteOnPass = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []
+        job.rerouteFor = self.state.followsEnded
         self.state.jobs[transfer] = job
         self.pump()
         let ids = job.assets.sorted()
@@ -1169,6 +1172,8 @@ extension SyncEngine {
         // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
         // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
         self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
+        // The publication ended, in this turn, before any bookkeeping below awaits the store (`recordPublicationEnd`).
+        self.recordPublicationEnd(transfer)
         switch error {
         case .superseded:
             // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the

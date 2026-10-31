@@ -42,8 +42,10 @@ extension SyncEngine {
     /// (cycle 11, S3-R14 item 2). While a follow is owed no admission is made and no space verdict given
     /// (`followBarrier`, F-28), no run settles (a claim may still move) and no job held for a manifest catch-up is
     /// released (it may be one the follow moves). Every job this apply's follow visits is visited under the apply's
-    /// decision instant (`followStamps`, S3-R15 item 1), the instant a visit-first engine visited it at.
+    /// decision instant (`followStamps`, S3-R15 item 1), the instant a visit-first engine visited it at. The apply is
+    /// counted (`appliesFollowed`) before any visit, so a visit tells it from the attempt ends and verdicts before it.
     func followApplied(from previous: ValidatedManifest) {
+        self.state.appliesFollowed += 1
         let stamp = self.worldStamp()
         let owed = self.state.followOrder[self.state.followNext...]
         let owedSet = Set(owed)
@@ -119,6 +121,7 @@ extension SyncEngine {
         }
         self.state.followOrder = []
         self.state.followNext = 0
+        self.state.followsEnded += 1
         if self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
             // `manifestCaughtUp` left them held while this follow was owed.
             self.state.heldForManifest.removeAll()
@@ -290,11 +293,14 @@ extension SyncEngine {
     private func replay(_ event: EventAfterFollow) {
         switch event {
         case .spaceFailure(let transfer, let epoch, let required):
-            // A job that ended or was superseded meanwhile has nobody left to answer.
-            guard self.state.jobs[transfer]?.epoch == epoch else {
+            // A job that ended or was superseded meanwhile has nobody left to answer; one the drain's earlier join created
+            // for the same content is not the job that failed (PROBE-C15R-SPACE-EPOCH).
+            guard let job = self.state.jobs[transfer], job.epoch == epoch else {
                 return
             }
+            let movesAfter = self.endDeferral(job)
             self.decideSpaceFailure(transfer, required: required)
+            self.followAfterVerdict(transfer, epoch: epoch, movesAfter)
         case .attemptFailed(let transfer, let epoch, let verdict):
             self.replayVerdict(transfer, epoch: epoch, verdict)
         case .join(let join):
@@ -379,8 +385,8 @@ extension SyncEngine {
     /// While the verdict waits, the job is inert as a visit-first engine's job is while its attempt still runs: the
     /// follow's own visit may move its ids or join it (its re-lane then does nothing, `relane`), and every other input
     /// that meets it (a join, a withdrawal, a conditions element, an edge) waits behind the verdict as an event of its own.
-    /// A publication's end is recorded as such (`VerdictAfterFollow.published`): the visit passes that job as it passes
-    /// one still publishing (`passesOnVisit`).
+    /// The deferral is recorded on the job (`recordDeferredVerdict`): a visit for an apply after it leaves the job to the
+    /// verdict, as a visit-first engine's visit met the job as the verdict left it (`rerouteOnVisit`, `followAfterVerdict`).
     func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
         guard self.defersToFollow, let job = self.state.jobs[transfer], self.exitDefers(job) else {
             return false
@@ -395,7 +401,8 @@ extension SyncEngine {
         case .queued, .blocked:
             return false
         }
-        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch, published: job.rerouteOnPass != nil)
+        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch)
+        self.recordDeferredVerdict(transfer)
         self.deferToFollow(.attemptFailed(transfer, epoch: job.epoch, verdict: verdict))
         self.notifyObservers()
         return true
@@ -412,6 +419,68 @@ extension SyncEngine {
         }
     }
 
+    /// Records the end of `transfer`'s publication in a failure (`publicationFailed`), in the turn it ends and before the
+    /// bookkeeping that awaits the store (an integrity failure's record, an ENOSPC's free-space read): a visit inside that
+    /// bookkeeping, for an apply made while the job still published, passes the job as a visit-first engine's visit at that
+    /// apply passed it, and one for an apply made since moves its moved ids, as that engine's visit met the job failed
+    /// with no verdict yet (`rerouteOnVisit`; Stage 3 close-out cycle 16, PROBE-C15C-INTEGRITY-WINDOW,
+    /// PROBE-C15C-ENOSPC-PASSED). A mark whose verdict is given at once, with no follow owed, is never read: any visit
+    /// after it belongs to a later apply.
+    func recordPublicationEnd(_ transfer: TransferID) {
+        let end = AttemptEnd(failedAfter: self.state.appliesFollowed, deferredAfter: nil)
+        self.state.jobs[transfer]?.attemptEnd = end
+    }
+
+    /// Records that `transfer`'s exit verdict defers to the follow (`defersFailure`, an ENOSPC's `.spaceFailure` in
+    /// `spaceFailed`): the applies followed now, and the ids a visit-first engine had moved before the verdict arrived,
+    /// which the owed visit that meets the job re-routes at once (`Job.rerouteOnPass`). Those are the ids listed elsewhere
+    /// now while a follow is owed (none otherwise: every visit has run), unless the attempt ended in its publication with
+    /// no apply since, whose visits passed the job publishing and keep the publication's own set. A visit for an apply
+    /// after this instant passes the job and leaves its other moved ids to the verdict, which the drain gives before it
+    /// moves them (`followAfterVerdict`; Stage 3 close-out cycle 16, ruling S3-R19 item 1).
+    func recordDeferredVerdict(_ transfer: TransferID) {
+        guard let job = self.state.jobs[transfer] else {
+            return
+        }
+        let applies = self.state.appliesFollowed
+        if job.attemptEnd?.failedAfter != applies {
+            // Computed before the job is written: an optional-chained assignment holds the state across its right side.
+            let moved: Set<AssetID> = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []
+            let follow = self.state.followsEnded
+            self.state.jobs[transfer]?.rerouteOnPass = moved
+            self.state.jobs[transfer]?.rerouteFor = follow
+        }
+        let end = AttemptEnd(failedAfter: job.attemptEnd?.failedAfter ?? applies, deferredAfter: applies)
+        self.state.jobs[transfer]?.attemptEnd = end
+    }
+
+    /// Whether an apply was followed since `job`'s exit verdict deferred to the follow: once the drain gives the verdict,
+    /// it moves the ids those applies moved from the job the verdict leaves (`followAfterVerdict`), which the owed visits
+    /// passed to the verdict. Also read by `followedLane`.
+    func movesAfterVerdict(_ job: Job) -> Bool {
+        job.attemptEnd?.deferredAfter.map { self.state.appliesFollowed > $0 } ?? false
+    }
+
+    /// Ends the deferral of `job`'s exit verdict as the drain gives it, and returns whether the drain moves its ids after
+    /// the verdict (`movesAfterVerdict`).
+    private func endDeferral(_ job: Job) -> Bool {
+        let moves = self.movesAfterVerdict(job)
+        self.state.jobs[job.transfer]?.attemptEnd = nil
+        return moves
+    }
+
+    /// The visit a visit-first engine made, after it gave the verdict, at each apply since: the job the verdict left,
+    /// still `epoch`'s, moves the ids those applies moved, which the owed visits passed to the verdict (`moves`, from
+    /// `endDeferral`). A job the verdict ended has nobody left to move. The job follows the copy afterwards, so the next
+    /// follow owes it no visit.
+    private func followAfterVerdict(_ transfer: TransferID, epoch: UInt64, _ moves: Bool) {
+        guard moves, self.state.jobs[transfer]?.epoch == epoch else {
+            return
+        }
+        self.state.unfollowed.remove(transfer)
+        _ = self.follow(transfer)
+    }
+
     /// Gives a deferred exit verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
     /// or was superseded meanwhile: the exit the attempt's end would have taken once the follow had visited first, on
     /// the lane, interests and ranks the visits left. Every input that met the job meanwhile waits behind this event, at
@@ -419,15 +488,24 @@ extension SyncEngine {
     /// PROBE-C10-JOIN-RETIRE). The ids a follow's visit passed, the job publishing, stay and are answered here, as a
     /// visit-first engine answered them with the publication's outcome; the drain visits no job before its verdict
     /// (Stage 3 close-out cycle 15, ruling S3-R18 item 2: the cycle-14 `followedForVerdict` visit served only the
-    /// deferred move a passed publication owed, and the visit that passes it re-routes those ids now).
+    /// deferred move a passed publication owed, and the visit that passes it re-routes those ids now). After the verdict,
+    /// the ids an apply moved since the verdict deferred move from the job it leaves (`followAfterVerdict`), as a
+    /// visit-first engine's visit at that apply moved them (cycle 16, ruling S3-R19 item 1).
     private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) {
         guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
             return
         }
         self.state.verdictsAfterFollow[transfer] = nil
-        guard self.state.jobs[transfer]?.epoch == epoch, case .failed? = self.state.jobs[transfer]?.state else {
+        guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed = job.state else {
             return
         }
+        let movesAfter = self.endDeferral(job)
+        self.giveVerdict(transfer, verdict)
+        self.followAfterVerdict(transfer, epoch: epoch, movesAfter)
+    }
+
+    /// `replayVerdict`'s verdict for a job still `failed` at its epoch.
+    private func giveVerdict(_ transfer: TransferID, _ verdict: AttemptVerdict) {
         switch verdict {
         case .resolve(let answer):
             self.resolveAll(transfer, with: .failed(answer))
@@ -615,48 +693,73 @@ extension SyncEngine {
         }
     }
 
-    /// Whether a follow's visit passes `job` instead of moving it: it publishes, or the verdict of a publication that
-    /// ended behind the follow barrier waits (`VerdictAfterFollow.published`), as a visit-first engine's visit at the apply
-    /// met it still publishing (the cycle-15 fixer's PROBE beside PROBE-C14C-MARK-TWO-APPLIES). Also the jobs walk of
-    /// `followedLane`.
-    func passesOnVisit(_ job: Job) -> Bool {
+    /// What a follow's visit re-routes of `job`'s moved ids when it passes the job instead of moving it; `nil` when it
+    /// moves every moved id. The visit passes the job as a visit-first engine's visit at the apply met it:
+    /// - publishing: passed, its publication's set re-routed (`Job.rerouteOnPass`; ruling S3-R18 item 2);
+    /// - failed with its exit verdict waiting: left to the verdict, the ids moved before the verdict arrived re-routed
+    ///   (`recordDeferredVerdict`), since a later apply's visit met the job as the verdict left it, which the drain moves
+    ///   then (`followAfterVerdict`; Stage 3 close-out cycle 16, ruling S3-R19 item 1, PROBE-C15R-VERDICT-LATER-APPLY);
+    /// - failed in its publication's bookkeeping, before the verdict defers: passed as still publishing while no apply was
+    ///   followed since the publication's end, else moved, as met failed (`recordPublicationEnd`;
+    ///   PROBE-C15C-INTEGRITY-WINDOW);
+    /// - otherwise (downloading, queued, parked, failed with its verdict given) moved.
+    /// Also read by `followedLane`.
+    func rerouteOnVisit(_ job: Job) -> Set<AssetID>? {
+        // The set serves only the follow owed when it was recorded (`Job.rerouteFor`).
+        let reroute = job.rerouteFor == self.state.followsEnded ? job.rerouteOnPass ?? [] : []
         switch job.state {
         case .verifying, .committing:
-            return true
+            return reroute
         case .failed:
-            return self.state.verdictsAfterFollow[job.transfer]?.published == true
+            guard let end = job.attemptEnd else {
+                return nil
+            }
+            if end.deferredAfter == nil, self.state.appliesFollowed != end.failedAfter {
+                return nil
+            }
+            return reroute
         case .queued, .blocked, .downloading:
-            return false
+            return nil
         }
     }
 
     /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job the visit passes
-    /// (`passesOnVisit`: publishing, or its publication's verdict waiting) keeps its bytes, its ledger entry and its
-    /// publication (R-SYN-11): its commit binds only the ids the copy still maps to it, and the ids it does not bind
-    /// follow their content then (`committed`). Of its moved ids, the visit re-routes at once those a visit-first engine
-    /// had moved before the publication began (`Job.rerouteOnPass`): that engine visited the job at the apply, while it
-    /// still downloaded (Stage 3 close-out cycle 15, ruling S3-R18 item 2). The others, which an apply moved while the job
-    /// already published, are passed, as that engine passed them (S3-R18a item 1): they are answered with the
-    /// publication's outcome, and the job stays in `unfollowed` for the next follow. The cycle-14 mark that deferred the
-    /// move to the publication's failure moved, at a later apply, ids that apply had moved during the publication too
-    /// (PROBE-C14C-MARK-TWO-APPLIES), and left a moved interest out of every decision that read the job's lane meanwhile
-    /// (PROBE-C14R-PASSED-LANE, PROBE-C14R-PASSED-FAIL). The caller checks the run and pumps once per turn, not once per
-    /// job.
+    /// (`rerouteOnVisit`: publishing, its exit verdict waiting, or failed in its publication's bookkeeping) keeps its
+    /// bytes, its ledger entry and its publication (R-SYN-11): its commit binds only the ids the copy still maps to it, and
+    /// the ids it does not bind follow their content then (`committed`). Of its moved ids, the visit re-routes at once
+    /// those a visit-first engine had moved before the publication began or the verdict arrived (`Job.rerouteOnPass`):
+    /// that engine visited the job at the apply, while it still downloaded (Stage 3 close-out cycle 15, ruling S3-R18
+    /// item 2). The others, which an apply moved while the job already published or after its verdict, are passed, as that
+    /// engine passed them or met the job as its verdict left it (S3-R18a item 1, S3-R19 item 1): they are answered with
+    /// the publication's outcome or the verdict, and the job stays in `unfollowed` for the next follow. The visit spends
+    /// the re-routed set, found moved or not: it is the visit a visit-first engine made at that apply, and a later apply's
+    /// visit of the same publication passes what it meets (cycle 16, PROBE-C15R-REROUTE-STALE); a set whose follow ended
+    /// without the visit is spent too (`Job.rerouteFor`, PROBE-C15C-STALE-REROUTE). A job that is not
+    /// publishing and whose every id moves is superseded, as that engine's visit superseded it. The cycle-14 mark that
+    /// deferred the move to the publication's failure moved, at a later apply, ids that apply had moved during the
+    /// publication too (PROBE-C14C-MARK-TWO-APPLIES), and left a moved interest out of every decision that read the job's
+    /// lane meanwhile (PROBE-C14R-PASSED-LANE, PROBE-C14R-PASSED-FAIL). The caller checks the run and pumps once per turn,
+    /// not once per job.
     private func follow(_ transfer: TransferID) -> Bool {
         guard let job = self.state.jobs[transfer] else {
             return false
+        }
+        let reroute = self.rerouteOnVisit(job)
+        if reroute != nil {
+            self.state.jobs[transfer]?.rerouteOnPass = []
         }
         var moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
         guard !moved.isEmpty else {
             return false
         }
-        if self.passesOnVisit(job) {
-            let passed = moved.subtracting(job.rerouteOnPass ?? [])
+        if let reroute {
+            let passed = moved.subtracting(reroute)
             if !passed.isEmpty {
                 self.state.unfollowed.insert(transfer)
             }
             moved.subtract(passed)
-        } else if moved.count == job.assets.count {
+        }
+        if moved.count == job.assets.count, job.state != .verifying, job.state != .committing {
             if job.state == .downloading {
                 if let active = job.active {
                     self.abandon(transfer, active)
@@ -825,6 +928,15 @@ enum AttemptVerdict: Sendable, Equatable {
     case requeue
 }
 
+/// A verdict that waits for the follow as `SyncEngine.followedLane` reads it: an attempt's exit verdict
+/// (`EventAfterFollow.attemptFailed`) or an ENOSPC's (`EventAfterFollow.spaceFailure`).
+enum WaitingVerdict: Sendable, Equatable {
+    /// An attempt's exit verdict.
+    case attempt(AttemptVerdict)
+    /// An ENOSPC's verdict (`SyncEngine.decideSpaceFailure`).
+    case space
+}
+
 /// A lane's lane-wide block when a pause arrived (`AttemptVerdict.pause`).
 struct LaneBlock: Sendable, Equatable {
     /// The lane.
@@ -888,10 +1000,21 @@ struct ConditionsSnapshot: Sendable, Equatable {
 struct VerdictAfterFollow: Sendable, Equatable {
     /// The job's epoch at the exit.
     let epoch: UInt64
-    /// Whether the attempt ended in its publication (`Job.rerouteOnPass` set: every publication failure leaves the job
-    /// `failed` before its verdict defers, so its state no longer says so): a follow's visit passes the job as it passes
-    /// one still publishing (`SyncEngine.passesOnVisit`).
-    let published: Bool
+}
+
+/// When a job's latest attempt ended in a failure and when its exit verdict deferred to the follow, in applies followed
+/// (`EngineState.appliesFollowed`, `Job.attemptEnd`; Stage 3 close-out cycle 16, ruling S3-R19 item 1, which replaces
+/// cycle 15's `VerdictAfterFollow.published` with this comparison). A follow's visit reads it to meet the job as a
+/// visit-first engine's visit at its apply met it (`SyncEngine.rerouteOnVisit`): an apply before a publication's end met
+/// the job publishing, one between that end and the verdict met it failed with no verdict yet, one after the verdict met
+/// the job as the verdict left it.
+struct AttemptEnd: Sendable, Equatable {
+    /// The applies followed when the attempt's publication ended (`SyncEngine.recordPublicationEnd`), or, for any other
+    /// attempt, when its verdict deferred.
+    let failedAfter: UInt64
+    /// The applies followed when its exit verdict deferred to the follow (`SyncEngine.recordDeferredVerdict`); `nil`
+    /// until then.
+    let deferredAfter: UInt64?
 }
 
 /// A join that waits for the follow (`EventAfterFollow.join`): what `addInterest` was called with.

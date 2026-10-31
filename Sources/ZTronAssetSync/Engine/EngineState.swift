@@ -60,6 +60,13 @@ struct EngineState {
     var followScans: [FollowScan] = []
     /// The next index of `followOrder` to visit.
     var followNext = 0
+    /// The applies the engine's copy has been followed for (`SyncEngine.followApplied(from:)`), counted: an attempt's end
+    /// and its deferred verdict record the count at their instant (`Job.attemptEnd`), so a later visit tells an apply a
+    /// visit-first engine visited the job at before them from one after (Stage 3 close-out cycle 16, ruling S3-R19 item 1).
+    var appliesFollowed: UInt64 = 0
+    /// The follows that ended (`SyncEngine.continueFollow`), counted: a job's re-route set belongs to the follow owed when
+    /// it was recorded (`Job.rerouteFor`) and is spent once that follow has ended (cycle 16, PROBE-C15C-STALE-REROUTE).
+    var followsEnded: UInt64 = 0
     /// A later turn is scheduled to continue the follow.
     var followFollowUpScheduled = false
     /// Test seam: while set, the scheduled follow-up keeps its visits owed and stays scheduled instead of running
@@ -608,14 +615,26 @@ struct Job {
     var adopt: StagedFile?
     /// Whether the last failure was transient (re-queued early on a satisfied edge, T19).
     var transientFailure = false
-    /// Set when the job's latest attempt reached its publication (`publish`), `nil` from the start of the next attempt
-    /// (`start`): the ids the engine's copy listed elsewhere when that publication began while a follow was owed. A
-    /// visit-first engine, visiting the job at that follow's apply while it still downloaded, moved them then, so the owed
-    /// visit that meets the job publishing, or its publication's verdict waiting, re-routes them at once
-    /// (`SyncEngine.follow`; Stage 3 close-out cycle 15, ruling S3-R18 item 2). An id an apply moved while the job already
-    /// published is not in it: that engine passed it too (S3-R18a item 1). Whether it is set also tells a deferred exit
-    /// verdict whether the attempt ended in its publication (`VerdictAfterFollow.published`).
+    /// The ids the next visit that passes the job re-routes at once (`SyncEngine.follow`, `SyncEngine.rerouteOnVisit`),
+    /// `nil` from the start of an attempt (`start`) until its publication or its deferred verdict sets it. Set when the
+    /// attempt reaches its publication (`publish`): the ids the engine's copy listed elsewhere then while a follow was owed,
+    /// which a visit-first engine, visiting the job at that follow's apply while it still downloaded, had moved (Stage 3
+    /// close-out cycle 15, ruling S3-R18 item 2); an id an apply moved while the job already published is not in it, since
+    /// that engine passed it (S3-R18a item 1). Set again when the attempt's exit verdict defers to the follow
+    /// (`recordDeferredVerdict`) unless the attempt ended in its publication with no apply since: the ids listed elsewhere
+    /// then while a follow was owed, which that engine had moved before the verdict arrived. The set serves the visit
+    /// the follow owed then makes, and only it: that visit empties it, found moved ids or not, and once that follow has
+    /// ended without visiting the job (an apply moved its ids back first) it is spent all the same (`rerouteFor`). A
+    /// later apply's visit meets ids an apply moved while the job published, which that engine passed; an id the set
+    /// kept was re-routed again once an apply had moved it back and away (cycle 16; PROBE-C15R-REROUTE-STALE,
+    /// PROBE-C15C-STALE-REROUTE).
     var rerouteOnPass: Set<AssetID>?
+    /// The follows ended (`EngineState.followsEnded`) when `rerouteOnPass` was set: the set belongs to the follow owed
+    /// then, and is spent once that follow has ended (`SyncEngine.rerouteOnVisit`).
+    var rerouteFor: UInt64 = 0
+    /// The applies followed when the latest attempt ended in a failure, and when its exit verdict deferred to the follow
+    /// (`AttemptEnd`); `nil` from the start of an attempt (`start`) and once the drain gives the verdict.
+    var attemptEnd: AttemptEnd?
     /// The error interests will receive if the job ends now.
     var lastError: AssetError?
 
