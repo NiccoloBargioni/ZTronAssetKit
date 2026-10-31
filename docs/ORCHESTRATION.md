@@ -164,6 +164,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - a test race from `0f32845`, which fails the Sync bundle under TSan (flaky).
   - **Cycle 16 fix** started 19:50. At 22:05 it had 11 commits (`39e18d2` to `d3242d3`) and was running its TSan gate. Weekly usage was 79 % at 22:05.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
+  - **Owner, 31 Oct 23:25: "when we do not need any more cycle, we stop. We'll continue next reset."**
+    - Keep running WP-F cycles until a verification has 0 blocking items. If cycle 18 still blocks, rule and start run 6 from cycle 19.
+    - **At convergence, stop.** No merge, no gates, no ADR-057, no Stage 5, no post-stage work: everything after convergence waits for the Thu 5 Nov 03:00 reset. Record the converged cycle and HEAD here.
+    - If the weekly limit stops the agents mid-cycle, resume that cycle after the reset; committed work stays on `wp/s3f`.
+    - **After the reset, start with** the merge of `wp/s3f`, then the pending list (6.4 check (b), phase-A gates, TSan and `--perf`, the P-13 verifier, the mutation re-check, ADR-057, Stage 5, then the facade method and the Electron app).
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
