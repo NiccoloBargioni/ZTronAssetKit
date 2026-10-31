@@ -109,6 +109,17 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - (C) keep the strict bar and cycle.
   - **Nothing is running.** The `wp/s3f` worktree is clean at `3f10eaa`.
   - **Next run:** `fromCycle: 13`, `findingsFile` `s3f-c12-issues.json`, plus the ruling that follows from the owner's choice.
+- **Owner, 31 Oct: "Narrow the bar"** (option A). This is ruling **S3-R16** in `s3-rulings-s3f.md`.
+  - **Blocking:**
+    - a different answer to a caller;
+    - a broken SPEC MUST or invariant (R-SYN-5: nothing goes to a live-throttled origin, and a 429 always throttles on arrival; space safety);
+    - liveness and flakiness;
+    - G4 for code that stays;
+    - the gates.
+  - **Recorded as residual risks:** order, place and timing differences.
+  - **Simplification is preferred:** for example, removing the place stamps behind R-I. One-to-one test records apply (G3).
+  - ADR-057 records S3-R16 as the owner's decision.
+- **Fix run 4** (args in `.build-orchestrator/s3-fix-args-run4.json`): `s3f` from cycle 13 to 16, findings `s3f-c12-issues.json`, simulator set 1, no usage stop. Launched 31 Oct at weekly 66 %.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
