@@ -168,4 +168,71 @@ extension EngineFollowBarrierTests {
         #expect(aResult == .failure(.serverUnavailable(retryAfter: nil)), "A gets C's timeout at the cap (visit-first): \(aResult)")
         #expect(bResult == .failure(.serverUnavailable(retryAfter: nil)), "B gets C's timeout at the cap, answered before v4 existed (visit-first): \(bResult)")
     }
+
+    /// A retry that arrived before a later apply leaves the job alive, and the ids that apply moved move from it once the
+    /// verdict is given, as a visit-first engine's visit at that apply moved them from the job backing off
+    /// (`verdictBeforeApply`, `.retry`; `followAfterVerdict`): behind the barrier v4's owed visit passed C to its waiting
+    /// verdict, and the drain moved B onto N after it. C's retry served A, and N served B.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierMovesALaterApplysIdFromAJobItsWaitingRetryLeft(_ visit: LaneDropVisit) async throws {
+        let (aResult, bResult) = try await self.verdictBeforeApply(visit, seed: 1_616_202, ending: .retry)
+        #expect((try? aResult.get())?.byteSize == 100_000, "A is served C's content by its retry (visit-first): \(aResult)")
+        #expect((try? bResult.get())?.byteSize == 16, "B is served N: v4's visit moved it from C backing off (visit-first): \(bResult)")
+    }
+
+    /// A job whose attempt failed before its owed visit, every id of which an apply had moved before the failure, is
+    /// superseded by that visit, as a visit-first engine's visit at the apply superseded it while it downloaded (the
+    /// visit re-routes them all, `Job.rerouteOnPass` from `recordDeferredVerdict`): C (100 kB, zz-a and zz-b, a user
+    /// waiter each) downloads; v3 moves both ids to N (16 bytes) while, behind the barrier, its follow owes C's visit, and
+    /// C's first attempt times out first (a retry, which waits). Both users are served N, and C's content is never asked
+    /// for again: no retry runs for a job nobody holds.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierSupersedesAFailedJobEveryIdOfWhichMovedBeforeItsFailure(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_616_702
+        let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let nBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let aMoved = EngineHarness.onDemand("zz-a", nBytes)
+        let bMoved = EngineHarness.onDemand("zz-b", nBytes)
+        try #require(a.transferID == b.transferID && aMoved.transferID == bMoved.transferID, "setup: zz-a and zz-b share C, then N")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .stage(cBytes)])
+        await s.harness.source.script(aMoved.transferID, [.stage(nBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [aMoved, bMoved] + Self.laterFillers(seed + 6_000), tag: "v3-supersede-\(seed)", s, visit: visit)
+        // C's first attempt times out: behind the barrier, before C's owed visit.
+        await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
+            let waiting = await engine.readForTests { e in (owed: e.followOwed, reroute: e.state.jobs[a.transferID]?.rerouteOnPass) }
+            #expect(waiting.owed && waiting.reroute == [a.identifier, b.identifier], "setup: C's verdict waits with both ids moved before it: \(waiting)")
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect((try? aResult.get())?.byteSize == 16, "A is served N (visit-first): \(aResult)")
+        #expect((try? bResult.get())?.byteSize == 16, "B is served N (visit-first): \(bResult)")
+        // A retry of C, had it run for nobody, starts C's content again once its backoff is due.
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { !$0.followBarrier && $0.state.jobs[a.transferID] == nil }
+        }
+        let starts = await s.harness.source.starts.filter { $0.id == a.transferID }.count
+        #expect(starts == 1, "C's content is asked for once: C was superseded, not retried (visit-first): \(starts)")
+        await Self.finishHeld(s)
+    }
 }
