@@ -136,16 +136,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **the place stamp's slot view** (PROBE-C14C-STAMP-AHEAD): a place ahead that visit-first started is not counted, and K2 is refused on a past throttle;
     - **the passed-publication mark** (C14C-MARK-TWO-APPLIES, C14C/C14R-PASSED-LANE, C14R-PASSED-FAIL): answer differences; RR-1's remainder is not a residual risk;
     - **G4:** followedLane's new branches have 0 hits.
-  - **S3-R18** (16:40), written after cycle 15's fixer had started (16:21) and delivered to it by message at 16:31; it re-read the ruling before changing any code.
+  - **S3-R18** (16:30), written after cycle 15's fixer had started (16:21) and delivered to it by message at 16:31; it re-read the ruling before changing any code.
     - Remove the place stamps' admission: the barrier-end pump reads only the live gates. Sweep-first answer assertions that expected a stamp's past view may change one to one (visit-first assertions never change).
     - A passed publication re-routes its moved ids at once (the requirements verifier's simplification); the mark, `followPassedPublication` and followedLane's publishing-job skip go. Per-pass id lists are the fallback only if a probe shows a MUST breaks.
     - Put-backs: finding 11 is accepted as a residual risk; `failureMoveBehindBarrier` is killed or removed; RR-2 and RR-4 are not blocking.
   - **Cycle 15 (run 4) was stopped at 16:41; run 4 ended there.**
     - **What happened:** a `SendMessage` to the running workflow fixer did not reach it. It started a second copy from the fixer's transcript, in the same worktree. That copy read S3-R18, saw the other writer, made no edits, and handed back an unverified analysis. The original fixer never got S3-R18 and was writing the stamp fix S3-R18 rules out (counting places ahead).
     - **Kept:** the original's unfinished tests are on `wip/s3f-c15a` (`5a87864`). `wp/s3f` is clean at `388f744`. The copy's analysis is in `.build-orchestrator/s3f-c15-handback-analysis.md`.
-    - **S3-R18a** (16:50) adds the case the copy found: a later apply while the earlier follow is owed. It also names the inputs above.
+    - **S3-R18a** (16:42) adds the case the copy found: a later apply while the earlier follow is owed. It also names the inputs above.
   - **Lesson: never `SendMessage` a workflow agent.** It starts a duplicate that writes in the same worktree. To change a running fixer's brief, stop the run and relaunch from the same cycle with the ruling in the rulings file.
-- **Fix run 5** (args in `.build-orchestrator/s3-fix-args-run5.json`): `s3f` from cycle 15 to 18, findings `s3f-c14-issues.json`, simulator set 1, no usage stop, Opus. **RUNNING** `wf_7c1faaa8-af9` (task `w0kg1yplq`), launched 31 Oct 16:52 at weekly 72 %.
+- **Fix run 5** (args in `.build-orchestrator/s3-fix-args-run5.json`): `s3f` from cycle 15 to 18, findings `s3f-c14-issues.json`, simulator set 1, no usage stop, Opus. **RUNNING** `wf_7c1faaa8-af9` (task `w0kg1yplq`), launched 31 Oct 16:43 at weekly 72 %.
   - **Resume:** in this session, use `resumeFromRunId` with the same args. From a fresh session, read `subagents/workflows/wf_7c1faaa8-af9/journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`. Run 4 (`wf_94baddee-151`) is finished: do not resume it.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
