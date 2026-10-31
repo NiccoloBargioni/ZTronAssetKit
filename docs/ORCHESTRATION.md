@@ -169,6 +169,10 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **At convergence, stop.** No merge, no gates, no ADR-057, no Stage 5, no post-stage work: everything after convergence waits for the Thu 5 Nov 03:00 reset. Record the converged cycle and HEAD here.
     - If the weekly limit stops the agents mid-cycle, resume that cycle after the reset; committed work stays on `wp/s3f`.
     - **After the reset, start with** the merge of `wp/s3f`, then the pending list (6.4 check (b), phase-A gates, TSan and `--perf`, the P-13 verifier, the mutation re-check, ADR-057, Stage 5, then the facade method and the Electron app).
+    - **Scheduled 31 Oct 23:31: one-time task `ztron-assetkit-resume-after-reset`** (Claude app → Scheduled; file `~/.claude/scheduled-tasks/ztron-assetkit-resume-after-reset/SKILL.md`) fires **Thu 5 Nov 03:10 CET**.
+      - It runs only while the app is open; otherwise it runs at the next launch. It starts in the default permission mode unless the owner sets one on the task.
+      - Its pre-flight launches nothing if weekly usage is above 10 %. It also checks that no earlier workflow is still writing.
+      - It then finishes WP-F if needed and works through the list above.
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
