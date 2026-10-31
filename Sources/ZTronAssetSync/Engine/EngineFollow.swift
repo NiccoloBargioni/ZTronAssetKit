@@ -44,6 +44,7 @@ extension SyncEngine {
     /// released (it may be one the follow moves). Every job this apply's follow visits is visited under the apply's
     /// decision instant (`followStamps`, S3-R15 item 1), the instant a visit-first engine visited it at.
     func followApplied(from previous: ValidatedManifest) {
+        self.state.appliesFollowed += 1
         let stamp = self.worldStamp()
         let owed = self.state.followOrder[self.state.followNext...]
         let owedSet = Set(owed)
@@ -191,8 +192,9 @@ extension SyncEngine {
     // MARK: One view of the world per decision instant (Stage 3 close-out cycle 12, S3-R15 item 1)
 
     /// The decision instant now: the instant and the view of the non-ledger real-world inputs as they stand
-    /// (`WorldView`), appended to `worldHistory` when it differs from the last view. Under a reading (a visit or a
-    /// replay) it is that reading: nothing a visit or a replay decides is an input of its own.
+    /// (`WorldView`), appended to `worldHistory` when it differs from the last view, with the applies followed so far and
+    /// the slots a pump now would offer (`freeSlots()`). Under a reading (a visit or a replay) it is that reading:
+    /// nothing a visit or a replay decides is an input of its own.
     func worldStamp() -> WorldStamp {
         if let reading = self.state.reading {
             return reading
@@ -207,7 +209,7 @@ extension SyncEngine {
         if self.state.worldHistory.last != view {
             self.state.worldHistory.append(view)
         }
-        return WorldStamp(at: self.environment.time.monotonicNow(), view: self.state.worldHistory.count - 1)
+        return WorldStamp(at: self.environment.time.monotonicNow(), view: self.state.worldHistory.count - 1, apply: self.state.appliesFollowed, freeSlots: self.freeSlots())
     }
 
     /// Runs `body` under the decision instant `stamp` (`EngineState.reading`): `decisionNow()` is its instant, the
@@ -273,7 +275,7 @@ extension SyncEngine {
             return
         }
         self.state.worldHistory.append(view)
-        self.state.reading = WorldStamp(at: stamp.at, view: self.state.worldHistory.count - 1)
+        self.state.reading = WorldStamp(at: stamp.at, view: self.state.worldHistory.count - 1, apply: stamp.apply, freeSlots: stamp.freeSlots)
     }
 
     /// Ends the world history once the barrier is down (`EngineState.worldHistory`): the barrier-end pump has read the
@@ -553,15 +555,30 @@ extension SyncEngine {
     /// the verdict, and returns whether the job is still `epoch`'s: one the visit superseded has nobody left to answer.
     /// The follow's visits moved them already, unless the follow passed the job while it verified or committed (it is
     /// visited again only by the next follow) or the job was joined for a replaced entry after the follow's pass; the
-    /// cycles before brought that visit forward to the failure. The drain's last batch pumps for any job it creates.
+    /// cycles before brought that visit forward to the failure. A job whose publication began before the apply of the
+    /// visit that passed it (`PassedPublication.publishingAtApply`) is not visited: a visit-first engine passed it too,
+    /// and answered its moved ids with the verdict (Stage 3 close-out cycle 14). The drain's last batch pumps for any job
+    /// it creates.
     private func followedForVerdict(_ transfer: TransferID, epoch: UInt64) -> Bool {
         guard let job = self.state.jobs[transfer], job.epoch == epoch else {
             return false
         }
-        if self.holdsIDListedElsewhere(job) {
+        if job.passedPublishing != .publishingAtApply, self.holdsIDListedElsewhere(job) {
             _ = self.visit(transfer, at: nil)
         }
         return self.state.jobs[transfer]?.epoch == epoch
+    }
+
+    /// Moves the ids a job the follow passed while it published, after the apply of that visit, still holds for content
+    /// the copy lists elsewhere, before its failure is answered once nothing waits for the follow (`resolveAll`): a
+    /// visit-first engine visited it at the apply, while it downloaded, and moved those ids then, so their users waited
+    /// for their new content instead of this failure (`PassedPublication.publishedAfterApply`; Stage 3 close-out cycle
+    /// 14). Returns whether it moved any.
+    func followPassedPublication(_ transfer: TransferID) -> Bool {
+        guard let job = self.state.jobs[transfer], job.passedPublishing == .publishedAfterApply, self.holdsIDListedElsewhere(job) else {
+            return false
+        }
+        return self.visit(transfer, at: nil)
     }
 
     /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
@@ -650,6 +667,15 @@ extension SyncEngine {
         case .verifying, .committing:
             if !moved.isEmpty {
                 self.state.unfollowed.insert(transfer)
+                // A visit-first engine visited at the apply this visit belongs to: a publication begun since met a job
+                // that still downloaded, whose ids it moved then (`PassedPublication`). Once owed, that move stays owed
+                // through a later apply's pass.
+                let apply = self.state.reading?.apply ?? self.state.appliesFollowed
+                if job.publishingSince >= apply {
+                    self.state.jobs[transfer]?.passedPublishing = .publishedAfterApply
+                } else if job.passedPublishing == nil {
+                    self.state.jobs[transfer]?.passedPublishing = .publishingAtApply
+                }
             }
             return false
         default:
@@ -658,6 +684,7 @@ extension SyncEngine {
         guard !moved.isEmpty else {
             return false
         }
+        self.state.jobs[transfer]?.passedPublishing = nil
         if moved.count == job.assets.count {
             if job.state == .downloading {
                 if let active = job.active {
@@ -869,13 +896,43 @@ struct WorldView: Sendable, Equatable {
     let edgeSerial: UInt64
 }
 
-/// A decision instant while the follow barrier holds: when, and the view of the world then (an index into
-/// `EngineState.worldHistory`).
+/// A decision instant while the follow barrier holds: when, the view of the world then (an index into
+/// `EngineState.worldHistory`), the applies followed by then, and the slots a pump then would have offered.
 struct WorldStamp: Sendable, Equatable {
     /// The instant.
     let at: MonotonicInstant
     /// The view's index in `EngineState.worldHistory`.
     let view: Int
+    /// `EngineState.appliesFollowed` then: a follow's visit under it belongs to that apply (`PassedPublication`).
+    let apply: UInt64
+    /// The slots a pump then would have offered a queued job (`SyncEngine.freeSlots()`): a place given under this
+    /// instant is refused on its view only where a visit-first engine's pump tried it then (`EngineState.placeStamps`).
+    let freeSlots: FreeSlots
+}
+
+/// The slots a pump would offer a queued job at one instant, by lane class (`SyncEngine.freeSlots()`).
+struct FreeSlots: Sendable, Equatable {
+    /// A user-initiated job's: a free transfer slot within the user cap.
+    let user: Bool
+    /// A prefetch or bulk job's: a free transfer slot within the non-user and pipeline caps.
+    let nonUser: Bool
+
+    /// Whether a job of `lane` had one.
+    func admit(_ lane: AssetPriority) -> Bool {
+        lane == .userInitiated ? self.user : self.nonUser
+    }
+}
+
+/// How a follow's visit passed a job it found verifying or committing with ids the copy moved (`Job.passedPublishing`;
+/// Stage 3 close-out cycle 14, the cycle-13 requirements verifier's G4 finding on `followedForVerdict`).
+enum PassedPublication: Sendable, Equatable {
+    /// The publication began before the visit's apply: a visit-first engine, visiting at the apply, passed the job too,
+    /// so its moved ids are answered with the publication's outcome.
+    case publishingAtApply
+    /// The publication began after the visit's apply: a visit-first engine visited the job at the apply, while it still
+    /// downloaded, and moved those ids then, so a failure is answered only after that move
+    /// (`SyncEngine.followPassedPublication`).
+    case publishedAfterApply
 }
 
 /// The lane-wide conditions an event read when it arrived (`WorldView.conditions`).

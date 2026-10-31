@@ -73,6 +73,24 @@ extension SyncEngine {
         return counts
     }
 
+    /// The slots a pump now would offer a queued job of each lane class, as its loops read them (`pump()`): a decision
+    /// instant behind the follow barrier records them (`WorldStamp.freeSlots`), so the barrier-end pump refuses a place
+    /// on that instant's view only where a visit-first engine's pump had tried it then. While every slot was busy, that
+    /// pump gated nothing, and the place waited for a slot and the live gates (PROBE-C13-STAMP-NO-SLOT; Stage 3 close-out
+    /// cycle 14). A user job's preemption of lower-lane work is not counted: read live then, a place is answered on the
+    /// live gates, the side ruling S3-R17 item 2 accepts. One pass over the jobs in flight (`slotCounts`), C2.
+    func freeSlots() -> FreeSlots {
+        let counts = self.slotCounts
+        let maximum = self.tuning.maxConcurrentTransfers
+        let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
+        let pipelineCap = self.tuning.pipelineDepth * maximum
+        let free = maximum - counts.running > 0
+        return FreeSlots(
+            user: free && counts.runningUser < self.userCap,
+            nonUser: free && counts.running - counts.runningUser < nonUserCap && counts.nonUserPipeline < pipelineCap
+        )
+    }
+
     /// The slots user-initiated work may take: every slot, or `interactiveConcurrencyAtCritical` at `.critical`.
     private var userCap: Int {
         if self.state.conditions?.power.thermal == .critical {
@@ -1031,6 +1049,7 @@ extension SyncEngine {
         }
         job = self.state.jobs[transfer] ?? job
         job.active = nil
+        job.publishingSince = self.state.appliesFollowed
         self.state.jobs[transfer] = job
         self.pump()
         let ids = job.assets.sorted()

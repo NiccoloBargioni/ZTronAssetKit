@@ -457,8 +457,10 @@ extension SyncEngine {
     /// cancelled, whose place ahead of the visits' places is an order difference only (Stage 3 close-out cycle 13,
     /// ruling S3-R16 item 3). Every other path that queues a job waits as an event of its own (a join, a verdict, a
     /// re-admission), so the cycle-9 `.enqueue` event is gone. A place a visit or a replay gives records its decision
-    /// instant (`placeStamps`): the barrier-end pump refuses the job on the origin's gates as they stood then, and admits
-    /// it only on the live gates (`gate`; S3-R15 item 3, S3-R16 item 3).
+    /// instant (`placeStamps`) when a pump then had a slot for the job's lane (`WorldStamp.freeSlots`): the barrier-end
+    /// pump refuses the job on the origin's throttle as it stood then, and admits it only on the live gates (`gate`;
+    /// S3-R15 item 3, S3-R16 item 3). A place given while no slot was free waited, visit-first, for one, and is read live
+    /// (PROBE-C13-STAMP-NO-SLOT; Stage 3 close-out cycle 14).
     func enqueue(_ transfer: TransferID, front: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return
@@ -466,7 +468,7 @@ extension SyncEngine {
         if !front {
             job.queuedAt = self.decisionNow()
         }
-        if let stamp = self.state.reading {
+        if let stamp = self.state.reading, stamp.freeSlots.admit(job.lane) {
             self.state.placeStamps[transfer] = stamp
         }
         self.state.lastTicket += 1
@@ -603,7 +605,18 @@ extension SyncEngine {
         if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
         }
+        // A job the follow passed while it published, after that visit's apply, moves the ids a visit-first engine moved
+        // at the apply before its failure is answered: their users wait for their new content (`followPassedPublication`;
+        // Stage 3 close-out cycle 14). The jobs that move creates are pumped once the failure is answered.
+        var moved = false
+        if case .failed = outcome {
+            moved = self.followPassedPublication(transfer)
+        }
         guard let job = self.state.jobs[transfer] else {
+            if moved {
+                self.checkRunSettled()
+                self.pump()
+            }
             return
         }
         for token in job.interests.keys.sorted() {
@@ -616,6 +629,9 @@ extension SyncEngine {
         self.publishTerminal(job: job, outcome: outcome)
         follow()
         self.checkRunSettled()
+        if moved {
+            self.pump()
+        }
     }
 
     /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023).
