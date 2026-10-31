@@ -290,6 +290,34 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
      `.build-orchestrator/s3f-c14-issues.json`, the probes `.build-orchestrator/s3f-probes-c14/`.
 
   Applied in cycle 15 ("Cycle 15" below): the ids are recorded when the publication begins (`Job.rerouteOnPass`).
+- **Orchestrator ruling (close-out) S3-R19 — added 2026-10-31 18:36 (cycle 15's put-backs; written while the cycle-15
+  verifiers ran, before the cycle-16 fixer).**
+  1. *A verdict that waits across a later apply* and *the publication failure's await window* (cycle 15, "Put to the
+     orchestrator").
+     - Probe first. Each is blocking only if a probe in both `LaneDropVisit` orders shows S3-R16 item 1 broken: a
+       different answer, a broken MUST or invariant, or liveness.
+     - If the probe shows it, prefer the smallest fix. For the first item, a verdict that arrived before a visit's apply
+       leaves the job to the verdict, so that visit passes it. This is the comparison the fixer named, and it is
+       allowed: it replaces the per-verdict `published` flag rather than adding a parallel mechanism.
+     - If no probe shows it, record it as a residual risk with the probe and its result.
+     - A cycle-15 verifier that has already probed either one decides it by this item.
+  2. *`laneJobsWalkAlways`.* A mutant that changes only cost, not any decision, answer or state, is equivalent for G4
+     (S3-R16 1(e)). No drain-turn seam is required.
+     - The draft records the equivalence argument: the walk's result when the guard is false.
+     - The guard's cost is covered by C2 (S3-R5). If the C2 margin for `followedLane` is not measured anywhere, record it
+       as unmeasured in the draft; it is not blocking.
+  3. *`spaceFailureEpochDropped`.* A defensive check that no path reaches is not left unkilled (1(e)). Do one of two
+     things: remove it, with the reason in the draft; or turn the condition it guards into an `invariantViolations()`
+     clause that a test exercises. If the check predates Stage 3 and lies outside the follow-barrier class, the third
+     option is to record it as pre-existing and out of class; it is not blocking.
+  4. *RR-2, RR-4 and RR-10 unprobed:* not blocking.
+
+  Applied in cycle 16 ("Cycle 16" below): both items of 1 were probed by the cycle-15 verifiers and are fixed by the
+  comparison item 1 names (`Job.attemptEnd`); 2's guard is now cost-only, and the decision it guarded is killed through
+  a drain-turn seam; 3's check is reached (the verifiers' probe) and kept, with that probe as its test. Item 3's rule
+  also settles three of cycle 16's own survivors: `followedLane`'s epoch filters are removed (cost-only, `e67f467`),
+  `start`'s resets are checked by an `invariantViolations()` clause a test exercises (`e9960ef`), and the visit's
+  supersede of a passed failed job is killed by a claim that would keep the job (`c161818`, `d3242d3`).
 
 ## Cycle 2: the cycle-1 verification findings
 
@@ -3122,6 +3150,257 @@ These rows replace cycle 14's I1, I8, I12 and its "New, `followedForVerdict`" ro
   `// REENTRANCY:` comment and no ledger row is proposed.
 - 0 unsafe escapes (gate below).
 
+## Cycle 16: the cycle-15 verifiers' findings, and S3-R19
+
+Cycle 16 applies **S3-R19**, recorded above as an "Orchestrator ruling (close-out)", to the cycle-15 verifiers' findings
+(the requirements lens's `reqs-1`…`reqs-5` and the correctness lens's `correct-1`…`correct-6`, with their non-blocking
+notes). Both of S3-R19 item 1's put-backs had been probed by those verifiers in both `LaneDropVisit` orders, with a
+different answer sweep-first, so both are blocking and fixed by the comparison item 1 names. The work went in this order:
+
+1. `39e18d2`: eight failing tests, committed on their own, each in both orders with `.timeLimit(.minutes(3))`, in the
+   serialized `EngineFollowBarrierTests` suite. New files: `EngineFollowBarrierStaleRerouteTests.swift`,
+   `EngineFollowBarrierVerdictApplyTests.swift`, `EngineFollowBarrierWindowTests.swift`; PublicationTests gained one.
+   - On cycle 15's sources (`e64cdba`) every one fails sweep-first only, on its answer assertion, and passes visit-first:
+     `✘ Test run with 8 tests in 1 suite failed after 7.494 seconds with 9 issues.` (`.build-s3f/c16/fail-head2.log`:
+     PublicationTests `:361`, StaleRerouteTests `:108`, `:118`, VerdictApplyTests `:140`, `:155`, `:168`, WindowTests
+     `:168`, `:179`, and a setup expectation, ReachTests `:30`, of the ENOSPC test's first version), then, with the
+     ENOSPC test's space-sweep follow-ups held, `✘ Test run with 3 tests in 1 suite failed after 2.951 seconds with 3
+     issues.` (`fail-head3.log`: VerdictApplyTests `:141`, `:156`, `:169`, the version committed).
+2. `abaeec1`: a ninth failing test (the same follow's later visit, below), on `e64cdba`'s sources with the tests of
+   `abaeec1`: `✘ Test run with 3 tests in 1 suite failed after 3.432 seconds with 3 issues.` (`fail-head4.log`:
+   StaleRerouteTests `:153`, `:165`, `:175`, sweep-first only).
+3. `33b1976`: the fix (below). Barrier suites after it: `✔ Test run with 106 tests in 2 suites passed after 77.951
+   seconds.` (`barrier4.log`); the Sync bundle: `✔ Test run with 520 tests in 53 suites passed after 86.417 seconds.`
+   (`sync1.log`, load 2.98).
+4. `f6ba277`: finding `reqs-5`/`correct-5`'s race in `barrierAnswersAPassedJobsRetryAsVisitedFirst`, and two stale doc
+   comments.
+5. `ef71ca9`: a drain-turn test seam and the LANE-WALK test (finding `reqs-3`).
+6. `ea5595e`, `c3f675b`: G4 tests for the branches the fix adds (mutant rounds 1 and 2, below).
+7. `e67f467`, `e9960ef`, `c161818`, `d3242d3`: the survivors of mutant rounds 1 and 2, settled under S3-R19 item 3
+   (below).
+   Barrier suites after `c161818`'s sources: `✔ Test run with 114 tests in 2 suites passed after 86.119 seconds.`
+   (`barrier5.log`, load 2.32).
+8. This draft.
+
+### The findings
+
+| Finding | Disposition |
+|---|---|
+| `reqs-1` (blocking): PROBE-C15R-REROUTE-STALE, seed 1_515_002 | **Fixed** in `33b1976`. The visit that uses a publication's re-route set spends it (`Job.rerouteOnPass` emptied, found moved ids or not). Test: `barrierLeavesAnIdMovedBackAndAwayToThePublication` (StaleRerouteTests `:150`) |
+| `correct-4` (blocking): PROBE-C15C-STALE-REROUTE, seed 1_515_902 | **Fixed** in `33b1976`. When v4 maps the id back while the follow still owes the visit, the pass compares with the current copy and the visit never comes, so spending at the visit is not enough: the set belongs to the follow owed when it was recorded (`Job.rerouteFor`, `EngineState.followsEnded`) and is spent once that follow ends. Test: `barrierSpendsTheRerouteOfAVisitThatFindsNothingMoved` (`:162`); `barrierSpendsTheRerouteForTheSameFollowsLaterVisits` (`:172`, `abaeec1`) keeps the spending at the visit killable |
+| `reqs-2`, `correct-3` (blocking): PROBE-C15R-VERDICT-LATER-APPLY, PROBE-C15C-VERDICT-ACROSS-APPLY (S3-R19 item 1, first put-back) | **Fixed** in `33b1976` by the comparison S3-R19 item 1 names, which replaces `VerdictAfterFollow.published` (below). Tests (VerdictApplyTests): a 404 (`:151`, seed 1_515_302), an ENOSPC that parks (`:162`), a timeout at the retry cap (`:179`); the drain's move after a verdict that leaves the job alive: a retry (`:192`) and an ENOSPC retry (`:202`); the lane it gives a 429 (VerdictLaneTests `:128`, four endings) |
+| `correct-2` (blocking): PROBE-C15C-INTEGRITY-WINDOW, seed 1_516_302 (S3-R19 item 1, second put-back) | **Fixed** in `33b1976`: the publication's end is recorded in its own turn, before the bookkeeping that awaits the store (`recordPublicationEnd`). A visit inside the window, for an apply made while the job published, passes it; one for an apply made inside the window moves its moved ids. Tests: `barrierPassesAPublicationFailingInItsBookkeeping` (WindowTests `:165`) and `barrierMovesTheIdsOfAnApplyInsideAPublicationFailure` (`:176`, seed 1_616_302), which hold the window open on a stepped metadata executor |
+| `correct-1` (blocking): PROBE-C15C-ENOSPC-PASSED | **Fixed** in `33b1976`: an ENOSPC's deferral is recorded on the job as an attempt's verdict is (`recordDeferredVerdict` in `spaceFailed`), so the visit meets a publication's ENOSPC as a publication's. Test: `barrierLeavesAPassedIdToAPublicationsSpaceRetry` (PublicationTests `:312`, seed 1_616_402) |
+| `reqs-3` (blocking): PROBE-C15R-LANE-WALK, seed 1_516_202, `laneJobsWalkAlways` not equivalent | **Restructured** (the finding's second option; S3-R19 item 2). The guard now decides nothing: with it false the walk adds nothing (argument below), and `laneJobsWalkAlways` is equivalent, cost-only. The decision it carried is the inner check that an owed visit's ids count only while a follow is owed, killed by `barrierDecidesA429BetweenDrainTurnsOnItsJobsOwnInterests` (DrainLaneTests `:26`, seed 1_616_602) through a new drain-turn seam (`holdDrainFollowUps`), which S3-R19 item 2 does not require but the inner check needs to be killed (G4) |
+| `reqs-4`, `correct-6` (blocking): PROBE-C15R-SPACE-EPOCH, seed 1_515_602, `spaceFailureEpochDropped` | **Kept and killed.** The check is reached: the drain's earlier join creates a new job for the same content, which the mutant parks `insufficientSpace`. It was added in `02d51a0`, after `s3-base`, in the follow-barrier class, so S3-R19 item 3's third option does not apply, and removing it changes the answer. The verifiers' probe is the test: `barrierGivesASpaceVerdictOnlyToTheJobThatFailed` (SpaceEpochTests `:22`). Cycle 15's row and survivor reason are corrected below |
+| `reqs-5`, `correct-5` (blocking): `barrierAnswersAPassedJobsRetryAsVisitedFirst` flaky (PROBE-C15C-RETRY-FAULT-RACE) | **Fixed** in `f6ba277`. Sweep-first, the test installed its EIO fault for C's hash while N, admitted once the barrier dropped, could still publish; when N's hash read came first, N took the fault and B was never answered. The sweep branch now waits, driving the clock, for N's job to end before the fault. Six consecutive runs passed (`flaky{1…6}.log`); the TSan run is under "Gate evidence (cycle 16)" |
+| `reqs` (non-blocking): PROBE-C15R-AWAIT-WINDOW's result | **Recorded** under "Residual risks (cycle 16)": the probe passed in both orders on `e64cdba`; the class it aimed at is `correct-2`'s, fixed |
+| non-blocking: AnswerTests `:680` (`followedForVerdict`) and `:719` (`Job.passedPublishing`) | **Fixed** in `f6ba277`: the comments name the re-route at the visit and the resets at the retry's start |
+| non-blocking: S3-R13 evidence | **Recorded**: the cycle-15 verifier's run (`Build complete! (49,82 s)`, 0 `warning:` lines) is quoted under "Gate evidence (cycle 16)", with this cycle's run |
+| non-blocking: "LaneTests' six" | **Corrected** below: five `@Test` functions, one of them parameterized over `WaitingRequest` |
+| non-blocking: `followedLane`'s C2 margin | **Recorded as unmeasured** (S3-R19 item 2), under "Residual risks (cycle 16)" |
+| non-blocking: P-13 (`BenchStorage.swift:249`) | **Routed**, WP-B's (`other-wp:b`). Not touched |
+| non-blocking: RR-2, RR-4, RR-10 | **Kept recorded**, not probed (S3-R19 item 4) |
+| non-blocking: the `laneJoinTargetIgnored` and `laneJoinStillWantsIgnored` rows' citations | **Corrected** below |
+| non-blocking: `laneJobsWalkAlways`'s reason | **Corrected** below, and the mutant is now equivalent |
+
+### What cycle 16 changes (`33b1976`; S3-R19 item 1)
+
+A visit-first engine's visit at an apply met the job as it stood at that apply: publishing, failed in its publication's
+bookkeeping with no verdict yet, or as the verdict had left it. Behind the barrier the visit runs later, so it compares
+the apply with the job's attempt end and verdict, counted in applies followed:
+
+- **`EngineState.appliesFollowed`** counts the applies followed (`followApplied`, before any visit). **`Job.attemptEnd`**
+  (`AttemptEnd`) holds `failedAfter`, the count when a publication ended in a failure (`recordPublicationEnd`, in
+  `publicationFailed`'s own turn) or, for any other attempt, when its verdict deferred, and `deferredAfter`, the count
+  when the exit verdict deferred (`recordDeferredVerdict`, in `defersFailure` and in `spaceFailed`'s deferral). Both are
+  reset at an attempt's start. They replace cycle 15's `VerdictAfterFollow.published`.
+- **`rerouteOnVisit`** replaces `passesOnVisit`. It returns what a passing visit re-routes, or `nil` to move every moved
+  id:
+  - publishing: the publication's set (`Job.rerouteOnPass`, as in cycle 15);
+  - failed with its verdict waiting: the ids moved before the verdict arrived, re-routed; the rest left to the verdict;
+  - failed in its publication's bookkeeping, no verdict yet: the publication's set while no apply was followed since
+    the end (a visit for an apply made while it published), else `nil` (an apply made inside the window);
+  - otherwise `nil`.
+- **`recordDeferredVerdict`** sets the set a waiting verdict's visit re-routes: the ids the copy lists elsewhere while a
+  follow is owed, which a visit-first engine moved before the verdict arrived, unless the attempt ended in its
+  publication with no apply since, whose set stays the publication's.
+- **The set is spent**: the visit that uses it empties it, found moved ids or not (`reqs-1`), and a set whose follow has
+  ended (`Job.rerouteFor` against `EngineState.followsEnded`) counts as empty (`correct-4`).
+- **After the verdict**, the drain moves from the job the verdict leaves the ids applies moved after it deferred
+  (`endDeferral`, `followAfterVerdict`, after `giveVerdict` and after `decideSpaceFailure`), as the later apply's visit
+  did for a visit-first engine. A job the verdict ended has nobody left to move.
+- **A job not publishing whose every id moves is superseded**, re-routed ids included, as before for a failed download
+  (its visit no longer goes through the "passing" branch alone).
+- **`followedLane`** counts, of another job whose verdict waits with an apply followed since, the interests the drain
+  moves after the verdict, less those the verdict answers (`movesAfterVerdict`, `verdictAnswers`). The walk runs while a
+  follow is owed or a verdict waits; an owed visit's ids count only while a follow is owed.
+- The `.spaceFailure` replay keeps its epoch check (`reqs-4`), now `guard let job …, job.epoch == epoch`.
+- `e67f467` removes `followedLane`'s epoch filters on waiting verdicts: by content, the last verdict waiting is read.
+  Mutant `laneVerdictEpochDrop` showed them cost-only (below).
+- `e9960ef` adds an `invariantViolations()` clause: a job that downloads holds no `Job.attemptEnd` and no
+  `Job.rerouteOnPass`, the two fields `start` resets.
+- `ef71ca9` adds the test seam `holdDrainFollowUps()`/`releaseDrainFollowUps()` (`EngineState.drainFollowUpsHeld`,
+  `drainFollowUpWaiting`), as the follow's own: no production path sets it.
+
+### Test changes (G3 one-to-one; S3-R16 item 4)
+
+- `barrierVisitsARetryThatFailsBeforeItsVisitAsADownload` (RetryTests), a cycle-15 test: the field it read is removed
+  with `VerdictAfterFollow.published` (S3-R19 item 1). One assertion is replaced by the state that now says the same:
+  - old: `#expect(unvisited.published == false, "the waiting verdict is a download's, not a publication's: …")`, reading
+    `e.state.verdictsAfterFollow[a.transferID]?.published`;
+  - new: `#expect(unvisited.reroute == [b.identifier], "the waiting verdict is a download's: its visit re-routes the id
+    v3 moved before it, not a publication's: …")`, reading `e.state.jobs[a.transferID]?.rerouteOnPass`.
+  - Its answer assertions are unchanged, and its doc comment names the new fields.
+- `barrierAnswersAPassedJobsRetryAsVisitedFirst` (AnswerTests): no assertion changed. Sweep-first it waits for N's job
+  to end before the fault (`reqs-5`); two doc comments of the file name the current mechanisms.
+- Cycle 16's own tests changed before this draft: StaleRerouteTests' helper takes a `StaleRerouteV4` instead of a
+  `Bool` (`abaeec1`); VerdictApplyTests' retry case gets a 404 at its retry, and its supersede case a re-queue instead
+  of a retry (`c3f675b`), so that each decides on an answer (mutant round 1 showed both passing with the branch
+  dropped).
+
+### Mutants (S3-R16 1(e))
+
+Setup: `.build-s3f/c16/mut.py` and `mut2.py` (cycle 15's runner) copy `Package.swift`, `Sources/` and `Tests/` into
+`.build-s3f/mutsrc`, apply each edit with a count check, build in `.build-s3f/mutbuild`, run the mutant's filter twice,
+revert, and diff the copy's `Sources/` against the worktree; every round printed `revert diff: none`. Round 1
+(`mut/summary.log`) ran on `ea5595e`'s sources and tests without `f6ba277`'s AnswerTests change; round 2 (`mut2/`) on
+`c3f675b`; round 3 (`mut3/`) on `c3f675b`, with the filter extended to the PublicationTests test rounds 1 and 2 left
+out; round 4 (`mut4.py`, `mut4/summary.log`, `summary2.log`) re-syncs the copy first and ran on `c161818` and
+`d3242d3`. Every failure is sweep-first. Lines are each round's tree's (round 1's VerdictApplyTests lines are
+`ea5595e`'s).
+
+| Mutant | Branch | Result | Killed by |
+|---|---|---|---|
+| `consumeDrop` | the visit does not spend the re-route set | 1: 2/2 | StaleRerouteTests `:175` |
+| `followGenerationDrop` | a set whose follow ended still re-routes | 1: 2/2 | StaleRerouteTests `:165` |
+| `failedNeverPasses` | a failed job is never passed | 1: 2/2 | PublicationTests `:361`; VerdictApplyTests `:141`, `:156`, `:169` |
+| `inWindowCheckDrop` | a visit inside the window passes whatever apply it is for | 1: 2/2 | WindowTests `:179` |
+| `verdictRerouteAlways` | a deferral recomputes the set also for a publication that ended with no apply since | 1, 2: **passed** 2/2 (filters without the test below); 3: 2/2 | PublicationTests `:301` |
+| `verdictRerouteNever` | a deferral never records the ids moved before it | 1: 2/2 | RetryTests `:164`, `:170`; VerdictApplyTests `:222`, `:235` |
+| `attemptDeferralRecordDrop` | `defersFailure` records nothing on the job | 2: 2/2 | RetryTests `:164`; VerdictApplyTests `:154`, `:182`, `:247` |
+| `spaceDeferralRecordDrop` | `spaceFailed`'s deferral records nothing on the job | 1: 2/2 | VerdictApplyTests `:156` |
+| `publicationEndDrop` | `publicationFailed` records no end | 1: 2/2 | PublicationTests `:361`; WindowTests `:168` |
+| `startEndResetDrop` | `start` keeps the last attempt's end | 2: **passed** 2/2 (the barrier suites, 112 tests); 4: 2/2 | WindowTests `:217` (the `e9960ef` clause) |
+| `startRerouteResetDrop` | `start` keeps the last publication's re-route set | 4: 2/2 | WindowTests `:217` |
+| `attemptInvariantDrop` | the `e9960ef` clause dropped | 4: **passed** 2/2 | Expected (below) |
+| `followAfterVerdictDrop` | the drain moves nothing after a verdict | 1: **passed** 2/2 (B was served N through C's retry's commit); 2: 2/2 | VerdictApplyTests `:195`, `:205` |
+| `attemptFollowAfterVerdictDrop` | as above, after an attempt's verdict only | 2: 2/2 | VerdictApplyTests `:195` |
+| `spaceFollowAfterVerdictDrop` | as above, after an ENOSPC's verdict only | 2: 2/2 | VerdictApplyTests `:205` |
+| `endDeferralKeepsEnd` | the drain keeps the end after the verdict | 2: 2/2 | VerdictApplyTests `:195`, `:205` |
+| `movesAfterVerdictInclusive` | `>=` for `>`: a move after a verdict with no apply since | 1: 2/2 | PublicationTests `:361` |
+| `supersedeFailedDrop` | a failed job whose ids are all re-routed is not superseded | 1, 2, 4 (`c161818`): **passed** 2/2; 4 (`d3242d3`): 2/2 | VerdictApplyTests `:316`; `:325` after the 3-minute limit (below) |
+| `laneAfterVerdictDrop` | `followedLane` ignores the moves after a verdict | 1: 2/2 | VerdictLaneTests `:131` |
+| `answersResolveFalse` | a resolution answers nobody | 1: 2/2 | VerdictLaneTests `:133` |
+| `answersThrottleFalse` | a 429 beyond the caps answers nobody | 1: 2/2 | VerdictLaneTests `:133` |
+| `answersRetryFalse` | a retry at the cap answers nobody | 1: 2/2 | VerdictLaneTests `:133` |
+| `answersRetryOwnPolicy` | the cap read on the background policy for every lane | 2: 2/2 | VerdictLaneTests `:133` |
+| `laneVisitOwedDrop` | an owed visit's ids counted with no follow owed | 1: 2/2 | DrainLaneTests `:115` |
+| `laneVerdictEpochDrop` | a waiting verdict of an earlier epoch counted | 2: **passed** 2/2 (the barrier suites, 112 tests) | Cost-only; the filters are removed (`e67f467`, below) |
+| `laneJobsWalkAlways` | the walk also with no follow owed and no verdict waiting | 1: **passed** 2/2 (the 13 `barrierDecidesA429` tests) | Equivalent (below) |
+| `spaceFailureEpochDropped` | the `.spaceFailure` replay without its epoch check | 1: 2/2 | SpaceEpochTests `:71` |
+
+**Survivors and equivalents.**
+
+- **`laneJobsWalkAlways` is equivalent** (S3-R19 item 2: it changes cost only). With the guard false, no follow is owed
+  and no verdict waits. For every other job the walk then computes `visit = []` (the inner check), so no asset counts by
+  the visit term, and `after` is `nil` (no verdict in `verdicts`), so none counts by the verdict term: `raise` is never
+  called and the lane is the job's own interests' and the joins'. The walk's result with the guard false is nothing. The
+  decision cycle 15's guard carried is the inner check, killed (`laneVisitOwedDrop`).
+- **`verdictRerouteAlways` is killed in round 3.** Rounds 1 and 2's filters left out
+  `barrierAnswersAPublicationFailedBeforeItsVisitAsPassed` (PublicationTests `:298`), whose publication ends with no
+  apply since and whose verdict then defers, the one case the comparison decides; with it, round 3 failed `:301` 2/2.
+- **`laneVerdictEpochDrop` was cost-only; the filters are removed** (`e67f467`; S3-R19 item 3, first option, and
+  item 2's measure). A verdict waits with its job's epoch then (`defersFailure`, and `spaceFailed` after its epoch
+  check), and a job of the same content gets a higher epoch only after the earlier one left or its verdict was given
+  (`start` and job creation take `lastEpoch + 1`; no start runs behind the barrier). So by content the last verdict
+  waiting is the current job's own when it has one. A current job with none waiting has no deferral on it: only
+  `recordDeferredVerdict` sets one, always with its event, and the drain's `endDeferral` and `start` clear it. Then
+  `movesAfterVerdict` is false and an earlier job's verdict adds nothing. What the filters changed is the guard: with
+  only an earlier job's verdict waiting and no follow owed, the walk now runs and adds nothing.
+- **`startEndResetDrop` and `startRerouteResetDrop` are checked by an invariant** (`e9960ef`; S3-R19 item 3, second
+  option). No decision reads a value either reset clears. A start runs only from `pump`, never while the barrier holds
+  or the drain runs, and only `followApplied` raises the barrier again, counting an apply. So a later comparison with a
+  kept `failedAfter` sees a later count (`recordDeferredVerdict`, `rerouteOnVisit`). A kept set is overwritten by the
+  next publication or deferral, or not read while `attemptEnd` is `nil`. The clause says what the resets keep: a job
+  that downloads holds neither field. `barrierRetriesAFailedPublicationWithNothingOfItsEnd` (WindowTests `:189`)
+  exercises it: C's publication fails with no follow owed, its verdict is given at once, and its retry downloads. Both
+  mutants fail `:217` 2/2. `attemptInvariantDrop` passes as expected: the clause checks a condition the resets keep.
+- **`supersedeFailedDrop` is killed through a claim** (`d3242d3`). Without the branch the visit re-routes every interest
+  one by one, and the last one's removal retires the job (`dropInterest`), as `supersede` removed it. The exception is a
+  pending claim on the job's content: `removeInterest` then keeps the job (`claimHeld`). Rounds 1 and 2 had no claim.
+  `c161818`'s test claimed the content but ended C in a 404, whose verdict removes the job anyway (`resolveAll`), so it
+  passed. `d3242d3` ends C in a re-queue instead. Under the mutant, C was kept for the claim and re-queued by its
+  verdict (`:316`), and zz-g's request was not answered within the 3-minute limit (`:273`, then `:325`). Visited first,
+  C was superseded at the apply.
+
+### Residual risks (cycle 16)
+
+- **RR-11. `verdictAnswers` counts three partial answers as none.** An offline exit's fail-fast (`failFast`), a retry
+  whose `Retry-After` exceeds the lane's cap (`Backoff.delay` gives none, `retryLater` answers), and an ENOSPC's verdict
+  (`decideSpaceFailure`'s fail-fast) answer some interests the drain would otherwise move. `followedLane` counts them, so
+  a 429 that arrives meanwhile may take the user lane's policy where a visit-first engine's took the job's own. Not
+  probed.
+- **RR-12. The move after a verdict runs at the verdict's place in the drain.** A visit-first engine gave the verdict at
+  its arrival and moved the ids at the later apply's visit; events that arrived between the two met the ids not yet
+  moved, and their replay now meets them moved. Not probed.
+- **PROBE-C15R-AWAIT-WINDOW (the requirements verifier's) passed in both orders on `e64cdba`**
+  (`.build-orchestrator/s3f-probes-c15/reqs/logs/window-{1,2}.log`: `✔ Test "PROBE-C15R-AWAIT-WINDOW" with 2 test
+  cases passed`). Its reading "in the window" showed the verdict already waiting (`VerdictAfterFollow(epoch: 4,
+  published: true)`, no unit held): the bulk executor did not hold the integrity record, which runs on the metadata
+  executor. The correctness verifier's probe held it there (`correct-2`), which is fixed and tested.
+- **`followedLane`'s C2 margin is unmeasured for cycle 16's walk** (S3-R19 item 2). Cycle 15 recorded the verifier's
+  figure for cycle 14's walk (best 2.41–2.69 ms per call at 10,000 owed jobs, release). Per job the walk now adds
+  `rerouteOnVisit` (a switch and two comparisons), `movesAfterVerdict` (one comparison) and a dictionary lookup, and per
+  interest asset with a verdict waiting one `verdictAnswers` (constant time); it also runs while a verdict waits with no
+  follow owed. No `followedLane` benchmark at 10,000 exists; none was added.
+- RR-2, RR-4 and RR-10 stay analysed, not probed (S3-R19 item 4). P-13 is WP-B's (`other-wp:b`).
+
+### Corrections to cycle 15's text
+
+- **I12's "LaneTests' six"**: LaneTests has five `@Test` functions; one of them,
+  `barrierDecidesA429WithoutAWaitingRequestThatDoesNotJoinIt`, is parameterized over `WaitingRequest`.
+- **The `laneJoinTargetIgnored` and `laneJoinStillWantsIgnored` rows** cite LaneTests `:149`, `:150`. At `e64cdba` and
+  at this cycle's commits those are LaneTests `:359`, `:360` (the parameterized test's two expectations), with
+  PublicationTests `:107` (the `serverUnavailable` helper's `Issue.record`) for both.
+- **`spaceFailureEpochDropped`**: the mutant does not "only write its `lastError`". A join replayed earlier in the same
+  drain creates a new job for the same content, `queued`; without the check `decideSpaceFailure` judges it on the stale
+  figures and parks it `insufficientSpace`, so the new user is not served (the verifiers' probe, now SpaceEpochTests).
+  The check came in `02d51a0`, after `s3-base`, not before Stage 3.
+- **`laneJobsWalkAlways`**: the barrier holds with no follow owed between two drain turns not only when more than 512
+  events wait but also when an event that ends a batch (`conditions`, `readmit`, `unblock`, `throttleAnswers`,
+  `spaceSweep`) waits before the last; the verifier's probe used two conditions elements. In cycle 15's code the mutant
+  changed an answer (PROBE-C15R-LANE-WALK); cycle 16's restructuring makes it equivalent (above).
+
+### The inventory, corrected (cycle 16)
+
+These rows replace cycle 15's I8, I12 and its "New, `EngineFollow.follow`" row. Line numbers at `d3242d3`.
+
+- **I8, `EngineDispatch.publicationFailed`.** Records the publication's end in its own turn (`recordPublicationEnd`),
+  before the bookkeeping that awaits the store; nothing moves at the failure. Tests: cycle 15's, the two WindowTests,
+  `barrierAnswersAPublicationFailedBeforeItsVisitAsPassed`, `barrierLeavesAPassedIdToAPublicationsSpaceRetry`. Mutants:
+  `publicationEndDrop`, `inWindowCheckDrop`, `verdictRerouteAlways`.
+- **I12, `EngineFailures.throttled`, `followedLane`, `verdictAnswers`.** A 429 behind the barrier is decided on the
+  highest lane of: its own interests (less a waiting withdrawal's, and, when owed a visit, less those whose ids all
+  moved); the interests other jobs' owed visits move onto it (a passing job's only in its re-route set), while a follow
+  is owed; the interests the drain moves onto it after another job's waiting verdict, less those the verdict answers;
+  the waiting joins. The job's own lane when none counts. Tests: cycle 13's to 15's, the five 429 tests of
+  PublicationTests, LaneTests' five, VerdictLaneTests (four endings), DrainLaneTests. Mutants: the `followedLane` rows.
+- **New, `EngineFollow.follow`, `rerouteOnVisit`, `recordDeferredVerdict`, `replayVerdict`, `replay(.spaceFailure)`,
+  `followAfterVerdict`.** The visit meets the job as a visit-first engine's visit at its apply met it (above); the drain
+  moves after a verdict the ids later applies moved. Tests and mutants: the table's, with
+  `barrierSupersedesAFailedJobAClaimWouldKeep` (VerdictApplyTests `:274`) for the supersede of a passed failed job.
+- **New, `invariantViolations()` (`e9960ef`).** A job that downloads holds no attempt end and no re-route set, which
+  `start` resets. Test: `barrierRetriesAFailedPublicationWithNothingOfItsEnd` (WindowTests `:189`). Mutants:
+  `startEndResetDrop`, `startRerouteResetDrop`.
+
+### Hang guards and re-entrancy
+
+- The new tests use `.minutes(3)`, as the suite's do.
+- No `await` was added in an actor: `git diff e64cdba..HEAD -- Sources | grep -c '^+.*await '` prints 0. So no
+  `// REENTRANCY:` comment and no ledger row is proposed.
+- 0 unsafe escapes (gate below).
+
 ## Items
 
 ### S3F-1 [BLOCKING] S3-CONC-04 — a satisfied first conditions reading is an edge — **Fixed**
@@ -4901,6 +5180,97 @@ this file only. Scratch was `.build-s3f*` on the shared 8-core host, one run at 
 - **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
   untouched: no `--gates-only` or `--full` run was made.
 
+## Gate evidence (cycle 16)
+
+All runs were made on this branch at `d3242d3`, the last code and test commit (21:52:00). The draft's commit changes
+this file only. Scratch was `.build-s3f*` on the shared 8-core host, one run at a time (`.build-s3f/c16/gates2.sh`, then
+`final.sh`), after the mutants (under "Cycle 16"). Logs are under `.build-s3f/c16/final/`, with stage times and
+1-minute loads in `times.txt`.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (21:52:00–21:56:31; `quick.log`).
+  - 1-minute load: 1.77 at the start, 4.68 at the end.
+  - Result: `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`.
+  - Tests passed: Transport 151, Sync 528 (`passed after 97.618 seconds`: cycle 15's 511 and this cycle's 17), Storage
+    459 (`60.750 seconds`), Model 84 (`59.905 seconds`), Kit 85, Compatibility 71, AppleHosted 104.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (ended 21:57:01,
+  `release.log`): `Build complete! (29,10 s)`, exit 0, 0 `warning:` lines.
+- **Gates** (`python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md && python3
+  Scripts/gates.py docs --sources "$PWD/Sources"`, 21:57:02, `gates.log`):
+  - `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`;
+  - `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  21:57:02–22:02:47; `syncx-{1,2,3}.log`).
+  - 1-minute load before each run: 3.78, 3.86 and 3.52; 2.79 after the last.
+  - Results: `✔ Test run with 528 tests in 53 suites passed after 97.316 seconds.`, `… after 97.158 seconds.`,
+    `… after 97.127 seconds.`
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, alone, 22:02:47–22:12:12, `tsan.log`).
+  - Load (S3-R12 rule 1, from 60 s after the start): mean 3.90, min 2.54, max 7.87 over 51 samples (`tsan-load.txt`).
+  - Result: `✔ Test run with 528 tests in 53 suites passed after 490.731 seconds.`; 0 `ThreadSanitizer` lines, 0
+    `Time limit` lines.
+  - Durations against guards (`python3 .build-s3f/c13/durations.py .build-s3f/c16/final/tsan.log`; 472 of the 528
+    reported names have a guard): none over a quarter of its guard.
+    - Largest: 23.9 % (`R-SYN-16: a heal whose re-download fails ends, and the engine forgets it`, 14.36 s of 1
+      minute).
+    - The 242 one-minute tests at most 14.36 s; the 222 three-minute tests at most 35.19 s (19.5 %); the 7 five-minute
+      tests at most 57.04 s (19.0 %); the six-minute stalled-subscriber test 54.45 s (15.1 %).
+  - This cycle's 17 tests all reported (`.build-s3f/c16/newtests.txt`), 1.77–19.58 s of 3 minutes (at most 10.9 %,
+    the waiting verdict's lane test over its eight cases).
+- **Coverage** (`swift test --scratch-path .build-s3f --enable-code-coverage --skip Benchmarks` with `TMPDIR`,
+  `CLANG_MODULE_CACHE_PATH` and `LLVM_PROFILE_FILE` under `.build-s3f/tmp`, 22:12:12–22:16:58; `cov-test.log`).
+  - 1-minute load 2.67 at the start, 6.23 at the end.
+  - Every bundle passed: 151, 528, 459, 84, 85, 71 and 104 tests.
+  - Then `xcrun llvm-cov export -summary-only` of `.build-s3f/out/Products/Debug/codecov/default.profdata` over the
+    `.xctest` bundles into `.build-s3f/cov.json`, and `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`
+    (`cov-gate.log`).
+  - Result: `COVERAGE target=ZTronAssetSync lines= 93.99% (10214/10867) min=90.0 OK`, overall `96.57% (26727/27675)`,
+    `COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK`, `COVERAGE: PASS`.
+- **iOS build:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` (ended 22:17:08, `ios-build.log`): exit 0,
+  0 `warning:` and 0 `error:` lines. Incremental: `EngineCommands.o` under `.build-s3f/xcode/Build/Intermediates.noindex`
+  is newer than the run's start.
+- **iOS Simulator tests** (simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iPhone 18 Pro, iOS 27.0, booted by
+  `simctl boot`; `Test-ZTronAssetKit-2026.10.31_22-17-18-+0100.xcresult`, 22:17:08–22:22:02; `.build-s3f/sim.log`,
+  `sim-summary.json`).
+  - 1-minute load 5.43 at the start, 10.96 at the end (the 5-minute 36.97).
+  - Result: `"result" : "Passed"`, `"totalTestCount" : 1482`, `"passedTests" : 1482`, `"failedTests" : 0`,
+    `"skippedTests" : 0` (`** TEST SUCCEEDED **`; cycle 15's 1,465 plus this cycle's 17).
+  - The log's four `warning:` lines are `appintentsmetadataprocessor`'s "Metadata extraction skipped, no
+    AppIntents.framework dependency found".
+  - The simulator is shut down: `simctl shutdown` exit 0, and `simctl list devices` shows `(Shutdown)`
+    (`sim-boot.log`).
+- **Benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks`,
+  after a release prebuild, `Build complete! (151,58 s)`; 22:24:40–22:30:59; load mean 3.87, min 2.26, max 6.90 over
+  38 samples, `bench-load.txt`; `bench.log`). Started without waiting for the load to fall after the simulator run:
+  the 1-minute load was 6.25 at the start.
+  - Result: `✘ Test run with 44 tests in 8 suites failed after 247.036 seconds with 1 issue.` The issue is P-13's
+    (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 9.52 ms against 5.0 ms; WP-B's,
+    `other-wp:b`, routed).
+  - `✔ Suite "SyncBenchmarks" passed after 113.342 seconds.`: every WP-F benchmark is within S3-R5's budgets (best of
+    three ≤ 10 ms, median ≤ 50 ms).
+  - The follow barrier's C2 figures (cycle 15's in brackets):
+    - The reclaim during an owed follow: [3.87, 3.88, 3.84] ms with one handle ([4.27, 3.91, 3.87]) and [4.92, 4.96,
+      4.89] ms with two ([4.90, 4.97, 4.98]).
+    - The mixed reclaim (1 member in 20 changed): [6.28, 6.16, 6.22] ms ([6.26, 6.43, 6.33]); with two handles [7.48,
+      7.53, 7.47] ms ([7.89, 7.54, 7.50]).
+    - The follow end and drain of 10,000 places: [4.91, 4.86, 4.90] ms ([4.72, 4.79, 4.77]).
+    - The follow's last turn plus the drain's first batch: the turn [4.76, 4.81, 4.76] ms ([4.69, 4.70, 4.66]).
+    - Throttle extension: [6.81, 6.60, 6.55] ms ([6.58, 6.61, 6.54]).
+  - P-9 p99 15.1 ms (budget 50.0, WP-G's); P-4 plan 10,000 11.8 ms (budget 20.0), ratio 1.98 (max 2.5).
+  - None of these runs `followedLane`'s walk at 10,000 jobs: its C2 stays unmeasured (under "Residual risks (cycle
+    16)").
+- **S3-R13** (`.build-s3f/c16/final.sh`, 22:30:59–22:32:25: `git archive` of `d3242d3` into the new folder
+  `.build-s3f/t64-c16`, line 1 set to `// swift-tools-version: 6.4` there only; Apple Swift version 6.4
+  (swiftlang-6.4.0.34.1)): `swift build --build-tests --scratch-path ../t64-c16-build -Xswiftc -warnings-as-errors`
+  exit 0, `Build complete! (49,28 s)`, 0 `warning:` and 0 `error:` lines; `swift build -c release --scratch-path
+  ../t64-c16-build` exit 0, `Build complete! (34,48 s)`, 0 `warning:` lines (`t64.txt`, `t64-debug.log`,
+  `t64-release.log`). `Package.swift` is not edited in the worktree. The cycle-15 requirements verifier's run on
+  `e64cdba` (the non-blocking note): `Build complete! (49,82 s)`, 0 `warning:` lines.
+- **Mutants:** under "Cycle 16" (`.build-s3f/c16/mut/`, `mut2/`, `mut3/`, `mut4/`). The failing-test runs of
+  `39e18d2` and `abaeec1` are `.build-s3f/c16/fail-head{2,3,4}.log`.
+- **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
+  untouched: no `--gates-only` or `--full` run was made.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -5012,3 +5382,7 @@ this file only. Scratch was `.build-s3f*` on the shared 8-core host, one run at 
   `spaceFailureEpochDropped` survive with the reasons given there. Finding 11's C2 figure is the verifier's; no
   `followedLane` benchmark at 10,000 was added. The R1 boundary probes were not re-run. `other-wp:b` (P-13) is not
   WP-F's.
+- Cycle 16: RR-11 and RR-12 (under "Cycle 16") are analysed, not probed. RR-2, RR-4 and RR-10 stay unprobed (S3-R19
+  item 4). `followedLane`'s C2 at 10,000 is unmeasured for cycle 16's walk (S3-R19 item 2). The cycle-15 verifiers'
+  probes were adapted into tests (their seeds kept where named), not re-run as probes. The R1 boundary probes were not
+  re-run. `other-wp:b` (P-13) is not WP-F's.
