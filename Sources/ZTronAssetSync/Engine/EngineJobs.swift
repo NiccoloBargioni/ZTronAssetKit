@@ -452,11 +452,13 @@ extension SyncEngine {
     /// Puts a queued job (back) into its lane's queue with a fresh ticket, asked for at `decisionNow()` (bulk aging reads
     /// it, the cycle-9 amendment (a)).
     ///
-    /// Behind the follow barrier a place is given only by a follow's visit or by the drain's replay of an event, each in
-    /// the visit-first order (F-28): every other path that queues a job waits as an event of its own (a join, a verdict, a
-    /// re-admission), so the cycle-9 `.enqueue` event is gone (Stage 3 close-out cycle 12; its last other caller, a
-    /// publication's ENOENT re-queue, waits as a verdict). Such a place records its decision instant (`placeStamps`):
-    /// the barrier-end pump reads the job's origin gates as they stood then (S3-R15 item 3).
+    /// Behind the follow barrier a place is given by a follow's visit or by the drain's replay of an event, each in the
+    /// visit-first order (F-28), and by one path at once: a publication's ENOENT re-queue of an attempt the engine
+    /// cancelled, whose place ahead of the visits' places is an order difference only (Stage 3 close-out cycle 13,
+    /// ruling S3-R16 item 3). Every other path that queues a job waits as an event of its own (a join, a verdict, a
+    /// re-admission), so the cycle-9 `.enqueue` event is gone. A place a visit or a replay gives records its decision
+    /// instant (`placeStamps`): the barrier-end pump refuses the job on the origin's gates as they stood then, and admits
+    /// it only on the live gates (`gate`; S3-R15 item 3, S3-R16 item 3).
     func enqueue(_ transfer: TransferID, front: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return

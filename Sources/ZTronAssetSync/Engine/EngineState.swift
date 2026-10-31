@@ -104,8 +104,9 @@ struct EngineState {
     /// `followOrder`, taken by its visit; cleared with `worldHistory`.
     var followStamps: [TransferID: WorldStamp] = [:]
     /// The decision instant of each queue place a visit or a replay gave while the barrier held: the barrier-end pump
-    /// reads the origin's gates of such a job as they stood then, which a visit-first engine's pump read at that place
-    /// (S3-R15 item 3, PROBE-C9-THROTTLE; R2 accepts only the admission's latency). Cleared with `worldHistory`.
+    /// refuses such a job on the origin's gates as they stood then, which a visit-first engine's pump read at that place,
+    /// and admits it only on the live gates (`SyncEngine.gate`; S3-R15 item 3, ruling S3-R16 items 1(b) and 3).
+    /// Cleared with `worldHistory`.
     var placeStamps: [TransferID: WorldStamp] = [:]
     /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
     /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
