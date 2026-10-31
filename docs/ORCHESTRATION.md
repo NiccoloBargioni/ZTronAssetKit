@@ -121,6 +121,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - ADR-057 records S3-R16 as the owner's decision.
 - **Fix run 4** (args in `.build-orchestrator/s3-fix-args-run4.json`): `s3f` from cycle 13 to 16, findings `s3f-c12-issues.json`, simulator set 1, no usage stop. **RUNNING** `wf_94baddee-151` (task `wybwtb9zp`), launched 31 Oct 09:46 (the owner's answer came in the morning) at weekly 66 %.
   - **Owner, 31 Oct ~10:00: "No cap".** WP-F runs until it converges under S3-R16. If cycle 16 still blocks, rule and start a new run from cycle 17. Do not offer the cap again.
+  - **Cycle 13 fix** ran 09:46–12:19 and ended at `314eedb`. It fixed the hang, R-I, UNDECIDED-LANE and R-C (a probe showed R-C changes an answer).
+    - It removed 11 pieces of order-only machinery under S3-R16 item 3.
+    - All 34 mutants are tabled: every branch that stays is killed 2/2, and alarmAtPark is equivalent by reasoning.
+    - Gates per the fixer: `VERIFY: PASS`, Sync 483 tests, simulator 1437/1437.
+    - Verification started at 12:19. Weekly usage was 68 % at 12:37.
+  - **S3-R17** (12:45) answers the fixer's put-back: S3-R16 1(a) conflicts with 1(b) when the visit-first answer needs admission to a live-throttled origin.
+    - The MUST wins, and live origin gates (throttle, breaker, reachability and conditions) join R1's real-world inputs.
+    - The two changed answer assertions are authorised one-to-one.
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
