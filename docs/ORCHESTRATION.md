@@ -87,6 +87,28 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - R-E (the store-work stall) is to be diagnosed as a liveness defect.
     - Every replay branch must be reached by a test, with its mutant shown failing.
   - **Cycle 12 is this run's last** (`maxCycle: 12`). If it still blocks, start a new run from cycle 13 with cycle 12's issues as `findingsFile`. Weekly usage was 63 % at 23:17.
+- **Fix run 3: ENDED, not converged** (12:55 on 30 Oct → about 03:15 on 31 Oct; 12 agents, ~2.55 M subagent tokens; weekly 49 % → 66 %).
+  - Blocking by cycle: c9 4+6, c10 5+3, c11 5+5, c12 6+5 (reqs+correct, with overlap).
+  - **Cycle 12 fix:** 23:3x–02:2x, head `3f10eaa`, under S3-R15.
+    - `2e22cf6` keeps a history of world views. Events carry arrival stamps and follows carry apply stamps. A 429 throttles on arrival with `followedLane`. R-A's commit is deferred.
+    - R-E was the probe's own wait, not a liveness defect. `noDispatchOwedFlag` is killed.
+    - Gates per the fixer: `VERIFY: PASS`, Sync 474, simulator 1428/1428, TSan clean, tools-6.4 0 warnings.
+  - **Cycle 12 verification:** 11 blocking, about 8 distinct. The issues are in `.build-orchestrator/s3f-c12-issues.json` (19 issues); the probes are in `.build-orchestrator/s3f-probes-c12/`.
+    1. The new test `barrierRetriesBehindTheOwedVisitsPlaces` is flaky. It hung in 4 of 6 bundle runs; the cause is a setup race, and the verifiers' runs of `--quick` ended `VERIFY: FAIL`.
+    2. R-I is proven: a place stamp admits with no free slot. N's request goes out under a live 60 s throttle, which breaks R-SYN-5. This is a regression from cycle 12.
+    3. R-H is proven twice: `followedLane` ignores interests that another owed visit moves. The backoff is wrong, or the decision is `.undecided` and leaves the origin unthrottled, so a manifest request goes to an origin that has just returned a 429.
+    4. R-C is not implemented.
+    5. The R-A integrity-failure remainder is open.
+    6. 12 surviving mutants and 0-hit replay branches (G4).
+    7. Inventory rows are uncited or stale.
+    - Non-blocking but unproven: a follow visit now removes a verifying or committing job, freeing its headroom while the store still publishes.
+  - **Orchestrator assessment:** eight cycles (5–12) on one class have not converged. Each fix adds machinery, and the verifiers find new members in it; cycle 12's fix introduced a SPEC MUST break (R-I).
+  - **Scope decision put to the owner (31 Oct ~03:30)**, as promised at 23:30:
+    - (A) narrow the bar to observable correctness, the recommendation;
+    - (B) a design panel for a full freeze: every input queues during a multi-turn follow, which reverses R1 and L4-R7 and reworks cycles 9–12;
+    - (C) keep the strict bar and cycle.
+  - **Nothing is running.** The `wp/s3f` worktree is clean at `3f10eaa`.
+  - **Next run:** `fromCycle: 13`, `findingsFile` `s3f-c12-issues.json`, plus the ruling that follows from the owner's choice.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
