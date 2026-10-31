@@ -316,15 +316,13 @@ extension SyncEngine {
     /// the view was read (L4-R5), or held back (T2). Its pending claim ends afterwards, once its interest, if any, is
     /// in place (L5-R1).
     ///
-    /// Behind the follow barrier the claim's end waits behind the member's join (`EventAfterFollow.endClaim`): it may
-    /// retire a job only the claim kept, which a visit-first engine retired, or kept for the join, after the visits.
+    /// Behind the follow barrier the join waits (`EventAfterFollow.join`) and the claim ends now. A job only the claim
+    /// kept is then retired before the join, and the drain's join creates it again: a transfer stopped and started
+    /// again where a visit-first engine kept it, an order difference with the same answers (the claim's own deferral was
+    /// removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3; recorded in the WP-F draft as a residual risk).
     private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
         defer {
-            if self.defersToFollow {
-                self.deferToFollow(.endClaim(token, member: id))
-            } else {
-                self.endClaim(token, member: id)
-            }
+            self.endClaim(token, member: id)
         }
         guard let entry = self.state.applied.entry(for: id) else {
             return
@@ -353,19 +351,11 @@ extension SyncEngine {
     /// interests of a prefetch handle in one turn, after sorting their transfers, held the engine's actor about 15 ms
     /// (review of close-out cycle 8, C2).
     ///
-    /// Behind the follow barrier the release waits (`EventAfterFollow.release`, S3-R14 item 3): it is a request, so a
-    /// visit-first engine released the group after the visits and the events before it; the group stays registered
-    /// until the drain, where the joins that arrived before the release are made and then removed with it. An
-    /// `ensureAvailable` caller waiting on the group is answered at once.
+    /// Behind the follow barrier the release applies now, as before Stage 3 close-out cycle 11: the group's joins that
+    /// still wait for the drain then join nothing (`replayJoin`'s `stillWants`). Its deferral (S3-R14 item 3) made only the
+    /// order of the release's removals equal to a visit-first engine's, and was removed in cycle 13 under ruling S3-R16
+    /// item 3 (recorded in the WP-F draft as a residual risk).
     func performReleaseGroup(_ token: InterestToken) {
-        if self.defersToFollow, self.state.groups[token] != nil {
-            let continuation = self.state.groups[token]?.continuation
-            self.state.groups[token]?.continuation = nil
-            continuation?.resume(returning: false)
-            self.deferToFollow(.release(token, entry: false))
-            self.notifyObservers()
-            return
-        }
         guard let group = self.state.groups.removeValue(forKey: token) else {
             return
         }
@@ -460,12 +450,6 @@ extension SyncEngine {
         guard !self.isShuttingDown else {
             return
         }
-        if self.defersToFollow {
-            // Behind the follow barrier the turn's claim ends and removals wait as the release's own (S3-R14 item 3).
-            self.deferToFollow(.continueReleases)
-            self.notifyObservers()
-            return
-        }
         self.resumeReleases()
     }
 
@@ -520,15 +504,8 @@ extension SyncEngine {
     /// release of the group drops what is left first. A degraded engine cannot spawn that follow-up, and its start failed
     /// before any job existed, so no claim drop can retire one there: it drops them all in this turn (one table update
     /// each). Internal so a test can give a registered group's claims up in one turn.
-    ///
-    /// Behind the follow barrier the claims' end waits as a claim's end does (`EventAfterFollow.endClaims`).
     func endClaims(of token: InterestToken) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
-            return
-        }
-        if self.defersToFollow {
-            self.deferToFollow(.endClaims(token))
-            self.notifyObservers()
             return
         }
         let claims = group.claimed[group.claimCursor...]
@@ -994,14 +971,7 @@ extension SyncEngine {
         // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
         self.dropBindings()
         self.settleRun(.cancelled)
-        if self.defersToFollow {
-            // A request: its withdrawals wait for the follow and meet the jobs the visits and earlier events leave
-            // (S3-R14 item 3).
-            self.deferToFollow(.purge(request))
-            self.notifyObservers()
-        } else {
-            self.withdrawPurged(request)
-        }
+        self.withdrawPurged(request)
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
@@ -1519,16 +1489,7 @@ extension SyncEngine {
         continuation.resume(returning: .done(.failure(.cancelled)))
         if stopWork {
             self.cancelTask(self.state.entryTasks[token])
-            if self.defersToFollow, self.state.groups[token] != nil {
-                // The caller is answered; the group's removal waits for the follow as a release does (S3-R14 item 3).
-                let waiting = self.state.groups[token]?.continuation
-                self.state.groups[token]?.continuation = nil
-                waiting?.resume(returning: false)
-                self.deferToFollow(.release(token, entry: true))
-                self.notifyObservers()
-            } else {
-                self.releaseEntryGroup(token)
-            }
+            self.releaseEntryGroup(token)
         }
         self.reconcileIdle()
     }
@@ -1937,9 +1898,7 @@ extension SyncEngine {
                 violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
             }
         }
-        // A release turn that waits for the follow (`EventAfterFollow.continueReleases`) is the turn the members wait for.
-        let releaseWaits = self.state.eventsAfterFollow.contains { if case .continueReleases = $0 { return true } else { return false } }
-        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled, !releaseWaits {
+        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
             violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
         }
         // A registered group's token is in `releasing` with claims only after a join's large give-up (L5-R15): that is
@@ -1974,9 +1933,8 @@ extension SyncEngine {
     /// drain is in progress (none, between turns), so none waits for ever; every failure verdict that waits names a
     /// failed job with its event (Stage 3 close-out cycle 9, amendment (c) of S3-R11); the joins registered in
     /// `joinsAfterFollow` are exactly the waiting `.join` events (cycle 10); the carried jobs are gone once the barrier
-    /// is down (cycle 11); every waiting event has its decision instant in the world history, every waiting commit names
-    /// a committing job that owes the follow its visit, and once the barrier is down the history, the visits' and the
-    /// places' decision instants and the marks of publications that owe a visit are gone (cycle 12, S3-R15).
+    /// is down (cycle 11); every waiting event has its decision instant in the world history, and once the barrier is
+    /// down the history and the visits' and the places' decision instants are gone (cycle 12, S3-R15).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -1987,17 +1945,13 @@ extension SyncEngine {
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
         for event in events {
             switch event {
-            case .committed(let commit):
-                if self.state.jobs[commit.transfer]?.epoch == commit.epoch, self.state.jobs[commit.transfer]?.state != .committing {
-                    violations.append("a commit waits for the follow for a job that is not committing")
-                }
             case .attemptFailed(let transfer, let epoch, _):
                 if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
                     verdicts.insert(transfer)
                 }
             case .join(let join):
                 joins[join.token, default: [:]][join.asset] = join.entry.transferID
-            case .spaceFailure, .endClaim, .endClaims, .removal, .release, .continueReleases, .purge, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers:
+            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers:
                 break
             }
         }
@@ -2010,8 +1964,8 @@ extension SyncEngine {
         if !self.followBarrier, !self.state.followCarried.isEmpty {
             violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
         }
-        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty || !self.state.placeStamps.isEmpty || !self.state.publishedOwingVisit.isEmpty {
-            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views, \(self.state.followStamps.count) visits' and \(self.state.placeStamps.count) places' decision instants and \(self.state.publishedOwingVisit.count) publications owing a visit left")
+        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty || !self.state.placeStamps.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views and \(self.state.followStamps.count) visits' and \(self.state.placeStamps.count) places' decision instants left")
         }
         if verdicts != Set(self.state.verdictsAfterFollow.keys) {
             violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")

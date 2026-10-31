@@ -315,24 +315,16 @@ extension SyncEngine {
     /// (L5-R1): a content left the manifest or changed (`followApplied`, `supersede`), became present (the pre-transfer
     /// read retires its job directly), failed or was held back (`EngineFailures`), or committed (`resolveAll`).
     ///
-    /// Behind the follow barrier the removal waits (`EventAfterFollow.removal`, S3-R14 item 3): a withdrawal, a run's end
-    /// or a release of re-attachments is a request, not a real-world ledger input, so a visit-first engine removed the
-    /// interest after the visits, the verdicts and the joins that arrived before it. Removed at once, a job the visits
-    /// then left without an interest was retired before the verdict and the join it followed, and the join's fresh job
-    /// started at once (PROBE-C10-JOIN-RETIRE). The follow's own removals and an answer's (`resolve`) are made at once.
+    /// Behind the follow barrier a removal applies now, except a waiter's withdrawal, which waits behind the verdicts and
+    /// joins that arrived before it (`withdraw`, `EventAfterFollow.removal`; PROBE-C10-JOIN-RETIRE). The deferral of the
+    /// other removals here (a run's end, a release of re-attachments, a group's release; S3-R14 item 3) made only their
+    /// order equal to a visit-first engine's (a transfer kept or stopped and started again) and was removed in Stage 3
+    /// close-out cycle 13 under ruling S3-R16 item 3 (recorded in the WP-F draft as a residual risk).
     func removeInterest(_ token: InterestToken, from transfer: TransferID) {
-        guard self.state.jobs[transfer]?.interests[token] != nil else {
-            return
-        }
-        if self.defersToFollow {
-            self.deferToFollow(.removal(token, transfer))
-            self.notifyObservers()
-            return
-        }
         self.dropInterest(token, from: transfer)
     }
 
-    /// `removeInterest` now, whatever the barrier: an interest answered (`resolve`) has nothing left to wait for.
+    /// `removeInterest`: an interest answered (`resolve`) is dropped here too.
     private func dropInterest(_ token: InterestToken, from transfer: TransferID) {
         guard var job = self.state.jobs[transfer], job.interests[token] != nil else {
             return
@@ -427,7 +419,6 @@ extension SyncEngine {
         self.state.originOwed.remove(transfer)
         self.state.unfollowed.remove(transfer)
         self.state.verdictsAfterFollow[transfer] = nil
-        self.state.publishedOwingVisit.remove(transfer)
         self.state.placeStamps[transfer] = nil
         self.state.systemHeld.remove(transfer)
         self.state.run?.held.remove(transfer)

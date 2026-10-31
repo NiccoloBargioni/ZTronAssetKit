@@ -338,11 +338,14 @@ extension SyncEngine {
     /// `maxRetryAfter` defers to the next run); the job parks `throttled`.
     ///
     /// Behind the follow barrier the 429 throttles the origin when it arrives, with or without a `Retry-After`, as a
-    /// visit-first engine's did (Stage 3 close-out cycle 12, S3-R15 item 2): readers that are no replay (a manifest fetch
-    /// for unknown ids, `ensureAvailable`, a pending run) see it at once (PROBE-C11-MANIFEST-THROTTLE). The backoff
-    /// without a `Retry-After` is the policy of the lane the owed visits leave the job (`followedLane`, the visit's own
-    /// rule without the visit; PROBE-C10-THROTTLE-LANE). The park and its fail-fast answers wait
-    /// (`AttemptVerdict.throttle`, `replayThrottle`): they read the interests the visits leave.
+    /// visit-first engine's did (Stage 3 close-out cycle 12, S3-R15 item 2; R-SYN-5, ruling S3-R16 item 1(b)): readers
+    /// that are no replay (a manifest fetch for unknown ids, `ensureAvailable`, a pending run) see it at once
+    /// (PROBE-C11-MANIFEST-THROTTLE). The backoff without a `Retry-After` is the policy of the lane the owed visits leave
+    /// the job (`followedLane`, the visit's own rule without the visit; PROBE-C10-THROTTLE-LANE), or of the job's own
+    /// lane when no interest of the job keeps an id there: the visits may move an interest of another job onto this
+    /// content (PROBE-C12-UNDECIDED-LANE), and leaving the origin unthrottled until the drain sent requests to it. Which
+    /// lane's backoff applies then is a recorded residual risk (S3-R16 item 2; the WP-F draft, cycle 13). The park and
+    /// its fail-fast answers wait (`AttemptVerdict.throttle`, `replayThrottle`): they read the interests the visits leave.
     private func throttled(_ transfer: TransferID, retryAfter: RetryAfter?, wall: Date) {
         guard let job = self.state.jobs[transfer], let origin = self.state.remote?.originID else {
             return
@@ -352,25 +355,16 @@ extension SyncEngine {
         if self.defersToFollow, self.exitDefers(job) {
             let decided = self.state.throttles[origin]
             let decision: ThrottleDecision
-            if let lane = self.followedLane(job) {
-                let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
-                if let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) {
-                    let until = now.adding(seconds: max(delay, seconds ?? 0))
-                    self.state.throttles[origin] = max(decided ?? .zero, until)
-                    self.state.metrics.retries[.throttled] += 1
-                    self.throttleExtended(from: decided)
-                    decision = .until(until)
-                } else {
-                    decision = .exhausted
-                }
+            let lane = self.followedLane(job) ?? job.lane
+            let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+            if let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) {
+                let until = now.adding(seconds: max(delay, seconds ?? 0))
+                self.state.throttles[origin] = max(decided ?? .zero, until)
+                self.state.metrics.retries[.throttled] += 1
+                self.throttleExtended(from: decided)
+                decision = .until(until)
             } else {
-                // Every id moves: a visit-first engine had cancelled this attempt. Only the origin's own `Retry-After`
-                // within the caps is a fact about the origin (S3-R14); no lane gives a backoff.
-                if let seconds, seconds <= min(self.tuning.retry.maxRetryAfter, self.tuning.interactiveRetry.maxRetryAfter) {
-                    self.state.throttles[origin] = max(decided ?? .zero, now.adding(seconds: seconds))
-                    self.throttleExtended(from: decided)
-                }
-                decision = .undecided
+                decision = .exhausted
             }
             if self.defersFailure(transfer, .throttle(ThrottleFacts(retryAfter: seconds, at: now, decision: decision))) {
                 return

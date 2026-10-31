@@ -107,11 +107,6 @@ struct EngineState {
     /// reads the origin's gates of such a job as they stood then, which a visit-first engine's pump read at that place
     /// (S3-R15 item 3, PROBE-C9-THROTTLE; R2 accepts only the admission's latency). Cleared with `worldHistory`.
     var placeStamps: [TransferID: WorldStamp] = [:]
-    /// The jobs whose publication began while a follow owed the visit of an id they hold that the engine's copy lists at
-    /// another transfer: a visit-first engine had visited them while they downloaded, so the follow visits them while
-    /// they verify or commit, and a commit that arrives before that visit waits for it (`EventAfterFollow.committed`;
-    /// S3-R15 item 3, residual R-A). `removeJob` forgets them.
-    var publishedOwingVisit: Set<TransferID> = []
     /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
     /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
     /// event that asks for it); `removeJob` forgets it.

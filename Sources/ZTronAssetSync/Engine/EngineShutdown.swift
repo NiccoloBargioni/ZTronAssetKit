@@ -120,7 +120,6 @@ extension SyncEngine {
         self.state.worldHistory = []
         self.state.followStamps = [:]
         self.state.placeStamps = [:]
-        self.state.publishedOwingVisit = []
         self.state.verdictsAfterFollow = [:]
         self.state.joinsAfterFollow = [:]
         self.state.followCarried = []

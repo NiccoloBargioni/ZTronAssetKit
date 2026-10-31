@@ -59,17 +59,20 @@ struct OriginGate: Equatable {
 
 extension SyncEngine {
     /// The origin's gates at `now` (`OriginGate`); without a remote source nothing is gated. Under a reading (a visit or
-    /// a replay while the follow barrier holds) the throttle and the breaker are those of its decision instant
-    /// (`throttleRecorded`, `breakerRecorded`; S3-R15 item 1, PROBE-C11-JOIN-THROTTLE-END).
+    /// a replay while the follow barrier holds) the throttle in force and the breaker are those of its decision instant
+    /// (`throttleRecorded`, `breakerRecorded`; S3-R15 item 1, PROBE-C11-JOIN-THROTTLE-END). Whether a recorded throttle
+    /// has ended, which clears it (`endThrottle`), reads the live throttle: only a throttle that has ended by `now`, and so
+    /// by the clock too, is cleared, never one a later 429 extended (R-SYN-5; Stage 3 close-out cycle 13, which removed
+    /// `endThrottle`'s guard for that case).
     func originGate(at now: MonotonicInstant) -> OriginGate {
-        guard self.state.remote != nil else {
+        guard let remote = self.state.remote else {
             return OriginGate(now: now, throttledUntil: nil, throttleEnded: false, breaker: nil)
         }
-        let end = self.throttleRecorded()
+        let live = self.state.throttles[remote.originID]
         return OriginGate(
             now: now,
-            throttledUntil: OriginGate.inForce(end, at: now),
-            throttleEnded: end.map { $0 <= now } ?? false,
+            throttledUntil: OriginGate.inForce(self.throttleRecorded(), at: now),
+            throttleEnded: live.map { $0 <= now } ?? false,
             breaker: self.breakerRecorded()?.admission(of: nil, at: now)
         )
     }
@@ -118,15 +121,12 @@ extension SyncEngine {
     }
 
     /// Clears the origin's ended throttle and re-queues the jobs it parked: the `.throttle` deadline's work, shared by its
-    /// alarm turn and `readmitOpenedOriginGates`. Under a reading the throttle ended at the reading's instant: the reading
-    /// sees it cleared from then on, and the live throttle is cleared only when it has ended by then too, since a later
-    /// 429 may have extended it (`readingClearedThrottle`, S3-R15 item 1).
+    /// alarm turn and `readmitOpenedOriginGates`. Both call it only for a live throttle that has ended by the decision
+    /// instant (`fireDue`'s `until <= now`, `OriginGate.throttleEnded`), so a throttle a later 429 extended is never
+    /// cleared here. Under a reading the reading's view sees it cleared from then on (`readingClearedThrottle`, S3-R15
+    /// item 1).
     func endThrottle(_ origin: String) {
         self.readingClearedThrottle()
-        if let end = self.state.throttles[origin], end > self.decisionNow() {
-            self.unblockOrigin(.throttled)
-            return
-        }
         self.state.throttles[origin] = nil
         if self.state.heap.deadline(for: .throttle(origin)) != nil {
             self.state.heap.remove(.throttle(origin))

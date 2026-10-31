@@ -206,16 +206,19 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
-    // MARK: Admissions on the gates of the place's instant (S3-R15 items 1 and 3)
+    // MARK: Refusals on the gates of the place's instant, admissions on the live gates (S3-R15 item 3, S3-R16 item 3)
 
-    /// The new content a follow's visit queues is admitted on the origin's gates as they stood at the apply, whatever a
-    /// 429 set while the visit was owed: C (1 MB) is the content of zz-a and zz-b, one user waiter each; v3 moves zz-a to
-    /// N (16 bytes, held once started) while the follow owes C's visit. C's attempt gets a 429 with Retry-After 60 s.
-    /// Visited first, the visit created N before the 429 and N started, so A is served from N and the throttle's
-    /// fail-fast answers B only. Admitted on the throttle the 429 set, N parked and A was answered
-    /// `serverUnavailable(60)` too (PROBE-C9-THROTTLE; R2 accepts the admission's latency, not a different answer).
+    /// The new content a follow's visit queues starts only under the live throttle (R-SYN-5): C (1 MB) is the content of
+    /// zz-a and zz-b, one user waiter each; v3 moves zz-a to N (16 bytes, held once started) while the follow owes C's
+    /// visit. C's attempt gets a 429 with Retry-After 60 s. Visited first, the visit created N before the 429 and N
+    /// started, so A is served from N and the throttle's fail-fast answers B only. Behind the barrier the visit comes
+    /// after the 429: N's start would be a request to an origin whose throttle is live, which R-SYN-5 forbids, so N parks
+    /// on the live throttle and A is answered `serverUnavailable` too (PROBE-C9-THROTTLE). Cycle 12 admitted N on the
+    /// apply's view (`placeStamps`) and served A; ruling S3-R16 items 1(b) and 3 make admission read the live gates, and
+    /// A's answer here is the one case in which the visit-first answer cannot be given without that request (recorded
+    /// in the WP-F draft, cycle 13, with the old assertion).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierAdmitsTheFollowsNewContentAsAtTheApply(_ visit: LaneDropVisit) async throws {
         let (s, _) = try await FollowBarrier.setUp(seed: 996_002)
         let engine = s.engine
@@ -247,14 +250,23 @@ extension EngineFollowBarrierTests {
         }
         await engine.readForTests { $0.releaseFollowFollowUps() }
         if visit == .sweepFollowsFirst {
-            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
-                await engine.awaitCondition { !$0.followBarrier }
+            await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+            // The clock has not moved since the 429: the origin is still throttled, and N must not start under it.
+            let atEnd = await engine.readForTests { e in
+                (throttled: e.state.remote.flatMap { e.state.throttles[$0.originID] } != nil, n: e.state.jobs[aMoved.transferID]?.state)
             }
+            let nStarted = await s.harness.source.starts.contains { $0.id == aMoved.transferID }
+            #expect(atEnd.throttled && !nStarted, "no request goes to the throttled origin for N (R-SYN-5): \(atEnd)")
         }
         await s.harness.source.release(aMoved.transferID, with: .progress(received: 0, expected: nil))
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
-        #expect((try? aResult.get())?.byteSize == 16, "A, moved to N, is served from N, not answered with C's throttle (visit-first): \(aResult)")
+        if visit == .followVisitedFirst {
+            #expect((try? aResult.get())?.byteSize == 16, "A, moved to N, is served from N, which started before the 429: \(aResult)")
+        } else if case .failure(.serverUnavailable) = aResult {
+        } else {
+            Issue.record("A, moved to N after the 429, gets the live throttle's answer (R-SYN-5): \(aResult)")
+        }
         if case .failure(.serverUnavailable) = bResult {
         } else {
             Issue.record("B gets the throttle's answer: \(bResult)")
@@ -337,13 +349,15 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
-    /// A request's job that waits for the follow is admitted on the breaker as it stood at the request: X (100 kB, zz-x)
+    /// A request's job that waits for the follow starts only while the breaker admits it (R-SYN-5): X (100 kB, zz-x)
     /// downloads for a user waiter, and one 403 opens the breaker. While the follow owes its visits, U requests zz-u, then
-    /// X's 403 opens the breaker. Visited first, U's job started at the request and U was served. Placed by the drain
-    /// and admitted on the breaker the 403 opened, U's job parked and U was answered `authRejected` (the cycle-11
-    /// residual R-B: the breaker's refusals are in the class, S3-R15 item 4).
+    /// X's 403 opens the breaker. Visited first, U's job started at the request and U was served. Behind the barrier U's
+    /// job is placed by the drain, after the 403: its start would be a request to an origin whose breaker is open, which
+    /// R-SYN-5 forbids, so it parks on the live breaker and U is answered `authRejected`. Cycle 12 admitted it on the
+    /// breaker of U's arrival (`placeStamps`) and served U; ruling S3-R16 items 1(b) and 3 make admission read the live
+    /// gates (recorded in the WP-F draft, cycle 13, with the old assertions).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierAdmitsARequestOnTheBreakerAtItsArrival(_ visit: LaneDropVisit) async throws {
         let tuning = SyncTuning(breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let (s, _) = try await FollowBarrier.setUp(seed: 999_202, tuning: tuning)
@@ -384,11 +398,21 @@ extension EngineFollowBarrierTests {
         }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let uState = await engine.readForTests { $0.state.jobs[u.transferID]?.state }
-        #expect(uState == .downloading, "U's job, requested before the breaker opened, runs (visit-first): \(String(describing: uState))")
+        let uStarted = await s.harness.source.starts.contains { $0.id == u.transferID }
+        if visit == .followVisitedFirst {
+            #expect(uState == .downloading, "U's job, requested before the breaker opened, runs: \(String(describing: uState))")
+        } else {
+            #expect(!uStarted && uState != .downloading, "no request goes to the origin while its breaker is open (R-SYN-5): \(String(describing: uState))")
+        }
         await s.harness.source.release(u.transferID, with: .progress(received: 0, expected: nil))
         let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: uWaiter) }
         let xResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: xWaiter) }
-        #expect((try? uResult.get())?.byteSize == Int64(uBytes.count), "U is served (visit-first): \(uResult)")
+        if visit == .followVisitedFirst {
+            #expect((try? uResult.get())?.byteSize == Int64(uBytes.count), "U is served: \(uResult)")
+        } else if case .failure(.authRejected) = uResult {
+        } else {
+            Issue.record("U, placed after the breaker opened, gets the open breaker's answer (R-SYN-5): \(uResult)")
+        }
         #expect((try? xResult.get()) == nil, "X's 403 fails it: \(xResult)")
         await FollowBarrier.finish(s, sync: sync)
     }
@@ -400,7 +424,9 @@ extension EngineFollowBarrierTests {
     /// H (100 kB) holds the other slot for a user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit.
     /// W's user request (zz-w) then arrives, and C's bytes complete. Visited first, C's visit re-routed A to a new job N
     /// at the apply, queued ahead of W; C's commit freed a slot and N started before W. Re-routed by the commit, A's join
-    /// waited behind W's, so W took the freed slot (PROBE-C11-COMMIT-PLACE).
+    /// waited behind W's, so W took the freed slot (PROBE-C11-COMMIT-PLACE). Which of N and W starts first is a recorded
+    /// order difference since Stage 3 close-out cycle 13 (ruling S3-R16 items 2 to 4, which removed the commit's
+    /// deferral): the test asserts the answers and that both start.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierPlacesACommitsMovedIDAtTheFollowsPlace(_ visit: LaneDropVisit) async throws {
@@ -444,7 +470,7 @@ extension EngineFollowBarrierTests {
             await engine.awaitCondition { $0.state.jobs[w.transferID]?.state == .queued }
         }
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
-        // C's publication's outcome has arrived: its job committed and left, or its commit waits for the follow.
+        // C's publication's outcome has arrived: its job committed and left.
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { e in
                 let c = e.state.jobs[a.transferID]?.state
@@ -466,7 +492,7 @@ extension EngineFollowBarrierTests {
         #expect((try? aResult.get())?.byteSize == 16, "A is served from N: \(aResult)")
         #expect((try? bResult.get())?.byteSize == Int64(xBytes.count), "B is served from X: \(bResult)")
         #expect((try? wResult.get())?.byteSize == Int64(wBytes.count), "W is served: \(wResult)")
-        #expect(nIndex != nil && wIndex != nil && nIndex! < wIndex!, "N, queued by C's visit at the apply, starts before W (visit-first): n=\(String(describing: nIndex)) w=\(String(describing: wIndex))")
+        #expect(nIndex != nil && wIndex != nil, "N, created for A's moved id, and W both start (their order is a recorded residual risk, S3-R16 item 2): n=\(String(describing: nIndex)) w=\(String(describing: wIndex))")
         await FollowBarrier.finish(s, sync: sync)
     }
 
@@ -475,7 +501,9 @@ extension EngineFollowBarrierTests {
     /// third user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit. R (zz-r) is then requested for
     /// user work, and C completes. Visited first, C's visit re-routed A to N before R's request, so N took its queue
     /// place first and took the slot C's commit freed; R waited. Re-routed by the commit, A's join waited behind R's,
-    /// and R took the slot (PROBE-C11R-COMMIT-REROUTE).
+    /// and R took the slot (PROBE-C11R-COMMIT-REROUTE). Which of N and R takes the slot is a recorded order difference
+    /// since Stage 3 close-out cycle 13 (ruling S3-R16 items 2 to 4, which removed the commit's deferral): the test
+    /// asserts that one takes it while the other waits, then the answers.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierGivesACommitsSlotToTheFollowsReroute(_ visit: LaneDropVisit) async throws {
@@ -515,7 +543,7 @@ extension EngineFollowBarrierTests {
         let rWaiter = Task { await engine.awaitAsset(r.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[r.transferID] != nil || FollowBarrier.joinWaits($0, r) }
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
-        // C's publication's outcome has arrived: its job committed and left, or its commit waits for the follow.
+        // C's publication's outcome has arrived: its job committed and left.
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { e in
                 let c = e.state.jobs[a.transferID]?.state
@@ -525,7 +553,7 @@ extension EngineFollowBarrierTests {
         await engine.readForTests { $0.releaseFollowFollowUps() }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let after = await engine.readForTests { e in (n: e.state.jobs[aMoved.transferID]?.state, r: e.state.jobs[r.transferID]?.state) }
-        #expect(after.n == .downloading && after.r == .queued, "N, created by C's visit before R's request, takes the slot C's commit frees (visit-first): \(after)")
+        #expect((after.n == .downloading && after.r == .queued) || (after.r == .downloading && after.n == .queued), "one of N and R takes the slot C's commit frees and the other waits (which one is a recorded residual risk, S3-R16 item 2): \(after)")
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
         #expect((try? bResult.get())?.byteSize == Int64(xBytes.count), "B is served from X: \(bResult)")
         let first = after.n == .downloading ? aMoved.transferID : r.transferID
