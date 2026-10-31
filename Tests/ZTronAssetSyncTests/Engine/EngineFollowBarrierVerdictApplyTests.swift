@@ -21,8 +21,16 @@ extension EngineFollowBarrierTests {
         case noSpace
         /// A timeout of C's second attempt, at the interactive policy's cap of two: every user is answered.
         case retryAtCap
-        /// A timeout of C's first attempt: C backs off and retries, its users still waiting.
+        /// A timeout of C's first attempt: C backs off, its users still waiting, and its retry gets a 404.
         case retry
+        /// An ENOSPC for 200 kB with room for it: C backs off (`decideSpaceFailure`), its users still waiting, and its
+        /// retry gets a 404.
+        case spaceRetry
+
+        /// Whether the attempt ends in an ENOSPC, whose free-space read runs a space sweep.
+        var isSpace: Bool {
+            self == .noSpace || self == .spaceRetry
+        }
     }
 
     /// Whether `event` is an ENOSPC's waiting verdict.
@@ -63,7 +71,9 @@ extension EngineFollowBarrierTests {
         case .retryAtCap:
             await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .hold, .fail(timeout)])
         case .retry:
-            await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .stage(cBytes)])
+            await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .fail(.permanentMissing(httpStatus: 404))])
+        case .spaceRetry:
+            await s.harness.source.script(a.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
         }
         await s.harness.source.script(bMoved.transferID, [.stage(nBytes)])
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
@@ -82,14 +92,17 @@ extension EngineFollowBarrierTests {
         let fillers = FollowBarrier.fillers(seed + 200)
         let later = Self.laterFillers(seed + 6_000)
         try await Self.applyHeld([s.q] + fillers + [a, b] + later, tag: "v3-verdict-\(seed)", s, visit: visit)
-        if ending == .noSpace {
+        if ending.isSpace {
             if visit == .sweepFollowsFirst {
                 // The ENOSPC's free-space read runs one follow turn (`advanceFollowForSpaceSweep`); the space sweep's own
                 // follow-up turns, which would run the rest of the follow and its drain before v4, are held.
                 await engine.readForTests { $0.holdSpaceSweepFollowUps() }
             }
-            try await Self.leaveRoom(500_000, harness: s.harness, fileSystem: s.fileSystem)
-            await s.harness.source.release(a.transferID, with: .failed(.insufficientSpace(requiredBytes: 20_000_000)))
+            if ending == .noSpace {
+                try await Self.leaveRoom(500_000, harness: s.harness, fileSystem: s.fileSystem)
+            }
+            let required: Int64 = ending == .noSpace ? 20_000_000 : 200_000
+            await s.harness.source.release(a.transferID, with: .failed(.insufficientSpace(requiredBytes: required)))
         } else {
             await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         }
@@ -172,12 +185,23 @@ extension EngineFollowBarrierTests {
     /// A retry that arrived before a later apply leaves the job alive, and the ids that apply moved move from it once the
     /// verdict is given, as a visit-first engine's visit at that apply moved them from the job backing off
     /// (`verdictBeforeApply`, `.retry`; `followAfterVerdict`): behind the barrier v4's owed visit passed C to its waiting
-    /// verdict, and the drain moved B onto N after it. C's retry served A, and N served B.
+    /// verdict, and the drain moved B onto N after it. N served B, and C's retry got a 404, which answered A alone; left on
+    /// C, B would have ridden that retry and been answered its 404.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierMovesALaterApplysIdFromAJobItsWaitingRetryLeft(_ visit: LaneDropVisit) async throws {
         let (aResult, bResult) = try await self.verdictBeforeApply(visit, seed: 1_616_202, ending: .retry)
-        #expect((try? aResult.get())?.byteSize == 100_000, "A is served C's content by its retry (visit-first): \(aResult)")
+        #expect(aResult == .failure(.notFound), "A gets the 404 of C's retry (visit-first): \(aResult)")
+        #expect((try? bResult.get())?.byteSize == 16, "B is served N: v4's visit moved it from C backing off (visit-first): \(bResult)")
+    }
+
+    /// As above, with an ENOSPC the volume has room for (`verdictBeforeApply`, `.spaceRetry`): its verdict waits as
+    /// `.spaceFailure` and backs C off when the drain gives it (`decideSpaceFailure`), and the drain then moves B onto N.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierMovesALaterApplysIdFromAJobItsWaitingSpaceRetryLeft(_ visit: LaneDropVisit) async throws {
+        let (aResult, bResult) = try await self.verdictBeforeApply(visit, seed: 1_616_902, ending: .spaceRetry)
+        #expect(aResult == .failure(.notFound), "A gets the 404 of C's retry (visit-first): \(aResult)")
         #expect((try? bResult.get())?.byteSize == 16, "B is served N: v4's visit moved it from C backing off (visit-first): \(bResult)")
     }
 
@@ -185,8 +209,9 @@ extension EngineFollowBarrierTests {
     /// superseded by that visit, as a visit-first engine's visit at the apply superseded it while it downloaded (the
     /// visit re-routes them all, `Job.rerouteOnPass` from `recordDeferredVerdict`): C (100 kB, zz-a and zz-b, a user
     /// waiter each) downloads; v3 moves both ids to N (16 bytes) while, behind the barrier, its follow owes C's visit, and
-    /// C's first attempt times out first (a retry, which waits). Both users are served N, and C's content is never asked
-    /// for again: no retry runs for a job nobody holds.
+    /// C's attempt first ends in a cancel the engine did not ask for (`.cancelled(.byClient)`: a fresh attempt at once,
+    /// `AttemptVerdict.requeue`, which waits). Both users are served N, and C's content is never asked for again: no
+    /// attempt runs for a job nobody holds.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierSupersedesAFailedJobEveryIdOfWhichMovedBeforeItsFailure(_ visit: LaneDropVisit) async throws {
@@ -205,7 +230,7 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
         await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
-        await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .stage(cBytes)])
+        await s.harness.source.script(a.transferID, [.hold, .fail(.cancelled(.byClient)), .stage(cBytes)])
         await s.harness.source.script(aMoved.transferID, [.stage(nBytes)])
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
@@ -214,7 +239,7 @@ extension EngineFollowBarrierTests {
         let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
         try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [aMoved, bMoved] + Self.laterFillers(seed + 6_000), tag: "v3-supersede-\(seed)", s, visit: visit)
-        // C's first attempt times out: behind the barrier, before C's owed visit.
+        // C's attempt ends in a cancel the engine did not ask for: behind the barrier, before C's owed visit.
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         if visit == .sweepFollowsFirst {
             await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
@@ -227,12 +252,12 @@ extension EngineFollowBarrierTests {
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
         #expect((try? aResult.get())?.byteSize == 16, "A is served N (visit-first): \(aResult)")
         #expect((try? bResult.get())?.byteSize == 16, "B is served N (visit-first): \(bResult)")
-        // A retry of C, had it run for nobody, starts C's content again once its backoff is due.
+        // A fresh attempt of C, had it run for nobody, starts C's content again.
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { !$0.followBarrier && $0.state.jobs[a.transferID] == nil }
         }
         let starts = await s.harness.source.starts.filter { $0.id == a.transferID }.count
-        #expect(starts == 1, "C's content is asked for once: C was superseded, not retried (visit-first): \(starts)")
+        #expect(starts == 1, "C's content is asked for once: C was superseded, not re-queued (visit-first): \(starts)")
         await Self.finishHeld(s)
     }
 }
