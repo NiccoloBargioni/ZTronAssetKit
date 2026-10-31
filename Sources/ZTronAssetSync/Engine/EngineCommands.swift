@@ -1951,7 +1951,7 @@ extension SyncEngine {
                 }
             case .join(let join):
                 joins[join.token, default: [:]][join.asset] = join.entry.transferID
-            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers:
+            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
                 break
             }
         }

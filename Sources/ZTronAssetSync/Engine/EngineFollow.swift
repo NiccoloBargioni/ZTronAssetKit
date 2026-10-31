@@ -311,6 +311,8 @@ extension SyncEngine {
             self.retryDue(transfer, epoch: epoch)
         case .throttleAnswers:
             self.answerThrottledUsersNow()
+        case .spaceSweep(let sweep):
+            self.judgeSpaceSweep(sweep)
         }
     }
 
@@ -786,12 +788,15 @@ enum EventAfterFollow: Sendable {
     case retryDue(TransferID, epoch: UInt64)
     /// A throttle's fail-fast turn for the users of the jobs it parked (`answerThrottledUsers`).
     case throttleAnswers
+    /// A space sweep's verdicts (`judgeSpaceSweep`) at the sweep's arrival place (`sweepSpaceParked`; the cycle-12
+    /// residual R-C, Stage 3 close-out cycle 13).
+    case spaceSweep(SpaceSweep)
 
     /// Whether the event is itself a bounded pass (a re-admission, a conditions element's pass, a throttle's fail-fast
-    /// turn): the drain's batch ends after it (`drainEventsAfterFollow`, C2).
+    /// turn, a space sweep): the drain's batch ends after it (`drainEventsAfterFollow`, C2).
     var endsDrainBatch: Bool {
         switch self {
-        case .conditions, .readmit, .unblock, .throttleAnswers:
+        case .conditions, .readmit, .unblock, .throttleAnswers, .spaceSweep:
             return true
         case .spaceFailure, .attemptFailed, .join, .removal, .retryDue:
             return false

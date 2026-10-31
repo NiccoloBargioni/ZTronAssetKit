@@ -747,12 +747,28 @@ extension SyncEngine {
     /// turn of the events that waited for it (`advanceFollowForSpaceSweep`, bounded as every such turn, C2), and owes
     /// itself to a follow-up sweep, which judges once the barrier is down, every job as the whole follow left it. A turn
     /// that follows judges nothing, and a turn that judges follows nothing (VERIFY-C8-C2-MIXED).
-    func sweepSpaceParked(_ sweep: SpaceSweep) {
+    ///
+    /// A sweep that arrives behind the barrier also waits as an event at its arrival place (`.spaceSweep`, judged by
+    /// `judgeSpaceSweep` in the drain on the followed state): a visit-first engine judged it before the requests that
+    /// arrived after it, and a request replayed before the follow-up sweep's judgement took the room the sweep gave a
+    /// parked job, a different answer (the cycle-12 residual R-C, ruling S3-R16 item 1(a); Stage 3 close-out cycle 13).
+    /// Its own follow-up turns (`arriving: false`) only keep the follow moving and judge once the barrier is down, which
+    /// leaves a job the drain re-queued alone (they judge parked jobs only).
+    func sweepSpaceParked(_ sweep: SpaceSweep, arriving: Bool = true) {
         if self.followBarrier {
+            if arriving, !self.state.drainingAfterFollow {
+                self.deferToFollow(.spaceSweep(sweep))
+            }
             self.advanceFollowForSpaceSweep()
             self.scheduleSpaceSweepFollowUp(sweep)
             return
         }
+        self.judgeSpaceSweep(sweep)
+    }
+
+    /// The verdicts of `sweep` on the jobs parked for lack of space now (`sweepSpaceParked`); reached when no barrier
+    /// holds, or from the drain's replay of a sweep that arrived behind it (`EventAfterFollow.spaceSweep`).
+    func judgeSpaceSweep(_ sweep: SpaceSweep) {
         let ahead = self.spaceAdmittedAhead()
         var (candidates, smallest) = self.spaceSweepCandidates(sweep)
         // A read re-checks only jobs parked `insufficientSpace`, and leaves untouched each it does not admit: once the
@@ -784,7 +800,7 @@ extension SyncEngine {
     }
 
     /// Judges `candidates`, in the pump's order, against `room` (a read's) or the ledger (`sweepSpaceParked`), counting
-    /// the bytes of the jobs re-admitted ahead of each. Reached only when no follow is owed.
+    /// the bytes of the jobs re-admitted ahead of each. Reached only when no follow is owed (`judgeSpaceSweep`).
     private func judgeSpaceParked(_ candidates: [SweepCandidate], sweep: SpaceSweep, room: Int64?, smallest: Int64, ahead: Int64) {
         var ahead = ahead
         var requeues = 0
@@ -960,7 +976,7 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
-        self.sweepSpaceParked(sweep)
+        self.sweepSpaceParked(sweep, arriving: false)
         self.checkRunSettled()
     }
 
