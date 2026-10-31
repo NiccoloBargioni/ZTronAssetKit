@@ -173,6 +173,9 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - It runs only while the app is open; otherwise it runs at the next launch. It starts in the default permission mode unless the owner sets one on the task.
       - Its pre-flight launches nothing if weekly usage is above 10 %. It also checks that no earlier workflow is still writing.
       - It then finishes WP-F if needed and works through the list above.
+      - **Keep-awake (owner, 23:37: "Yes, keep it awake"):** `caffeinate -ims` runs from 31 Oct 23:37 to Thu 5 Nov 05:00, so the task fires on time.
+        - It is a background task of session `eaf5a17f`, so it ends if that session or the app stops.
+        - Lid closed or battery power can still let the Mac sleep.
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
