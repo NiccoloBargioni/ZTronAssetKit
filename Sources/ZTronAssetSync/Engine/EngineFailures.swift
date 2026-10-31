@@ -682,13 +682,16 @@ extension SyncEngine {
         let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) })
         var withdrawn: Set<InterestToken> = []
         var verdicts: [TransferID: WaitingVerdict] = [:]
+        // By content, the last one waiting: an earlier job's verdict, which the drain skips, waits before the current
+        // job's own, and a current job with none waiting has no deferral on it (`movesAfterVerdict` is false), so an
+        // earlier job's verdict moves nothing here (cycle 16: an epoch filter changed only the walk's cost).
         for event in self.state.eventsAfterFollow {
             switch event {
             case .removal(let token, _):
                 withdrawn.insert(token)
-            case .attemptFailed(let transfer, let epoch, let verdict) where self.state.jobs[transfer]?.epoch == epoch:
+            case .attemptFailed(let transfer, _, let verdict):
                 verdicts[transfer] = .attempt(verdict)
-            case .spaceFailure(let transfer, let epoch, _) where self.state.jobs[transfer]?.epoch == epoch:
+            case .spaceFailure(let transfer, _, _):
                 verdicts[transfer] = .space
             default:
                 break
