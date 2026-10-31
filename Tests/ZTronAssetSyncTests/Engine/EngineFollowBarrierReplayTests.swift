@@ -319,4 +319,51 @@ extension EngineFollowBarrierTests {
         await engine.releaseGroup(group)
         await FollowBarrier.finish(s, sync: sync)
     }
+
+    // MARK: A join whose owner is gone (`replayJoin`'s `stillWants`)
+
+    /// A run's join that waits for the follow is not made once the run ended: v3 adds E (zz-e), a fetch of the run that
+    /// applies it, which joins E while the follow it started is owed. A purge then ends the run (`cancelled`). Visited
+    /// first, the run's join created E's job and the run's end retired it again; a drain that made the waiting join gave E a
+    /// job no run wants, which started.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierDropsTheJoinOfAnEndedRun(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 992_702)
+        let engine = s.engine
+        let eBytes = EngineFixture.bytes(992_710, count: 16)
+        let e = EngineFixture.entry("zz-e", eBytes)
+        let hBytes = EngineFixture.bytes(992_711, count: 16)
+        let h = EngineHarness.onDemand("zz-h", hBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(769_000) + [h], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(e.transferID, [.hold, .stage(eBytes)])
+        // H, a user transfer held in flight, keeps the conditions watcher running: the run's lanes need its reading.
+        await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        let hWaiter = Task { await engine.awaitAsset(h.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[h.transferID]?.state == .downloading }
+        }
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(869_000) + [h, e], s, visit: visit)
+        await engine.awaitCondition { $0.state.jobs[e.transferID] != nil || FollowBarrier.joinWaits($0, e) }
+        if visit == .sweepFollowsFirst {
+            let waits = await engine.readForTests { e2 in e2.followOwed && FollowBarrier.joinWaits(e2, e) }
+            #expect(waits, "setup: the run's join of E waits for the owed follow")
+        }
+        let purge = Task { await engine.purge(.scope(.identifiers(["nothing-here"]))) }
+        let outcome = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: sync) }
+        #expect(outcome == .failed(.cancelled), "the purge ended the run: \(outcome)")
+        _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: purge) }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled && $0.state.run == nil }
+        let left = await engine.readForTests { e2 in e2.state.jobs[e.transferID].map { ($0.state, $0.interests.count) } }
+        #expect(left == nil, "no job is left for the ended run's fetch (visit-first): \(String(describing: left))")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
+        await s.harness.source.release(h.transferID, with: .progress(received: 0, expected: nil))
+        _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: hWaiter) }
+        await engine.shutdown()
+    }
 }
