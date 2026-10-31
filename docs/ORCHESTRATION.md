@@ -147,6 +147,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Lesson: never `SendMessage` a workflow agent.** It starts a duplicate that writes in the same worktree. To change a running fixer's brief, stop the run and relaunch from the same cycle with the ruling in the rulings file.
 - **Fix run 5** (args in `.build-orchestrator/s3-fix-args-run5.json`): `s3f` from cycle 15 to 18, findings `s3f-c14-issues.json`, simulator set 1, no usage stop, Opus. **RUNNING** `wf_7c1faaa8-af9` (task `w0kg1yplq`), launched 31 Oct 16:43 at weekly 72 %.
   - **Resume:** in this session, use `resumeFromRunId` with the same args. From a fresh session, read `subagents/workflows/wf_7c1faaa8-af9/journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`. Run 4 (`wf_94baddee-151`) is finished: do not resume it.
+  - **Cycle 15 fix** ran 16:43–18:28 and ended at `e64cdba` (`b461450`, `0f32845`, `9673e2f`, `e64cdba`).
+    - **S3-R18 is done:** the place stamps are removed, a passed publication re-routes its moved ids at once (`rerouteOnPass`, two applies included), and `followedLane` is non-optional.
+    - **Gates per the fixer:** `VERIFY: PASS`; Sync 511 tests ×3, TSan clean; simulator 1465/1465; Sync coverage 93.84 %. The benchmark failure is P-13 (WP-B).
+    - **Mutants:** two survive (`laneJobsWalkAlways`, `spaceFailureEpochDropped`).
+    - **Put back:** a verdict that waits across a later apply; the publication failure's await window; a drain-turn seam.
+  - **Cycle 15 verification** started 18:29. Weekly usage was 74 % at 18:35.
+  - **S3-R19** (18:45) rules on cycle 15's put-backs:
+    - the two analysed items are probed first and are blocking only if item 1 breaks (smallest fix);
+    - a cost-only mutant is equivalent;
+    - the defensive check is removed, turned into an invariant, or recorded as pre-existing and out of class.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
   - **Owner, 31 Oct ~10:05: "Keep Opus".** The owner was offered a Fable fixer and kept every close-out agent on Opus (no `models` arg). To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
