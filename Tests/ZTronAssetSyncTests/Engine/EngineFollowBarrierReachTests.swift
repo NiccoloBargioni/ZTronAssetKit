@@ -166,6 +166,53 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 
+    // MARK: A publication's integrity failure (the cycle-12 R-A remainder; S3-R16 item 5, "probe first")
+
+    /// A publication's integrity failure of a job that holds an id the owed visits move answers that id's user with the
+    /// content the copy maps it to, as a visit-first engine's did: C (zz-a and zz-b) downloads for user waiters A and B;
+    /// v3 moves zz-a to N (16 bytes) while the follow owes C's visit; then C's bytes fail their checksum. Visited first,
+    /// the visit moved A onto N before C's bytes arrived: A was served N and B answered `integrityFailure`. Behind the
+    /// barrier the failure's answers wait for the visit (`resolveAll`'s `.resolve` verdict, `defersFailure`), which moves
+    /// A onto N first, so the answers are the same; nothing else of the publication waits (cycle 13 removed the commit
+    /// deferral, which only ordered the answers).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierAnswersAnIntegrityFailureAfterTheVisit(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 1_310_002)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(1_310_003, count: 100_000)
+        let wrong = EngineFixture.bytes(1_310_004, count: 100_000)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        try #require(a.transferID == b.transferID, "setup: A and B share C")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(1_310_100) + [a, b], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(a.transferID, [.hold, .stage(wrong)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.interests.count == 2 && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let nBytes = EngineFixture.bytes(1_310_005, count: 16)
+        let aMoved = EngineHarness.onDemand("zz-a", nBytes)
+        await s.harness.source.script(aMoved.transferID, [.stage(nBytes)])
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(1_310_200) + [aMoved, b], tag: "v3-integrity", s, visit: visit)
+        await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
+        if visit == .sweepFollowsFirst {
+            // C's failure answers wait for its visit (`defersFailure`).
+            await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect((try? aResult.get())?.byteSize == 16, "A is served N, the content v3 maps zz-a to (visit-first): \(aResult)")
+        #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure (visit-first): \(bResult)")
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
+    }
+
     // MARK: A join answered on the breaker of its arrival (`breakerRecorded`)
 
     /// A request for a job the breaker parked, made while the follow owes its visits and a half-open breaker's probe
