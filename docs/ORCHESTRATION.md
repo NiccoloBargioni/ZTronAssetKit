@@ -162,7 +162,23 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - a re-route answer difference new in `0f32845` (S3-R18a);
     - `laneJobsWalkAlways` is not cost-only and `spaceFailureEpochDropped` is reachable (G4);
     - a test race from `0f32845`, which fails the Sync bundle under TSan (flaky).
-  - **Cycle 16 fix** started 19:50. At 22:05 it had 11 commits (`39e18d2` to `d3242d3`) and was running its TSan gate. Weekly usage was 79 % at 22:05.
+  - **Cycle 16 fix** ran 19:50–22:35 and ended at `aa2b444`, after 12 commits from `39e18d2`.
+    - The fixer reported `--quick` PASS, Sync 528 tests x3, TSan 528 passed, Sync coverage 93.99 % and the simulator at 1,482/1,482.
+    - It declined 5 items, all covered by S3-R19: P-13 is WP-B's; RR-2, RR-4 and RR-10 are unprobed; there is no 10,000-job `followedLane` benchmark; `laneJobsWalkAlways` is cost-only; it made no `--full` run.
+  - **Cycle 16 verification** ran 22:35–23:48. The reqs lens found 5 issues (2 blocking) and the correct lens 9 (4 blocking), about 5 distinct, all probed:
+    - a setup race in cycle 16's new test `barrierRetriesAFailedPublicationWithNothingOfItsEnd` (WindowTests:211, 23 of 120 copies). The verifier's fix is probe-checked: gate the first conditions reading.
+    - RR-11 is an answer difference, not only a lane-policy one. `verdictAnswers` misses `retryLater`'s answer when the Retry-After exceeds the lane's maxRetryAfter; both lenses found this, and it breaks R-SYN-5. It also counts no answer for a waiting 429's park fail-fast. The offline and ENOSPC fail-fasts are the same, unprobed.
+    - The re-route set of a waiting verdict misses an id that a later apply maps back to the job's own content.
+    - Older than cycle 16: two applies inside one owed follow skip the intermediate content (a different error, and different bytes; 2 of 2 runs). The verifier offered to have it ruled out of scope as a residual risk. It was not ruled out: S3-R16 item 1(a) makes an answer difference blocking.
+    - Non-blocking:
+      - no "Cycle 16 adds:" document proposal;
+      - two surviving condition mutants, equivalent by analysis;
+      - P-13 (WP-B);
+      - P-11 misses that depend on load;
+      - two other-WP tests that failed only while the verifiers' simulator runs overlapped (load up to 782), and passed alone.
+  - **Cycle 17 fix** started 23:48 automatically. Weekly usage was 83 % at 23:50. Forecast: cycle 17's verdict about 03:50 (about 87 %) and cycle 18's about 07:50 (about 91 %). Cycles 19 and 20 in run 6 would end at about 95 % and 99 %, and the limit stops cycle 21.
+  - **Signal for the owner:** 4 of cycle 16's 5 items come from cycle 16's own additions (3 in new code, 1 a new test), and 1 is an older structural gap. As promised on 31 Oct at 22:12, if cycle 17's verifiers again find new cases in the same logic, put the full-freeze alternative back in front of the owner. That is option (B) of 31 Oct 02:22: about 2 h of design panel plus 2–3 cycles, 12–16 weekly points. Unused weekly budget does not carry over, so cycles run this week cost next week nothing.
+  - **For run 6's args:** both verifiers ran simulator suites at the same time as timing-sensitive macOS runs, and the load reached 782. That caused two other-WP flakes and a coverage re-run. Add to the focus: take a lock (`mkdir .build-orchestrator/sim.lock`, removed afterwards) around each simulator or coverage run.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
   - **Owner, 31 Oct 23:25: "when we do not need any more cycle, we stop. We'll continue next reset."**
     - Keep running WP-F cycles until a verification has 0 blocking items. If cycle 18 still blocks, rule and start run 6 from cycle 19.
