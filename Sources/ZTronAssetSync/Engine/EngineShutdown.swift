@@ -119,7 +119,6 @@ extension SyncEngine {
         self.state.reading = nil
         self.state.worldHistory = []
         self.state.followStamps = [:]
-        self.state.placeStamps = [:]
         self.state.verdictsAfterFollow = [:]
         self.state.joinsAfterFollow = [:]
         self.state.followCarried = []

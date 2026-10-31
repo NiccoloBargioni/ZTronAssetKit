@@ -5,11 +5,12 @@ import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// The follow barrier's answers after Stage 3 close-out cycle 13 (the cycle-13 verifiers' probes, rulings S3-R16 and
-/// S3-R17): a place's stamp never strands a job, a purge withdraws the joins that wait for the follow, a stamp refuses a
-/// place only where a visit-first pump would have tried it, a 429 is decided on the lane a visit-first engine's job had,
-/// and a failure of a job the follow passed while it published answers its moved ids as a visit-first engine did. Each
-/// test runs in both orders (`LaneDropVisit`), with the visit-first outcome expected in both.
+/// The follow barrier's answers after Stage 3 close-out cycle 13 (the cycle-13 verifiers' probes, rulings S3-R16 to
+/// S3-R18): a place behind a breaker never strands a job, a purge withdraws the joins that wait for the follow, a place
+/// is gated on the live throttle, a 429 is decided on the lane a visit-first engine's job had, and a failure of a job the
+/// follow passed while it published answers its moved ids as a visit-first engine did. Each test runs in both orders
+/// (`LaneDropVisit`), with the visit-first outcome expected in both except where a live origin gate changed during the
+/// barrier (S3-R17 item 2, S3-R18 item 1).
 extension EngineFollowBarrierTests {
     /// The 2,100 changed on-demand entries that sort after the scenario's `zz-` ids: with `FollowBarrier.fillers` before
     /// them, the follow's second turn finds the scenario's job and formats `followFormatsPerTurn` in all, so the follow
@@ -301,7 +302,7 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 
-    // MARK: A stamp refuses only where a visit-first pump tried the place (PROBE-C13-STAMP-NO-SLOT, S3-R16 1(a))
+    // MARK: A place is gated on the live throttle (PROBE-C13-STAMP-NO-SLOT, S3-R16 1(a); S3-R18 item 1)
 
     /// A request that waits for the follow while no slot is free is gated on the live throttle when the slot frees, as
     /// a visit-first engine's pump gated it: one slot; C (1 MB, held) downloads for user waiter A. While the follow is
@@ -309,7 +310,8 @@ extension EngineFollowBarrierTests {
     /// then a user asks for zz-k (16 bytes, listed). Visited first, K waited in the queue behind C's slot (the pump gates
     /// nothing while no slot is free); the throttle ended, C completed, and the pump started K: K's caller was served.
     /// Refused on its place's stamp (the throttle of the join's arrival) although no slot was free then, K's caller was
-    /// answered `serverUnavailable` and K never started (the cycle-13 correctness verifier).
+    /// answered `serverUnavailable` and K never started (the cycle-13 correctness verifier); the stamps are gone since
+    /// Stage 3 close-out cycle 15 (ruling S3-R18 item 1).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierGatesAPlaceWithoutASlotOnTheLiveThrottle(_ visit: LaneDropVisit) async throws {
@@ -359,16 +361,18 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
-    /// A user request that waits for the follow while a reserved interactive slot is free is refused on the throttle at
-    /// its arrival, as a visit-first engine's pump refused it there: two slots, one reserved for user work; C (1 MB,
-    /// held) downloads for a prefetch group and takes the only slot other work may use. While the follow is owed, an
-    /// unknown id's manifest fetch gets a 429 with Retry-After 3 s; then a user asks for zz-k (16 bytes, listed). Visited
-    /// first, the pump tried K at once in the reserved slot, the throttle refused it, and K's caller was answered
-    /// `serverUnavailable`. A place's stamp records the slots of the lane it was given for (`FreeSlots.admit`): read as a
-    /// prefetch or bulk place, K's had no slot, the barrier-end pump admitted it on the live gates after the throttle's
-    /// end, and K's caller was served.
+    /// A user request that waits for the follow while a reserved interactive slot is free is gated on the live throttle:
+    /// two slots, one reserved for user work; C (1 MB, held) downloads for a prefetch group and takes the only slot other
+    /// work may use. While the follow is owed, an unknown id's manifest fetch gets a 429 with Retry-After 3 s; then a user
+    /// asks for zz-k (16 bytes, listed). Visited first, the pump tried K at once in the reserved slot, the throttle refused
+    /// it, and K's caller was answered `serverUnavailable`. Behind the barrier K's join waits; the throttle ends before
+    /// the barrier does, and the barrier-end pump admits K on the live gates: K's caller is served, the answer a live
+    /// origin gate that changed during the barrier gives (ruling S3-R18 item 1, S3-R17 item 2; recorded as a residual
+    /// risk). Cycle 14 refused K on its place's stamp, the throttle at its arrival (`FreeSlots`, mutant `slotLaneBlind`);
+    /// the stamps are gone since Stage 3 close-out cycle 15 (PROBE-C14C-STAMP-AHEAD). No request goes to the throttled
+    /// origin in either order (R-SYN-5).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a user request during an owed follow with a reserved slot free is refused on the throttle at its arrival (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierRefusesAUserPlaceInAReservedSlotOnItsThrottle(_ visit: LaneDropVisit) async throws {
         let (s, _) = try await FollowBarrier.setUp(seed: 1_316_702, tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 1))
         let engine = s.engine
@@ -407,9 +411,15 @@ extension EngineFollowBarrierTests {
         }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let kResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: kWaiter) }
-        if case .failure(.serverUnavailable) = kResult {
+        if visit == .followVisitedFirst {
+            if case .failure(.serverUnavailable) = kResult {
+            } else {
+                Issue.record("K's caller is answered serverUnavailable: the pump tried K in the reserved slot under the throttle (visit-first): \(kResult)")
+            }
         } else {
-            Issue.record("K's caller is answered serverUnavailable: the pump tried K in the reserved slot under the throttle (visit-first): \(kResult)")
+            // S3-R18 item 1 (an exception like S3-R17 item 3): K's place is admitted on the live gates, and the throttle
+            // ended during the barrier.
+            #expect((try? kResult.get())?.byteSize == 16, "K's caller is served, K admitted once the live throttle had ended: \(kResult)")
         }
         await s.harness.source.release(c.transferID, with: .progress(received: 0, expected: nil))
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
@@ -580,7 +590,7 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
-    // MARK: A failure of a job the follow passed while it published (S3-R16 1(a) and 1(e); `followedForVerdict`)
+    // MARK: A failure of a job the follow passed while it published (S3-R16 1(a), S3-R18 item 2)
 
     /// The shared scenario of the three tests below: C (100 kB, the content of zz-a and zz-b, a user waiter each)
     /// publishes bytes that fail their checksum; v3 moves zz-b to N (16 bytes). The fillers before and after the `zz-`
@@ -629,9 +639,15 @@ extension EngineFollowBarrierTests {
         if visit == .sweepFollowsFirst, !failBeforeVisit {
             await Self.runOneFollowTurn(engine)
             let passed = await engine.readForTests { e in
-                (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, passed: e.state.unfollowed.contains(a.transferID) && !e.state.followOrder[e.state.followNext...].contains(a.transferID))
+                (
+                    owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, visited: !e.state.followOrder[e.state.followNext...].contains(a.transferID),
+                    holdsB: e.state.jobs[a.transferID]?.assets.contains(b.identifier) == true, unfollowed: e.state.unfollowed.contains(a.transferID)
+                )
             }
-            #expect(passed.owed && passed.c == .verifying && passed.passed, "setup: the follow's second turn passed C while it verified and stays owed: \(passed)")
+            // Begun after the apply, C's publication had its moved id re-routed by the visit (S3-R18 item 2); begun before
+            // it, C was passed with zz-b (cycle 14's `passed`: in `unfollowed`, visited).
+            let rerouted = publishingAtApply ? passed.holdsB && passed.unfollowed : !passed.holdsB && !passed.unfollowed
+            #expect(passed.owed && passed.c == .verifying && passed.visited && rerouted, "setup: the follow's second turn visited C while it verified and stays owed: \(passed)")
             if !failBehindBarrier {
                 await engine.readForTests { $0.releaseFollowFollowUps() }
                 await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
@@ -745,9 +761,13 @@ extension EngineFollowBarrierTests {
         if visit == .sweepFollowsFirst {
             await Self.runOneFollowTurn(engine)
             let passed = await engine.readForTests { e in
-                (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, passed: e.state.unfollowed.contains(a.transferID) && !e.state.followOrder[e.state.followNext...].contains(a.transferID))
+                (
+                    owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, visited: !e.state.followOrder[e.state.followNext...].contains(a.transferID),
+                    holdsB: e.state.jobs[a.transferID]?.assets.contains(b.identifier) == true, unfollowed: e.state.unfollowed.contains(a.transferID)
+                )
             }
-            #expect(passed.owed && passed.c == .verifying && passed.passed, "setup: the follow's second turn passed C while it verified and stays owed: \(passed)")
+            // C's publication began after the apply: the visit re-routed its moved id at once (S3-R18 item 2).
+            #expect(passed.owed && passed.c == .verifying && passed.visited && !passed.holdsB && !passed.unfollowed, "setup: the follow's second turn visited C while it verified and stays owed: \(passed)")
             await engine.readForTests { $0.releaseFollowFollowUps() }
             await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         }
@@ -765,8 +785,10 @@ extension EngineFollowBarrierTests {
         // C's retry publishes; v4 moves zz-c while that publication, begun before v4's apply, verifies.
         releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
         try await Self.applyHeld([s.q] + fillers + [a, bMoved, cMoved] + later, tag: "v4-retry-\(seed)", s, visit: .followVisitedFirst)
-        let passedAgain = await engine.readForTests { e in (c: e.state.jobs[a.transferID]?.state, mark: e.state.jobs[a.transferID]?.passedPublishing) }
-        #expect(passedAgain.c == .verifying && passedAgain.mark == .publishingAtApply, "setup: v4's follow passed C's second publication, begun before its apply: \(passedAgain)")
+        let passedAgain = await engine.readForTests { e in
+            (c: e.state.jobs[a.transferID]?.state, holdsC: e.state.jobs[a.transferID]?.assets.contains(c.identifier) == true, unfollowed: e.state.unfollowed.contains(a.transferID))
+        }
+        #expect(passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed, "setup: v4's follow passed C's second publication, begun before its apply: \(passedAgain)")
         releaser.cancel()
         await releaser.value
         await bulk.setHolding(false)

@@ -73,24 +73,6 @@ extension SyncEngine {
         return counts
     }
 
-    /// The slots a pump now would offer a queued job of each lane class, as its loops read them (`pump()`): a decision
-    /// instant behind the follow barrier records them (`WorldStamp.freeSlots`), so the barrier-end pump refuses a place
-    /// on that instant's view only where a visit-first engine's pump had tried it then. While every slot was busy, that
-    /// pump gated nothing, and the place waited for a slot and the live gates (PROBE-C13-STAMP-NO-SLOT; Stage 3 close-out
-    /// cycle 14). A user job's preemption of lower-lane work is not counted: read live then, a place is answered on the
-    /// live gates, the side ruling S3-R17 item 2 accepts. One pass over the jobs in flight (`slotCounts`), C2.
-    func freeSlots() -> FreeSlots {
-        let counts = self.slotCounts
-        let maximum = self.tuning.maxConcurrentTransfers
-        let nonUserCap = maximum - min(max(self.tuning.reservedInteractiveSlots, 0), maximum - 1)
-        let pipelineCap = self.tuning.pipelineDepth * maximum
-        let free = maximum - counts.running > 0
-        return FreeSlots(
-            user: free && counts.runningUser < self.userCap,
-            nonUser: free && counts.running - counts.runningUser < nonUserCap && counts.nonUserPipeline < pipelineCap
-        )
-    }
-
     /// The slots user-initiated work may take: every slot, or `interactiveConcurrencyAtCritical` at `.critical`.
     private var userCap: Int {
         if self.state.conditions?.power.thermal == .critical {
@@ -388,19 +370,7 @@ extension SyncEngine {
             return .parked(1)
         case .block(let reason):
             let lane = self.state.jobs[transfer]?.lane
-            if let stamp = self.state.placeStamps[transfer] {
-                // A place given behind the barrier is parked as at its decision instant (S3-R15 item 3): its fail-fast
-                // answers read the wait then, against the throttle's end of that instant's view.
-                let end: MonotonicInstant?
-                if case .throttled(let until) = reason {
-                    end = until
-                } else {
-                    end = nil
-                }
-                self.park(transfer, reason: reason, answeredAt: stamp.at, answerEnd: end)
-            } else {
-                self.park(transfer, reason: reason)
-            }
+            self.park(transfer, reason: reason)
             switch reason {
             case .offline, .policy:
                 guard let lane else {
@@ -491,12 +461,11 @@ extension SyncEngine {
         return nil
     }
 
-    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4), reading a throttle's wait at `answeredAt`
-    /// against `answerEnd` when given (`failFast`). A throttle's park keeps the origin's alarm at the origin's end, never
-    /// earlier: a park whose 429 waited for the follow carries its own, earlier end while a later 429 extended the
-    /// origin's, and moving the alarm back to the park's end re-admitted the throttle's jobs before the origin's end
-    /// (PROBE-C10-THROTTLE-EXTENDED).
-    func park(_ transfer: TransferID, reason: BlockReason, answeredAt: MonotonicInstant? = nil, answerEnd: MonotonicInstant? = nil) {
+    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4). A throttle's park keeps the origin's alarm
+    /// at the origin's end, never earlier: a park whose 429 waited for the follow carries its own, earlier end while a
+    /// later 429 extended the origin's, and moving the alarm back to the park's end re-admitted the throttle's jobs before
+    /// the origin's end (PROBE-C10-THROTTLE-EXTENDED).
+    func park(_ transfer: TransferID, reason: BlockReason) {
         guard self.transition(transfer, to: .blocked(reason)) else {
             return
         }
@@ -508,7 +477,7 @@ extension SyncEngine {
         if case .circuitOpen = reason {
             self.scheduleBreakerDeadline()
         }
-        self.failFast(transfer, reason: reason, at: answeredAt, answerEnd: answerEnd)
+        self.failFast(transfer, reason: reason)
         if reason == .awaitingSpace {
             // Only the store's due work wakes it: make sure something will run that work.
             self.ensureSpaceWake()
@@ -536,18 +505,12 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
-        // A place a visit or a replay gave while the follow barrier held, at an instant a visit-first engine's pump had a
-        // slot for it (`placeStamps`, `enqueue`), is refused by the origin's throttle as it stood then (S3-R15 item 3):
-        // that pump refused it there, and its fail-fast answers read that instant (`dispatch`). The view never admits: a
-        // start is a request, and a request reads the live throttle, breaker and slots below (R-SYN-5; ruling S3-R16 items
-        // 1(b) and 3). Admitted on the view, a place whose slot was busy at the view's instant started under a throttle a
-        // 429 set since (PROBE-C12-PLACE-SLOT, the cycle-12 residual R-I). The view's breaker is not read: refused on it
-        // after the breaker's close had re-admitted its parked jobs in the drain, a place parked `circuitOpen` behind a
-        // closed breaker that nothing re-admits (PROBE-C13R-STAMP-BREAKER; Stage 3 close-out cycle 14, S3-R16 items 1(c)
-        // and 3, S3-R17 item 2: the breaker is a live origin gate).
-        if let stamp = self.state.placeStamps[transfer], let until = OriginGate.inForce(self.state.worldHistory[stamp.view].throttle, at: stamp.at) {
-            return .block(.throttled(until: until))
-        }
+        // Every place, a follow's visit's and a drain replay's included, is admitted on the live throttle, breaker, slots
+        // and space alone: a start is a request, and a request reads the live origin gates (R-SYN-5; Stage 3 close-out
+        // cycle 15, ruling S3-R18 item 1). The cycle-12 to cycle-14 place stamps, which refused a place on the throttle of
+        // its decision instant's view, were a past view: refused there after a place ahead of it, which a visit-first
+        // pump started, had taken the slot, a place was answered `serverUnavailable` although the live throttle had
+        // ended (PROBE-C14C-STAMP-AHEAD).
         // The origin's gates through the pure functions every other decision reads too (`OriginGate`, F-40), each read
         // once per job: this runs for every job a pump dispatches or parks.
         if let until = OriginGate.inForce(self.state.throttles[remote.originID], at: now) {
@@ -764,8 +727,11 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
-        // A place given behind the barrier started, visit-first, under its decision instant's edge (S3-R15 item 1).
-        job.active?.edgeSerial = self.state.placeStamps[transfer].map { self.state.worldHistory[$0.view].edgeSerial } ?? self.state.networkEdgeSerial
+        // A new attempt: the last publication's ids and its end are behind it (`Job.rerouteOnPass`).
+        job.rerouteOnPass = nil
+        // The edge in force when the attempt starts, also for a place given behind the barrier: it starts on the live
+        // gates (Stage 3 close-out cycle 15, ruling S3-R18 item 1), so an edge before this start is no edge it missed.
+        job.active?.edgeSerial = self.state.networkEdgeSerial
         // A publication of a file an earlier attempt staged has no stream: nothing is left to drain if its job is
         // retired before its driver runs (`publish` then discards the file).
         job.active?.terminalReceived = adopt != nil
@@ -1046,7 +1012,10 @@ extension SyncEngine {
         }
         job = self.state.jobs[transfer] ?? job
         job.active = nil
-        job.publishingSince = self.state.appliesFollowed
+        // The ids a visit-first engine moved before this publication began: an owed follow's visit, which meets the job
+        // publishing, re-routes them at once (`Job.rerouteOnPass`, `follow`). None while no follow is owed: every
+        // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits.
+        job.rerouteOnPass = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []
         self.state.jobs[transfer] = job
         self.pump()
         let ids = job.assets.sorted()
@@ -1200,13 +1169,6 @@ extension SyncEngine {
         // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
         // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
         self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
-        // A job an owed follow passed while it published, after that visit's apply, moves the ids a visit-first engine
-        // moved at the apply before this failure meets them (`followPassedPublication`; Stage 3 close-out cycle 14). Behind
-        // the follow barrier the failure's verdict waits, and the drain's visit before it moves them (`followedForVerdict`).
-        if !self.defersToFollow, self.followPassedPublication(transfer) {
-            self.checkRunSettled()
-            self.pump()
-        }
         switch error {
         case .superseded:
             // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the

@@ -274,16 +274,18 @@ extension EngineFollowBarrierTests {
         await FollowBarrier.finish(s, sync: sync)
     }
 
-    /// The new content a follow's visit queues is admitted on the throttle in force at the apply, also when that
-    /// throttle ended while the visit was owed: T (1 MB, zz-t) downloads for a prefetch member; D (1 MB, content W)
-    /// downloads for U's user waiter and a prefetch member (zz-u). Between v3's fetch and its apply, T gets a 429 with
-    /// Retry-After 10 s; v3 moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends. Visited first, D's visit
-    /// created N at the apply under the 10 s throttle: N parked and U was answered `serverUnavailable(10)`; the throttle's
-    /// alarm then re-admitted N for the member. Visited after the throttle's end, N started and U was served from it (the
-    /// cycle-11 residual R-D, "a visit reads inputs that arrived after it was owed"). Parked on the apply's throttle once
-    /// no live throttle is left, N waits for that alarm alone (`fireDue`'s `.throttle` without a live throttle).
+    /// The new content a follow's visit queues is gated on the live throttle: T (1 MB, zz-t) downloads for a prefetch
+    /// member; D (1 MB, content W) downloads for U's user waiter and a prefetch member (zz-u). Between v3's fetch and its
+    /// apply, T gets a 429 with Retry-After 10 s; v3 moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends.
+    /// Visited first, D's visit created N at the apply under the 10 s throttle: N parked and U was answered
+    /// `serverUnavailable(10)`; the throttle's alarm then re-admitted N for the member. Visited after the throttle's end,
+    /// N's place is admitted on the live gates, which no throttle holds any more: N starts and U is served from it, the
+    /// answer a live origin gate that changed during the barrier gives (ruling S3-R18 item 1, S3-R17 item 2; recorded as a
+    /// residual risk). Cycles 12 to 14 refused N on its place's stamp, the throttle of the apply's view (the cycle-11
+    /// residual R-D); the stamps are gone since Stage 3 close-out cycle 15 (PROBE-C14C-STAMP-AHEAD). No request goes to the
+    /// origin while its throttle is live in either order (R-SYN-5).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    @Test("R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply(_ visit: LaneDropVisit) async throws {
         let (s, _) = try await FollowBarrier.setUp(seed: 999_102)
         let engine = s.engine
@@ -333,13 +335,19 @@ extension EngineFollowBarrierTests {
         }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: uWaiter) }
-        if case .failure(.serverUnavailable(let retryAfter?)) = uResult {
-            #expect(abs(retryAfter - 10) < 0.5, "U, moved to N under the 10 s throttle at the apply, gets its fail-fast answer (visit-first): \(uResult)")
+        if visit == .followVisitedFirst {
+            if case .failure(.serverUnavailable(let retryAfter?)) = uResult {
+                #expect(abs(retryAfter - 10) < 0.5, "U, moved to N under the 10 s throttle at the apply, gets its fail-fast answer (visit-first): \(uResult)")
+            } else {
+                Issue.record("U gets the throttle's fail-fast answer of the apply's instant (visit-first serverUnavailable(10)): \(uResult)")
+            }
         } else {
-            Issue.record("U gets the throttle's fail-fast answer of the apply's instant (visit-first serverUnavailable(10)): \(uResult)")
+            // S3-R18 item 1 (an exception like S3-R17 item 3): N's place is admitted on the live gates, and the throttle
+            // ended during the barrier.
+            #expect((try? uResult.get())?.byteSize == 16, "U is served N, admitted once the live throttle had ended: \(uResult)")
         }
-        // N, parked on the apply's throttle after it had ended, is re-admitted by the throttle's alarm (no live throttle
-        // is left to end) and served for the group's member.
+        // N is served for the group's member: re-admitted by the throttle's alarm visited first, started at the
+        // barrier-end pump otherwise.
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { $0.state.jobs[t.transferID] == nil && $0.state.jobs[uMoved.transferID] == nil }
         }

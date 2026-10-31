@@ -2007,8 +2007,8 @@ extension SyncEngine {
         if !self.followBarrier, !self.state.followCarried.isEmpty {
             violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
         }
-        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty || !self.state.placeStamps.isEmpty {
-            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views and \(self.state.followStamps.count) visits' and \(self.state.placeStamps.count) places' decision instants left")
+        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views and \(self.state.followStamps.count) visits' decision instants left")
         }
         if verdicts != Set(self.state.verdictsAfterFollow.keys) {
             violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")

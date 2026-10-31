@@ -355,7 +355,7 @@ extension SyncEngine {
         if self.defersToFollow, self.exitDefers(job) {
             let decided = self.state.throttles[origin]
             let decision: ThrottleDecision
-            let lane = self.followedLane(job) ?? job.lane
+            let lane = self.followedLane(job)
             let policy = lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
             if let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: seconds, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) {
                 let until = now.adding(seconds: max(delay, seconds ?? 0))
@@ -646,27 +646,29 @@ extension SyncEngine {
         return space
     }
 
-    /// The lane a visit-first engine's `job` had at this instant, while the follow barrier holds (S3-R15 item 2): what
-    /// the owed visits and the waiting events leave it, the visit's own rule (`follow`) and the drain's without
-    /// performing them, so a 429 is decided on that lane's policy (`throttled`):
+    /// The lane a visit-first engine's `job` had at this instant, while the follow barrier holds (S3-R15 item 2; the
+    /// only caller, `throttled`, reads it behind the barrier): what the owed visits and the waiting events leave it, the
+    /// visit's own rule (`follow`) and the drain's without performing them, so a 429 is decided on that lane's policy:
     /// - its own interests, less those a waiting withdrawal removes (`EventAfterFollow.removal`), and, when the job is
     ///   owed a visit, less those none of whose ids the copy still maps to its content;
-    /// - the interests other jobs hold in ids the copy now maps to its content, which their owed visits move onto it
-    ///   (a job publishing is passed by its visit, so its interests stay);
+    /// - the interests other jobs hold in ids the copy now maps to its content, which their owed visits move onto it: of
+    ///   a job the visit passes (`passesOnVisit`), only those in the ids it re-routes (`Job.rerouteOnPass`; Stage 3
+    ///   close-out cycle 15, ruling S3-R18 item 2: skipped whole, a publication begun after the apply left out an
+    ///   interest a visit-first engine had moved onto this content, PROBE-C14R-PASSED-LANE, PROBE-C14C-PASSED-LANE);
     /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them).
     ///
-    /// The held lane (or bulk) when no interest is left but ids stay; `nil` when the visit supersedes the job (every id
-    /// moves and nothing moves onto it). Without the last two, a 429 of a job a moved interest or a waiting request made
+    /// The job's own lane when none of these counts: a visit-first engine's job then had no interest left, and was
+    /// retired (no 429 reached it) or kept by a claim with the lane its interests had (`Job.heldLane`). The cycle-14
+    /// fallback to the held lane or bulk decided a job whose only interest a waiting withdrawal removes on the background
+    /// policy, which throttled the origin where a visit-first engine had retired the job (cycle 15; the cycle-14
+    /// requirements verifier's G4 finding). Without the last two, a 429 of a job a moved interest or a waiting request made
     /// user work was decided on the background policy, which throttled the origin and served the job's prefetch waiter
     /// by a retry where a visit-first engine deferred to the next run and answered it `serverUnavailable`; and a waiting
     /// withdrawal's interest the reverse (PROBE-C13-EXHAUST-LANE; Stage 3 close-out cycle 14). Only whether the lane is
     /// user-initiated chooses the policy, so the walks stop there. The walk over the jobs runs only while a follow owes
     /// its visits, and the walk over the events only while events wait: one lookup in the copy per id, no transfer
     /// formatted (C2).
-    func followedLane(_ job: Job) -> AssetPriority? {
-        guard self.followBarrier else {
-            return job.lane
-        }
+    func followedLane(_ job: Job) -> AssetPriority {
         let copy = self.state.applied
         func here(_ asset: AssetID) -> Bool {
             copy.entry(for: asset).map { SyncEngine.sameTransfer($0, job.entry) } ?? false
@@ -686,8 +688,9 @@ extension SyncEngine {
             raise(interest.lane)
         }
         if lane != .userInitiated, self.followOwed {
-            jobs: for (transfer, other) in self.state.jobs where transfer != job.transfer && other.state != .verifying && other.state != .committing {
-                for (token, interest) in other.interests where !withdrawn.contains(token) && interest.assets.contains(where: here) {
+            jobs: for (transfer, other) in self.state.jobs where transfer != job.transfer {
+                let passes = self.passesOnVisit(other)
+                for (token, interest) in other.interests where !withdrawn.contains(token) && interest.assets.contains(where: { here($0) && (!passes || other.rerouteOnPass?.contains($0) == true) }) {
                     raise(interest.lane)
                     if lane == .userInitiated {
                         break jobs
@@ -711,13 +714,7 @@ extension SyncEngine {
                 }
             }
         }
-        if let lane {
-            return lane
-        }
-        if visited {
-            return job.assets.contains(where: here) ? job.heldLane ?? .bulk : nil
-        }
-        return job.heldLane ?? .bulk
+        return lane ?? job.lane
     }
 
     // MARK: Breaker bookkeeping (ARCHITECTURE §7.7)

@@ -103,18 +103,6 @@ struct EngineState {
     /// carried it), whose instant a visit-first engine visited it at (S3-R15 item 1). Set when the job joins
     /// `followOrder`, taken by its visit; cleared with `worldHistory`.
     var followStamps: [TransferID: WorldStamp] = [:]
-    /// The decision instant of each queue place a visit or a replay gave while the barrier held, at an instant a
-    /// visit-first engine's pump had a slot for it (`WorldStamp.freeSlots`, `SyncEngine.enqueue`): the barrier-end pump
-    /// refuses such a job on the origin's throttle as it stood then, which that pump read at that place, and admits it
-    /// only on the live gates (`SyncEngine.gate`; S3-R15 item 3, ruling S3-R16 items 1(b) and 3). A place given while
-    /// every slot was busy waited, visit-first, for a slot, and is read live (PROBE-C13-STAMP-NO-SLOT, Stage 3 close-out
-    /// cycle 14). Cleared with `worldHistory`.
-    var placeStamps: [TransferID: WorldStamp] = [:]
-    /// The applies the engine has followed (`SyncEngine.followApplied(from:)`), counted: a decision instant carries the
-    /// count then (`WorldStamp.apply`) and a publication the count at its start (`Job.publishingSince`), so a follow's
-    /// visit that passes a publishing job knows whether a visit-first engine, visiting at the apply, had passed it too
-    /// (`Job.passedPublishing`; Stage 3 close-out cycle 14).
-    var appliesFollowed: UInt64 = 0
     /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
     /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
     /// event that asks for it); `removeJob` forgets it.
@@ -620,10 +608,14 @@ struct Job {
     var adopt: StagedFile?
     /// Whether the last failure was transient (re-queued early on a satisfied edge, T19).
     var transientFailure = false
-    /// `EngineState.appliesFollowed` when its current publication began (`publish`).
-    var publishingSince: UInt64 = 0
-    /// How a follow's visit that found the job publishing passed it, holding ids the copy moved (`SyncEngine.follow`).
-    var passedPublishing: PassedPublication?
+    /// Set when the job's latest attempt reached its publication (`publish`), `nil` from the start of the next attempt
+    /// (`start`): the ids the engine's copy listed elsewhere when that publication began while a follow was owed. A
+    /// visit-first engine, visiting the job at that follow's apply while it still downloaded, moved them then, so the owed
+    /// visit that meets the job publishing, or its publication's verdict waiting, re-routes them at once
+    /// (`SyncEngine.follow`; Stage 3 close-out cycle 15, ruling S3-R18 item 2). An id an apply moved while the job already
+    /// published is not in it: that engine passed it too (S3-R18a item 1). Whether it is set also tells a deferred exit
+    /// verdict whether the attempt ended in its publication (`VerdictAfterFollow.published`).
+    var rerouteOnPass: Set<AssetID>?
     /// The error interests will receive if the job ends now.
     var lastError: AssetError?
 

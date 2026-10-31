@@ -419,7 +419,6 @@ extension SyncEngine {
         self.state.originOwed.remove(transfer)
         self.state.unfollowed.remove(transfer)
         self.state.verdictsAfterFollow[transfer] = nil
-        self.state.placeStamps[transfer] = nil
         self.state.systemHeld.remove(transfer)
         self.state.run?.held.remove(transfer)
         self.state.spaceAdmitted[transfer] = nil
@@ -456,20 +455,15 @@ extension SyncEngine {
     /// visit-first order (F-28), and by one path at once: a publication's ENOENT re-queue of an attempt the engine
     /// cancelled, whose place ahead of the visits' places is an order difference only (Stage 3 close-out cycle 13,
     /// ruling S3-R16 item 3). Every other path that queues a job waits as an event of its own (a join, a verdict, a
-    /// re-admission), so the cycle-9 `.enqueue` event is gone. A place a visit or a replay gives records its decision
-    /// instant (`placeStamps`) when a pump then had a slot for the job's lane (`WorldStamp.freeSlots`): the barrier-end
-    /// pump refuses the job on the origin's throttle as it stood then, and admits it only on the live gates (`gate`;
-    /// S3-R15 item 3, S3-R16 item 3). A place given while no slot was free waited, visit-first, for one, and is read live
-    /// (PROBE-C13-STAMP-NO-SLOT; Stage 3 close-out cycle 14).
+    /// re-admission), so the cycle-9 `.enqueue` event is gone. The barrier-end pump admits every place on the live
+    /// throttle, breaker, slots and space alone (`gate`; Stage 3 close-out cycle 15, ruling S3-R18 item 1): the cycle-12
+    /// to cycle-14 place stamps, which refused a place on its decision instant's throttle, are gone.
     func enqueue(_ transfer: TransferID, front: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return
         }
         if !front {
             job.queuedAt = self.decisionNow()
-        }
-        if let stamp = self.state.reading, stamp.freeSlots.admit(job.lane) {
-            self.state.placeStamps[transfer] = stamp
         }
         self.state.lastTicket += 1
         job.ticket = self.state.lastTicket
@@ -638,14 +632,14 @@ extension SyncEngine {
     }
 
     /// The fail-fast policy when a job is parked (ARCHITECTURE §7.6/§7.7): which interests get an answer now; `only`
-    /// restricts it to one interest (a joiner of a parked job). A throttle's wait is read at `at` when given: a place
-    /// given behind the barrier answers with the wait at its decision instant, against the end `answerEnd` of that
-    /// instant's view (`dispatch`'s stamped park). A replayed 429's park reads both from its reading (`replayThrottle`).
-    func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil, at: MonotonicInstant? = nil, answerEnd: MonotonicInstant? = nil) {
+    /// restricts it to one interest (a joiner of a parked job). A throttle's wait is read at the decision instant
+    /// (`decisionNow()`) against the end the origin's throttle had then (`throttleEnd(after:)`): a replayed 429's park
+    /// reads both from its reading (`replayThrottle`).
+    func failFast(_ transfer: TransferID, reason: BlockReason, only: InterestToken? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        let now = at ?? self.decisionNow()
+        let now = self.decisionNow()
         for token in job.interests.keys.sorted() where only == nil || only == token {
             guard let interest = self.state.jobs[transfer]?.interests[token], interest.kind == .waiter || interest.kind == .ensure else {
                 continue
@@ -658,7 +652,7 @@ extension SyncEngine {
                 error = cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
             case .throttled(let until):
                 // The origin's end, not the job's: a later 429 may have extended the throttle after it parked (F-36).
-                let wait = (answerEnd ?? self.throttleEnd(after: until)).seconds(since: now)
+                let wait = self.throttleEnd(after: until).seconds(since: now)
                 let limit = interest.lane == .userInitiated ? self.tuning.interactiveRetry.interactiveMaxWait : .infinity
                 error = wait > limit ? .serverUnavailable(retryAfter: wait) : nil
             case .insufficientSpace:
