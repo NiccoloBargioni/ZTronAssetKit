@@ -184,6 +184,12 @@ extension EngineFollowBarrierTests {
     /// (`recordPublicationEnd`) stays on the job through the backoff its verdict, given at once, sets; the retry's `start`
     /// resets it, and the re-route set. A later visit reads both as the retry's own (`rerouteOnVisit`). No apply is made:
     /// the property is the attempt's own bookkeeping, the same in both `LaneDropVisit` orders.
+    ///
+    /// C's first attempt is held until the engine has its first conditions reading, as `verdictLane` and the verdict-apply
+    /// tests wait (cycle 17, the cycle-16 requirements verifier's PROBE-C16R-RETRY-END-DIAG): the watcher was torn down
+    /// while idle after the v2 sync, and a first reading that came after C's publication failure counted as a satisfied
+    /// edge (`EngineConditions`), which re-queued C at once for its transient failure (`owedOnEdge`); the retry's `start`
+    /// then reset the end before the setup read it (23 of 120 copies under load).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)", .timeLimit(.minutes(3)))
     func barrierRetriesAFailedPublicationWithNothingOfItsEnd() async throws {
@@ -197,9 +203,14 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
         await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
-        await s.harness.source.script(a.transferID, [.stage(cBytes), .hold, .stage(cBytes)])
+        await s.harness.source.script(a.transferID, [.hold, .stage(cBytes), .hold, .stage(cBytes)])
         s.fileSystem.addFault(FaultRule(operation: .read, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .io))
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        // The first conditions reading arrives before C's first attempt ends: it is no edge for C's failure.
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         // The publication fails (EIO): retried after a backoff, its end recorded.
         await engine.awaitCondition { e in
             if case .failed(.at) = e.state.jobs[a.transferID]?.state {
