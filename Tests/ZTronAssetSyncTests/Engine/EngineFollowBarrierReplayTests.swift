@@ -233,4 +233,90 @@ extension EngineFollowBarrierTests {
         #expect((try? pResult.get())?.byteSize == 16 && (try? rResult.get())?.byteSize == 16, "P is served from N and R from its fresh attempt: \(pResult) \(rResult)")
         await FollowBarrier.finish(s, sync: sync)
     }
+
+    // MARK: A policy pause on a lane the conditions refuse (`AttemptVerdict.pause`)
+
+    /// A policy pause that ends while the follow owes a visit, on a lane the conditions still refuse after the visits,
+    /// parks its job with the place it had, as a visit-first engine's pause did: under Low Data Mode, X (1 MB) downloads
+    /// for U's user waiter (b-x) and a prefetch member (zz-x); Y (zz-y), a later member, waits (the policy parks it once a
+    /// slot frees); H holds the other of two slots. v3 moves b-x to new content M, so the follow's first turn lowers X to the prefetch lane and
+    /// pauses it; the pause ends while the rest of the follow is owed. Visited first, X was parked on its policy with its
+    /// ticket, ahead of Y's, so when the network is unrestricted again X is re-admitted, and starts, before Y. Queued at
+    /// the front instead, X took a fresh ticket, the gate parked it behind Y, and Y started first.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierParksAPolicyPauseWithItsPlace(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 992_602, tuning: SyncTuning(maxConcurrentTransfers: 2, preemptLowerLanes: false))
+        let engine = s.engine
+        let xBytes = Data(repeating: 0xD1, count: 1_000_000)
+        let hBytes = EngineFixture.bytes(992_610, count: 16)
+        let yBytes = EngineFixture.bytes(992_611, count: 16)
+        let mBytes = EngineFixture.bytes(992_612, count: 16)
+        let bx = EngineHarness.onDemand("b-x", xBytes)
+        let zx = EngineHarness.onDemand("zz-x", xBytes)
+        let h = EngineHarness.onDemand("zz-h", hBytes)
+        let y = EngineHarness.onDemand("zz-y", yBytes)
+        try #require(bx.transferID == zx.transferID, "setup: b-x and zz-x share X")
+        await s.harness.serveManifest([s.q, bx] + FollowBarrier.fillers(768_000) + [h, zx, y], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        await s.harness.source.script(bx.transferID, [.hold, .hold, .stage(xBytes)])
+        await s.harness.source.script(y.transferID, [.hold, .stage(yBytes)])
+        let hWaiter = Task { await engine.awaitAsset(h.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[h.transferID]?.state == .downloading }
+        }
+        await s.harness.conditions.send(EngineRegressionCycle10Tests.constrained)
+        await engine.awaitCondition { $0.state.conditions == EngineRegressionCycle10Tests.constrained }
+        let uWaiter = Task { await engine.awaitAsset(bx.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[bx.transferID]?.state == .downloading }
+        let group = try await engine.registerGroup([zx.identifier, y.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { $0.state.jobs[bx.transferID]?.interests.count == 2 && $0.state.jobs[y.transferID] != nil }
+        let tickets = await engine.readForTests { e in (x: e.state.jobs[bx.transferID]?.ticket, y: e.state.jobs[y.transferID]?.ticket) }
+        try #require(tickets.x != nil && tickets.y != nil && tickets.x! < tickets.y!, "setup: X's ticket is Y's elder: \(tickets)")
+        let m = EngineHarness.onDemand("b-x", mBytes)
+        await s.harness.source.script(m.transferID, [.stage(mBytes)])
+        await engine.readForTests { $0.holdAttemptTerminals() }
+        let sync = await FollowBarrier.apply([s.q, m] + FollowBarrier.fillers(868_000) + [h, zx, y], s, visit: visit)
+        await engine.awaitCondition { $0.heldAttemptTerminalCount == 1 }
+        if visit == .sweepFollowsFirst {
+            let before = await engine.readForTests { e in (owed: e.followOwed, lane: e.state.jobs[bx.transferID]?.lane, pause: e.state.jobs[bx.transferID]?.active?.policyPause) }
+            #expect(before.owed && before.lane == .prefetch && before.pause != nil, "setup: X's visit lowered it and asked for a policy pause while the follow is owed: \(before)")
+            await engine.readForTests { $0.releaseAttemptTerminals() }
+            await engine.awaitCondition { $0.state.jobs[bx.transferID]?.state != .downloading }
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        } else {
+            await engine.readForTests { $0.releaseAttemptTerminals() }
+        }
+        let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: uWaiter) }
+        #expect((try? uResult.get())?.byteSize == 16, "U is served from M: \(uResult)")
+        await engine.awaitCondition { e in
+            !e.followBarrier && !e.state.drainFollowUpScheduled && e.state.jobs[bx.transferID]?.state.isLaneParked == true && e.state.jobs[m.transferID] == nil
+        }
+        // The network is unrestricted again: the parked members are re-admitted in the pump's order, and one slot is free.
+        let starts = await s.harness.source.starts.count
+        await s.harness.conditions.send(.unrestricted)
+        await engine.awaitCondition { e in
+            e.state.conditions == .unrestricted && (e.state.jobs[bx.transferID]?.state == .downloading || e.state.jobs[y.transferID]?.state == .downloading)
+        }
+        await engine.waitForAllHandles()
+        let after = await engine.readForTests { e in (x: e.state.jobs[bx.transferID]?.state, y: e.state.jobs[y.transferID]?.state) }
+        let next = await s.harness.source.starts.dropFirst(starts).map(\.id)
+        #expect(after.x == .downloading && after.y == .queued, "X, parked with its elder ticket, is re-admitted and starts before Y (visit-first): \(after)")
+        #expect(next.first == bx.transferID, "the next start is X's: \(next)")
+        await s.harness.source.release(bx.transferID, with: .progress(received: 0, expected: nil))
+        await s.harness.source.release(h.transferID, with: .progress(received: 0, expected: nil))
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[y.transferID]?.state == .downloading }
+        }
+        await s.harness.source.release(y.transferID, with: .progress(received: 0, expected: nil))
+        _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: hWaiter) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[bx.transferID] == nil && $0.state.jobs[y.transferID] == nil }
+        }
+        await engine.releaseGroup(group)
+        await FollowBarrier.finish(s, sync: sync)
+    }
 }
