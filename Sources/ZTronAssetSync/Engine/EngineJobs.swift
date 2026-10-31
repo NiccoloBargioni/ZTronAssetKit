@@ -605,18 +605,7 @@ extension SyncEngine {
         if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
         }
-        // A job the follow passed while it published, after that visit's apply, moves the ids a visit-first engine moved
-        // at the apply before its failure is answered: their users wait for their new content (`followPassedPublication`;
-        // Stage 3 close-out cycle 14). The jobs that move creates are pumped once the failure is answered.
-        var moved = false
-        if case .failed = outcome {
-            moved = self.followPassedPublication(transfer)
-        }
         guard let job = self.state.jobs[transfer] else {
-            if moved {
-                self.checkRunSettled()
-                self.pump()
-            }
             return
         }
         for token in job.interests.keys.sorted() {
@@ -629,9 +618,6 @@ extension SyncEngine {
         self.publishTerminal(job: job, outcome: outcome)
         follow()
         self.checkRunSettled()
-        if moved {
-            self.pump()
-        }
     }
 
     /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023).

@@ -571,15 +571,16 @@ extension SyncEngine {
     }
 
     /// Moves the ids a job the follow passed while it published, after the apply of that visit, still holds for content
-    /// the copy lists elsewhere, before its failure is answered once nothing waits for the follow (`resolveAll`): a
-    /// visit-first engine visited it at the apply, while it downloaded, and moved those ids then, so their users waited
-    /// for their new content instead of this failure (`PassedPublication.publishedAfterApply`; Stage 3 close-out cycle
-    /// 14). Returns whether it moved any.
+    /// the copy lists elsewhere, once that publication failed and nothing waits for the follow (`publicationFailed`):
+    /// a visit-first engine visited the job at the apply, while it downloaded, and moved those ids then, so their users
+    /// waited for their new content, whatever the failure's exit (an answer, a retry and its cap, a space verdict;
+    /// `PassedPublication.publishedAfterApply`; Stage 3 close-out cycle 14). The publication has ended, so the job is
+    /// moved although it still verifies or commits. Returns whether it moved any.
     func followPassedPublication(_ transfer: TransferID) -> Bool {
         guard let job = self.state.jobs[transfer], job.passedPublishing == .publishedAfterApply, self.holdsIDListedElsewhere(job) else {
             return false
         }
-        return self.visit(transfer, at: nil)
+        return self.visit(transfer, at: nil, publicationEnded: true)
     }
 
     /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
@@ -640,14 +641,15 @@ extension SyncEngine {
 
     /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`), under the decision
     /// instant `stamp` of the apply it belongs to (`withReading`; S3-R15 item 1, the cycle-11 residual R-D), or under the
-    /// current reading when `nil` (a drain's visit before a verdict, `followedForVerdict`).
-    private func visit(_ transfer: TransferID, at stamp: WorldStamp?) -> Bool {
+    /// current reading when `nil` (a drain's visit before a verdict, `followedForVerdict`). `publicationEnded`: the job's
+    /// publication failed, so a job still verifying or committing is moved (`followPassedPublication`).
+    private func visit(_ transfer: TransferID, at stamp: WorldStamp?, publicationEnded: Bool = false) -> Bool {
         self.state.inFollowVisit = true
         defer {
             self.state.inFollowVisit = false
         }
         guard let stamp else {
-            return self.follow(transfer)
+            return self.follow(transfer, publicationEnded: publicationEnded)
         }
         return self.withReading(stamp) {
             self.follow(transfer)
@@ -657,15 +659,16 @@ extension SyncEngine {
     /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job verifying or committing is
     /// not moved (its commit binds only the ids the copy still maps to it, and the ids it does not bind follow their
     /// content then, `committed`); it stays in `unfollowed` for the next follow, so its staged bytes stay in the ledger
-    /// and its slot taken until the store's outcome (R-SYN-11). The caller checks the run and pumps once per turn, not
-    /// once per job.
-    private func follow(_ transfer: TransferID) -> Bool {
+    /// and its slot taken until the store's outcome (R-SYN-11). `publicationEnded`: the store's outcome was a failure
+    /// (`followPassedPublication`), so the job is moved as any other. The caller checks the run and pumps once per turn,
+    /// not once per job.
+    private func follow(_ transfer: TransferID, publicationEnded: Bool = false) -> Bool {
         guard let job = self.state.jobs[transfer] else {
             return false
         }
         let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
         switch job.state {
-        case .verifying, .committing:
+        case .verifying where !publicationEnded, .committing where !publicationEnded:
             if !moved.isEmpty {
                 self.state.unfollowed.insert(transfer)
                 // A visit-first engine visited at the apply this visit belongs to: a publication begun since met a job

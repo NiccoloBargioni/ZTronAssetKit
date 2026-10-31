@@ -1200,6 +1200,13 @@ extension SyncEngine {
         // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
         // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
         self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
+        // A job an owed follow passed while it published, after that visit's apply, moves the ids a visit-first engine
+        // moved at the apply before this failure meets them (`followPassedPublication`; Stage 3 close-out cycle 14). Behind
+        // the follow barrier the failure's verdict waits, and the drain's visit before it moves them (`followedForVerdict`).
+        if !self.defersToFollow, self.followPassedPublication(transfer) {
+            self.checkRunSettled()
+            self.pump()
+        }
         switch error {
         case .superseded:
             // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the
