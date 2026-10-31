@@ -300,4 +300,66 @@ extension EngineFollowBarrierTests {
         #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
         #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure: the follow passed C, publishing at the apply, in both orders (visit-first): \(bResult)")
     }
+
+    /// As above, with the publication ending in ENOSPC (the store's placement rename) while the follow is owed and
+    /// before its turn that finds C (PROBE-C15C-ENOSPC-PASSED). C's publication began before v3's apply, which moves zz-b
+    /// to N. The ENOSPC's free-space read runs that turn (`advanceFollowForSpaceSweep`) inside the failure's bookkeeping,
+    /// before its verdict waits as `.spaceFailure`; the 32 MB volume makes the verdict a retry, whose bytes fail their
+    /// checksum. Visited first, v3's visit passed C, publishing, and B rode the retry to its `integrityFailure`. Behind the
+    /// barrier the visit met C failed with no verdict waiting and moved B onto N as a download's, and N served B.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierLeavesAPassedIdToAPublicationsSpaceRetry(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_616_402
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let wrong = EngineFixture.bytes(seed + 4, count: 100_000)
+        let nBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let bMoved = EngineHarness.onDemand("zz-b", nBytes)
+        try #require(a.transferID == b.transferID, "setup: zz-a and zz-b share C")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(a.transferID, [.hold, .stage(cBytes), .stage(wrong)])
+        await s.harness.source.script(bMoved.transferID, [.stage(nBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        let releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [a, bMoved] + Self.laterFillers(seed + 6_000), tag: "v3-enospc-\(seed)", s, visit: visit)
+        // The placement rename of C's verified bytes fails ENOSPC.
+        s.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .noSpace))
+        if visit == .sweepFollowsFirst {
+            // The ENOSPC's free-space read runs one follow turn; the space sweep's own follow-up turns are held.
+            await engine.readForTests { $0.holdSpaceSweepFollowUps() }
+        }
+        releaser.cancel()
+        await releaser.value
+        await bulk.setHolding(false)
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.eventsAfterFollow.contains(where: Self.isSpaceFailure) }
+            let waiting = await engine.readForTests { e in
+                (owed: e.followOwed, visited: !e.state.followOrder[e.state.followNext...].contains(a.transferID))
+            }
+            #expect(waiting.owed && waiting.visited, "setup: C's ENOSPC waits behind the owed follow, whose visit of C ran in the failure's bookkeeping: \(waiting)")
+            await engine.readForTests { e in
+                e.releaseFollowFollowUps()
+                e.releaseSpaceSweepFollowUps()
+            }
+        }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect(aResult == .failure(.integrityFailure), "A gets the retry's integrity failure (visit-first): \(aResult)")
+        #expect(bResult == .failure(.integrityFailure), "B rode C's retry: v3's follow passed C, publishing at the apply (visit-first): \(bResult)")
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
+    }
 }
