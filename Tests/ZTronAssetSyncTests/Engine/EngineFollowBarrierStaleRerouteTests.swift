@@ -12,17 +12,41 @@ import ZTronAssetTestSupport
 /// published, which a visit-first engine passed and answered with the publication's outcome. Each test runs in both
 /// orders (`LaneDropVisit`) with the visit-first outcome expected in both.
 extension EngineFollowBarrierTests {
+    /// When v4 maps zz-b back to C's content in `staleReroute`, behind the barrier.
+    enum StaleRerouteV4: Sendable {
+        /// After v3's follow ended: its visit of C re-routed B onto N, and v5's follow is a later one.
+        case afterFollow
+        /// While v3's follow still owes C's visit, which then finds nothing moved; v5's follow is a later one.
+        case beforeVisit
+        /// After v3's follow visited C and re-routed B onto N, while that follow is still owed; v5 is applied while it is
+        /// owed too, so v5's visit of C belongs to the same follow as the visit that re-routed B.
+        case afterVisitWhileOwed
+    }
+
+    /// Runs held follow-up turns of the follow until `done` holds; requires the follow to stay owed throughout.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func runFollowTurns(_ engine: SyncEngine, until done: @escaping @Sendable (isolated SyncEngine) -> Bool, _ setup: String) async throws {
+        for _ in 0..<12 {
+            let now = await engine.readForTests { e in (done: done(e), owed: e.followOwed) }
+            try #require(now.owed, "setup: the follow is still owed (\(setup))")
+            if now.done {
+                return
+            }
+            await Self.runOneFollowTurn(engine)
+        }
+        Issue.record("setup: \(setup) within twelve follow turns")
+    }
+
     /// The shared scenario: C (100 kB, the content of zz-a and zz-b, a user waiter each) publishes bytes that fail their
     /// checksum. v3 moves zz-b to N (16 bytes, its download held); C's publication begins after v3's apply and is held at
     /// its first store unit, so behind the barrier it begins while v3's follow still owes C's visit (`rerouteOnPass` is
-    /// `[zz-b]`). v4 maps zz-b back to C's content while C still publishes: after v3's follow ended (its visit re-routed
-    /// B onto N; N's visit then supersedes N and B rejoins C), or, with `v4WhileOwed`, while v3's follow still owes C's
-    /// visit, which then finds nothing moved. v5 moves zz-b to N2 (24 bytes) while the same publication still verifies:
-    /// its follow passes C in both orders. Visited first, v3's visit moved B onto N while C downloaded, v4's superseded N
-    /// and B rejoined C, and v5's passed C, publishing, so B was answered C's `integrityFailure`. Returns the answers of
-    /// A and B.
+    /// `[zz-b]`). v4 maps zz-b back to C's content while C still publishes (`when`); where v3's visit re-routed B onto N,
+    /// N's visit then supersedes N and B rejoins C. v5 moves zz-b to N2 (24 bytes) while the same publication still
+    /// verifies: its follow passes C in both orders. Visited first, v3's visit moved B onto N while C downloaded, v4's
+    /// superseded N and B rejoined C, and v5's passed C, publishing, so B was answered C's `integrityFailure`. Returns the
+    /// answers of A and B.
     @available(macOS 15.0, iOS 18.0, *)
-    func staleReroute(_ visit: LaneDropVisit, seed: UInt64, v4WhileOwed: Bool) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>) {
+    func staleReroute(_ visit: LaneDropVisit, seed: UInt64, when: StaleRerouteV4) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>) {
         let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
         let engine = s.engine
         let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
@@ -61,14 +85,16 @@ extension EngineFollowBarrierTests {
             #expect(atPublish.owed && atPublish.reroute == [b.identifier], "setup: C's publication began while v3's follow owed C's visit: \(atPublish)")
         }
         let v4 = [s.q] + fillers + [a, b] + later
-        if v4WhileOwed {
+        var v5Visit = LaneDropVisit.followVisitedFirst
+        switch when {
+        case .beforeVisit:
             // v4 maps zz-b back while (behind the barrier) v3's follow still owes C's visit: that visit finds nothing moved.
             try await Self.applyHeld(v4, tag: "v4-stale-\(seed)", s, visit: visit)
             if visit == .sweepFollowsFirst {
                 await engine.readForTests { $0.releaseFollowFollowUps() }
                 await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
             }
-        } else {
+        case .afterFollow:
             if visit == .sweepFollowsFirst {
                 // v3's follow visits C, publishing, and re-routes zz-b onto N at once.
                 await engine.readForTests { $0.releaseFollowFollowUps() }
@@ -77,13 +103,32 @@ extension EngineFollowBarrierTests {
             await engine.awaitCondition { $0.state.jobs[bMoved.transferID]?.state == .downloading }
             // v4 maps zz-b back after v3's follow ended: N's visit supersedes N, and B rejoins C.
             try await Self.applyHeld(v4, tag: "v4-stale-\(seed)", s, visit: .followVisitedFirst)
+        case .afterVisitWhileOwed:
+            if visit == .sweepFollowsFirst {
+                // v3's follow visits C, publishing, and re-routes zz-b onto N at once (queued: no admission is made while
+                // the follow is owed); its later fillers keep it owed.
+                try await Self.runFollowTurns(engine, until: { $0.state.jobs[bMoved.transferID] != nil }, "v3's visit re-routes B onto N")
+                // v4 maps zz-b back while that follow is owed (its own later fillers keep it so); N's visit supersedes N,
+                // and B rejoins C, before v5.
+                try await Self.applyHeld([s.q] + fillers + [a, b] + Self.laterFillers(seed + 9_000), tag: "v4-stale-\(seed)", s, visit: visit)
+                try await Self.runFollowTurns(engine, until: { $0.state.jobs[bMoved.transferID] == nil }, "v4's visit supersedes N")
+                v5Visit = .sweepFollowsFirst
+            } else {
+                await engine.awaitCondition { $0.state.jobs[bMoved.transferID]?.state == .downloading }
+                try await Self.applyHeld(v4, tag: "v4-stale-\(seed)", s, visit: visit)
+            }
         }
         let atV4 = await engine.readForTests { e in
             (c: e.state.jobs[a.transferID]?.state, cAssets: e.state.jobs[a.transferID]?.assets.sorted(), n: e.state.jobs[bMoved.transferID]?.state)
         }
         try #require(atV4.c == .verifying && atV4.cAssets == [a.identifier, b.identifier] && atV4.n == nil, "setup: B is on C, which still publishes, and N is gone: \(atV4)")
         // v5 moves zz-b to N2 while the same publication still verifies: its follow passes C in both orders.
-        try await Self.applyHeld([s.q] + fillers + [a, bMoved2] + later, tag: "v5-stale-\(seed)", s, visit: .followVisitedFirst)
+        try await Self.applyHeld([s.q] + fillers + [a, bMoved2] + later, tag: "v5-stale-\(seed)", s, visit: v5Visit)
+        if v5Visit == .sweepFollowsFirst {
+            // v5's visit of C comes in the follow that re-routed B at v3's visit.
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        }
         let atV5 = await engine.readForTests { e in e.state.jobs[a.transferID]?.state }
         try #require(atV5 == .verifying, "setup: the same publication still verifies at v5: \(String(describing: atV5))")
         releaser.cancel()
@@ -103,18 +148,30 @@ extension EngineFollowBarrierTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierLeavesAnIdMovedBackAndAwayToThePublication(_ visit: LaneDropVisit) async throws {
-        let (aResult, bResult) = try await self.staleReroute(visit, seed: 1_515_002, v4WhileOwed: false)
+        let (aResult, bResult) = try await self.staleReroute(visit, seed: 1_515_002, when: .afterFollow)
         #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
         #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure: v5's follow passed C, publishing (visit-first): \(bResult)")
     }
 
-    /// As above, with v4 applied while v3's follow still owes C's visit (PROBE-C15C-STALE-REROUTE): that visit finds
-    /// nothing moved, as a visit-first engine's v4 found B back on C, and its re-route is spent all the same.
+    /// As above, with v4 applied while v3's follow still owes C's visit (PROBE-C15C-STALE-REROUTE): the follow's pass
+    /// compares with the current copy, where v4 mapped zz-b back, so C's visit never comes; a visit-first engine's v3
+    /// visit had re-routed B and its v4 visit found B back on C. The re-route belongs to v3's follow and is spent when
+    /// that follow ends (`Job.rerouteFor`), so v5's later follow passes C.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-INT-3: an owed visit that finds nothing moved spends the re-route of the publication it meets (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    @Test("R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierSpendsTheRerouteOfAVisitThatFindsNothingMoved(_ visit: LaneDropVisit) async throws {
-        let (aResult, bResult) = try await self.staleReroute(visit, seed: 1_515_902, v4WhileOwed: true)
+        let (aResult, bResult) = try await self.staleReroute(visit, seed: 1_515_902, when: .beforeVisit)
         #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
         #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure: v5's follow passed C, publishing (visit-first): \(bResult)")
+    }
+
+    /// As above, with v4 and v5 applied while the follow whose visit re-routed B is still owed: v5's visit of C belongs
+    /// to the same follow, and passes C because that visit spent the re-route (`Job.rerouteOnPass` emptied).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierSpendsTheRerouteForTheSameFollowsLaterVisits(_ visit: LaneDropVisit) async throws {
+        let (aResult, bResult) = try await self.staleReroute(visit, seed: 1_616_502, when: .afterVisitWhileOwed)
+        #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
+        #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure: v5's visit passed C, publishing (visit-first): \(bResult)")
     }
 }
