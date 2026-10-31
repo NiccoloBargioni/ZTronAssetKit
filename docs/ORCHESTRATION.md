@@ -119,7 +119,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Recorded as residual risks:** order, place and timing differences.
   - **Simplification is preferred:** for example, removing the place stamps behind R-I. One-to-one test records apply (G3).
   - ADR-057 records S3-R16 as the owner's decision.
-- **Fix run 4** (args in `.build-orchestrator/s3-fix-args-run4.json`): `s3f` from cycle 13 to 16, findings `s3f-c12-issues.json`, simulator set 1, no usage stop. Launched 31 Oct at weekly 66 %.
+- **Fix run 4** (args in `.build-orchestrator/s3-fix-args-run4.json`): `s3f` from cycle 13 to 16, findings `s3f-c12-issues.json`, simulator set 1, no usage stop. **RUNNING** `wf_94baddee-151` (task `wybwtb9zp`), launched 31 Oct at about 03:45 at weekly 66 %. To resume in this session, use `resumeFromRunId` with the same args. From a fresh session, read its `journal.jsonl` and start a new run from the next cycle.
   - **Resume:**
     - In this session, use `resumeFromRunId` with the same script and the same args.
     - From a fresh session, read the run's `journal.jsonl` and start a new run from the next cycle with the last verification's issues as `findingsFile`.
