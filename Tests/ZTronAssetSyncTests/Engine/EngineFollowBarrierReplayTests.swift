@@ -118,10 +118,18 @@ extension EngineFollowBarrierTests {
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
-        await s.harness.source.script(r.transferID, [.fail(.transient(.serverError(httpStatus: 500), retryAfter: nil)), .hold, .stage(rBytes)])
+        // R's first attempt holds until the watcher's first reading is in: a satisfied first reading is an edge
+        // (S3-CONC-04), and one that arrived after R's 500 re-queued R at once (no backoff left to end), so R kept the
+        // only slot and H never started (the cycle-12 verifiers' PROBE-C12-RETRY-SETUP-RACE). The 500 then fails R with
+        // the reading in place, whenever the reading came.
+        await s.harness.source.script(r.transferID, [.hold, .fail(.transient(.serverError(httpStatus: 500), retryAfter: nil)), .hold, .stage(rBytes)])
         await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
         await s.harness.source.script(p.transferID, [.stage(pBytes)])
         let rWaiter = Task { await engine.awaitAsset(r.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[r.transferID]?.state == .downloading }
+        }
+        await s.harness.source.release(r.transferID, with: .progress(received: 0, expected: nil))
         await engine.awaitCondition { e in
             if case .failed(.at) = e.state.jobs[r.transferID]?.state {
                 return true
