@@ -348,6 +348,12 @@ extension SyncEngine {
 
     /// The scheduled continuation of `drainEventsAfterFollow`.
     private func drainFollowUp() {
+        if self.state.drainFollowUpsHeld {
+            // Test seam: the events stay waiting and the turn stays scheduled until the release runs it.
+            self.state.drainFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
         self.state.drainFollowUpScheduled = false
         guard self.isRunning else {
             return
@@ -860,6 +866,23 @@ extension SyncEngine {
         }
         self.state.followFollowUpWaiting = false
         self.followFollowUp()
+    }
+
+    /// Test seam: the drain's next follow-up turns keep their events waiting until `releaseDrainFollowUps()`, so a test
+    /// meets the engine between two drain turns (no follow owed, the barrier up), which no production path can order
+    /// (Stage 3 close-out cycle 16, PROBE-C15R-LANE-WALK).
+    func holdDrainFollowUps() {
+        self.state.drainFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held drain follow-up run in this turn, or disarms a hold nothing reached.
+    func releaseDrainFollowUps() {
+        self.state.drainFollowUpsHeld = false
+        guard self.state.drainFollowUpWaiting else {
+            return
+        }
+        self.state.drainFollowUpWaiting = false
+        self.drainFollowUp()
     }
 }
 

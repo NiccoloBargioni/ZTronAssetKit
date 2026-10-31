@@ -126,6 +126,11 @@ struct EngineState {
     var drainingAfterFollow = false
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false
+    /// Test seam: while set, the drain's scheduled follow-up keeps its events waiting and stays scheduled instead of
+    /// running (`holdDrainFollowUps()`, `releaseDrainFollowUps()`). No production path sets it.
+    var drainFollowUpsHeld = false
+    /// Test seam: a drain follow-up turn reached the hold and waits for its release.
+    var drainFollowUpWaiting = false
     /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
     /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
     /// by that visit; `removeJob` drops it.
