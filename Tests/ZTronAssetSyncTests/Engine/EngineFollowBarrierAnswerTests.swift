@@ -21,7 +21,7 @@ extension EngineFollowBarrierTests {
 
     /// `FollowBarrier.setUp` with a stepped bulk executor, so a test can hold a publication at its first store unit.
     @available(macOS 15.0, iOS 18.0, *)
-    static func setUpHeldPublications(seed: UInt64) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
+    static func setUpHeldPublications(seed: UInt64, tuning: SyncTuning = SyncTuning()) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
         let fileSystem = FakeFileSystem(
@@ -30,7 +30,7 @@ extension EngineFollowBarrierTests {
             configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
         )
         let bulk = SteppedBlockingExecutor(holding: false)
-        let harness = EngineHarness.make(time: time, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), bulk: bulk, fileSystem: fileSystem)
+        let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), bulk: bulk, fileSystem: fileSystem)
         let qBytes = EngineFixture.bytes(seed, count: 300)
         let q = EngineFixture.entry("q", qBytes)
         await harness.serveManifest([q])
@@ -574,9 +574,10 @@ extension EngineFollowBarrierTests {
     /// publishes bytes that fail their checksum; v3 moves zz-b to N (16 bytes). The fillers before and after the `zz-`
     /// ids make the follow's first turn stop before C and its second turn find C and stay owed. `publishingAtApply`:
     /// C's publication is held before v3's apply, else after it. `failBehindBarrier`: C's bytes fail while the follow is
-    /// still owed, else after its drain.
+    /// still owed, else after its drain. `failBeforeVisit` (with both): C's bytes fail before the follow's turn that finds
+    /// C, so the visit meets C failed, its verdict waiting.
     @available(macOS 15.0, iOS 18.0, *)
-    func passedPublication(_ visit: LaneDropVisit, seed: UInt64, publishingAtApply: Bool, failBehindBarrier: Bool) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>) {
+    func passedPublication(_ visit: LaneDropVisit, seed: UInt64, publishingAtApply: Bool, failBehindBarrier: Bool, failBeforeVisit: Bool = false) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>) {
         let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
         let engine = s.engine
         let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
@@ -613,7 +614,7 @@ extension EngineFollowBarrierTests {
             }
             releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
         }
-        if visit == .sweepFollowsFirst {
+        if visit == .sweepFollowsFirst, !failBeforeVisit {
             await Self.runOneFollowTurn(engine)
             let passed = await engine.readForTests { e in
                 (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, passed: e.state.unfollowed.contains(a.transferID) && !e.state.followOrder[e.state.followNext...].contains(a.transferID))
@@ -629,6 +630,12 @@ extension EngineFollowBarrierTests {
         await bulk.setHolding(false)
         if visit == .sweepFollowsFirst, failBehindBarrier {
             await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
+            if failBeforeVisit {
+                let unvisited = await engine.readForTests { e in
+                    e.followOwed && !e.state.followOrder.contains(a.transferID) && e.state.jobs[a.transferID]?.assets.contains(b.identifier) == true
+                }
+                #expect(unvisited, "setup: C's bytes failed before the follow's turn that finds C")
+            }
             await engine.readForTests { $0.releaseFollowFollowUps() }
         }
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
