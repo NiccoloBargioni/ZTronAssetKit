@@ -78,13 +78,14 @@ extension EngineFollowBarrierTests {
     /// The new content an owed follow's visit queues behind a half-open breaker starts once the breaker closes: X's 403
     /// opens the breaker (one distinct asset trips it); prefetch members M and K park; at the cooldown's end one of them
     /// probes and holds. v3 moves the parked member's id to N while the follow owes its visits; then the probe commits
-    /// and closes the breaker. Visited first, N parked behind the half-open breaker at the apply and the close
-    /// re-admitted it. Refused on the breaker of its place's stamp after the close's re-admission had run in the drain,
-    /// N parked `circuitOpen` behind a closed breaker that nothing re-admits (the cycle-13 requirements verifier).
+    /// and closes the breaker. Three slots, so one is free at the apply (H and the probe hold two). Visited first, the
+    /// pump tried N at the apply, the half-open breaker refused it, and the close re-admitted it. Refused on the breaker
+    /// of its place's stamp after the close's re-admission had run in the drain, N parked `circuitOpen` behind a closed
+    /// breaker that nothing re-admits (the cycle-13 requirements verifier).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierStartsAVisitsPlaceOnceTheBreakerCloses(_ visit: LaneDropVisit) async throws {
-        let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
+        let tuning = SyncTuning(maxConcurrentTransfers: 3, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let (s, _) = try await FollowBarrier.setUp(seed: 1_314_002, tuning: tuning)
         let engine = s.engine
         let origin = s.harness.source.originID
@@ -206,6 +207,9 @@ extension EngineFollowBarrierTests {
         }
         let purged = await engine.purge(.scope(.identifiers([m.identifier])))
         #expect((try? purged.get()) != nil, "the purge completes: \(purged)")
+        // The withdrawn join still waits in the queue, no longer registered (`JoinAfterFollow.withdrawn`).
+        let whileWaiting = await engine.invariantViolations()
+        #expect(whileWaiting.isEmpty, "\(whileWaiting.prefix(3))")
         let startsBefore = await s.harness.source.starts.filter { $0.id == m.transferID }.count
         if visit == .sweepFollowsFirst {
             await engine.readForTests { $0.releaseFollowFollowUps() }
@@ -227,6 +231,58 @@ extension EngineFollowBarrierTests {
         let present = await s.harness.store.location(for: m.identifier, extensions: [], recordingAccess: false) != nil
         #expect(!present, "zz-m stays purged (visit-first)")
         await engine.releaseGroup(token)
+        await s.harness.source.release(w.transferID, with: .progress(received: 0, expected: nil))
+        let wResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: wWaiter) }
+        #expect((try? wResult.get())?.byteSize == Int64(wBytes.count), "W's waiter is served: \(wResult)")
+        await Self.finishHeld(s)
+    }
+
+    /// A purge during an owed follow forgets a heal of a purged id whose join waits for the follow, as it forgot the heal
+    /// of a visit-first engine: W downloads for a user waiter while v3's follow is owed; zz-h's quarantine ends (its heal
+    /// joins a system interest), then `purge(.scope([zz-h]))` arrives. Visited first, the heal's join created H and the
+    /// purge withdrew its system interest and forgot the heal (`EngineState.heals`). Behind the barrier the purge
+    /// withdraws the waiting join and forgets the heal too (`withdrawPurgedJoins`).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierPurgeForgetsAWaitingHeal(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 1_317_302)
+        let engine = s.engine
+        let hBytes = EngineFixture.bytes(1_317_304, count: 100_000)
+        let wBytes = EngineFixture.bytes(1_317_305, count: 100_000)
+        let h = EngineHarness.onDemand("zz-h", hBytes)
+        let w = EngineHarness.onDemand("zz-w", wBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(1_317_400) + [h, w], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        await s.harness.source.script(w.transferID, [.hold, .stage(wBytes)])
+        let wWaiter = Task { await engine.awaitAsset(w.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[w.transferID]?.state == .downloading }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(1_317_500) + [h, w], tag: "v3-heal", s, visit: visit)
+        await engine.readForTests { $0.scheduleHeal(h.identifier, at: $0.environment.time.monotonicNow()) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            if visit == .sweepFollowsFirst {
+                await engine.awaitCondition { FollowBarrier.joinWaits($0, h) }
+            } else {
+                await engine.awaitCondition { $0.state.jobs[h.transferID]?.interests.values.contains { $0.kind == .system } == true }
+            }
+        }
+        let purged = await engine.purge(.scope(.identifiers([h.identifier])))
+        #expect((try? purged.get()) != nil, "the purge completes: \(purged)")
+        let healAfterPurge = await engine.readForTests { $0.state.heals[h.identifier] }
+        #expect(healAfterPurge == nil, "the purge forgot zz-h's heal (visit-first): \(String(describing: healAfterPurge))")
+        let startsBefore = await s.harness.source.starts.filter { $0.id == h.transferID }.count
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let after = await engine.readForTests { e in (job: e.state.jobs[h.transferID]?.state, heal: e.state.heals[h.identifier]) }
+        let startsAfter = await s.harness.source.starts.filter { $0.id == h.transferID }.count
+        #expect(after.job == nil && after.heal == nil, "no job and no heal for the purged zz-h (visit-first): \(after)")
+        #expect(startsAfter == startsBefore, "no request for the purged zz-h after the purge (visit-first): \(startsBefore) -> \(startsAfter)")
         await s.harness.source.release(w.transferID, with: .progress(received: 0, expected: nil))
         let wResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: wWaiter) }
         #expect((try? wResult.get())?.byteSize == Int64(wBytes.count), "W's waiter is served: \(wResult)")
@@ -288,6 +344,68 @@ extension EngineFollowBarrierTests {
         #expect((try? aResult.get())?.byteSize == Int64(cBytes.count), "A is served by C: \(aResult)")
         #expect((try? kResult.get())?.byteSize == 16, "K's caller is served: K waited behind C's slot and started on the live gates once the throttle ended (visit-first): \(kResult)")
         #expect(kStarts == 1, "K's one request (visit-first): \(kStarts)")
+        await FollowBarrier.finish(s, sync: sync)
+    }
+
+    /// A user request that waits for the follow while a reserved interactive slot is free is refused on the throttle at
+    /// its arrival, as a visit-first engine's pump refused it there: two slots, one reserved for user work; C (1 MB,
+    /// held) downloads for a prefetch group and takes the only slot other work may use. While the follow is owed, an
+    /// unknown id's manifest fetch gets a 429 with Retry-After 3 s; then a user asks for zz-k (16 bytes, listed). Visited
+    /// first, the pump tried K at once in the reserved slot, the throttle refused it, and K's caller was answered
+    /// `serverUnavailable`. A place's stamp records the slots of the lane it was given for (`FreeSlots.admit`): read as a
+    /// prefetch or bulk place, K's had no slot, the barrier-end pump admitted it on the live gates after the throttle's
+    /// end, and K's caller was served.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a user request during an owed follow with a reserved slot free is refused on the throttle at its arrival (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierRefusesAUserPlaceInAReservedSlotOnItsThrottle(_ visit: LaneDropVisit) async throws {
+        let (s, _) = try await FollowBarrier.setUp(seed: 1_316_702, tuning: SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 1))
+        let engine = s.engine
+        let cBytes = Data(repeating: 0xE9, count: 1_000_000)
+        let kBytes = EngineFixture.bytes(1_316_704, count: 16)
+        let c = EngineHarness.onDemand("zz-c", cBytes)
+        let k = EngineHarness.onDemand("zz-k", kBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(1_316_800) + [c, k], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await s.harness.source.script(c.transferID, [.hold, .stage(cBytes)])
+        await s.harness.source.script(k.transferID, [.stage(kBytes)])
+        let group = try await engine.registerGroup([c.identifier], lane: .prefetch).get()
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[c.transferID]?.state == .downloading }
+        }
+        let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(1_316_900) + [c, k], s, visit: visit)
+        await s.harness.source.scriptManifest([.fail(.transient(.throttled, retryAfter: .seconds(3)))])
+        _ = await engine.awaitAsset("zz-none", lane: .userInitiated)
+        let throttled = await engine.readForTests { e in
+            (left: e.state.remote.flatMap { e.state.throttles[$0.originID] }?.seconds(since: e.environment.time.monotonicNow()), c: e.state.jobs[c.transferID]?.state)
+        }
+        try #require(throttled.left != nil && throttled.c == .downloading, "setup: the origin is throttled while C holds the non-user slot: \(throttled)")
+        let kWaiter = Task { await engine.awaitAsset(k.identifier, lane: .userInitiated) }
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, k) }
+        } else {
+            // Visited first, the pump answers the request at its arrival (the throttled park's fail-fast): no clock moves.
+            _ = await EngineHarness.value(of: kWaiter)
+        }
+        s.time.advance(by: 4)
+        await engine.awaitCondition { e in e.state.remote.flatMap { e.state.throttles[$0.originID] }.map { $0 <= e.environment.time.monotonicNow() } ?? true }
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let kResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: kWaiter) }
+        if case .failure(.serverUnavailable) = kResult {
+        } else {
+            Issue.record("K's caller is answered serverUnavailable: the pump tried K in the reserved slot under the throttle (visit-first): \(kResult)")
+        }
+        await s.harness.source.release(c.transferID, with: .progress(received: 0, expected: nil))
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[c.transferID] == nil }
+        }
+        let served = await engine.readForTests { e in e.state.groups[group]?.pending[c.identifier] == nil }
+        #expect(served, "the group's member is served by C")
+        await engine.releaseGroup(group)
         await FollowBarrier.finish(s, sync: sync)
     }
 
@@ -553,5 +671,91 @@ extension EngineFollowBarrierTests {
         let (aResult, bResult) = try await self.passedPublication(visit, seed: 1_316_402, publishingAtApply: true, failBehindBarrier: true)
         #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
         #expect(bResult == .failure(.integrityFailure), "B gets C's integrity failure: the follow passed C, publishing, in both orders (visit-first): \(bResult)")
+    }
+
+    /// A retried publication of a job the follow passed after its apply serves the moved id its new content, and a later
+    /// apply's follow that passes the job's next publication answers as a visit-first engine's: C (100 kB, the content of
+    /// zz-a, zz-b and zz-c, a user waiter each) publishes after v3's apply, which moves zz-b to N (16 bytes); behind the
+    /// barrier the follow passes C while it verifies. C's verification read then fails (EIO), a transient error the
+    /// interactive policy retries. Visited first, B was moved onto N at the apply and served N; C's retry downloaded
+    /// bytes that fail their checksum, and v4, applied while that second publication verified, moved zz-c to N2 (24
+    /// bytes): its follow passed C, publishing, so A and zz-c's user were answered `integrityFailure`. Behind the barrier,
+    /// left to C's retry, B rode it and was answered C's failure; and a pass's mark kept from the first publication
+    /// would move zz-c onto N2 at the second failure, which a visit-first engine never did (`Job.passedPublishing`).
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierAnswersAPassedJobsRetryAsVisitedFirst(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_317_002
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let wrong = EngineFixture.bytes(seed + 4, count: 100_000)
+        let nBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let n2Bytes = EngineFixture.bytes(seed + 6, count: 24)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let c = EngineHarness.onDemand("zz-c", cBytes)
+        let bMoved = EngineHarness.onDemand("zz-b", nBytes)
+        let cMoved = EngineHarness.onDemand("zz-c", n2Bytes)
+        try #require(a.transferID == b.transferID && a.transferID == c.transferID, "setup: zz-a, zz-b and zz-c share C")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b, c] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(a.transferID, [.hold, .stage(cBytes)])
+        await s.harness.source.script(bMoved.transferID, [.stage(nBytes)])
+        await s.harness.source.script(cMoved.transferID, [.stage(n2Bytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        let cWaiter = Task { await engine.awaitAsset(c.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 3 }
+        let fillers = FollowBarrier.fillers(seed + 200)
+        let later = Self.laterFillers(seed + 6_000)
+        try await Self.applyHeld([s.q] + fillers + [a, bMoved, c] + later, tag: "v3-retry-\(seed)", s, visit: visit)
+        if visit == .followVisitedFirst {
+            // Visited first, C's visit moved B onto N at the apply; N is served before C's bytes arrive.
+            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[bMoved.transferID] == nil }
+            }
+        }
+        var releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
+        if visit == .sweepFollowsFirst {
+            await Self.runOneFollowTurn(engine)
+            let passed = await engine.readForTests { e in
+                (owed: e.followOwed, c: e.state.jobs[a.transferID]?.state, passed: e.state.unfollowed.contains(a.transferID) && !e.state.followOrder[e.state.followNext...].contains(a.transferID))
+            }
+            #expect(passed.owed && passed.c == .verifying && passed.passed, "setup: the follow's second turn passed C while it verified and stays owed: \(passed)")
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        }
+        releaser.cancel()
+        await releaser.value
+        // The held unit is the first chunk of C's hash: its read of the claimed staging file fails, and C is retried.
+        s.fileSystem.addFault(FaultRule(operation: .read, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .io))
+        await s.harness.source.script(a.transferID, [.hold, .stage(wrong)])
+        await bulk.setHolding(false)
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        #expect((try? bResult.get())?.byteSize == 16, "B is served N, the content v3 maps zz-b to (visit-first): \(bResult)")
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[a.transferID]?.state == .downloading && $0.state.jobs[a.transferID]?.attempts == 1 }
+        }
+        // C's retry publishes; v4 moves zz-c while that publication, begun before v4's apply, verifies.
+        releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
+        try await Self.applyHeld([s.q] + fillers + [a, bMoved, cMoved] + later, tag: "v4-retry-\(seed)", s, visit: .followVisitedFirst)
+        let passedAgain = await engine.readForTests { e in (c: e.state.jobs[a.transferID]?.state, mark: e.state.jobs[a.transferID]?.passedPublishing) }
+        #expect(passedAgain.c == .verifying && passedAgain.mark == .publishingAtApply, "setup: v4's follow passed C's second publication, begun before its apply: \(passedAgain)")
+        releaser.cancel()
+        await releaser.value
+        await bulk.setHolding(false)
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let cResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: cWaiter) }
+        #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
+        #expect(cResult == .failure(.integrityFailure), "zz-c's user gets C's integrity failure: v4's follow passed C publishing, in both orders (visit-first): \(cResult)")
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
     }
 }
