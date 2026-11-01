@@ -177,6 +177,21 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - P-11 misses that depend on load;
       - two other-WP tests that failed only while the verifiers' simulator runs overlapped (load up to 782), and passed alone.
   - **Cycle 17 fix** started 23:48 automatically. Weekly usage was 83 % at 23:50. Forecast: cycle 17's verdict about 03:50 (about 87 %) and cycle 18's about 07:50 (about 91 %). Cycles 19 and 20 in run 6 would end at about 95 % and 99 %, and the limit stops cycle 21.
+  - **Cycle 17 fix at 02:31:** 8 commits, `05f94cc` to `346a8cb`.
+    - The flaky test is fixed, and failing-first tests cover every cycle-16 item.
+    - The fix, `5843c41`:
+      - whom a waiting verdict answers is now read through the functions its replay uses (`retryDelay`, `failFastError`, `spaceVerdict`);
+      - ids that a later apply maps back to a job whose verdict waits are taken off before the verdict and re-routed after it;
+      - `bringInbound`: when an attempt ends while a follow is owed, its job gets the interests the owed visits would move there.
+    - Then G4 tests, removal of order-only placement (S3-R16 item 3), and 10,000-job walk benchmarks.
+    - **Put-back:** `bringInbound` makes its moves in one turn, about 400 ms with 10,000 ids converging on one content, which breaks C2.
+    - **S3-R20 (02:34):** this is blocking unless the owner waives C2. The verifiers measure it, and a fix must keep every turn within C2.
+  - **Usage at 02:31: 89 %** (85 % at 01:31).
+    - This machine's agents used about $18 in that hour, roughly 1 point.
+    - The rest came from use elsewhere on the account; the Fable bar also rose from 12 to 14 %.
+  - **Put to the owner at 02:40:** switch WP-F to the full-freeze design (option (B) of 31 Oct 02:22)? The evidence:
+    - 4 of cycle 16's 5 items came from cycle 16's own code;
+    - cycle 17's fix adds about 400 engine lines, and its new step collides with C2, the constraint the owed follow exists for.
   - **Signal for the owner:** 4 of cycle 16's 5 items come from cycle 16's own additions (3 in new code, 1 a new test), and 1 is an older structural gap. As promised on 31 Oct at 22:12, if cycle 17's verifiers again find new cases in the same logic, put the full-freeze alternative back in front of the owner. That is option (B) of 31 Oct 02:22: about 2 h of design panel plus 2–3 cycles, 12–16 weekly points. Unused weekly budget does not carry over, so cycles run this week cost next week nothing.
   - **For run 6's args:** both verifiers ran simulator suites at the same time as timing-sensitive macOS runs, and the load reached 782. That caused two other-WP flakes and a coverage re-run. Add to the focus: take a lock (`mkdir .build-orchestrator/sim.lock`, removed afterwards) around each simulator or coverage run.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
