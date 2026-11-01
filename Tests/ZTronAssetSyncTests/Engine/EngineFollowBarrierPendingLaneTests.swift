@@ -21,6 +21,14 @@ extension EngineFollowBarrierTests {
         case owedTurn
     }
 
+    /// How O's first attempt ends in `pendingLane`.
+    enum PendingLaneEnding: Sendable {
+        /// A timeout: a retry below every cap, which keeps every interest, so the drain moves B on to J after it.
+        case timeout
+        /// A 404, which answers every interest on O, B's included: nothing is left for the drain to move on to J.
+        case notFound
+    }
+
     /// The answers `pendingLane` reads: P's (J's prefetch waiter), B's (H's user waiter, whose id converges on O and
     /// then moves on to J), A's (O's user waiter), whether J's 429 throttled the origin, and J's starts.
     struct PendingLaneOutcome {
@@ -45,8 +53,11 @@ extension EngineFollowBarrierTests {
     /// Visit-first: v3's visit moved B onto O, O's retry kept it, and v4's visit moved it on to J, so J's 429 is user work
     /// beyond its cap: J fails, P and B are answered `serverUnavailable`, the origin is not throttled, and O's retry
     /// serves A.
+    ///
+    /// With `ending` `.notFound`, O's 404 answered A, B and every holder ahead before v4 (visit-first), so J's 429 is
+    /// prefetch work below its cap: it throttles the origin, and J's retry serves P.
     @available(macOS 15.0, iOS 18.0, *)
-    func pendingLane(_ visit: LaneDropVisit, _ shape: PendingLaneShape) async throws -> PendingLaneOutcome {
+    func pendingLane(_ visit: LaneDropVisit, _ shape: PendingLaneShape, ending: PendingLaneEnding = .timeout) async throws -> PendingLaneOutcome {
         let seed: UInt64 = 1_919_002
         let tuning = SyncTuning(maxConcurrentTransfers: 12, reservedInteractiveSlots: 4, interactiveRetry: Self.shortInteractiveRetry)
         let (s, bulk) = try await Self.setUpHeldPublications(seed: seed, tuning: tuning)
@@ -72,7 +83,12 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
         await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
-        await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .stage(oBytes)])
+        switch ending {
+        case .timeout:
+            await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .stage(oBytes)])
+        case .notFound:
+            await s.harness.source.script(a.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
+        }
         await s.harness.source.script(p.transferID, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(60))), .stage(jBytes)])
         await s.harness.source.script(k.transferID, [.hold, .stage(kBytes)])
         let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
@@ -107,7 +123,7 @@ extension EngineFollowBarrierTests {
         try #require(epochs.h > epochs.ahead, "setup: H is created after the holders ahead: \(epochs)")
         // v3 maps zz-b and every holder's id to O's content.
         try await Self.applyHeld([s.q] + fillers + [a, bToO, k, p] + aheadOnO + Self.laterFillers(seed + 6_000), tag: "v3-pending-\(seed)", s, visit: visit)
-        // O's first attempt times out: a retry below every cap.
+        // O's first attempt times out (a retry below every cap) or gets its 404.
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         if visit == .sweepFollowsFirst {
             await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
@@ -181,5 +197,19 @@ extension EngineFollowBarrierTests {
         #expect(!outcome.throttled, "a 429 beyond the user lane's cap throttles nothing (visit-first)")
         #expect(outcome.jStarts == 1, "J starts once (visit-first): \(outcome.jStarts)")
         #expect((try? outcome.a.get())?.byteSize == 100_000, "O's retry serves A (visit-first): \(outcome.a)")
+    }
+
+    /// The same with O's 404 (`pendingLane(_:_:ending: .notFound)`): while H's move onto O is owed, B's interest counts by
+    /// O's rule, whose waiting 404 answers it, not by H's, whose owed visit would move it: a visit-first engine's O
+    /// answered B before v4, so J's 429 was prefetch work, throttled the origin, and J's retry served P.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, PendingLaneShape.allCases)
+    func barrierDecidesA429WithoutAnInterestTheOwedMovesVerdictAnswers(_ visit: LaneDropVisit, _ shape: PendingLaneShape) async throws {
+        let outcome = try await self.pendingLane(visit, shape, ending: .notFound)
+        #expect((try? outcome.p.get())?.byteSize == 16, "J's 429 is prefetch work below its cap: J's retry serves P (visit-first): \(outcome.p); jStarts \(outcome.jStarts)")
+        #expect(outcome.b == .failure(.notFound), "O's 404 answers B, moved onto O by v3's visit (visit-first): \(outcome.b)")
+        #expect(outcome.throttled, "a 429 of prefetch work below its cap throttles the origin (visit-first)")
+        #expect(outcome.jStarts == 2, "J's retry starts it again (visit-first): \(outcome.jStarts)")
+        #expect(outcome.a == .failure(.notFound), "O's 404 answers A: \(outcome.a)")
     }
 }
