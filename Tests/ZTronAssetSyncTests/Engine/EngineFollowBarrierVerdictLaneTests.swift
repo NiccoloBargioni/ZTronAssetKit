@@ -36,6 +36,11 @@ extension EngineFollowBarrierTests {
         /// left, within `interactiveMaxWait`, so whether the fail-fast answers B is read at O's 429, as the drain gives the
         /// verdict under its arrival (`verdictAnswers`' stamp; Stage 3 close-out cycle 18, the drop-mutant vaStampDrop).
         case throttleFailFastLater
+        /// A 503 whose `Retry-After` is a date 31 s ahead of the clock at its arrival, beyond the user lane's 30 s cap, with
+        /// 9 s passing before v4: B is answered `serverUnavailable`. J's 429 meets O's verdict waiting with the date 22 s
+        /// ahead, within the cap, so whether the retry answers B is read against the wall clock of the 503's arrival, as
+        /// the drain gives it (`verdictAnswers`' `wall`; Stage 3 close-out cycle 18, the drop-mutant vaWallDrop).
+        case retryAfterDateLater
         /// An offline failure of O's second attempt, begun after the conditions' first element (no edge since): O waits
         /// for the next edge and the offline fail-fast answers B `offline` (cycle 17).
         case offline
@@ -113,6 +118,9 @@ extension EngineFollowBarrierTests {
             await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.serverError(httpStatus: 503), retryAfter: .seconds(120))), .stage(oBytes)])
         case .throttleFailFast, .throttleFailFastLater:
             await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(10))), .stage(oBytes)])
+        case .retryAfterDateLater:
+            // The 503 is released at the hold, its date read off the clock then.
+            await s.harness.source.script(a.transferID, [.hold, .stage(oBytes)])
         case .offline:
             await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .hold, .fail(.offline(.noConnection)), .stage(oBytes)])
         case .insufficientSpace:
@@ -147,6 +155,9 @@ extension EngineFollowBarrierTests {
             }
             try await Self.leaveRoom(500_000, harness: s.harness, fileSystem: s.fileSystem)
             await s.harness.source.release(a.transferID, with: .failed(.insufficientSpace(requiredBytes: 20_000_000)))
+        } else if ending == .retryAfterDateLater {
+            let date = s.time.now().addingTimeInterval(31)
+            await s.harness.source.release(a.transferID, with: .failed(.transient(.serverError(httpStatus: 503), retryAfter: .date(date))))
         } else {
             await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         }
@@ -169,8 +180,8 @@ extension EngineFollowBarrierTests {
                 }
             }
         }
-        if ending == .throttleFailFastLater {
-            // 9 of the throttle's 10 s pass before v4 and J's 429.
+        if ending == .throttleFailFastLater || ending == .retryAfterDateLater {
+            // 9 s pass before v4 and J's 429: 9 of the throttle's 10 s, or of the date's 31 s.
             s.time.advance(by: 9)
         }
         // v4 moves zz-b onto J's content while (behind the barrier) the follow is still owed.
@@ -201,7 +212,8 @@ extension EngineFollowBarrierTests {
     /// fails J, answering P), or found B answered by O's 404, 429 beyond the caps, timeout at the cap, `Retry-After`
     /// beyond the cap, throttle's fail-fast, offline fail-fast or ENOSPC fail-fast (a prefetch lane, the 429 throttles
     /// the origin until its own end and J's retry serves P). Cycle 17 adds four endings and the assertions on J's own
-    /// throttle end and on the answers of B and P; cycle 18 the throttle's fail-fast read 9 s after it.
+    /// throttle end and on the answers of B and P; cycle 18 the throttle's fail-fast read 9 s after it, and a
+    /// `Retry-After` date read 9 s after its arrival.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, VerdictLaneEnding.allCases)
     func barrierDecidesA429OnTheLaneAWaitingVerdictLeaves(_ visit: LaneDropVisit, _ ending: VerdictLaneEnding) async throws {
