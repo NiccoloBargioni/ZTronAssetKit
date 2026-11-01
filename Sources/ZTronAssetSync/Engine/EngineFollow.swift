@@ -887,8 +887,11 @@ extension SyncEngine {
     /// interest met a later apply's copy: when that apply moved its id on to a third content, the visit moved it there,
     /// and it skipped the outcome a visit-first engine gave it on this job. Only the ids the copy maps to this content
     /// move, each holder's visit moves the rest itself (a holder whose every id moves is superseded, as its visit would
-    /// supersede it), and their joins are made at once (`EngineState.bringingInbound`). One pass over the jobs' ids
-    /// with one lookup in the copy each and no transfer formatted (C2; `BenchSync`).
+    /// supersede it), and their joins are made at once (`EngineState.bringingInbound`). The pass is one walk over the
+    /// jobs' ids with one lookup in the copy each and no transfer formatted (C2; `BenchSync.inboundWalkTurns`). The
+    /// moves cost what the visits they stand for cost, all in this turn and unbounded: when thousands of ids converge
+    /// on this one content, the turn exceeds C2 (put to the orchestrator in the WP-F draft, Stage 3 close-out cycle
+    /// 17).
     func bringInbound(_ transfer: TransferID) {
         guard self.followOwed, let target = self.state.jobs[transfer] else {
             return
