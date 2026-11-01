@@ -54,9 +54,11 @@ extension EngineFollowBarrierTests {
     /// (`ending`) while v3's follow is owed, so behind the barrier its verdict waits; C is visited for v3 after the end or
     /// before it (`when`; an ENOSPC's only after it). v4 then maps zz-b back to C's content. Visited first, v3's visit moved
     /// B onto N while C downloaded, C's verdict answered A alone and removed C, and v4's visit superseded N and moved B to
-    /// a fresh job of C's content, whose download (C's next scripted step) served B. Returns the answers of A and B.
+    /// a fresh job of C's content, whose download (C's next scripted step) served B. Returns the answers of A and B, and
+    /// the events a subscriber received from before C's attempt ended until B's `assetAvailable` (Stage 3 close-out
+    /// cycle 18: C's verdict reports the ids C holds, so zz-b, taken off C before it, gets no `assetFailed`).
     @available(macOS 15.0, iOS 18.0, *)
-    func mappedBack(_ visit: LaneDropVisit, seed: UInt64, when: MappedBackVisit, ending: MappedBackEnding = .notFound) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>) {
+    func mappedBack(_ visit: LaneDropVisit, seed: UInt64, when: MappedBackVisit, ending: MappedBackEnding = .notFound) async throws -> (a: Result<AssetLocation, AssetError>, b: Result<AssetLocation, AssetError>, events: [AssetEvent]) {
         try #require(ending == .notFound || when == .afterVerdict, "setup: an ENOSPC's free-space read runs a follow turn, which would end v3's follow once its visit of C ran")
         let space = ending == .spaceAtCap
         let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: space ? SyncTuning(interactiveRetry: Self.shortInteractiveRetry) : SyncTuning())
@@ -88,6 +90,7 @@ extension EngineFollowBarrierTests {
         }
         let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
         await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        let probe = EventProbe(stream: try await engine.subscribe().get())
         if space {
             // C's first attempt times out before any apply: one attempt counted, nobody answered, C retries.
             await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
@@ -133,8 +136,30 @@ extension EngineFollowBarrierTests {
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        // The stream is ordered: once B's `assetAvailable` is in, every event of C's verdict is too.
+        let bID = b.identifier
+        if (try? bResult.get()) != nil {
+            _ = await probe.next { event in
+                if case .assetAvailable(let id, _) = event {
+                    return id == bID
+                }
+                return false
+            }
+        }
+        let events = await probe.received
+        await probe.stop()
         await Self.finishHeld(s)
-        return (aResult, bResult)
+        return (aResult, bResult, events)
+    }
+
+    /// Whether `events` hold an `assetFailed` for `id`.
+    static func reportsFailed(_ id: AssetID, in events: [AssetEvent]) -> Bool {
+        events.contains { event in
+            if case .assetFailed(let failed, _, _) = event {
+                return failed == id
+            }
+            return false
+        }
     }
 
     /// An id a later apply maps back to the content whose verdict waits joins that content after the verdict, not before
@@ -147,6 +172,8 @@ extension EngineFollowBarrierTests {
         let outcome = try await self.mappedBack(visit, seed: 1_616_902, when: when)
         #expect(outcome.a == .failure(.notFound), "A gets C's 404 (visit-first): \(outcome.a)")
         #expect((try? outcome.b.get())?.byteSize == 100_000, "B was on N at C's 404, and v4 moved it back to a fresh job of C's content, which serves it (visit-first): \(outcome.b)")
+        #expect(Self.reportsFailed("zz-a", in: outcome.events), "C's 404 reports zz-a failed (visit-first): \(outcome.events)")
+        #expect(!Self.reportsFailed("zz-b", in: outcome.events), "C's 404 does not report zz-b, on N at the 404 and served after it (visit-first): \(outcome.events)")
     }
 
     /// As above, with C's second attempt ending in an ENOSPC whose room is there after all (`mappedBack`, `.spaceAtCap`;
@@ -159,6 +186,8 @@ extension EngineFollowBarrierTests {
         let outcome = try await self.mappedBack(visit, seed: 1_617_602, when: .afterVerdict, ending: .spaceAtCap)
         Self.expectInsufficientSpace(outcome.a, "A gets C's ENOSPC at the user lane's cap (visit-first)")
         #expect((try? outcome.b.get())?.byteSize == 100_000, "B was on N at C's ENOSPC, and v4 moved it back to a fresh job of C's content, which serves it (visit-first): \(outcome.b)")
+        #expect(Self.reportsFailed("zz-a", in: outcome.events), "C's ENOSPC at the cap reports zz-a failed (visit-first): \(outcome.events)")
+        #expect(!Self.reportsFailed("zz-b", in: outcome.events), "C's ENOSPC does not report zz-b, on N at the verdict and served after it (visit-first): \(outcome.events)")
     }
 
     /// How N's attempt ends in `intermediateHop`.
