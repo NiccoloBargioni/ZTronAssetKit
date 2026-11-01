@@ -664,15 +664,54 @@ extension ZTronAssetKitBenchmarks {
                 runs.append(try await SyncBench.concentration(members: 10_000, ending: ending))
             }
             for run in runs {
-                #expect(run.owed && run.ids == 10_001, "setup: \(run)")
+                #expect(run.owed, "setup: the follow is owed at O's ending: \(run)")
                 if ending == .notFound {
-                    #expect(run.verdictWaits, "setup: the 404's verdict waits for the follow: \(run)")
+                    #expect(run.verdictWaits && run.left == 0 && run.lane != nil, "setup: the 404's verdict waits for the follow, and answers every id once the moves and visits bring them onto O: \(run)")
+                } else {
+                    #expect(run.ids == 10_001, "setup: O's job holds every id: \(run)")
                 }
             }
             let waits = runs.map(\.wait)
             let turns = runs.map { $0.turns.max() ?? 0 }
-            print("R-SYN-11 10,000 ids converging on one content during an owed follow, \(label): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            let lanes = runs.compactMap(\.lane)
+            print("R-SYN-11 10,000 ids converging on one content during an owed follow, \(label): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms; followedLane with the moves owed \(lanes) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(label): \(waits)")
+            if ending == .notFound {
+                #expect((lanes.min() ?? .infinity) <= Self.c2Budget, "followedLane with the moves owed: \(lanes)")
+            }
+        }
+
+        /// C2 of the walk an apply makes while a follow is owed and a publication runs (Stage 3 close-out cycle 18; the
+        /// cycle-17 verifiers' PROBE-C17R-RR14-PUBLICATION-HOP): before the copy changes, `bringInboundOntoPublications`
+        /// looks for the ids the outgoing copy maps to a publishing job's content that an owed visit would move
+        /// (`SyncBench.publicationApply`). Where none converges on the publication, the walk is all it costs: timed
+        /// inside the actor, the median of 21 calls a run. Then v4 is applied, and the heartbeat's longest wait covers
+        /// its turns, the walk's included: once where the walk finds nothing, once where the outgoing copy maps nearly
+        /// every one of the 10,000 members to the publication's content, so the walk records a move for each. The best
+        /// of three runs against C2, after a warm-up.
+        @Test("R-SYN-11: the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(5)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func publicationApplyTurns() async throws {
+            _ = try await SyncBench.publicationApply(members: 1_000, onto: false)
+            var runs: [PublicationApplyRun] = []
+            var ontoRuns: [PublicationApplyRun] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.publicationApply(members: 10_000, onto: false))
+                ontoRuns.append(try await SyncBench.publicationApply(members: 10_000, onto: true))
+            }
+            for run in runs {
+                #expect(run.jobs == 10_001 && run.owed && run.publishing && run.found == 0, "setup: \(run)")
+            }
+            for run in ontoRuns {
+                #expect(run.owed && run.publishing && run.found >= 9_000, "setup: v4's walk finds a move for nearly every member: \(run)")
+            }
+            let walks = runs.map(\.walk)
+            let applies = runs.map(\.apply)
+            let ontoApplies = ontoRuns.map(\.apply)
+            print("R-SYN-11 the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs: median of 21 calls \(walks) ms, best \(walks.min() ?? .infinity) ms; the apply's longest actor wait \(applies) ms, best \(applies.min() ?? .infinity) ms; with a move found for nearly every member \(ontoApplies) ms, best \(ontoApplies.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs) \(ontoRuns)")
+            #expect((walks.min() ?? .infinity) <= Self.c2Budget, "the walk: \(walks)")
+            #expect((applies.min() ?? .infinity) <= Self.c2Budget, "the apply: \(applies)")
+            #expect((ontoApplies.min() ?? .infinity) <= Self.c2Budget, "the apply whose walk finds the moves: \(ontoApplies)")
         }
     }
 }
@@ -2459,6 +2498,8 @@ struct ConcentrationRun: CustomStringConvertible {
     /// The heartbeat's longest wait, in milliseconds, from O's ending until every id is on O's job (and, for a
     /// publication, until it reaches the store).
     var wait: Double = 0
+    /// The heartbeat's longest wait in O's ending's own window (its turn), in milliseconds; 0 with no ending.
+    var ending: Double = 0
     /// The follow's held turns released in that window, each timed inside the actor, in milliseconds.
     var turns: [Double] = []
     /// The jobs when O's attempt ended.
@@ -2467,13 +2508,39 @@ struct ConcentrationRun: CustomStringConvertible {
     var owed = false
     /// The ids of O's job at the window's end.
     var ids = 0
-    /// Whether O's 404 verdict waited for the follow at the window's end.
+    /// The jobs at the window's end.
+    var left = 0
+    /// Whether O's 404 verdict waited for the follow once its turn ended.
     var verdictWaits = false
+    /// For a 404, the median of 21 timed `followedLane` calls, inside the actor, on the job of the last holder whose move
+    /// is still owed once the 404's turn ended, in milliseconds.
+    var lane: Double?
 
     var description: String {
         let sorted = self.turns.sorted()
         let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
-        return "wait \(self.wait) ms; \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), verdict waits \(self.verdictWaits); \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
+        return "wait \(self.wait) ms, ending \(self.ending) ms; \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), \(self.left) jobs left, verdict waits \(self.verdictWaits), followedLane \(String(describing: self.lane)) ms; \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
+    }
+}
+
+/// One run of `SyncBench.publicationApply`.
+struct PublicationApplyRun: CustomStringConvertible {
+    /// The median of 21 timed `bringInboundOntoPublications` calls, inside the actor, in milliseconds; not timed (0)
+    /// where the members converge on the publication, whose first call would find every move.
+    var walk: Double = 0
+    /// The heartbeat's longest wait while v4 is applied, in milliseconds.
+    var apply: Double = 0
+    /// The jobs before v4.
+    var jobs = 0
+    /// Whether the follow was owed before v4.
+    var owed = false
+    /// Whether O's job was publishing before v4.
+    var publishing = false
+    /// The moves the timed walks found, or, where the members converge on the publication, v4's apply.
+    var found = 0
+
+    var description: String {
+        "walk \(self.walk) ms, apply \(self.apply) ms; \(self.jobs) jobs, follow owed \(self.owed), publishing \(self.publishing), \(self.found) moves found"
     }
 }
 
@@ -2485,7 +2552,9 @@ extension SyncBench {
     /// downloads. v3 maps every member to O's content, with the follow's follow-ups held after its first turn, so each
     /// member's job holds an id the copy maps to O's content and is owed a visit. Then O's attempt ends (`ending`), and
     /// the follow's held turns are released one at a time, each timed inside the actor, until O's job holds every id
-    /// (and, for a publication, until it reaches the store); the heartbeat's longest wait covers the whole window.
+    /// (and, for a publication, until it reaches the store) or the follow ends (a 404's last turn gives the verdict); the
+    /// heartbeat's longest wait covers the whole window. The ending's own turn is timed in a window of its own, after
+    /// which, for a 404, `followedLane` is timed on the job of a holder whose move is still owed.
     static func concentration(members count: Int, ending: ConcentrationEnding) async throws -> ConcentrationRun {
         let time = ManualTimeSource()
         let source = FakeRemoteSource()
@@ -2571,24 +2640,33 @@ extension SyncBench {
         run.owed = before.owed
         await SyncBench.raiseOwnedTaskPriority(engine)
         var turns: [Double] = []
-        run.wait = try await SyncBench.longestWait(on: engine) {
-            switch ending {
-            case .notFound:
+        // O's ending, timed in a window of its own: the turn that walks the jobs and makes the first moves.
+        switch ending {
+        case .notFound:
+            run.ending = try await SyncBench.longestWait(on: engine) {
                 await source.release(o.transferID, with: .progress(received: 0, expected: nil))
                 while !Task.isCancelled, !(await SyncBench.verdictWaits(engine, o.transferID)) {
                     await Task.yield()
                 }
-            case .publication:
-                await bulk.setHolding(true)
+            }
+            // `followedLane` with the moves owed, outside the heartbeat's windows.
+            run.verdictWaits = await SyncBench.verdictWaits(engine, o.transferID)
+            run.lane = await SyncBench.followedLaneMedian(engine, await SyncBench.lastOwedHolder(engine), calls: 21)
+        case .publication:
+            await bulk.setHolding(true)
+            run.ending = try await SyncBench.longestWait(on: engine) {
                 await source.release(o.transferID, with: .progress(received: 0, expected: nil))
                 while !Task.isCancelled, !(await SyncBench.leftDownloading(engine, o.transferID)) {
                     await Task.yield()
                 }
-            case .none:
-                break
             }
-            // The follow's held turns, one at a time, until O's job holds every id.
-            while !Task.isCancelled, await SyncBench.concentrating(engine, o.transferID, count: count + 1) {
+        case .none:
+            break
+        }
+        let rest = try await SyncBench.longestWait(on: engine) {
+            // The follow's held turns, one at a time, until O's job holds every id; for a 404, until the follow ends and
+            // its drain gives the verdict.
+            while !Task.isCancelled, ending == .notFound ? await SyncBench.followOwedNow(engine) : await SyncBench.concentrating(engine, o.transferID, count: count + 1) {
                 if let turn = await SyncBench.releaseOneHeldTurn(engine) {
                     turns.append(turn)
                 } else {
@@ -2600,10 +2678,11 @@ extension SyncBench {
                 await bulk.waitForHeldUnits(atLeast: 1)
             }
         }
+        run.wait = max(run.ending, rest)
         run.turns = turns
         let after = await SyncBench.inbound(engine, o.transferID)
         run.ids = after.ids
-        run.verdictWaits = after.waits
+        run.left = after.jobs
         await engine.releaseFollowFollowUps()
         await bulk.setHolding(false)
         await bulk.releaseAll()
@@ -2611,6 +2690,16 @@ extension SyncBench {
         _ = await sync.value
         _ = await waiter.value
         return run
+    }
+
+    /// Whether the follow is owed.
+    static func followOwedNow(_ engine: isolated SyncEngine) -> Bool {
+        engine.followOwed
+    }
+
+    /// The holder of the last owed move (`EngineState.inboundMoves`), if one is owed.
+    static func lastOwedHolder(_ engine: isolated SyncEngine) -> TransferID? {
+        engine.inboundOwed ? engine.state.inboundMoves.last?.holder : nil
     }
 
     /// Whether `transfer`'s job left `downloading` (its publication began or its attempt ended), or is gone.
@@ -2635,5 +2724,175 @@ extension SyncBench {
         let span = clock.now - start
         engine.holdFollowFollowUps()
         return SyncBench.milliseconds(span)
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// An owed follow over `count` jobs while O's publication runs (Stage 3 close-out cycle 18, `publicationApplyTurns`):
+    /// a prefetch group of `count` on-demand members waits `awaitingSpace` as in `inboundWalk`; O's download completes
+    /// and its publication is held at its first store unit (every later store unit runs); then v3 gives every member a
+    /// new content, or, `onto`, O's, with the follow's follow-ups held after its first turn. Without `onto`, times 21
+    /// `bringInboundOntoPublications` calls inside the actor (the walk an apply makes then; it finds no move). Then v4
+    /// gives every member another content, and the heartbeat times its apply: `onto`, its walk finds a move onto O for
+    /// every member whose visit v3's follow still owes.
+    static func publicationApply(members count: Int, onto: Bool) async throws -> PublicationApplyRun {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let bulk = SteppedBlockingExecutor(holding: false)
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: bulk,
+            time: time,
+            random: SeededRandom(seed: 0x12),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = SyncBench.entry("x", xBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData([x]), etag: ETag(rawValue: "\"v1\""))])
+        await source.script(x.transferID, [.stage(xBytes)])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        let oBytes = Data(repeating: 0x6F, count: 16)
+        let o = SyncBench.entry("o", oBytes, policy: .onDemand)
+        let old = (0..<count).map { index in
+            SyncBench.entry(String(format: "s%05d", index), GeneratedPayload.bytes(seed: 0x21_000 + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+        }
+        // v2 prunes x: its 2,000 bytes wait for the grace, so the members wait `awaitingSpace`.
+        await source.scriptManifest([.fetched(SyncBench.manifestData(old + [o]), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the pruning sync did not complete")
+        }
+        try await store.flush(.ordered)
+        try await SyncBench.leaveRoom(100, store: store, fileSystem: fileSystem, ballast: "ballast")
+        await engine.refreshFreeSpace()
+        await source.script(o.transferID, [.hold, .stage(oBytes)])
+        let waiter = Task { await engine.awaitAsset(o.identifier, lane: .userInitiated) }
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, o.transferID)) {
+            await Task.yield()
+        }
+        guard case .success = await engine.registerGroup(old.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.othersAwaitingSpace(engine, count: count, besides: o.transferID)) {
+            await Task.yield()
+        }
+        // O's publication begins, held at its first store unit; every later unit (an apply's) runs.
+        await bulk.setHolding(true)
+        await source.release(o.transferID, with: .progress(received: 0, expected: nil))
+        while !Task.isCancelled, !(await SyncBench.leftDownloading(engine, o.transferID)) {
+            await Task.yield()
+        }
+        await bulk.waitForHeldUnits(atLeast: 1)
+        guard let unit = await bulk.heldUnits.first else {
+            throw SyncBenchError.incomplete("O's publication holds no store unit")
+        }
+        let releaser = Task {
+            while !Task.isCancelled {
+                await bulk.waitForHeldUnits(atLeast: 2)
+                for other in await bulk.heldUnits where other != unit {
+                    await bulk.release(other)
+                }
+            }
+        }
+        // v3 gives every member a new content, or, `onto`, O's.
+        let v3 = (0..<count).map { index in
+            let name = String(format: "s%05d", index)
+            return onto ? SyncBench.entry(name, oBytes, policy: .onDemand) : SyncBench.entry(name, GeneratedPayload.bytes(seed: 0x55_000 + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(v3 + [o]), etag: ETag(rawValue: "\"v3\""))])
+        await engine.holdFollowFollowUps()
+        let sync = Task { await engine.sync(.force) }
+        while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
+            await Task.yield()
+        }
+        var run = onto ? await SyncBench.applyWalkSetup(engine, o.transferID) : await SyncBench.timedApplyWalks(engine, o.transferID, calls: 21)
+        // v4 gives every member another content.
+        let v4 = (0..<count).map { index in
+            SyncBench.entry(String(format: "s%05d", index), GeneratedPayload.bytes(seed: 0x77_000 + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+        }
+        let manifest = try ValidatedManifest(entries: v4 + [o], digest: ContentHash.sha256(of: Data("v4-\(count)-\(onto)".utf8)))
+        let before = await SyncBench.inboundMovesRecorded(engine)
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        var applied: Result<ApplyReport, StoreError>?
+        run.apply = try await SyncBench.longestWait(on: engine) {
+            applied = await engine.applyAndFollow(manifest, etag: nil, eviction: nil)
+        }
+        guard case .success = applied else {
+            throw SyncBenchError.incomplete("v4 was not applied: \(String(describing: applied))")
+        }
+        if onto {
+            run.found = await SyncBench.inboundMovesRecorded(engine) - before
+        }
+        await engine.releaseFollowFollowUps()
+        releaser.cancel()
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
+        await engine.shutdown()
+        _ = await sync.value
+        _ = await waiter.value
+        _ = await releaser.value
+        return run
+    }
+
+    /// The moves the walks have recorded so far (`EngineState.inboundMoves`, made or owed).
+    static func inboundMovesRecorded(_ engine: isolated SyncEngine) -> Int {
+        engine.state.inboundMoves.count
+    }
+
+    /// The jobs, whether the follow is owed and whether `transfer`'s job is publishing, without a timed walk.
+    static func applyWalkSetup(_ engine: isolated SyncEngine, _ transfer: TransferID) -> PublicationApplyRun {
+        let state = engine.state.jobs[transfer]?.state
+        var run = PublicationApplyRun()
+        run.jobs = engine.state.jobs.count
+        run.owed = engine.followOwed
+        run.publishing = state == .verifying || state == .committing
+        return run
+    }
+
+
+    /// Times `calls` calls of `bringInboundOntoPublications` inside the actor; `transfer` is the publishing job's.
+    static func timedApplyWalks(_ engine: isolated SyncEngine, _ transfer: TransferID, calls: Int) -> PublicationApplyRun {
+        let state = engine.state.jobs[transfer]?.state
+        let publishing = state == .verifying || state == .committing
+        let before = engine.state.inboundMoves.count
+        let clock = ContinuousClock()
+        var spans: [Double] = []
+        for _ in 0..<calls {
+            let start = clock.now
+            engine.bringInboundOntoPublications()
+            spans.append(SyncBench.milliseconds(clock.now - start))
+        }
+        spans.sort()
+        var run = PublicationApplyRun()
+        run.walk = spans[spans.count / 2]
+        run.jobs = engine.state.jobs.count
+        run.owed = engine.followOwed
+        run.publishing = publishing
+        run.found = engine.state.inboundMoves.count - before
+        return run
     }
 }
