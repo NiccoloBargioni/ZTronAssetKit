@@ -211,12 +211,36 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - PROBE-C17-ADMIT-DURING-APPLY is pre-existing and outside the class, so it is not blocking. It goes in the residual risks and is marked for the owner in Stage 5: a wrong `notFound` under a race.
     - Cycle 17's issues are in `.build-orchestrator/s3f-c17-issues.json`.
   - **Cycle 18 fix** started 04:44 automatically, with S3-R20 in the rulings file. S3-R21 reaches cycle 18's verifiers and the next fixer. Weekly usage was 94 % at 04:45, so the limit will probably cut cycle 18 off between about 07:00 and 08:30.
-  - **If the limit cuts cycle 18 off (resume after the reset):**
-    - Save any uncommitted worktree changes on `wip/s3f-c18a`, as with `wip/s3f-c15a`. Reset the worktree to its last commit.
-    - Start run 6 from cycle 18. Copy `s3-fix-args-run5.json` and set `fromCycle` 18, `findingsFile` `s3f-c17-issues.json` and `maxCycle` 30.
-    - The focus names S3-R20 and S3-R21 and the WIP branch ("copy files or hunks, never merge").
-    - If cycle 18's verification did finish, start from cycle 19 with its issues instead.
-    - Do not start run 6 before the reset when weekly usage is at 98 % or more.
+  - **Cycle 18 fix** ran 04:44–07:54 and ended at `4b1c3a6`, 13 commits from `d788d75`.
+    - Its fixes:
+      - a Retry-After date is now read on arrival;
+      - interests join in place;
+      - the moves an attempt's end or an apply owes now run over the follow's turns (S3-R20);
+      - RR-14 is fixed by a walk at each apply.
+    - The fixer reported `--quick` PASS, Sync 543 tests, Sync coverage 94.02 % and the simulator at 1,497/1,497.
+    - It recorded RR-16 (a start-count difference), RR-17 (PROBE-C17-ADMIT-DURING-APPLY, per S3-R21) and RR-18 (unprobed, put to the orchestrator).
+  - **Cycle 18 verification** ran 07:54–09:18. The correct lens found 6 issues (1 blocking) and the reqs lens 9 (4 blocking).
+    - Every cycle-17 item is confirmed fixed, including the S3-R20 and S3-R21 C2 items (408 ms and 17.7 ms before).
+    - The new items:
+      - PROBE-C18C-PENDING-LANE: cycle 18's owed moves make `followedLane` decide a 429 on the wrong lane, when a move's target is a failed job whose verdict waits and a later apply was followed;
+      - C2: a single visit or owed move that carries 10,000 ids takes 54–56 ms in one turn;
+      - G4: five surviving drop-mutants of cycle 18's deferral code, branches never run, and the unpinned release paths of the publication's wait for owed moves (liveness).
+    - Non-blocking:
+      - a timing-only difference from the publication's wait;
+      - a C2 benchmark that missed only under load;
+      - P-13;
+      - doc and invariant notes;
+      - RR-18's difference may not exist.
+  - **Run 5 ended 09:19** after cycle 18 (12 agents, 0 errors). Weekly usage was 99 %, so run 6 waits for the reset.
+    - **S3-R22 (09:20):**
+      - the many-ids-in-one-turn shape is inside C2, so it is blocking;
+      - RR-18 is not blocking;
+      - simulator and coverage runs take turns under a lock directory.
+    - Cycle 18's issues are in `.build-orchestrator/s3f-c18-issues.json`.
+    - **Run 6 is ready:** `.build-orchestrator/s3-fix-args-run6.json`, with fromCycle 19, maxCycle 30, the c18 findings, and a focus that names S3-R20 to S3-R22.
+      - The worktree is clean at `4b1c3a6`, and no build or test processes are left.
+      - After the reset, launch `.claude/workflows/assetkit-stage3-fix.js` with those args.
+    - Blocking items per cycle: 7 in cycle 13, then 5, about 8, 5, 6 and 5 in cycles 14 to 18. Cycle 18's 5 include only 1 answer difference (cycle 17 had 2); the rest are 1 C2 shape and 3 G4 test-strength items.
   - **Signal for the owner:** 4 of cycle 16's 5 items come from cycle 16's own additions (3 in new code, 1 a new test), and 1 is an older structural gap. As promised on 31 Oct at 22:12, if cycle 17's verifiers again find new cases in the same logic, put the full-freeze alternative back in front of the owner. That is option (B) of 31 Oct 02:22: about 2 h of design panel plus 2–3 cycles, 12–16 weekly points. Unused weekly budget does not carry over, so cycles run this week cost next week nothing.
   - **For run 6's args:** both verifiers ran simulator suites at the same time as timing-sensitive macOS runs, and the load reached 782. That caused two other-WP flakes and a coverage re-run. Add to the focus: take a lock (`mkdir .build-orchestrator/sim.lock`, removed afterwards) around each simulator or coverage run.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
