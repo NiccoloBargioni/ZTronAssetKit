@@ -50,7 +50,7 @@ extension EngineFollowBarrierTests {
     }
 
     /// What `sharedMove` reads: the answers of O's waiter and of each member's, the ids each sweep-first turn moved off
-    /// the members' job, and that job's starts.
+    /// the members' job, and that job's starts and cancellations.
     struct SharedMoveOutcome {
         /// O's waiter's answer.
         let o: Result<AssetLocation, AssetError>
@@ -63,6 +63,8 @@ extension EngineFollowBarrierTests {
         let endTurn: Int?
         /// The starts of the members' first job's transfer.
         let holderStarts: Int
+        /// The cancellations the origin recorded for that transfer once the follow ended, before the shutdown.
+        var holderCancels = 0
         /// The ids of each move off the members' job O's attempt's end owed (sweep-first `.attemptEnd`,
         /// `.convergenceEnds`), and the members on that job when it ended.
         var moveSizes: [Int] = []
@@ -221,8 +223,9 @@ extension EngineFollowBarrierTests {
         }
         let holderStarts = await s.harness.source.starts.filter { $0.id == holder }.count
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let holderCancels = await s.harness.source.controlLog.filter { $0.transfer == holder && $0.control == .cancel }.count
         await Self.finishHeld(s)
-        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply)
+        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, holderCancels: holderCancels, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply)
     }
 
     /// The answers once the engine shut down (`sharedMove(_:seed:shape:shutdown:)`).
@@ -262,6 +265,9 @@ extension EngineFollowBarrierTests {
         #expect(wrong.isEmpty, "every member gets \(expected) (visit-first); \(wrong.count) do not: \(wrong.prefix(3).map { "zz-s\($0.offset): \($0.element)" }); turns \(outcome.turns)")
         if shape.converges {
             #expect(outcome.holderStarts == 1, "the members' first job starts once, its attempt abandoned or ended by the move: \(outcome.holderStarts)")
+            // The move that takes H's every id supersedes H: its running attempt is cancelled at the move's first turn,
+            // as v3's visit on a visit-first engine cancelled it, not left running once its job is removed.
+            #expect(outcome.holderCancels == 1, "the members' first job's attempt is cancelled once, when the move off it began: \(outcome.holderCancels)")
         }
         guard visit == .sweepFollowsFirst else {
             return
