@@ -192,6 +192,9 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Put to the owner at 02:40:** switch WP-F to the full-freeze design (option (B) of 31 Oct 02:22)? The evidence:
     - 4 of cycle 16's 5 items came from cycle 16's own code;
     - cycle 17's fix adds about 400 engine lines, and its new step collides with C2, the constraint the owed follow exists for.
+  - **Owner, 1 Nov 02:39: "No, keep fixing".** The full freeze is declined a second time; the first was "Narrow the bar" on 31 Oct.
+    - Keep cycling until convergence, with S3-R20 in force: C2 is not waived.
+    - Do not offer the freeze again at each verdict. Raise it again only on a new kind of evidence: a liveness failure, or a C2-bounded fix that cannot keep the answers equal.
   - **Signal for the owner:** 4 of cycle 16's 5 items come from cycle 16's own additions (3 in new code, 1 a new test), and 1 is an older structural gap. As promised on 31 Oct at 22:12, if cycle 17's verifiers again find new cases in the same logic, put the full-freeze alternative back in front of the owner. That is option (B) of 31 Oct 02:22: about 2 h of design panel plus 2–3 cycles, 12–16 weekly points. Unused weekly budget does not carry over, so cycles run this week cost next week nothing.
   - **For run 6's args:** both verifiers ran simulator suites at the same time as timing-sensitive macOS runs, and the load reached 782. That caused two other-WP flakes and a coverage re-run. Add to the focus: take a lock (`mkdir .build-orchestrator/sim.lock`, removed afterwards) around each simulator or coverage run.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
