@@ -218,6 +218,8 @@ extension SyncEngine {
         self.forgetBound(self.state.boundContent.filter { !SyncEngine.isPresent(view.records[$0.key], at: $0.value) }.keys)
         let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
         let previous = self.state.applied
+        // As `applied`: the outgoing copy's moves onto a running publication come first (RR-14).
+        self.bringInboundOntoPublications()
         self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
         self.state.generation = max(self.state.generation, view.generation)
         for id in pruned {

@@ -114,6 +114,7 @@ extension SyncEngine {
         self.state.followNext = 0
         self.state.followScans = []
         self.state.pumpWaitsForFollow = false
+        self.releaseInboundWaits()
         self.state.eventsAfterFollow = []
         self.state.eventStamps = []
         self.state.reading = nil

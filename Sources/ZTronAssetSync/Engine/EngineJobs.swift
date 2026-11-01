@@ -187,7 +187,10 @@ extension SyncEngine {
     /// Keeps the indexes a join feeds (Stage 3, S3-PERF-02): a job joined for an entry the engine's copy does not name for
     /// `asset` may need moving at the next follow (`unfollowed`); a system interest's job is visited by a run's release
     /// of re-attachments (`systemHeld`); the active run's interest is removed at its end (`RunState.held`). One lookup in
-    /// the copy and a comparison of the two entries' transfer keys, no transfer formatted.
+    /// the copy and a comparison of the two entries' transfer keys, no transfer formatted. An owed move's join under the
+    /// copy an apply has replaced since (`SyncEngine.continueInbound`) is compared with the engine's copy too: a job that
+    /// holds an id the copy maps elsewhere is in `unfollowed` (`invariantViolations()`), whether or not the pass over the
+    /// copy has reached the id.
     private func noteJoin(_ transfer: TransferID, asset: AssetID, entry: ManifestEntry, token: InterestToken, kind: InterestKind) {
         if let listed = self.state.applied.entry(for: asset), SyncEngine.sameTransfer(listed, entry) {
             // Follows the copy.

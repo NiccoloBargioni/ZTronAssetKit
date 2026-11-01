@@ -999,7 +999,7 @@ extension SyncEngine {
     /// `downloading → verifying`, publish, then `committing →` present: every interest present **now** receives the
     /// locations (RE-S14).
     func publish(_ transfer: TransferID, epoch: UInt64, file: StagedFile, cancelledAttempt: Bool) async {
-        guard var job = self.state.jobs[transfer], job.epoch == epoch else {
+        guard self.state.jobs[transfer]?.epoch == epoch else {
             // The job was retired (or replaced) before this publication began: nobody else will publish the file. The
             // transfer ended without a verdict (a half-open probe's exit, §7.7) unless a new job of it runs.
             if self.state.jobs[transfer] == nil {
@@ -1015,18 +1015,44 @@ extension SyncEngine {
         // The interests a visit-first engine's visits had moved onto this content are the job's before its publication
         // binds its ids (`bringInbound`; Stage 3 close-out cycle 17, PROBE-C16C-INTERMEDIATE-HOP-SERVED).
         self.bringInbound(transfer)
-        job = self.state.jobs[transfer] ?? job
-        job.active = nil
+        self.state.jobs[transfer]?.active = nil
         // The ids a visit-first engine moved before this publication began: an owed follow's visit, which meets the job
         // publishing, re-routes them at once (`Job.rerouteOnPass`, `follow`). None while no follow is owed: every
-        // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits.
-        job.rerouteOnPass = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []
-        job.rerouteFor = self.state.followsEnded
-        self.state.jobs[transfer] = job
-        self.pump()
+        // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits. Read at
+        // the attempt's end: the moves it owes (`bringInbound`) bring ids the copy maps here, which none of this holds.
+        var away: Set<AssetID> = []
+        if self.followOwed, let assets = self.state.jobs[transfer]?.assets {
+            away = assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
+        }
+        // Read before the job is written: an optional-chained assignment holds the state across its right side.
+        let follow = self.state.followsEnded
+        self.state.jobs[transfer]?.rerouteOnPass = away
+        self.state.jobs[transfer]?.rerouteFor = follow
+        if self.inboundBlocks(transfer) {
+            // The binding waits for the moves owed onto or off this job (ruling S3-R20 item 3: the job's end waits while
+            // they are made over the follow's turns, `bringInbound`).
+            // REENTRANCY: RE-S48 (proposed) — the lifecycle, and the job at this epoch still verifying: a job retired or
+            // replaced meanwhile gets the retired publication's exit, the file discarded.
+            await self.awaitInboundMoves(transfer)
+            guard self.isRunning else {
+                return
+            }
+            guard self.state.jobs[transfer]?.epoch == epoch, self.state.jobs[transfer]?.state == .verifying else {
+                if self.state.jobs[transfer] == nil {
+                    self.recordBreaker(.abandoned(transfer))
+                }
+                // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a copy nobody wants.
+                await self.state.staging?.discard(file.name)
+                return
+            }
+        }
+        guard let job = self.state.jobs[transfer] else {
+            return
+        }
         let ids = job.assets.sorted()
         let identity = job.identity
         let lane = job.lane
+        self.pump()
         let serial = self.state.ledgerForgets
         let locations: [AssetID: AssetLocation]
         do {
@@ -1119,12 +1145,13 @@ extension SyncEngine {
     /// it when the asset left the manifest (T21): a waiter gets `.notFound`, a group drops the member, a heal is
     /// forgotten. The run's claim leaves `old` either way, so the run never waits for a job that will not report to it.
     /// An asset the store holds at its current entry's content (an apply reused a blob for it) joins no job: it is
-    /// answered from the store (L4-R5).
-    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID) {
+    /// answered from the store (L4-R5). `listing` is the copy whose entry the interest follows, the engine's copy when
+    /// `nil` (`SyncEngine.continueInbound`'s moves, found under a copy an apply may have replaced since).
+    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID, listing: ValidatedManifest? = nil) {
         if interest.kind == .run {
             self.releaseRunClaim(token, asset: asset, from: old)
         }
-        guard let entry = self.state.applied.entry(for: asset) else {
+        guard let entry = (listing ?? self.state.applied).entry(for: asset) else {
             switch interest.kind {
             case .waiter:
                 self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(.notFound))
@@ -1228,14 +1255,15 @@ extension SyncEngine {
     /// engine's copy of the manifest still maps to this content was superseded by a manifest the store holds and the
     /// copy does not show yet: it waits on a fresh, held job of the content until the copy catches up (F-20), never
     /// `.notFound` while the asset is listed. A follow passes `settling: false` and checks the run and pumps once per
-    /// turn instead (C2).
-    func supersede(_ transfer: TransferID, settling: Bool = true) {
+    /// turn instead (C2). `listing` is the copy the interests follow, the engine's copy when `nil` (`reroute`).
+    func supersede(_ transfer: TransferID, settling: Bool = true, listing: ValidatedManifest? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
+        let copy = listing ?? self.state.applied
         self.state.jobs[transfer]?.interests.removeAll()
         self.removeJob(transfer)
-        if job.interests.values.contains(where: { interest in interest.assets.contains { self.state.applied.entry(for: $0)?.transferID == transfer } }) {
+        if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0)?.transferID == transfer } }) {
             self.holdForManifest(transfer)
         }
         for token in job.interests.keys.sorted() {
@@ -1243,7 +1271,7 @@ extension SyncEngine {
                 continue
             }
             for asset in interest.assets.sorted() {
-                self.reroute(token, interest: interest, asset: asset, from: transfer)
+                self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
             }
         }
         guard settling else {

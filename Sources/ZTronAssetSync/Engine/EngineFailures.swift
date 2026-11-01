@@ -717,8 +717,14 @@ extension SyncEngine {
     /// wait: one lookup in the copy per id, no transfer formatted (C2).
     func followedLane(_ job: Job) -> AssetPriority {
         let copy = self.state.applied
+        // An id an owed move brings onto a job (`inboundPendingIDs`) is that job's, whatever a later copy maps it to: the
+        // move re-routes it under the copy that found it (Stage 3 close-out cycle 18).
+        let pending = self.inboundPendingIDs()
         func here(_ asset: AssetID) -> Bool {
-            copy.entry(for: asset).map { SyncEngine.sameTransfer($0, job.entry) } ?? false
+            if !pending.isEmpty, let target = pending[asset] {
+                return target == job.transfer
+            }
+            return copy.entry(for: asset).map { SyncEngine.sameTransfer($0, job.entry) } ?? false
         }
         let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) })
         var withdrawn: Set<InterestToken> = []
@@ -762,7 +768,7 @@ extension SyncEngine {
                         guard here(asset) else {
                             return false
                         }
-                        if visit?.contains(asset) ?? true || movedBefore.contains(asset) {
+                        if visit?.contains(asset) ?? true || movedBefore.contains(asset) || (!pending.isEmpty && pending[asset] != nil) {
                             return true
                         }
                         guard let after else {

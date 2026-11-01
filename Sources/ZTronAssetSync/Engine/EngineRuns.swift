@@ -363,6 +363,9 @@ extension SyncEngine {
     func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport, since serial: UInt64) {
         let unreported = self.prunesUnreported(by: report, in: manifest)
         let previous = self.state.applied
+        // The interests the outgoing copy's owed visits move onto a running publication are its own before the copy
+        // changes (`bringInboundOntoPublications`; Stage 3 close-out cycle 18, RR-14).
+        self.bringInboundOntoPublications()
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
