@@ -19,6 +19,10 @@ extension EngineFollowBarrierTests {
         /// No publication: O's attempt's end makes `inboundMovesNow` moves and v4's own follow turn `followsPerTurn`, so
         /// 330 holders ahead leave H's move owed after both.
         case owedTurn
+        /// As `owedTurn`, but zz-b starts on J's content: B and P share J, created after the holders ahead, so the owed
+        /// move carries B off J, the job whose 429 is decided, and v4 maps zz-b back to J's content. B's interest counts
+        /// on J's lane only as O's rule brings it back (`followedLane`'s own interests).
+        case owedTurnFromJ
     }
 
     /// How O's first attempt ends in `pendingLane`.
@@ -48,11 +52,13 @@ extension EngineFollowBarrierTests {
     /// prefetch waiter each) and then H (zz-b, 50 kB, user waiter B), created last, wait. v3 maps zz-b and every holder's
     /// id to O's content; O's first attempt times out (a retry below every cap, which keeps every interest); v4 maps zz-b
     /// on to J's content; then J gets a 429 whose `Retry-After` (60 s) is above the user lane's cap (30 s) and below the
-    /// prefetch lane's. Sweep-first, O's attempt's end owes H's move onto O, and it is still owed at J's 429.
+    /// prefetch lane's. Sweep-first, O's attempt's end owes H's move onto O, and it is still owed at J's 429. With
+    /// `.owedTurnFromJ`, zz-b starts on J's content instead: J, created after the holders ahead for B and P, takes H's
+    /// place, the owed move carries B off J, and v4 maps zz-b back to J's content.
     ///
-    /// Visit-first: v3's visit moved B onto O, O's retry kept it, and v4's visit moved it on to J, so J's 429 is user work
-    /// beyond its cap: J fails, P and B are answered `serverUnavailable`, the origin is not throttled, and O's retry
-    /// serves A.
+    /// Visit-first: v3's visit moved B onto O, O's retry kept it, and v4's visit moved it on (or back) to J, so J's 429 is
+    /// user work beyond its cap: J fails, P and B are answered `serverUnavailable`, the origin is not throttled, and O's
+    /// retry serves A.
     ///
     /// With `ending` `.notFound`, O's 404 answered A, B and every holder ahead before v4 (visit-first), so J's 429 is
     /// prefetch work below its cap: it throttles the origin, and J's retry serves P.
@@ -74,11 +80,14 @@ extension EngineFollowBarrierTests {
         let bToJ = EngineHarness.onDemand("zz-b", jBytes)
         try #require(bToO.transferID == a.transferID && bToJ.transferID == p.transferID && b.transferID != a.transferID && b.transferID != p.transferID, "setup: zz-b on H, then on O, then on J")
         let aheadCount = shape == .publicationHeld ? Self.publicationHopAhead : SyncEngine.inboundMovesNow + SyncEngine.followsPerTurn + 10
+        // The job that holds zz-b until the move: H, or J for `.owedTurnFromJ`.
+        let fromJ = shape == .owedTurnFromJ
+        let bJob = fromJ ? p.transferID : b.transferID
         let aheadNames = (0..<aheadCount).map { String(format: "zz-g%04d", $0) }
         let aheadOwn = aheadNames.enumerated().map { EngineHarness.onDemand($0.element, EngineFixture.bytes(seed + 10_000 + UInt64($0.offset), count: 16)) }
         let aheadOnO = aheadNames.map { EngineHarness.onDemand($0, oBytes) }
         let fillers = FollowBarrier.fillers(seed + 200)
-        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b, k, p] + aheadOwn + Self.laterFillers(seed + 3_000), etag: "v2")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, fromJ ? bToJ : b, k, p] + aheadOwn + Self.laterFillers(seed + 3_000), etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
         try await s.harness.store.flush(.ordered)
@@ -95,9 +104,12 @@ extension EngineFollowBarrierTests {
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
         }
-        let pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
-        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
-            await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .downloading }
+        var pWaiter: Task<Result<AssetLocation, AssetError>, Never>?
+        if !fromJ {
+            pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
+            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .downloading }
+            }
         }
         var kWaiter: Task<Result<AssetLocation, AssetError>, Never>?
         var releaser: Task<Void, Never>?
@@ -118,17 +130,24 @@ extension EngineFollowBarrierTests {
         let aheadTransfers = aheadOwn.map(\.transferID)
         await engine.awaitCondition { e in aheadTransfers.allSatisfy { e.state.jobs[$0]?.interests.isEmpty == false } }
         let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
-        await engine.awaitCondition { $0.state.jobs[b.transferID]?.interests.isEmpty == false }
-        let epochs = await engine.readForTests { e in (h: e.state.jobs[b.transferID]?.epoch ?? 0, ahead: aheadTransfers.compactMap { e.state.jobs[$0]?.epoch }.max() ?? 0) }
-        try #require(epochs.h > epochs.ahead, "setup: H is created after the holders ahead: \(epochs)")
+        await engine.awaitCondition { $0.state.jobs[bJob]?.interests.isEmpty == false }
+        if fromJ {
+            // P joins J, which B's user interest admits ahead of the prefetch holders.
+            pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
+            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[p.transferID]?.state == .downloading && $0.state.jobs[p.transferID]?.interests.count == 2 }
+            }
+        }
+        let epochs = await engine.readForTests { e in (h: e.state.jobs[bJob]?.epoch ?? 0, ahead: aheadTransfers.compactMap { e.state.jobs[$0]?.epoch }.max() ?? 0) }
+        try #require(epochs.h > epochs.ahead, "setup: zz-b's job is created after the holders ahead: \(epochs)")
         // v3 maps zz-b and every holder's id to O's content.
         try await Self.applyHeld([s.q] + fillers + [a, bToO, k, p] + aheadOnO + Self.laterFillers(seed + 6_000), tag: "v3-pending-\(seed)", s, visit: visit)
         // O's first attempt times out (a retry below every cap) or gets its 404.
         await s.harness.source.release(a.transferID, with: .progress(received: 0, expected: nil))
         if visit == .sweepFollowsFirst {
             await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
-            let owed = await engine.readForTests { e in e.inboundOwed && e.state.inboundMoves[e.state.inboundNext...].contains { $0.holder == b.transferID } }
-            try #require(owed, "setup: O's attempt's end owes H's move onto O")
+            let owed = await engine.readForTests { e in e.inboundOwed && e.state.inboundMoves[e.state.inboundNext...].contains { $0.holder == bJob } }
+            try #require(owed, "setup: O's attempt's end owes zz-b's move onto O")
         } else {
             await engine.awaitCondition { e in
                 guard let job = e.state.jobs[a.transferID] else {
@@ -142,11 +161,11 @@ extension EngineFollowBarrierTests {
                 }
             }
         }
-        // v4 maps zz-b on to J's content.
+        // v4 maps zz-b on to J's content (back to it, from J).
         try await Self.applyHeld([s.q] + fillers + [a, bToJ, k, p] + aheadOnO + Self.laterFillers(seed + 9_000), tag: "v4-pending-\(seed)", s, visit: visit)
         if visit == .sweepFollowsFirst {
-            let owed = await engine.readForTests { e in e.inboundOwed && e.state.inboundMoves[e.state.inboundNext...].contains { $0.holder == b.transferID } }
-            try #require(owed, "setup: H's move onto O is still owed after v4's apply")
+            let owed = await engine.readForTests { e in e.inboundOwed && e.state.inboundMoves[e.state.inboundNext...].contains { $0.holder == bJob } }
+            try #require(owed, "setup: zz-b's move onto O is still owed after v4's apply")
         }
         let before = await engine.readForTests { e in e.state.remote.flatMap { e.state.throttles[$0.originID] } }
         // J's 429 (Retry-After 60 s).
@@ -162,7 +181,8 @@ extension EngineFollowBarrierTests {
             await engine.readForTests { $0.releaseFollowFollowUps() }
         }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
-        let pResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: pWaiter) }
+        let pTask = try #require(pWaiter)
+        let pResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: pTask) }
         let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
         let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
         if let kWaiter {
