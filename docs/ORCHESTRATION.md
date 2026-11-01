@@ -3,6 +3,26 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
+- **Now (1 Nov 14:13 CET): fix run 6 is RUNNING** `wf_d6632791-fdd` (task `wge0vsaky`) in session `03c95f5a-f115-421f-9542-6de93e7caf98`.
+  - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
+  - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
+  - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
+  - **S3-R23** (14:15, before the run), on the shared host:
+    - Context: the owner's ZTronScrollView sessions run simulator UI tests, which held the load at 51–1,008 on 8 cores at 14:09–14:11.
+    - Every timing figure carries the load.
+    - A miss seen only above load 50 follows S3-R12 and S3-R5.
+    - A turn bound is pinned twice: by a deterministic test, and by the BenchSync case taken at load ≤ 10.
+    - A case not measured at a quiet load is neither confirmed nor blocking. The orchestrator measures it before ruling convergence.
+  - **Keep-awake:** `caffeinate -ims -t 259200`, from 14:12 to 4 Nov 14:12, as a background task of this session.
+  - **Watcher:** `watch_journal.py` in this session's scratchpad wakes the orchestrator at each agent result, so put-backs are ruled between cycles.
+  - **Stale scheduled task:** `ztron-assetkit-resume-after-reset` (Thu 5 Nov 03:10) waits for a reset that has already come. Its pre-flight launches nothing above 10 % weekly. The owner is asked whether to disable it.
+  - **At convergence:** the reset the owner's 31 Oct 23:25 decision waited for has come, so the pending list follows, as in the scheduled task's steps 5–8: merge `wp/s3f`, the gates, ADR-057, Stage 5, then the post-stages. The owner can say stop.
+  - **Forecast:**
+    - A cycle took 4–5 h before (fix 2.5–3.7 h, verification 1.1–1.5 h); under this load, expect about 5–6 h. Each cycle costs about 3.5–4 weekly points.
+    - Cycles 13–18 left 7, 5, ~8, 5, 6 and 5 blocking items, so there is no clear trend. Plan for 2–5 more cycles: about 10–30 h and 7–20 weekly points.
+  - **Resume:**
+    - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and args.
+    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
