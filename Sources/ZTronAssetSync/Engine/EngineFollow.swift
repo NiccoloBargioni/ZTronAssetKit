@@ -442,15 +442,18 @@ extension SyncEngine {
 
     /// Records that `transfer`'s exit verdict defers to the follow (`defersFailure`, an ENOSPC's `.spaceFailure` in
     /// `spaceFailed`): the applies followed now, and the ids a visit-first engine had moved before the verdict arrived,
-    /// which the owed visit that meets the job re-routes at once (`Job.rerouteOnPass`). Those are the ids listed elsewhere
-    /// now while a follow is owed (none otherwise: every visit has run), unless the attempt ended in its publication with
-    /// no apply since, whose visits passed the job publishing and keep the publication's own set, less the ids an apply
-    /// moved back to the job's content while it published: that engine's visit at that apply joined them to the job
-    /// publishing, so the verdict answers them, and an apply that moves them away again after the verdict moves them from
-    /// the job the verdict leaves (Stage 3 close-out cycle 17). A visit for an apply after this instant passes the job and
-    /// leaves its other moved ids to the verdict, which the drain gives before it moves them (`followAfterVerdict`; cycle
-    /// 16, ruling S3-R19 item 1). The set is kept unspent as `AttemptEnd.movedBefore`: the drain takes any of its ids
-    /// still on the job off before the verdict (`takeOffMovedBefore`).
+    /// which the owed visit that meets the job re-routes at once (`Job.rerouteOnPass`). While a follow is owed those
+    /// are the ids the copy lists elsewhere or not at all, unless the attempt ended in its publication with no apply
+    /// since, whose visits passed the job publishing and keep the publication's own set, less the ids an apply moved
+    /// back to the job's content while it published: that engine's visit at that apply joined them to the job
+    /// publishing, so the verdict answers them, and an apply that moves them away again after the verdict moves them
+    /// from the job the verdict leaves (Stage 3 close-out cycle 17). With no follow owed there are none: every visit
+    /// has run, so no id the job holds is one such a visit had moved, not even one the copy does not list, such as an
+    /// id a waiter joined from a newer manifest while an apply was in flight (`EngineManifest.join`), which the verdict
+    /// answers (cycle 17, `EngineFollowBarrierUnlistedTests`). A visit for an apply after this instant passes the job
+    /// and leaves its other moved ids to the verdict, which the drain gives before it moves them (`followAfterVerdict`;
+    /// cycle 16, ruling S3-R19 item 1). The set is kept unspent as `AttemptEnd.movedBefore`: the drain takes any of its
+    /// ids still on the job off before the verdict (`takeOffMovedBefore`).
     func recordDeferredVerdict(_ transfer: TransferID) {
         guard let job = self.state.jobs[transfer] else {
             return
