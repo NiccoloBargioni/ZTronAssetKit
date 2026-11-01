@@ -69,6 +69,9 @@ extension EngineFollowBarrierTests {
         let holderStarts: Int
         /// The cancellations the origin recorded for that transfer once the follow ended, before the shutdown.
         var holderCancels = 0
+        /// The cancellations the origin had recorded for that transfer when the first turn that moved a member off the
+        /// job ended (sweep-first): the visit's first turn, or O's attempt's end turn (`.attemptEnd`).
+        var cancelsAtFirstMove: Int?
         /// The ids of each move off the members' job O's attempt's end owed (sweep-first `.attemptEnd`,
         /// `.convergenceEnds`), and the members on that job when it ended.
         var moveSizes: [Int] = []
@@ -177,6 +180,7 @@ extension EngineFollowBarrierTests {
         let owedOff: @Sendable (isolated SyncEngine) -> [Int] = { e in
             e.state.inboundMoves[e.state.inboundNext...].filter { $0.holder == holder }.map(\.ids.count)
         }
+        var cancelsAtFirstMove: Int?
         if visit == .sweepFollowsFirst {
             // The follow's scans reach the members' entries in its first follow-up turn, which visits their job.
             var left = await Self.membersLeft(engine, on: holder, members: ids)
@@ -192,6 +196,9 @@ extension EngineFollowBarrierTests {
                 endTurn = left - now
                 turns.append(left - now)
                 left = now
+                if left < count {
+                    cancelsAtFirstMove = await s.harness.source.controlLog.filter { $0.transfer == holder && $0.control == .cancel }.count
+                }
             }
             while await engine.readForTests({ $0.followOwed }) {
                 try #require(turns.count < 16, "the follow ends within 16 turns: \(turns)")
@@ -199,6 +206,9 @@ extension EngineFollowBarrierTests {
                 let now = await Self.membersLeft(engine, on: holder, members: ids)
                 turns.append(left - now)
                 left = now
+                if cancelsAtFirstMove == nil, left < count {
+                    cancelsAtFirstMove = await s.harness.source.controlLog.filter { $0.transfer == holder && $0.control == .cancel }.count
+                }
                 let resting = await engine.readForTests { $0.state.followMoving?.holder == holder }
                 if resting, endTurn == nil, shape == .convergenceEnds || shape == .convergenceApplies || shape == .divergencePublishes {
                     // O's bytes arrive while the visit still owes members: O's publication waits.
@@ -258,7 +268,7 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let holderCancels = await s.harness.source.controlLog.filter { $0.transfer == holder && $0.control == .cancel }.count
         await Self.finishHeld(s)
-        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, holderCancels: holderCancels, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply, pendingAtEnd: pendingAtEnd, bystander: tResult)
+        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, holderCancels: holderCancels, cancelsAtFirstMove: cancelsAtFirstMove, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply, pendingAtEnd: pendingAtEnd, bystander: tResult)
     }
 
     /// The answers once the engine shut down (`sharedMove(_:seed:shape:shutdown:)`).
@@ -308,6 +318,11 @@ extension EngineFollowBarrierTests {
         }
         guard visit == .sweepFollowsFirst else {
             return
+        }
+        if shape.converges {
+            // The supersession is made in the move's first turn, as v3's visit made it on a visit-first engine: the
+            // origin is told then to cancel H's attempt, so no bytes, failure or 429 of it reach the follow's later turns.
+            #expect(outcome.cancelsAtFirstMove == 1, "the members' first job's attempt is cancelled in the turn the move off it began: \(String(describing: outcome.cancelsAtFirstMove)); turns \(outcome.turns)")
         }
         #expect(outcome.turns.reduce(0, +) == Self.sharedMembers, "every member left its job over the turns: \(outcome.turns)")
         #expect(outcome.turns.allSatisfy { $0 <= Self.sharedIDsPerTurn }, "no turn moves more than followIDsPerTurn = \(Self.sharedIDsPerTurn) ids: \(outcome.turns)")
