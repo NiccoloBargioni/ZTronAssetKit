@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (1 Nov 14:13 CET): fix run 6 is RUNNING** `wf_d6632791-fdd` (task `wge0vsaky`) in session `03c95f5a-f115-421f-9542-6de93e7caf98`.
+- **Now (1 Nov 14:13 CET): fix run 6 is RUNNING** `wf_d6632791-fdd` in session `03c95f5a-f115-421f-9542-6de93e7caf98`. Since the 23:29 resume its task is `wt8pjmmof`; it was `wge0vsaky`.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -43,10 +43,44 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - The unreached branches are blocking until reached, removed with an invariant, or shown equivalent.
     - #6 is accepted.
     - RR-23 is a timing difference in RR-16's family.
-  - **Cycle 19 verification** started 21:30; the verdict is expected around 22:45–23:30. The watcher wakes the orchestrator when both lenses return.
+  - **Cycle 19 verification** ran 21:30–23:22 and left **8 distinct blocking items**. The correctness lens reported 3 blocking of 6 issues, the requirements lens 6 of 10, and both report the flake.
+    - The issues are in `.build-orchestrator/s3f-c19-issues.json`, numbered per lens. The probes and scripts are in `.build-orchestrator/s3f-probes-c19/{correct,reqs}/`.
+    - Both lenses confirm every cycle-18 item fixed.
+    - **C2 (2 items):**
+      - the drain gives each waiting verdict its own 512-id budget: 41.6 ms at 8,000 ids, load 5.6;
+      - `Job.lane` and `dropInterest` cost O(interests) per id, in code that predates s3-base: 33.7 and 66.4 ms per 512-id turn with 10,000 user waiters, load 7–8.
+    - **G4 (5 items):**
+      - two subtractions in the bound survive their drop-mutants;
+      - the checksum-less lookups are reachable, and the reqs probe reaches them;
+      - `waitingTarget`'s queued case, the unspawnable branch and three `EngineMoves` lines are not reached.
+    - **Flake (1 item):** `barrierReadmitsBehindTheOwedVisitsPlaces` failed once in the coverage run and twice on the simulator (1 in 60 runs alone). The two lenses read two different mechanisms.
+    - **The other gates pass:**
+      - `VERIFY: PASS`; Sync ×3; TSan clean;
+      - Sync coverage 94.19–94.20 %; the iOS build;
+      - every WP-F C2 case within budget at load ≤ 10. The only benchmark failure is P-13 (WP-B).
+      - RR-21's commit window measures 9.76 ms best, inside the budget by 0.24 ms.
+  - **S3-R25** (23:35): all 8 items are blocking, fixed as the verifiers describe. The ruling adds:
+    - C2's reference set is 10,000 ids however their interests are grouped, user waiters included. A cost that predates s3-base is not exempt.
+    - per-lane interest counts, with an invariant that recounts them;
+    - an inventory of the per-id work in the follow's turns;
+    - the flake is settled by observing the engine's own admission order, with the test's tuning unchanged (G3), then a sweep of the tests that assert the transport's start order;
+    - `:203` and `:206` are reached, not removed, and no holder epoch is added;
+    - the fixer runs the verifiers' covdiff and mutant scripts on its own HEAD before it returns.
+  - **Restart so that the fixer reads S3-R25 (23:28–23:29):**
+    - The cycle-20 fixer started at 23:21 and read the rulings at 23:22, before S3-R25 existed.
+    - It had changed nothing: the worktree was clean at `49a0493`, with no `sim.lock`.
+    - The orchestrator stopped task `wge0vsaky` and resumed with the same script and args. The three cycle-19 results came from the cache.
+    - A fresh cycle-20 fixer (agent `a1176e45…`) read the rulings through S3-R25 at 23:29.
+  - **Forecast (23:35):**
+    - Cycle 19 took 9 h 9 min.
+    - Cycles 13–19 left 7, 5, ~8, 5, 6, 5 and 8 blocking items, which is flat. S3-R25's self-checks target the two kinds that keep recurring: the fixer's own unreached branches, and per-id C2 costs.
+    - Plan for 2–5 more cycles, about 3 expected: 18–45 h.
+    - The weekly meter is account-wide, so it includes the owner's other sessions. It went from 0 to 13 % between 14:08 and 23:30, about 1.4 points an hour, or about 10–13 points a cycle.
+    - That gives 20–60 points for the cycles, plus 10–20 for the merge, the gates, ADR-057 and Stage 5. The reset is Fri 6 Nov 19:00.
+  - **Watcher:** armed to wake the orchestrator when the cycle-20 fixer returns, at the 4th result.
   - **Resume:**
-    - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and args.
-    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle.
+    - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`.
+    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle. Use the last verification's issues as `findingsFile`; while cycle 20 runs, that file is `s3f-c19-issues.json`.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
