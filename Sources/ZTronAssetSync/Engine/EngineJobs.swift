@@ -144,22 +144,29 @@ extension SyncEngine {
             self.notifyObservers()
             return
         }
-        guard var job = self.state.jobs[transfer] else {
-            return
+        let before: AssetPriority
+        let wasReleasedOnly: Bool
+        do {
+            guard let job = self.state.jobs[transfer] else {
+                return
+            }
+            before = job.lane
+            // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
+            wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
         }
-        let before = job.lane
-        // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
-        let wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
-        job.assets.insert(asset)
-        if var interest = job.interests[token] {
-            interest.assets.insert(asset)
-            interest.lane = max(interest.lane, lane)
-            job.interests[token] = interest
+        // The join is made in the table, with no copy of the job alive: a copy's id sets would be copied whole by the
+        // insertion, so a job that grows to 10,000 ids cost a follow turn of 256 joins up to 19 ms (Stage 3 close-out
+        // cycle 18, ruling S3-R21 item 1; `BenchSync.concentrationFollowTurns`).
+        self.state.jobs[transfer]?.assets.insert(asset)
+        if self.state.jobs[transfer]?.interests[token] != nil {
+            self.state.jobs[transfer]?.interests[token]?.assets.insert(asset)
+            if let held = self.state.jobs[transfer]?.interests[token]?.lane, held < lane {
+                self.state.jobs[transfer]?.interests[token]?.lane = lane
+            }
         } else {
-            job.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
+            self.state.jobs[transfer]?.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
         }
-        self.state.jobs[transfer] = job
-        if job.state.isCircuitParked {
+        if self.state.jobs[transfer]?.state.isCircuitParked == true, let job = self.state.jobs[transfer] {
             // The interest may raise the job's rank: its place in the breaker's order moves with it.
             self.noteCircuitParked(job)
         }
