@@ -171,4 +171,57 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         await Self.finishHeld(s)
     }
+
+    /// A `Retry-After` HTTP date is read against the clock at the response's arrival, though the verdict waits for an
+    /// owed follow (Stage 3 close-out cycle 18; the cycle-17 verifier's PROBE-C17C-RETRY-AFTER-DATE): C (100 kB, zz-b; a
+    /// user waiter B; the interactive policy caps `Retry-After` at 30 s) downloads while v3, which changes fillers only,
+    /// is followed. C's attempt ends in a 503 whose `Retry-After` is a date 31 s ahead of the clock, and the clock then
+    /// moves on 5 s with the follow still owed (sweep-first). Visited first, the 503's verdict read 31 s, above the cap,
+    /// so every interest was answered and B got `serverUnavailable`. Read at the drain, the date is 26 s ahead, within
+    /// the cap: C backed off and its retry served B, an answer the visit-first engine never gave.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierReadsARetryAfterDateAtItsArrival(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_717_102
+        let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(b.transferID, [.hold, .stage(cBytes)])
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[b.transferID]?.state == .downloading }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [b] + Self.laterFillers(seed + 6_000), tag: "v3-date-\(seed)", s, visit: visit)
+        let date = s.time.now().addingTimeInterval(31)
+        await s.harness.source.release(b.transferID, with: .failed(.transient(.serverError(httpStatus: 503), retryAfter: .date(date))))
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.verdictsAfterFollow[b.transferID] != nil }
+            let waiting = await engine.readForTests { $0.followOwed }
+            try #require(waiting, "setup: the 503's verdict waits for the owed follow")
+        } else {
+            await engine.awaitCondition { $0.state.jobs[b.transferID]?.state != .downloading }
+        }
+        // The clock moves on while the barrier holds (sweep-first); the same step in both orders.
+        s.time.advance(by: 5)
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        let cStarts = await s.harness.source.starts.filter { $0.id == b.transferID }.count
+        var after: TimeInterval?
+        if case .failure(.serverUnavailable(let retryAfter)) = bResult {
+            after = retryAfter
+        }
+        #expect(after.map { abs($0 - 31) < 0.001 } == true, "the 503's Retry-After, 31 s at its arrival, is above the cap, so B is answered with it (visit-first): \(bResult)")
+        #expect(cStarts == 1, "C is not retried after the 503 (visit-first): \(cStarts) starts")
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
+    }
 }
