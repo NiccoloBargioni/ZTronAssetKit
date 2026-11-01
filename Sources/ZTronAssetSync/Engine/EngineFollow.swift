@@ -911,7 +911,11 @@ extension SyncEngine {
     /// defers. Visited later, such an interest met a later apply's copy: when that apply moved its id on to a third
     /// content, the visit moved it there, and it skipped the outcome a visit-first engine gave it on this job. Only the
     /// ids the copy maps to this content move; each holder's visit moves the rest itself (a holder whose every id moves
-    /// is superseded, as its visit would supersede it).
+    /// is superseded, as its visit would supersede it). When this job's own owed visit came before the holder's in follow
+    /// order and moved every id the job held, a visit-first engine had superseded the job, and its visit gave the
+    /// interest a fresh job of this content instead: the answers agree while the origin answers both requests for the
+    /// content alike, and the requests differ by one (the cycle-17 verifiers' PROBE-C17C-INBOUND-SUPERSEDED; the WP-F
+    /// draft's RR-16).
     ///
     /// The walk that finds them is one pass over the jobs' ids with one lookup in the copy each and no transfer formatted,
     /// and records one move per holder (C2; `BenchSync.inboundWalkTurns`, `BenchSync.concentrationNotFoundTurns`). The
