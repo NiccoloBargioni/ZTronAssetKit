@@ -794,29 +794,31 @@ extension ZTronAssetKitBenchmarks {
         }
 
         /// C2 of the drain's visits after the verdicts that waited (Stage 3 close-out cycle 20, ruling S3-R25 item 1; the
-        /// cycle-19 correctness verifier's PROBE-C19C-DRAIN-C2): 16 jobs, each shared by 625 members of one prefetch
-        /// group (10,000 ids), download on 16 slots; v3 changes only fillers, so its follow is owed when every attempt
-        /// times out, and each verdict waits; v4 gives every member a content of its own, so the drain gives the 16
-        /// verdicts and moves each job's members after its verdict (`followAfterVerdict`; `SyncBench.drainVerdicts`).
-        /// The follow's and the drain's held turns are released one at a time, each timed inside the actor, under the
-        /// heartbeat; the best of three of the longest held turn and of the heartbeat's longest wait against C2, after a
-        /// warm-up.
-        @Test("R-SYN-6: the drain's visits after 16 waiting verdicts that move 10,000 members off their jobs hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)))
+        /// cycle-19 correctness verifier's PROBE-C19C-DRAIN-C2): 16 jobs, each shared by `perJob` members of one prefetch
+        /// group, download on 16 slots; v3 changes only fillers, so its follow is owed when every attempt times out, and
+        /// each verdict waits; v4 gives every member a content of its own, so the drain gives the 16 verdicts and moves
+        /// each job's members after its verdict (`followAfterVerdict`; `SyncBench.drainVerdicts`). With 500 members a job
+        /// (the verifier's shape, 8,000 ids) each visit fits in one turn's ids, so a drain whose visits each had a whole
+        /// turn's ids moved all 16 in one turn (41 ms in the verifier's run); with 625 (10,000 ids) each visit leaves a
+        /// rest. The follow's and the drain's held turns are released one at a time, each timed inside the actor, under
+        /// the heartbeat; the best of three of the longest held turn and of the heartbeat's longest wait against C2, after
+        /// a warm-up.
+        @Test("R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their jobs hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)), arguments: [500, 625])
         @available(macOS 15.0, iOS 18.0, *)
-        func drainVerdictTurns() async throws {
+        func drainVerdictTurns(_ perJob: Int) async throws {
             _ = try await SyncBench.drainVerdicts(slots: 16, perJob: 50)
             var runs: [DrainVerdictRun] = []
             for _ in 0..<3 {
-                runs.append(try await SyncBench.drainVerdicts(slots: 16, perJob: 625))
+                runs.append(try await SyncBench.drainVerdicts(slots: 16, perJob: perJob))
             }
             for run in runs {
-                #expect(run.waitingBefore == 16 && run.heldBefore == 10_000 && run.heldAfter == 0, "setup: the 16 verdicts waited with every member on its job, and the drain moved them all off: \(run)")
+                #expect(run.waitingBefore == 16 && run.heldBefore == 16 * perJob && run.heldAfter == 0, "setup: the 16 verdicts waited with every member on its job, and the drain moved them all off: \(run)")
             }
             let turns = runs.map { $0.turns.max() ?? 0 }
             let waits = runs.map(\.wait)
-            print("R-SYN-6 the drain's visits after 16 waiting verdicts moving 10,000 members off their jobs: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
-            #expect((turns.min() ?? .infinity) <= Self.c2Budget, "the longest held turn: \(turns)")
-            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "the heartbeat: \(waits)")
+            print("R-SYN-6 the drain's visits after 16 waiting verdicts moving \(16 * perJob) members off their jobs: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            #expect((turns.min() ?? .infinity) <= Self.c2Budget, "\(perJob) a job, the longest held turn: \(turns)")
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(perJob) a job, the heartbeat: \(waits)")
         }
 
         /// C2 of a visit that moves 10,000 ids, each with a user-initiated waiter of its own (Stage 3 close-out cycle 20,
