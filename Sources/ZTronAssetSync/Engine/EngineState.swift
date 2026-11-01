@@ -666,8 +666,12 @@ struct Job {
     var state: JobState
     /// Bumped on every (re)start, supersede and abandon; a stale continuation is dropped (ARCHITECTURE §10).
     var epoch: UInt64
-    /// Interests by token.
-    var interests: [InterestToken: JobInterest] = [:]
+    /// Interests by token. Changed only through `setInterest` and the other mutators below, which keep
+    /// `interestCounts` with it.
+    private(set) var interests: [InterestToken: JobInterest] = [:]
+    /// How many of `interests` ask for each lane (`InterestCounts`), kept by every change to them, so the job's lane is
+    /// read without a walk of its interests; the invariant check recounts them (`SyncEngine.invariantViolations`).
+    var interestCounts = InterestCounts()
     /// The lane-queue ticket (lazy deletion).
     var ticket: UInt64 = 0
     /// Its entry's place in its lane queue (`LaneQueues.Entry.place`), where `reinstate` puts it back.
@@ -712,14 +716,158 @@ struct Job {
     /// released interest were still there. Read only while the job has no interest.
     var heldLane: AssetPriority?
 
+    /// A job of `transfer`'s content, for `entry`, with no interest.
+    init(
+        transfer: TransferID,
+        entry: ManifestEntry,
+        identity: ContentIdentity,
+        assets: Set<AssetID>,
+        state: JobState,
+        epoch: UInt64,
+        queuedAt: MonotonicInstant
+    ) {
+        self.transfer = transfer
+        self.entry = entry
+        self.identity = identity
+        self.assets = assets
+        self.state = state
+        self.epoch = epoch
+        self.queuedAt = queuedAt
+    }
+
     /// The maximum over its interests (ADR-020); for a job only a pending claim keeps, the lane it had (`heldLane`).
+    /// Read from `interestCounts`: each id a follow moves reads the lanes of the jobs it leaves and joins (`addInterest`,
+    /// `relane`, `dropInterest`), and the walk of every interest it was made that O(interests) per id, so a bounded turn
+    /// of 512 ids off a job of 10,000 user waiters held the actor 33 to 71 ms (Stage 3 close-out cycle 20, ruling S3-R25
+    /// item 2; the cycle-19 correctness verifier's PROBE-C19C-USER-SHARED-C2, `BenchSync.userSharedApplyTurns`).
     var lane: AssetPriority {
-        self.interests.values.map(\.lane).max() ?? self.heldLane ?? .bulk
+        self.interestCounts.highest ?? self.heldLane ?? .bulk
     }
 
     /// Whether a user-initiated interest is a single request (served before batches, sync.md §7.2).
     var isSingleUser: Bool {
-        self.interests.values.contains { $0.lane == .userInitiated && $0.kind != .ensure }
+        self.interestCounts.singleUser > 0
+    }
+
+    /// Sets `token`'s interest, or removes it with `nil`, and keeps `interestCounts`: an insertion counts the new
+    /// interest, a removal uncounts the old one, and a replacement moves its count from the old interest's lane and kind
+    /// to the new one's (a token's interests keep the lane they registered with, `invariantViolations`, so today's
+    /// replacements narrow an interest's ids and keep both).
+    mutating func setInterest(_ interest: JobInterest?, for token: InterestToken) {
+        switch (self.interests[token], interest) {
+        case (nil, let added?):
+            self.interestCounts.add(added)
+        case (let removed?, nil):
+            self.interestCounts.remove(removed)
+        case (let old?, let new?):
+            self.interestCounts.remove(old)
+            self.interestCounts.add(new)
+        case (nil, nil):
+            break
+        }
+        self.interests[token] = interest
+    }
+
+    /// Adds `asset` to `token`'s interest, in place; nothing without one. Its lane and kind, and so the counts, stay.
+    mutating func insertAsset(_ asset: AssetID, for token: InterestToken) {
+        self.interests[token]?.assets.insert(asset)
+    }
+
+    /// Removes `asset` from `token`'s interest, in place; whether the interest held it. The interest stays, with its lane
+    /// and kind, when it is left with no id: its caller removes it (`setInterest`).
+    mutating func removeAsset(_ asset: AssetID, for token: InterestToken) -> Bool {
+        self.interests[token]?.assets.remove(asset) != nil
+    }
+
+    /// Removes `assets` from `token`'s interest, in place, as `removeAsset` does each.
+    mutating func subtractAssets(_ assets: Set<AssetID>, for token: InterestToken) {
+        self.interests[token]?.assets.subtract(assets)
+    }
+
+    /// Replaces the ids of `token`'s interest, in place; nothing without one. Its lane and kind stay.
+    mutating func setAssets(_ assets: Set<AssetID>, for token: InterestToken) {
+        self.interests[token]?.assets = assets
+    }
+
+    /// Removes every interest, and their counts.
+    mutating func removeAllInterests() {
+        self.interests.removeAll()
+        self.interestCounts = InterestCounts()
+    }
+
+    /// Keeps the interests `isIncluded` accepts, and recounts them (`SyncEngine.jobAtVerdict`'s copy of a job).
+    mutating func keepInterests(where isIncluded: (InterestToken, JobInterest) -> Bool) {
+        self.interests = self.interests.filter { isIncluded($0.key, $0.value) }
+        self.interestCounts = InterestCounts(self.interests.values)
+    }
+}
+
+/// How many of a job's interests ask for each lane, and how many of its user-initiated ones are single requests (no
+/// `ensure` batch): the job's lane and its single-user rank (`Job.lane`, `Job.isSingleUser`) are read from them in O(1)
+/// (Stage 3 close-out cycle 20, ruling S3-R25 item 2).
+struct InterestCounts: Equatable {
+    /// The bulk interests.
+    var bulk = 0
+    /// The prefetch interests.
+    var prefetch = 0
+    /// The user-initiated interests.
+    var userInitiated = 0
+    /// The user-initiated interests that are single requests, no `ensure` batch (`Job.isSingleUser`).
+    var singleUser = 0
+
+    /// No interest.
+    init() {}
+
+    /// The counts of `interests`, recounted.
+    init<Interests: Sequence>(_ interests: Interests) where Interests.Element == JobInterest {
+        for interest in interests {
+            self.add(interest)
+        }
+    }
+
+    /// The highest lane an interest asks for; `nil` with none.
+    var highest: AssetPriority? {
+        self.highest { _ in true }
+    }
+
+    /// The highest lane an interest `admits` accepts asks for; `nil` with none. `verdictAnswers` reads the lane a retry
+    /// keeps (the lanes whose cap the attempt does not reach) here, where it walked the interests once for each it read.
+    func highest(where admits: (AssetPriority) -> Bool) -> AssetPriority? {
+        if self.userInitiated > 0, admits(.userInitiated) {
+            return .userInitiated
+        }
+        if self.prefetch > 0, admits(.prefetch) {
+            return .prefetch
+        }
+        if self.bulk > 0, admits(.bulk) {
+            return .bulk
+        }
+        return nil
+    }
+
+    /// Counts `interest`.
+    mutating func add(_ interest: JobInterest) {
+        self.count(interest, by: 1)
+    }
+
+    /// Uncounts `interest`.
+    mutating func remove(_ interest: JobInterest) {
+        self.count(interest, by: -1)
+    }
+
+    /// Moves `interest`'s lane's count, and the single requests' for a user-initiated one, by `delta`.
+    private mutating func count(_ interest: JobInterest, by delta: Int) {
+        switch interest.lane {
+        case .bulk:
+            self.bulk += delta
+        case .prefetch:
+            self.prefetch += delta
+        case .userInitiated:
+            self.userInitiated += delta
+            if interest.kind != .ensure {
+                self.singleUser += delta
+            }
+        }
     }
 }
 

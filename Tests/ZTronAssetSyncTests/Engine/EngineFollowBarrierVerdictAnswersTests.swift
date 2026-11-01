@@ -52,7 +52,7 @@ extension EngineFollowBarrierTests {
                 )
                 job.attempts = attempts
                 for token in tokens {
-                    job.interests[token] = interests[token]
+                    job.setInterest(interests[token], for: token)
                 }
                 return job
             }
@@ -151,9 +151,9 @@ extension EngineFollowBarrierTests {
                 epoch: 1,
                 queuedAt: MonotonicInstant(nanoseconds: 0)
             )
-            job.interests[u] = JobInterest(lane: .userInitiated, kind: .waiter, assets: [b])
-            job.interests[w] = JobInterest(lane: .prefetch, kind: .waiter, assets: [a.identifier])
-            job.interests[x] = JobInterest(lane: .bulk, kind: .ensure, assets: [a.identifier, b])
+            job.setInterest(JobInterest(lane: .userInitiated, kind: .waiter, assets: [b]), for: u)
+            job.setInterest(JobInterest(lane: .prefetch, kind: .waiter, assets: [a.identifier]), for: w)
+            job.setInterest(JobInterest(lane: .bulk, kind: .ensure, assets: [a.identifier, b]), for: x)
             job.attemptEnd = AttemptEnd(failedAfter: 1, deferredAfter: 1, movedBefore: [b])
             let leaving = engine.jobAtVerdict(job, withdrawn: [])
             let withdrawn = engine.jobAtVerdict(job, withdrawn: [w])

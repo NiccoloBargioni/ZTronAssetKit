@@ -202,14 +202,14 @@ extension SyncEngine {
             guard let interest = self.state.jobs[holder]?.interests[item.token].map({ JobInterest(lane: $0.lane, kind: $0.kind, assets: []) }) else {
                 continue
             }
-            guard self.state.jobs[holder]?.interests[item.token]?.assets.remove(asset) != nil else {
+            guard self.state.jobs[holder]?.removeAsset(asset, for: item.token) == true else {
                 continue
             }
             self.reroute(item.token, interest: interest, asset: asset, from: holder, listing: listing)
             moved = true
             if self.state.jobs[holder]?.interests[item.token]?.assets.isEmpty == true {
                 if progress.supersedes {
-                    self.state.jobs[holder]?.interests[item.token] = nil
+                    self.state.jobs[holder]?.setInterest(nil, for: item.token)
                 } else {
                     self.removeInterest(item.token, from: holder)
                 }

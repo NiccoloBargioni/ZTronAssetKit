@@ -146,7 +146,7 @@ extension SyncEngine {
                 queuedAt: now
             )
             job.resume = self.state.launchResumes.removeValue(forKey: transfer)
-            job.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
+            job.setInterest(JobInterest(lane: lane, kind: kind, assets: [asset]), for: token)
             self.state.jobs[transfer] = job
             self.enqueue(transfer)
             self.ensureWatcher()
@@ -158,9 +158,9 @@ extension SyncEngine {
             // The interest keeps its lane: a token's interests carry the one lane it registered with, which every join
             // and re-route passes on (`invariantViolations()`). The cycle-18 in-place raise, which no path reached, was
             // removed under ruling S3-R19 item 3 (Stage 3 close-out cycle 19).
-            self.state.jobs[transfer]?.interests[token]?.assets.insert(asset)
+            self.state.jobs[transfer]?.insertAsset(asset, for: token)
         } else {
-            self.state.jobs[transfer]?.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
+            self.state.jobs[transfer]?.setInterest(JobInterest(lane: lane, kind: kind, assets: [asset]), for: token)
         }
         if self.state.jobs[transfer]?.state.isCircuitParked == true, let job = self.state.jobs[transfer] {
             // The interest may raise the job's rank: its place in the breaker's order moves with it.
@@ -340,22 +340,19 @@ extension SyncEngine {
         self.dropInterest(token, from: transfer)
     }
 
-    /// `removeInterest`: an interest answered (`resolve`) is dropped here too.
+    /// `removeInterest`: an interest answered (`resolve`) is dropped here too. The job is changed in place, with no copy
+    /// of it alive across the removal: a copy shares the storage of its interests, so the removal copied them whole, once
+    /// for each interest a follow's move removes (O(interests) per id; Stage 3 close-out cycle 20, ruling S3-R25 item 2).
     private func dropInterest(_ token: InterestToken, from transfer: TransferID) {
-        guard var job = self.state.jobs[transfer], job.interests[token] != nil else {
+        guard self.state.jobs[transfer]?.interests[token] != nil, let before = self.state.jobs[transfer]?.lane else {
             return
         }
-        let before = job.lane
-        job.interests[token] = nil
+        self.state.jobs[transfer]?.setInterest(nil, for: token)
         if self.state.run?.token == token {
             self.state.run?.held.remove(transfer)
         }
-        if job.interests.isEmpty {
-            job.heldLane = before
-        }
-        self.state.jobs[transfer] = job
-        if job.interests.isEmpty {
-            let key = ClaimKey(job: job)
+        if self.state.jobs[transfer]?.interests.isEmpty == true, let key = self.state.jobs[transfer].map(ClaimKey.init(job:)) {
+            self.state.jobs[transfer]?.heldLane = before
             if self.state.claims[key] != nil {
                 // Kept for the claim: its last end retires the job (`dropClaim`).
                 self.state.claimHeld[key] = transfer
@@ -623,7 +620,7 @@ extension SyncEngine {
                 self.deliver(outcome, to: token, interest: interest, transfer: transfer)
             }
         }
-        self.state.jobs[transfer]?.interests.removeAll()
+        self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
         self.publishTerminal(job: job, outcome: outcome)
         follow()

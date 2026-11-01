@@ -469,7 +469,7 @@ struct EngineRegressionCycle16Tests {
                 epoch: 1,
                 queuedAt: MonotonicInstant(nanoseconds: 0)
             )
-            job.interests[InterestToken(rawValue: 1)] = JobInterest(lane: lane, kind: .run, assets: [entry.identifier])
+            job.setInterest(JobInterest(lane: lane, kind: .run, assets: [entry.identifier]), for: InterestToken(rawValue: 1))
             return job
         }
         let transfer = entry.transferID

@@ -295,7 +295,7 @@ extension SyncEngine {
             }
             if self.reachesCap(interest.lane, attempts: attempts) {
                 self.deliver(.failed(assetError), to: token, interest: interest, transfer: transfer)
-                self.state.jobs[transfer]?.interests[token] = nil
+                self.state.jobs[transfer]?.setInterest(nil, for: token)
             }
         }
         guard let remaining = self.state.jobs[transfer], !remaining.interests.isEmpty || (claimOnly && self.claimRetries(remaining, attempts: attempts)) else {
@@ -872,7 +872,7 @@ extension SyncEngine {
     func jobAtVerdict(_ job: Job, withdrawn: Set<InterestToken>) -> Job {
         let leaving = job.attemptEnd?.movedBefore ?? []
         var met = job
-        met.interests = job.interests.filter { token, interest in
+        met.keepInterests { token, interest in
             !withdrawn.contains(token) && !interest.assets.isSubset(of: leaving)
         }
         return met
@@ -913,8 +913,10 @@ extension SyncEngine {
                 return true
             }
             // The lane `retryLater` reads: the job's, less the interests the count answers (this one is not among them),
-            // and the wall clock it reads a `Retry-After` date against, the failure's arrival.
-            let kept = job.interests.values.filter { !self.reachesCap($0.lane, attempts: attempts) }.map(\.lane).max() ?? interest.lane
+            // and the wall clock it reads a `Retry-After` date against, the failure's arrival. Read from the counts, as
+            // the cap depends on the lane alone: the walk of the job's interests for each interest read was O(interests²)
+            // a verdict (Stage 3 close-out cycle 20, ruling S3-R25 item 3).
+            let kept = job.interestCounts.highest { !self.reachesCap($0, attempts: attempts) } ?? interest.lane
             return self.retryDelay(job.transfer, error: error, attempts: attempts, lane: kept, wall: wall) == nil
         case .attempt(.throttle(let facts)):
             switch facts.decision {

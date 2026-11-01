@@ -449,9 +449,12 @@ struct EngineOutcomeTests {
         await engine.waitUntil { $0.running == 1 }
         #expect(await engine.invariantViolations().isEmpty, "a healthy engine")
         let transfer = entry.transferID
-        let orphaned = await engine.violations { $0.jobs[transfer]?.interests.removeAll() }
+        let orphaned = await engine.violations { $0.jobs[transfer]?.removeAllInterests() }
         #expect(orphaned.contains { $0.hasPrefix("job ") && $0.contains("has no interest") })
         #expect(orphaned.contains { $0.hasPrefix("group ") && $0.contains("without an interest") })
+        // The counts a job's lane is read from are its interests' (`Job.interestCounts`; Stage 3 close-out cycle 20).
+        let miscounted = await engine.violations { $0.jobs[transfer]?.interestCounts.userInitiated += 1 }
+        #expect(miscounted == ["job \(transfer) counts its interests InterestCounts(bulk: 0, prefetch: 1, userInitiated: 1, singleUser: 0), which count InterestCounts(bulk: 0, prefetch: 1, userInitiated: 0, singleUser: 0)"])
         let inactive = await engine.violations { $0.jobs[transfer]?.active = nil }
         #expect(inactive.contains { $0.contains("in downloading with active false") })
         let illegal = await engine.violations { $0.metrics.illegalTransitions = 2 }

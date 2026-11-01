@@ -1112,9 +1112,9 @@ extension SyncEngine {
             }
             let bound = interest.assets.subtracting(unbound)
             if bound.isEmpty {
-                self.state.jobs[transfer]?.interests[token] = nil
+                self.state.jobs[transfer]?.setInterest(nil, for: token)
             } else {
-                self.state.jobs[transfer]?.interests[token]?.assets = bound
+                self.state.jobs[transfer]?.setAssets(bound, for: token)
             }
             for asset in unbound.sorted() {
                 guard self.state.applied.entry(for: asset)?.transferID == transfer else {
@@ -1257,7 +1257,7 @@ extension SyncEngine {
             return
         }
         let copy = listing ?? self.state.applied
-        self.state.jobs[transfer]?.interests.removeAll()
+        self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
         if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0).map { SyncEngine.sameTransfer($0, job.entry) } ?? false } }) {
             self.holdForManifest(transfer)

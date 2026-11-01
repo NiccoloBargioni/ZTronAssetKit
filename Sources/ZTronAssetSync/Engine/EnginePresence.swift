@@ -345,7 +345,7 @@ extension SyncEngine {
                 continue
             }
             let left = interest.assets.subtracting(held)
-            self.state.jobs[transfer]?.interests[token] = left.isEmpty ? nil : JobInterest(lane: interest.lane, kind: interest.kind, assets: left)
+            self.state.jobs[transfer]?.setInterest(left.isEmpty ? nil : JobInterest(lane: interest.lane, kind: interest.kind, assets: left), for: token)
             for asset in held.sorted() {
                 self.answerPresent(token, kind: interest.kind, lane: interest.lane, asset: asset, at: transfer, from: transfer)
             }

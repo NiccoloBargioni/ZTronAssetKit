@@ -557,7 +557,7 @@ extension SyncEngine {
         self.state.jobs[job.transfer]?.assets.subtract(held)
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
             for asset in interest.assets.sorted() where held.contains(asset) {
-                self.state.jobs[job.transfer]?.interests[token]?.assets.remove(asset)
+                _ = self.state.jobs[job.transfer]?.removeAsset(asset, for: token)
                 off.append((token, interest, asset))
             }
             if self.state.jobs[job.transfer]?.interests[token]?.assets.isEmpty == true {
@@ -944,7 +944,7 @@ extension SyncEngine {
         self.state.jobs[transfer]?.assets.subtract(moved)
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
             for asset in interest.assets.sorted() where moved.contains(asset) {
-                self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
+                _ = self.state.jobs[transfer]?.removeAsset(asset, for: token)
                 self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
             }
             if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {

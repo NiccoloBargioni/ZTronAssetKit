@@ -1032,7 +1032,7 @@ extension SyncEngine {
                 if withdrawn.count == interest.assets.count {
                     self.removeInterest(token, from: transfer)
                 } else {
-                    self.state.jobs[transfer]?.interests[token]?.assets.subtract(withdrawn)
+                    self.state.jobs[transfer]?.subtractAssets(withdrawn, for: token)
                 }
             }
         }
@@ -1723,6 +1723,12 @@ extension SyncEngine {
                 if lane != interest.lane {
                     violations.append("interest \(token.rawValue) in \(transfer) at \(interest.lane), its token's lane being \(lane)")
                 }
+            }
+            // The counts a job's lane is read from are its interests' (`Job.interestCounts`; Stage 3 close-out cycle 20,
+            // ruling S3-R25 item 2).
+            let recount = InterestCounts(job.interests.values)
+            if job.interestCounts != recount {
+                violations.append("job \(transfer) counts its interests \(job.interestCounts), which count \(recount)")
             }
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
                 let key = ClaimKey(job: job)

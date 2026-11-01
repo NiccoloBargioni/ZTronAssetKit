@@ -131,7 +131,7 @@ struct EngineSafetyTests {
         await engine.awaitCondition { !$0.state.syncJoiners.isEmpty }
         // No correct path drops a job the run claims without telling it; the safety net still lets the run settle.
         let settlement = await engine.settleRunAfter { state in
-            state.jobs[entry.transferID]?.interests.removeAll()
+            state.jobs[entry.transferID]?.removeAllInterests()
         }
         #expect(settlement == .finished)
         let outcome = await run.value
