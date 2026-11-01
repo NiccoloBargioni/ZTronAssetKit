@@ -15,7 +15,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - A case not measured at a quiet load is neither confirmed nor blocking. The orchestrator measures it before ruling convergence.
   - **Keep-awake:** `caffeinate -ims -t 259200`, from 14:12 to 4 Nov 14:12, as a background task of this session.
   - **Watcher:** `watch_journal.py` in this session's scratchpad wakes the orchestrator at each agent result, so put-backs are ruled between cycles.
-  - **Stale scheduled task:** `ztron-assetkit-resume-after-reset` (Thu 5 Nov 03:10) waits for a reset that has already come. Its pre-flight launches nothing above 10 % weekly. The owner is asked whether to disable it.
+  - **Retired scheduled task:** `ztron-assetkit-resume-after-reset` (Thu 5 Nov 03:10) waited for a reset that had already come.
+    - Owner, 1 Nov: "Yes, disable it".
+    - `list_scheduled_tasks` shows no tasks at all, so nothing is armed that the tool can disable.
+    - As a guard, its `SKILL.md` now says do nothing if it fires. The original prompt is kept in `.build-orchestrator/retired-task-resume-after-reset.SKILL.md`.
+    - If the task still appears under Claude app → Scheduled, the owner can delete it there.
   - **At convergence:** the reset the owner's 31 Oct 23:25 decision waited for has come, so the pending list follows, as in the scheduled task's steps 5–8: merge `wp/s3f`, the gates, ADR-057, Stage 5, then the post-stages. The owner can say stop.
   - **Forecast:**
     - A cycle took 4–5 h before (fix 2.5–3.7 h, verification 1.1–1.5 h); under this load, expect about 5–6 h. Each cycle costs about 3.5–4 weekly points.
