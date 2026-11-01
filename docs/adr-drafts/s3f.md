@@ -318,6 +318,43 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
   also settles three of cycle 16's own survivors: `followedLane`'s epoch filters are removed (cost-only, `e67f467`),
   `start`'s resets are checked by an `invariantViolations()` clause a test exercises (`e9960ef`), and the visit's
   supersede of a passed failed job is killed by a claim that would keep the job (`c161818`, `d3242d3`).
+- **Orchestrator ruling (close-out) S3-R20 — added 2026-11-01 02:34 (the cycle-17 fixer's put-back on `bringInbound`'s
+  C2 cost; written while the cycle-17 fixer ran, before its verifiers).**
+  1. `bringInbound` makes all its moves in one turn, the attempt's end. The fixer's scratch release figure was about
+     400 ms with 10,000 ids converging on one content, which breaks C2 (CLAUDE.md C2; S3-R5's budgets).
+     - C2 is a standing order: the orchestrator cannot waive it; only the owner can, explicitly.
+     - Until the owner does, the breach is blocking (S3-R16 item 1: a broken MUST, and the gates).
+  2. Verifiers measure the breach with a BenchSync release case: 10,000 ids, held by other jobs, that the copy maps to
+     one content whose attempt ends while the follow is owed. They report the best of 3 with the load and judge it by
+     C2 and S3-R5; a scratch figure settles nothing either way.
+  3. A fix keeps every turn within C2 and changes no answer (S3-R16 item 1). For example, the moves continue over
+     bounded turns, as the owed follow's visits do, while the job's end and every later event wait, as events already
+     wait while a follow is owed. The order, place and timing differences the fix makes are not blocking (S3-R16 item
+     2). Its walk and its moves each get a BenchSync case.
+
+  Applied in cycle 18 ("Cycle 18" below): the walk records the moves, and the follow's turns make them.
+- **Orchestrator ruling (close-out) S3-R21 — added 2026-11-01 04:46 (the cycle-17 fixer's put-backs and cycle 17's
+  verification; written while the cycle-18 fixer ran, before its verifiers).** The owner decided on 1 Nov at 02:39:
+  "No, keep fixing". C2 is not waived.
+  1. *The owed follow's own turns in the 10,000-member concentration shape.* Both cycle-17 verifiers measured the
+     longest turn at 17.7 to 19.1 ms, at a load of about 5.
+     - The shape is inside C2's reference set (S3-R5, S3F-5, S3-R20), so the breach is blocking. Option (c), ruling the
+       shape outside C2, is not available.
+     - The fix: join in place (option (b)), so each join is O(1) amortised with no live copy of a `Job` or
+       `JobInterest`. Where a turn still exceeds C2, also bound the turns by the work done (option (a)).
+     - Pinned by a BenchSync release case: best of 3, at most `SyncBenchmarks.c2Budget`.
+  2. *`bringInbound`.* S3-R20 applies unchanged and is recorded in the draft (above). In-place joins may shrink the 408
+     to 432 ms measured, but a figure over C2 at 10,000 still needs bounded turns (S3-R20 item 3).
+  3. *PROBE-C17-ADMIT-DURING-APPLY.* An admission that races an older apply omitting the id is answered `notFound`.
+     Visit-first gives the same answer, both rules predate s3-base, and no barrier is involved: outside the
+     follow-barrier class and pre-existing, as in S3-R19 item 3, so not blocking and not fixed in this close-out. It is
+     recorded under the residual risks with the probe, its seed, its figures and the two options, and marked for the
+     owner in Stage 5's RESIDUAL-RISKS: it gives a wrong `notFound` under a race.
+  4. *RR-14* is proven by both verifiers, so it is blocking (S3-R16 item 1(a)). Fix it as the verifiers describe, with
+     the moves bounded under S3-R20.
+
+  Applied in cycle 18 ("Cycle 18" below): in-place joins (item 1; the turns then measure within C2, and a bound on the
+  stale entries a turn passes was added as margin), bounded moves (item 2), RR-17 (item 3) and RR-14's fix (item 4).
 
 ## Cycle 2: the cycle-1 verification findings
 
@@ -3761,6 +3798,305 @@ These rows replace cycle 16's I12 and its "New, `EngineFollow.follow`…" row, a
   `// REENTRANCY:` comment and no ledger row is proposed.
 - 0 unsafe escapes (gate below).
 
+## Cycle 18: the cycle-17 verifiers' findings, and S3-R20 and S3-R21
+
+Cycle 18 applies S3-R20 and S3-R21 to the cycle-17 verifiers' findings. From the requirements lens: `reqs-1` (a
+`Retry-After` date read at the drain), `reqs-2` (RR-14), `reqs-3` (`bringInbound`'s C2), `reqs-4` (the follow's own
+turns), `reqs-5` (`bringInbound`'s doc premise) and `reqs-6` (P-2, P-5, P-6, P-13). From the correctness lens:
+`correct-1` (S3-R20 neither applied nor recorded), `correct-2` (the follow's own turns), `correct-3` (RR-14),
+`correct-4` (the narrowed re-route's test) and `correct-5` (three drop-mutants). The nine blocking ones are fixed. The
+work went in this order:
+
+1. `d788d75`: the failing tests, committed on their own (P3), each scenario in both orders with
+   `.timeLimit(.minutes(3))` in the serialized `EngineFollowBarrierTests` suite:
+   - the new `EngineFollowBarrierPublicationHopTests.swift` holds both verifiers' RR-14 probes as one test with two
+     shapes: PROBE-C17R-RR14-PUBLICATION-HOP (seed 1_717_002, a 16-byte publisher, `smallPublisher`) and
+     PROBE-C17C-RR14-PUBLICATION-HOP (seed 1_717_302, a 100 kB publisher, `largePublisher`);
+   - RetryTests gains PROBE-C17C-RETRY-AFTER-DATE (seed 1_717_102);
+   - BenchSync gains the three concentration cases S3-R20 item 2 and S3-R21 item 1 ask for.
+
+   On `e1cf3e5`'s sources: `✘ Test run with 2 tests in 1 suite failed after 2.886 seconds with 4 issues.`
+   (`.build-s3f/c18/fail-first.log`). Every issue is sweep-first: PublicationHopTests `:118` (both shapes), RetryTests
+   `:222` (B not answered `serverUnavailable(31)`: C's retry served it) and `:223` (two starts of C). The benchmarks,
+   release, in a copy of `e1cf3e5`'s sources (`.build-s3f/c18/headbench.log`, 1-minute load 10.83): the 404's turn
+   [393.91, 394.76, 394.21] ms, the publication's [403.53, 400.95, 405.38] ms, the follow's own turns [17.49, 17.56,
+   17.50] ms (39 held turns, median 9.82 ms). Best of three: 393.91, 400.95 and 17.49 ms against C2's 10 ms.
+2. `c4dda13`: `reqs-1`'s fix (below).
+3. `2aa5a67`: the in-place join (S3-R21 item 1).
+4. `b9c0513`: the moves over the follow's turns (S3-R20) and RR-14's fix (S3-R21 item 4).
+5. `bfb1c70`, `f662510`, `165ccdd`: the tests `correct-4` and `correct-5` ask for, one commit each.
+6. `deb5c9d`: the convergence test, the moves' answers at 400 holders in both orders.
+7. `70e0801`: the benchmarks' final shape: the ending's own turn and the held turns timed apart, and the walk an apply
+   makes for the publications in flight.
+8. `640ac96`: `reqs-5`'s doc correction (a doc comment only).
+9. `c0bbe09` and `4fb1375`: the tests the mutant pass asked for (under "Mutants"): `catchUpWalkDrop`,
+   `inboundHolderWaitDrop` and `vaWallDrop` survived the Sync bundle in its first round (`70e0801`'s tree, whose code
+   is `640ac96`'s). Tests only.
+10. This draft.
+
+The Sync bundle on `70e0801`'s sources before the gate runs: `✔ Test run with 541 tests in 53 suites passed after
+123.145 seconds.` (`.build-s3f/c18/sync3.log`).
+
+### The findings
+
+| Finding | Disposition |
+|---|---|
+| `reqs-1` (blocking): PROBE-C17C-RETRY-AFTER-DATE, seed 1_717_102: a deferred retry reads its `Retry-After` date against the clock at the drain | **Fixed** in `c4dda13`, by the finding's first option. `retryLater` reads the wall clock before `defersFailure`, and the deferred verdict carries it (`AttemptVerdict.retry(_:answer:wall:)`, `EngineFollow.swift:1353`). The replay (`giveVerdict`) and `verdictAnswers` (`EngineFailures.swift:855`) read the date against it. Test: `barrierReadsARetryAfterDateAtItsArrival` (RetryTests `:184`; B gets `serverUnavailable`, C starts once). VerdictAnswersTests construct the verdict with `wall:` (below). Mutants: `retryAfterWallDrop`, and `vaWallDrop`, killed by VerdictLaneTests' `retryAfterDateLater` ending (`4fb1375`) |
+| `reqs-2` (blocking): PROBE-C17C-RR14-PUBLICATION-HOP, seed 1_717_302; `correct-3` (blocking): PROBE-C17R-RR14-PUBLICATION-HOP, seed 1_717_002 | **Fixed** in `b9c0513`, by the findings' first option: at each apply made while a follow is owed, before the copy changes, `bringInboundOntoPublications` (`EngineFollow.swift:948`; called from `applied`, `EngineRuns.swift:368`, and `followStoreView`, `EngineCatchUp.swift:222`) records the moves the outgoing copy owes onto every job whose publication runs, with S3-R20's bound. **One deviation:** the reqs finding also names "the failed jobs whose verdict waits". They are left out: a visit-first engine gave that verdict when the attempt ended, before the apply, so its visit at the apply joined the interest after the verdict, which is what cycle 17's join behind a waiting verdict does (`addInterest`'s rule 3); brought onto the job, the verdict would answer it. Tests: `barrierGivesAnInterestMovedOntoAPublicationItsOutcome` (PublicationHopTests `:197`, both shapes), its catch-up variant (`:208`, `c0bbe09`), and the convergence test's `publicationApply` ending at 400 holders. C2: `publicationApplyTurns`. Mutants: `applyWalkDrop`, `catchUpWalkDrop`. An apply inside a failed publication's bookkeeping await is not covered (RR-18, below) |
+| `reqs-3`, `correct-1` (blocking): `bringInbound` moves every holder in the attempt-end turn (S3-R20); S3-R20 not recorded | **Fixed** in `b9c0513`, as S3-R20 item 3's example says (below). S3-R20 and S3-R21 are recorded under "Orchestrator rulings (close-out)". The longest actor waits at 10,000 converging ids, best of three, fall from 393.91 ms (the 404) and 400.95 ms (the publication) to 6.23 and 5.45 ms (under "Gate evidence (cycle 18)"). Tests: the convergence test; cycle 17's hop tests unchanged. C2: `concentrationNotFoundTurns`, `concentrationPublicationTurns` (the moves), `inboundWalkTurns` (the walk). Mutants: the `inbound*` and `publishInboundWaitDrop` rows; `inboundHolderWaitDrop` is killed by PublicationHopTests' mapped-back test (`:221`, `c0bbe09`) |
+| `reqs-4`, `correct-2` (blocking): the follow's own turns 17.7 to 19.1 ms in the concentration shape (S3-R21 item 1) | **Fixed** in `2aa5a67` by option (b): `addInterest` joins in the table, with no live copy of the `Job` or the `JobInterest` (`EngineJobs.swift:160`), so a join is O(1) amortised. The follow's held turns fall from 17.49 ms to 3.84 ms, best of three (under "Gate evidence (cycle 18)"), with no further bound (option (a) not needed). A turn that passes stale entries of the follow's order is also bounded (`followSkipsPerTurn`, below). C2: `concentrationFollowTurns` |
+| `correct-4` (blocking): no test kills `rerouteOnPassKeepWhole` (PROBE-C17R-NARROWED-REROUTE, seed 1_717_102) | **Fixed** in `bfb1c70`: the probe is committed as `barrierAnswersAnIDMovedBackAndAwayAgainWithThePublicationsOutcome` (MovedBeforeTests `:103`, both orders), next to `publicationMappedBack`. The mutant fails it 2/2 at `:170` (table below) |
+| `correct-5` (blocking): `vaStampDrop`, `bringInboundStampDrop` and `takeOffAssetsKeep` survive the Sync bundle | `vaStampDrop`: **killed** by VerdictLaneTests' new `throttleFailFastLater` ending (`165ccdd`), which advances the clock 9 s between O's verdict and v4, so a fail-fast read at the drain's instant instead of the verdict's stamp answers otherwise. `takeOffAssetsKeep`: **killed** by the mapped-back tests' event checks (`f662510`): C's 404 reports zz-a failed and not zz-b. `bringInboundStampDrop`: the code is **removed** (S3-R19 item 3); the moves read no world view (argument under "Mutants") |
+| `reqs-5` (non-blocking): `bringInbound`'s doc premise; PROBE-C17C-INBOUND-SUPERSEDED (seed 1_717_002), its CONTROL and CONSISTENT (seed 1_717_022) | **Recorded** as RR-16 under "Residual risks (S3-R16; cycle 18)". The doc comment is **corrected** in `640ac96`: a holder's interest goes onto this job, or, when the job's own owed visit comes first and supersedes it, a visit-first engine gave it a fresh job of the content; the answers agree while the origin answers both requests alike, and the requests differ by one. The optional skip is not taken |
+| `reqs-6` (non-blocking): StorageBenchmarks P-2, P-5, P-6, P-13 during a load spike | **Routed**, WP-B's (`other-wp:b`). No WP-F change. In this cycle's run P-13 failed again (unit max 5.36 ms against 5.0 ms; under "Gate evidence (cycle 18)") |
+
+### What cycle 18 changes (`c4dda13`, `2aa5a67`, `b9c0513`, `640ac96`)
+
+- **A `Retry-After` date is read at the response's arrival** (`retryLater`, `EngineFailures.swift:244`). The wall clock
+  is read before the verdict may defer and travels with it (`AttemptVerdict.retry`'s `wall`). `giveVerdict` passes it
+  back to `retryLater`, and `verdictAnswers` reads `retryDelay` against it. A date 31 s ahead at the arrival, read at
+  the drain 5 s later, was 26 s ahead: within the 30 s cap that the visit-first answer exceeded.
+- **A join writes into the table** (`addInterest`, `EngineJobs.swift:108`). The cycle-17 join mutated a copy of the
+  `Job` and wrote it back, so each insertion copied the growing id sets of the job and the interest. The join now
+  reads what it needs into constants, then inserts through `self.state.jobs[transfer]?`.
+- **The moves an attempt's end owes are recorded, then made over the follow's turns** (S3-R20):
+  - **The walk** (`findInbound`, `EngineFollow.swift:975`, and `foundInbound`, `:1010`) is cycle 17's pass over every
+    job's ids, with one lookup in the copy each. It now records one move per holder and target
+    (`EngineState.inboundMoves`; `InboundMove`, `EngineState.swift:613`): the target's transfer and epoch, the holder,
+    the ids, and the copy the walk read. The moves are sorted by keys of plain integers (the holder's `Job.epoch`, the
+    target's epoch, an index), so the sort moves no id set (the first sort, of tuples carrying the sets, cost about
+    3.7 ms at 10,000 in a profile copy). `inboundOnto` counts the owed moves onto each target, once per walk. Ids an
+    owed move already carries are not recorded again (`inboundPendingIDs`, `:1060`).
+  - **The moves.** `bringInbound` (`:928`) makes the first `inboundMovesNow` (64) in the attempt's end turn
+    (`makeInboundNow`, `:1090`). The follow's turns make the rest before any visit (`continueFollow`, `:111`;
+    `continueInbound`, `:1113`). Moves and visits share a turn's `followsPerTurn` (256): a turn that leaves a move owed
+    visits nothing, so no visit runs before a move it follows on a visit-first engine. A move re-checks its target
+    (`inboundTargetWaits`, `:1146`: the same epoch, publishing, or failed with its end recorded) and moves the ids the
+    holder still holds, under the copy that found them (`move(_:of:listing:)`, `:856`; `supersede` and `reroute` take
+    the `listing`). A move onto a target that has ended is dropped; the holder's own visit then moves the ids.
+  - **The barrier.** While a move is owed, the follow is owed (`followOwed` includes `inboundOwed`), so every later
+    event waits as it waits for an owed visit, and the job's verdict waits in `verdictsAfterFollow` as before.
+  - **The publication waits.** A publication binds its ids only once no move onto or off its job is owed
+    (`inboundBlocks`, `:1076`; `publish`, `EngineDispatch.swift:1031`). It waits in `awaitInboundMoves` (`:1175`),
+    resumed by the last such move (`inboundMade`, `:1162`) or by shutdown (`releaseInboundWaits`, `:1192`, from
+    `drainEverything`). After the wait, `publish` re-checks the lifecycle and the job's epoch and state, and a job
+    retired or replaced meanwhile gets the retired publication's exit, the file discarded. **REENTRANCY RE-S48
+    (proposed)**, the one new `await` in the actor.
+  - **The lane.** `followedLane` counts an owed move's ids on its target, whatever a later copy maps them to
+    (`EngineFailures.swift:718`).
+  - **The joins.** `noteJoin` compares a move's join with the engine's copy, also when the move reads a replaced copy:
+    a job holding an id the copy maps elsewhere is in `unfollowed` (`invariantViolations()`). Comparing with the move's
+    copy broke that invariant in a scratch run, so it was not kept.
+- **RR-14** (S3-R21 item 4). At each apply made while a follow is owed, `bringInboundOntoPublications` walks for the
+  jobs in flight that publish (verifying or committing), under the outgoing copy, before `adoptApplied`. It makes no
+  move itself, and the apply leaves the follow's first turn to the follow-up turn the walk schedules
+  (`EngineState.applyWalked`, `EngineFollow.swift:71`). With the follow's first turn (its moves) in the apply's turn
+  too, that turn held the actor 9.38 to 9.57 ms at 10,000 (`publicationApplyTurns`, `.build-s3f/c18/bench4.log`, load
+  5.35); deferred, 4.35 ms, and 6.02 ms with a move found for nearly every member (best of three, under "Gate evidence
+  (cycle 18)").
+- **Stale entries of the follow's order.** A turn passes at most `followSkipsPerTurn` (4,096) entries of jobs that
+  left `unfollowed` before their visit (`EngineFollow.swift:158`). After the 404's drain removed 10,001 ids' jobs, the
+  next turn passed about 9,500 such entries (about 2 ms in a profile copy). Cost only: a pass is not a visit.
+
+### Tests added (display names)
+
+All in the serialized `EngineFollowBarrierTests` suite, each with `.timeLimit(.minutes(3))`; the scenario tests run in
+both `LaneDropVisit` orders and expect the visit-first outcome in both.
+
+- `EngineFollowBarrierPublicationHopTests.swift` (`d788d75`): "R-INT-3: an interest an apply moves onto a publishing
+  content gets the publication's outcome, though the next apply moves it on (F-28)"
+  (`barrierGivesAnInterestMovedOntoAPublicationItsOutcome`, `:197` at `4fb1375`; seeds 1_717_002 and 1_717_302).
+- PublicationHopTests (`c0bbe09`), both shapes:
+  - "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the
+    next manifest (F-28)" (`barrierGivesAnInterestMovedOntoAPublicationItsOutcomeThroughACatchUp`, `:208`). v4 is
+    applied by the store and followed through `followStoreView` (`followStoreHeld`, `:68`), the catch-up's path after an
+    `apply` that threw past its writes.
+  - "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old
+    job's bytes (F-28)" (`barrierGivesAnInterestMappedBackOffAPublicationItsOutcome`, `:221`). v4 maps zz-x back to H's
+    content; 72 prefetch holders created before H (`publicationHopAhead`, `:62`) also converge on P, so v4's walk owes
+    their moves before H's, and H's attempt's end, which makes the first 64, leaves the move off H owed while H's bytes
+    publish (the setup checks it, sweep-first). Five transfer slots, two reserved for user work, so H downloads beside
+    P. Q, W and every holder ahead get P's integrity failure, as visited first.
+- RetryTests (`d788d75`): "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a
+  follow (F-28)" (`barrierReadsARetryAfterDateAtItsArrival`, `:184`; seed 1_717_102).
+- MovedBeforeTests (`bfb1c70`): "R-INT-3: an id an apply moves back while a publication runs gets the publication's
+  outcome though a later apply moves it again (F-28)"
+  (`barrierAnswersAnIDMovedBackAndAwayAgainWithThePublicationsOutcome`, `:103`; seed 1_717_102).
+- `EngineFollowBarrierConvergenceTests.swift` (`deb5c9d`): "R-SYN-4: ids converging on one content while a follow is
+  owed get its outcome, the moves made over the follow's turns (F-28)"
+  (`barrierMovesConvergingIDsOverTheFollowsTurns`, `:164`; seed 1_818_002). 400 holders, whose ids v3 maps to O's
+  content while the follow owes their visits, and four endings: O's 404 (everyone `notFound`), O's publication
+  (everyone served 16 bytes), the 404 and then v4 mapping the holders to Z while the moves are owed (everyone
+  `notFound`, Z never starts), and v4 while O's publication runs (O served, the holders served Z's 48 bytes, the moves
+  onto the ended publication dropped). Sweep-first, the setup checks that the attempt's end made 64 moves and owes the
+  rest, or that v4's apply owes one move per holder, and the follow's turns run one at a time.
+- BenchSync (`d788d75`, `70e0801`): `concentrationNotFoundTurns`, `concentrationPublicationTurns`,
+  `concentrationFollowTurns` and `publicationApplyTurns` (R-SYN-11), release only.
+
+### Test changes (G3 one-to-one; S3-R16 item 4)
+
+- `barrierJoinsAnIDMappedBackAfterTheVerdictThatWaits` and `barrierJoinsAnIDMappedBackAfterTheSpaceVerdictThatWaits`
+  (HopTests), cycle-17 tests: `mappedBack` subscribes to the engine's events before B's interest counts and returns
+  them with the answers (`f662510`). Both tests keep their two expectations and add two: C's verdict reports zz-a failed
+  and does not report zz-b. Nothing removed.
+- `barrierDecidesA429OnTheLaneAWaitingVerdictLeaves` (VerdictLaneTests), a cycle-16 test, gains the endings
+  `throttleFailFastLater` (`165ccdd`): `throttleFailFast`'s script, with the clock advanced 9 s before v4; and
+  `retryAfterDateLater` (`4fb1375`): O's attempt held, then released with a 503 whose `Retry-After` is a date 31 s
+  ahead of the clock, and the clock advanced 9 s before v4. Every existing ending and expectation is unchanged.
+- `publicationHop` (this cycle's own, `d788d75`) gains `next:` (`c0bbe09`): its default, `.onward`, is the scenario
+  `barrierGivesAnInterestMovedOntoAPublicationItsOutcome` ran before, with the same tuning, entries and expectations;
+  it also returns the answers of the holders ahead (none unless `.back`).
+- VerdictAnswersTests' four retry expectations construct `.retry(_, answer: nil, wall: wall)` (`c4dda13`), the new
+  case's shape; their conditions and messages are unchanged.
+- BenchSync's three concentration cases (`d788d75`, this cycle's own) are reshaped in `70e0801`: the ending's own turn
+  is timed in a window of its own, the held turns after it, and the 404's case checks that the follow ends with every id
+  answered. Their C2 expectation is unchanged.
+
+### Mutants (S3-R16 1(e))
+
+Setup: `.build-s3f/c18/mut.py` (cycle 17's runner, with this cycle's list) copies `Package.swift`, `Sources/` and
+`Tests/` into `.build-s3f/mutsrc` and applies each edit with a count check. It builds in `.build-s3f/mutbuild` and runs
+the mutant's filter: twice when it fails, else the Sync bundle once (twice if that fails). Then it reverts and diffs the
+copy's `Sources/` against the worktree. `mut2.py`, `mut4.py` and `mut5.py` are the same runner over `.build-s3f/mutsrc2`
+and `.build-s3f/mutbuild2`. Round 1 (`mut/`) ran on `70e0801`'s tree: `640ac96`, one doc comment in
+`EngineFollow.swift`, was committed while it ran, and its final check printed that comment's diff. Its copy's
+`Sources/` and `Tests/` equal a `git archive` of `70e0801` (`diff -rq`), so every mutant was reverted. Round 2
+(`mut2/`) ran on `640ac96`'s sources with the first draft of `c0bbe09`'s tests, whose mapped-back case had no holders
+ahead of H. Round 3 (`mut4/`) and round 4 (`mut5/`) ran on `4fb1375`'s tree (the copy's `Tests/` equal the worktree's).
+Rounds 2 to 4 printed `sync diff: none` and `revert diff: none`. Every scenario failure is sweep-first. Lines are each
+round's tree's: `70e0801`'s and `4fb1375`'s tests differ only in PublicationHopTests and VerdictLaneTests.
+
+| Mutant | Branch | Result | Killed by |
+|---|---|---|---|
+| `rerouteOnPassKeepWhole` | a deferral after a pass keeps the job's whole `rerouteOnPass`, not its part moved away again | 1: 2/2 | MovedBeforeTests `:170` (`correct-4`'s probe) |
+| `vaStampDrop` | `verdictAnswers` reads the drain's instant, not the verdict's stamp | 1: 2/2 (`:214`, `:219`); 4: 2/2 | VerdictLaneTests `:226`, `:231` (`throttleFailFastLater`) |
+| `takeOffAssetsKeep` | a move leaves the moved ids among the holder's assets | 1: 2/2 | HopTests `:176` (C's 404 reports zz-b failed) |
+| `inboundSharedBudgetDrop` | the visits get a turn's budget of their own after the moves | 1: 2/2 | ConvergenceTests `:179`, `:181` (`applyBetween`; `notFound` also ran into its time limit, `:163`) |
+| `inboundListingDrop` | a move re-routes under the engine's copy, not the copy that found it | 1: 2/2 | ConvergenceTests `:179`, `:181` (`applyBetween`) |
+| `inboundTargetWaitsDrop` | a move onto a target whose attempt has ended is made | 1: 2/2 | ConvergenceTests `:179` (`publicationApply`) |
+| `publishInboundWaitDrop` | `publish` binds while moves onto or off its job are owed | 1: 2/2 | ConvergenceTests `:179` (`publication`; its setup's wait for the publication's wait ran into the time limit, `:163`) |
+| `inboundHolderWaitDrop` | the publication waits for moves onto its job only, not off it | 1: **passed** (filter and bundle); 2: **passed** (filter and bundle); 3: 2/2 | PublicationHopTests `:224` (mapped back, both shapes) |
+| `applyWalkDrop` | `applied` walks no publication | 1: 2/2 (`:118`); 3: 2/2 | PublicationHopTests `:200` (both shapes) |
+| `catchUpWalkDrop` | `followStoreView` walks no publication | 1: **passed** (filter and bundle); 2: 2/2 (`:183`); 3: 2/2 | PublicationHopTests `:211` (through the catch-up, both shapes) |
+| `retryAfterWallDrop` | `giveVerdict`'s retry reads the date against the clock at the drain | 1: 2/2 | RetryTests `:222`, `:223` |
+| `vaWallDrop` | `verdictAnswers` reads the date against the clock when asked, not at the 503's arrival | 1: **passed** (filter and bundle); 3: 2/2 | VerdictLaneTests `:224`, `:226`, `:231` (`retryAfterDateLater`) |
+| `bringInboundVisitFilterDrop` | the walk brings a holder's ids its visit would not move | 1: filter passed; bundle 2/2 | HopTests `:407` |
+| `publishBringInboundDrop` | `publish` brings nothing | 1: 2/2 | HopTests `:330` (`published`); ConvergenceTests' setup `:121` (`publication`, which then ran into its time limit, `:163`) |
+| `spaceBringInboundDrop` | `spaceFailed`'s deferral brings nothing | 1: 2/2 | HopTests `:30` (the `expectInsufficientSpace` helper, `insufficientSpace`) |
+| `deferBringInboundDrop` | `defersFailure` brings nothing | 1: 2/2 | HopTests `:327` (`notFound`); ConvergenceTests' setup `:121` |
+| `rule3BringingDrop` | the moves' joins wait behind the verdict too | 1: 2/2 | ConvergenceTests `:179`, `:181` (`notFound` also ran into its time limit, `:163`); HopTests `:30`, `:327` |
+| `followSkipsPerTurnUnbounded` | a turn passes every stale entry of the follow's order | 3: **passed** (filter and bundle) | Cost only (below) |
+| `applyWalkedDrop` | the apply's turn also runs the follow's first turn | 3: 2/2, setup checks only | ConvergenceTests `:130`, PublicationHopTests `:161`; cost only (below) |
+| `bringInboundStampDrop` | the moves' joins read the holder's visit instant | — | **Removed** in `b9c0513` (below) |
+
+Round 2 shows why the mapped-back case needs holders ahead: H's attempt's end runs `bringInbound`, which makes the first
+`inboundMovesNow` owed moves (`makeInboundNow`), the move off H among them, so the publication never met a move off its
+job still owed. With 72 holders created before H converging on P, v4's walk owes their moves first, and the move off H
+is still owed when H publishes (the test's setup checks it). Unwaited, H's publication bound zz-x, which v4 maps to H's
+content, and served W H's bytes; a visit-first engine had moved W onto P at v3's visit.
+
+`bringInboundStampDrop` (`correct-5`): cycle 17's moves joined each interest under the holder's visit instant
+(`withReading`), and the drop-mutant survived every bundle. The moves make no visit, so they read no decision instant:
+a join onto a job at its attempt's end reads none. The reading was removed with the moves' rewrite in `b9c0513`
+(S3-R19 item 3; `continueInbound`'s doc comment).
+
+`followSkipsPerTurnUnbounded` and `applyWalkedDrop` change where a turn ends, not what the follow does. A pass over a
+stale entry visits nothing. The follow's first turn makes the same moves and visits, in the same order, whether the
+apply's turn or the follow-up turn runs it, and every event between the two waits behind the barrier. Both are cost
+only (S3-R19 item 2). `applyWalkedDrop` fails only the two setup checks that read where the moves are owed when the
+apply returns (`#require`, before any answer is read). No benchmark ran with either mutant. Before the deferral was
+added, the apply's turn measured 9.38 to 9.57 ms (`bench4.log`, load 5.35), within C2's 10 ms by less than 0.7 ms;
+without the bound, the turn after the 404's drain passed about 9,500 stale entries, about 2 ms in a profile copy. Both
+are margin for C2; the figures with them are under "Gate evidence (cycle 18)".
+
+### Residual risks (S3-R16; cycle 18)
+
+For Stage 5's `docs/RESIDUAL-RISKS.md`, beside RR-1 to RR-15.
+
+- **RR-14 is closed** by `b9c0513` (above), except the window in RR-18.
+- **RR-15, rewritten (order only).** A visit's join behind a waiting verdict is placed right behind the verdict. The
+  moves an attempt's end or an apply owes are made in the holders' creation order (`Job.epoch`), before any owed visit,
+  over the follow's turns; a visit-first engine made them at each apply's instant, in follow order. A move onto a job
+  whose attempt ended meanwhile is dropped, and the holder's own visit moves the ids. Not probed.
+- **RR-16. A holder's interest brought onto a job that a visit-first engine had already superseded** (`reqs-5`;
+  PROBE-C17C-INBOUND-SUPERSEDED, seed 1_717_002, its holder-first CONTROL and its CONSISTENT variant, seed 1_717_022,
+  in `.build-orchestrator/s3f-probes-c17/correct/VerifyC17CorrectProbes.swift:450-479`). When the ending job's own owed
+  visit comes before the holder's in follow order and moves every id it holds, a visit-first engine superseded the job
+  and gave the holder's interest a fresh job of the content: one request more (tStarts 2 against 1). The verifier's
+  results: INBOUND-SUPERSEDED fails sweep-first 6 of 6 (W `notFound` against 100,000 bytes served), only because the
+  fake answers T's first request 404 and its second 200; CONSISTENT, with every request for T's content answered 404,
+  passes both orders 3 of 3 (W `notFound`); CONTROL passes 6 of 6. A start-count difference while the server answers
+  alike (S3-R16 item 2); an answer difference only when the origin answers two requests for one content differently.
+- **RR-17. An admission racing an older apply that omits the id answers `notFound`** (S3-R21 item 3;
+  PROBE-C17-ADMIT-DURING-APPLY, seed 1_618_202). **For the owner: it gives a wrong `notFound` under a race.** A waiter
+  for an id the copy does not list is admitted from the manifest its fetch returns (`EngineManifest.join`). While an
+  `apply` of an older manifest that omits the id is in flight, the engine refuses the store's view
+  (`followStoreView`), so the job holds an id its copy does not list. That apply's follow then visits the job:
+  `follow`'s filter counts the id as moved, and `reroute` answers the waiter `notFound`, since the copy does not list
+  it; the store lists the id, and the catch-up the refused view owed adopts it just after. The probe
+  (`.build-s3f/c17/ScratchC17AdmitDuringApply.swift.txt`, run in the mutation copy, not committed) failed 2 of 2 runs:
+  `(xHoldsU: false, copyListsU: true), storeListsU: true; U: failure(ZTronAssetModel.AssetError.notFound)`; X's own
+  waiter was served. Visit-first answers the same, and both rules predate s3-base (the visit's filter is s3-base's
+  `followApplied`; the refused view is `5a53605`), so it is outside the follow-barrier class. When: the server adds the
+  id between a run's fetch and the refetch, and the admission lands while that run's apply is in flight. Options,
+  none taken: (a) while a catch-up is owed (`catchUpAfterFailedApply`), a visit leaves an id the copy does not list,
+  and the catch-up's follow decides it; (b) the admission records the ids it joined unlisted, and a visit moves only
+  the ids the copy pruned.
+- **RR-18. An apply inside a failed publication's bookkeeping await** (found while fixing; analysis, not probed). An
+  apply's walk brings ids onto publishing jobs only. A job whose publication failed is `failed` with its end recorded
+  and no verdict yet while `integrityFailed` or `spaceFailed` awaits the store. An apply landing in that await, while a
+  follow is owed, finds no target there: when the outgoing copy had mapped a held id to that content (the holder's visit
+  owed) and the new copy maps it on, the verdict's deferral (`bringInbound` under the new copy) no longer brings it,
+  while a visit-first engine's visit at the earlier apply had joined it to the publication, whose failure answered it.
+  The fix would add such jobs to the walk's targets (`inboundTargetWaits` already accepts them); a test needs the
+  store's bookkeeping held, which no seam holds today. Put to the orchestrator below.
+
+### Put to the orchestrator (found while fixing; not changed this cycle)
+
+1. **RR-18** (above): blocking only if a probe shows it (S3-R16 item 1(a)). The walk's change is one clause; the
+   test needs a seam that holds `integrityFailed`'s store await.
+
+### Corrections to cycle 17's text
+
+- **`bringInbound`'s doc comment** said every interest it brings is one a visit-first engine's visits had already moved
+  onto the job. Not when the job's own owed visit comes first and supersedes it (RR-16). Corrected in `640ac96`.
+- **RR-14** was "Not probed" in cycle 17: both verifiers probed it, and it is fixed (above).
+- **RR-15**'s "`bringInbound` takes its holders by transfer" is replaced by the creation order (above).
+
+### The inventory, corrected (cycle 18)
+
+These rows replace cycle 17's `bringInbound` row and add four. Line numbers are at `640ac96` (sources; the tests'
+at `4fb1375`).
+
+- **`bringInbound`** (`EngineFollow.swift:928`; called from `defersFailure`, `spaceFailed` and `publish`), now a walk
+  that records the moves (`findInbound` `:975`, `foundInbound` `:1010`) and makes the first 64. Tests: cycle 17's hop
+  tests, the convergence test. Mutants: `deferBringInboundDrop`, `spaceBringInboundDrop`, `publishBringInboundDrop`,
+  `bringInboundVisitFilterDrop`, `rule3BringingDrop`. C2: `inboundWalkTurns`, `concentrationNotFoundTurns`,
+  `concentrationPublicationTurns`.
+- **New, the owed moves** (`continueInbound` `:1113`, `inboundTargetWaits` `:1146`, `inboundMade` `:1162`,
+  `continueFollow`'s shared budget `:111`). Test: the convergence test. Mutants: `inboundSharedBudgetDrop`,
+  `inboundListingDrop`, `inboundTargetWaitsDrop`. C2: the concentration cases' held turns.
+- **New, the publication's wait** (`inboundBlocks` `:1076`, `awaitInboundMoves` `:1175`, `publish`
+  `EngineDispatch.swift:1031`, `releaseInboundWaits` `:1192`). Tests: the convergence test's `publication` ending (onto
+  the job), PublicationHopTests' mapped-back test (`:221`, off it). Mutants: `publishInboundWaitDrop`,
+  `inboundHolderWaitDrop`. RE-S48 (proposed).
+- **New, the apply's walk** (`bringInboundOntoPublications` `:948`, `applyWalked` `:71`; called from `applied` and
+  `followStoreView`). Tests: PublicationHopTests (`:197`; through the catch-up, `:208`), the convergence test's
+  `publicationApply` ending. Mutants: `applyWalkDrop`, `catchUpWalkDrop`; `applyWalkedDrop` and
+  `followSkipsPerTurnUnbounded` are cost only (under "Mutants"). C2: `publicationApplyTurns`.
+- **New, the arrival's wall clock** (`retryLater` `EngineFailures.swift:244`, `verdictAnswers` `:855`,
+  `AttemptVerdict.retry`'s `wall` `EngineFollow.swift:1353`). Tests: RetryTests `:184`, VerdictLaneTests'
+  `retryAfterDateLater` (`:219`). Mutants: `retryAfterWallDrop`, `vaWallDrop`.
+
+### Hang guards and re-entrancy
+
+- The new tests use `.minutes(3)`, as the suite's do; the benchmarks `.minutes(5)` (`publicationApplyTurns` and the
+  concentration cases run seven and four engines of 10,000 members).
+- One `await` was added in an actor: `publish`'s `await self.awaitInboundMoves(transfer)`
+  (`EngineDispatch.swift:1036`), with its `// REENTRANCY: RE-S48 (proposed)` comment; `awaitInboundMoves`'s own
+  `withCheckedContinuation` carries the same row. Proposed row under "Proposed document changes", "Cycle 18 adds:".
+- 0 unsafe escapes (gate below).
+
 ## Items
 
 ### S3F-1 [BLOCKING] S3-CONC-04 — a satisfied first conditions reading is an edge — **Fixed**
@@ -4679,6 +5015,34 @@ Cycle 17 adds:
 - **§14:** no new seam. Three items found while fixing go to the orchestrator: `bringInbound`'s C2 cost in the
   concentration shape, RR-14, and an admission that races an apply omitting its id (all under "Cycle 17", "Put to the
   orchestrator").
+
+Cycle 18 adds:
+
+- **§7.10, "Follow barrier (F-28)"**, changes to cycle 17's paragraph:
+  - "An attempt's end (its publication's start, or its exit verdict's deferral) first brings onto its job the interests
+    other jobs hold in ids the copy maps to its content and whose owed visits would move them" becomes "An attempt's
+    end (its publication's start, or its exit verdict's deferral), and each apply made while a follow is owed for every
+    job whose publication runs (under the outgoing copy, before it is replaced), record the moves of the interests other
+    jobs hold in ids the copy maps to the job's content and whose owed visits would move them. The attempt's end makes
+    the first 64; the follow's turns make the rest, before any visit and within its 256 a turn, each under the copy that
+    found it; a move onto a job whose attempt has since ended is dropped, and the holder's visit moves the ids. While a
+    move is owed the follow is owed, and a publication binds its ids only once no move onto or off its job is owed".
+  - After the deferral sentence, add "A deferred retry reads its `Retry-After` date against the wall clock at the
+    failure's arrival".
+  - "RR-2 to RR-5 and RR-7 to RR-15" becomes "RR-2 to RR-5, RR-7 to RR-13 and RR-15 to RR-18" (RR-14 is closed).
+- **§7.x, the follow's cost (S3F-5's text):** a join writes into the jobs table with no copy of the job alive, O(1)
+  amortised, so a job that grows to 10,000 ids keeps a follow turn within C2.
+- **`docs/RESIDUAL-RISKS.md` (Stage 5):** RR-15 as rewritten, and RR-16 to RR-18, as written under "Cycle 18". RR-17 is
+  marked for the owner: it gives a wrong `notFound` under a race (S3-R21 item 3).
+- **§10.2, new row:** `RE-S48 | `publish`'s wait for the moves owed onto or off its job (`awaitInboundMoves`) | the
+  lifecycle, and the job at this epoch still verifying: a job retired or replaced meanwhile gets the retired
+  publication's exit, the file discarded`.
+- **§11:** the cycle-18 tests (`d788d75`, `bfb1c70`, `f662510`, `165ccdd`, `deb5c9d`, `c0bbe09`, `4fb1375`), all in
+  `EngineFollowBarrierTests` (serialized), and BenchSync's `concentrationNotFoundTurns`,
+  `concentrationPublicationTurns`, `concentrationFollowTurns` and `publicationApplyTurns` (`d788d75`, `70e0801`) for C2.
+- **§1.2:** WP-F's new test files `EngineFollowBarrierConvergenceTests.swift` and
+  `EngineFollowBarrierPublicationHopTests.swift` under `Tests/ZTronAssetSyncTests/Engine/`.
+- **§14:** no new seam. RR-18 is put to the orchestrator (under "Cycle 18").
 
 ## Gate evidence (cycle 1)
 
@@ -5785,6 +6149,116 @@ are not cited.
 - **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
   untouched: no `--gates-only` or `--full` run was made.
 
+## Gate evidence (cycle 18)
+
+All runs were made on this branch at `4fb1375`, the last code and test commit (07:01:57). The draft's commit changes
+this file only. Scratch was `.build-s3f*` on the shared 8-core host, one gate at a time (`.build-s3f/c18/gates.sh`).
+The mutant rounds overlapped the first stages: round 3 ran 07:01:08–07:12:38, round 1's last mutants until 07:16:26
+and round 4 07:15:15–07:15:44, so the quick run and the three Sync runs shared the host with them. TSan, coverage,
+the iOS build, the simulator run, the benchmarks and S3-R13 ran with no mutant. Logs are under
+`.build-s3f/c18/final/`, with stage times and 1-minute loads in `times.txt`. A first run on `640ac96` was stopped during
+its third Sync run when the mutant pass asked for `c0bbe09` and `4fb1375`; its logs are in `final-stopped/` and are not
+cited.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (07:02:24–07:08:13; `quick.log`).
+  - 1-minute load: 5.42 at the start, 11.36 at the end.
+  - Result: `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`.
+  - Tests passed: Transport 151, Sync 543 (`passed after 139.848 seconds`: cycle 17's 537 and this cycle's 6),
+    Storage 459 (`73.597 seconds`), Model 84 (`66.544 seconds`), Kit 85, Compatibility 71, AppleHosted 104.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (ended 07:08:44,
+  `release.log`): `Build complete! (30,60 s)`, exit 0, 0 `warning:` lines.
+- **Gates** (`python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md && python3
+  Scripts/gates.py docs --sources "$PWD/Sources"`, 07:08:44, `gates.log`):
+  - `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`;
+  - `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  07:08:44–07:16:33; `syncx-{1,2,3}.log`).
+  - 1-minute load before each run: 9.88, 6.81 and 4.92; 5.12 after the last.
+  - Results: `✔ Test run with 543 tests in 53 suites passed after 133.436 seconds.`, `… after 129.838 seconds.`,
+    `… after 129.627 seconds.`
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, alone, 07:16:33–07:28:20, `tsan.log`).
+  - Load (S3-R12 rule 1, from 60 s after the start): mean 4.99, min 3.04, max 12.71 over 65 samples (`tsan-load.txt`).
+  - Result: `✔ Test run with 543 tests in 53 suites passed after 630.540 seconds.`; 0 `ThreadSanitizer` lines, 0
+    `Time limit` lines.
+  - Durations against guards (`python3 .build-s3f/c18/durations.py .build-s3f/c18/final/tsan.log`; 487 of the 543
+    reported names have a guard): none over half of its guard (S3-R12 rule 2).
+    - Largest: 27.7 % (`R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it
+      answers (F-28)`, 49.77 s of 3 minutes over its twenty cases; 39.79 s over sixteen in cycle 17). The limit holds
+      each case of a parameterized test: in the mutant runs the time-limit issue names its case's arguments, and the
+      convergence test ran 194–198 s in all against its 180 s limit. The whole test's figure bounds each case's.
+    - The 242 one-minute tests at most 14.20 s (23.7 %, `R-SYN-2: a job held for a manifest catch-up stays held until
+      the follow that may move it has ended`); the 237 three-minute tests at most 49.77 s (27.7 %); the 7 five-minute
+      tests at most 59.10 s (19.7 %); the six-minute stalled-subscriber test 56.00 s (15.6 %).
+  - This cycle's 10 new or changed tests all reported (`.build-s3f/c18/newtests.txt`), each with a three-minute guard:
+    at most 49.77 s (27.7 %, the verdict-lane test above).
+- **Coverage** (`swift test --scratch-path .build-s3f --enable-code-coverage --skip Benchmarks` with `TMPDIR`,
+  `CLANG_MODULE_CACHE_PATH` and `LLVM_PROFILE_FILE` under `.build-s3f/tmp`, 07:28:20–07:33:28; `cov-test.log`).
+  - 1-minute load 3.62 at the start, 6.63 at the end.
+  - Every bundle passed: 151, 543, 459, 84, 85, 71 and 104 tests.
+  - Then `xcrun llvm-cov export -summary-only` of `.build-s3f/out/Products/Debug/codecov/default.profdata` over the
+    `.xctest` bundles into `.build-s3f/cov.json`, and `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`
+    (`cov-gate.log`).
+  - Result: `COVERAGE target=ZTronAssetSync lines= 94.02% (10655/11333) min=90.0 OK`, overall `96.53% (27165/28141)`,
+    `COVERAGE device-only-excluded lines=177 share=0.63% max=3.0% OK`, `COVERAGE: PASS`.
+- **iOS build:** `xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet` (ended 07:33:38, `ios-build.log`): exit 0,
+  0 `warning:` and 0 `error:` lines. Incremental: `EngineFollow.o` under `.build-s3f/xcode/Build/Intermediates.noindex`
+  was rebuilt at 07:33:37.
+- **iOS Simulator tests** (simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA, iPhone 18 Pro, iOS 27.0, booted by
+  `simctl boot`; `Test-ZTronAssetKit-2026.11.01_07-33-47-+0100.xcresult`, 07:33:38–07:39:20; `.build-s3f/sim.log`,
+  `sim-summary.json`).
+  - 1-minute load 6.33 at the start, 15.04 at the end (the 5-minute 43.90).
+  - Result: `"result" : "Passed"`, `"totalTestCount" : 1497`, `"passedTests" : 1497`, `"failedTests" : 0`,
+    `"skippedTests" : 0` (`** TEST SUCCEEDED **`; cycle 17's 1,491 plus this cycle's 6).
+  - The log's four `warning:` lines are `appintentsmetadataprocessor`'s "Metadata extraction skipped, no
+    AppIntents.framework dependency found".
+  - The simulator is shut down: `simctl shutdown` exit 0, and `simctl list devices` shows `(Shutdown)`
+    (`sim-boot.log`).
+- **Benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks`,
+  after a release prebuild, `Build complete! (101,80 s)`; 07:41:08–07:47:08; load mean 5.52, min 3.79, max 8.73 over
+  37 samples, `bench-load.txt`; `bench.log`). The 1-minute load was 6.49 at the start (the 5-minute 32.45, after the
+  simulator run).
+  - Result: `✘ Test run with 49 tests in 8 suites failed after 221.269 seconds with 1 issue.` The issue is P-13's
+    (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 5.364125 ms against 5.0 ms in
+    503 units, unlink p99 0.061 ms; WP-B's, `other-wp:b`, routed as `reqs-6`).
+  - `✔ Suite "SyncBenchmarks" passed after 87.031 seconds.`: every WP-F benchmark is within S3-R5's budgets (best of
+    three ≤ 10 ms, median ≤ 50 ms).
+  - This cycle's C2 figures at 10,000, longest actor wait per run, against `e1cf3e5`'s (`headbench.log`, load 10.83)
+    in brackets:
+    - `concentrationNotFoundTurns`, a 404 whose verdict waits: [6.27, 6.23, 6.32] ms, best 6.23 ([393.91, 394.76,
+      394.21]); the 404's own turn 5.95 ms and the longest held turn after it 6.26 ms in the first run (40 held turns,
+      median 1.68 ms); the 429's `followedLane` with the moves owed [2.71, 2.69, 2.66] ms.
+    - `concentrationPublicationTurns`, a publication: [5.45, 5.56, 5.72] ms, best 5.45 ([403.53, 400.95, 405.38]); the
+      longest held turn [3.84, 3.71, 3.74] ms (38 held turns in the first run, median 1.72 ms).
+    - `concentrationFollowTurns`, the follow's own turns with no ending: [3.84, 3.94, 3.91] ms, best 3.84 ([17.49,
+      17.56, 17.50]); 39 held turns in the first run, median 1.79 ms.
+    - `publicationApplyTurns`: the walk an apply makes for the publications in flight, median of 21 calls [2.12, 2.14,
+      2.13] ms; the apply's longest actor wait [4.35, 4.43, 4.67] ms, and [6.11, 6.02, 6.04] ms with a move found for
+      nearly every member.
+    - `inboundWalkTurns`: the 404's turn that walks 10,000 owed jobs [3.47, 3.41, 3.44] ms, and the 429's
+      `followedLane` with a verdict waiting [2.40, 2.34, 2.34] ms.
+  - The follow barrier's other C2 figures (cycle 17's in brackets):
+    - The reclaim during an owed follow: [3.91, 3.92, 4.02] ms with one handle ([4.13, 3.99, 3.95]) and [5.20, 5.20,
+      5.16] ms with two ([5.07, 5.09, 5.08]).
+    - The mixed reclaim (1 member in 20 changed): [6.58, 6.60, 6.59] ms ([6.62, 7.23, 6.69]); with two handles [8.03,
+      8.02, 8.02] ms ([8.30, 7.99, 7.98]).
+    - The follow end and drain of 10,000 places: [5.00, 4.92, 5.02] ms ([4.94, 4.85, 4.92]).
+    - The follow's last turn plus the drain's first batch: the turn [4.79, 4.86, 4.88] ms ([4.86, 4.94, 4.88]).
+    - Throttle extension: [6.86, 6.77, 6.74] ms ([6.77, 6.85, 7.04]).
+  - P-11: `speedup 3.4612088212982366 (min 3.0)`, concurrency 1 3.549 s and 5 1.025 s. P-9 p99 15.129 ms (budget
+    50.0, WP-G's); P-4 plan 10,000 11.38 ms (budget 20.0), ratio 2.07 (max 2.5).
+- **S3-R13** (`.build-s3f/c18/gates.sh`, 07:47:08–07:48:38: `git archive` of `4fb1375` into the new folder
+  `.build-s3f/t64-c18`, line 1 set to `// swift-tools-version: 6.4` there only; Apple Swift version 6.4
+  (swiftlang-6.4.0.34.1)): `swift build --build-tests --scratch-path ../t64-c18-build -Xswiftc -warnings-as-errors`
+  exit 0, `Build complete! (52,15 s)`, 0 `warning:` and 0 `error:` lines; `swift build -c release --scratch-path
+  ../t64-c18-build` exit 0, `Build complete! (35,38 s)`, 0 `warning:` lines (`t64.txt`, `t64-debug.log`,
+  `t64-release.log`). `Package.swift` is not edited in the worktree.
+- **Mutants:** under "Cycle 18" (`.build-s3f/c18/mut/`, `mut2/`, `mut4/`, `mut5/`). The failing-test run of
+  `e1cf3e5`'s sources is `.build-s3f/c18/fail-first.log`.
+- **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
+  untouched: no `--gates-only` or `--full` run was made.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -5907,3 +6381,8 @@ are not cited.
   cycle-16 verifiers' probes were adapted into tests (their seeds kept), not re-run as probes. The R1 boundary probes
   were not re-run. `other-wp:b` (P-13), `other-wp:h` (`LoopbackHTTPServerTests.swift:400`) and `other-wp:d`
   (`SizeAndResumeTests.swift:164`) are not WP-F's.
+- Cycle 18: RR-12, RR-13, RR-15 and RR-18 (under "Cycle 18") are analysed, not probed. RR-16's figures are the
+  cycle-17 verifier's and RR-17's the cycle-17 scratch probe's; neither was re-run here. RR-2, RR-4 and RR-10 stay
+  unprobed (S3-R19 item 4). The moves' and the follow's C2 is pinned by BenchSync on this host only (no device run).
+  The cycle-17 verifiers' probes were adapted into tests (their seeds kept), not re-run as probes. The R1 boundary
+  probes were not re-run. `other-wp:b` (P-2, P-5, P-6, P-13) is not WP-F's.
