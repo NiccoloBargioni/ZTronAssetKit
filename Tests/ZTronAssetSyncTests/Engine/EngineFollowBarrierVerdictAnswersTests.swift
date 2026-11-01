@@ -57,6 +57,8 @@ extension EngineFollowBarrierTests {
                 return job
             }
             let names = [u: "U", w: "W", g: "G"]
+            // The retries' arrival on the wall clock: the clock now, which the verdict read before it carried its own.
+            let wall = engine.environment.time.now()
             var cases: [VerdictAnswerCase] = []
             func expect(_ verdict: WaitingVerdict, _ label: String, _ job: Job, _ expected: [InterestToken: Bool], on engine: isolated SyncEngine) {
                 for (token, answered) in expected.sorted(by: { $0.key < $1.key }) {
@@ -75,13 +77,13 @@ extension EngineFollowBarrierTests {
             expect(.attempt(.throttle(ThrottleFacts(retryAfter: 7_200, decision: .exhausted))), "429 beyond the caps", mixed, [u: true, w: true, g: true], on: engine)
             // A retry answers those its count reaches the cap of: the user lane's second attempt, not the background's.
             let timeout = TransferError.transient(.timedOut, retryAfter: nil)
-            expect(.attempt(.retry(timeout, answer: nil)), "first timeout", mixed, [u: false, w: false, g: false], on: engine)
-            expect(.attempt(.retry(timeout, answer: nil)), "second timeout", second, [u: true, w: false, g: false], on: engine)
+            expect(.attempt(.retry(timeout, answer: nil, wall: wall)), "first timeout", mixed, [u: false, w: false, g: false], on: engine)
+            expect(.attempt(.retry(timeout, answer: nil, wall: wall)), "second timeout", second, [u: true, w: false, g: false], on: engine)
             // A `Retry-After` beyond the cap of the lane the job keeps ends it for everyone (`Backoff.delay`, `retryLater`):
             // the user lane's 30 s when U stays, the background's 3,600 s without it.
             let unavailable = TransferError.transient(.serverError(httpStatus: 503), retryAfter: .seconds(120))
-            expect(.attempt(.retry(unavailable, answer: nil)), "503 after 120 s, U kept", mixed, [u: true, w: true, g: true], on: engine)
-            expect(.attempt(.retry(unavailable, answer: nil)), "503 after 120 s, background", background, [w: false, g: false], on: engine)
+            expect(.attempt(.retry(unavailable, answer: nil, wall: wall)), "503 after 120 s, U kept", mixed, [u: true, w: true, g: true], on: engine)
+            expect(.attempt(.retry(unavailable, answer: nil, wall: wall)), "503 after 120 s, background", background, [w: false, g: false], on: engine)
             // A throttle's park: its wait read against each lane's limit (2 s for the user lane, none for prefetch).
             let end = MonotonicInstant(nanoseconds: 10_000_000_000)
             expect(.attempt(.throttle(ThrottleFacts(retryAfter: 10, decision: .until(end)))), "429 for 10 s", mixed, [u: true, w: false, g: false], on: engine)

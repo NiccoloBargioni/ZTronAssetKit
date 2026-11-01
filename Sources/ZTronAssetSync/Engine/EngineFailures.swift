@@ -241,11 +241,15 @@ extension SyncEngine {
     /// Backoff with full jitter (R-SYN-5): interests whose lane's attempt cap is reached receive the error (or
     /// `answer`, the engine's own figures), the rest wait for `failed(.at)` (the alarm re-queues, T18) or a satisfied
     /// edge (T19). The interactive policy applies while the job's lane is user-initiated (sync.md §8.2).
-    func retryLater(_ transfer: TransferID, error: TransferError, answer: AssetError? = nil) {
-        if self.defersFailure(transfer, .retry(error, answer: answer)) {
+    func retryLater(_ transfer: TransferID, error: TransferError, answer: AssetError? = nil, wall arrival: Date? = nil) {
+        // The wall clock a `Retry-After` date is read against: the failure's arrival, also when its verdict waits for the
+        // follow (`AttemptVerdict.retry`): read at the drain, a date 31 s ahead at its arrival read 26 s after 5 s of
+        // barrier, within a 30 s cap a visit-first engine's verdict had exceeded (Stage 3 close-out cycle 18; the cycle-17
+        // verifier's PROBE-C17C-RETRY-AFTER-DATE).
+        let wall = arrival ?? self.environment.time.now()
+        if self.defersFailure(transfer, .retry(error, answer: answer, wall: wall)) {
             return
         }
-        let wall = self.environment.time.now()
         let assetError = answer ?? error.assetError(now: wall)
         guard let remaining = self.countFailedAttempt(transfer, error: error, assetError: assetError) else {
             return
@@ -842,13 +846,14 @@ extension SyncEngine {
         switch verdict {
         case .attempt(.resolve):
             return true
-        case .attempt(.retry(let error, _)):
+        case .attempt(.retry(let error, _, let wall)):
             if self.reachesCap(interest.lane, attempts: attempts) {
                 return true
             }
-            // The lane `retryLater` reads: the job's, less the interests the count answers (this one is not among them).
+            // The lane `retryLater` reads: the job's, less the interests the count answers (this one is not among them),
+            // and the wall clock it reads a `Retry-After` date against, the failure's arrival.
             let kept = job.interests.values.filter { !self.reachesCap($0.lane, attempts: attempts) }.map(\.lane).max() ?? interest.lane
-            return self.retryDelay(job.transfer, error: error, attempts: attempts, lane: kept, wall: self.environment.time.now()) == nil
+            return self.retryDelay(job.transfer, error: error, attempts: attempts, lane: kept, wall: wall) == nil
         case .attempt(.throttle(let facts)):
             switch facts.decision {
             case .exhausted:

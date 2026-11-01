@@ -570,8 +570,8 @@ extension SyncEngine {
         switch verdict {
         case .resolve(let answer):
             self.resolveAll(transfer, with: .failed(answer))
-        case .retry(let error, let answer):
-            self.retryLater(transfer, error: error, answer: answer)
+        case .retry(let error, let answer, let wall):
+            self.retryLater(transfer, error: error, answer: answer, wall: wall)
         case .offline(let requeue):
             if requeue {
                 // An edge passed while the attempt ran (`failed`'s offline exit): a fresh attempt, no answer.
@@ -1074,8 +1074,9 @@ enum AttemptVerdict: Sendable, Equatable {
     /// Every interest is answered with the failure (`resolveAll`).
     case resolve(AssetError)
     /// The attempt counts toward the retry caps and the job backs off (`retryLater`), `answer` being the engine's own
-    /// figures when it has them.
-    case retry(TransferError, answer: AssetError?)
+    /// figures when it has them, and `wall` the wall clock at the failure's arrival, which a `Retry-After` date is read
+    /// against (Stage 3 close-out cycle 18, PROBE-C17C-RETRY-AFTER-DATE).
+    case retry(TransferError, answer: AssetError?, wall: Date)
     /// The attempt failed offline: a fresh attempt when `requeue` (an edge passed while it ran and the path is
     /// satisfied), else a wait for the next edge with the offline fail-fast (`failed(.whenOnline)`). Both read when the
     /// failure arrived (R-SYN-13).
