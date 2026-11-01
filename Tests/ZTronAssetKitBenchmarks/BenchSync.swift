@@ -792,6 +792,351 @@ extension ZTronAssetKitBenchmarks {
             print("R-SYN-11 an attempt's end bringing 10,000 ids one job holds onto its content during an owed follow: longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
         }
+
+        /// C2 of the drain's visits after the verdicts that waited (Stage 3 close-out cycle 20, ruling S3-R25 item 1; the
+        /// cycle-19 correctness verifier's PROBE-C19C-DRAIN-C2): 16 jobs, each shared by 625 members of one prefetch
+        /// group (10,000 ids), download on 16 slots; v3 changes only fillers, so its follow is owed when every attempt
+        /// times out, and each verdict waits; v4 gives every member a content of its own, so the drain gives the 16
+        /// verdicts and moves each job's members after its verdict (`followAfterVerdict`; `SyncBench.drainVerdicts`).
+        /// The follow's and the drain's held turns are released one at a time, each timed inside the actor, under the
+        /// heartbeat; the best of three of the longest held turn and of the heartbeat's longest wait against C2, after a
+        /// warm-up.
+        @Test("R-SYN-6: the drain's visits after 16 waiting verdicts that move 10,000 members off their jobs hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func drainVerdictTurns() async throws {
+            _ = try await SyncBench.drainVerdicts(slots: 16, perJob: 50)
+            var runs: [DrainVerdictRun] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.drainVerdicts(slots: 16, perJob: 625))
+            }
+            for run in runs {
+                #expect(run.waitingBefore == 16 && run.heldBefore == 10_000 && run.heldAfter == 0, "setup: the 16 verdicts waited with every member on its job, and the drain moved them all off: \(run)")
+            }
+            let turns = runs.map { $0.turns.max() ?? 0 }
+            let waits = runs.map(\.wait)
+            print("R-SYN-6 the drain's visits after 16 waiting verdicts moving 10,000 members off their jobs: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            #expect((turns.min() ?? .infinity) <= Self.c2Budget, "the longest held turn: \(turns)")
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "the heartbeat: \(waits)")
+        }
+
+        /// C2 of a visit that moves 10,000 ids, each with a user-initiated waiter of its own (Stage 3 close-out cycle 20,
+        /// ruling S3-R25 item 2; the cycle-19 correctness verifier's PROBE-C19C-USER-SHARED-C2): `sharedApplyTurns`'
+        /// converging shape with one interest per id, so the job the ids join grows to 10,000 interests and, with
+        /// `.keep`, the job they leave keeps one and each emptied interest is removed from it (`SyncBench.userShared`).
+        /// A job's lane read every interest, and a removal copied the job's interests, once per id. The heartbeat's
+        /// longest wait over the apply's sync and its whole follow; the best of three against C2, after a warm-up.
+        @Test("R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)), arguments: UserSharedShape.allCases)
+        @available(macOS 15.0, iOS 18.0, *)
+        func userSharedApplyTurns(_ shape: UserSharedShape) async throws {
+            _ = try await SyncBench.userShared(count: 1_000, shape: shape)
+            var runs: [UserSharedRun] = []
+            for _ in 0..<3 {
+                runs.append(try await SyncBench.userShared(count: 10_000, shape: shape))
+            }
+            let kept = shape == .keep ? 1 : 0
+            for run in runs {
+                #expect(run.before == 10_000 + kept && run.interestsBefore == run.before && run.onO == 10_001 && run.onH == kept && !run.owedAfter, "setup: H held every waiter's id, one interest each, and O's job holds them after the follow: \(run)")
+            }
+            let waits = runs.map(\.wait)
+            print("R-SYN-6 an apply moving 10,000 ids that share one content, a user-initiated waiter each, \(shape): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(shape): \(waits)")
+        }
+    }
+}
+
+/// One run of `SyncBench.drainVerdicts`.
+struct DrainVerdictRun: CustomStringConvertible {
+    /// The held follow and drain turns from v4's apply until the drain ended, each timed inside the actor, in milliseconds.
+    var turns: [Double] = []
+    /// The ids each of those turns moved off the members' jobs.
+    var moved: [Int] = []
+    /// The verdicts waiting, and the members' ids on their jobs, when v4 was applied.
+    var waitingBefore = 0
+    var heldBefore = 0
+    /// The members' ids still on their jobs once the drain ended.
+    var heldAfter = 0
+    /// The heartbeat's longest wait over those turns, in milliseconds.
+    var wait: Double = 0
+
+    var description: String {
+        "\(self.turns.count) turns, longest \(self.turns.max() ?? 0) ms; heartbeat \(self.wait) ms; verdicts waiting \(self.waitingBefore), ids held \(self.heldBefore) then \(self.heldAfter); moved per turn \(self.moved)"
+    }
+}
+
+/// The two shapes of `SyncBench.userShared`.
+enum UserSharedShape: String, Sendable, CaseIterable {
+    /// Every id of H moves: H is superseded, its interests dropped in place as they leave.
+    case supersede
+    /// One more id of H's content (`keep`, a waiter of its own) stays, so each interest that leaves is removed from H
+    /// (`removeInterest`).
+    case keep
+}
+
+/// One run of `SyncBench.userShared`.
+struct UserSharedRun: CustomStringConvertible {
+    /// The heartbeat's longest wait over v3's sync and its follow, in milliseconds.
+    var wait: Double = 0
+    /// H's ids and interests before v3.
+    var before = 0
+    var interestsBefore = 0
+    /// O's and H's ids after the follow.
+    var onO = 0
+    var onH = 0
+    /// Whether a follow was still owed when the window closed.
+    var owedAfter = false
+
+    var description: String {
+        "wait \(self.wait) ms; H held \(self.before) ids, \(self.interestsBefore) interests; after: O \(self.onO) ids, H \(self.onH) ids, owed \(self.owedAfter)"
+    }
+}
+
+@available(macOS 15.0, iOS 18.0, *)
+extension SyncBench {
+    /// `slots` jobs, each shared by `perJob` members of one prefetch group, on `slots` slots with none reserved
+    /// (`SyncBenchmarks.drainVerdictTurns`): every job downloads (held); v3 changes only fillers, with the follow's
+    /// follow-ups held, so the follow is owed when every attempt times out (a retry: the interests stay) and each verdict
+    /// waits; v4 gives every member a content of its own. The follow's and the drain's held turns are then released one
+    /// at a time under the heartbeat, each timed inside the actor, with the members' ids it moved off their jobs.
+    static func drainVerdicts(slots: Int, perJob: Int) async throws -> DrainVerdictRun {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (64 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x12),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let tuning = SyncTuning(maxConcurrentTransfers: slots, reservedInteractiveSlots: 0)
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: tuning))
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = SyncBench.entry("x", xBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData([x]), etag: ETag(rawValue: "\"v1\""))])
+        await source.script(x.transferID, [.stage(xBytes)])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        let contents: [Data] = (0..<slots).map { GeneratedPayload.bytes(seed: 0x77_000 + UInt64($0), offset: 0, length: 16) }
+        var members: [ManifestEntry] = []
+        var own: [ManifestEntry] = []
+        for k in 0..<slots {
+            for m in 0..<perJob {
+                let name = String(format: "s%02d%05d", k, m)
+                members.append(SyncBench.entry(name, contents[k], policy: .onDemand))
+                own.append(SyncBench.entry(name, GeneratedPayload.bytes(seed: 0x88_000 + UInt64(k * 100_000 + m), offset: 0, length: 16), policy: .onDemand))
+            }
+        }
+        let jobs = (0..<slots).map { members[$0 * perJob].transferID }
+        func fillers(_ prefix: String, _ seed: UInt64) -> [ManifestEntry] {
+            (0..<(SyncEngine.followFormatsPerTurn + 52)).map { SyncBench.entry(String(format: "\(prefix)%05d", $0), GeneratedPayload.bytes(seed: seed + UInt64($0), offset: 0, length: 16), policy: .onDemand) }
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(fillers("f", 0x51_000) + members + fillers("zzz", 0x53_000)), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await store.flush(.ordered)
+        let timeout = TransferError.transient(.timedOut, retryAfter: nil)
+        for k in 0..<slots {
+            await source.script(jobs[k], [.hold, .fail(timeout), .stage(contents[k])])
+        }
+        guard case .success = await engine.registerGroup(members.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        var spins = 0
+        while !Task.isCancelled, !(await SyncBench.drainJobsHeld(engine, jobs, perJob: perJob)) {
+            spins += 1
+            if spins > 2_000_000 {
+                throw SyncBenchError.incomplete("setup: the jobs never all downloaded")
+            }
+            await Task.yield()
+        }
+        guard try await SyncBench.applyHeldFollow(engine, fillers("f", 0x52_000) + members + fillers("zzz", 0x54_000), tag: "v3-drain-\(slots)-\(perJob)") else {
+            throw SyncBenchError.incomplete("setup: v3's follow is not owed")
+        }
+        for transfer in jobs {
+            await source.release(transfer, with: .progress(received: 0, expected: nil))
+        }
+        spins = 0
+        while !Task.isCancelled, (await SyncBench.drainHeld(engine, jobs)).waiting < slots {
+            spins += 1
+            if spins > 2_000_000 {
+                throw SyncBenchError.incomplete("setup: the verdicts never all waited")
+            }
+            await Task.yield()
+        }
+        _ = try await SyncBench.applyHeldFollow(engine, fillers("f", 0x52_000) + own + fillers("zzz", 0x55_000), tag: "v4-drain-\(slots)-\(perJob)")
+        var run = DrainVerdictRun()
+        let before = await SyncBench.drainHeld(engine, jobs)
+        run.waitingBefore = before.waiting
+        run.heldBefore = before.ids
+        await SyncBench.holdDrain(engine)
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        var turns: [Double] = []
+        var moved: [Int] = []
+        var heldNow = before.ids
+        run.wait = try await SyncBench.longestWait(on: engine) {
+            spins = 0
+            while !Task.isCancelled, !(await SyncBench.followDrained(engine)) {
+                if let turn = await SyncBench.releaseOneHeldFollowOrDrainTurn(engine) {
+                    turns.append(turn)
+                    let now = await SyncBench.drainHeld(engine, jobs).ids
+                    moved.append(heldNow - now)
+                    heldNow = now
+                } else {
+                    spins += 1
+                    if spins > 5_000_000 {
+                        throw SyncBenchError.incomplete("the drain never ended")
+                    }
+                    await Task.yield()
+                }
+            }
+        }
+        run.turns = turns
+        run.moved = moved
+        run.heldAfter = heldNow
+        await SyncBench.releaseHeldTurns(engine)
+        await engine.shutdown()
+        return run
+    }
+
+    /// The members' ids still on `jobs`, the verdicts that wait for them, and the jobs still downloading.
+    static func drainHeld(_ engine: isolated SyncEngine, _ jobs: [TransferID]) -> (ids: Int, waiting: Int) {
+        let ids = jobs.reduce(0) { $0 + (engine.state.jobs[$1]?.assets.count ?? 0) }
+        let waiting = jobs.filter { engine.state.verdictsAfterFollow[$0] != nil }.count
+        return (ids, waiting)
+    }
+
+    /// Whether every one of `jobs` downloads and holds its `perJob` members.
+    static func drainJobsHeld(_ engine: isolated SyncEngine, _ jobs: [TransferID], perJob: Int) -> Bool {
+        jobs.allSatisfy { engine.state.jobs[$0]?.state == .downloading && engine.state.jobs[$0]?.assets.count == perJob }
+    }
+
+    /// Applies `entries` (tagged `tag`) through the engine's apply path with the follow's follow-ups held, and returns
+    /// whether its follow is owed.
+    static func applyHeldFollow(_ engine: isolated SyncEngine, _ entries: [ManifestEntry], tag: String) async throws -> Bool {
+        let manifest = try ValidatedManifest(entries: entries, digest: ContentHash.sha256(of: Data(tag.utf8)))
+        engine.holdFollowFollowUps()
+        let applied = await engine.applyAndFollow(manifest, etag: nil, eviction: nil)
+        return (try? applied.get()) != nil && engine.followOwed
+    }
+
+    /// Holds the drain's follow-up turns as well as the follow's.
+    static func holdDrain(_ engine: isolated SyncEngine) {
+        engine.holdFollowFollowUps()
+        engine.holdDrainFollowUps()
+    }
+
+    /// Releases every held follow and drain turn.
+    static func releaseHeldTurns(_ engine: isolated SyncEngine) {
+        engine.releaseFollowFollowUps()
+        engine.releaseDrainFollowUps()
+    }
+
+    /// Releases the held follow or drain follow-up and holds the next ones, timing the turn that runs it inside that
+    /// turn; `nil` when neither waits at its hold yet.
+    static func releaseOneHeldFollowOrDrainTurn(_ engine: isolated SyncEngine) -> Double? {
+        let follow = engine.state.followFollowUpWaiting
+        guard follow || engine.state.drainFollowUpWaiting else {
+            return nil
+        }
+        let clock = ContinuousClock()
+        let start = clock.now
+        if follow {
+            engine.releaseFollowFollowUps()
+        } else {
+            engine.releaseDrainFollowUps()
+        }
+        let span = clock.now - start
+        engine.holdFollowFollowUps()
+        engine.holdDrainFollowUps()
+        return SyncBench.milliseconds(span)
+    }
+
+    /// H's ids and interests, and the engine's waiters.
+    static func userHolding(_ engine: isolated SyncEngine, _ transfer: TransferID) -> (ids: Int, interests: Int, waiters: Int) {
+        (engine.state.jobs[transfer]?.assets.count ?? 0, engine.state.jobs[transfer]?.interests.count ?? 0, engine.state.waiters.count)
+    }
+
+    /// One visit of `count` ids, each with a user-initiated waiter of its own (`SyncBenchmarks.userSharedApplyTurns`):
+    /// the ids share H's 16 bytes, so H's job holds `count` interests, downloading (held); O, 16 bytes for a user request,
+    /// downloads (held). With `.keep`, one more id of H's content (`keep`, its own waiter) stays on H. v3 maps every
+    /// other id to O's content, and the heartbeat times its apply: the follow visits H's job once, and that visit moves
+    /// every id onto O's job over its bounded turns.
+    static func userShared(count: Int, shape: UserSharedShape) async throws -> UserSharedRun {
+        let bench = try await SyncBench.followBench()
+        let engine = bench.engine
+        let source = bench.source
+        let oBytes = Data(repeating: 0x6F, count: 16)
+        let hBytes = Data(repeating: 0x68, count: 16)
+        let o = SyncBench.entry("o", oBytes, policy: .onDemand)
+        let extra = shape == .keep ? [SyncBench.entry("keep", hBytes, policy: .onDemand)] : []
+        let members = SyncBench.sharing(count, hBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData(members + [o] + extra), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await bench.store.flush(.ordered)
+        let holder = members[0].transferID
+        await source.script(o.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
+        await source.script(holder, [.hold, .stage(hBytes)])
+        let oWaiter = Task { await engine.awaitAsset(o.identifier, lane: .userInitiated) }
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, o.transferID)) {
+            await Task.yield()
+        }
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in members + extra {
+            let id = entry.identifier
+            callers.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+        }
+        let held = count + extra.count
+        var spins = 0
+        while !Task.isCancelled {
+            let now = await SyncBench.userHolding(engine, holder)
+            if now.ids == held, now.interests == held, now.waiters == held + 1, await SyncBench.isRunning(engine, holder) {
+                break
+            }
+            spins += 1
+            if spins > 5_000_000 {
+                throw SyncBenchError.incomplete("setup: H never held every waiter's id: \(now)")
+            }
+            await Task.yield()
+        }
+        var run = UserSharedRun()
+        let before = await SyncBench.userHolding(engine, holder)
+        run.before = before.ids
+        run.interestsBefore = before.interests
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        run.wait = try await SyncBench.timedApply(bench, SyncBench.sharing(count, oBytes) + [o] + extra, tag: "v3-user-\(shape.rawValue)-\(count)")
+        run.onO = await SyncBench.userHolding(engine, o.transferID).ids
+        run.onH = await SyncBench.userHolding(engine, holder).ids
+        run.owedAfter = await SyncBench.holding(engine, o.transferID).owed
+        await engine.shutdown()
+        for caller in callers {
+            _ = await caller.value
+        }
+        _ = await oWaiter.value
+        return run
     }
 }
 
