@@ -42,6 +42,10 @@ extension EngineFollowBarrierTests {
         /// the attempt's end finds one move of all ten members, makes `inboundIDsNow` of them, and the follow's turns
         /// make the rest.
         case attemptEnd
+        /// As `convergence`, with zz-t (a prefetch waiter) on a content of its own that v3 changes: the pass finds its job
+        /// after H's, in the turn H's visit leaves its rest, and its visit waits until the rest is moved and the turn
+        /// still has ids (a turn whose ids are spent visits no job).
+        case convergenceBystander
 
         /// Whether the members leave one job for O's.
         var converges: Bool {
@@ -72,6 +76,11 @@ extension EngineFollowBarrierTests {
         var leftAtEnd: Int?
         /// The ids of each move off the members' job owed once v4 landed (sweep-first `.convergenceApplies`).
         var movesAfterApply: [Int]?
+        /// The members the owed moves name as carried (`inboundPendingIDs`) right after O's attempt's end turn
+        /// (sweep-first `.attemptEnd`, `.convergenceEnds`, `.convergenceApplies`).
+        var pendingAtEnd: Int?
+        /// zz-t's waiter's answer (`.convergenceBystander`).
+        var bystander: Result<AssetLocation, AssetError>?
     }
 
     /// The members still on the job they share before v3 (`H` converging, `O` diverging).
@@ -105,10 +114,14 @@ extension EngineFollowBarrierTests {
         let onH = names.map { EngineHarness.onDemand($0, hBytes) }
         let onO = names.map { EngineHarness.onDemand($0, oBytes) }
         let own = names.enumerated().map { EngineHarness.onDemand($0.element, ownBytes[$0.offset]) }
-        let before = shape.converges ? onH : onO
-        let after = shape.converges ? onO : own
+        let tOld = EngineHarness.onDemand("zz-t", EngineFixture.bytes(seed + 5, count: 12))
+        let tNewBytes = EngineFixture.bytes(seed + 6, count: 20)
+        let tNew = EngineHarness.onDemand("zz-t", tNewBytes)
+        let bystanderOn = shape == .convergenceBystander
+        let before = (shape.converges ? onH : onO) + (bystanderOn ? [tOld] : [])
+        let after = (shape.converges ? onO : own) + (bystanderOn ? [tNew] : [])
         let holder = try #require(before.first?.transferID)
-        try #require(Set(before.map(\.transferID)).count == 1 && (holder == o.transferID) == !shape.converges, "setup: the members share one content")
+        try #require(Set(before.prefix(count).map(\.transferID)).count == 1 && (holder == o.transferID) == !shape.converges, "setup: the members share one content")
         await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + before + [o] + Self.laterFillers(seed + 3_000), etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
@@ -118,6 +131,9 @@ extension EngineFollowBarrierTests {
             await s.harness.source.script(o.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
         } else {
             await s.harness.source.script(o.transferID, [.hold, .stage(oBytes)])
+        }
+        if bystanderOn {
+            await s.harness.source.script(tNew.transferID, [.stage(tNewBytes)])
         }
         if shape.converges {
             await s.harness.source.script(holder, [.hold, .stage(hBytes)])
@@ -131,19 +147,30 @@ extension EngineFollowBarrierTests {
             await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[o.transferID]?.state == .downloading }
         }
         var waiters: [Task<Result<AssetLocation, AssetError>, Never>] = []
-        for member in before {
+        for member in before.prefix(count) {
             let id = member.identifier
             waiters.append(Task { await engine.awaitAsset(id, lane: .prefetch) })
         }
         let interests = shape.converges ? count : count + 1
         await engine.awaitCondition { $0.state.jobs[holder]?.interests.count == interests }
-        let ids = before.map(\.identifier)
+        var tWaiter: Task<Result<AssetLocation, AssetError>, Never>?
+        if bystanderOn {
+            tWaiter = Task { await engine.awaitAsset(tOld.identifier, lane: .prefetch) }
+            await engine.awaitCondition { $0.state.jobs[tOld.transferID]?.interests.isEmpty == false }
+        }
+        let ids = before.prefix(count).map(\.identifier)
         try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + after + [o] + Self.laterFillers(seed + 6_000), tag: "v3-shared-\(seed)", s, visit: visit)
         var turns: [Int] = []
         var endTurn: Int?
         var moveSizes: [Int] = []
         var leftAtEnd: Int?
         var movesAfterApply: [Int]?
+        var pendingAtEnd: Int?
+        // The members an owed move names as carried, for the ids it has left (`inboundPendingIDs`).
+        let pendingOf: @Sendable (isolated SyncEngine) -> Int = { e in
+            let pending = e.inboundPendingIDs()
+            return ids.filter { pending[$0] != nil }.count
+        }
         // v3 with its later fillers changed: no member's entry or O's changes.
         let v4 = [s.q] + FollowBarrier.fillers(seed + 200) + after + [o] + Self.laterFillers(seed + 9_000)
         // The moves off the members' job that O's attempt's end owes, by their ids.
@@ -160,6 +187,7 @@ extension EngineFollowBarrierTests {
                 await s.harness.source.release(o.transferID, with: .progress(received: 0, expected: nil))
                 await engine.awaitCondition { $0.state.verdictsAfterFollow[o.transferID] != nil }
                 moveSizes = await engine.readForTests(owedOff)
+                pendingAtEnd = await engine.readForTests(pendingOf)
                 let now = await Self.membersLeft(engine, on: holder, members: ids)
                 endTurn = left - now
                 turns.append(left - now)
@@ -178,6 +206,7 @@ extension EngineFollowBarrierTests {
                     await s.harness.source.release(o.transferID, with: .progress(received: 0, expected: nil))
                     await engine.awaitCondition { $0.state.inboundWaits[o.transferID] != nil }
                     moveSizes = await engine.readForTests(owedOff)
+                    pendingAtEnd = await engine.readForTests(pendingOf)
                     let ended = await Self.membersLeft(engine, on: holder, members: ids)
                     endTurn = left - ended
                     turns.append(left - ended)
@@ -221,11 +250,15 @@ extension EngineFollowBarrierTests {
         for waiter in waiters {
             members.append(await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: waiter) })
         }
+        var tResult: Result<AssetLocation, AssetError>?
+        if let tWaiter {
+            tResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: tWaiter) }
+        }
         let holderStarts = await s.harness.source.starts.filter { $0.id == holder }.count
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let holderCancels = await s.harness.source.controlLog.filter { $0.transfer == holder && $0.control == .cancel }.count
         await Self.finishHeld(s)
-        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, holderCancels: holderCancels, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply)
+        return SharedMoveOutcome(o: oResult, members: members, turns: turns, endTurn: endTurn, holderStarts: holderStarts, holderCancels: holderCancels, moveSizes: moveSizes, leftAtEnd: leftAtEnd, movesAfterApply: movesAfterApply, pendingAtEnd: pendingAtEnd, bystander: tResult)
     }
 
     /// The answers once the engine shut down (`sharedMove(_:seed:shape:shutdown:)`).
@@ -254,7 +287,7 @@ extension EngineFollowBarrierTests {
         case .attemptEnd:
             #expect(outcome.o == .failure(.notFound), "O's waiter gets its 404: \(outcome.o)")
             expected = .failure(.notFound)
-        case .convergence, .convergenceEnds, .convergenceApplies:
+        case .convergence, .convergenceEnds, .convergenceApplies, .convergenceBystander:
             #expect((try? outcome.o.get())?.byteSize == 24, "O's waiter is served: \(outcome.o)")
             expected = .success(24)
         case .divergence, .divergencePublishes:
@@ -268,6 +301,10 @@ extension EngineFollowBarrierTests {
             // The move that takes H's every id supersedes H: its running attempt is cancelled at the move's first turn,
             // as v3's visit on a visit-first engine cancelled it, not left running once its job is removed.
             #expect(outcome.holderCancels == 1, "the members' first job's attempt is cancelled once, when the move off it began: \(outcome.holderCancels)")
+        }
+        if shape == .convergenceBystander {
+            // v3's visit moved zz-t to its new content (visit-first): its visit waited for H's rest, and no rest was lost.
+            #expect((try? outcome.bystander?.get())?.byteSize == 20, "zz-t's waiter gets its new content: \(String(describing: outcome.bystander))")
         }
         guard visit == .sweepFollowsFirst else {
             return
@@ -284,6 +321,10 @@ extension EngineFollowBarrierTests {
         }
         if shape == .attemptEnd || shape == .convergenceEnds || shape == .convergenceApplies {
             #expect(outcome.moveSizes == [outcome.leftAtEnd ?? -1], "O's attempt's end owes one move off H carrying every member still on it (\(String(describing: outcome.leftAtEnd))), no id twice: \(outcome.moveSizes)")
+        }
+        if shape == .attemptEnd || shape == .convergenceEnds || shape == .convergenceApplies {
+            let left = (outcome.leftAtEnd ?? 0) - (outcome.endTurn ?? 0)
+            #expect(outcome.pendingAtEnd == left, "after O's attempt's end the owed move names as carried the members it has left, \(left): \(String(describing: outcome.pendingAtEnd))")
         }
         if shape == .convergenceApplies {
             #expect(outcome.movesAfterApply == outcome.moveSizes, "v4's walk records no move for the members the owed move still carries: \(String(describing: outcome.movesAfterApply)), owed before v4 \(outcome.moveSizes)")
