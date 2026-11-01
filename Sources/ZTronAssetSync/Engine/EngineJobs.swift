@@ -124,7 +124,16 @@ extension SyncEngine {
         }
         let now = self.decisionNow()
         self.noteJoin(transfer, asset: asset, entry: entry, token: token, kind: kind)
-        if self.state.jobs[transfer] == nil {
+        let before: AssetPriority
+        let wasReleasedOnly: Bool
+        // The job is read in this scope only: the join below is made in the table, with no copy of the job alive, as a
+        // copy's id sets would be copied whole by the insertion (a job that grows to 10,000 ids cost a follow turn of 256
+        // joins up to 19 ms; Stage 3 close-out cycle 18, ruling S3-R21 item 1; `BenchSync.concentrationFollowTurns`).
+        if let job = self.state.jobs[transfer] {
+            before = job.lane
+            // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
+            wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
+        } else {
             self.state.lastEpoch += 1
             self.state.jobsCreated += 1
             var job = Job(
@@ -144,25 +153,12 @@ extension SyncEngine {
             self.notifyObservers()
             return
         }
-        let before: AssetPriority
-        let wasReleasedOnly: Bool
-        do {
-            guard let job = self.state.jobs[transfer] else {
-                return
-            }
-            before = job.lane
-            // A queued job only released groups want may wait in no queue (a scan set its entry aside, `setsAside`).
-            wasReleasedOnly = job.state == .queued && self.isReleasedOnly(job)
-        }
-        // The join is made in the table, with no copy of the job alive: a copy's id sets would be copied whole by the
-        // insertion, so a job that grows to 10,000 ids cost a follow turn of 256 joins up to 19 ms (Stage 3 close-out
-        // cycle 18, ruling S3-R21 item 1; `BenchSync.concentrationFollowTurns`).
         self.state.jobs[transfer]?.assets.insert(asset)
         if self.state.jobs[transfer]?.interests[token] != nil {
+            // The interest keeps its lane: a token's interests carry the one lane it registered with, which every join
+            // and re-route passes on (`invariantViolations()`). The cycle-18 in-place raise, which no path reached, was
+            // removed under ruling S3-R19 item 3 (Stage 3 close-out cycle 19).
             self.state.jobs[transfer]?.interests[token]?.assets.insert(asset)
-            if let held = self.state.jobs[transfer]?.interests[token]?.lane, held < lane {
-                self.state.jobs[transfer]?.interests[token]?.lane = lane
-            }
         } else {
             self.state.jobs[transfer]?.interests[token] = JobInterest(lane: lane, kind: kind, assets: [asset])
         }

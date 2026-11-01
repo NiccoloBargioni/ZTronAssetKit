@@ -701,7 +701,10 @@ extension SyncEngine {
     ///   moves onto it after the verdict (`followAfterVerdict`), less those the verdict answers (`verdictAnswers`, on the
     ///   job the verdict meets, `jobAtVerdict`, under the verdict's own decision instant): a visit-first engine's visit at
     ///   that apply moved them onto this content (cycle 16, ruling S3-R19 item 1; cycle 17 for the partial answers);
-    /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them).
+    /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them);
+    /// - in each of these, an interest in an id an owed move carries (`EngineState.inboundMoves`) as an interest of the
+    ///   move's job, while that job waits at its attempt's end, by that job's rule: the visit the move stands for had joined
+    ///   it there (Stage 3 close-out cycle 19).
     ///
     /// The job's own lane when none of these counts: a visit-first engine's job then had no interest left, and was
     /// retired (no 429 reached it) or kept by a claim with the lane its interests had (`Job.heldLane`). The cycle-14
@@ -717,68 +720,95 @@ extension SyncEngine {
     /// wait: one lookup in the copy per id, no transfer formatted (C2).
     func followedLane(_ job: Job) -> AssetPriority {
         let copy = self.state.applied
-        // An id an owed move brings onto a job (`inboundPendingIDs`) is that job's, whatever a later copy maps it to: the
-        // move re-routes it under the copy that found it (Stage 3 close-out cycle 18).
-        let pending = self.inboundPendingIDs()
         func here(_ asset: AssetID) -> Bool {
-            if !pending.isEmpty, let target = pending[asset] {
-                return target == job.transfer
-            }
-            return copy.entry(for: asset).map { SyncEngine.sameTransfer($0, job.entry) } ?? false
+            copy.entry(for: asset).map { SyncEngine.sameTransfer($0, job.entry) } ?? false
         }
-        let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) })
-        var withdrawn: Set<InterestToken> = []
-        var verdicts: [TransferID: (verdict: WaitingVerdict, stamp: WorldStamp?)] = [:]
-        // By content, the last one waiting: an earlier job's verdict, which the drain skips, waits before the current
-        // job's own, and a current job with none waiting has no deferral on it (`movesAfterVerdict` is false), so an
-        // earlier job's verdict moves nothing here (cycle 16: an epoch filter changed only the walk's cost). Each with
-        // the decision instant the drain gives it under (`eventStamps`).
-        let stamps = self.state.eventStamps
-        for (index, event) in self.state.eventsAfterFollow.enumerated() {
-            let stamp = index < stamps.count ? stamps[index] : nil
-            switch event {
-            case .removal(let token, _):
-                withdrawn.insert(token)
-            case .attemptFailed(let transfer, _, let verdict):
-                verdicts[transfer] = (.attempt(verdict), stamp)
-            case .spaceFailure(let transfer, _, let required):
-                verdicts[transfer] = (.space(required: required), stamp)
-            default:
-                break
-            }
+        let waiting = self.laneEventsWaiting()
+        let withdrawn = waiting.withdrawn
+        let verdicts = waiting.verdicts
+        // What decides whether an interest of a job in an id the copy maps here moves here: what the job's owed visit
+        // moves (`nil`: every moved id), the ids the drain takes off it before its verdict and re-routes after it
+        // (`takeOffMovedBefore`), and the verdict after which the drain moves the rest, with the job that verdict meets,
+        // read once and only for a job with an interest it may leave to move here.
+        func rule(of other: Job) -> LaneMoveRule {
+            LaneMoveRule(
+                job: other,
+                visit: self.followOwed ? self.rerouteOnVisit(other) : [],
+                movedBefore: other.attemptEnd?.movedBefore ?? [],
+                after: self.movesAfterVerdict(other) ? verdicts[other.transfer] : nil
+            )
         }
+        func moves(_ asset: AssetID, _ interest: JobInterest, under rule: inout LaneMoveRule) -> Bool {
+            if rule.visit?.contains(asset) ?? true || rule.movedBefore.contains(asset) {
+                return true
+            }
+            guard let after = rule.after else {
+                return false
+            }
+            let met = rule.met ?? self.jobAtVerdict(rule.job, withdrawn: withdrawn)
+            rule.met = met
+            return !self.verdictAnswers(after.verdict, interest, of: met, at: after.stamp)
+        }
+        // An id an owed move carries onto its job (`inboundPendingIDs`) is that job's on a visit-first engine, whose visit
+        // the move stands for joined it there before the job's attempt ended: while the job is still at that end the move
+        // is made (`waitingTarget`), so the id's interests count as that job's own interests in it would, by its rule
+        // (Stage 3 close-out cycle 19, PROBE-C18C-PENDING-LANE: counted on the job alone, an interest the drain then moves
+        // here after the job's verdict was missed). A move whose job left that end is dropped, and its holder's own visit
+        // moves the id: by the holder's rule.
+        let pending = self.inboundPendingIDs()
+        func carried(_ asset: AssetID) -> Job? {
+            guard !pending.isEmpty, let index = pending[asset] else {
+                return nil
+            }
+            return self.waitingTarget(self.state.inboundMoves[index])
+        }
+        // `nil` for an id no owed move carries; else whether the interest moves here by the rule of the move's job, each
+        // such rule read once (`targets`).
+        func movesViaTarget(_ asset: AssetID, _ interest: JobInterest, _ targets: inout [TransferID: LaneMoveRule]) -> Bool? {
+            guard let target = carried(asset) else {
+                return nil
+            }
+            var targetRule = targets[target.transfer] ?? rule(of: target)
+            let reaches = moves(asset, interest, under: &targetRule)
+            targets[target.transfer] = targetRule
+            return reaches
+        }
+        var targets: [TransferID: LaneMoveRule] = [:]
+        let visited = self.followOwed && (self.state.unfollowed.contains(job.transfer) || job.assets.contains { !here($0) || carried($0) != nil })
         var lane: AssetPriority?
         func raise(_ other: AssetPriority) {
             lane = max(lane ?? other, other)
         }
-        for (token, interest) in job.interests where !withdrawn.contains(token) && (!visited || interest.assets.contains(where: here)) {
-            raise(interest.lane)
+        for (token, interest) in job.interests where !withdrawn.contains(token) {
+            var stays = !visited
+            if !stays {
+                for asset in interest.assets where here(asset) {
+                    if movesViaTarget(asset, interest, &targets) ?? true {
+                        stays = true
+                        break
+                    }
+                }
+            }
+            if stays {
+                raise(interest.lane)
+            }
         }
         if lane != .userInitiated, self.followOwed || !verdicts.isEmpty {
             jobs: for (transfer, other) in self.state.jobs where transfer != job.transfer {
-                // What its owed visit moves (`nil`: every moved id), and the verdict after which the drain moves the rest.
-                let visit = self.followOwed ? self.rerouteOnVisit(other) : []
-                let after = self.movesAfterVerdict(other) ? verdicts[transfer] : nil
-                // The ids the drain takes off before the verdict and re-routes after it (`takeOffMovedBefore`).
-                let movedBefore = other.attemptEnd?.movedBefore ?? []
-                // The job the verdict meets, read once and only for a job with an interest it may leave to move here.
-                var met: Job?
+                var own = rule(of: other)
                 for (token, interest) in other.interests where !withdrawn.contains(token) {
-                    let moves = interest.assets.contains { asset in
-                        guard here(asset) else {
-                            return false
+                    var reaches = false
+                    for asset in interest.assets where here(asset) {
+                        if let viaTarget = movesViaTarget(asset, interest, &targets) {
+                            reaches = viaTarget
+                        } else {
+                            reaches = moves(asset, interest, under: &own)
                         }
-                        if visit?.contains(asset) ?? true || movedBefore.contains(asset) || (!pending.isEmpty && pending[asset] != nil) {
-                            return true
+                        if reaches {
+                            break
                         }
-                        guard let after else {
-                            return false
-                        }
-                        let verdictJob = met ?? self.jobAtVerdict(other, withdrawn: withdrawn)
-                        met = verdictJob
-                        return !self.verdictAnswers(after.verdict, interest, of: verdictJob, at: after.stamp)
                     }
-                    guard moves else {
+                    guard reaches else {
                         continue
                     }
                     raise(interest.lane)
@@ -807,6 +837,31 @@ extension SyncEngine {
         return lane ?? job.lane
     }
 
+    /// What the waiting events change of the lanes `followedLane` reads: the interests a waiting withdrawal removes, and,
+    /// by content, the last verdict waiting. An earlier job's verdict, which the drain skips, waits before the current
+    /// job's own, and a current job with none waiting has no deferral on it (`movesAfterVerdict` is false), so an earlier
+    /// job's verdict moves nothing there (cycle 16: an epoch filter changed only the walk's cost). Each verdict comes with
+    /// the decision instant the drain gives it under (`eventStamps`).
+    private func laneEventsWaiting() -> (withdrawn: Set<InterestToken>, verdicts: [TransferID: (verdict: WaitingVerdict, stamp: WorldStamp?)]) {
+        var withdrawn: Set<InterestToken> = []
+        var verdicts: [TransferID: (verdict: WaitingVerdict, stamp: WorldStamp?)] = [:]
+        let stamps = self.state.eventStamps
+        for (index, event) in self.state.eventsAfterFollow.enumerated() {
+            let stamp = index < stamps.count ? stamps[index] : nil
+            switch event {
+            case .removal(let token, _):
+                withdrawn.insert(token)
+            case .attemptFailed(let transfer, _, let verdict):
+                verdicts[transfer] = (.attempt(verdict), stamp)
+            case .spaceFailure(let transfer, _, let required):
+                verdicts[transfer] = (.space(required: required), stamp)
+            default:
+                break
+            }
+        }
+        return (withdrawn, verdicts)
+    }
+
     /// The job a verdict waiting for `job` meets when the drain gives it, as `followedLane` reads it: `job` less the
     /// interests a waiting withdrawal removes and those all of whose ids leave it before the verdict, the ids a
     /// visit-first engine's visits had moved off it before the verdict arrived (`AttemptEnd.movedBefore`: re-routed by its
@@ -830,7 +885,8 @@ extension SyncEngine {
     /// PROBE-C16C-THROTTLE-FAILFAST-LANE):
     /// - a resolution and a 429 beyond the caps answer every interest;
     /// - a retry answers those whose lane's cap the attempt reaches (`reachesCap`), and every one when its `Retry-After`
-    ///   exceeds the cap of the lane the job keeps (`retryDelay`, read against the clock now, as `retryLater` reads it);
+    ///   exceeds the cap of the lane the job keeps (`retryDelay`; a `Retry-After` date read against the wall clock at
+    ///   the failure's arrival, the instant `retryLater` reads it at);
     /// - a 429's park, an offline exit that waits for the next edge and a policy pause that parks on an offline lane
     ///   answer those the park's fail-fast answers (`failFastError`; a throttle's wait read at the verdict's instant);
     /// - an ENOSPC's verdict (`spaceVerdict`) answers those at their cap when it retries or waits for the reclaim, and
@@ -973,4 +1029,21 @@ extension SyncEngine {
         }
         self.rearm()
     }
+}
+
+/// What `SyncEngine.followedLane` reads of a job whose interests may move onto the job it decides for: what its owed
+/// visit moves (`SyncEngine.rerouteOnVisit`; `nil`: every moved id), the ids the drain takes off it before its waiting
+/// verdict (`AttemptEnd.movedBefore`), and the verdict after which the drain moves the rest, with the job that verdict
+/// meets (`SyncEngine.jobAtVerdict`), read once.
+struct LaneMoveRule {
+    /// The job.
+    let job: Job
+    /// What its owed visit moves; `nil`: every moved id.
+    let visit: Set<AssetID>?
+    /// The ids the drain takes off it before its verdict.
+    let movedBefore: Set<AssetID>
+    /// Its waiting verdict when an apply was followed since it deferred (`SyncEngine.movesAfterVerdict`).
+    let after: (verdict: WaitingVerdict, stamp: WorldStamp?)?
+    /// The job the verdict meets, once read.
+    var met: Job?
 }

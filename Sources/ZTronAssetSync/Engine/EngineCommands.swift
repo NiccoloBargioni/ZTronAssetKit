@@ -1712,7 +1712,18 @@ extension SyncEngine {
         }
         // A job the owed passes of a follow have not reached follows the copy they replaced (`followScans`).
         let unscanned = self.state.followScans.isEmpty ? [:] : self.unscannedFollowEntries()
+        // A token's interests carry the one lane it registered with: its group's (`Group.lane`), its waiter's, a run's
+        // bulk lane or a system interest's, which every join and re-route passes on, so a second join of a token's
+        // interest in a job never changes its lane (`addInterest`; Stage 3 close-out cycle 19, ruling S3-R19 item 3).
+        var tokenLanes: [InterestToken: AssetPriority] = [:]
         for (transfer, job) in self.state.jobs {
+            for (token, interest) in job.interests {
+                let lane = self.state.groups[token]?.lane ?? tokenLanes[token] ?? interest.lane
+                tokenLanes[token] = lane
+                if lane != interest.lane {
+                    violations.append("interest \(token.rawValue) in \(transfer) at \(interest.lane), its token's lane being \(lane)")
+                }
+            }
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
                 let key = ClaimKey(job: job)
                 if self.state.claims[key] == nil {
@@ -1731,7 +1742,10 @@ extension SyncEngine {
             }
             // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
             // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
-            if !self.state.unfollowed.contains(transfer), let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true }) {
+            // The holder of a visit's rest (`followMoving`) holds the ids it still moves, and is visited already.
+            if !self.state.unfollowed.contains(transfer), self.state.followMoving?.holder != transfer,
+                let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true })
+            {
                 violations.append("job \(transfer) holds \(asset), which the copy maps elsewhere, and is not in unfollowed")
             }
             if job.interests.values.contains(where: { $0.kind == .system }), !self.state.systemHeld.contains(transfer) {
@@ -2026,6 +2040,19 @@ extension SyncEngine {
         }
         if !unfailed.isEmpty {
             violations.append("\(unfailed.count) jobs whose failure verdict waits for a follow are not failed")
+        }
+        // The owed moves onto each job are counted once (`inboundOnto`), and a publication waits only while a move onto or
+        // off its job, or its visit's rest, is owed: one that nothing owes is never resumed (Stage 3 close-out cycle 19).
+        var onto: [TransferID: Int] = [:]
+        for move in self.state.inboundMoves[min(self.state.inboundNext, self.state.inboundMoves.count)...] {
+            onto[move.target, default: 0] += 1
+        }
+        if onto != self.state.inboundOnto {
+            violations.append("\(self.state.inboundOnto.count) jobs count owed moves onto them, \(onto.count) with moves owed")
+        }
+        let stranded = self.state.inboundWaits.keys.filter { self.state.jobs[$0]?.state != .verifying || !self.inboundBlocks($0) }
+        if self.isRunning, !stranded.isEmpty {
+            violations.append("\(stranded.count) publications wait for owed moves that nothing owes")
         }
         return violations
     }

@@ -77,9 +77,11 @@ extension SyncEngine {
         self.continueFollow()
     }
 
-    /// Whether a follow still owes a pass, moves (`inboundOwed`) or visits to follow-up turns.
+    /// Whether a follow still owes a pass, moves (`inboundOwed`), the rest of a visit (`EngineState.followMoving`) or
+    /// visits to follow-up turns.
     var followOwed: Bool {
         !self.state.followScans.isEmpty || self.state.followNext < self.state.followOrder.count || self.inboundOwed
+            || self.state.followMoving != nil
     }
 
     /// Whether moves an attempt's end or an apply found (`bringInbound`) are still owed (`EngineState.inboundMoves`).
@@ -102,17 +104,23 @@ extension SyncEngine {
         self.followBarrier && !self.state.inFollowVisit && !self.state.drainingAfterFollow
     }
 
-    /// Continues the follow's owed passes, then its owed moves (`continueInbound`), then visits its next jobs, at most
-    /// `followsPerTurn` moves and visits together; schedules a follow-up turn for the rest, or ends the follow: the jobs
-    /// held for a manifest catch-up that no catch-up holds any more are released, and the run is checked. No job is
-    /// visited while a move is owed: the moves stand for visits a visit-first engine had made before any visit still
-    /// owed (Stage 3 close-out cycle 18, ruling S3-R20 item 3), so they take the turn's budget first, and a turn that
-    /// leaves one owed has none left for a visit.
+    /// Continues the follow's owed passes, then its owed moves (`continueInbound`), then the rest of a visit too large for
+    /// one turn (`continueVisitRemainder`), then visits its next jobs, at most `followsPerTurn` moves and visits together
+    /// and `followIDsPerTurn` ids they move (`FollowBudget`); schedules a follow-up turn for the rest, or ends the follow:
+    /// the jobs held for a manifest catch-up that no catch-up holds any more are released, and the run is checked. No job
+    /// is visited while a move or a visit's rest is owed: the moves stand for visits a visit-first engine had made before
+    /// any visit still owed (Stage 3 close-out cycle 18, ruling S3-R20 item 3), and a visit's rest for the visit it
+    /// made at once (cycle 19, ruling S3-R22 item 1), so they take the turn's budget first.
     private func continueFollow() {
         self.continueFollowScans()
-        var (visited, moved) = self.continueInbound(budget: Self.followsPerTurn)
+        var budget = FollowBudget(holders: Self.followsPerTurn, ids: self.state.followIDsPerTurn)
+        var moved = self.continueInbound(&budget)
+        if !self.inboundOwed, self.continueVisitRemainder(&budget) {
+            moved = true
+        }
         var skipped = 0
-        while visited < Self.followsPerTurn, skipped < Self.followSkipsPerTurn, self.state.followNext < self.state.followOrder.count {
+        // A visit's rest owed (`followMoving`) has spent the turn's ids, so no visit follows it in this turn.
+        while !self.inboundOwed, budget.holders > 0, budget.ids > 0, skipped < Self.followSkipsPerTurn, self.state.followNext < self.state.followOrder.count {
             let transfer = self.state.followOrder[self.state.followNext]
             self.state.followNext += 1
             let stamp = self.state.followStamps.removeValue(forKey: transfer)
@@ -121,8 +129,8 @@ extension SyncEngine {
                 skipped += 1
                 continue
             }
-            visited += 1
-            if self.visit(transfer, at: stamp ?? self.worldStamp()) {
+            budget.holders -= 1
+            if self.visit(transfer, at: stamp ?? self.worldStamp(), budget: &budget) {
                 moved = true
             }
         }
@@ -185,12 +193,24 @@ extension SyncEngine {
         self.state.eventsAfterFollow.removeFirst(count)
         self.state.eventStamps.removeFirst(min(count, self.state.eventStamps.count))
         self.state.drainingAfterFollow = true
-        for (event, stamp) in batch {
+        for (offset, (event, stamp)) in batch.enumerated() {
             self.withReading(stamp) {
                 self.replay(event)
             }
+            if self.state.followMoving != nil {
+                // A visit after a verdict too large for one turn (`followAfterVerdict`): a visit-first engine made it at
+                // once, before the next event, so the events after it wait for its rest, in order (C2; cycle 19).
+                let rest = batch[(offset + 1)...]
+                self.state.eventsAfterFollow.insert(contentsOf: rest.map(\.0), at: 0)
+                self.state.eventStamps.insert(contentsOf: rest.map(\.1), at: 0)
+                break
+            }
         }
         self.state.drainingAfterFollow = false
+        if self.state.followMoving != nil {
+            self.scheduleFollowFollowUp()
+            return
+        }
         guard self.state.eventsAfterFollow.isEmpty else {
             self.scheduleDrainFollowUp()
             return
@@ -482,7 +502,7 @@ extension SyncEngine {
         }
         let applies = self.state.appliesFollowed
         // Computed before the job is written: an optional-chained assignment holds the state across its right side.
-        let away: Set<AssetID> = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []
+        let away: Set<AssetID> = self.followOwed ? job.assets.filter { asset in self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? true } : []
         let movedBefore: Set<AssetID>
         if job.attemptEnd?.failedAfter != applies {
             movedBefore = away
@@ -557,7 +577,7 @@ extension SyncEngine {
             return
         }
         self.state.unfollowed.remove(transfer)
-        _ = self.follow(transfer)
+        _ = self.follow(transfer, ids: self.state.followIDsPerTurn, afterVerdict: true)
     }
 
     /// Gives a deferred exit verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
@@ -764,16 +784,54 @@ extension SyncEngine {
         return unscanned
     }
 
-    /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`), under the decision
-    /// instant `stamp` of the apply it belongs to (`withReading`; S3-R15 item 1, the cycle-11 residual R-D).
-    private func visit(_ transfer: TransferID, at stamp: WorldStamp) -> Bool {
+    /// `follow(_:ids:afterVerdict:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`),
+    /// under the decision instant `stamp` of the apply it belongs to (`withReading`; S3-R15 item 1, the cycle-11 residual
+    /// R-D), within the ids `budget` leaves; returns whether it moved.
+    private func visit(_ transfer: TransferID, at stamp: WorldStamp, budget: inout FollowBudget) -> Bool {
         self.state.inFollowVisit = true
         defer {
             self.state.inFollowVisit = false
         }
-        return self.withReading(stamp) {
-            self.follow(transfer)
+        let ids = budget.ids
+        let made = self.withReading(stamp) {
+            self.follow(transfer, ids: ids, afterVerdict: false)
         }
+        budget.ids -= made.spent
+        return made.moved
+    }
+
+    /// Continues the rest of a visit too large for one turn (`EngineState.followMoving`) within `budget`, as the visit
+    /// moved: under its decision instant, its joins the follow's own (`inFollowVisit`), and those of the drain's visit
+    /// after a verdict made at once, as the drain made them, never behind a verdict that waits (`addInterest`). At its
+    /// last id the visit ends: a passed job's re-route set is spent (`follow`), and the job's publication, which waited
+    /// for it, binds (`inboundBlocks`). Returns whether an id moved.
+    private func continueVisitRemainder(_ budget: inout FollowBudget) -> Bool {
+        guard var rest = self.state.followMoving, budget.ids > 0 else {
+            return false
+        }
+        self.state.inFollowVisit = true
+        self.state.bringingInbound = rest.afterVerdict
+        defer {
+            self.state.inFollowVisit = false
+            self.state.bringingInbound = false
+        }
+        let ids = budget.ids
+        let made = self.withReading(rest.stamp) {
+            self.continueMove(&rest.moves, of: rest.holder, listing: nil, budget: ids)
+        }
+        budget.ids -= made.spent
+        guard rest.moves.isDone else {
+            self.state.followMoving = rest
+            return made.moved
+        }
+        self.state.followMoving = nil
+        if rest.spends {
+            self.state.jobs[rest.holder]?.rerouteOnPass = []
+        }
+        if !self.inboundBlocks(rest.holder) {
+            self.state.inboundWaits.removeValue(forKey: rest.holder)?.resume()
+        }
+        return made.moved
     }
 
     /// What a follow's visit re-routes of `job`'s moved ids when it passes the job instead of moving it; `nil` when it
@@ -825,18 +883,16 @@ extension SyncEngine {
     /// publication too (PROBE-C14C-MARK-TWO-APPLIES), and left a moved interest out of every decision that read the job's
     /// lane meanwhile (PROBE-C14R-PASSED-LANE, PROBE-C14R-PASSED-FAIL). The caller checks the run and pumps once per turn,
     /// not once per job.
-    private func follow(_ transfer: TransferID) -> Bool {
+    ///
+    /// A visit moves at most `ids` ids now (`startMove`); one that moves more leaves the rest to the follow's next turns
+    /// (`EngineState.followMoving`; Stage 3 close-out cycle 19, ruling S3-R22 item 1), and spends a passed job's set at
+    /// its last. `afterVerdict`: the drain's visit (`followAfterVerdict`). Returns whether it moved, and the ids spent.
+    private func follow(_ transfer: TransferID, ids budget: Int, afterVerdict: Bool) -> (moved: Bool, spent: Int) {
         guard let job = self.state.jobs[transfer] else {
-            return false
+            return (false, 0)
         }
         let reroute = self.rerouteOnVisit(job)
-        if reroute != nil {
-            self.state.jobs[transfer]?.rerouteOnPass = []
-        }
-        var moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
-        guard !moved.isEmpty else {
-            return false
-        }
+        var moved = job.assets.filter { asset in self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? true }
         if let reroute {
             let passed = moved.subtracting(reroute)
             if !passed.isEmpty {
@@ -844,7 +900,14 @@ extension SyncEngine {
             }
             moved.subtract(passed)
         }
-        return self.move(moved, of: job)
+        let made = moved.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(moved, of: job, listing: nil, budget: budget)
+        if let rest = made.rest {
+            let stamp = self.state.reading ?? self.worldStamp()
+            self.state.followMoving = VisitRemainder(holder: transfer, moves: rest, stamp: stamp, afterVerdict: afterVerdict, spends: reroute != nil)
+        } else if reroute != nil {
+            self.state.jobs[transfer]?.rerouteOnPass = []
+        }
+        return (made.moved, made.spent)
     }
 
     /// Moves `moved`, ids of `job` the engine's copy maps elsewhere, as a visit moves them (`follow`, `continueInbound`):
@@ -853,7 +916,7 @@ extension SyncEngine {
     /// content (`reroute`), and an interest left with no id is removed. `listing` is the copy the move is made under, the
     /// engine's copy when `nil` (an owed move found under the copy an apply has since replaced, `InboundMove.copy`).
     /// `true` when it moved an id.
-    private func move(_ moved: Set<AssetID>, of job: Job, listing: ValidatedManifest? = nil) -> Bool {
+    func move(_ moved: Set<AssetID>, of job: Job, listing: ValidatedManifest? = nil) -> Bool {
         let transfer = job.transfer
         if moved.count == job.assets.count, job.state != .verifying, job.state != .committing {
             if job.state == .downloading {
@@ -966,12 +1029,13 @@ extension SyncEngine {
 
     /// The walk of `bringInbound`: records, holder by holder, the ids each other job holds that the copy maps to one of
     /// `targets`' contents and that its owed visit would move (`rerouteOnVisit`), unless a move already owes them. The
-    /// holders are taken in the order their jobs were created (`Job.epoch`): every id they give joins one job, so their
-    /// order is an order only (the follow's order, which the cycle-17 fix first kept, was removed under ruling S3-R16
-    /// item 3, its drop-mutant having survived), and an epoch sorts without formatting a transfer. A target is named by
-    /// its index while the walk runs, and each target's count of owed moves is written once, so a holder costs one set of
-    /// its ids and one record (C2: at 10,000 holders, a dictionary per holder and a count per holder and per id held the
-    /// attempt-end turn about 15 ms).
+    /// holders are taken in the order of their jobs' epochs (`Job.epoch`, the job's creation or its last attempt's start,
+    /// which takes a new one), then of their targets' epochs: every id they give joins one job, so their order is an
+    /// order only (the follow's order, which the cycle-17 fix first kept, was removed under ruling S3-R16 item 3, its
+    /// drop-mutant having survived), and an epoch sorts without formatting a transfer. A target is named by its index
+    /// while the walk runs, and each target's count of owed moves is written once, so a holder costs one set of its ids
+    /// per target it gives to and one record each (C2: at 10,000 holders, a dictionary per holder and a count per holder
+    /// and per id held the attempt-end turn about 15 ms).
     private func findInbound(onto targets: [InboundTarget]) {
         let copy = self.state.applied
         let pending = self.inboundPendingIDs()
@@ -1010,7 +1074,7 @@ extension SyncEngine {
     private func foundInbound(
         _ targets: [InboundTarget],
         copy: ValidatedManifest,
-        pending: [AssetID: TransferID],
+        pending: [AssetID: Int],
         byChecksum: [ContentHash: Int],
         byIdentifier: [AssetID: Int]
     ) -> [(order: UInt64, target: Int, holder: TransferID, ids: Set<AssetID>)] {
@@ -1053,27 +1117,37 @@ extension SyncEngine {
         return found
     }
 
-    /// The ids of the owed moves, with the job each moves onto (`EngineState.inboundMoves`): a walk records none of them
-    /// again (`findInbound`), and the lane a 429 is decided on counts each on that job, whatever a later copy maps it to
-    /// (`followedLane`). Read from the owed moves when asked, one pass over them, so the walk that records thousands writes
-    /// no entry per id (C2).
-    func inboundPendingIDs() -> [AssetID: TransferID] {
+    /// The ids of the owed moves, with the index of the move that carries each (`EngineState.inboundMoves`; of a move
+    /// begun, the ids it has left, `InboundMove.progress`): a walk records none of them again (`findInbound`), and the
+    /// lane a 429 is decided on counts each as an interest on the move's job would count (`followedLane`). Read from the
+    /// owed moves when asked, one pass over them, so the walk that records thousands writes no entry per id (C2).
+    func inboundPendingIDs() -> [AssetID: Int] {
         guard self.inboundOwed else {
             return [:]
         }
-        var pending: [AssetID: TransferID] = [:]
-        for move in self.state.inboundMoves[self.state.inboundNext...] {
-            for asset in move.ids {
-                pending[asset] = move.target
+        var pending: [AssetID: Int] = [:]
+        for index in self.state.inboundNext..<self.state.inboundMoves.count {
+            if let progress = self.state.inboundMoves[index].progress {
+                for item in progress.heap {
+                    pending[item.asset] = index
+                }
+            } else {
+                for asset in self.state.inboundMoves[index].ids {
+                    pending[asset] = index
+                }
             }
         }
         return pending
     }
 
-    /// Whether a move onto or off `transfer`'s job is owed: its publication binds the ids it holds once none is
-    /// (`publish`), those a visit-first engine's visits had moved onto it included, and none they had moved off it. The
-    /// moves off it are looked for among the owed moves, one pass, only while one is owed and a publication asks.
+    /// Whether a move onto or off `transfer`'s job is owed, or the rest of its visit (`EngineState.followMoving`): its
+    /// publication binds the ids it holds once none is (`publish`), those a visit-first engine's visits had moved onto it
+    /// included, and none they had moved off it. The moves off it are looked for among the owed moves, one pass, only
+    /// while one is owed and a publication asks.
     func inboundBlocks(_ transfer: TransferID) -> Bool {
+        if self.state.followMoving?.holder == transfer {
+            return true
+        }
         guard self.inboundOwed else {
             return false
         }
@@ -1086,19 +1160,23 @@ extension SyncEngine {
     static let inboundMovesNow = 64
 
     /// Makes the first moves now, in the attempt's end or the apply's turn, and leaves the rest to the follow's turns: at
-    /// most `inboundMovesNow` holders.
+    /// most `inboundMovesNow` holders and `inboundIDsNow` ids.
     private func makeInboundNow() {
         guard self.inboundOwed else {
             return
         }
-        _ = self.continueInbound(budget: Self.inboundMovesNow)
+        var budget = FollowBudget(holders: Self.inboundMovesNow, ids: self.inboundIDsNow)
+        _ = self.continueInbound(&budget)
         if self.inboundOwed {
             self.scheduleFollowFollowUp()
         }
     }
 
-    /// Makes the owed moves (`EngineState.inboundMoves`), oldest first, at most `budget` holders; returns the holders
-    /// taken and whether an id moved. Each move re-routes under the copy that found it (`InboundMove.copy`), as the visit
+    /// Makes the owed moves (`EngineState.inboundMoves`), oldest first, within `budget`'s holders and ids; returns whether
+    /// an id moved. A move that carries more ids than are left stays owed, its moves left in `InboundMove.progress`, and
+    /// ends the turn's moves (`startMove`; Stage 3 close-out cycle 19, ruling S3-R22 item 1: one holder of 10,000 ids made
+    /// the attempt-end turn re-route all of them); its holder counts once, at its first turn, and its target is re-read
+    /// at every turn. Each move re-routes under the copy that found it (`InboundMove.copy`), as the visit
     /// it stands for re-routed under the copy of its instant, and its joins are made at once
     /// (`EngineState.bringingInbound`). A move found under a copy an apply has replaced since is made as any other: its
     /// job is at its attempt's end, so the newer copy's visit of it leaves it to its verdict or passes its publication
@@ -1110,11 +1188,10 @@ extension SyncEngine {
     /// follow their content). No visit is made, so the moves read no decision instant: a join onto a job at its
     /// attempt's end reads none (the cycle-17 `withReading` of the holder's visit instant was removed under ruling
     /// S3-R16 item 3, its drop-mutant having survived).
-    private func continueInbound(budget: Int) -> (taken: Int, moved: Bool) {
+    private func continueInbound(_ budget: inout FollowBudget) -> Bool {
         guard self.inboundOwed else {
-            return (0, false)
+            return false
         }
-        var taken = 0
         var moved = false
         self.state.inFollowVisit = true
         self.state.bringingInbound = true
@@ -1122,38 +1199,54 @@ extension SyncEngine {
             self.state.inFollowVisit = false
             self.state.bringingInbound = false
         }
-        while taken < budget, self.state.inboundNext < self.state.inboundMoves.count {
+        while budget.holders > 0, budget.ids > 0, self.state.inboundNext < self.state.inboundMoves.count {
             let move = self.state.inboundMoves[self.state.inboundNext]
-            self.state.inboundNext += 1
-            taken += 1
-            if self.inboundTargetWaits(move), let holder = self.state.jobs[move.holder] {
-                let ids = holder.assets.intersection(move.ids)
-                if !ids.isEmpty, self.move(ids, of: holder, listing: move.copy) {
-                    moved = true
-                }
+            if move.progress == nil {
+                budget.holders -= 1
             }
+            var rest: MoveProgress?
+            if self.waitingTarget(move) != nil, let holder = self.state.jobs[move.holder] {
+                let made: (moved: Bool, spent: Int)
+                if var progress = move.progress {
+                    made = self.continueMove(&progress, of: move.holder, listing: move.copy, budget: budget.ids)
+                    rest = progress.isDone ? nil : progress
+                } else {
+                    let ids = holder.assets.intersection(move.ids)
+                    let started = ids.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(ids, of: holder, listing: move.copy, budget: budget.ids)
+                    made = (started.moved, started.spent)
+                    rest = started.rest
+                }
+                budget.ids -= made.spent
+                moved = moved || made.moved
+            }
+            if let rest {
+                self.state.inboundMoves[self.state.inboundNext].progress = rest
+                break
+            }
+            self.state.inboundNext += 1
             self.inboundMade(move)
         }
         if !self.inboundOwed {
             self.state.inboundMoves = []
             self.state.inboundNext = 0
         }
-        return (taken, moved)
+        return moved
     }
 
-    /// Whether `move`'s job is still at the attempt's end the move was found for: the same epoch, publishing, or failed
-    /// with its end recorded (its verdict waiting, or its publication's failure being booked, `recordPublicationEnd`).
-    private func inboundTargetWaits(_ move: InboundMove) -> Bool {
+    /// `move`'s job while it is still at the attempt's end the move was found for: the same epoch, publishing, or failed
+    /// with its end recorded (its verdict waiting, or its publication's failure being booked, `recordPublicationEnd`);
+    /// `nil` once it left it, which drops the move (`continueInbound`). Also read by `followedLane`.
+    func waitingTarget(_ move: InboundMove) -> Job? {
         guard let job = self.state.jobs[move.target], job.epoch == move.epoch else {
-            return false
+            return nil
         }
         switch job.state {
         case .verifying, .committing:
-            return true
+            return job
         case .failed:
-            return job.attemptEnd != nil
+            return job.attemptEnd != nil ? job : nil
         case .queued, .blocked, .downloading:
-            return false
+            return nil
         }
     }
 
@@ -1170,26 +1263,27 @@ extension SyncEngine {
         }
     }
 
-    /// Waits until no move is owed onto or off `transfer`'s job (`inboundBlocks`): its publication binds the ids it holds
-    /// then. Returns at once when none is owed; shutdown resumes it (`releaseInboundWaits`).
+    /// Waits until no move is owed onto or off `transfer`'s job and no rest of its visit (`inboundBlocks`): its
+    /// publication binds the ids it holds then. The caller found one owed in this turn (`publish`), so the wait registers
+    /// at once; the last move or the visit's rest resumes it (`inboundMade`, `continueVisitRemainder`), and shutdown
+    /// resumes every one (`releaseInboundWaits`), which also drops what was owed, so no wait registers after it. The
+    /// cycle-18 early return and the re-check inside the continuation, which no path reached (the caller's check runs in
+    /// the same turn), were removed under ruling S3-R19 item 3 (cycle 19).
     func awaitInboundMoves(_ transfer: TransferID) async {
-        guard self.inboundBlocks(transfer), self.isRunning else {
-            return
-        }
-        // REENTRANCY: RE-S48 (proposed) — nothing here: the body checks and registers synchronously; the caller re-reads
-        // the lifecycle and its job's epoch and state after it.
+        // REENTRANCY: RE-S48 (proposed) — nothing here: the body registers synchronously; the caller re-reads the
+        // lifecycle after it.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            if !self.inboundBlocks(transfer) || !self.isRunning {
-                continuation.resume()
-            } else {
-                self.state.inboundWaits[transfer] = continuation
-            }
+            self.state.inboundWaits[transfer] = continuation
+            // A mutation: the test seams' conditions re-evaluate after it, as after any other (`awaitCondition`, L4-R17);
+            // a publication whose attempt's end owed no move found nothing else to notify them.
+            self.notifyObservers()
         }
     }
 
-    /// Drops every owed move and resumes every publication that waited for one (shutdown, or a follow-up that cannot be
-    /// spawned): nothing follows any more.
+    /// Drops every owed move and the rest of a visit (`EngineState.followMoving`), and resumes every publication that
+    /// waited for one (shutdown, or a follow-up that cannot be spawned): nothing follows any more.
     func releaseInboundWaits() {
+        self.state.followMoving = nil
         self.state.inboundMoves = []
         self.state.inboundNext = 0
         self.state.inboundOnto = [:]

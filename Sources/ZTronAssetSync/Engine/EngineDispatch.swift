@@ -1021,28 +1021,24 @@ extension SyncEngine {
         // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits. Read at
         // the attempt's end: the moves it owes (`bringInbound`) bring ids the copy maps here, which none of this holds.
         var away: Set<AssetID> = []
-        if self.followOwed, let assets = self.state.jobs[transfer]?.assets {
-            away = assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
+        if self.followOwed, let job = self.state.jobs[transfer] {
+            away = job.assets.filter { asset in self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? true }
         }
         // Read before the job is written: an optional-chained assignment holds the state across its right side.
         let follow = self.state.followsEnded
         self.state.jobs[transfer]?.rerouteOnPass = away
         self.state.jobs[transfer]?.rerouteFor = follow
         if self.inboundBlocks(transfer) {
-            // The binding waits for the moves owed onto or off this job (ruling S3-R20 item 3: the job's end waits while
-            // they are made over the follow's turns, `bringInbound`).
-            // REENTRANCY: RE-S48 (proposed) — the lifecycle, and the job at this epoch still verifying: a job retired or
-            // replaced meanwhile gets the retired publication's exit, the file discarded.
+            // The binding waits for the moves owed onto or off this job, and for the rest of its visit (ruling S3-R20
+            // item 3: the job's end waits while they are made over the follow's turns, `bringInbound`; cycle 19).
+            // REENTRANCY: RE-S48 (proposed) — the lifecycle (shutdown resumes the wait, `releaseInboundWaits`). The job is
+            // still verifying at this epoch, as an invariant checks while it waits (`followBarrierViolations`): a
+            // verifying job is never retired (`retire`), superseded (`move`, `startMove`) or given an attempt, and its
+            // interests' withdrawals wait behind the barrier. The cycle-18 re-check of the job's epoch and state, which no
+            // path reached, was removed under ruling S3-R19 item 3 (cycle 19; the cycle-18 requirements verifier's G4
+            // finding on RE-S48).
             await self.awaitInboundMoves(transfer)
             guard self.isRunning else {
-                return
-            }
-            guard self.state.jobs[transfer]?.epoch == epoch, self.state.jobs[transfer]?.state == .verifying else {
-                if self.state.jobs[transfer] == nil {
-                    self.recordBreaker(.abandoned(transfer))
-                }
-                // REENTRANCY: f-3 (proposed) — nothing: an idempotent removal of a copy nobody wants.
-                await self.state.staging?.discard(file.name)
                 return
             }
         }
@@ -1263,7 +1259,7 @@ extension SyncEngine {
         let copy = listing ?? self.state.applied
         self.state.jobs[transfer]?.interests.removeAll()
         self.removeJob(transfer)
-        if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0)?.transferID == transfer } }) {
+        if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0).map { SyncEngine.sameTransfer($0, job.entry) } ?? false } }) {
             self.holdForManifest(transfer)
         }
         for token in job.interests.keys.sorted() {

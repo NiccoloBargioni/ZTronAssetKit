@@ -89,8 +89,17 @@ struct EngineState {
     /// `inboundMoves[inboundNext...]` are still owed. The follow makes them a bounded number per turn, before any visit
     /// (`SyncEngine.continueInbound`; Stage 3 close-out cycle 18, ruling S3-R20 item 3), so a follow is owed while one is.
     var inboundMoves: [InboundMove] = []
-    /// The next index of `inboundMoves` to make.
+    /// The next index of `inboundMoves` to make. A move that carries more ids than a turn moves stays there, its moves
+    /// left in `InboundMove.progress`, until its last turn (Stage 3 close-out cycle 19, ruling S3-R22 item 1).
     var inboundNext = 0
+    /// The rest of a visit that moves more ids than a turn moves (`SyncEngine.followIDsPerTurn`): the follow is owed until
+    /// its last id moved, its turns make it before any other visit, and its holder's publication waits for it (Stage 3
+    /// close-out cycle 19, ruling S3-R22 item 1).
+    var followMoving: VisitRemainder?
+    /// The ids a follow turn moves at most, visits, owed moves and a visit's rest together, half of them in an attempt's
+    /// end or an apply's turn (`SyncEngine.followIDsPerTurn`). A seam: a test sets it small to pin the bound (S3-R23
+    /// item 3); no production path writes it.
+    var followIDsPerTurn = SyncEngine.followIDsPerTurn
     /// The owed moves onto each job, counted once per walk: the job's publication binds its ids only once none is owed
     /// onto it or off it (`SyncEngine.inboundBlocks`). The moves off a job are found among the owed moves when its
     /// publication asks, so a walk that finds thousands of holders records no holder twice (C2).
@@ -621,6 +630,9 @@ struct InboundMove {
     let ids: Set<AssetID>
     /// The copy that mapped them to `target`'s content: the moves re-route under it (`SyncEngine.reroute`).
     let copy: ValidatedManifest
+    /// The moves left of a move that carries more ids than a turn moves, once its first turn made some
+    /// (`SyncEngine.continueInbound`); `nil` before.
+    var progress: MoveProgress?
 }
 
 /// A job `SyncEngine.findInbound` brings ids onto: its transfer, its epoch and its entry, read before the walk, so no copy
