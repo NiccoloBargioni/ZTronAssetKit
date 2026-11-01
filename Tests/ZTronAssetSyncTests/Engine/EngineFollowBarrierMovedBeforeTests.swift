@@ -91,6 +91,85 @@ extension EngineFollowBarrierTests {
         #expect(outcome.b == .failure(.integrityFailure), "B was back on C, publishing, at its integrity failure (visit-first): \(outcome.b)")
     }
 
+    /// `publicationMappedBack` plus one apply (Stage 3 close-out cycle 18; the cycle-17 verifier's
+    /// PROBE-C17R-NARROWED-REROUTE, which kills a mutant keeping `Job.rerouteOnPass` whole in `recordDeferredVerdict`):
+    /// once C's integrity verdict waits, with no apply since the publication's end, v5 moves zz-b to N again before the
+    /// follow visits C. Visited first, v4's visit had joined B to C publishing, C's integrity failure answered A and B,
+    /// and v5 moved nobody. Behind the barrier the set the visit re-routes is the publication's less the ids the copy
+    /// mapped back (none here), so the owed visit that v5's pass finds passes zz-b to the verdict. Kept whole, the visit
+    /// re-routed B to N before the verdict, and N served it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome though a later apply moves it again (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierAnswersAnIDMovedBackAndAwayAgainWithThePublicationsOutcome(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 1_717_102
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let wrong = EngineFixture.bytes(seed + 4, count: 100_000)
+        let nBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let b = EngineHarness.onDemand("zz-b", cBytes)
+        let bMoved = EngineHarness.onDemand("zz-b", nBytes)
+        try #require(a.transferID == b.transferID, "setup: zz-a and zz-b share C")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(a.transferID, [.hold, .stage(wrong), .stage(cBytes)])
+        await s.harness.source.script(bMoved.transferID, [.hold, .stage(nBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[a.transferID]?.state == .downloading }
+        }
+        let bWaiter = Task { await engine.awaitAsset(b.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[a.transferID]?.interests.count == 2 }
+        let fillers = FollowBarrier.fillers(seed + 200)
+        let later = Self.laterFillers(seed + 6_000)
+        // v3 moves zz-b to N.
+        try await Self.applyHeld([s.q] + fillers + [a, bMoved] + later, tag: "v3-narrow-\(seed)", s, visit: visit)
+        if visit == .followVisitedFirst {
+            await engine.awaitCondition { $0.state.jobs[bMoved.transferID]?.state == .downloading }
+        }
+        let releaser = try await Self.holdPublication(of: a.transferID, s, bulk: bulk)
+        if visit == .sweepFollowsFirst {
+            let atPublish = await engine.readForTests { e in (owed: e.followOwed, reroute: e.state.jobs[a.transferID]?.rerouteOnPass) }
+            try #require(atPublish.owed && atPublish.reroute == [b.identifier], "setup: C's publication began while v3's follow owed C's visit: \(atPublish)")
+        }
+        // v4 maps zz-b back while (behind the barrier) v3's follow still owes C's visit.
+        try await Self.applyHeld([s.q] + fillers + [a, b] + later, tag: "v4-narrow-\(seed)", s, visit: visit)
+        // The publication fails its checksum.
+        releaser.cancel()
+        await releaser.value
+        await bulk.setHolding(false)
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.verdictsAfterFollow[a.transferID] != nil }
+            let waiting = await engine.readForTests { e in (owed: e.followOwed, end: e.state.jobs[a.transferID]?.attemptEnd) }
+            try #require(waiting.owed && waiting.end?.deferredAfter != nil && waiting.end?.failedAfter == waiting.end?.deferredAfter, "setup: the verdict waits with no apply since the publication's end: \(waiting)")
+        } else {
+            _ = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        }
+        // v5 moves zz-b to N again before (behind the barrier) the follow visits C; its own turn may visit C and end the
+        // follow, so it is applied without `applyHeld`'s expectation that the follow is still owed.
+        let v5 = try ValidatedManifest(entries: [s.q] + fillers + [a, bMoved] + later, digest: ContentHash.sha256(of: Data("v5-narrow-\(seed)".utf8)))
+        await engine.readForTests { $0.holdFollowFollowUps() }
+        let appliedV5 = await engine.applyAndFollow(v5, etag: nil, eviction: nil)
+        try #require((try? appliedV5.get()) != nil, "setup: v5 is applied: \(appliedV5)")
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        // A B that waits on N's held download is served by it.
+        let nDownloading = await engine.readForTests { $0.state.jobs[bMoved.transferID]?.state == .downloading }
+        if nDownloading {
+            await s.harness.source.release(bMoved.transferID, with: .progress(received: 0, expected: nil))
+        }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let bResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
+        #expect(aResult == .failure(.integrityFailure), "A gets C's integrity failure (visit-first): \(aResult)")
+        #expect(bResult == .failure(.integrityFailure), "B was back on C, publishing, at its integrity failure, whatever v5 does (visit-first): \(bResult)")
+    }
+
     /// What `takeOffLane` reads: the origin's throttle after J's 429, and the answers of A, B and P.
     struct TakeOffLaneOutcome {
         /// The origin's throttle end after J's 429.
