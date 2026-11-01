@@ -32,6 +32,10 @@ extension EngineFollowBarrierTests {
         /// A 429 with `Retry-After` 10 s, within the user lane's cap and beyond `interactiveMaxWait`: O parks throttled
         /// and the park's fail-fast answers B `serverUnavailable` (cycle 17, PROBE-C16C-THROTTLE-FAILFAST-LANE).
         case throttleFailFast
+        /// As `throttleFailFast`, with 9 s passing before v4: J's 429 meets O's verdict waiting with 1 s of its throttle
+        /// left, within `interactiveMaxWait`, so whether the fail-fast answers B is read at O's 429, as the drain gives the
+        /// verdict under its arrival (`verdictAnswers`' stamp; Stage 3 close-out cycle 18, the drop-mutant vaStampDrop).
+        case throttleFailFastLater
         /// An offline failure of O's second attempt, begun after the conditions' first element (no edge since): O waits
         /// for the next edge and the offline fail-fast answers B `offline` (cycle 17).
         case offline
@@ -107,7 +111,7 @@ extension EngineFollowBarrierTests {
             await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .hold, .fail(timeout)])
         case .retryAfterBeyondCap:
             await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.serverError(httpStatus: 503), retryAfter: .seconds(120))), .stage(oBytes)])
-        case .throttleFailFast:
+        case .throttleFailFast, .throttleFailFastLater:
             await s.harness.source.script(a.transferID, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(10))), .stage(oBytes)])
         case .offline:
             await s.harness.source.script(a.transferID, [.hold, .fail(timeout), .hold, .fail(.offline(.noConnection)), .stage(oBytes)])
@@ -165,6 +169,10 @@ extension EngineFollowBarrierTests {
                 }
             }
         }
+        if ending == .throttleFailFastLater {
+            // 9 of the throttle's 10 s pass before v4 and J's 429.
+            s.time.advance(by: 9)
+        }
         // v4 moves zz-b onto J's content while (behind the barrier) the follow is still owed.
         try await Self.applyHeld([s.q] + fillers + [a, bMoved, p] + Self.laterFillers(seed + 9_000), tag: "v4-lane-\(seed)", s, visit: visit)
         let before = await engine.readForTests { e in e.state.remote.flatMap { e.state.throttles[$0.originID] } }
@@ -192,8 +200,8 @@ extension EngineFollowBarrierTests {
     /// item 1): visited first, v4's visit moved B onto J from O backing off (a user lane, the 429 throttles nothing and
     /// fails J, answering P), or found B answered by O's 404, 429 beyond the caps, timeout at the cap, `Retry-After`
     /// beyond the cap, throttle's fail-fast, offline fail-fast or ENOSPC fail-fast (a prefetch lane, the 429 throttles
-    /// the origin until its own end and J's retry serves P). Cycle 17 adds the last four endings and the assertions on
-    /// J's own throttle end and on the answers of B and P.
+    /// the origin until its own end and J's retry serves P). Cycle 17 adds four endings and the assertions on J's own
+    /// throttle end and on the answers of B and P; cycle 18 the throttle's fail-fast read 9 s after it.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, VerdictLaneEnding.allCases)
     func barrierDecidesA429OnTheLaneAWaitingVerdictLeaves(_ visit: LaneDropVisit, _ ending: VerdictLaneEnding) async throws {
