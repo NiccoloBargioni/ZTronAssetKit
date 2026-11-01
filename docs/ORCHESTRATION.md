@@ -195,6 +195,28 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Owner, 1 Nov 02:39: "No, keep fixing".** The full freeze is declined a second time; the first was "Narrow the bar" on 31 Oct.
     - Keep cycling until convergence, with S3-R20 in force: C2 is not waived.
     - Do not offer the freeze again at each verdict. Raise it again only on a new kind of evidence: a liveness failure, or a C2-bounded fix that cannot keep the answers equal.
+  - **Cycle 17 fix** ran 23:48–03:29 and ended at `e1cf3e5`, 10 commits from `05f94cc`.
+    - The fixer reported `--quick` PASS, Sync 537 tests x3, TSan 537 passed alone, Sync coverage 94.17 % and the simulator at 1,491/1,491. The benchmarks failed only P-13 (WP-B).
+    - It put back 3 items: `bringInbound`'s C2 cost, RR-14, and PROBE-C17-ADMIT-DURING-APPLY. It did not see S3-R20, because it started before the ruling.
+  - **Cycle 17 verification** ran 03:29–04:44. The reqs lens found 6 issues (4 blocking) and the correct lens 5 (5 blocking), 6 distinct. Every cycle-16 item is confirmed fixed. The new items:
+    - a waiting retry verdict converts an HTTP-date Retry-After at the drain, not on arrival: a different answer;
+    - RR-14 is proven by both lenses: an id moved twice during a publication skips that publication's outcome;
+    - C2: `bringInbound` measured 408 to 432 ms at 10,000 converging ids (S3-R20);
+    - C2, older than cycle 17: the owed follow's own turns take 17.7 to 19.1 ms in the 10,000-member concentration shape, because `addInterest` joins through copies of the Job;
+    - G4: four cycle-17 mutants survive, the `rerouteOnPass` narrowing and three stamp or take-off drops.
+    - Non-blocking: a start-count difference when `bringInbound` meets a superseded holder (record it as a residual risk), and WP-B benchmarks that missed under a load spike.
+  - **S3-R21 (04:46):**
+    - The follow's own turns in the concentration shape are inside C2, so they are blocking; fix by joining in place and, if needed, bounding the turns by work.
+    - S3-R20 stands for `bringInbound`, and RR-14 is blocking.
+    - PROBE-C17-ADMIT-DURING-APPLY is pre-existing and outside the class, so it is not blocking. It goes in the residual risks and is marked for the owner in Stage 5: a wrong `notFound` under a race.
+    - Cycle 17's issues are in `.build-orchestrator/s3f-c17-issues.json`.
+  - **Cycle 18 fix** started 04:44 automatically, with S3-R20 in the rulings file. S3-R21 reaches cycle 18's verifiers and the next fixer. Weekly usage was 94 % at 04:45, so the limit will probably cut cycle 18 off between about 07:00 and 08:30.
+  - **If the limit cuts cycle 18 off (resume after the reset):**
+    - Save any uncommitted worktree changes on `wip/s3f-c18a`, as with `wip/s3f-c15a`. Reset the worktree to its last commit.
+    - Start run 6 from cycle 18. Copy `s3-fix-args-run5.json` and set `fromCycle` 18, `findingsFile` `s3f-c17-issues.json` and `maxCycle` 30.
+    - The focus names S3-R20 and S3-R21 and the WIP branch ("copy files or hunks, never merge").
+    - If cycle 18's verification did finish, start from cycle 19 with its issues instead.
+    - Do not start run 6 before the reset when weekly usage is at 98 % or more.
   - **Signal for the owner:** 4 of cycle 16's 5 items come from cycle 16's own additions (3 in new code, 1 a new test), and 1 is an older structural gap. As promised on 31 Oct at 22:12, if cycle 17's verifiers again find new cases in the same logic, put the full-freeze alternative back in front of the owner. That is option (B) of 31 Oct 02:22: about 2 h of design panel plus 2–3 cycles, 12–16 weekly points. Unused weekly budget does not carry over, so cycles run this week cost next week nothing.
   - **For run 6's args:** both verifiers ran simulator suites at the same time as timing-sensitive macOS runs, and the load reached 782. That caused two other-WP flakes and a coverage re-run. Add to the focus: take a lock (`mkdir .build-orchestrator/sim.lock`, removed afterwards) around each simulator or coverage run.
   - If cycle 18 still blocks, rule and start run 6 from cycle 19 (no cap).
