@@ -458,8 +458,13 @@ extension EngineFollowBarrierTests {
             // and the turns of the visit's rest follow (`drainEventsAfterFollow`).
             let ids = Set(onC.map(\.identifier))
             var before = count
+            var made = 0
             while await engine.readForTests({ $0.followOwed }) {
+                // The time limit's cancellation ends `runOneFollowTurn`'s wait for a scheduled turn, not this loop, so a
+                // follow whose turns stop coming fails here instead of spinning past the limit.
+                try #require(made < 16, "the follow ends within 16 turns: \(made) made, members moved \(turns)")
                 await Self.runOneFollowTurn(engine)
+                made += 1
                 let now = await engine.readForTests { e in e.state.jobs[c.transferID]?.assets.intersection(ids).count ?? 0 }
                 if now != before {
                     turns.append(before - now)
