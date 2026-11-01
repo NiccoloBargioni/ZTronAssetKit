@@ -852,11 +852,13 @@ extension SyncEngine {
         return !moved.isEmpty
     }
 
-    /// Waits `join` behind the exit verdict that waits for `target` (its `.attemptFailed` or `.spaceFailure` at the job's
-    /// epoch), after the joins already waiting right behind it, under the decision instant now (the visit's): the drain
-    /// joins it to the job the verdict leaves, or to a new job of the content, as a visit-first engine's visit at the
-    /// apply that moved it there joined it once the verdict had been given (`addInterest`; Stage 3 close-out cycle 17).
-    /// Only a follow's visit calls it, while the follow is owed and every waiting event is queued.
+    /// Waits `join` right behind the exit verdict that waits for `target` (its `.attemptFailed` or `.spaceFailure` at the
+    /// job's epoch), under the decision instant now (the visit's): the drain joins it to the job the verdict leaves, or to
+    /// a new job of the content, as a visit-first engine's visit at the apply that moved it there joined it once the
+    /// verdict had been given (`addInterest`; Stage 3 close-out cycle 17). Its place among the joins already waiting
+    /// there is an order only (they all join the same content), so none is kept: the skip past them was removed under
+    /// ruling S3-R16 item 3, its drop-mutant having survived. Only a follow's visit calls it, while the follow is owed and
+    /// every waiting event is queued.
     func deferBehindVerdict(_ join: JoinAfterFollow, of target: Job) {
         let events = self.state.eventsAfterFollow
         let verdict = events.lastIndex { event in
@@ -867,28 +869,26 @@ extension SyncEngine {
                 return false
             }
         }
-        var index = (verdict ?? events.count - 1) + 1
-        while index < events.count, case .join = events[index] {
-            index += 1
-        }
+        let index = (verdict ?? events.count - 1) + 1
         self.state.joinsAfterFollow[join.token, default: [:]][join.asset] = join.entry.transferID
         self.state.eventsAfterFollow.insert(.join(join), at: index)
         self.state.eventStamps.insert(self.worldStamp(), at: min(index, self.state.eventStamps.count))
     }
 
-    /// Brings onto `transfer`'s job, as its attempt ends while a follow is owed (its publication begins, `publish`, or its
-    /// exit verdict defers, `defersFailure`, `spaceFailed`), the interests a visit-first engine's visits had already
-    /// moved onto it: those in ids the engine's copy maps to its content that another job holds and whose owed visit
-    /// would move them (`rerouteOnVisit`), each holder in the follow's order (its owed visit's place, then the holders no
-    /// pass has found yet, by transfer), under its visit's decision instant (Stage 3 close-out cycle 17; the cycle-16
-    /// verifiers' PROBE-C16C-INTERMEDIATE-HOP and PROBE-C16C-INTERMEDIATE-HOP-SERVED). The attempt's end is the last
-    /// instant they are the job's own: its publication binds the ids it holds when it begins, and its verdict answers or
-    /// keeps the interests it holds when it defers. Visited later, such an interest met a later apply's copy: when that
-    /// apply moved its id on to a third content, the visit moved it there, and it skipped the outcome a visit-first engine
-    /// gave it on this job. Only the ids the copy maps to this content move, each holder's visit moves the rest itself
-    /// (a holder whose every id moves is superseded, as its visit would supersede it), and their joins are made at once
-    /// (`EngineState.bringingInbound`). One pass over the jobs' ids with one lookup in the copy each and no transfer
-    /// formatted (C2; `BenchSync`).
+    /// Brings onto `transfer`'s job, as its attempt ends while a follow is owed (its publication begins, `publish`, or
+    /// its exit verdict defers, `defersFailure`, `spaceFailed`), the interests a visit-first engine's visits had
+    /// already moved onto it: those in ids the engine's copy maps to its content that another job holds and whose owed
+    /// visit would move them (`rerouteOnVisit`), each holder under its visit's decision instant (Stage 3 close-out
+    /// cycle 17; the cycle-16 verifiers' PROBE-C16C-INTERMEDIATE-HOP and PROBE-C16C-INTERMEDIATE-HOP-SERVED). The
+    /// holders are taken by transfer: every id they give joins this one job, so their order is an order only (the
+    /// follow's order, which the first fix kept, was removed under ruling S3-R16 item 3, its drop-mutant having
+    /// survived). The attempt's end is the last instant they are the job's own: its publication binds the ids it holds
+    /// when it begins, and its verdict answers or keeps the interests it holds when it defers. Visited later, such an
+    /// interest met a later apply's copy: when that apply moved its id on to a third content, the visit moved it there,
+    /// and it skipped the outcome a visit-first engine gave it on this job. Only the ids the copy maps to this content
+    /// move, each holder's visit moves the rest itself (a holder whose every id moves is superseded, as its visit would
+    /// supersede it), and their joins are made at once (`EngineState.bringingInbound`). One pass over the jobs' ids
+    /// with one lookup in the copy each and no transfer formatted (C2; `BenchSync`).
     func bringInbound(_ transfer: TransferID) {
         guard self.followOwed, let target = self.state.jobs[transfer] else {
             return
@@ -906,19 +906,13 @@ extension SyncEngine {
         guard !inbound.isEmpty else {
             return
         }
-        var order: [TransferID] = []
-        var placed: Set<TransferID> = []
-        for holder in self.state.followOrder[self.state.followNext...] where inbound[holder] != nil && placed.insert(holder).inserted {
-            order.append(holder)
-        }
-        order += inbound.keys.filter { !placed.contains($0) }.sorted()
         self.state.inFollowVisit = true
         self.state.bringingInbound = true
         defer {
             self.state.inFollowVisit = false
             self.state.bringingInbound = false
         }
-        for holder in order {
+        for holder in inbound.keys.sorted() {
             guard let job = self.state.jobs[holder], let ids = inbound[holder] else {
                 continue
             }
