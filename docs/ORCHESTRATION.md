@@ -24,6 +24,26 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Forecast:**
     - A cycle took 4–5 h before (fix 2.5–3.7 h, verification 1.1–1.5 h); under this load, expect about 5–6 h. Each cycle costs about 3.5–4 weekly points.
     - Cycles 13–18 left 7, 5, ~8, 5, 6 and 5 blocking items, so there is no clear trend. Plan for 2–5 more cycles: about 10–30 h and 7–20 weekly points.
+    - Re-estimated at 17:20: about 85–90 % that cycle 20 is needed. About 4 cycles counting cycle 19 if the items keep shrinking, about 8 if they stay flat. The plan now reads "Ultra" (it read "Max" at 13:08), and weekly usage was 5 % at 17:20, account-wide.
+  - **Cycle 19 fix** ran 14:13–21:30 (7 h 17 min, slowed by the host load) and ended at `49a0493`, 11 commits from `5dd145a`.
+    - **Fixes:**
+      - moves are bounded per follow turn: `followIDsPerTurn` is 512, with a seam;
+      - an owed move's ids take their job's lane;
+      - two invariants, removals and doc corrections; RR-18 is withdrawn;
+      - `0684845` stops copying an interest's ids for each id moved.
+    - **Gates per the fixer:**
+      - `VERIFY: PASS`; Sync 552 tests ×3; TSan clean at a mean load of 62;
+      - Sync coverage 94.23 %; simulator 1,506/1,506; tools-6.4 builds with 0 warnings;
+      - the new C2 cases run 6.67–7.25 ms best at a 1-minute load ≤ 6.28. The benchmarks fail only P-13 (WP-B).
+    - **Mutants:** 27 in all; 26 killed 2/2, one removed with its clause.
+    - **Put back:** RR-20 (#14), RR-21 (#11), three branches no test reaches, #6, and RR-23.
+  - **S3-R24** (21:35, while the cycle-19 verifiers run):
+    - RR-20 is not blocking.
+    - RR-21 is pinned in the next fix cycle; a miss at load ≤ 10 is blocking.
+    - The unreached branches are blocking until reached, removed with an invariant, or shown equivalent.
+    - #6 is accepted.
+    - RR-23 is a timing difference in RR-16's family.
+  - **Cycle 19 verification** started 21:30; the verdict is expected around 22:45–23:30. The watcher wakes the orchestrator when both lenses return.
   - **Resume:**
     - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and args.
     - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle.
