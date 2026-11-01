@@ -154,6 +154,11 @@ struct EngineState {
     var followCarried: Set<TransferID> = []
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
+    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), set
+    /// at each batch to what the turn has left: one turn's ids cover the whole batch, the follow's last turn included
+    /// (Stage 3 close-out cycle 20, ruling S3-R25 item 1; each visit had a whole turn's ids, so a batch of verdicts moved
+    /// that many times more in one turn).
+    var drainIDsLeft = 0
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false
     /// Test seam: while set, the drain's scheduled follow-up keeps its events waiting and stays scheduled instead of

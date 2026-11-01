@@ -154,7 +154,8 @@ extension SyncEngine {
         if moved || self.state.pumpWaitsForFollow {
             self.pump()
         }
-        self.drainEventsAfterFollow()
+        // The drain's first batch runs in this turn, on the ids its visits left.
+        self.drainEventsAfterFollow(ids: budget.ids)
         self.endWorldHistory()
     }
 
@@ -178,7 +179,13 @@ extension SyncEngine {
     /// queues, the cycle-9 amendment (d)); after the last, the run is checked and the queues pumped. Each event
     /// re-validates what it names (the job, its epoch, the interest): a job that ended or moved meanwhile is skipped. A
     /// sweep owed meanwhile is a follow-up turn already (`sweepSpaceParked`).
-    func drainEventsAfterFollow() {
+    ///
+    /// The batch's visits after verdicts (`followAfterVerdict`) share `ids`, what the turn has left (a whole turn's when
+    /// `nil`: a turn of its own), so a batch of verdicts moves no more ids in one turn than a follow turn moves (C2;
+    /// Stage 3 close-out cycle 20, ruling S3-R25 item 1). Once they are spent the rest of the batch goes back to the
+    /// head of `eventsAfterFollow`, in order, for the next drain turn, as it does after a visit that leaves a rest; the
+    /// events wait in order either way, so no answer changes.
+    func drainEventsAfterFollow(ids: Int? = nil) {
         guard !self.followOwed, !self.state.eventsAfterFollow.isEmpty else {
             return
         }
@@ -193,13 +200,15 @@ extension SyncEngine {
         self.state.eventsAfterFollow.removeFirst(count)
         self.state.eventStamps.removeFirst(min(count, self.state.eventStamps.count))
         self.state.drainingAfterFollow = true
+        self.state.drainIDsLeft = ids ?? self.state.followIDsPerTurn
         for (offset, (event, stamp)) in batch.enumerated() {
             self.withReading(stamp) {
                 self.replay(event)
             }
-            if self.state.followMoving != nil {
-                // A visit after a verdict too large for one turn (`followAfterVerdict`): a visit-first engine made it at
-                // once, before the next event, so the events after it wait for its rest, in order (C2; cycle 19).
+            // A visit after a verdict too large for the ids left (`followAfterVerdict`): a visit-first engine made it at
+            // once, before the next event, so the events after it wait for its rest, in order (C2; cycle 19). With the
+            // turn's ids spent and no rest, they wait for the next drain turn (cycle 20).
+            if self.state.followMoving != nil || self.state.drainIDsLeft <= 0 {
                 let rest = batch[(offset + 1)...]
                 self.state.eventsAfterFollow.insert(contentsOf: rest.map(\.0), at: 0)
                 self.state.eventStamps.insert(contentsOf: rest.map(\.1), at: 0)
@@ -571,13 +580,16 @@ extension SyncEngine {
     /// the verdict ended has nobody left to move (`follow` finds no job). No verdict creates a job in its own turn, so the
     /// job found is the verdict's: the cycle-16 epoch check was redundant (its drop-mutant survived) and was removed in
     /// Stage 3 close-out cycle 17 under ruling S3-R16 item 3. The job follows the copy afterwards, so the next follow owes
-    /// it no visit.
+    /// it no visit. The visit moves at most the ids the drain's turn has left (`EngineState.drainIDsLeft`), and spends
+    /// them: a visit of more leaves its rest to the follow's next turns (`followMoving`; cycle 19), and the batch's
+    /// visits share one turn's ids (cycle 20, ruling S3-R25 item 1).
     private func followAfterVerdict(_ transfer: TransferID, _ moves: Bool) {
         guard moves else {
             return
         }
         self.state.unfollowed.remove(transfer)
-        _ = self.follow(transfer, ids: self.state.followIDsPerTurn, afterVerdict: true)
+        let made = self.follow(transfer, ids: self.state.drainIDsLeft, afterVerdict: true)
+        self.state.drainIDsLeft -= made.spent
     }
 
     /// Gives a deferred exit verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
