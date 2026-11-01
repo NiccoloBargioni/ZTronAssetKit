@@ -195,10 +195,16 @@ extension SyncEngine {
                 self.state.jobs[holder]?.assets.remove(asset)
             }
             _ = progress.popFirst()
-            guard let interest = self.state.jobs[holder]?.interests[item.token], interest.assets.contains(asset) else {
+            // The interest is read for its lane and kind, all `reroute` reads, and its id is removed in the table. A copy
+            // of the interest held across the removal shares its ids' storage, so the removal copied them whole, once per
+            // id moved: a turn of 512 off one interest of 10,000 ids held the actor about 20 ms (the cycle-19 gate run's
+            // `BenchSync.sharedApplyTurns`, `divergenceTurns` and `inboundHolderTurns`).
+            guard let interest = self.state.jobs[holder]?.interests[item.token].map({ JobInterest(lane: $0.lane, kind: $0.kind, assets: []) }) else {
                 continue
             }
-            self.state.jobs[holder]?.interests[item.token]?.assets.remove(asset)
+            guard self.state.jobs[holder]?.interests[item.token]?.assets.remove(asset) != nil else {
+                continue
+            }
             self.reroute(item.token, interest: interest, asset: asset, from: holder, listing: listing)
             moved = true
             if self.state.jobs[holder]?.interests[item.token]?.assets.isEmpty == true {
