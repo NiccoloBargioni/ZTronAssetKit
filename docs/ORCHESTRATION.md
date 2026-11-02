@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 08:25 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written; a third read-only analysis vets RR-21** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
+- **Now (2 Nov 09:55 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written; the RR-21 integrator runs (task `w8lgfmkvv`)** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -126,9 +126,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - 18 interactions with RR-21, an implementation order, and 5 open questions for the orchestrator.
     - The RR-21 judge had not finished, so the integrator built on `design-minimal.md`.
   - **Analysis 1 at 08:15:** `design:reuse` (agent `afde5b69…`) is still reading code after 4.5 hours. `judge:rr21` has not started. `design-fixer.md` is saved.
-  - **Third analysis:** `wf_c114d84e-f12` (task `wuzekt260`), launched 08:25, read-only.
+  - **Third analysis:** `wf_c114d84e-f12` (task `wuzekt260`), launched 08:20, read-only.
     - Three critics vet `design-minimal`'s RR-21 against the code and `integrate-c21.md`: answers, MUSTs and liveness; C2, G4, pins and reuse; composition with items A–C.
-    - An integrator then writes RR-21's section in the same format. At its start, it saves any `design-reuse` or `judge-rr21` result and weighs it.
+    - An integrator then writes RR-21's section in the same format.
+    - The critics were done by 09:02. The answers lens finds the design **unsound**: joining under the copy at the replay reopens RR-14; there is no hold over the publication window; and the site's own `reconcileIdle` prunes the bindings that owed present ids need. The compose lens finds the same prune. The cost lens finds four groupings still above 10 ms.
+  - **Analysis 1 done 09:50** (6 agents, no errors). `design-reuse.md` and `judge-rr21.md` are saved.
+    - The judge rejects all three designs as written: minimal breaks P-a and RR-14; reuse misses RR-14 and makes a pseudo-follow; the fixer's design keeps a stale copy and has 28 branches.
+    - It recommends a synthesis: one `.reroutes` event per site above the bound, a corrected layer chain that picks the copy, a global publication hold, in-place owner updates, and site 2's take-off at once. It has about 20 branches, and the judge puts a clean cycle in RR-21's area at about 0.25–0.35.
+  - **Integrator restarted 09:53:** TaskStop `wuzekt260`, then resumed `wf_c114d84e-f12` as task `w8lgfmkvv`, with the critics served from the cache. The new integrator prompt builds RR-21's section from the judge's synthesis, the three critiques and `integrate-c21.md`, and states the orchestrator's intended rulings on the judge's open questions. The critiques are saved as `critic-rr21-*.md`.
   - **Next:**
     - Write S3-R26 from `integrate-c21.md` and the third analysis's RR-21 section.
     - Rule on the 5 open questions.
