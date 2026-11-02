@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 09:55 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written; the RR-21 integrator runs (task `w8lgfmkvv`)** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
+- **Now (2 Nov 11:10 CET): fix run 6 is PAUSED before cycle 21's fixer; S3-R26 is written and under a read-only review (task `wuul7n4ml`) before it is appended** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -134,12 +134,18 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - The judge rejects all three designs as written: minimal breaks P-a and RR-14; reuse misses RR-14 and makes a pseudo-follow; the fixer's design keeps a stale copy and has 28 branches.
     - It recommends a synthesis: one `.reroutes` event per site above the bound, a corrected layer chain that picks the copy, a global publication hold, in-place owner updates, and site 2's take-off at once. It has about 20 branches, and the judge puts a clean cycle in RR-21's area at about 0.25–0.35.
   - **Integrator restarted 09:53:** TaskStop `wuzekt260`, then resumed `wf_c114d84e-f12` as task `w8lgfmkvv`, with the critics served from the cache. The new integrator prompt builds RR-21's section from the judge's synthesis, the three critiques and `integrate-c21.md`, and states the orchestrator's intended rulings on the judge's open questions. The critiques are saved as `critic-rr21-*.md`.
+  - **Third analysis done 11:00** (4 agents, no errors). `integrate-rr21.md` (1,064 lines) builds RR-21 from the judge's synthesis and the three critiques, consistent with items A–C:
+    - A site's own turn makes at most `inboundIDsNow` re-routes, counting its own answers. The rest is one `.reroutes` event, which the drain replays at most `drainIDsLeft` ids a turn, under the copy layers recorded while it waits.
+    - While re-routes are owed, there is a global publication hold, no binding is pruned, the watcher stays, and no run settles.
+    - It found one more hole: a run that settles mid-drain. The fix is a counter guard in `checkRunSettled`.
+    - About 32 branches, 30 tests and 17 BenchSync cases. It puts a clean cycle 21 at about 0.3 in RR-21's area, and about 0.12 for the whole plan.
+  - **S3-R26 written 11:10** from `integrate-c21.md` and `integrate-rr21.md`. It answers the 7 RR-21 open questions, the integrator's 9 and `integrate-c21.md`'s 5. The draft is `.build-orchestrator/s3f-c20-analysis/s3-r26-draft.md`.
+  - **Ruling review:** `wf_192ea945-460` (task `wuul7n4ml`), launched 11:10, read-only. Two lenses (the bar and earlier rulings; the two specs) look for contradictions before the ruling is appended.
   - **Next:**
-    - Write S3-R26 from `integrate-c21.md` and the third analysis's RR-21 section.
-    - Rule on the 5 open questions.
+    - Apply the review's must-fix findings and append S3-R26 to `.build-orchestrator/s3-rulings-s3f.md`.
     - Then resume run 6.
   - **Resume:**
-    - In this session, write S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
+    - In this session, append S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
     - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from cycle 21 (`fromCycle: 21`), with `findingsFile: s3f-c20-issues.json`.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
