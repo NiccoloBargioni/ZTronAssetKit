@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 14:15 CET): Stage 3 is STOPPED before WP-F's cycle 21, by the owner's decision. The owner turned the PC off at 14:15 while a read-only profiling run was in progress: see "Restart" step 1a. Restart the WP-F cycles from a fresh session on Fri 6 Nov after the 19:00 CET reset: see "Restart" below. Nothing is scheduled.** Fix run 6 (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`) ran from 1 Nov 14:13 and is finished; its cache is same-session only, so it is not resumed.
+- **Now (2 Nov 14:15 CET): Stage 3 is STOPPED before WP-F's cycle 21, by the owner's decision. At the owner's request, the read-only profiling run was paused at 14:19, before its report: see "Restart" step 1a. Restart the WP-F cycles from a fresh session on Fri 6 Nov after the 19:00 CET reset: see "Restart" below. Nothing is scheduled.** Fix run 6 (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`) ran from 1 Nov 14:13 and is finished; its cache is same-session only, so it is not resumed.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -172,14 +172,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
        - **What it is.** The read-only workflow `wf_6927a3a9-c76` started at about 14:00.
          - It profiles commit re-routes, the drain take-off and `supersede` in a scratch copy of `8e1fb24` under `.build-prof40/`, with one profiler and one independent reviewer.
          - The goal is to test the INFERRED cost split in `.build-orchestrator/s3f-c20-analysis/analysis-40ms.md`. That split says formatting the transfer id 3–4 times per id is about 40–50 % of the 41–49 ms turns.
-       - **What happened.** The PC was turned off at 14:15, before it finished. At 14:15 no report existed (`profile-40ms.md`).
-       - **If `.build-orchestrator/s3f-c20-analysis/profile-40ms.md` exists,** treat it as cut off: incomplete and unreviewed.
-       - **To re-run it:**
-         - Run `rm -rf /Users/admin/Documents/ZTronAssetKit/.build-prof40`.
-         - Then run `Workflow({scriptPath: "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/tools/wpf-profile-40ms.js"})`, with no `resumeFromRunId`: a run resumes only in its own session.
-         - The script is a copy of the one that ran.
-         - Expect about 45–90 min and about 1–2 weekly points.
-         - Timings count only at a 1-minute load of 10 or less (S3-R23); the profile shares hold at any load.
+       - **What happened.** The owner asked for a pause, so the run was stopped at 14:19, just before the profiler wrote its report. The reviewer never ran.
+         - Done, in `/Users/admin/Documents/ZTronAssetKit/.build-prof40/`: the build, the three CPU profiles, the attribution tables and the micro-timings. The baselines ran on a loaded host.
+         - The unreviewed numbers, and the list of what is left, are in `.build-orchestrator/s3f-c20-analysis/profile-40ms-progress.md`.
+         - First reading, unreviewed: transfer-id formatting is 16–21 % of the three turns, not 40–50 %. Jobs-table access is 21–27 %. A whole-`EngineState` copy in `decisionNow` is 11–13 %. No single cost dominates.
+       - **To resume, do not delete `.build-prof40/`.** Run `Workflow({scriptPath: "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/tools/wpf-profile-40ms-resume.js"})`, with no `resumeFromRunId`, because a run resumes only in its own session.
+         - The resume script is the original plus a RESUME note. The note tells the profiler to reuse the scratch copy, the build and the exports. It then does only what is left: quiet baselines, the verdicts and the report. The independent review follows.
+         - Expect about 20–40 min and under 1 weekly point.
+         - Timings count only at a 1-minute load of 10 or less (S3-R23). The profile shares hold at any load.
+       - **To start over instead:** delete `.build-prof40/`, then run `.build-orchestrator/tools/wpf-profile-40ms.js`.
        - **Then report to the owner,** as "if the ceiling were 40 ms", per the 2 Nov rule: a value the owner floats is analysis, not a ruling.
     2. Ask the owner which path to take, unless they have already said.
     3. **Path A, freeze WP-F at `8e1fb24`** (the orchestrator's recommendation on 2 Nov).
