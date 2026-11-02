@@ -393,6 +393,146 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
 
   Applied in cycle 19 ("Cycle 19" below): loads beside every figure (item 1), the bound pinned by
   `EngineState.followIDsPerTurn` in the deterministic tests and by three BenchSync cases (item 3).
+- **Orchestrator ruling (close-out) S3-R24 — added 2026-11-01 21:35 (the cycle-19 fixer's put-backs; written while
+  the cycle-19 verifiers ran, before any cycle-20 fixer).** A cycle-19 verifier that read it before returning judged
+  these items by it.
+  1. *RR-20, an empty binding books a commit* (#14, VERIFY-C18R-EMPTY-BINDING): not blocking. The answers agree in
+     both orders, and the extra commit count and object success are bookkeeping. The free-space estimate errs low,
+     the safe side, until the next read, and staging GC (R-CLN-3) reclaims the staged file. It is recorded under the
+     residual risks for Stage 5. It becomes blocking only if a probe shows the extra object success or the low estimate
+     changing an answer through a breaker or space decision (S3-R16 1(a), S3-R17); the finding's fix then applies.
+  2. *RR-21, work not bounded by ids in a turn* (#11). The commit's binding of a 10,001-id publication measured
+     9.64 ms best at load 3.84, inside C2 by 0.36 ms: not blocking now. The next fix cycle pins it, extending
+     `concentrationPublicationTurns` through the commit, best of 3, at most `c2Budget`. It measures the same way, at
+     10,000 ids, the drain's `takeOffMovedBefore` and the commit's re-routes of the ids it does not bind. A miss at a
+     1-minute load of 10 or less, best of 3, is blocking (S3-R22 item 1). The fix then bounds that work over the
+     follow's turns or the store's units without changing an answer (S3-R20 item 3), with the two pins of S3-R23
+     item 3.
+  3. *Branches no test reaches* (the cycle-19 draft's "Not reached by a test (cycle 19)"): `findInbound`'s
+     checksum-less lookups (`EngineFollow.swift:1049`, `:1095`), `waitingTarget`'s queued, blocked and downloading
+     case, and `scheduleFollowFollowUp`'s unspawnable branch. G4 applies to code that stays (S3-R16 1(e)), so each is
+     blocking until one of these holds:
+     - **Reached**: a test reaches it in both `LaneDropVisit` orders and kills its drop-mutant 2/2. For the
+       checksum-less lookups the pass path is tried first: a visit passes a publishing checksum-less target, its
+       `rerouteOnPass` moves its own id off, and an apply maps the id back before the target's attempt ends.
+     - **Removed**: the assumption it guarded becomes a `followBarrierViolations` clause a test exercises (S3-R19
+       item 3), with the argument in the draft. For the checksum-less lookups, removal means a checksum-less target
+       gets no inbound move and the holder's own visit moves the id.
+     - **Equivalent**: it runs but changes no decision, answer or state (a release with nothing to release, for
+       example; S3-R19 item 2), with the argument in the draft.
+  4. *#6, `awaitInboundMoves` overwriting a wait*: accepted. The two invariants added to `followBarrierViolations`
+     stand in for the unreachable overwrite (S3-R19 item 3).
+  5. *RR-23, RR-16 followed by an apply that maps the id on*: a timing difference (S3-R16 item 2) in RR-16's family.
+     Which content the caller gets depends on whether the later apply lands before the id's answer, and the
+     sweep-first engine answers earlier because it makes no second request. It is recorded with RR-16; it is not
+     blocking, and no probe is required. It becomes blocking only if a probe shows a different answer when the later
+     apply lands after both engines' answers, or before both.
+
+  Applied in cycle 20 ("Cycle 20" below): RR-20 stays a Stage 5 residual risk (item 1). RR-21 is measured (item 2):
+  the commit window meets C2, and the commit's re-routes and the drain's take-off miss it, so both are blocking and
+  open. The checksum-less lookups are Reached and the unspawnable branch is Removed; `waitingTarget`'s case is open
+  (item 3). RR-23 is recorded with RR-16 (item 5).
+- **Orchestrator ruling (close-out) S3-R25 — added 2026-11-01 23:35 (cycle 19's verification; written after the
+  cycle-20 fixer's first start, which was stopped and started again so that it reads this).** Cycle 19 fixed every
+  blocking item of cycle 18, and both verifiers confirmed it. They left 8 distinct blocking items (both lenses report
+  the flake), listed with the non-blocking ones in `.build-orchestrator/s3f-c19-issues.json` ("correct #n" and "reqs
+  #n" are the lenses' numbers); their probes and scripts are under `.build-orchestrator/s3f-probes-c19/`. The cycle-20
+  verifiers judge by this ruling.
+  1. *C2 in the drain* (correct #1, PROBE-C19C-DRAIN-BOUND, PROBE-C19C-DRAIN-C2; blocking, S3-R22 item 1).
+     - One turn's id budget covers the whole drain batch. It is seeded with what the turn has left, the follow's last
+       turn included, and what remains is passed to `followAfterVerdict` at both call sites. Once it is spent, the rest
+       of the batch goes back to the head with a drain follow-up, as the `followMoving` branch does.
+     - No answer changes (S3-R20 item 3).
+     - The pins (S3-R23 item 3): the probe's shape as a test in both orders at `followIDsPerTurn` = 4, with three such
+       verdicts, every turn within the bound, and the drop-mutant of the budget's subtraction failing it 2/2; and the
+       16-slot shape (`correct/VerifyC19DrainBench.swift`) as a BenchSync release case, best of 3 at most `c2Budget`.
+  2. *C2 per id: `Job.lane` and `dropInterest` cost O(interests of the job)* (correct #2; blocking).
+     - C2's reference set (S3-R5, S3-R21 item 1, S3-R22 item 1) is 10,000 ids however their interests are grouped:
+       one prefetch group, many groups, or one user waiter per id.
+     - A cost that predates s3-base is not exempt: it is spent inside the follow's turns, and C2 is a standing order
+       (S3-R20 item 1).
+     - The fix is the verifier's: per-lane interest counts on `Job`, kept on every insert, removal and lane change, so
+       `Job.lane` is O(1); and `dropInterest` in place, with no live copy of the job, as S3-R21 item 1 did for joins.
+     - An `invariantViolations()` clause checks that the counts equal a recount from `interests`. The drop-mutant of
+       each count update (insert, removal, lane change) fails a test 2/2.
+     - Both shapes of `correct/VerifyC19UserBench.swift` (superseding, and one id kept) become BenchSync release
+       cases, best of 3 at most `c2Budget`.
+     - Then S3-R24 item 2's figures are measured, which run through the same interest code.
+  3. *A C2 inventory before returning* (cycles 17, 18 and 19 each found one more per-id cost).
+     - The draft lists every operation the follow's turns and the drain do per id or per event, with its cost in the
+       turn's ids and in the job's interests: `continueMove`, `continueInbound`, `continueVisitRemainder`, the drain's
+       replays, the commit's binding and re-routes, `takeOffMovedBefore`, `addInterest`, `removeInterest`,
+       `dropInterest`, `relane`, `Job.lane`, and any other operation found.
+     - Each one that is not O(1) amortised per id gets item 2's treatment or a BenchSync release figure at 10,000
+       within `c2Budget`.
+     - A missing or wrong row is blocking only if a probe shows a turn over `c2Budget` at a 1-minute load of 10 or
+       less.
+  4. *The flake in `barrierReadmitsBehindTheOwedVisitsPlaces`* (correct #3, reqs #6; blocking, S3-R16 1(d)). The two
+     verifiers read two mechanisms, so the mechanism is settled before anything changes.
+     - **Observe**: the engine's own admission order, with each queue ticket, inside the actor, on the simulator under
+       `sim.lock`, in both orders, at least 30 iterations per argument.
+     - **If the engine admits N ahead of every re-queued member each time**, the transport's `.started` records race
+       after the store read (reqs #6). The test asserts the engine's admission order instead, with its tuning and
+       scenario unchanged (one slot would lose the concurrent scenario, which G3 forbids), and the draft records the
+       old and the new assertion.
+     - **If the engine itself sometimes admits a member first**, the interleaving is made deterministic with the
+       fakes' gates (no sleeps, C4) and the assertion kept. If the sweep-first order then differs from visit-first's,
+       that is an order difference (S3-R16 item 2), recorded as a residual risk, with the assertion changed one to one
+       (S3-R16 item 4).
+     - **Sweep**: every test in `ZTronAssetSyncTests` that asserts the order of the fake transport's `.started`
+       records where more than one attempt can be in flight gets the same change, each recorded in the draft.
+     - **Close**: 30 iterations per argument on the simulator with 0 failures, and the Sync bundle under
+       `--enable-code-coverage` 3 times.
+  5. *The bound's pins* (reqs #1; blocking, S3-R23 item 3): the two shapes of
+     `reqs/VerifyC19ReqsTurnTotalProbes.swift` as tests in both orders, each counting per turn the ids that leave all
+     holders; `inboundSpentDrop` and `restSpentDrop` killed 2/2; those two and `continueMoveBudgetDrop` in the
+     draft's mutant table.
+  6. *`findInbound`'s checksum-less lookups* (reqs #2). PROBE-C19R-LEGACY-TARGET
+     (`reqs/VerifyC19ReqsLegacyProbes.swift`) reaches them, and the recorded move differs under both mutants, so of
+     S3-R24 item 3's options only "Reached" is left: the probe's shape as a test in both orders, with
+     `byIdentifierTargetDrop` and `byIdentifierLookupDrop` killed 2/2.
+  7. *`waitingTarget`'s queued, blocked and downloading case* (reqs #3) and *`scheduleFollowFollowUp`'s unspawnable
+     branch* (reqs #4): S3-R24 item 3 unchanged.
+     - For `waitingTarget`, the window the draft concedes is tried first: a publication's ENOENT re-queue behind the
+       barrier (`enqueue`'s doc in `EngineJobs.swift`), with an owed move onto it and a lane decision that reads
+       `carried()`.
+     - The unspawnable branch is a liveness branch, so a shutdown, or a degrade, landing between the follow's turns is
+       tried first. A test that reaches it asserts that every wait is released and shutdown completes, with a bounded
+       check rather than a time limit, so that the drop-mutant fails rather than hangs. If no path reaches it, it is
+       removed with a `followBarrierViolations` clause for the assumption, and the draft's argument covers all the
+       state resets the branch makes.
+  8. *`continueMove`'s re-validation and its end re-lane* (reqs #5: `EngineMoves.swift:203`, `:206`, `:222-223`;
+     blocking, S3-R16 1(e)).
+     - `:203` and `:206` are the per-interest guards that make a stale holder safe (item 9): they are reached, not
+       removed. Possible shapes: a waiter that cancels between a bounded move's turns, or a token's interest, or its
+       ids, taken off the holder between turns by an owed move or a later apply's walk.
+     - `:222-223` is reached by an apply that maps an id back to a superseded holder's content mid-move, or removed
+       with a `followBarrierViolations` clause.
+     - Each reached line's drop-mutant is killed 2/2 in both orders.
+  9. *A holder re-created between turns* (correct #4): not blocking. The draft records why item 8's per-interest guards
+     make the stale items no-ops. No holder epoch is added, as it would add another branch under G4. It becomes
+     blocking only if a probe shows a different answer, a broken MUST or invariant, or a hang.
+  10. *The fixer's own check before it returns*, on the final HEAD, so that the next cycle does not find the fixer's
+      own new branches.
+      - `reqs/covdiff.py` over every line changed this cycle. Each zero-count changed line is reached with its
+        drop-mutant killed 2/2, removed, or listed in the draft as structural (an Optional's empty case, a loop's
+        exit; reqs #10) or as Equivalent, with the argument.
+      - Drop-mutants (`reqs/mut.py`, `reqs/turnmut.py`) of every branch added this cycle and of every subtraction and
+        comparison in a turn bound, each result in the draft's mutant table.
+      - The verifiers' scripts are copied and adapted to the fixer's own scratch path, never run in place.
+  11. *Non-blocking*:
+      - RR-21 (reqs #7) falls under S3-R24 item 2, measured after item 2's change.
+      - The draft's records (reqs #9): RR-23 moves under RR-16 (S3-R24 item 5), and RR-20 stays under the Stage 5
+        residual risks.
+      - The structural zero-hit lines (reqs #10) are noted in the draft as structural.
+      - P-13 (correct #5, reqs #8) stays routed to WP-B.
+      - The load-only miss of `throttleExtensionTurns` (correct #6) is covered by S3-R23 item 2.
+      - `shutdownReleaseInboundWaitsDrop` is killed only by a hang, which is not blocking. If item 7's bounded check
+        also kills it, that is recorded.
+
+  Applied in cycle 20 ("Cycle 20" below): items 1, 2 and 4 to 6 are fixed or met as ruled, and item 8 is met with one
+  drop-mutant Equivalent (`:203`'s). Item 3's inventory is written, with RR-21's two misses open and four rows without
+  a figure. Under item 7 the branch is removed and `waitingTarget`'s case is open. Items 9 to 11 are recorded.
 
 ## Cycle 2: the cycle-1 verification findings
 
@@ -4065,6 +4205,17 @@ For Stage 5's `docs/RESIDUAL-RISKS.md`, beside RR-1 to RR-15.
   fake answers T's first request 404 and its second 200; CONSISTENT, with every request for T's content answered 404,
   passes both orders 3 of 3 (W `notFound`); CONTROL passes 6 of 6. A start-count difference while the server answers
   alike (S3-R16 item 2); an answer difference only when the origin answers two requests for one content differently.
+
+  **RR-23, RR-16 followed by an apply that maps the id on**, is recorded here (ruling S3-R24 item 5; found while fixing
+  cycle 19, first written under "Cycle 19", moved here in cycle 20). In RR-16's shape a visit-first engine superseded
+  the ending job T at the apply, and its visit gave the holder's interest a fresh job of T's content (the second
+  request); sweep-first, T's attempt's end brings the interest onto T (`bringInbound`). If T's publication binds the id
+  and answers it before a later apply maps the id on to Z, while the visit-first engine's fresh job is still downloading
+  at that apply, that engine's visit moves the id to Z: T's bytes against Z's outcome, with the origin answering alike.
+  The difference follows RR-16's extra request and needs the later apply to land between T's answer and the fresh
+  job's. A timing difference in RR-16's family (S3-R16 item 2): not blocking, and no probe is required; it becomes
+  blocking only if a probe shows a different answer when the later apply lands after both engines' answers, or before
+  both. Not probed: a probe needs PROBE-C17C-INBOUND-SUPERSEDED's setup and a fourth manifest.
 - **RR-17. An admission racing an older apply that omits the id answers `notFound`** (S3-R21 item 3;
   PROBE-C17-ADMIT-DURING-APPLY, seed 1_618_202). **For the owner: it gives a wrong `notFound` under a race.** A waiter
   for an id the copy does not list is admitted from the manifest its fetch returns (`EngineManifest.join`). While an
@@ -4418,23 +4569,22 @@ the bound, the loop spun on after the cancellation (90 to 97 % of a core) until 
   binding of a 10,001-id publication (`committed`, then `resolveAll`/`publishTerminal`: 9.64 ms best at load 3.84, 11.8
   to 12.0 at load 6.7 to 7.0, VERIFY-C18R-CONC-COMMIT), the drain's take-off of a job's moved-before ids before its
   verdict (`takeOffMovedBefore`) and the commit's re-routes of the ids it does not bind. None has a BenchSync case.
+  Measured in cycle 20 (S3-R24 item 2; under "Cycle 20", "Open" item 1): the commit window meets C2 (9.81 ms best),
+  and the commit's re-routes (48.47 ms best) and the drain's take-off (45.51 ms best) miss it, so both are blocking.
 - **RR-22. The order bounded moves re-route in** (order and place only, S3-R16 item 2): a bounded move re-routes by
   (id, token) where `move` goes by (token, id), and a visit's rest moves its ids in later turns than a visit-first
   engine's visit. The jobs the re-routes create are created, and queued, in that order; no answer depends on it, as
   the shared-move cases check in both orders.
-- **RR-23. RR-16 followed by an apply that maps the id on** (found while fixing; analysis of the code, not probed,
-  as S3-R22 item 2 allows for an unprobed entry). In RR-16's shape a visit-first engine superseded the ending job T at
-  the apply, and its visit gave the holder's interest a fresh job of T's content (the second request); sweep-first, T's
-  attempt's end brings the interest onto T (`bringInbound`). If T's publication binds the id and answers it before a
-  later apply maps the id on to Z, while the visit-first engine's fresh job is still downloading at that apply, that
-  engine's visit moves the id to Z: T's bytes against Z's outcome, with the origin answering alike. The difference
-  follows RR-16's extra request and needs the later apply to land between T's answer and the fresh job's. Not probed:
-  a probe needs PROBE-C17C-INBOUND-SUPERSEDED's setup and a fourth manifest.
+- **RR-23. RR-16 followed by an apply that maps the id on** (found while fixing). Moved in cycle 20 under RR-16, in
+  "Residual risks (S3-R16; cycle 18)", where its text now stands: ruling S3-R24 item 5 rules it a timing difference in
+  RR-16's family, recorded with RR-16 (the cycle-19 requirements verifier's reqs #9).
 
 ### Put to the orchestrator (found while fixing; not changed this cycle)
 
 1. **RR-23** (above): an answer difference by the reading of the code, not probed. If a probe shows it, it is blocking
    under S3-R16 1(a), and the fix belongs with RR-16's (the move onto a job that a visit-first engine had superseded).
+   Answered by ruling S3-R24 item 5: a timing difference recorded with RR-16, with no probe required; moved there in
+   cycle 20.
 
 ### Hang guards and re-entrancy
 
@@ -4444,6 +4594,396 @@ after it (`guard self.isRunning`). Every new test has `.timeLimit(.minutes(3))`;
 with the loads, are under "Gate evidence (cycle 19)". The time limit's cancellation ends `runOneFollowTurn`'s wait for
 a scheduled turn but not a loop around it, so every loop over follow turns in the new tests is bounded by a
 `#require` (the drain test's from `3cd80c7`, after `drainRestReturnDrop` spun past the limit without one).
+
+## Cycle 20: the cycle-19 verifiers' findings, and S3-R24 and S3-R25
+
+Cycle 20 applies S3-R24 and S3-R25 (recorded under "Orchestrator rulings (close-out)") to the sixteen findings of the
+cycle-19 verifiers (`.build-orchestrator/s3f-c19-issues.json`, on `49a0493`; "correct #n" and "reqs #n" are the
+lenses' numbers). Of the eight distinct blocking items, seven are fixed or met as ruled. `waitingTarget`'s case
+(reqs #3) is **open**. S3-R24 item 2's measurement made two more items blocking, and both are **open**: the commit's
+re-routes of the ids an apply moved away, and the drain's take-off of a job's moved-before ids, miss C2 at a quiet load
+(RR-21, under "Open" below). The work went in this order:
+
+1. `8cfc76e`: the failing tests, committed on their own (P3). The first is the drain's bound,
+   `barrierBoundsTheDrainsVisitsAfterVerdictsByOneTurnsIDs` (the new `EngineFollowBarrierDrainBoundTests.swift`). It
+   failed sweep-first on `49a0493` in both shapes (`.build-s3f/c20/fail-drain2.log`, the committed file): a turn moved
+   more than `followIDsPerTurn` (`:191`), and after a rest the batch did not stop once the turn's ids were spent
+   (`:196`). The other two are BenchSync's `drainVerdictTurns` and `userSharedApplyTurns`, the
+   shapes of the verifier's `VerifyC19DrainBench.swift` and `VerifyC19UserBench.swift`.
+2. `e39a076`: the drain case at the verifier's 16-slot shape, at 500 and 625 ids a job. On `49a0493` it measured
+   40.79 ms best at 500 a job (load 2.84 to 3.01), and 4.60 ms at 625. The user-waiter shapes measured 32.89 ms best
+   (supersede) and 70.82 ms best (keep), at load 10.05 to 11.64 (under "Gate evidence (cycle 20)").
+3. `ddb0ba1`: the drain's visits after verdicts share one turn's ids (S3-R25 item 1; correct #1).
+4. `f066083`: per-lane interest counts on `Job`, and `dropInterest` in place (item 2; correct #2).
+5. `ca6df35`: the turn bound pinned across holders (item 5; reqs #1), and the checksum-less walk target reached (item
+   6; reqs #2).
+6. `429ace5`, then `bf1d4eb`: first a failing test for an admission whose store calls straddle shutdown's start, then
+   its fix. The fix also removes the unspawnable branch, with a `followBarrierViolations` clause in its place (item 7;
+   reqs #4).
+7. `daa426d`: the flaking test asserts the engine's admission order (item 4; correct #3, reqs #6).
+8. `431d397`: a case for the lane read of a verdict whose count caps a user interest (item 10: `keptCapDrop` survived
+   mutant round 1).
+9. `c2f9e31`: what lands between a bounded move's turns, in both orders (item 8; reqs #5).
+10. `c03c0e8`: the commit window pinned, and the commit's and the drain's re-routes measured (S3-R24 item 2; reqs #7).
+11. This draft.
+
+### The findings
+
+| Finding | Disposition |
+|---|---|
+| correct #1 (blocking): a drain batch gave each verdict whose job's ids an apply moved a whole turn's ids (`followAfterVerdict`), so one turn could move 512 ids per verdict (PROBE-C19C-DRAIN-BOUND; 16 slots: 40.79 ms best on `49a0493`) | **Fixed** (`ddb0ba1`) as S3-R25 item 1 says ("What cycle 20 changes"). Pinned twice (S3-R23 item 3). The deterministic pin is `barrierBoundsTheDrainsVisitsAfterVerdictsByOneTurnsIDs`: both orders × two shapes, `followIDsPerTurn` = 4, three verdicts of three ids, every turn within the bound. It fails on `49a0493`, and kills all six drain mutants 2/2, `drainSpentDrop` (the subtraction) among them. The timed pin is BenchSync `drainVerdictTurns` [500, 625]: 4.42 and 4.22 ms best on `ca6df35` (load 3.19 to 6.79). The gate run's figures are under "Gate evidence (cycle 20)" |
+| correct #2 (blocking): `Job.lane` and `dropInterest` cost O(interests of the job) per id (PROBE-C19C-USER-SHARED-C2 and -TURNS: 32.89 and 70.82 ms best on `49a0493`) | **Fixed** (`f066083`) as item 2 says. `Job.interestCounts` holds counts per lane, plus the single-user count. `Job`'s mutators keep them on every insert, removal and lane change (`interests` is `private(set)`). `Job.lane` and `isSingleUser` read them in O(1). `dropInterest` changes the job in place. An `invariantViolations()` clause compares the counts with a recount. Every count update's drop-mutant is killed 2/2 ("Mutants"). BenchSync `userSharedApplyTurns` (supersede, keep): 7.42 and 8.64 ms best on `ca6df35` (load 3.19 to 6.79); the gate run's figures are under "Gate evidence (cycle 20)" |
+| correct #3 and reqs #6 (blocking): `barrierReadmitsBehindTheOwedVisitsPlaces` flaked under coverage and on the simulator | **Fixed** (`daa426d`) by item 4's first branch. The engine's own admission order was observed first, with each admission's ticket and place, through the seam `EngineState.admissionsForTests` and a temporary print (not committed): 60 of 60 on the simulator (`897F9D8D…`, under `sim.lock`, 30 iterations per argument), and 60 of 60 twice under `--enable-code-coverage`, the second time with the drain's state at N's admission. The engine admitted N first every time, so it is the transport's `.started` records that race after each attempt's store read. The test now asserts the engine's order, with its tuning and scenario unchanged; the old and new assertions are under "Test changes". Of the 28 Sync tests that read the transport's starts, no other asserts their order with more than one attempt in flight (`starts_sweep.py`). The close (30 iterations per argument on the simulator, and the Sync bundle under `--enable-code-coverage` 3 times) is under "Gate evidence (cycle 20)" |
+| correct #4 (non-blocking): a holder re-created between a bounded move's turns | **Recorded** (item 9) under "A holder re-created between turns" below. No holder epoch is added |
+| correct #5 and reqs #8 (non-blocking): StorageBenchmarks P-13 | **Routed** `other-wp:b`, as in every cycle. No WP-F change |
+| correct #6 (non-blocking): `throttleExtensionTurns` missed only under load | **Covered** by S3-R23 item 2. This cycle's figure and its loads are under "Gate evidence (cycle 20)" |
+| reqs #1 (blocking): the turn bound across holders was not pinned (`inboundSpentDrop` and `restSpentDrop` survived) | **Met** (`ca6df35`) as item 5 says. `barrierBoundsAnOwedMovesTurnAcrossHolders` and `barrierBoundsARestsTurnAcrossHolders` (the new `EngineFollowBarrierTurnTotalTests.swift`) are the verifier's two shapes, run in both orders. Each counts, per turn, the ids that leave all holders. `inboundSpentDrop`, `restSpentDrop`, `visitSpentDrop` and `continueMoveBudgetDrop` are killed 2/2 |
+| reqs #2 (blocking): `findInbound`'s checksum-less lookups were unreached | **Reached** (`ca6df35`) as item 6 says. `barrierWalksOntoAChecksumLessPublication` (the new `EngineFollowBarrierLegacyTargetTests.swift`) builds the probe's shape in both orders, with the owed follow-ups released before or after T's publication resumes. `byIdentifierTargetDrop` and `byIdentifierLookupDrop` are killed 2/2 |
+| reqs #3 (blocking): `waitingTarget`'s `queued`, `blocked` and `downloading` case is unreached | **Open** (S3-R24 item 3): this cycle neither reaches it, nor removes it, nor shows it Equivalent. The analysis is under "Open" below |
+| reqs #4 (blocking): `scheduleFollowFollowUp`'s unspawnable branch is unreached | **Removed** (`bf1d4eb`), after a failing test (`429ace5`). Trying a shutdown between a follow's turns found one path that started a follow after shutdown began: an unknown-id admission followed the store view it read after its awaits without re-reading the lifecycle. Before the fix (on `429ace5`), `admissionStraddlingShutdownFollowsNothing` (the new `EngineFollowShutdownTests.swift`) failed with 4 issues (`:55`, `:56`, `:57`, `:64`): a later generation announced, a follow started, the copy changed, and no clause. The admission now re-reads the lifecycle after its last await, before it follows the view. With the branch gone, `followBarrierViolations` reports a follow owed while the engine does not run, and the test exercises that clause. The argument over every reset the branch made is under "Removals" |
+| reqs #5 (blocking): `continueMove`'s per-interest guards (`EngineMoves.swift:203`, `:206`) and its end re-lane (`:222-223`) were unreached | **Reached** (`c2f9e31`) as item 8 says. `barrierRereadsWhatLandsBetweenABoundedMovesTurns` (the new `EngineFollowBarrierMoveRevalidationTests.swift`) lands three changes between the turns of H's visit, in both orders: a group's release, a purge, and an apply that maps a member back. The drops of `:206` (`moveIDGoneDrop`) and `:222` (`supersedeRelaneDrop`) are killed 2/2. `:203` is reached: `moveInterestGoneReroute`, which re-routes the gone interest, is killed 2/2. Its plain drop, `moveInterestGoneDrop`, is Equivalent: with the token's interest gone, `:205`'s removal finds no interest, so the item is skipped either way (argument under "Mutants") |
+| reqs #7 (non-blocking): RR-21, the commit window at 9.76 ms best | **Measured** (`c03c0e8`) as S3-R24 item 2 says. The commit window, 9.81 ms best (load 2.73 to 2.99), meets C2. Two figures miss it: the commit's re-routes of the 10,000 ids moved away, 48.47 ms best (same run), and the drain's take-off and re-route of 10,000 moved-before ids, 45.51 ms best (load 1.90 to 1.94). The gate run measured 9.86, 48.68 and 45.67 ms best, at load 2.21 to 5.59. Both misses are **blocking and open** (S3-R22 item 1; "Open" below) |
+| reqs #9 (non-blocking): RR-23 recorded on its own; RR-20's place | **Corrected**. RR-23 moves under RR-16 (S3-R24 item 5), in "Residual risks (S3-R16; cycle 18)". RR-20 stays with the Stage 5 residual risks (item 1) |
+| reqs #10 (non-blocking): `EngineMoves.swift:54` and `:87` at 0 hits | **Noted** as structural (S3-R25 item 11): an Optional API's empty case and a sift loop's exit, not decisions, replays or deferrals |
+
+### What cycle 20 changes (`ddb0ba1`, `f066083`, `bf1d4eb`, `daa426d`)
+
+- **The drain's visits after verdicts share one turn's ids** (item 1). `EngineState.drainIDsLeft` holds what the
+  drain's turn has left. At the follow's end the drain runs in the follow's last turn, so that turn seeds it with what
+  its visits left (`drainEventsAfterFollow(ids: budget.ids)`); a drain follow-up turn seeds it with a whole turn's
+  (`followIDsPerTurn`). `followAfterVerdict` visits within what is left, and subtracts what it moved. When nothing is
+  left, or a visit left a rest (`followMoving`, cycle 19), the rest of the batch goes back to the head of
+  `eventsAfterFollow` with its stamps, in order, for the next drain turn. The events keep their order, so no answer
+  changes (S3-R20 item 3).
+- **A job's lane is read from per-lane interest counts** (item 2). `Job.interests` is `private(set)`, and only `Job`'s
+  mutators change it: `setInterest`, `insertAsset`, `removeAsset`, `subtractAssets`, `setAssets`,
+  `removeAllInterests` and `keepInterests`. `setInterest`, `removeAllInterests` and `keepInterests` keep
+  `Job.interestCounts` (`InterestCounts`): bulk, prefetch, user-initiated, and the user-initiated interests that are
+  not `.ensure`, which `isSingleUser` reads.
+  - `Job.lane` is `interestCounts.highest ?? heldLane ?? .bulk`.
+  - `dropInterest` changes the job in place, with no copy of it alive across the removal. A copy shares the storage of
+    its interests, so the removal used to copy them whole.
+  - A retry verdict's answer for each interest (`verdictAnswers` in `EngineFailures`) reads the lane `retryLater`
+    reads: the job's, less the interests the count answers. That lane is now `interestCounts.highest {
+    !reachesCap($0, attempts:) }`. Before, it walked the job's interests for each interest read, O(interests²) a
+    verdict; the inventory found it (item 3).
+  - The new invariant: each job's counts equal a recount of its interests.
+- **No follow starts once the engine stops running** (item 7). The unknown-id admission (`EngineManifest`) now
+  re-reads the lifecycle after `planningView()`, its last await. Once shutdown began it returns before
+  `followStoreView` and `noteBound`; until now it re-read the lifecycle only after them. An apply's end and a catch-up
+  already re-read it first. `scheduleFollowFollowUp` spawns its task without checking the result, and
+  `followBarrierViolations` reports `a follow is owed while the engine is <lifecycle>`.
+- **The seam `EngineState.admissionsForTests`** (item 4). It is `nil` by default. A test sets it to `[]` and reads each
+  admission (`AttemptAdmission`: transfer, ticket, queue place, attempt) in the engine's order. No production path sets
+  it.
+
+### Removals (S3-R19 item 3; S3-R24 item 3)
+
+- **`scheduleFollowFollowUp`'s unspawnable branch** (`bf1d4eb`). It ran when `spawn` refused the follow-up task, which
+  `spawn` does only while the engine is shutting down or degraded. The branch reset `followFollowUpScheduled`,
+  `followOrder` and `followNext`, `followScans`, `followCarried` and `pumpWaitsForFollow`, and called
+  `releaseInboundWaits`, which drops `followMoving` and the owed moves and resumes the publications that waited. Why
+  nothing is lost without it:
+  - A follow starts only while the engine runs. An apply's end and a catch-up re-read the lifecycle before they
+    follow, and since `bf1d4eb` so does the unknown-id admission, the one path that did not
+    (`admissionStraddlingShutdownFollowsNothing`).
+  - The engine degrades only while starting, before any apply, so no follow is owed then.
+  - Shutdown's first turn and the drain after each task it joins (`drainEverything`) drop the job table and redo
+    every reset but one: `followOrder`, `followNext`, `followScans`, `followCarried`, `pumpWaitsForFollow` and
+    `releaseInboundWaits`.
+  - The exception, `followFollowUpScheduled`, needs no reset. A follow-up already scheduled clears the flag, finds the
+    engine shutting down and returns at once (`followFollowUp`), and while shutting down nothing new is spawned to wait
+    on the flag.
+  - `followBarrierViolations` checks the assumption (`!isRunning && followOwed`). The test forces it by setting
+    `followOrder = [b]` on the shut-down engine, and reads the one violation.
+
+  `scheduleDrainFollowUp` has an analogous `spawned == nil` branch (`EngineFollow.swift:390`), which this cycle does not
+  change. It has 0 hits (under "Not reached and structural lines (cycle 20)").
+
+### Tests added (display names)
+
+- `8cfc76e`, the new `EngineFollowBarrierDrainBoundTests.swift`: "R-SYN-6: the drain's visits after the verdicts that
+  waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" (`LaneDropVisit`
+  × `DrainBoundShape`: `verdicts`, `verdictsAfterARest`).
+- `f066083`, the new `EngineInterestCountsTests.swift`: "R-SYN-3: a job's lane and single-user rank, read from its
+  interest counts, follow every change to its interests"; "R-SYN-3: removing every interest of a job, or keeping some,
+  leaves the counts of the interests it holds"; "R-SYN-5: the highest lane among the admitted ones is read from the
+  counts".
+- `ca6df35`, the new `EngineFollowBarrierTurnTotalTests.swift`: "R-SYN-6: the follow's turns that make owed moves off
+  two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)"; "R-SYN-6:
+  the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across
+  them, with the visit-first answers (C2, F-28)" (both over `LaneDropVisit`).
+- `ca6df35`, the new `EngineFollowBarrierLegacyTargetTests.swift`: "R-SYN-6: an apply's walk moves an id onto a
+  publishing checksum-less content's job, with the visit-first answers (F-28)" (`LaneDropVisit` × follow-ups released
+  first or last).
+- `429ace5`, the new `EngineFollowShutdownTests.swift`: "R-SYN-15: an unknown-id admission whose store calls straddle
+  shutdown's start follows no store view and starts no follow (F-28)".
+- `431d397`, in `EngineFollowBarrierVerdictAnswersTests.swift`: the case "503 after 120 s, U at its cap".
+- `c2f9e31`, the new `EngineFollowBarrierMoveRevalidationTests.swift`: "R-SYN-6: what a release, a purge or an apply
+  changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" (`LaneDropVisit` ×
+  `MoveRevalidationShape`: `groupReleased`, `memberPurged`, `mappedBack`).
+- BenchSync (release, best of 3 against `c2Budget`, loads beside every figure):
+  - `8cfc76e` and `e39a076`: "R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their
+    jobs hold the engine's actor at most C2's 10 ms per turn" ([500, 625]).
+  - `8cfc76e`: "R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds
+    the engine's actor at most C2's 10 ms per turn" (`UserSharedShape`: supersede, keep).
+  - `c03c0e8`: "R-SYN-11: the commit of a publication whose 10,000 converged ids an apply moved away re-routes them
+    holding the engine's actor at most C2's 10 ms per turn", and "R-SYN-11: the drain's verdict on a job holding 10,000
+    ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn". These are the
+    two that miss: they stay as they are and fail until RR-21 is fixed (G4: a pin that fails is the record).
+
+### Test changes (G3 one-to-one; S3-R16 item 4)
+
+1. `EngineFollowBarrierReplayTests.swift`, `barrierReadmitsBehindTheOwedVisitsPlaces` (`daa426d`; item 4).
+   - Old: `#expect(started.first == n.transferID, "N, queued at P's visit, starts before the members the follow-up
+     re-queues (visit-first): …")`.
+   - New: `#expect(admitted.first?.transfer == n.transferID, "N, queued at P's visit, is admitted before the members
+     the follow-up re-queues (visit-first): …")`, where `admitted` is the engine's admissions
+     (`admissionsForTests = []` is set before the apply), plus `#expect(Set(admitted.map(\.transfer)) ==
+     others.union([n.transferID]), …)`.
+   - The assertion on the set of starts is unchanged, and so are the tuning, the scenario and the doc comment's
+     premise. The comment now says why the order is the engine's.
+2. `EngineFollowBarrierVerdictAnswersTests.swift` (`f066083`, `431d397`).
+   - `job.interests[token] = interests[token]` (`:55`) becomes `job.setInterest(interests[token], for: token)`.
+   - The three `job.interests[x] = JobInterest(…)` lines (`:154-156` on `49a0493`) become
+     `job.setInterest(JobInterest(…), for: x)`, with the same values. The property is `private(set)` now, and the
+     mutator keeps the counts.
+   - The case "503 after 120 s, U at its cap" is added, so `#expect(cases.count == 49, …)` becomes `== 52`.
+3. `EngineRegressionCycle16Tests.swift:472`: `job.interests[InterestToken(rawValue: 1)] = JobInterest(…)` becomes
+   `job.setInterest(JobInterest(…), for: InterestToken(rawValue: 1))`, with the same interest.
+4. `EngineSafetyTests.swift:134`: `state.jobs[…]?.interests.removeAll()` becomes
+   `state.jobs[…]?.removeAllInterests()`.
+5. `EngineOutcomeTests.swift`, `invariantOracle`: the orphaned case's `interests.removeAll()` becomes
+   `removeAllInterests()`, and a `miscounted` expectation is added for the counts clause.
+6. BenchSync's `concentrationPublicationTurns` (`c03c0e8`; S3-R24 item 2). The case now goes on through the commit:
+   `concentrationTurns(.publication, label:)` becomes `concentrationTurns(.publication, commit: .bound, label:)`, and
+   its display name says "begins and commits". The wait it checks spans both the publication's start and its commit,
+   so the old check is kept and extended.
+
+None of these removes or weakens an assertion. The mutator changes write the same interests through the API that
+keeps their counts.
+
+### Mutants (S3-R16 1(e); S3-R25 items 1, 2, 5 to 8 and 10)
+
+The runner is `.build-s3f/c20/mut.py`. It works on a copy of `Sources` and `Tests` (`.build-s3f/mutsrc`) built in
+`.build-s3f/mutbuild`, never in place. Each mutant runs its filter twice. A mutant that survives its filter also runs
+the whole Sync bundle (`full1`, then `full2`). Every round ends with the copy reverted, and `diff -r` against the
+worktree's `Sources` was empty. Round 1's diff showed one line, the admission record (`daa426d`): it was written in
+the worktree while that round ran, after the copy had been made.
+
+The loads, as the 1-minute average across each round: round 1, 27.98 down to 1.95; round 2, 17.64 to 9.62; round 3,
+3.62 to 3.26; round 4, 13.57 to 2.79. These are kill or survive results, not timings.
+
+| Mutant (round) | What it changes | Result | Killed at |
+|---|---|---|---|
+| `drainSpentDrop` (1) | `followAfterVerdict` leaves `drainIDsLeft` unspent | killed 2/2 | `EngineFollowBarrierDrainBoundTests.swift:191`, `:196` |
+| `drainSeedFull` (1) | the follow's last turn seeds the drain with a whole turn | killed 2/2 | `:191`, `:196` |
+| `drainSpentBreakDrop` (1) | the batch goes on with the ids spent | killed 2/2 | `:196` |
+| `drainBoundLt` (1) | `<= 0` becomes `< 0` | killed 2/2 | `:196` |
+| `drainVisitIDsFull` (1) | each verdict's visit gets `followIDsPerTurn` | killed 2/2 | `:191`, `:196` |
+| `drainFollowUpSeedZero` (1) | a drain follow-up turn seeds 0 ids | killed 2/2 | `:196` |
+| `countInsertDrop` (1) | an inserted interest is not counted | killed 2/2 | `EngineInterestCountsTests.swift:108`, `:115` |
+| `countRemovalDrop` (1) | a removed interest is not uncounted | killed 2/2 | `EngineInterestCountsTests.swift:51`, `:52` |
+| `countLaneChangeDrop` (1) | a replaced interest keeps the old count | killed 2/2 | `EngineInterestCountsTests.swift:51`, `:52` |
+| `countInsertDropEngine` (1) | as `countInsertDrop`, against the engine suites | killed 2/2 | `EngineFollowTests.swift:1022`, `:1044` |
+| `countRemovalDropEngine` (1) | as `countRemovalDrop`, against the engine suites | killed 2/2 | `EngineFollowTests.swift:1022`, `:1057` |
+| `countRemoveAllDrop` (1) | `removeAllInterests` keeps the counts | killed 2/2 | `EngineInterestCountsTests.swift:117`, `:118` |
+| `countKeepRecountDrop` (1) | `keepInterests` keeps the old counts | killed 2/2 | `EngineInterestCountsTests.swift:111`, `:112` |
+| `countSingleUserDrop` (1) | the single-user count is not kept | killed 2/2 | `EngineInterestCountsTests.swift:108`, `:52` |
+| `countsClauseDrop` (1) | the counts clause reports nothing | killed 2/2 | `EngineOutcomeTests.swift:457` |
+| `keptCapDrop` (1) | the kept lane ignores the cap (`highest` alone) | **survived** filter and `full1` | — (round 2 below) |
+| `dropHeldLaneDrop` (1) | `dropInterest` leaves `heldLane` unset | killed 2/2 | `EngineClaimRetryTests.swift:40`, `EngineGroupClaimTests.swift:341` |
+| `inboundSpentDrop` (1) | `continueInbound` leaves the turn's ids unspent | killed 2/2 | `EngineFollowBarrierTurnTotalTests.swift:106` |
+| `restSpentDrop` (1) | `continueVisitRemainder` leaves them unspent | killed 2/2 | `EngineFollowBarrierTurnTotalTests.swift:199`, `:200` |
+| `visitSpentDrop` (1) | the visits leave them unspent | killed 2/2 | `:199`, `:200` |
+| `continueMoveBudgetDrop` (1) | `continueMove` ignores its budget | killed 2/2 | `EngineFollowBarrierTurnTotalTests.swift:104`, `:106` |
+| `byIdentifierTargetDrop` (1) | a checksum-less target is not keyed | killed 2/2 | `EngineFollowBarrierLegacyTargetTests.swift:70` |
+| `byIdentifierLookupDrop` (1) | a checksum-less listed entry finds no target | killed 2/2 | `:70` |
+| `keptCapDrop` (2, after `431d397`) | as in round 1 | killed 2/2 | `EngineFollowBarrierVerdictAnswersTests.swift:133` |
+| `moveIDGoneDrop` (2) | `:205-206`: an interest without the id is re-routed anyway | killed 2/2 | `EngineFollowBarrierMoveRevalidationTests.swift:212` |
+| `supersedeRelaneDrop` (2) | `:222`: no re-lane at the superseding move's end | killed 2/2 | `EngineFollowBarrierMoveRevalidationTests.swift:223` |
+| `moveInterestGoneReroute` (2) | `:202-206`: a gone interest is re-routed on a stand-in interest | killed 2/2 | `EngineFollowBarrierMoveRevalidationTests.swift:213` |
+| `moveInterestGoneDrop` (2) | `:202-203`: a gone interest gets a stand-in, then reaches `:205` | **survived** filter and `full1`: **Equivalent** | — |
+| `admissionGuardDrop` (3) | the admission does not re-read the lifecycle | killed 2/2 | `EngineFollowShutdownTests.swift:55`, `:56`, `:57` |
+| `admissionGuardBack` (3) | the re-read goes back after `followStoreView` (`49a0493`'s order) | killed 2/2 | `:55`, `:56`, `:57` |
+| `followOwedClauseDrop` (3) | the follow-owed clause reports nothing | killed 2/2 | `EngineFollowShutdownTests.swift:64` |
+| `highestUserDrop` (4) | `highest` skips the user lane | killed 2/2 | `EngineInterestCountsTests.swift:108`, `:112` |
+| `highestPrefetchDrop` (4) | `highest` skips the prefetch lane | killed 2/2 | `EngineInterestCountsTests.swift:114`, `:133` |
+| `highestBulkDrop` (4) | `highest` skips the bulk lane | killed 2/2 | `EngineInterestCountsTests.swift:130`, `:137` |
+| `highestUserGe` (4) | `userInitiated > 0` becomes `>= 0` | killed 2/2 | `EngineInterestCountsTests.swift:114`, `:118` |
+| `highestAdmitsDrop` (4) | the user lane is taken without `admits` | killed 2/2 | `EngineFollowBarrierVerdictAnswersTests.swift:133` |
+| `countBulkDrop` (4) | the bulk count is not kept | killed 2/2 | `EngineInterestCountsTests.swift:130`, `:137` |
+| `countPrefetchDrop` (4) | the prefetch count is not kept | killed 2/2 | `EngineInterestCountsTests.swift:114`, `:133` |
+| `countUserDrop` (4) | the user-initiated count is not kept | killed 2/2 | `EngineInterestCountsTests.swift:108`, `:112` |
+| `singleUserGe` (4) | `singleUser > 0` becomes `>= 0` | killed 2/2 | `EngineInterestCountsTests.swift:112`, `:118` |
+| `laneHeldDrop` (4) | `Job.lane` ignores `heldLane` | killed 2/2 | `EngineGroupClaimTests.swift:341` |
+| `admissionRecordDrop` (4) | the admission is not recorded | killed 2/2 | `EngineFollowBarrierReplayTests.swift:97`, `:98` |
+| `purgeSubtractDrop` (4) | a purge leaves the withdrawn ids on the interest | survived its filter; killed by `full1` and `full2` | `EngineFollowBarrierMoveRevalidationTests.swift:212` |
+
+That is 42 mutants: 40 killed 2/2 (`keptCapDrop` from round 2, `purgeSubtractDrop` by the whole bundle twice) and one
+Equivalent (`moveInterestGoneDrop`).
+
+- **`moveInterestGoneDrop` is Equivalent** (S3-R19 item 2). With the token's interest gone, the mutant reads a
+  stand-in interest and goes on to `:205`. There `removeAsset(asset, for: token)` finds no interest under the token,
+  returns `false`, and the item is skipped. That is exactly what `:203`'s `continue` does, so no decision, answer or
+  state differs. `:203` is still reached: `moveInterestGoneReroute` drops both guards, re-routes the gone interest, and
+  is killed 2/2 at `:213`. The two guards stay, as item 8 says, and `:205`'s removal is what decides once the
+  interest is gone.
+
+### The C2 inventory (S3-R25 item 3)
+
+Every operation the follow's turns and the drain do per id or per event. "Ids" means the turn's ids, at most
+`followIDsPerTurn` (512); N is a job's ids, I a job's interests, E the events waiting. The reference set is 10,000 ids,
+however their interests are grouped (item 2). The figures are the gate run's (under "Gate evidence (cycle 20)") unless
+a commit is named.
+
+| Operation | Cost | Bound or figure | Status |
+|---|---|---|---|
+| The follow's passes over the copy (`continueFollow`'s scans) | at most 16,384 entries and 2,048 formats a turn (`followScansPerTurn`, `followFormatsPerTurn`) | bounded a turn; `concentrationNotFoundTurns` | met |
+| A visit's filter of the job's ids the copy moved (`rerouteOnVisit`) | O(N) once a visit; ≤ 10,000 a turn over the visits | `sharedApplyTurns`, `divergenceTurns` | met |
+| `startMove` building a move's items | O(moved ids) once a move | `sharedApplyTurns`, `inboundHolderTurns` | met |
+| `continueMove`, `continueInbound` (its intersection at the move's first turn), `continueVisitRemainder` | O(log ids) a moved id; at most `followIDsPerTurn` ids and `followsPerTurn` holders a turn | the turn-total tests; `sharedApplyTurns`, `divergenceTurns`, `inboundHolderTurns` | met |
+| `move` (a move that fits the turn's ids) | sorts each interest's whole ids: O(N log N) a holder, ≤ 10,000 ids a turn over the holders | no figure of its own (inside the shared cases' visits) | no figure: put to the orchestrator |
+| The walk for the publications in flight (`findInbound`) | one pass over the jobs' ids, one lookup each | `inboundWalkTurns`, `concentrationNotFoundTurns` | met |
+| `reroute`, `addInterest` (a join in place) | O(1) amortised an id | `concentrationFollowTurns`, `sharedApplyTurns` | met |
+| `removeInterest`, `dropInterest`, `relane`, `Job.lane`, `isSingleUser` | O(1) an id (`f066083`) | `userSharedApplyTurns`: 7.18 ms best (supersede) and 8.01 (keep) | met |
+| `deferBehindVerdict` (a visit's join behind a waiting verdict) | O(E) a call (a `lastIndex` scan and an insert) | no figure | no figure: put to the orchestrator |
+| The drain's events (`drainEventsAfterFollow`) | at most `eventsAfterFollowPerTurn` (512) events a turn; their visits after verdicts share the turn's ids (`ddb0ba1`) | `drainVerdictTurns` [500, 625]: 4.13 and 4.08 ms best | met |
+| A retry verdict's answer for each interest (`verdictAnswers`, the lane `retryLater` reads) | O(1) an interest, O(I) a verdict (`f066083`); O(I²) a verdict before | O(1) amortised an id | met |
+| `followedLane` | O(I) a call | the 429 case of R-SYN-5, `concentrationNotFoundTurns` | met |
+| `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | inside `concentrationPublicationTurns` (the start) | met at the start; the verdict's has no figure |
+| The commit's binding (`committed`, then `resolveAll`, `publishTerminal`) | O(N log N) once a commit | `concentrationPublicationTurns` through the commit: 9.86 ms best (9.81 at load 2.73 to 2.99 before `c03c0e8` was committed) | met, by 0.14 ms |
+| The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn | `concentrationCommitRerouteTurns`: 48.68 ms best (48.47 before `c03c0e8` was committed) | **miss: blocking, open** |
+| `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn | `movedBeforeDrainTurns`: 45.67 ms best (45.51 before `c03c0e8` was committed) | **miss: blocking, open** |
+| `supersede` of a superseded publication (`publicationFailed`'s `.superseded`) | O(N) re-routes in one turn | no figure; outside the follow and the drain | no figure: put to the orchestrator |
+
+### A holder re-created between turns (correct #4; S3-R25 item 9)
+
+- **The case.** `continueMove` re-reads its holder by `TransferID`, which is derived from content. A job removed
+  between two turns of its move and created again for the same content is found under the same key. The moves left
+  (`MoveProgress`'s (id, token) items) then name the old job's interests.
+- **Why the per-interest guards make the stale items no-ops.**
+  - Tokens come from a counter (`EngineLifecycle`, `lastToken`), one per registration, so the re-created job holds an
+    interest under an item's token only if that same registration's interest came back onto the content. An item
+    whose token is not there is skipped at `:202-203`. One whose interest no longer holds the id is skipped at
+    `:205-206`.
+  - An item passes both guards only if the re-created holder holds that same interest in that same id. Then `reroute`
+    moves it under the current copy, as the re-created job's own visit would. If the copy maps the id to this content
+    again, `reroute` re-joins it here (`addInterest`), so the job keeps it.
+  - Behind the barrier no join adds a new interest in an id of the rest: every join but the follow's own waits
+    (`addInterest`'s `.join` events), and the drain that replays them waits until the rest is done (`followOwed`
+    covers `followMoving`). So the interests in a rest's id are its items' tokens until the rest moves the id.
+  - No holder epoch is added (S3-R25 item 9).
+- **An observation, not probed.** `continueMove` removes the id from the holder's ids (`Job.assets`, `:195`) at the
+  item's first interest, before the guards. The removal can matter in only one state: the holder holds the id under a
+  token that is not among its items, and every item of the id is stale. That needs the same id on two jobs at once
+  (a publishing job's id can be, as in the checksum-less test). It also needs that job's visit, under a later apply,
+  to move the id's interest onto the re-created holder, and every item's interest to have left meanwhile. No path
+  that builds this was found, and none was tried. It is put to the orchestrator with that shape.
+
+### Not reached and structural lines (cycle 20)
+
+The counts are from the gate run's coverage (`.build-s3f/c20/gates/cov.profdata`, every bundle but the benchmarks, on
+`c03c0e8`).
+
+- **This cycle's changed lines.** `.build-s3f/c20/covdiff20.py` is the verifier's `reqs/covdiff.py`, adapted to this
+  scratch path and to `49a0493..HEAD`. Over every line changed in `Sources` it finds no zero-count line:
+  `EngineCommands.swift` 12, `EngineDispatch.swift` 4, `EngineFailures.swift` 6, `EngineFollow.swift` 30,
+  `EngineJobs.swift` 11, `EngineManifest.swift` 9, `EngineMoves.swift` 2, `EnginePresence.swift` 1 and
+  `EngineState.swift` 175 changed lines, 0 at zero count in each (S3-R25 item 10).
+- **Item 8's lines are reached.** `EngineMoves.swift:203` has 7 hits, `:206` has 1 and `:222` has 1; their mutants are
+  under "Mutants".
+- **Structural lines.** `EngineMoves.swift:54` (`MoveProgress.popFirst`'s `return nil`) and `:87` (the sift loop's
+  exit) have 0 hits (reqs #10, S3-R25 item 11).
+- **`waitingTarget`'s case is unreached.** `EngineFollow.swift:1261`, the `return nil` of `queued`, `blocked` and
+  `downloading`, has 0 hits ("Open" item 2).
+- **`scheduleDrainFollowUp`'s unspawnable branch is unreached.** `EngineFollow.swift:391-398` has 0 hits (its `if` at
+  `:390` has 21). It is the analogue of the branch removed under "Removals". This cycle does not change it, and it is
+  not on S3-R24 item 3's list; it is put to the orchestrator.
+
+### Open (blocking; not fixed this cycle)
+
+1. **RR-21's two misses** (S3-R24 item 2; S3-R22 item 1), at a quiet load, best of 3:
+   - The commit's re-routes: `committed` re-routes, in one turn, every interest in an id the publication does not
+     bind because an apply moved it away. That was 48.47 ms best for 10,000 ids, at a 1-minute load of 2.73 to 2.99.
+   - The drain's take-off: `replayVerdict` takes a job's moved-before ids off before its verdict
+     (`takeOffMovedBefore`) and re-routes them after it (`rerouteMovedBefore`), each in one turn. That was 45.51 ms
+     best for 10,000 ids, at a 1-minute load of 1.90 to 1.94.
+   - The gate run on `c03c0e8` measured 48.68 and 45.67 ms best, at a 1-minute load of 2.21 to 5.59 (under "Gate
+     evidence (cycle 20)").
+
+   The fix was not attempted this cycle. Both re-routes must keep the visit-first answers while they span turns
+   (S3-R20 item 3), and the state they would leave between turns needs its own invariants. The proposed design, put
+   to the orchestrator:
+   - **Turn the owed re-routes into drain events.** A `.reroutes(batch)` event carries the (token, id) pairs and the
+     copy that found them, and is queued where the re-routes are made now. Each drain turn spends at most
+     `drainIDsLeft` of them.
+   - **Keep a limbo index.** It records the interests taken off a job and not yet re-routed, so the invariants (a
+     waiter's interest, a group's members, the run's claims) accept them while they are owed. `followedLane` counts
+     them by the rule of the job they left, as it does for an owed move's ids.
+   - **Hold a publication while re-routes are owed.** `inboundBlocks` makes a publication wait while re-routes onto
+     or off its job are owed, as it does for the owed moves.
+   - **Decide each re-route under its event's copy.** The decision T21 reads is made under the copy the event
+     carries, and the join under the copy current at the re-route.
+   - **Clear and seam them like the owed moves.** Shutdown drops them, and the seam `rerouteIDsPerTurn` lets a test
+     count them per turn.
+   - **Extend the same treatment to the O(N) `supersede` row** of the inventory.
+
+   The pins would be S3-R23 item 3's two: a deterministic per-turn count with the bound's drop-mutant, and the two
+   BenchSync cases above, best of 3, at most `c2Budget`.
+2. **`waitingTarget`'s `queued`, `blocked` and `downloading` case** (reqs #3; S3-R24 item 3). Not reached by a test,
+   not removed, and not shown Equivalent:
+   - `downloading` at the move's epoch cannot happen. A move is recorded at its target's attempt end, and only a new
+     attempt's start makes the job download again, and that start gives it a new epoch (`Job.epoch`).
+   - `blocked` at the move's epoch comes only after the `queued` case below. A job leaves its attempt's end for
+     `blocked` only through a park. The parks that act on a job at its attempt's end are verdicts, and they wait in
+     the drain while a move is owed. A queued job's parks (the admission gate, a space sweep) need the `queued` case
+     first.
+   - `queued` at the move's epoch happens on one path: the ENOENT re-queue of a drained publication
+     (`publicationFailed`, `.fileSystem(.notFound)` with `cancelledAttempt`). That re-queue also happens behind the
+     barrier, and the job keeps its epoch until its next start, which the barrier holds back. In that window,
+     `continueInbound` drops the move (`waitingTarget` is `nil`), and the holder's own visit later moves the id. On a
+     visit-first engine, the id would already be on the target, so the difference is only the job the id waits on
+     until the visit, and its place and ticket. By the reading of `followedLane`, the id counts by its holder's rule
+     there (`carried` is `nil`), the rule its holder's visit moves it by, and the queued target has no verdict waiting
+     to differ.
+
+   This is a reading of the code. No test builds the window this cycle (a drained attempt's publication failing with
+   ENOENT while a move onto its job is owed and the follow's turns are held), so it is neither Reached nor proven
+   Equivalent: in `continueInbound` the case changes order and tickets, so it is not Equivalent under S3-R19 item 2's
+   "no state" either. Put to the orchestrator: reach it with that shape (the fakes can fail a publication with ENOENT
+   after a cancelled attempt's staging, as `EngineRaceTests` does) and kill its drop-mutant, or rule the
+   order-and-ticket difference a residual risk (S3-R16 item 2).
+
+### Residual risks (cycle 20)
+
+- **RR-21** (rewritten): see "Open" item 1. The commit window itself meets C2, at 9.86 ms best in the gate run (9.81
+  before). The commit's re-routes and the drain's take-off miss it, and both are blocking. RR-21 is a residual risk
+  no longer; it stays listed until it is fixed.
+- **RR-20** stays with the Stage 5 residual risks (S3-R24 item 1), as written under "Cycle 19".
+- **RR-23** is recorded with RR-16 (S3-R24 item 5), under "Residual risks (S3-R16; cycle 18)".
+- No new residual risk. `waitingTarget`'s window is open, not a residual risk, unless the orchestrator rules it one.
+
+### Put to the orchestrator (found while fixing; not changed this cycle)
+
+1. RR-21's design ("Open" item 1).
+2. `waitingTarget`'s window ("Open" item 2).
+3. The inventory rows with no figure: `move`'s sort of a holder's interests, `deferBehindVerdict`'s O(E) scan,
+   `recordDeferredVerdict`'s filter, and `supersede` of a superseded publication. Each is not O(1) amortised per id
+   and has no BenchSync case at 10,000 (S3-R25 item 3).
+4. `continueMove`'s removal of the id from `Job.assets` before the per-interest guards ("A holder re-created between
+   turns").
+5. `scheduleDrainFollowUp`'s `spawned == nil` branch (`EngineFollow.swift:391-398`, 0 hits in the gate run's
+   coverage), the analogue of the removed one: removal with a clause, as under "Removals", or a test that reaches it.
+
+### Hang guards and re-entrancy
+
+No new `await` in the engine's actor code. The admission's lifecycle re-read moved up to its last await, and its
+`// REENTRANCY: RE-S37` comment says what is re-validated after it (the lifecycle, before the view is followed). Every
+new test has `.timeLimit(.minutes(1))` (the shutdown test) or `.timeLimit(.minutes(3))`. Every loop over follow turns
+is bounded by a `#require` (8 or 16 turns). The tests' times in the gate run's Sync bundle runs, with the loads, are
+under "Gate evidence (cycle 20)". `shutdownReleaseInboundWaitsDrop` is still killed only by a hang. The new shutdown
+test does not involve inbound waits, so it does not kill it either (S3-R25 item 11).
 
 ## Items
 
@@ -5412,7 +5952,8 @@ Cycle 19 adds:
   - "RR-2 to RR-5, RR-7 to RR-13 and RR-15 to RR-18" becomes "RR-2 to RR-5, RR-7 to RR-13, RR-15 to RR-17 and RR-19
     to RR-23" (RR-18 is withdrawn).
 - **`docs/RESIDUAL-RISKS.md` (Stage 5):** RR-18 withdrawn, its premise corrected (under "Residual risks (S3-R16; cycle
-  18)"); RR-19 to RR-23 as written under "Cycle 19". RR-23 is put to the orchestrator.
+  18)"); RR-19 to RR-22 as written under "Cycle 19", and RR-23 with RR-16 (ruling S3-R24 item 5; moved in cycle
+  20).
 - **§10.2, RE-S48's row** becomes `RE-S48 | `publish`'s wait for the moves owed onto or off its job and for the rest
   of a visit of it (`awaitInboundMoves`) | the lifecycle; the job stays verifying at its epoch while it waits (an
   invariant checks it), so nothing else is re-read`. No new `await` in an actor this cycle.
@@ -5424,8 +5965,39 @@ Cycle 19 adds:
   `EngineFollowBarrierSharedMoveTests.swift` and `EngineFollowBarrierTwoTargetsTests.swift` under
   `Tests/ZTronAssetSyncTests/Engine/`.
 - **§14:** the seam `EngineState.followIDsPerTurn` (`SyncEngine.followIDsPerTurn`, 512, by default), which the tests
-  lower to count the ids each turn moves; no production path sets it. RR-23 is put to the orchestrator (under "Cycle
-  19").
+  lower to count the ids each turn moves; no production path sets it.
+
+Cycle 20 adds:
+
+- **§7.10, "Follow barrier (F-28)"**, changes to cycle 19's paragraph:
+  - After "the events after the drain's visit wait for it", add "The drain's visits after verdicts share the ids its
+    turn has left (the follow's last turn's, or a whole turn's in a drain turn of its own); once they are spent, the
+    rest of the batch waits, in order, for the next drain turn".
+  - Add "A follow starts only while the engine runs: an apply's end, a catch-up and an unknown-id admission re-read
+    the lifecycle before they follow, and an invariant checks that no follow is owed while the engine does not run".
+  - The residual-risk list keeps RR-23, which is now recorded within RR-16's entry (ruling S3-R24 item 5).
+- **§7.4, "Lanes, dispatch and promotion"**: add "A job's lane, the maximum over its interests, is read from per-lane
+  counts that the job keeps on every change to its interests, so reading it is O(1) whatever the number of interests
+  (C2)".
+- **§10.2, RE-S37's row**: after "or the waiter still registered (admission)", add "; after the admission's view
+  read, the lifecycle, before the view is followed (a view read once shutdown began is not followed)". No new `await`
+  in an actor this cycle.
+- **`docs/RESIDUAL-RISKS.md` (Stage 5):** RR-23 with RR-16 (ruling S3-R24 item 5), as written under "Residual risks
+  (S3-R16; cycle 18)". RR-20 stays (S3-R24 item 1). RR-21 is rewritten as under "Cycle 20": the commit window meets
+  C2, the commit's re-routes and the drain's take-off miss it, and both are blocking and open, so RR-21 goes into
+  `RESIDUAL-RISKS.md` only if the orchestrator rules it a residual risk.
+- **§11:** the cycle-20 tests (`8cfc76e`, `f066083`, `ca6df35`, `429ace5`, `431d397`, `c2f9e31`): all are in
+  `EngineFollowBarrierTests` (serialized), except `EngineInterestCountsTests`. BenchSync adds `drainVerdictTurns`
+  (`8cfc76e`, `e39a076`), `userSharedApplyTurns` (`8cfc76e`), and `concentrationCommitRerouteTurns` and
+  `movedBeforeDrainTurns` (`c03c0e8`). `concentrationPublicationTurns` now goes through the commit (`c03c0e8`).
+- **§1.2:** WP-F's new test files, under `Tests/ZTronAssetSyncTests/Engine/`:
+  `EngineFollowBarrierDrainBoundTests.swift`, `EngineFollowBarrierLegacyTargetTests.swift`,
+  `EngineFollowBarrierMoveRevalidationTests.swift`, `EngineFollowBarrierTurnTotalTests.swift`,
+  `EngineFollowShutdownTests.swift` and `EngineInterestCountsTests.swift`. No new source file.
+- **§14:** the seam `EngineState.admissionsForTests` (`nil` by default): a test sets it to `[]` and reads each
+  admission (transfer, ticket, queue place, attempt) in the engine's order. No production path sets it.
+  `Job.interestCounts` is settable inside the module, so the counts clause can be exercised. Only `Job`'s mutators
+  change it in production code.
 
 ## Gate evidence (cycle 1)
 
@@ -6820,6 +7392,160 @@ Two earlier runs are kept:
 - **`git status`:** clean after the draft's commit (`.build-s3f*` is untracked scratch). `docs/TRACEABILITY.md` is
   untouched: no `--gates-only` or `--full` run was made.
 
+## Gate evidence (cycle 20)
+
+All runs below were made on this branch at `c03c0e8`, the last code and test commit (02:14:11). The tree was clean
+when they started (`times.txt`: `start head c03c0e8 dirty 0`); only this draft was edited while they ran, and the
+draft's commit changes this file only. Scratch was `.build-s3f*` on the shared 8-core host, one gate at a time
+(`.build-s3f/c20/gates20.sh`, 02:27:58 to 03:32:37). No mutant ran during it; mutant round 4 had ended before it
+started. S3-R23 item 1's three load averages are in `times.txt` beside every stage, and every 5 s in the coverage,
+simulator and benchmark stages (`cov-load.txt`, `sim-load.txt`, `bench-load.txt`). Logs are under
+`.build-s3f/c20/gates/`. Other projects' simulators (`b4-fade-*`, not WP-F's) raised the 1-minute load to 271.77 at
+TSan's end; nothing of theirs was touched (S3-R23 item 4).
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (02:27:58 to 02:34:46; `quick.log`).
+  - 1-minute load: 3.99 at the start, 16.68 at the end.
+  - Result: `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines.
+  - Tests passed: Transport 151, Sync 561 (`passed after 173.252 seconds`: cycle 19's 552 and this cycle's 9),
+    Storage 459 (`86.893 seconds`), Model 84 (`73.196 seconds`), Kit 85, Compatibility 71, AppleHosted 104.
+- **Release build** `swift build -c release --scratch-path .build-s3f -Xswiftc -warnings-as-errors` (ended 02:35:24,
+  `release.log`): `Build complete! (36,96 s)`, exit 0, 0 `warning:` lines.
+- **Gates** (`python3 Scripts/gates.py unsafe --sources "$PWD/Sources" --audit docs/UNSAFE-AUDIT.md`, then `python3
+  Scripts/gates.py docs --sources "$PWD/Sources"`, 02:35:24; `unsafe.log`, `docs.log`):
+  - `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`;
+  - `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (`swift test --scratch-path .build-s3f --skip Benchmarks --filter ZTronAssetSyncTests`,
+  02:35:24 to 02:45:16; `sync{1,2,3}.log`).
+  - 1-minute load at each run's end: 6.65, 3.55 and 3.08.
+  - Results: `✔ Test run with 561 tests in 54 suites passed after 175.701 seconds.`, `… after 167.672 seconds.`,
+    `… after 165.826 seconds.`
+  - Durations against guards (`python3 .build-s3f/c20/guards.py`, which matches 502 of the 561 reported names to
+    their `.timeLimit`; the other 59 took at most 0.67 s): none over half of its guard. The largest were 7.4 % (13.31
+    s of 3 minutes), 6.2 % and 6.0 %.
+  - This cycle's tests, at most: the drain bound 2.28 s, the checksum-less walk 3.00 s, the revalidation 3.23 s, the
+    re-admission test 1.54 s, the two turn-total tests 0.92 and 0.98 s, the shutdown test 0.003 s (of 1 minute), and
+    the three counts tests 0.57 s.
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, alone, 02:45:16 to 03:01:44; `tsan.log`).
+  - Load: 3.08 at the start and 271.77 at the end, another project's. It was stamped at the start and the end only,
+    not sampled during the run (S3-R12 rule 1 asks for 5 s or less; under "Not verified here").
+  - Result: `✔ Test run with 561 tests in 54 suites passed after 907.020 seconds.`; 0 `ThreadSanitizer` lines, 0
+    `Time limit` lines.
+  - Durations against guards (`guards.py`, 502 matched; the other 59 took at most 1.71 s): none over half. The
+    largest was 27.7 % (`R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it
+    answers (F-28)`, 49.83 s of 3 minutes), then 24.3 % (14.60 s of 1 minute).
+  - This cycle's tests took at most 14.34 s (the revalidation test, 8.0 % of 3 minutes).
+- **iOS generic build** (`xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, ended 03:02:03, `ios.log`): exit 0; the
+  only output line is the usual `IDERunDestination: Supported platforms for the buildables in the current scheme is
+  empty.`
+- **Coverage** under `sim.lock` (taken 03:02:03; `swift test --scratch-path .build-s3f --enable-code-coverage --skip
+  Benchmarks`, 03:02:03 to 03:08:06; `cov.log`, `cov-gate.log`).
+  - Load (`cov-load.txt`, every 5 s): mean 63.23, min 6.86, max 224.26 over 73 samples; another project's load fell
+    from 224.26 at the start to 7.94 at the end.
+  - Every bundle passed: Transport 151, Sync 561 (`passed after 165.759 seconds`), Storage 459, Model 84, Kit 85,
+    Compatibility 71, AppleHosted 104.
+  - `python3 Scripts/gates.py coverage --json .build-s3f/c20/gates/cov.json`:
+    - `COVERAGE target=ZTronAssetSync           lines= 94.54% (11091/11732) min=90.0 OK`;
+    - `COVERAGE overall lines=96.70% (27599/28540) min=80.0 OK`;
+    - `COVERAGE device-only-excluded lines=177 share=0.62% max=3.0% OK` / `COVERAGE: PASS`;
+    - the other targets: AppleHosted 99.68 %, Kit 97.83 %, Model 99.31 %, Storage 97.37 %, Transport 99.08 %.
+  - The changed lines' counts (`covdiff20.py`) are under "Cycle 20", "Not reached and structural lines (cycle 20)": no
+    zero-count changed line.
+  - **The flake's close, coverage half** (S3-R25 item 4): the Sync bundle passed under `--enable-code-coverage` three
+    times, under the same lock:
+    - the run above;
+    - `covsync2.log`: `✔ Test run with 561 tests in 54 suites passed after 170.130 seconds.`, at a 1-minute load of
+      mean 5.47 over 34 samples (2.74 to 23.15; 39.80 at its end, 03:10:59);
+    - `covsync3.log`: `… after 262.189 seconds.`, at mean 152.87 over 52 samples (39.80 to 271.44).
+    - Their durations against guards were at most 5.8 % and 6.7 %. The lock was released at 03:15:25.
+- **iOS Simulator** under `sim.lock` (taken 03:15:25, released 03:24:31), on WP-F's own simulator
+  `897F9D8D-B10D-4D91-8E22-417A2B9D70AA` (iPhone 18 Pro, iOS 27.0), shut down afterwards: `xcrun simctl shutdown`
+  found it already shut down (`Unable to shutdown device in current state: Shutdown`, exit 149), and `simctl list`
+  shows it `(Shutdown)`.
+  - `xcodebuild build-for-testing -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=897F9D8D…"
+    -derivedDataPath .build-s3f/xcode-sim OTHER_SWIFT_FLAGS='-warnings-as-errors'`: `** TEST BUILD SUCCEEDED **`
+    (03:15:25 to 03:16:38). The only `warning:` lines are four of `appintentsmetadataprocessor`'s `Metadata
+    extraction skipped, no AppIntents.framework dependency found`, none from the compiler.
+  - `xcodebuild test-without-building … -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never`, then
+    `xcrun xcresulttool get test-results summary` (`sim.xcresult`, `sim-summary.json`): `** TEST EXECUTE SUCCEEDED
+    **` (03:16:58 to 03:23:10); `result: Passed`, `totalTestCount: 1515`, `passedTests: 1515`, `failedTests: 0`,
+    `skippedTests: 0` (cycle 19's 1,506 and this cycle's 9), on `iPhone 18 Pro`
+    `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0.
+  - **The flake's close, simulator half** (S3-R25 item 4): `-only-testing:"ZTronAssetSyncTests/
+    EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)" -test-iterations 30`
+    (`sim-rep30.xcresult`): `** TEST EXECUTE SUCCEEDED **` (03:23:20 to 03:24:27); `result: Passed`, the device's
+    `passedTests: 60` and `failedTests: 0`: 30 iterations of each of the two arguments, 0 failures.
+  - Load (`sim-load.txt`, every 5 s): the build at mean 175.42 (102.26 to 239.08), the suite at mean 155.46 (10.03 to
+    445.26, other projects' simulators), the 30 iterations at mean 51.91 (8.94 to 79.99).
+- **Benchmarks** (`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter
+  Benchmarks`, 03:24:31 to 03:32:37; `bench.log`, `bench-load.txt`).
+  - When the suites ran: the test command's own build took `Build complete! (144,24 s)`, so the serialized suites ran
+    from about 03:26:59. SyncBenchmarks, the fifth, ran from about 03:29:13 to 03:32:36.
+  - Load: over SyncBenchmarks the three load averages went from { 2.21 36.61 69.39 } (03:29:13) to { 2.75 20.42
+    55.61 } (03:32:34). The 1-minute load was mean 3.58, min 2.21, max 5.59 over 41 samples: a quiet load (S3-R23
+    item 3). Over all the suites (03:26:59 to 03:32:37) it was mean 3.68, min 2.21, max 6.28 over 67 samples; over
+    the build before them, mean 19.47 (6.56 to 45.37).
+  - Result: `✘ Test run with 56 tests in 8 suites failed after 337.375 seconds with 3 issues.`
+    - One is P-13's (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 8.380 ms
+      against 5.0 ms in 491 units; WP-B's, `other-wp:b`, as in every cycle).
+    - Two are RR-21's (`✘ Suite "SyncBenchmarks" failed after 203.265 seconds with 2 issues.`). Both cases fail until
+      RR-21 is fixed (under "Cycle 20", "Open" item 1):
+      - `concentrationCommitRerouteTurns` (`BenchSync.swift:722:13: Expectation failed: (waits.min() ?? .infinity)
+        <= Self.c2Budget`): [48.68, 48.88, 49.27] ms, best 48.68, all of it the commit window; the longest held turn
+        [3.77, 3.90, 3.71] ms. Each run committed, served and re-routed 10,000 ids. Before `c03c0e8` was committed
+        it measured 48.47 ms best, at load 2.73 to 2.99.
+      - `movedBeforeDrainTurns` (`BenchSync.swift:689:13`, the same expectation): [46.65, 46.82, 45.67] ms, best
+        45.67; the longest held turn [46.64, 46.81, 45.67] ms. Each run moved 10,000 ids off the job before its
+        verdict and re-routed 10,000 after it. Before `c03c0e8` was committed it measured 45.51 ms best, at load
+        1.90 to 1.94.
+    - Every other WP-F benchmark is within S3-R5's budgets (best of three ≤ 10 ms, median ≤ 50 ms).
+  - This cycle's other C2 figures, longest actor wait per run, best of three. In brackets, the same cases on
+    `49a0493`'s sources, before the fixes:
+    - `drainVerdictTurns`, the drain's visits after 16 waiting verdicts (`ddb0ba1`):
+      - 500 ids a job, 8,000 moved: [4.13, 7.46, 6.25] ms, best 4.13; the longest held turn best 4.12. ([41.17,
+        41.80, 40.79] ms, best 40.79; `headbench2.log`, 23:55:10 to 23:55:15, at load 2.84 to 3.01.)
+      - 625 ids a job, 10,000 moved: [4.10, 4.08, 4.12] ms, best 4.08 ([4.61, 5.08, 4.70] ms, best 4.61).
+    - `userSharedApplyTurns`, an apply moving 10,000 ids that share one content, a user-initiated waiter each
+      (`f066083`):
+      - supersede: [7.22, 7.18, 7.19] ms, best 7.18 ([32.89, 33.05, 33.25] ms, best 32.89);
+      - keep: [8.20, 8.12, 8.01] ms, best 8.01 ([71.56, 71.17, 70.82] ms, best 70.82).
+      - The bracketed run is `headbench.log`, 23:52:41 to 23:52:56, at load 11.64 to 10.05: not a quiet load, but
+        its figures are more than three and seven times C2's budget.
+    - `concentrationPublicationTurns`, now through the commit (`c03c0e8`): [9.87, 9.99, 9.86] ms, best 9.86, all of
+      it the commit window; the longest held turn [3.77, 3.71, 3.72] ms. It meets C2 by 0.14 ms. Before `c03c0e8`
+      was committed it measured 9.81 ms best, at load 2.73 to 2.99.
+  - The follow barrier's other C2 figures at 10,000 ids (cycle 19's gate run in brackets):
+    - `sharedApplyTurns`: onto one other content [6.86, 6.82, 6.90] ms, best 6.82 ([6.80, 6.67, 6.75], best 6.67);
+      each onto a content of its own [7.29, 7.28, 7.24] ms, best 7.24 ([7.18, 7.08, 7.17], best 7.08).
+    - `divergenceTurns`: back to their own contents [7.03, 7.06, 7.11] ms, best 7.03 ([7.11, 7.06, 7.00], best
+      7.00); on to fresh contents [7.11, 7.04, 7.14] ms, best 7.04 ([6.97, 7.07, 6.96], best 6.96).
+    - `inboundHolderTurns`: [7.18, 7.24, 7.18] ms, best 7.18 ([7.25, 7.34, 7.31], best 7.25); the longest held turn
+      [7.17, 7.24, 7.18] ms.
+    - `concentrationNotFoundTurns`: [6.31, 6.24, 6.28] ms, best 6.24 ([6.24, 6.20, 6.21]); the 429's `followedLane`
+      with the moves owed [3.51, 3.45, 3.46] ms ([3.37, 3.39, 3.38]).
+    - `concentrationFollowTurns`, no ending: [3.64, 3.73, 3.75] ms, best 3.64 ([3.76, 3.66, 3.71]).
+    - `publicationApplyTurns`:
+      - the walk's median of 21 calls: [2.13, 2.10, 2.16] ms ([2.11, 2.13, 2.09]);
+      - the apply's longest wait: [4.03, 4.02, 4.46] ms ([3.94, 3.92, 3.90]);
+      - the same with a move found for nearly every member: [5.88, 5.95, 5.86] ms ([5.92, 5.84, 5.78]).
+    - `inboundWalkTurns`: the 404's turn that walks 10,000 owed jobs [3.31, 3.43, 3.37] ms ([3.27, 3.25, 3.26]); the
+      429's `followedLane` with a verdict waiting [2.74, 2.73, 2.79] ms ([2.86, 2.83, 2.87]).
+    - The reclaim during an owed follow: [3.80, 3.79, 3.80] ms with one handle ([3.80, 3.77, 3.74]) and [4.90, 4.85,
+      4.83] ms with two ([4.96, 4.89, 4.91]).
+    - The mixed reclaim (1 member in 20 changed): [5.81, 6.12, 5.91] ms ([6.25, 6.21, 6.26]); with two handles [6.92,
+      6.85, 7.29] ms ([7.58, 8.19, 8.94]).
+    - The follow end and drain of 10,000 places: [4.93, 4.90, 4.86] ms ([4.91, 4.88, 4.90]).
+    - The follow's last turn plus the drain's first batch: the turn [4.71, 4.67, 4.65] ms ([4.78, 4.71, 4.78]); the
+      longest wait [4.96, 4.99, 4.94] ms.
+    - Throttle extension (correct #6): [7.20, 7.79, 7.24] ms, best 7.20 ([6.77, 10.41, 6.90]), at the quiet load
+      above.
+  - The other R-SYN cases' longest actor waits, as the log reports them (space parking and re-admission, network
+    edges, releases, a cancelled resolve, shutdown, refreshes, the prune announcement, retries, re-joins and the
+    breaker's cases): 0.02 to 5.24 ms.
+  - P-11: `speedup 3.6992047607935787 (min 3.0)`, concurrency 1 3.824 s and 5 1.034 s. P-9 p99 15.121 ms (budget
+    50.0, WP-G's). P-4 plan 10,000 11.50 ms (budget 20.0), ratio 2.02 (max 2.5).
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -6958,3 +7684,12 @@ Two earlier runs are kept:
   (`0684845` leaves its path as `3cd80c7` had it). The cycle-18 verifiers' probes were adapted into tests (their seeds
   kept), not re-run as probes. The R1 boundary probes were not re-run. TSan's load was sampled every 10 s, where S3-R12
   rule 1 asks for 5 s or less. `other-wp:b` (P-13, and P-5 in the `3cd80c7` run) is not WP-F's.
+- Cycle 20: RR-21's two misses are measured, not fixed. Their BenchSync cases fail, and the design under "Cycle 20",
+  "Open" item 1, is not implemented. `waitingTarget`'s window is analysed, not reached by a test, and so is the item-9
+  observation (the id's removal from `Job.assets` before the per-interest guards), which was not probed. Four rows of
+  the C2 inventory have no BenchSync figure. `scheduleDrainFollowUp`'s unspawnable branch has no test. The flake's
+  mechanism was observed with a temporary print, not committed. The observation runs were taken under other projects'
+  load and are not timings. TSan's load was stamped at its start and end only, not sampled during the run (S3-R12
+  rule 1 asks for 5 s or less). The cycle-19 verifiers' probes were adapted into tests (their shapes kept), not re-run
+  as probes. The R1 boundary probes were not re-run. The C2 figures are this host's only (no device run).
+  `other-wp:b` (P-13) is not WP-F's.
