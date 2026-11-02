@@ -4820,7 +4820,7 @@ The loads, as the 1-minute average across each round: round 1, 27.98 down to 1.9
 | `admissionRecordDrop` (4) | the admission is not recorded | killed 2/2 | `EngineFollowBarrierReplayTests.swift:97`, `:98` |
 | `purgeSubtractDrop` (4) | a purge leaves the withdrawn ids on the interest | survived its filter; killed by `full1` and `full2` | `EngineFollowBarrierMoveRevalidationTests.swift:212` |
 
-That is 42 mutants: 40 killed 2/2 (`keptCapDrop` from round 2, `purgeSubtractDrop` by the whole bundle twice) and one
+That is 42 mutants: 41 killed 2/2 (`keptCapDrop` from round 2, `purgeSubtractDrop` by the whole bundle twice) and one
 Equivalent (`moveInterestGoneDrop`).
 
 - **`moveInterestGoneDrop` is Equivalent** (S3-R19 item 2). With the token's interest gone, the mutant reads a
