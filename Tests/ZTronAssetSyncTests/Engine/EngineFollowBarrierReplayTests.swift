@@ -19,8 +19,11 @@ extension EngineFollowBarrierTests {
     /// turn re-queues `readmissionsPerTurn` members, which download, and owes the last 8 in the pump's order, P among
     /// them, to a follow-up turn the hold keeps waiting. v3 moves zz-p to new content N. Visited first,
     /// the visit moved P's interest onto N, queued at the apply, and the follow-up then re-queued the other 7 behind it,
-    /// so N starts before them. Re-admitted before the visit, the 7 took their places ahead of N (P, re-queued with them,
-    /// left the queue at its visit).
+    /// so N is admitted before them. Re-admitted before the visit, the 7 took their places ahead of N (P, re-queued with
+    /// them, left the queue at its visit). The order is the engine's own (`EngineState.admissionsForTests`): on four
+    /// slots N's attempt and the members' are in flight together, and each attempt's driver reaches the fake transport
+    /// only after its own store read (`answeredFromStore`), so the transport's records of the started requests need not
+    /// keep the engine's order (the cycle-19 flake of this test; Stage 3 close-out cycle 20, ruling S3-R25 item 4).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierReadmitsBehindTheOwedVisitsPlaces(_ visit: LaneDropVisit) async throws {
@@ -77,6 +80,7 @@ extension EngineFollowBarrierTests {
         let n = EngineHarness.onDemand("zz-p", nBytes)
         await s.harness.source.script(n.transferID, [.stage(nBytes)])
         let startsBefore = await s.harness.source.starts.count
+        await engine.readForTests { $0.state.admissionsForTests = [] }
         let sync = await FollowBarrier.apply([s.q] + FollowBarrier.fillers(862_000) + members + [n], s, visit: visit)
         // The follow-up turn (sweep-first: while the follow owes P's visit).
         await engine.readForTests { $0.releaseReadmissionFollowUps() }
@@ -89,7 +93,9 @@ extension EngineFollowBarrierTests {
             await engine.awaitCondition { e in !e.followBarrier && e.state.jobs.isEmpty }
         }
         let started = await s.harness.source.starts.dropFirst(startsBefore).map(\.id)
-        #expect(started.first == n.transferID, "N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): \(started.prefix(3))")
+        let admitted = await engine.readForTests { $0.state.admissionsForTests ?? [] }
+        #expect(admitted.first?.transfer == n.transferID, "N, queued at P's visit, is admitted before the members the follow-up re-queues (visit-first): \(admitted.prefix(3))")
+        #expect(Set(admitted.map(\.transfer)) == others.union([n.transferID]), "N and the 7 other owed members are admitted, P is not: \(admitted.count) admissions")
         #expect(Set(started) == others.union([n.transferID]), "N and the 7 other owed members start, P does not: \(started.count) starts")
         await engine.releaseGroup(token)
         await FollowBarrier.finish(s, sync: sync)

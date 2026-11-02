@@ -74,6 +74,12 @@ struct EngineState {
     var followFollowUpsHeld = false
     /// Test seam: a follow-up turn reached the hold and waits for its release.
     var followFollowUpWaiting = false
+    /// Test seam: while set, every attempt's start appends its admission here, in the order the engine admits them
+    /// (`SyncEngine.start`). The fake transport records a request when the attempt's driver reaches it, after the
+    /// driver's own store read (`answeredFromStore`), so attempts in flight together may reach it in either order: a
+    /// test of the order of admissions reads it here (Stage 3 close-out cycle 20, ruling S3-R25 item 4). No production
+    /// path sets it.
+    var admissionsForTests: [AttemptAdmission]?
     /// A pump found the follow barrier up (`SyncEngine.followBarrier`, F-28) and admitted nothing: every follow turn
     /// pumps again, and the drain's last batch pumps once the barrier is down (Stage 3, close-out cycles 3 and 9).
     var pumpWaitsForFollow = false
@@ -649,6 +655,18 @@ struct InboundTarget {
     let epoch: UInt64
     /// Its entry: an id the copy maps to the same transfer (`SyncEngine.sameTransfer`) moves onto it.
     let entry: ManifestEntry
+}
+
+/// One attempt's admission, as `EngineState.admissionsForTests` records it.
+struct AttemptAdmission: Equatable, Sendable {
+    /// The job's transfer.
+    let transfer: TransferID
+    /// The ticket of the queue entry it was admitted from (`Job.ticket`).
+    let ticket: UInt64
+    /// That entry's place in its lane queue (`Job.queuePlace`).
+    let place: Int64
+    /// The attempt.
+    let attempt: TransferAttempt
 }
 
 /// One transfer's outstanding work (ARCHITECTURE §7.1).

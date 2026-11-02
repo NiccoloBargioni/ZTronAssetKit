@@ -727,6 +727,7 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
+        self.state.admissionsForTests?.append(AttemptAdmission(transfer: transfer, ticket: job.ticket, place: job.queuePlace, attempt: attempt))
         // A new attempt: the last publication's ids, its end and its verdict are behind it (`Job.rerouteOnPass`,
         // `Job.attemptEnd`).
         job.rerouteOnPass = nil
