@@ -160,6 +160,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Owner, 2 Nov ~12:40:** about 150 % of a weekly Ultra allowance went into this work this week (100 % on another account, 38 % on this one), and that many fix cycles to fix what was first built is too much.
     - The orchestrator put a freeze on the table (path A below). The choice is the owner's: only the owner can waive C2 (S3-R20 item 1).
     - Time spent since "continue fix cycle from stage 5" (1 Nov 14:05): about 22 h. Cycles 19 and 20 took about 15 h (fix and verification); the read-only analyses and the S3-R26 work took about 7 h.
+  - **Owner, 2 Nov, after the stop:** "can we decide if it's realistically possible to converge to 10ms or it will never happen because during design we were too strict?"
+    - The orchestrator's answer is in `.build-orchestrator/s3f-c20-analysis/convergence-2nov.md`.
+    - Under 10 ms is technically reachable. The loop under the current bar does not converge: cycles 13–20 stayed at 5–8 blocking, and since cycle 12 nearly every item is a C2 figure or sits in the machinery added to split work over turns.
+    - The design was not too strict. SPEC.md:111 makes "~10 ms" a *(hint)* that P-9 proves (heartbeat gap p99 ≤ 50 ms).
+    - The hard 10.0 ms per turn at 10,000 ids came from Stage 2's `c2Budget` and from the rulings S3-R5, S3-R16 1(f) and S3-R20 to S3-R25. It was applied to an engine built without bounded turns.
+    - Path C below was added.
   - **Restart (Fri 6 Nov, after the 19:00 CET reset, in a fresh session the owner opens):**
     1. Read this block only. Check `get_usage`, that `git -C .worktrees/s3f status` is clean at `8e1fb24`, and that `.build-orchestrator/sim.lock` does not exist.
     2. Ask the owner which path to take, unless they have already said.
@@ -175,6 +181,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
        - Start the keep-awake, `caffeinate -ims -t 259200`, as a background task.
        - Watch with `python3 .build-orchestrator/tools/watch_journal.py <the new run's journal.jsonl> 0 1`. `.build-orchestrator/tools/dump_analysis.py` saves a read-only workflow's results as Markdown.
        - Forecast, 2 Nov: about 3 more cycles (2–5), 30 h or more, 40–50 weekly points, and about 12 % that cycle 21 is clean.
+       - Revised later on 2 Nov: there is no end to forecast under this bar. See `convergence-2nov.md`.
+    5. **Path C, re-scope C2 to the SPEC, then one fix pass.** This needs the owner's ruling on the new C2 bar.
+       - C2 is judged by P-9 plus a per-turn ceiling that the owner names. The orchestrator suggests 100 ms at 10,000 ids.
+       - The 10 ms per-turn figures become recorded residual risks. The answer, MUST and G4 bars are unchanged.
+       - Fix only the shapes over the ceiling, by re-indexing:
+         - `move`: 80 ms at 16 moves, 305 ms at 64. Fix it with a per-job interest index, as in cycle 20's fix text.
+         - Optionally, `deferBehindVerdict`'s per-verdict buckets.
+       - Write that ruling as S3-R26 in place of the RR-21 draft, which stays unused. Write a new focus into a copy of `s3-fix-args-run7.json`, then launch from cycle 21.
+       - Forecast: about 1 cycle, about 10 h, about 15 weekly points.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
