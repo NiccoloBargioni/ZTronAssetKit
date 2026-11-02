@@ -2006,6 +2006,11 @@ extension SyncEngine {
         if self.isRunning, !events.isEmpty, !self.followOwed, !self.state.drainFollowUpScheduled, !self.state.drainingAfterFollow {
             violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
         }
+        // Only a running engine follows, so a follow-up turn is never owed when `spawn` refuses its task
+        // (`scheduleFollowFollowUp`; Stage 3 close-out cycle 20, ruling S3-R25 item 7).
+        if !self.isRunning, self.followOwed {
+            violations.append("a follow is owed while the engine is \(self.state.lifecycle)")
+        }
         var verdicts: Set<TransferID> = []
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
         for event in events {

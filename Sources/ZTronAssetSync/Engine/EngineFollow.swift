@@ -1293,7 +1293,7 @@ extension SyncEngine {
     }
 
     /// Drops every owed move and the rest of a visit (`EngineState.followMoving`), and resumes every publication that
-    /// waited for one (shutdown, or a follow-up that cannot be spawned): nothing follows any more.
+    /// waited for one (shutdown): nothing follows any more.
     func releaseInboundWaits() {
         self.state.followMoving = nil
         self.state.inboundMoves = []
@@ -1325,31 +1325,25 @@ extension SyncEngine {
         }
     }
 
-    /// Schedules one later turn for the visits a follow turn left after `followsPerTurn`. When none can be spawned
-    /// (shutting down), the follow ends here: the jobs it still owed stay in `unfollowed` for the next follow.
+    /// Schedules one later turn for the visits a follow turn left after `followsPerTurn`. Only a running engine follows,
+    /// so the task is always spawned (`spawn` refuses one only while shutting down or degraded): a follow starts only
+    /// while the engine runs (an apply's end, a catch-up and an admission re-read the lifecycle before they follow), the
+    /// engine degrades only while starting, before any apply, and shutdown's first turn drops the owed follow with the
+    /// job table (`drainEverything`), after which a scheduled follow-up returns at once (`followFollowUp`). The branch
+    /// that ended the follow when no task could be spawned, which no path reached, was removed under ruling S3-R25
+    /// item 7 (Stage 3 close-out cycle 20); `followBarrierViolations` checks the assumption.
     private func scheduleFollowFollowUp() {
         guard !self.state.followFollowUpScheduled else {
             return
         }
         self.state.followFollowUpScheduled = true
-        let spawned = self.spawn(.entry) { engine in
+        self.spawn(.entry) { engine in
             // REENTRANCY: RE-S44 (proposed) — the follow-up hops onto the actor and re-reads everything it uses: the
             // owed passes and the visit cursor (a newer apply's follow may have extended or restarted them), the copy as
             // it stands then (each pass compares with it), whether each job is still owed a visit (in `unfollowed`, which
             // `removeJob` leaves) and still exists, and its state and ids, so a job that moved, started, ended or was
             // re-joined meanwhile is followed as it is now.
             await engine.followFollowUp()
-        }
-        if spawned == nil {
-            // The jobs found so far stay in `unfollowed`; the owed passes and moves are dropped: shutting down, nothing
-            // follows, and a publication that waited for a move is resumed.
-            self.state.followFollowUpScheduled = false
-            self.state.followOrder = []
-            self.state.followNext = 0
-            self.state.followScans = []
-            self.state.followCarried = []
-            self.state.pumpWaitsForFollow = false
-            self.releaseInboundWaits()
         }
     }
 
