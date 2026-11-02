@@ -182,14 +182,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
        - Watch with `python3 .build-orchestrator/tools/watch_journal.py <the new run's journal.jsonl> 0 1`. `.build-orchestrator/tools/dump_analysis.py` saves a read-only workflow's results as Markdown.
        - Forecast, 2 Nov: about 3 more cycles (2–5), 30 h or more, 40–50 weekly points, and about 12 % that cycle 21 is clean.
        - Revised later on 2 Nov: there is no end to forecast under this bar. See `convergence-2nov.md`.
-    5. **Path C, re-scope C2 to the SPEC, then one fix pass.** This needs the owner's ruling on the new C2 bar.
-       - C2 is judged by P-9 plus a per-turn ceiling that the owner names. The orchestrator suggests 100 ms at 10,000 ids.
-       - The 10 ms per-turn figures become recorded residual risks. The answer, MUST and G4 bars are unchanged.
-       - Fix only the shapes over the ceiling, by re-indexing:
-         - `move`: 80 ms at 16 moves, 305 ms at 64. Fix it with a per-job interest index, as in cycle 20's fix text.
-         - Optionally, `deferBehindVerdict`'s per-verdict buckets.
-       - Write that ruling as S3-R26 in place of the RR-21 draft, which stays unused. Write a new focus into a copy of `s3-fix-args-run7.json`, then launch from cycle 21.
-       - Forecast: about 1 cycle, about 10 h, about 15 weekly points.
+    5. **Path C, re-scope C2.** This applies only if the owner rules a new per-turn ceiling. Until then, C2 stays 10 ms.
+       - On 2 Nov the owner said 100 ms is too much, and asked for an analysis of 40 ms only: "remember I didn't say to set to 40ms, bar is still 10ms. Just run analysis."
+       - The analysis is in `.build-orchestrator/s3f-c20-analysis/analysis-40ms.md`. In short:
+         - Each of the five shapes over 32 ms has a fix that splits no work: format each transfer id once, filter before sorting, join in place, use smaller deferred events, and drop the sort and copy per move.
+         - The main risk is the "any grouping" rule. The reviewers expect the verifiers to build new groupings, estimated at 35–60 ms even after the fixes.
+         - Forecast: about 3–4 cycles (2–5), about 20–40 h and about 45–60 weekly points.
+       - If the owner rules a new ceiling:
+         - The answer, MUST and G4 bars stay unchanged.
+         - Write the ruling as S3-R26 in place of the RR-21 draft.
+         - Write a new focus into a copy of `s3-fix-args-run7.json`, then launch from cycle 21.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
