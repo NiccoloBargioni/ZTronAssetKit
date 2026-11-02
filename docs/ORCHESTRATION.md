@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 12:00 CET): fix run 6 is PAUSED before cycle 21's fixer; S3-R26 was corrected after a first review and is under a second read-only review (task `wym0emnzq`) before it is appended** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
+- **Now (2 Nov 12:40 CET): Stage 3 is STOPPED before WP-F's cycle 21, by the owner's decision. Restart from a fresh session on Fri 6 Nov after the 19:00 CET reset: see "Restart" below. Nothing is scheduled.** Fix run 6 (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`) ran from 1 Nov 14:13 and is finished; its cache is same-session only, so it is not resumed.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -13,8 +13,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - A miss seen only above load 50 follows S3-R12 and S3-R5.
     - A turn bound is pinned twice: by a deterministic test, and by the BenchSync case taken at load ≤ 10.
     - A case not measured at a quiet load is neither confirmed nor blocking. The orchestrator measures it before ruling convergence.
-  - **Keep-awake:** `caffeinate -ims -t 259200`, from 14:12 to 4 Nov 14:12, as a background task of this session.
-  - **Watcher:** `watch_journal.py` in this session's scratchpad wakes the orchestrator at each agent result, so put-backs are ruled between cycles.
+  - **Keep-awake:** `caffeinate -ims -t 259200` ran from 1 Nov 14:12 and was stopped on 2 Nov at 12:40, when the owner stopped the work.
+  - **Watcher:** `watch_journal.py` wakes the orchestrator at each agent result, so put-backs are ruled between cycles. A copy is in `.build-orchestrator/tools/`.
   - **Retired scheduled task:** `ztron-assetkit-resume-after-reset` (Thu 5 Nov 03:10) waited for a reset that had already come.
     - Owner, 1 Nov: "Yes, disable it".
     - `list_scheduled_tasks` shows no tasks at all, so nothing is armed that the tool can disable.
@@ -153,13 +153,28 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - item 3's merge gate has a criterion and a contingency (a lazy index);
       - a decision rule for figures that cannot be taken at a quiet load;
       - a red-first rule for shapes that need the new code (a scratch copy, as S3-R3 does).
-  - **Second review:** `wf_de4b1184-3b7` (task `wym0emnzq`), launched 11:57, read-only. One lens checks that each finding is resolved; the other reads the rewrite fresh.
-  - **Next:**
-    - Apply the second review's findings and append S3-R26 to `.build-orchestrator/s3-rulings-s3f.md`.
-    - Then resume run 6.
-  - **Resume:**
-    - In this session, append S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
-    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from cycle 21 (`fromCycle: 21`), with `findingsFile: s3f-c20-issues.json`.
+  - **Second review:** `wf_de4b1184-3b7` (task `wym0emnzq`), 11:57–12:35, read-only. 33 of the 42 findings are fully resolved. 3 must-fix and 12 should-fix findings remain, saved as `.build-orchestrator/s3f-c20-analysis/s3-r26-review2.md`. **S3-R26 is not appended.**
+  - **Owner, 2 Nov ~12:15:** "stop before cycle 21 and write to orchestration to restart from a clean session on Friday. You don't schedule it, I will open a new session and request to resume".
+    - The keep-awake (`bcrry29s9`) was stopped at 12:40.
+    - Nothing runs: the worktree is clean at `8e1fb24`, with no `sim.lock`.
+  - **Owner, 2 Nov ~12:40:** about 150 % of a weekly Ultra allowance went into this work this week (100 % on another account, 38 % on this one), and that many fix cycles to fix what was first built is too much.
+    - The orchestrator put a freeze on the table (path A below). The choice is the owner's: only the owner can waive C2 (S3-R20 item 1).
+    - Time spent since "continue fix cycle from stage 5" (1 Nov 14:05): about 22 h. Cycles 19 and 20 took about 15 h (fix and verification); the read-only analyses and the S3-R26 work took about 7 h.
+  - **Restart (Fri 6 Nov, after the 19:00 CET reset, in a fresh session the owner opens):**
+    1. Read this block only. Check `get_usage`, that `git -C .worktrees/s3f status` is clean at `8e1fb24`, and that `.build-orchestrator/sim.lock` does not exist.
+    2. Ask the owner which path to take, unless they have already said.
+    3. **Path A, freeze WP-F at `8e1fb24`** (the orchestrator's recommendation on 2 Nov).
+       - Cycle 20's verification left no answer difference. `--quick` PASS, 561/561 ×3, TSan clean, coverage 94.4 %, simulator 1,515/1,515 on both lenses.
+       - Of its 8 blocking items, 6 are C2 figures at 10,000 ids in worst-case groupings (41–49 ms, 47 ms, 41 ms, 36–40 ms, 80–305 ms, and 10.16 ms against the 10 ms budget). 2 are G4: `waitingTarget`'s unreached case, and `scheduleDrainFollowUp`'s unspawnable branch.
+       - It needs the owner's explicit C2 waiver for those six shapes. Record it, with the figures, in `docs/adr-drafts/s3f.md` and in Stage 5's `docs/RESIDUAL-RISKS.md`.
+       - Optional small pass, one fixer and one verifier: remove the unspawnable branch (S3-R26 draft item 6), and add item 5's test. Otherwise record both as residual G4 gaps.
+       - Then the post-convergence list: merge `wp/s3f` with `--no-ff`; the tools-6.4 check; the phase-A gates; TSan and `--perf` on an idle host; an independent verifier for P-13; the mutation re-check of the 11 survivors; ADR-057 through `assetkit-level-docs.js`; tag `s3-merged`; remove the s3 worktrees and branches. Then Stage 5.
+    4. **Path B, continue the cycles.**
+       - Apply `s3-r26-review2.md`'s findings to `.build-orchestrator/s3f-c20-analysis/s3-r26-draft.md`. Fill in its time, and append it to `.build-orchestrator/s3-rulings-s3f.md`.
+       - Launch a new run from cycle 21: `Workflow({scriptPath: ".claude/workflows/assetkit-stage3-fix.js", args: <the JSON in .build-orchestrator/s3-fix-args-run7.json>})`. It has `fromCycle: 21`, `findingsFile: s3f-c20-issues.json`, the S3-R26 focus, and no usage stop. Pass no `resumeFromRunId`.
+       - Start the keep-awake, `caffeinate -ims -t 259200`, as a background task.
+       - Watch with `python3 .build-orchestrator/tools/watch_journal.py <the new run's journal.jsonl> 0 1`. `.build-orchestrator/tools/dump_analysis.py` saves a read-only workflow's results as Markdown.
+       - Forecast, 2 Nov: about 3 more cycles (2–5), 30 h or more, 40–50 weekly points, and about 12 % that cycle 21 is clean.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
