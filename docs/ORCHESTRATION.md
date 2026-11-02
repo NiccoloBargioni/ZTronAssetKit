@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 05:40 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
+- **Now (2 Nov 08:25 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written; a third read-only analysis vets RR-21** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -117,10 +117,22 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Rows 3–5 are the inventory's "no figure" rows, now measured at a load of 10 or less. The analysts predicted them.
     - No regression: `--quick` PASS, 561/561 ×3, TSan clean, coverage 94.4 %, simulator 1,515/1,515 on both lenses.
   - **Cycle-21 fixer paused** at 05:30, one minute in: TaskStop `wt8pjmmof`, with the worktree clean at `8e1fb24` and no `sim.lock`. Its first start (agent `a36c8f13…`) read the rulings before S3-R26 existed. Resuming starts a fresh fixer, as at 23:29.
-  - **Second analysis:** `wf_bc7908d4-1ad` (task `wv109mqwm`), launched 05:37, read-only.
-    - Three designers take the new C2 items: the deferred joins behind a verdict, `move`'s cost (with `continueMove`'s `Job.assets` removal), and the commit turn's headroom.
-    - An adversarial critic checks each design, and an integrator then combines them with the RR-21 judge's design.
-    - S3-R26 is written from both analyses, and then run 6 resumes.
+  - **Second analysis:** `wf_bc7908d4-1ad` (task `wv109mqwm`), launched 05:37, read-only, **done 08:14** (7 agents, no errors).
+    - Three designers took the new C2 items: the deferred joins behind a verdict, `move`'s cost (with `continueMove`'s `Job.assets` removal), and the commit turn's headroom.
+    - An adversarial critic checked each design, and an integrator combined them into `.build-orchestrator/s3f-c20-analysis/integrate-c21.md`:
+      - item A: a bucket per waiting verdict, placed at the drain's batch formation;
+      - item B: a per-job id-to-holders index;
+      - item C: commit-window Phase 1, in place, plus a contingent Phase 2;
+      - 18 interactions with RR-21, an implementation order, and 5 open questions for the orchestrator.
+    - The RR-21 judge had not finished, so the integrator built on `design-minimal.md`.
+  - **Analysis 1 at 08:15:** `design:reuse` (agent `afde5b69…`) is still reading code after 4.5 hours. `judge:rr21` has not started. `design-fixer.md` is saved.
+  - **Third analysis:** `wf_c114d84e-f12` (task `wuzekt260`), launched 08:25, read-only.
+    - Three critics vet `design-minimal`'s RR-21 against the code and `integrate-c21.md`: answers, MUSTs and liveness; C2, G4, pins and reuse; composition with items A–C.
+    - An integrator then writes RR-21's section in the same format. At its start, it saves any `design-reuse` or `judge-rr21` result and weighs it.
+  - **Next:**
+    - Write S3-R26 from `integrate-c21.md` and the third analysis's RR-21 section.
+    - Rule on the 5 open questions.
+    - Then resume run 6.
   - **Resume:**
     - In this session, write S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
     - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from cycle 21 (`fromCycle: 21`), with `findingsFile: s3f-c20-issues.json`.
