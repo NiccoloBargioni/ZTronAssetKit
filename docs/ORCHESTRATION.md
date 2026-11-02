@@ -77,10 +77,36 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Plan for 2–5 more cycles, about 3 expected: 18–45 h.
     - The weekly meter is account-wide, so it includes the owner's other sessions. It went from 0 to 13 % between 14:08 and 23:30, about 1.4 points an hour, or about 10–13 points a cycle.
     - That gives 20–60 points for the cycles, plus 10–20 for the merge, the gates, ADR-057 and Stage 5. The reset is Fri 6 Nov 19:00.
-  - **Watcher:** armed to wake the orchestrator when the cycle-20 fixer returns, at the 4th result.
+  - **Cycle 20 fix** ran 23:29–03:44 (4 h 15 min) and ended at `8e1fb24`, 13 commits from `8cfc76e`.
+    - **Fixed or met** 7 of the 8 items:
+      - the drain shares one turn's ids (`drainIDsLeft`, `ddb0ba1`);
+      - per-lane interest counts with a recount invariant, and `dropInterest` in place (`f066083`);
+      - the unspawnable branch is removed. Trying to reach it found a real path: an admission whose store calls straddle shutdown's start. The admission now re-reads the lifecycle (`429ace5` the failing test, `bf1d4eb` the fix);
+      - the flaky test now asserts the engine's admission order (`daa426d`). The engine admitted N first in 60 of 60 runs on the simulator and under coverage, and no other test asserts the transport's start order with more than one attempt in flight;
+      - the turn-total pins and the checksum-less target (`ca6df35`), and `EngineMoves :203/:206/:222` reached (`c2f9e31`).
+    - **Gates per the fixer:**
+      - `VERIFY: PASS`; Sync 561 tests ×3; TSan clean; Sync coverage 94.54 %; simulator 1,515/1,515;
+      - the new C2 cases run 4.1–8.0 ms; the commit window is 9.86 ms (inside by 0.14 ms).
+      - Benchmarks fail only P-13 (WP-B) and RR-21's two new cases.
+    - **Mutants:** 42; 41 killed 2/2 and 1 Equivalent.
+    - **Open, blocking:**
+      - RR-21: the commit's re-routes take 48.68 ms and the drain's take-off of moved-before ids 45.67 ms, best at load ≤ 5.6. A design is proposed but not built.
+      - `waitingTarget`'s queued case: there is only a reading of it.
+    - **Put back:**
+      - RR-21's design;
+      - `waitingTarget`'s window;
+      - 4 C2 inventory rows with no figure (`move`'s sort, `deferBehindVerdict`, `recordDeferredVerdict`'s filter, `supersede`'s re-routes);
+      - `continueMove` taking the id off `Job.assets` before its guards;
+      - `scheduleDrainFollowUp`'s unspawnable branch (0 hits).
+  - **Analysis for S3-R26:** `wf_6b2553de-48c` (task `wsmhgi3wg`), launched 03:50.
+    - It is read-only and makes no builds.
+    - Three independent RR-21 designs (reuse the bounded moves; the fixer's design; fewest states) go to an adversarial judge.
+    - Two analysts take the other put-backs: `waitingTarget` and the drain branch; `continueMove`'s order and the inventory rows.
+    - S3-R26 is written from its result before the cycle-21 fixer starts. If the verifiers return first, that fixer is restarted, as at 23:28.
+  - **Watcher:** armed for both cycle-20 verifiers, at the 6th result.
   - **Resume:**
     - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`.
-    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle. Use the last verification's issues as `findingsFile`; while cycle 20 runs, that file is `s3f-c19-issues.json`.
+    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle, with the last verification's issues as `findingsFile`. While cycle 20's verification runs, that file is `s3f-c19-issues.json`.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
