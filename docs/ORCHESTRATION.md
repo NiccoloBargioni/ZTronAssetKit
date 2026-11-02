@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (1 Nov 14:13 CET): fix run 6 is RUNNING** `wf_d6632791-fdd` in session `03c95f5a-f115-421f-9542-6de93e7caf98`. Since the 23:29 resume its task is `wt8pjmmof`; it was `wge0vsaky`.
+- **Now (2 Nov 05:40 CET): fix run 6 is PAUSED before cycle 21's fixer, while S3-R26 is written** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -102,11 +102,28 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - It is read-only and makes no builds.
     - Three independent RR-21 designs (reuse the bounded moves; the fixer's design; fewest states) go to an adversarial judge.
     - Two analysts take the other put-backs: `waitingTarget` and the drain branch; `continueMove`'s order and the inventory rows.
-    - S3-R26 is written from its result before the cycle-21 fixer starts. If the verifiers return first, that fixer is restarted, as at 23:28.
-  - **Watcher:** armed for both cycle-20 verifiers, at the 6th result.
+    - The analysts and the minimal design were done by 05:05. Their results are saved as Markdown in `.build-orchestrator/s3f-c20-analysis/`.
+  - **Cycle 20 verification** (03:44–05:29, on `8e1fb24`): not converged. correct: 7 blocking of 8; reqs: 5 blocking of 11. The verdicts are in `.build-orchestrator/s3f-c20-issues.json`, numbered per lens, and the probes are in `.build-orchestrator/s3f-probes-c20/`.
+    - 7 of cycle 19's 8 items are confirmed fixed. Only `waitingTarget` is left (0 hits).
+    - 8 distinct blocking items:
+      1. RR-21: the commit's re-routes (47.99–49.34 ms best).
+      2. RR-21: the drain's take-off (47.03 ms best).
+      3. `supersede` of a superseded publication (41.09 ms).
+      4. `deferBehindVerdict` is O(E) a join (35.78–39.55 ms).
+      5. `move` re-sorts a holder once per owed move (79.55 ms at 16 moves, 304.79 ms at 64).
+      6. The commit-window pin misses: 10.16 ms best at load 3.12 (correct lens); reqs measured 9.82 ms.
+      7. `waitingTarget` is still unreached.
+      8. `scheduleDrainFollowUp`'s unspawnable branch is unreached.
+    - Rows 3–5 are the inventory's "no figure" rows, now measured at a load of 10 or less. The analysts predicted them.
+    - No regression: `--quick` PASS, 561/561 ×3, TSan clean, coverage 94.4 %, simulator 1,515/1,515 on both lenses.
+  - **Cycle-21 fixer paused** at 05:30, one minute in: TaskStop `wt8pjmmof`, with the worktree clean at `8e1fb24` and no `sim.lock`. Its first start (agent `a36c8f13…`) read the rulings before S3-R26 existed. Resuming starts a fresh fixer, as at 23:29.
+  - **Second analysis:** `wf_bc7908d4-1ad` (task `wv109mqwm`), launched 05:37, read-only.
+    - Three designers take the new C2 items: the deferred joins behind a verdict, `move`'s cost (with `continueMove`'s `Job.assets` removal), and the commit turn's headroom.
+    - An adversarial critic checks each design, and an integrator then combines them with the RR-21 judge's design.
+    - S3-R26 is written from both analyses, and then run 6 resumes.
   - **Resume:**
-    - In this session, use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`.
-    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from the next cycle, with the last verification's issues as `findingsFile`. While cycle 20's verification runs, that file is `s3f-c19-issues.json`.
+    - In this session, write S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
+    - From a fresh session, read `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/03c95f5a-f115-421f-9542-6de93e7caf98/subagents/workflows/wf_d6632791-fdd/journal.jsonl` and start a new run from cycle 21 (`fromCycle: 21`), with `findingsFile: s3f-c20-issues.json`.
 - **Owner, 29 Oct:** "Finish from Orchestration.md", taken as the go-ahead for Stage 3 and then Stage 5 (Stage 4 stays cancelled).
   - No stop was given, so the orchestrator first applied a default of 70 % (the hunt and the close-outs gated at 65).
 - **Owner, 29 Oct 15:2x: "Do not set any budget stop. List P99".**
