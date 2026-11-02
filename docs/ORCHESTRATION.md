@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 11:10 CET): fix run 6 is PAUSED before cycle 21's fixer; S3-R26 is written and under a read-only review (task `wuul7n4ml`) before it is appended** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
+- **Now (2 Nov 12:00 CET): fix run 6 is PAUSED before cycle 21's fixer; S3-R26 was corrected after a first review and is under a second read-only review (task `wym0emnzq`) before it is appended** (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`). It started 1 Nov 14:13. Its tasks were `wge0vsaky`, then `wt8pjmmof` from the 23:29 resume.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -140,9 +140,22 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - It found one more hole: a run that settles mid-drain. The fix is a counter guard in `checkRunSettled`.
     - About 32 branches, 30 tests and 17 BenchSync cases. It puts a clean cycle 21 at about 0.3 in RR-21's area, and about 0.12 for the whole plan.
   - **S3-R26 written 11:10** from `integrate-c21.md` and `integrate-rr21.md`. It answers the 7 RR-21 open questions, the integrator's 9 and `integrate-c21.md`'s 5. The draft is `.build-orchestrator/s3f-c20-analysis/s3-r26-draft.md`.
-  - **Ruling review:** `wf_192ea945-460` (task `wuul7n4ml`), launched 11:10, read-only. Two lenses (the bar and earlier rulings; the two specs) look for contradictions before the ruling is appended.
+  - **Ruling review:** `wf_192ea945-460` (task `wuul7n4ml`), launched 11:10, read-only. Two lenses (the bar and earlier rulings; the two specs) looked for contradictions before the ruling is appended.
+    - **Done 11:54:** 42 findings (6 must-fix, 24 should-fix, 12 nits), saved as `.build-orchestrator/s3f-c20-analysis/s3-r26-review-v1.md`. The must-fix ones:
+      - two tests required at site 2, where their shapes cannot exist;
+      - two forms of the commit's `refused` check;
+      - a pin case ruled timing that S3-R24 item 5 makes blocking, now a probe (`PROBE-RR21-PIN-END`);
+      - a test-change rule looser than G3 and S3-R16 item 4;
+      - R18 placed in a step where it cannot exist yet.
+    - All 42 are applied in the rewrite (`s3-r26-draft.md`; the first version is `s3-r26-draft-v1.md`). Other changes in the rewrite:
+      - labels carry their spec's prefix (`rr21-`, `A-`, `B-`);
+      - Phase 2 has four triggers, all landing at step 6;
+      - item 3's merge gate has a criterion and a contingency (a lazy index);
+      - a decision rule for figures that cannot be taken at a quiet load;
+      - a red-first rule for shapes that need the new code (a scratch copy, as S3-R3 does).
+  - **Second review:** `wf_de4b1184-3b7` (task `wym0emnzq`), launched 11:57, read-only. One lens checks that each finding is resolved; the other reads the rewrite fresh.
   - **Next:**
-    - Apply the review's must-fix findings and append S3-R26 to `.build-orchestrator/s3-rulings-s3f.md`.
+    - Apply the second review's findings and append S3-R26 to `.build-orchestrator/s3-rulings-s3f.md`.
     - Then resume run 6.
   - **Resume:**
     - In this session, append S3-R26, then use `resumeFromRunId: "wf_d6632791-fdd"` with the same script and the unchanged `s3-fix-args-run6.json`. Every agent through cycle 20's verification is served from the cache, and the cycle-21 fixer starts fresh.
