@@ -84,6 +84,11 @@ extension EngineFollowBarrierTests {
             let unavailable = TransferError.transient(.serverError(httpStatus: 503), retryAfter: .seconds(120))
             expect(.attempt(.retry(unavailable, answer: nil, wall: wall)), "503 after 120 s, U kept", mixed, [u: true, w: true, g: true], on: engine)
             expect(.attempt(.retry(unavailable, answer: nil, wall: wall)), "503 after 120 s, background", background, [w: false, g: false], on: engine)
+            // The second attempt's count answers U at its cap, so the job keeps the background lane, whose 3,600 s the
+            // `Retry-After` is within: W and G are retried, as `retryLater` reads the lane of the interests the count
+            // leaves (a lane read with U's capped interest in it ended the job for them on the user lane's 30 s; Stage 3
+            // close-out cycle 20, the drop-mutant of the cap in the lane read from the counts, S3-R25 item 10).
+            expect(.attempt(.retry(unavailable, answer: nil, wall: wall)), "503 after 120 s, U at its cap", second, [u: true, w: false, g: false], on: engine)
             // A throttle's park: its wait read against each lane's limit (2 s for the user lane, none for prefetch).
             let end = MonotonicInstant(nanoseconds: 10_000_000_000)
             expect(.attempt(.throttle(ThrottleFacts(retryAfter: 10, decision: .until(end)))), "429 for 10 s", mixed, [u: true, w: false, g: false], on: engine)
@@ -123,7 +128,7 @@ extension EngineFollowBarrierTests {
     @Test("R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)", .timeLimit(.minutes(3)))
     func verdictAnswersMirrorTheReplays() async {
         let cases = await Self.verdictAnswerCases()
-        #expect(cases.count == 49, "every case ran: \(cases.count)")
+        #expect(cases.count == 52, "every case ran: \(cases.count)")
         for item in cases {
             #expect(item.answers == item.expected, "\(item.label): verdictAnswers \(item.answers), the replay \(item.expected)")
         }
