@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (2 Nov 12:40 CET): Stage 3 is STOPPED before WP-F's cycle 21, by the owner's decision. Restart from a fresh session on Fri 6 Nov after the 19:00 CET reset: see "Restart" below. Nothing is scheduled.** Fix run 6 (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`) ran from 1 Nov 14:13 and is finished; its cache is same-session only, so it is not resumed.
+- **Now (2 Nov 14:15 CET): Stage 3 is STOPPED before WP-F's cycle 21, by the owner's decision. The owner turned the PC off at 14:15 while a read-only profiling run was in progress: see "Restart" step 1a. Restart the WP-F cycles from a fresh session on Fri 6 Nov after the 19:00 CET reset: see "Restart" below. Nothing is scheduled.** Fix run 6 (`wf_d6632791-fdd`, session `03c95f5a-f115-421f-9542-6de93e7caf98`) ran from 1 Nov 14:13 and is finished; its cache is same-session only, so it is not resumed.
   - **Owner, 1 Nov ~14:05:** "continue fix cycle from stage 5", read as: continue WP-F from where run 5 stopped (cycle 19).
   - **Usage:** the weekly meter reset early. At 14:08 it read 0 % for all models and for Fable. The next reset is **Fri 6 Nov 19:00 CET**, not Thu 5 Nov 03:00.
   - **Args:** `.build-orchestrator/s3-fix-args-run6.json`: fromCycle 19, maxCycle 30, findings `s3f-c18-issues.json`, simulator set 1, Opus, no usage stop. The focus also names S3-R23.
@@ -168,6 +168,19 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Path C below was added.
   - **Restart (Fri 6 Nov, after the 19:00 CET reset, in a fresh session the owner opens):**
     1. Read this block only. Check `get_usage`, that `git -C .worktrees/s3f status` is clean at `8e1fb24`, and that `.build-orchestrator/sim.lock` does not exist.
+    1a. **Unfinished: the profiling the owner asked for on 2 Nov ("Profile them").** Do this whenever the owner resumes, even before Friday. It is analysis only: C2 stays 10 ms.
+       - **What it is.** The read-only workflow `wf_6927a3a9-c76` started at about 14:00.
+         - It profiles commit re-routes, the drain take-off and `supersede` in a scratch copy of `8e1fb24` under `.build-prof40/`, with one profiler and one independent reviewer.
+         - The goal is to test the INFERRED cost split in `.build-orchestrator/s3f-c20-analysis/analysis-40ms.md`. That split says formatting the transfer id 3–4 times per id is about 40–50 % of the 41–49 ms turns.
+       - **What happened.** The PC was turned off at 14:15, before it finished. At 14:15 no report existed (`profile-40ms.md`).
+       - **If `.build-orchestrator/s3f-c20-analysis/profile-40ms.md` exists,** treat it as cut off: incomplete and unreviewed.
+       - **To re-run it:**
+         - Run `rm -rf /Users/admin/Documents/ZTronAssetKit/.build-prof40`.
+         - Then run `Workflow({scriptPath: "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/tools/wpf-profile-40ms.js"})`, with no `resumeFromRunId`: a run resumes only in its own session.
+         - The script is a copy of the one that ran.
+         - Expect about 45–90 min and about 1–2 weekly points.
+         - Timings count only at a 1-minute load of 10 or less (S3-R23); the profile shares hold at any load.
+       - **Then report to the owner,** as "if the ceiling were 40 ms", per the 2 Nov rule: a value the owner floats is analysis, not a ruling.
     2. Ask the owner which path to take, unless they have already said.
     3. **Path A, freeze WP-F at `8e1fb24`** (the orchestrator's recommendation on 2 Nov).
        - Cycle 20's verification left no answer difference. `--quick` PASS, 561/561 ×3, TSan clean, coverage 94.4 %, simulator 1,515/1,515 on both lenses.
