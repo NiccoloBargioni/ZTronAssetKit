@@ -905,9 +905,16 @@ struct DrainVerdictRun: CustomStringConvertible {
     var heldAfter = 0
     /// The heartbeat's longest wait over those turns, in milliseconds.
     var wait: Double = 0
+    /// The most joins waiting behind verdicts after any of those turns (`EngineState.joinsBehindVerdicts`): the chained
+    /// shape's visits wait theirs behind the next job's verdict (Stage 3 close-out cycle 21, candidate 4).
+    var mostBehind = 0
+    /// The invariants' report once the drain ended.
+    var violations: [String] = []
+    /// The host's load averages before and after the run (S3-R23).
+    var load = ""
 
     var description: String {
-        "\(self.turns.count) turns, longest \(self.turns.max() ?? 0) ms; heartbeat \(self.wait) ms; verdicts waiting \(self.waitingBefore), ids held \(self.heldBefore) then \(self.heldAfter); moved per turn \(self.moved)"
+        "\(self.turns.count) turns, longest \(self.turns.max() ?? 0) ms; heartbeat \(self.wait) ms; verdicts waiting \(self.waitingBefore), ids held \(self.heldBefore) then \(self.heldAfter); moved per turn \(self.moved); most behind verdicts \(self.mostBehind); load \(self.load)"
     }
 }
 
@@ -944,8 +951,12 @@ extension SyncBench {
     /// (`SyncBenchmarks.drainVerdictTurns`): every job downloads (held); v3 changes only fillers, with the follow's
     /// follow-ups held, so the follow is owed when every attempt times out (a retry: the interests stay) and each verdict
     /// waits; v4 gives every member a content of its own. The follow's and the drain's held turns are then released one
-    /// at a time under the heartbeat, each timed inside the actor, with the members' ids it moved off their jobs.
-    static func drainVerdicts(slots: Int, perJob: Int) async throws -> DrainVerdictRun {
+    /// at a time under the heartbeat, each timed inside the actor, with the members' ids it moved off their jobs. With
+    /// `chained`, v4 maps job k's members to job k + 1's content instead (the last job's to contents of their own), whose
+    /// verdict waits later in the batch: each visit's joins wait behind that verdict and replay right behind it
+    /// (`joinWaitsForVerdict`; Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 5, candidate 4).
+    static func drainVerdicts(slots: Int, perJob: Int, chained: Bool = false) async throws -> DrainVerdictRun {
+        let loadBefore = SyncBench.loadAverages()
         let time = ManualTimeSource()
         let source = FakeRemoteSource()
         let conditions = FakeDeviceConditionsSource()
@@ -992,7 +1003,8 @@ extension SyncBench {
             for m in 0..<perJob {
                 let name = String(format: "s%02d%05d", k, m)
                 members.append(SyncBench.entry(name, contents[k], policy: .onDemand))
-                own.append(SyncBench.entry(name, GeneratedPayload.bytes(seed: 0x88_000 + UInt64(k * 100_000 + m), offset: 0, length: 16), policy: .onDemand))
+                let next = chained && k + 1 < slots ? contents[k + 1] : GeneratedPayload.bytes(seed: 0x88_000 + UInt64(k * 100_000 + m), offset: 0, length: 16)
+                own.append(SyncBench.entry(name, next, policy: .onDemand))
             }
         }
         let jobs = (0..<slots).map { members[$0 * perJob].transferID }
@@ -1043,6 +1055,7 @@ extension SyncBench {
         var turns: [Double] = []
         var moved: [Int] = []
         var heldNow = before.ids
+        var mostBehind = 0
         run.wait = try await SyncBench.longestWait(on: engine) {
             spins = 0
             while !Task.isCancelled, !(await SyncBench.followDrained(engine)) {
@@ -1051,6 +1064,7 @@ extension SyncBench {
                     let now = await SyncBench.drainHeld(engine, jobs).ids
                     moved.append(heldNow - now)
                     heldNow = now
+                    mostBehind = max(mostBehind, await SyncBench.joinsBehindVerdicts(engine))
                 } else {
                     spins += 1
                     if spins > 5_000_000 {
@@ -1063,8 +1077,11 @@ extension SyncBench {
         run.turns = turns
         run.moved = moved
         run.heldAfter = heldNow
+        run.mostBehind = mostBehind
+        run.violations = await SyncBench.violations(engine)
         await SyncBench.releaseHeldTurns(engine)
         await engine.shutdown()
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
         return run
     }
 

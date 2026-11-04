@@ -10,8 +10,9 @@ import ZTronAssetTransport
 
 /// The C2 pins of Stage 3 close-out cycle 21 (ruling S3-R26 items 2 to 4 and 12; the cycle-20 verifiers' reqs #3,
 /// correct #2, correct #5 and reqs #10): the joins a follow's visit defers behind a waiting exit verdict
-/// (`deferBehindVerdictTurns`) and the commit's own turn in four groupings (`commitTurns`). Each figure is printed with
-/// the host's load averages, which S3-R23 asks for beside every timing figure.
+/// (`deferBehindVerdictTurns`), the drain's visits after verdicts that wait their joins behind the next verdict
+/// (`drainVerdictChainTurns`, item 12's answer 5) and the commit's own turn in four groupings (`commitTurns`). Each
+/// figure is printed with the host's load averages, which S3-R23 asks for beside every timing figure.
 extension ZTronAssetKitBenchmarks.SyncBenchmarks {
     /// C2 of a follow whose visit moves 10,000 ids onto a content whose exit verdict waits (`SyncBench.deferBehind`):
     /// every join waits behind that verdict (`deferBehindVerdict`). Each held follow and drain turn is timed inside the
@@ -36,6 +37,32 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         print("R-SYN-11 deferBehindVerdictTurns \(shape.rawValue) at 10,000: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
         #expect((turns.min() ?? .infinity) <= Self.c2Budget, "longest held turn: \(turns)")
         #expect((waits.min() ?? .infinity) <= Self.c2Budget, "heartbeat: \(waits)")
+    }
+
+    /// C2 of the drain's visits after 16 waiting verdicts whose members an apply maps onto the next job's content, whose
+    /// own verdict waits later in the batch (ruling S3-R26 item 12's answer 5, candidate 4): `drainVerdictTurns`' shape,
+    /// chained (`SyncBench.drainVerdicts`). Each visit's joins wait behind the next verdict (`joinWaitsForVerdict`) and
+    /// replay right behind it once it replays, so a drain turn replays up to a turn's ids of joins besides its events and
+    /// its visits' moves (`drainEventsAfterFollow`). The follow's and the drain's held turns are released one at a time,
+    /// each timed inside the actor, under the heartbeat; the best of three of each against C2, after a warm-up.
+    @Test("R-SYN-6: the drain's visits after 16 waiting verdicts that move their members behind the next verdict hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)), arguments: [500, 625])
+    @available(macOS 15.0, iOS 18.0, *)
+    func drainVerdictChainTurns(_ perJob: Int) async throws {
+        _ = try await SyncBench.drainVerdicts(slots: 16, perJob: 50, chained: true)
+        var runs: [DrainVerdictRun] = []
+        for _ in 0..<3 {
+            runs.append(try await SyncBench.drainVerdicts(slots: 16, perJob: perJob, chained: true))
+        }
+        for run in runs {
+            #expect(run.waitingBefore == 16 && run.heldBefore == 16 * perJob, "setup: the 16 verdicts waited with every member on its job: \(run)")
+            #expect(run.mostBehind > 0 && run.heldAfter == 15 * perJob, "setup: the visits' joins waited behind the next verdict, and each job but the first holds the members before it: \(run)")
+            #expect(run.violations.isEmpty, "setup: \(run.violations.prefix(3))")
+        }
+        let turns = runs.map { $0.turns.max() ?? 0 }
+        let waits = runs.map(\.wait)
+        print("R-SYN-6 drainVerdictChainTurns \(perJob) a job: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+        #expect((turns.min() ?? .infinity) <= Self.c2Budget, "\(perJob) a job, the longest held turn: \(turns)")
+        #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(perJob) a job, the heartbeat: \(waits)")
     }
 
     /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
