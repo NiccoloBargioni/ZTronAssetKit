@@ -225,7 +225,7 @@ extension SyncEngine {
         var offset = 0
         while offset < batch.count {
             let (event, stamp) = batch[offset]
-            self.withReading(stamp) {
+            let owed: EventAfterFollow? = self.withReading(stamp) {
                 self.replay(event)
             }
             // The joins a visit after an earlier verdict of the batch waited behind this one (`joinWaitsForVerdict`).
@@ -234,9 +234,11 @@ extension SyncEngine {
             }
             // A visit after a verdict too large for the ids left (`followAfterVerdict`): a visit-first engine made it at
             // once, before the next event, so the events after it wait for its rest, in order (C2; cycle 19). With the
-            // turn's ids spent and no rest, they wait for the next drain turn (cycle 20).
+            // turn's ids spent and no rest, they wait for the next drain turn (cycle 20). What the replay still owes, the
+            // rest of a batch of re-routes, waits first, with its decision instant: a replay returns it only once it spent
+            // the turn's ids (`continueReroutes`), so it is never left behind here (cycle 21, `integrate-rr21.md` R8).
             if self.state.followMoving != nil || self.state.drainIDsLeft <= 0 {
-                let rest = batch[(offset + 1)...]
+                let rest: [(EventAfterFollow, WorldStamp)] = (owed.map { [($0, stamp)] } ?? []) + batch[(offset + 1)...]
                 self.state.eventsAfterFollow.insert(contentsOf: rest.map(\.0), at: 0)
                 self.state.eventStamps.insert(contentsOf: rest.map(\.1), at: 0)
                 break
@@ -368,14 +370,16 @@ extension SyncEngine {
         self.state.followStamps = [:]
     }
 
-    /// Applies one event that waited for the follow (`drainEventsAfterFollow`).
-    private func replay(_ event: EventAfterFollow) {
+    /// Applies one event that waited for the follow (`drainEventsAfterFollow`), and returns what of it the turn still
+    /// owes: the rest of a batch of re-routes the turn's ids did not cover (`continueReroutes`), which waits at the
+    /// queue's head for the next drain turn; `nil` once the event is applied whole.
+    private func replay(_ event: EventAfterFollow) -> EventAfterFollow? {
         switch event {
         case .spaceFailure(let transfer, let epoch, let required):
             // A job that ended or was superseded meanwhile has nobody left to answer; one the drain's earlier join created
             // for the same content is not the job that failed (PROBE-C15R-SPACE-EPOCH).
             guard let job = self.state.jobs[transfer], job.epoch == epoch else {
-                return
+                return nil
             }
             let off = self.takeOffMovedBefore(job)
             let movesAfter = self.endDeferral(job)
@@ -400,7 +404,11 @@ extension SyncEngine {
             self.answerThrottledUsersNow()
         case .spaceSweep(let sweep):
             self.judgeSpaceSweep(sweep)
+        case .reroutes(var batch):
+            self.continueReroutes(&batch)
+            return batch.items.isEmpty ? nil : .reroutes(batch)
         }
+        return nil
     }
 
     /// Schedules one later turn for the events a drain turn left (C2). Only a running engine drains, so the task is
@@ -603,6 +611,75 @@ extension SyncEngine {
             self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
         }
         self.state.runClaimTakenOff = false
+    }
+
+    /// Makes the re-routes of `batch` the drain turn's ids still cover (`EngineState.drainIDsLeft`), in (id, token)
+    /// order, each id whole with all its tokens as `continueMove` moves a holder's ids, and spends them (C2; Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 1). Each id follows the copy a visit-first engine's re-route followed
+    /// (`rerouteListing`). No owner is checked first: `reroute`'s own guards pass a gone waiter, a released group and an
+    /// ended run, and nothing writes `jobs[batch.from]`, which an earlier item may have created again (F-20). The joins
+    /// are made at once, as the drain's are (`addInterest`). The batch's last item counts it down and releases the
+    /// publications the owed re-routes held (`releaseRerouteHolds`).
+    private func continueReroutes(_ batch: inout RerouteBatch) {
+        var spent = 0
+        var current: AssetID?
+        var listing: ValidatedManifest?
+        while let item = batch.items.first {
+            if item.asset != current {
+                guard spent < self.state.drainIDsLeft else {
+                    break
+                }
+                spent += 1
+                current = item.asset
+                listing = self.rerouteListing(item.asset, batch)
+            }
+            _ = batch.items.popFirst()
+            self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: batch.from, listing: listing)
+        }
+        self.state.drainIDsLeft -= spent
+        if batch.items.isEmpty {
+            self.state.reroutesWaiting -= 1
+            self.releaseRerouteHolds()
+        }
+    }
+
+    /// The copy whose entry `asset`'s owed re-route follows (`RerouteBatch`), `nil` for the engine's own: the copy at the
+    /// owing instant, then, at each apply since (`RerouteBatch.layers`), the copy the apply's visit moved the id to. An
+    /// entry whose job was at an attempt's end at that apply pins the id to the copy the apply replaced while the job is
+    /// still at that end (`waitingTarget`): a visit-first engine's interest that had joined it stayed through the visit,
+    /// which passed the publishing job (RR-14), and is re-routed at that end only. A copy without the id is returned as
+    /// it is, so the re-route ends the interest (T21), as that visit did.
+    func rerouteListing(_ asset: AssetID, _ batch: RerouteBatch) -> ValidatedManifest? {
+        guard var entry = batch.copy.entry(for: asset) else {
+            return batch.copy
+        }
+        for (index, layer) in batch.layers.enumerated() {
+            if let epoch = layer.ends[entry.transferID] {
+                return self.waitingTarget(entry.transferID, epoch: epoch) != nil ? layer.outgoing : nil
+            }
+            let incoming = index + 1 < batch.layers.count ? batch.layers[index + 1].outgoing : self.state.applied
+            guard let next = incoming.entry(for: asset) else {
+                return incoming
+            }
+            entry = next
+        }
+        return nil
+    }
+
+    /// Resumes every publication that waited (`awaitInboundMoves`) once no re-route is owed, in the order of their
+    /// jobs, as `releaseInboundWaits` does. No wait is filtered by `inboundBlocks`: a batch ends only inside a drain turn,
+    /// which starts only while no follow is owed and stops at a visit's rest, and no move is owed onto or off a job then
+    /// (`bringInbound`), so nothing else holds a publication at that point; `awaitInboundMoves` does not check again
+    /// after it resumes (`integrate-rr21.md` R12).
+    private func releaseRerouteHolds() {
+        guard self.state.reroutesWaiting == 0 else {
+            return
+        }
+        let waits = self.state.inboundWaits
+        self.state.inboundWaits = [:]
+        for transfer in waits.keys.sorted() {
+            waits[transfer]?.resume()
+        }
     }
 
     /// The visit a visit-first engine made, after it gave the verdict, at each apply since: the job the verdict left
@@ -1190,7 +1267,7 @@ extension SyncEngine {
         var pending: [AssetID: Int] = [:]
         for index in self.state.inboundNext..<self.state.inboundMoves.count {
             if let progress = self.state.inboundMoves[index].progress {
-                for item in progress.heap {
+                for item in progress.heap.elements {
                     pending[item.asset] = index
                 }
             } else {
@@ -1297,11 +1374,17 @@ extension SyncEngine {
         return moved
     }
 
-    /// `move`'s job while it is still at the attempt's end the move was found for: the same epoch, publishing, or failed
-    /// with its end recorded (its verdict waiting, or its publication's failure being booked, `recordPublicationEnd`);
-    /// `nil` once it left it, which drops the move (`continueInbound`). Also read by `followedLane`.
+    /// `move`'s job while it is still at the attempt's end the move was found for (`waitingTarget(_:epoch:)`); `nil` once
+    /// it left it, which drops the move (`continueInbound`). Also read by `followedLane`.
     func waitingTarget(_ move: InboundMove) -> Job? {
-        guard let job = self.state.jobs[move.target], job.epoch == move.epoch else {
+        self.waitingTarget(move.target, epoch: move.epoch)
+    }
+
+    /// `transfer`'s job while it is still at the attempt's end of `epoch`: the same epoch, publishing, or failed with its
+    /// end recorded (its verdict waiting, or its publication's failure being booked, `recordPublicationEnd`); `nil` once it
+    /// left it. Read for an owed move (`waitingTarget(_:)`) and for an owed re-route's pin (`rerouteListing`).
+    func waitingTarget(_ transfer: TransferID, epoch: UInt64) -> Job? {
+        guard let job = self.state.jobs[transfer], job.epoch == epoch else {
             return nil
         }
         switch job.state {
@@ -1482,12 +1565,17 @@ enum EventAfterFollow: Sendable {
     /// A space sweep's verdicts (`judgeSpaceSweep`) at the sweep's arrival place (`sweepSpaceParked`; the cycle-12
     /// residual R-C, Stage 3 close-out cycle 13).
     case spaceSweep(SpaceSweep)
+    /// Re-routes a site owes instead of making them in its own turn (`RerouteBatch`), replayed at their place a drain
+    /// turn's ids a turn (`SyncEngine.continueReroutes`; Stage 3 close-out cycle 21, ruling S3-R26 item 1). Not
+    /// indirect: the batch (120 bytes) is smaller than a join (168), so the event's stride is 168 either way (ruling
+    /// S3-R26 item 12's answer 7).
+    case reroutes(RerouteBatch)
 
     /// Whether the event is itself a bounded pass (a re-admission, a conditions element's pass, a throttle's fail-fast
-    /// turn, a space sweep): the drain's batch ends after it (`drainEventsAfterFollow`, C2).
+    /// turn, a space sweep, a batch of owed re-routes): the drain's batch ends after it (`drainEventsAfterFollow`, C2).
     var endsDrainBatch: Bool {
         switch self {
-        case .conditions, .readmit, .unblock, .throttleAnswers, .spaceSweep:
+        case .conditions, .readmit, .unblock, .throttleAnswers, .spaceSweep, .reroutes:
             return true
         case .spaceFailure, .attemptFailed, .join, .removal, .retryDue:
             return false
@@ -1503,7 +1591,7 @@ enum EventAfterFollow: Sendable {
             return VerdictKey(transfer: transfer, epoch: epoch)
         case .attemptFailed(let transfer, let epoch, _):
             return VerdictKey(transfer: transfer, epoch: epoch)
-        case .join, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
+        case .join, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep, .reroutes:
             return nil
         }
     }

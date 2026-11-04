@@ -1,8 +1,9 @@
 import Foundation
 import ZTronAssetModel
 
-/// One interest of a holder in one id it moves (`MoveProgress`), ordered by id and then token.
-struct MoveItem: Comparable {
+/// One interest of a holder in one id it moves (`MoveProgress`), ordered by id and then token. Hashable for the pairs a
+/// batch of owed re-routes holds (`RerouteBatch`, read by `invariantViolations()`).
+struct MoveItem: Comparable, Hashable, Sendable {
     /// The id.
     let asset: AssetID
     /// The interest's token.
@@ -13,13 +14,104 @@ struct MoveItem: Comparable {
     }
 }
 
+/// A binary min-heap: a turn takes its next elements in order without the whole set sorted up front (a sort of 10,000
+/// is milliseconds, the heap's first pass a fraction of one). A move's interests wait in one (`MoveProgress`), and so do
+/// a batch of owed re-routes (`RerouteBatch`).
+struct MinHeap<Element: Comparable & Sendable>: Sendable {
+    /// The elements, in heap order.
+    private(set) var elements: [Element]
+
+    /// A heap of `elements`, built in place in O(n).
+    init(_ elements: [Element]) {
+        self.elements = elements
+        self.heapify()
+    }
+
+    /// Whether no element is left.
+    var isEmpty: Bool {
+        self.elements.isEmpty
+    }
+
+    /// The elements left.
+    var count: Int {
+        self.elements.count
+    }
+
+    /// The least element, without taking it.
+    var first: Element? {
+        self.elements.first
+    }
+
+    /// Takes the least element.
+    mutating func popFirst() -> Element? {
+        guard let first = self.elements.first else {
+            return nil
+        }
+        let last = self.elements.removeLast()
+        if !self.elements.isEmpty {
+            self.elements[0] = last
+            self.siftDown(from: 0)
+        }
+        return first
+    }
+
+    /// Drops every element.
+    mutating func removeAll() {
+        self.elements.removeAll()
+    }
+
+    /// Takes out every element `shouldRemove` matches, in heap order, and keeps the rest a heap: one pass and, when it
+    /// took any, one heapify, O(n) (a purge's withdrawals from an owed batch, `withdrawPurgedJoins`).
+    mutating func removeAll(where shouldRemove: (Element) -> Bool) -> [Element] {
+        var removed: [Element] = []
+        self.elements.removeAll { element in
+            guard shouldRemove(element) else {
+                return false
+            }
+            removed.append(element)
+            return true
+        }
+        if !removed.isEmpty {
+            self.heapify()
+        }
+        return removed
+    }
+
+    private mutating func heapify() {
+        var index = self.elements.count / 2
+        while index > 0 {
+            index -= 1
+            self.siftDown(from: index)
+        }
+    }
+
+    private mutating func siftDown(from start: Int) {
+        var parent = start
+        let count = self.elements.count
+        while true {
+            let left = 2 * parent + 1
+            guard left < count else {
+                return
+            }
+            var child = left
+            if left + 1 < count, self.elements[left + 1] < self.elements[left] {
+                child = left + 1
+            }
+            guard self.elements[child] < self.elements[parent] else {
+                return
+            }
+            self.elements.swapAt(child, parent)
+            parent = child
+        }
+    }
+}
+
 /// The moves left of one visit, or of one owed move, that carries more ids than a turn moves (C2; Stage 3 close-out
 /// cycle 19, ruling S3-R22 item 1): its holder's interests in the ids it moves, taken by id and then token over the
-/// follow's turns (`SyncEngine.continueMove`). They wait in a binary heap, so a turn takes its next ones in that order
-/// without the whole set sorted up front: a sort of 10,000 is milliseconds, the heap's first pass a fraction of one.
+/// follow's turns (`SyncEngine.continueMove`), from a heap (`MinHeap`).
 struct MoveProgress {
-    /// The interests left, a min-heap.
-    private(set) var heap: [MoveItem]
+    /// The interests left.
+    private(set) var heap: MinHeap<MoveItem>
     /// Whether every id leaves a job that is not publishing: as `SyncEngine.move` supersedes it, its running attempt was
     /// abandoned at the first turn, and the job is removed once its last interest leaves (`SyncEngine.startMove`).
     let supersedes: Bool
@@ -28,14 +120,9 @@ struct MoveProgress {
     let lane: AssetPriority
 
     init(_ items: [MoveItem], supersedes: Bool, lane: AssetPriority) {
-        self.heap = items
+        self.heap = MinHeap(items)
         self.supersedes = supersedes
         self.lane = lane
-        var index = items.count / 2
-        while index > 0 {
-            index -= 1
-            self.siftDown(from: index)
-        }
     }
 
     /// Whether every interest has been moved.
@@ -50,41 +137,63 @@ struct MoveProgress {
 
     /// Takes the next interest.
     mutating func popFirst() -> MoveItem? {
-        guard let first = self.heap.first else {
-            return nil
-        }
-        let last = self.heap.removeLast()
-        if !self.heap.isEmpty {
-            self.heap[0] = last
-            self.siftDown(from: 0)
-        }
-        return first
+        self.heap.popFirst()
     }
 
     /// Drops every interest left: the holder is gone.
     mutating func removeAll() {
         self.heap.removeAll()
     }
+}
 
-    private mutating func siftDown(from start: Int) {
-        var parent = start
-        let count = self.heap.count
-        while true {
-            let left = 2 * parent + 1
-            guard left < count else {
-                return
-            }
-            var child = left
-            if left + 1 < count, self.heap[left + 1] < self.heap[left] {
-                child = left + 1
-            }
-            guard self.heap[child] < self.heap[parent] else {
-                return
-            }
-            self.heap.swapAt(child, parent)
-            parent = child
-        }
+/// One owed re-route (`RerouteBatch`): an interest's token in one id, with the lane and kind `reroute` reads of the
+/// interest, ordered by id and then token as `MoveItem`. A token's interests carry its one lane and kind
+/// (`invariantViolations()`), so the id and the token decide the rest, and the order is total over a batch's items.
+struct RerouteItem: Comparable, Sendable {
+    /// The id.
+    let asset: AssetID
+    /// The interest's token.
+    let token: InterestToken
+    /// The interest's lane.
+    let lane: AssetPriority
+    /// The interest's kind.
+    let kind: InterestKind
+
+    static func < (lhs: RerouteItem, rhs: RerouteItem) -> Bool {
+        (lhs.asset, lhs.token) < (rhs.asset, rhs.token)
     }
+}
+
+/// The engine's copy one apply replaced while a batch of owed re-routes waited (`SyncEngine.adoptApplied`), and the
+/// jobs then at an attempt's end, so the batch's ids follow the copy a visit-first engine's re-route at the owing
+/// instant, and its visits at the applies since, followed (`SyncEngine.rerouteListing`).
+struct RerouteLayer: Sendable {
+    /// The copy the apply replaced.
+    let outgoing: ValidatedManifest
+    /// The applies followed before it (`EngineState.appliesFollowed`).
+    let applies: UInt64
+    /// The jobs at an attempt's end then, with their epochs: publishing, or failed with an exit verdict that waits behind
+    /// the batch. A visit-first engine's interest that had joined one of them stayed there through the apply's visit,
+    /// which passed the job, while the job is still at that end (`SyncEngine.waitingTarget`).
+    let ends: [TransferID: UInt64]
+}
+
+/// Re-routes a site owes instead of making them in its own turn (C2; Stage 3 close-out cycle 21, ruling S3-R26 item
+/// 1): its interests left their job at the owing instant, and the drain re-routes them at the batch's place in
+/// `EngineState.eventsAfterFollow`, at most a drain turn's ids a turn, each id with all its tokens
+/// (`SyncEngine.continueReroutes`).
+struct RerouteBatch: Sendable {
+    /// The job the interests left.
+    let from: TransferID
+    /// The engine's copy at the owing instant.
+    let copy: ValidatedManifest
+    /// `EngineState.copySerial` at the owing instant: the batch holds one layer for each copy adopted since
+    /// (`invariantViolations()`).
+    let serial: UInt64
+    /// The re-routes left.
+    var items: MinHeap<RerouteItem>
+    /// The copies adopted since the owing instant, oldest first (`SyncEngine.adoptApplied`).
+    var layers: [RerouteLayer]
 }
 
 /// The rest of a visit that moves more ids than a turn moves (`EngineState.followMoving`).

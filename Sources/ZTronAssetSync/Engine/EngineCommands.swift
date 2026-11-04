@@ -2110,7 +2110,7 @@ extension SyncEngine {
                 }
             case .join(let join):
                 register(join)
-            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
+            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep, .reroutes:
                 break
             }
             // A verdict's joins count at its place, newest first, where the queue held them (`joinsBehindVerdicts`).

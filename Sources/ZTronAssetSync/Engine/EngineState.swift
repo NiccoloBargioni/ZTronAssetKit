@@ -182,11 +182,15 @@ struct EngineState {
     /// (`checkRunSettled`), and the drain's end checks the run again (Stage 3 close-out cycle 21, found while fixing
     /// S3-R26 item 12's answer 5, candidate 2: a check the verdict made between the two settled the run without the claim).
     var runClaimTakenOff = false
-    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), set
-    /// at each batch to what the turn has left: one turn's ids cover the whole batch, the follow's last turn included
-    /// (Stage 3 close-out cycle 20, ruling S3-R25 item 1; each visit had a whole turn's ids, so a batch of verdicts moved
-    /// that many times more in one turn).
+    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), and its
+    /// owed re-routes re-route (`SyncEngine.continueReroutes`), set at each batch to what the turn has left: one turn's
+    /// ids cover the whole batch, the follow's last turn included (Stage 3 close-out cycle 20, ruling S3-R25 item 1; each
+    /// visit had a whole turn's ids, so a batch of verdicts moved that many times more in one turn).
     var drainIDsLeft = 0
+    /// The batches of owed re-routes (`EventAfterFollow.reroutes`) not yet replayed whole, whether they wait in
+    /// `eventsAfterFollow` or in a drain turn's batch: a batch's last item counts it down (`SyncEngine.continueReroutes`;
+    /// Stage 3 close-out cycle 21, ruling S3-R26 item 1).
+    var reroutesWaiting = 0
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false
     /// Test seam: while set, the drain's scheduled follow-up keeps its events waiting and stays scheduled instead of
