@@ -106,6 +106,30 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
     }
 
+    /// The interest index's own costs (`Job.tokensByID`; ruling S3-R26 item 3's inventory rows), on a job of 10,000 ids
+    /// that one prefetch group holds, each id also held by a user waiter of its own (`SyncBench.indexCosts`): the release
+    /// of the group's interest (`dropInterest`'s: 10,000 ids each leaving an entry of two holders), `keepInterests`
+    /// dropping it on a copy of the job (`jobAtVerdict`'s, which copies the index once), and the freeing of the job with
+    /// its index (`removeJob`'s at a commit). Each is timed alone in release, best of three, after a warm-up; the engine's
+    /// turns that contain them are `handleReleaseTurns`, `followedLane`'s cases and `concentrationPublicationTurns`.
+    @Test("R-SYN-11: the interest index's own upkeep for 10,000 ids stays inside C2's 10 ms", .timeLimit(.minutes(5)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func indexOwnCosts() async throws {
+        _ = SyncBench.indexCosts(count: 1_000)
+        var runs: [IndexCostRun] = []
+        for _ in 0..<3 {
+            runs.append(SyncBench.indexCosts(count: 10_000))
+        }
+        for run in runs {
+            #expect(run.indexedBefore == 10_000 && run.indexedAfter == 10_000 && run.copyIndexed == 10_000, "setup: every id indexed, and each keeps its waiter once the group leaves: \(run)")
+        }
+        let release = runs.map(\.release).min() ?? .infinity
+        let keep = runs.map(\.keepOnCopy).min() ?? .infinity
+        let free = runs.map(\.free).min() ?? .infinity
+        print("R-SYN-11 indexOwnCosts 10,000 ids: release \(runs.map(\.release)) ms (best \(release)), keepInterests on a copy \(runs.map(\.keepOnCopy)) ms (best \(keep)), freeing \(runs.map(\.free)) ms (best \(free)) (budget \(Self.c2Budget) ms best); runs \(runs)")
+        #expect(release <= Self.c2Budget && keep <= Self.c2Budget && free <= Self.c2Budget, "\(runs)")
+    }
+
     /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
     /// verifiers' correct #5 and reqs #10), in four groupings: a user waiter per id, the same with a stalled subscriber,
     /// one prefetch group with a stalled subscriber, and 10,000 one-member prefetch groups. The heartbeat over the commit
@@ -240,6 +264,24 @@ struct PartialMoveRun: CustomStringConvertible {
 
     var description: String {
         "wait \(String(format: "%.2f", self.wait)) ms; on O \(self.onO), on H \(self.onH); load \(self.load)"
+    }
+}
+
+/// What `SyncBench.indexCosts` measured and read.
+struct IndexCostRun: CustomStringConvertible {
+    /// The release of the group's interest, `keepInterests` dropping it on a copy, and the job's freeing, in ms.
+    var release = 0.0
+    var keepOnCopy = 0.0
+    var free = 0.0
+    /// The ids indexed before the release, after it, and on the copy after `keepInterests`.
+    var indexedBefore = 0
+    var indexedAfter = 0
+    var copyIndexed = 0
+    /// The host's load averages before and after the run.
+    var load = ""
+
+    var description: String {
+        "release \(String(format: "%.3f", self.release)) ms, keep on a copy \(String(format: "%.3f", self.keepOnCopy)) ms, free \(String(format: "%.3f", self.free)) ms; indexed \(self.indexedBefore) -> \(self.indexedAfter), copy \(self.copyIndexed); load \(self.load)"
     }
 }
 
@@ -711,6 +753,40 @@ extension SyncBench {
             _ = await caller.value
         }
         _ = await oWaiter.value
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
+        return run
+    }
+
+    /// A job of `count` ids that one prefetch group holds, each id also held by a user waiter of its own, and the index's
+    /// own costs on it, each timed alone (Stage 3 close-out cycle 21, ruling S3-R26 item 3): `keepInterests` dropping the
+    /// group on a copy (the copy's index is copied once, then 10,000 ids released), the group's release in place
+    /// (`setInterest(nil)`, what `dropInterest` does), and the freeing of the job, its index with it.
+    static func indexCosts(count: Int) -> IndexCostRun {
+        var run = IndexCostRun()
+        let loadBefore = SyncBench.loadAverages()
+        let entry = SyncBench.entry("index-h", Data(repeating: 0x69, count: 16), policy: .onDemand)
+        let ids = (0..<count).map { AssetID(String(format: "index-%05d", $0)) }
+        var job: Job? = Job(transfer: entry.transferID, entry: entry, identity: entry.contentIdentity, assets: Set(ids), state: .queued, epoch: 1, queuedAt: MonotonicInstant(nanoseconds: 0))
+        let group = InterestToken(rawValue: 1)
+        job?.setInterest(JobInterest(lane: .prefetch, kind: .prefetch, assets: Set(ids)), for: group)
+        for (index, id) in ids.enumerated() {
+            job?.setInterest(JobInterest(lane: .userInitiated, kind: .waiter, assets: [id]), for: InterestToken(rawValue: UInt64(index) + 2))
+        }
+        run.indexedBefore = job?.tokensByID.count ?? 0
+        let clock = ContinuousClock()
+        var copy = job
+        var started = clock.now
+        copy?.keepInterests { token, _ in token != group }
+        run.keepOnCopy = SyncBench.milliseconds(clock.now - started)
+        run.copyIndexed = copy?.tokensByID.values.filter { $0.tokens.count == 1 }.count ?? 0
+        copy = nil
+        started = clock.now
+        job?.setInterest(nil, for: group)
+        run.release = SyncBench.milliseconds(clock.now - started)
+        run.indexedAfter = job?.tokensByID.values.filter { $0.tokens.count == 1 }.count ?? 0
+        started = clock.now
+        job = nil
+        run.free = SyncBench.milliseconds(clock.now - started)
         run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
         return run
     }
