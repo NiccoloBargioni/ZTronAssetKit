@@ -4934,14 +4934,14 @@ a commit is named.
 | `continueMove`, `continueInbound` (its intersection at the move's first turn), `continueVisitRemainder` | O(log ids) a moved id; at most `followIDsPerTurn` ids and `followsPerTurn` holders a turn | the turn-total tests; `sharedApplyTurns`, `divergenceTurns`, `inboundHolderTurns` | met |
 | `move` (a move that fits the turn's ids) | sorts each interest's whole ids: O(N log N) a holder, ≤ 10,000 ids a turn over the holders | no figure of its own (inside the shared cases' visits) | no figure: put to the orchestrator |
 | The walk for the publications in flight (`findInbound`) | one pass over the jobs' ids, one lookup each | `inboundWalkTurns`, `concentrationNotFoundTurns` | met |
-| `reroute`, `addInterest` (a join in place) | O(1) amortised an id | `concentrationFollowTurns`, `sharedApplyTurns` | met |
+| `reroute`, `addInterest` (a join in place) | O(1) amortised an id since `a78f913` (cycle 21, steps C10 and C11). Before it, a re-route that dropped a group member or released a run claim (T21) copied the group's `pending` or the run's `outstanding`: O(members) an id (`critic-commit-window.md` A5) | `concentrationFollowTurns`, `sharedApplyTurns` | met |
 | `removeInterest`, `dropInterest`, `relane`, `Job.lane`, `isSingleUser` | O(1) an id (`f066083`) | `userSharedApplyTurns`: 7.18 ms best (supersede) and 8.01 (keep) | met |
 | `deferBehindVerdict` (a visit's join behind a waiting verdict) | O(E) a call (a `lastIndex` scan and an insert) | no figure | no figure: put to the orchestrator |
 | The drain's events (`drainEventsAfterFollow`) | at most `eventsAfterFollowPerTurn` (512) events a turn; their visits after verdicts share the turn's ids (`ddb0ba1`) | `drainVerdictTurns` [500, 625]: 4.13 and 4.08 ms best | met |
 | A retry verdict's answer for each interest (`verdictAnswers`, the lane `retryLater` reads) | O(1) an interest, O(I) a verdict (`f066083`); O(I²) a verdict before | O(1) amortised an id | met |
 | `followedLane` | O(I) a call | the 429 case of R-SYN-5, `concentrationNotFoundTurns` | met |
 | `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | inside `concentrationPublicationTurns` (the start) | met at the start; the verdict's has no figure |
-| The commit's binding (`committed`, then `resolveAll`, `publishTerminal`) | O(N log N) once a commit | `concentrationPublicationTurns` through the commit: 9.86 ms best (9.81 at load 2.73 to 2.99 before `c03c0e8` was committed) | met, by 0.14 ms |
+| The commit's binding (`committed`, then `resolveAll`, `publishTerminal`, `removeJob`, and the pump's `materializeEnsures`) | O(N log N) once a commit: `committed` sorts the job's interests. Since `a78f913` (cycle 21, item C's Phase 1) `resolveAll`, `publishTerminal` and `removeJob` sort nothing and retire only keys with a progress entry; `materializeEnsures` sorts every group's token at the commit's pump, O(G log G) | `concentrationPublicationTurns` through the commit: 9.86 ms best before cycle 21, 6.16 ms after Phase 1. `commitTurns` (cycle 21, heartbeat best after Phase 1, load 7.06 to 6.67): `.waiters` 12.09 ms, `.waitersStalledSubscriber` 15.49 ms, `.groupStalledSubscriber` 9.24 ms, `.manyGroups` 10.79 ms | **miss:** `.waiters` and `.waitersStalledSubscriber` go to Phase 2 (step 6); `.manyGroups` is open until rr21-C3 (cycle 21, step 2) |
 | The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn | `concentrationCommitRerouteTurns`: 48.68 ms best (48.47 before `c03c0e8` was committed) | **miss: blocking, open** |
 | `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn | `movedBeforeDrainTurns`: 45.67 ms best (45.51 before `c03c0e8` was committed) | **miss: blocking, open** |
 | `supersede` of a superseded publication (`publicationFailed`'s `.superseded`) | O(N) re-routes in one turn | no figure; outside the follow and the drain | no figure: put to the orchestrator |
@@ -5097,10 +5097,15 @@ fix (S3-R26 item 11, "Red first").
    `EngineFollowBarrierRunClaimTests.swift` (candidates 1 and 2), `EngineFollowBarrierLaterVerdictTests.swift`
    (candidate 4) and `EngineFollowBarrierJoinGapFailureTests.swift` (the join gap's failure shape, until rr21-C4).
    Results under "Step 1" below.
-2. Item C, Phase 1: pending. **Next action:** take the 'before' heartbeat and in-actor figures of
-   `concentrationPublicationTurns` and `commitTurns(.waiters)` (item C's "measure first"), then C2–C11 with the C9
-   clause and T-PG1 to T-PG4 and T-ORDER, the `commitTurns` pins committed failing right before the fix. Then
-   candidate 1's pair, then candidate 2's (failing test, then fix; "Step 1" below): pending.
+2. Item C, Phase 1: **committed** (`1645233` the `commitTurns` pins, red; `a78f913` C2–C11 with the C9 clause,
+   T-PG1 to T-PG4 and T-ORDER; `cf4719e` the T21 tests; `5f2f1b7` the C3 clause's test; the step's last commit: these
+   records). Results under "Step 2" below. Then candidate 1's pair, then candidate 2's: pending. **Next action:**
+   commit `barrierKeepsARunsClaimAtTheVerdictItWaitsBehind` failing (`.build-s3f/c21/pending/RunClaim-c1.swift`
+   becomes `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierRunClaimTests.swift`, run red on the HEAD first),
+   then its fix: `checkRunSettled` returns while a waiting run join targets a claim the run still holds. Then
+   `barrierKeepsARunsClaimReroutedBehindAVerdict` failing (added to that file from
+   `.build-s3f/c21/pending/EngineFollowBarrierRunClaimTests.swift`), then its fix: `recordRunOutcome` removes only the
+   answered ids from the transfer's claims.
 3. Item A (A2–A11, K1–K4): pending. Then candidate 4's pair: pending.
 4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending.
 5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
@@ -5200,6 +5205,90 @@ figure here is **not measured at a quiet load** (S3-R23 item 3), and step 8 re-m
   rewrite `recordRunOutcome` and `releaseRunClaim` in place); candidate 4 after step 3 (item A rewrites
   `deferBehindVerdict`, the deferral its fix extends); Q1's stage 2 with B8 in step 4, and variant Y right after B8.
   Each pair is its failing test, run red again on the HEAD before its fix, then the fix.
+
+### Step 2: item C, Phase 1
+
+Commits: `1645233` (the `commitTurns` pins, red: all four groupings missed `c2Budget` on `4dc74a8`), `a78f913` (steps
+C2–C11 with clauses P1–P3, T-ORDER and T-PG1 to T-PG4), `cf4719e` (two T21 tests that reach C10's and C11's changed
+lines in both orders). C1 waits for rr21-C3 (S3-R26 item 4). The commit stays one turn with no added await, and
+R-SYN-12's order (`removeJob` before `publishTerminal`), F-20 and RE-S14 are untouched.
+
+- **What landed** (`integrate-c21.md` item C): C2, `resolveAll` delivers in the table's order with no re-read; C3,
+  `InterestOutcome.committed(_, ascending:)` carries the binding `publish` sorted, and `publishTerminal` walks it; C4,
+  `removeJob` retires only keys with a `lastEmitted` entry; C5, `deliver`'s group arm in place (`Group.clearPending`);
+  C6, `recordRunOutcome` written through `self.state.run?`; C7, `bind` reserves its growth; C8, `broadcast(_:to:)`,
+  with the subscriber keys sorted once in `publishTerminal`; C9, `progressGateViolations` (P1–P3) and
+  `SubscriberQueue.liveSlots`; C10, `dropGroupMember` in place; C11, `releaseRunClaim` in place.
+- **Figures** (release, best of 3, heartbeat / the commit's own turn in the actor; logs `.build-s3f/c21/step2-red.log`,
+  `step2-measure.log`, `step2-measure2.log`):
+
+  | Shape | Before, `4dc74a8` (1-minute load 5.53 to 5.78) | After Phase 1, `a78f913` (load 7.06 to 6.67) |
+  |---|---|---|
+  | `.waiters` | 18.78 / 18.52 ms | 12.09 / 11.72 ms |
+  | `.waitersStalledSubscriber` | 24.27 / 23.96 ms | 15.49 / 15.24 ms |
+  | `.groupStalledSubscriber` | 15.32 / 15.31 ms | 9.24 / 9.24 ms |
+  | `.manyGroups` | 16.47 / 16.46 ms | 10.79 / 10.78 ms |
+  | Two stalled subscribers (recorded, not gated) | 30.41 / 29.28 ms (load 20.71, step 1) | 18.25 / 17.76 ms (load 8.63) |
+
+  `concentrationPublicationTurns` after Phase 1: longest wait 6.16 ms best, the commit window 6.16 ms, longest held
+  turn 3.72 ms (`step2-measure.log`; that bench prints no load, and none was read around it). Re-measured with the
+  load read around it (S3-R23), at a 1-minute load of 4.22 before and 6.03 after
+  (`step2-concentration-quiet.log`): longest wait 6.32, 6.09, 6.89 ms, best 6.09 ms; the commit window the same;
+  longest held turn 3.72, 3.73, 3.70 ms. Within `c2Budget`.
+- **Item 4's Phase 2 trigger fires.** After Phase 1 the in-actor `.waiters` turn is 11.72 ms, above 7.0 ms, and the
+  heartbeats of `.waiters` (12.09 ms) and `.waitersStalledSubscriber` (15.49 ms) are above `c2Budget`, at a 1-minute
+  load of 7.06 to 6.67. Phase 2 lands at step 6. `commitTurns` stays red in those two groupings until then.
+- **`.manyGroups` misses `c2Budget` after Phase 1: 10.79 ms** (10.78 in the actor), at a load of 6.98 to 6.67.
+  Phase 2 cannot cut it (item 4). Its turn holds two costs `integrate-c21.md` lists as unconfirmed: `committed` sorts
+  the job's 10,000 interests, which rr21-C3's rewrite of `committed` (with C1) replaces, and `materializeEnsures`
+  sorts every group's token at the commit's pump (`EngineDispatch.swift:224`). Item 4 re-measures every shape after
+  rr21-C3; a `.manyGroups` miss that stays there is blocking (S3-R16 1(f)) and is reported with its figures and loads
+  ("Some misses stay"). **Open.**
+- **`.groupStalledSubscriber`, 9.24 ms**, is within `c2Budget`: `reserveCapacity` (C12's contingency) is not needed.
+- **Two stalled subscribers, 18.25 ms** at a load of 8.63, miss `c2Budget` at a load of 10 or less: **open, for the
+  owner** (item 12's answer 4), neither accepted nor blocking this cycle. Re-measured after Phase 2.
+- **Item C's UNCONFIRMED claims, checked** (S3-R26, "UNCONFIRMED claims"):
+  - "A commit with 10,000 user waiters is estimated at 6.3–9.1 ms": false, 11.72 ms in the actor after Phase 1. Its
+    route is Phase 2 (item 4).
+  - "Each subscriber adds about 0.25–0.6 µs per event": confirmed. One stalled subscriber adds 3.52 ms to the
+    10,000-event commit (0.35 µs an event); a second adds 2.52 ms (0.25 µs).
+  - C2's premise, "`deliver` never writes `state.jobs`": confirmed in the code (it writes waiters, groups, the run and
+    heals); the Sync bundle passes with the re-read removed.
+  - C4's "a no-op `SubscriberQueue.retire` never compacts": confirmed in the code (`compactIfNeeded` reads only
+    `order`, `head` and `slots`, which a no-op retire leaves).
+  - "That `locations.keys` ⊆ `ids`": confirmed in the code. `performPublish` binds only `extensionGroups(ids, …)`
+    (`AssetStore+Publish.swift:126-150`), and `stillBound` returns a subset of what it bound (`:180-196`).
+  - "That no reachable shape binds an id the job no longer holds, which would make the `job.assets.contains` mutant
+    of C3 Equivalent": **false.** `publish` captures `job.assets`, the ids an owed follow's visit re-routes at once
+    included (`Job.rerouteOnPass`, `EngineDispatch.swift:1024-1049`). Swept first, that visit takes such an id off
+    the publishing job (`move` never supersedes a publishing job), and a later apply that maps the id back to the
+    job's content reaches the store before the engine follows it: the store then binds the id while the engine's copy
+    maps it elsewhere. `commitAnnouncesNoIDItsJobNoLongerHolds` (`5f2f1b7`) builds that shape in both orders, and the
+    commit announces only the ids its job holds, as `job.assets.sorted()` did before C3. Visited first the shape
+    cannot arise (v4's visit takes the id off the job while it downloads, before the binding is captured). The clause
+    stays; its mutant is killed below.
+  - C10 and C11's "which existing tests already reach them": existing tests reach both, and
+    `barrierPurgeWithdrawsAWaitingGroupJoin` kills C10's pending-removal mutant in both orders, but no test in both
+    orders reached C10's resume or C11's removal; `cf4719e` adds the two T21 tests.
+- **Mutants**, each run twice (`.build-s3f/c21/mut-*.log`):
+  - C4's filter made `== nil`, and made `where false`: T-PG4 fails 2/2 in both orders.
+  - C3 walking `locations.keys`, or `job.assets`, in place of the binding, and C3 without `locations[asset] != nil`:
+    T-ORDER fails 2/2 in both orders.
+  - C10 without the pending removal: the T21 ensure test fails 2/2 in both orders, and so does
+    `barrierPurgeWithdrawsAWaitingGroupJoin`. C10 without the resume: the T21 ensure test fails 2/2 in both orders, at
+    its bounded release check (the time limit).
+  - C11 without the claim removal: the T21 run test fails 2/2 in both orders.
+  - C3 without `job.assets.contains`: the whole Sync bundle passes with it (`mut-c3-nocontains.log`, one run, no
+    failing case); `commitAnnouncesNoIDItsJobNoLongerHolds` fails 2/2 swept first, the commit announcing zz-a too
+    (`mut-c3-nocontains-t.log`). Visited first it passes, since the shape needs the owed visit.
+  - **Equivalent** (S3-R19 item 2): N1, C4 without its filter (under P1–P3 a retire of a key with no `lastEmitted` entry
+    does nothing); C5–C8 with the old code put back (cost and capacity only); C2 with its re-read put back (it cannot
+    fail, as above).
+- **The order of resumes** (step C2): `resolveAll` resumes in the table's order, which varies from run to run. An
+  accepted order (S3-R16 item 2) and a residual risk. No existing test depends on it: the Sync bundle passed after
+  Phase 1 (567 tests, `step2-sync.log`), and step 8's three Sync runs and TSan run check it again.
+- **The inventory (C0):** the commit's row and the `reroute` row of "The C2 inventory" carry these figures; the
+  `reroute` row is corrected as `critic-commit-window.md` A5 asks.
 
 ## Items
 
