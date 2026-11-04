@@ -324,4 +324,19 @@ extension EngineFollowBarrierTests {
         #expect(outcome.tD == .failure(.notFound), "T_D gets H's retry's 404 (visit-first): \(outcome.tD)")
         #expect(outcome.violations.isEmpty, "\(outcome.violations.prefix(3))")
     }
+
+    /// Q1's stage 3 (variant Y), a probe (ruling S3-R26 item 12, answer 5): T1 is a prefetch waiter that stays; C_y maps
+    /// A to Y's content while H publishes, before the rest takes (A, T1), and H's publication fails its integrity
+    /// check. Visited first, X's visit at C_w moved T1 onto H, and C_y's visit passed H, publishing, so H's failure
+    /// answers T1; the rest's re-route under the copy at its turn would move T1 to Y.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierAnswersARestsIDOnItsPublishingHolderAsVisitedFirst(_ visit: LaneDropVisit) async throws {
+        let outcome = try await self.restRejoin(visit, shape: .movedWhilePublishing)
+        #expect(outcome.t1 == .failure(.integrityFailure), "T1, passed on the publishing H by C_y's visit, gets H's integrity failure (visit-first): \(String(describing: outcome.t1))")
+        #expect(outcome.tPrime == .failure(.integrityFailure), "T' gets H's integrity failure (visit-first): \(outcome.tPrime)")
+        #expect(outcome.tD == .failure(.integrityFailure), "T_D gets H's integrity failure: \(outcome.tD)")
+        #expect(outcome.hStarts == 1, "H's content is downloaded once: \(outcome.hStarts) starts")
+        #expect(outcome.violations.isEmpty, "\(outcome.violations.prefix(3))")
+    }
 }
