@@ -65,6 +65,47 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(perJob) a job, the heartbeat: \(waits)")
     }
 
+    /// C2 of `k` moves owed off one holder of 10,000 ids onto `k` publications in flight (`SyncBench.manyMoves`; the
+    /// cycle-20 correctness verifier's PROBE-C20C-MANY-MOVES): one follow turn makes them all, at most `followsPerTurn`.
+    /// The longest held follow turn, timed inside the actor, best of three against C2, after a warm-up.
+    @Test("R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(10)), arguments: [1, 16, 64, 256])
+    @available(macOS 15.0, iOS 18.0, *)
+    func manyMovesTurns(_ moves: Int) async throws {
+        _ = try await SyncBench.manyMoves(count: 1_000, moves: moves)
+        var runs: [ManyMovesRun] = []
+        for _ in 0..<3 {
+            runs.append(try await SyncBench.manyMoves(count: 10_000, moves: moves))
+        }
+        for run in runs {
+            #expect(run.violations.isEmpty, "setup: \(run.violations.prefix(3))")
+            #expect(run.publishing == moves && run.owedOffH == moves, "setup: one owed move off H per publication: \(run)")
+            #expect(run.firstTurnMoves == moves, "setup: one held turn makes every owed move: \(run)")
+        }
+        let longest = runs.map(\.longestFollow)
+        print("R-SYN-11 manyMovesTurns k=\(moves) off 10,000 ids: longest follow turn \(longest) ms, best \(longest.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+        #expect((longest.min() ?? .infinity) <= Self.c2Budget, "\(longest)")
+    }
+
+    /// C2 of a visit that moves 500 of a holder's 10,000 ids (`SyncBench.partialMove`; the cycle-20 requirements
+    /// verifier's PROBE-C20R-PARTIAL-MOVE-C2): the moved ids fit the turn, so the visit takes `move`. With `users`, each
+    /// id has a user waiter of its own; without, one prefetch group holds them all. The heartbeat over the apply and its
+    /// follow, best of three against C2, after a warm-up.
+    @Test("R-SYN-11: a visit that moves 500 of a 10,000-id holder's ids holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(10)), arguments: [false, true])
+    @available(macOS 15.0, iOS 18.0, *)
+    func partialMoveTurns(_ users: Bool) async throws {
+        _ = try await SyncBench.partialMove(members: 1_000, moved: 50, users: users)
+        var runs: [PartialMoveRun] = []
+        for _ in 0..<3 {
+            runs.append(try await SyncBench.partialMove(members: 10_000, moved: 500, users: users))
+        }
+        for run in runs {
+            #expect(run.onO == 501 && run.onH == 9_500, "setup: the visit moved 500 ids onto O and left 9,500 on H: \(run)")
+        }
+        let waits = runs.map(\.wait)
+        print("R-SYN-11 partialMoveTurns users=\(users) 500 of 10,000: heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+        #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
+    }
+
     /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
     /// verifiers' correct #5 and reqs #10), in four groupings: a user waiter per id, the same with a stalled subscriber,
     /// one prefetch group with a stalled subscriber, and 10,000 one-member prefetch groups. The heartbeat over the commit
@@ -156,6 +197,49 @@ struct DeferBehindRun: CustomStringConvertible {
 
     var description: String {
         "turns \(self.turns.count) longest \(String(format: "%.2f", self.turns.max() ?? 0)) ms; apply \(String(format: "%.2f", self.applyWait)) ms, turns' heartbeat \(String(format: "%.2f", self.turnsWait)) ms; most events during the follow \(self.eventsDuringFollow.max() ?? 0), most queued joins \(self.joinsDuringFollow.max() ?? 0); joins at the follow's end \(self.joinsAtFollowEnd) queued, \(self.behindAtFollowEnd) behind a verdict; on O \(self.onO); load \(self.load)"
+    }
+}
+
+/// What `SyncBench.manyMoves` measured and read.
+struct ManyMovesRun: CustomStringConvertible {
+    /// Each held follow or drain turn, timed inside the actor, with its kind.
+    var turns: [(kind: String, ms: Double)] = []
+    /// The users' publications held at the store.
+    var publishing = 0
+    /// The moves owed after v4's apply, and those off H.
+    var owedAfterV4 = 0
+    var owedOffH = 0
+    /// The moves the first held follow turn made (the owed moves it took off the queue).
+    var firstTurnMoves = 0
+    /// H's ids after v3's apply.
+    var hAfterV3 = 0
+    /// The invariants once the follow and its drain are over.
+    var violations: [String] = []
+    /// The host's load averages before and after the run.
+    var load = ""
+
+    /// The longest held follow turn.
+    var longestFollow: Double {
+        self.turns.filter { $0.kind == "follow" }.map(\.ms).max() ?? 0
+    }
+
+    var description: String {
+        "publishing \(self.publishing); H ids after v3 \(self.hAfterV3); owed after v4 \(self.owedAfterV4) (off H \(self.owedOffH)); first turn's moves \(self.firstTurnMoves); longest follow turn \(String(format: "%.2f", self.longestFollow)) ms over \(self.turns.count) turns; load \(self.load)"
+    }
+}
+
+/// What `SyncBench.partialMove` measured and read.
+struct PartialMoveRun: CustomStringConvertible {
+    /// The heartbeat's longest wait over the apply and its follow.
+    var wait = 0.0
+    /// The ids on O's job and on H's after the follow.
+    var onO = 0
+    var onH = 0
+    /// The host's load averages before and after the run.
+    var load = ""
+
+    var description: String {
+        "wait \(String(format: "%.2f", self.wait)) ms; on O \(self.onO), on H \(self.onH); load \(self.load)"
     }
 }
 
@@ -440,6 +524,195 @@ extension SyncBench {
             throw SyncBenchError.incomplete("the setup sync did not complete")
         }
         return HeldPublicationBench(bench: FollowBench(engine: engine, source: source, store: store, fileSystem: fileSystem), bulk: bulk)
+    }
+
+    /// `k` moves owed off one holder onto `k` publications in flight (Stage 3 close-out cycle 21, ruling S3-R26 item 3;
+    /// the cycle-20 correctness verifier's PROBE-C20C-MANY-MOVES): H, `count` prefetch members sharing one content,
+    /// downloads (held); `k` user waiters U_i on contents of their own publish, held at their first store unit. v3 maps
+    /// H's first `k` members each to one U_i's content (the follow is held, H not visited: the leading fillers change at
+    /// each apply); v4 (the same mapping, other fillers) is applied while H's visit is owed, so its walk finds one move off
+    /// H per publication (`bringInboundOntoPublications`). Each held follow or drain turn is timed inside the actor.
+    static func manyMoves(count: Int, moves k: Int) async throws -> ManyMovesRun {
+        var run = ManyMovesRun()
+        let loadBefore = SyncBench.loadAverages()
+        // No preemption: the user downloads must not cancel H's held attempt.
+        let held = try await SyncBench.heldPublicationBench(tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 1, preemptLowerLanes: false))
+        let engine = held.bench.engine
+        let source = held.bench.source
+        let bulk = held.bulk
+        let hBytes = Data(repeating: 0x68, count: 16)
+        let names = (0..<count).map { String(format: "zz-h%05d", $0) }
+        let onH = names.map { SyncBench.entry($0, hBytes, policy: .onDemand) }
+        let uBytes = (0..<k).map { GeneratedPayload.bytes(seed: 0x61_000 + UInt64($0), offset: 0, length: 20 + $0 % 7) }
+        let users = (0..<k).map { SyncBench.entry(String(format: "zz-u%03d", $0), uBytes[$0], policy: .onDemand) }
+        let movedH = (0..<count).map { index in index < k ? SyncBench.entry(names[index], uBytes[index], policy: .onDemand) : onH[index] }
+        let hTransfer = onH[0].transferID
+        let userTransfers = users.map(\.transferID)
+        guard Set(userTransfers).count == k, !userTransfers.contains(hTransfer) else {
+            throw SyncBenchError.incomplete("setup: the users' contents are not distinct")
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(SyncBench.leadingFillers(0x62_000) + onH + users), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await held.bench.store.flush(.ordered)
+        await source.script(hTransfer, [.hold, .hold, .hold, .stage(hBytes)])
+        for (user, bytes) in zip(users, uBytes) {
+            await source.script(user.transferID, [.stage(bytes)])
+        }
+        guard case .success = await engine.registerGroup(onH.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled {
+            let now = await SyncBench.holding(engine, hTransfer)
+            if now.ids == count, await SyncBench.isRunning(engine, hTransfer), await SyncBench.storeIdle(engine) {
+                break
+            }
+            await Task.yield()
+        }
+        await bulk.setHolding(true)
+        let waiters = users.map { user in Task { await engine.awaitAsset(user.identifier, lane: .userInitiated) } }
+        var spins = 0
+        while !Task.isCancelled, await SyncBench.verifying(engine, userTransfers) < k {
+            spins += 1
+            if spins > 50_000_000 {
+                throw SyncBenchError.incomplete("setup: the users' publications never all began: \(await SyncBench.verifying(engine, userTransfers)) of \(k)")
+            }
+            await Task.yield()
+        }
+        await bulk.waitForHeldUnits(atLeast: k)
+        let heldUnits = Set(await bulk.heldUnits)
+        let releaser = Task {
+            while !Task.isCancelled {
+                await bulk.waitForHeldUnits(atLeast: heldUnits.count + 1)
+                for other in await bulk.heldUnits where !heldUnits.contains(other) {
+                    await bulk.release(other)
+                }
+            }
+        }
+        run.publishing = await SyncBench.verifying(engine, userTransfers)
+        guard try await SyncBench.applyHeldFollow(engine, SyncBench.leadingFillers(0x63_000) + movedH + users, tag: "v3-many-\(count)-\(k)") else {
+            throw SyncBenchError.incomplete("setup: v3's follow is not owed")
+        }
+        run.hAfterV3 = await SyncBench.holding(engine, hTransfer).ids
+        guard try await SyncBench.applyHeldFollow(engine, SyncBench.leadingFillers(0x64_000) + movedH + users, tag: "v4-many-\(count)-\(k)") else {
+            throw SyncBenchError.incomplete("setup: v4's follow is not owed")
+        }
+        (run.owedAfterV4, run.owedOffH) = await SyncBench.owedMoves(engine, off: hTransfer)
+        await SyncBench.holdTurns(engine)
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        var first = true
+        while !Task.isCancelled, await SyncBench.barrierUp(engine) {
+            let follow = await SyncBench.followWaiting(engine)
+            let owedBefore = await SyncBench.owedMoves(engine, off: hTransfer).total
+            if let turn = await SyncBench.releaseOneHeldFollowOrDrainTurn(engine) {
+                run.turns.append((follow ? "follow" : "drain", turn))
+                if first, follow {
+                    first = false
+                    run.firstTurnMoves = owedBefore - (await SyncBench.owedMoves(engine, off: hTransfer).total)
+                }
+            } else {
+                await Task.yield()
+            }
+            if run.turns.count > 400 {
+                throw SyncBenchError.incomplete("the follow and its drain did not end within 400 turns")
+            }
+        }
+        await SyncBench.releaseHeldTurns(engine)
+        while !Task.isCancelled, !(await SyncBench.turnsSettled(engine)) {
+            await Task.yield()
+        }
+        run.violations = await SyncBench.violations(engine)
+        releaser.cancel()
+        _ = await releaser.value
+        await bulk.setHolding(false)
+        await bulk.releaseAll()
+        await engine.shutdown()
+        for waiter in waiters {
+            _ = await waiter.value
+        }
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
+        return run
+    }
+
+    /// Whether no store work is in flight.
+    static func storeIdle(_ engine: isolated SyncEngine) -> Bool {
+        !engine.state.storeWorkInFlight
+    }
+
+    /// How many of `transfers` are verifying (their publication began).
+    static func verifying(_ engine: isolated SyncEngine, _ transfers: [TransferID]) -> Int {
+        transfers.filter { engine.state.jobs[$0]?.state == .verifying }.count
+    }
+
+    /// The owed moves (`EngineState.inboundMoves[inboundNext...]`), and those off `holder`.
+    static func owedMoves(_ engine: isolated SyncEngine, off holder: TransferID) -> (total: Int, off: Int) {
+        let owed = engine.state.inboundMoves[engine.state.inboundNext...]
+        return (owed.count, owed.filter { $0.holder == holder }.count)
+    }
+
+    /// A visit that moves `moved` of a holder's `count` ids (Stage 3 close-out cycle 21, ruling S3-R26 item 3; the
+    /// cycle-20 requirements verifier's PROBE-C20R-PARTIAL-MOVE-C2): the members share H's 16 bytes (one job,
+    /// downloading, held), each with a user waiter (`users`) or all in one prefetch group; O (a user waiter) downloads,
+    /// held. v3 maps the first `moved` members to O's content: H's visit moves `moved` ids, which fit the turn's ids, so it
+    /// takes `move`. The heartbeat times the apply's sync and its whole follow.
+    static func partialMove(members count: Int, moved: Int, users: Bool) async throws -> PartialMoveRun {
+        var run = PartialMoveRun()
+        let loadBefore = SyncBench.loadAverages()
+        let bench = try await SyncBench.followBench()
+        let engine = bench.engine
+        let source = bench.source
+        let oBytes = Data(repeating: 0x6F, count: 16)
+        let hBytes = Data(repeating: 0x68, count: 16)
+        let o = SyncBench.entry("o", oBytes, policy: .onDemand)
+        let members = SyncBench.sharing(count, hBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData(members + [o]), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await bench.store.flush(.ordered)
+        let holder = members[0].transferID
+        await source.script(o.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
+        await source.script(holder, [.hold, .stage(hBytes)])
+        let oWaiter = Task { await engine.awaitAsset(o.identifier, lane: .userInitiated) }
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, o.transferID)) {
+            await Task.yield()
+        }
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        if users {
+            for entry in members {
+                let id = entry.identifier
+                callers.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+            }
+        } else {
+            guard case .success = await engine.registerGroup(members.map(\.identifier), lane: .prefetch) else {
+                throw SyncBenchError.incomplete("the prefetch group was refused")
+            }
+        }
+        var spins = 0
+        while !Task.isCancelled {
+            let now = await SyncBench.userHolding(engine, holder)
+            if now.ids == count, now.interests == (users ? count : 1), await SyncBench.isRunning(engine, holder) {
+                break
+            }
+            spins += 1
+            if spins > 5_000_000 {
+                throw SyncBenchError.incomplete("setup: H never held every id: \(now)")
+            }
+            await Task.yield()
+        }
+        let v3 = SyncBench.sharing(count, hBytes).enumerated().map { index, entry in index < moved ? SyncBench.entry(entry.identifier.rawValue, oBytes, policy: .onDemand) : entry }
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        run.wait = try await SyncBench.timedApply(bench, v3 + [o], tag: "v3-partial-\(users)-\(moved)-\(count)")
+        run.onO = await SyncBench.userHolding(engine, o.transferID).ids
+        run.onH = await SyncBench.userHolding(engine, holder).ids
+        await engine.shutdown()
+        for caller in callers {
+            _ = await caller.value
+        }
+        _ = await oWaiter.value
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
+        return run
     }
 
     /// A commit that binds and answers `count` ids (Stage 3 close-out cycle 21, ruling S3-R26 item 4;
