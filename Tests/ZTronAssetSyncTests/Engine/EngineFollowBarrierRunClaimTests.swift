@@ -6,8 +6,8 @@ import ZTronAssetStorage
 import ZTronAssetTestSupport
 
 /// A run's claim that a visit re-routed onto a job whose verdict waits (Stage 3 close-out cycle 21, ruling S3-R26 item 12's
-/// answer 5, candidate 1; `critic-defer-bucket.md`'s T-RUN). Each runs in both orders (`LaneDropVisit`) and expects the
-/// visit-first answers in both.
+/// answer 5, candidates 1 and 2; `critic-defer-bucket.md`'s T-RUN and residual risks). Each runs in both orders
+/// (`LaneDropVisit`) and expects the visit-first answers in both.
 extension EngineFollowBarrierTests {
     // MARK: Item 12's answer 5, candidate 1: a run's claim orphaned at a verdict replayed with the barrier down
 
@@ -81,6 +81,67 @@ extension EngineFollowBarrierTests {
             nil
         }
         #expect(report?.fetched == 1 && report?.failures.isEmpty == true, "the run fetches zz-a with T's content (visit-first): \(outcome)")
+        await Self.finishHeld(s)
+    }
+
+    // MARK: Item 12's answer 5, candidate 2: a run's claim a visit re-routed onto a job whose verdict waits
+
+    /// A forced sync's run fetches zz-t1 (content t, job T) and zz-o2 (content o, job O), both held downloading. v3's
+    /// follow is then owed, and T's attempt gets a 404: its verdict waits. v4 maps zz-o2 to content t: the follow's
+    /// visit of O re-routes the run's claim on zz-o2 onto T (`reroute`), its join behind T's waiting verdict. The drain
+    /// gives T's verdict, which answers the run for T. Until close-out cycle 21 that emptied all of T's claims
+    /// (`recordRunOutcome`'s `outstanding[T] = nil`), so the join behind it found no claim (`stillWants`;
+    /// `critic-defer-bucket.md`'s residual risks) and zz-o2 was neither fetched nor failed. Visited first, T's 404 failed
+    /// zz-t1 and ended T before v4, whose visit of O made a new job of content t for zz-o2, which fetched it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierKeepsARunsClaimReroutedBehindAVerdict(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_021_901
+        let (s, _) = try await FollowBarrier.setUp(seed: seed)
+        let engine = s.engine
+        let tBytes = EngineFixture.bytes(seed + 3, count: 16)
+        let oBytes = EngineFixture.bytes(seed + 4, count: 20)
+        let t1 = EngineFixture.entry("zz-t1", tBytes)
+        let o2 = EngineFixture.entry("zz-o2", oBytes)
+        let o2OnT = EngineFixture.entry("zz-o2", tBytes)
+        let t = t1.transferID
+        let o = o2.transferID
+        try #require(o2OnT.transferID == t && t != o, "setup: v4 maps zz-o2 to T's content")
+        await s.harness.source.script(t, [.hold, .fail(.permanentMissing(httpStatus: 404)), .stage(tBytes)])
+        await s.harness.source.script(o, [.hold, .stage(oBytes)])
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [t1, o2] + Self.laterFillers(seed + 3_000), etag: "v2")
+        let sync = Task { await engine.sync(.force) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in
+                e.state.jobs[t]?.state == .downloading && e.state.jobs[o]?.state == .downloading && e.state.run?.outstanding.count == 2
+            }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [t1, o2] + Self.laterFillers(seed + 6_000), tag: "v3-run-reroute-\(seed)", s, visit: visit)
+        await s.harness.source.release(t, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { e in
+            visit == .sweepFollowsFirst ? e.state.jobs[t]?.attemptEnd?.deferredAfter != nil : e.state.jobs[t] == nil
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 300) + [t1, o2OnT] + Self.laterFillers(seed + 9_000), tag: "v4-run-reroute-\(seed)", s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            var turns = 0
+            while await engine.readForTests({ $0.state.run?.outstanding[t]?.contains(o2.identifier) != true }) {
+                try #require(turns < 8, "setup: O's visit re-routes the run's claim on zz-o2 onto T within 8 follow turns")
+                await Self.runOneFollowTurn(engine)
+                turns += 1
+            }
+            let waiting = await engine.readForTests { e in (e.state.jobs[t]?.attemptEnd?.deferredAfter != nil, e.state.jobs[t]?.assets.contains(o2.identifier) == true) }
+            try #require(waiting.0 && !waiting.1, "setup: T's verdict waits, and the claim's join waits behind it: \(waiting)")
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        let outcome = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: sync) }
+        let report: SyncReport? = switch outcome {
+        case .completeWithFailures(let report), .complete(let report):
+            report
+        default:
+            nil
+        }
+        #expect(report?.fetched == 1, "the run fetches zz-o2 with T's content (visit-first): \(outcome)")
+        #expect(report?.failures.map(\.id) == [t1.identifier] && report?.failures.first?.error == .notFound, "the run fails zz-t1 with T's 404: \(outcome)")
         await Self.finishHeld(s)
     }
 }
