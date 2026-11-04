@@ -5106,8 +5106,10 @@ fix (S3-R26 item 11, "Red first").
    `68ce0d7` the fix, `6a7834b` its C2 pin). Mutants: item A's running (`.build-s3f/c21/mut21-a.txt`), candidate 4's,
    T1-space's and K4's queued after them (`MUT_EXTRA=.build-s3f/c21/tools/mut-c4.py python3
    .build-s3f/c21/tools/mut21.py`); their table goes under "Step 3" when they end. Results under "Step 3" below.
-4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending. **Next action:** B2–B4 with I1
-   and I3 and `EngineIDTokensTests`, green before any caller changes.
+4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: B2–B4 with I1 and I3 and
+   `EngineIDTokensTests` **committed** (`f9bce7a`; the whole Sync suite green with the two clauses, 587 tests).
+   **Next action:** item B's pins (`manyMovesTurns`, `partialMoveTurns`) and B-T4, red on `f9bce7a`, committed alone;
+   then B5–B7 and B9–B11 with T2, T3, T6 and T7's I1 and I3 injections (already in `EngineIDTokensTests`).
 5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
