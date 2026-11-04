@@ -132,9 +132,10 @@ struct EngineIDTokensTests {
     }
 
     /// The index's clause of the invariant check (I1) reports an id whose holders the index forgot, and only that, in
-    /// one exact message; the interest clause (I3) reports an interest with no id.
+    /// one exact message; the interest clauses report an interest with no id (I3) and an interest in an id outside the
+    /// job's ids (I2), each beside what the injected state may trip in neighbouring clauses.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: the invariant check reports a job whose index of its interests' ids is wrong, or that holds an interest with no id", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: the invariant check reports a job whose index of its interests' ids is wrong, that holds an interest with no id, or one in an id outside its ids", .timeLimit(.minutes(1)))
     func invariantsReportAMisindexedJob() async throws {
         let harness = EngineHarness.make()
         let bytes = EngineFixture.bytes(2_021_801)
@@ -152,6 +153,8 @@ struct EngineIDTokensTests {
         #expect(forgotten == ["job \(transfer) indexes the holders of 1 ids unlike its interests, 0 with its first holder among the others"], "\(forgotten)")
         let empty = await engine.violations { $0.jobs[transfer]?.setInterest(JobInterest(lane: .prefetch, kind: .prefetch, assets: []), for: InterestToken(rawValue: 999_999)) }
         #expect(empty.contains("job \(transfer) holds interest 999999 with no id"), "\(empty)")
+        let outside = await engine.violations { _ = $0.jobs[transfer]?.assets.remove(AssetID("held")) }
+        #expect(outside.contains("job \(transfer) has interests in 1 ids outside its ids"), "\(outside)")
         #expect(await engine.invariantViolations().isEmpty, "the check restored the state")
         await harness.source.release(transfer, with: .progress(received: 0, expected: nil))
         await engine.releaseGroup(group)
