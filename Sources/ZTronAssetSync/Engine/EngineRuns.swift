@@ -584,8 +584,10 @@ extension SyncEngine {
 
     /// `checkRunSettled()`; `spaceSwept` once this check has re-checked the space-parked jobs against the ledger.
     private func checkRunSettled(spaceSwept: Bool) {
-        // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again.
-        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier else {
+        // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again. While the
+        // drain gives a verdict whose job it took a run's claim off first, the claim is on no job's interest until its
+        // re-route lands it (`runClaimTakenOff`): the drain's end checks again.
+        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier, !self.state.runClaimTakenOff else {
             return
         }
         self.materializeRun()

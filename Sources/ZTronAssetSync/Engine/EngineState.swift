@@ -165,6 +165,11 @@ struct EngineState {
     var followCarried: Set<TransferID> = []
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
+    /// Set while the drain gives a waiting verdict whose job it took a run's claim off first (`takeOffMovedBefore`), until
+    /// `rerouteMovedBefore` lands the claim: until then it is on no job's interest, so the run check waits
+    /// (`checkRunSettled`), and the drain's end checks the run again (Stage 3 close-out cycle 21, found while fixing
+    /// S3-R26 item 12's answer 5, candidate 2: a check the verdict made between the two settled the run without the claim).
+    var runClaimTakenOff = false
     /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), set
     /// at each batch to what the turn has left: one turn's ids cover the whole batch, the follow's last turn included
     /// (Stage 3 close-out cycle 20, ruling S3-R25 item 1; each visit had a whole turn's ids, so a batch of verdicts moved

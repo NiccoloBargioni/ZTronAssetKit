@@ -556,6 +556,10 @@ extension SyncEngine {
         var off: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
         self.state.jobs[job.transfer]?.assets.subtract(held)
         for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
+            if interest.kind == .run, !interest.assets.isDisjoint(with: held) {
+                // The run's claim is on no job's interest until `rerouteMovedBefore` lands it: the run check waits.
+                self.state.runClaimTakenOff = true
+            }
             for asset in interest.assets.sorted() where held.contains(asset) {
                 _ = self.state.jobs[job.transfer]?.removeAsset(asset, for: token)
                 off.append((token, interest, asset))
@@ -568,11 +572,13 @@ extension SyncEngine {
     }
 
     /// Re-routes, after the verdict, the interests `takeOffMovedBefore` took off `transfer`'s job: each follows its id's
-    /// entry in the copy (`reroute`), to the job the verdict left or a new job of the content, or another content.
+    /// entry in the copy (`reroute`), to the job the verdict left or a new job of the content, or another content. A
+    /// run's claim among them is landed then, so the run check that waited for it may run again (`runClaimTakenOff`).
     private func rerouteMovedBefore(_ off: [(token: InterestToken, interest: JobInterest, asset: AssetID)], from transfer: TransferID) {
         for item in off {
             self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
         }
+        self.state.runClaimTakenOff = false
     }
 
     /// The visit a visit-first engine made, after it gave the verdict, at each apply since: the job the verdict left
