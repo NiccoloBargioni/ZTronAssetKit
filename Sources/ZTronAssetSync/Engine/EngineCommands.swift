@@ -1768,6 +1768,12 @@ extension SyncEngine {
             if misindexed > 0 || doubled > 0 {
                 violations.append("job \(transfer) indexes the holders of \(misindexed) ids unlike its interests, \(doubled) with its first holder among the others")
             }
+            // Every interest's ids are the job's (I2): a rest that takes an id off its holder puts it back while an
+            // interest that joined meanwhile holds it (`continueMove`).
+            let outside = holders.keys.filter { !job.assets.contains($0) }.count
+            if outside > 0 {
+                violations.append("job \(transfer) has interests in \(outside) ids outside its ids")
+            }
             // Every writer removes an interest its last id leaves (I3): a move's per-holder removal relies on it.
             if let empty = job.interests.filter({ $0.value.assets.isEmpty }).keys.min() {
                 violations.append("job \(transfer) holds interest \(empty.rawValue) with no id")

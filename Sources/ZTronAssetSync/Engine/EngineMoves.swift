@@ -173,7 +173,8 @@ extension SyncEngine {
 
     /// Continues `progress`, the moves left off `holder`'s job, within `budget` ids; returns whether an id moved and the
     /// ids spent. An id is taken whole, all of its interests in one turn, so it leaves the job in one turn or stays: it
-    /// leaves the job's ids (`Job.assets`) at its first interest, as `move` subtracts them before it re-routes, and each
+    /// leaves the job's ids (`Job.assets`) at its first interest, as `move` subtracts them before it re-routes, and comes
+    /// back after its last one when an interest that joined meanwhile still holds it (the invariant check's I2), and each
     /// interest is re-routed as `move` re-routes it (`reroute`, under `listing`; a visit's under the copy as it stands at
     /// the turn) unless it left the job meanwhile. An id that an apply made since maps to the job's content again rejoins
     /// the job through `reroute`, as that apply's visit on a visit-first engine moved it back: behind the job's exit
@@ -189,36 +190,41 @@ extension SyncEngine {
         }
         var spent = 0
         var moved = false
-        var current: AssetID?
-        while let item = progress.first {
-            let asset = item.asset
-            if asset != current {
-                guard spent < budget else {
-                    break
+        while let first = progress.first {
+            let asset = first.asset
+            guard spent < budget else {
+                break
+            }
+            spent += 1
+            self.state.jobs[holder]?.assets.remove(asset)
+            while let item = progress.first, item.asset == asset {
+                _ = progress.popFirst()
+                // The interest is read for its lane and kind, all `reroute` reads, and its id is removed in the table. A
+                // copy of the interest held across the removal shares its ids' storage, so the removal copied them whole,
+                // once per id moved: a turn of 512 off one interest of 10,000 ids held the actor about 20 ms (the
+                // cycle-19 gate run's `BenchSync.sharedApplyTurns`, `divergenceTurns` and `inboundHolderTurns`).
+                guard let interest = self.state.jobs[holder]?.interests[item.token].map({ JobInterest(lane: $0.lane, kind: $0.kind, assets: []) }) else {
+                    continue
                 }
-                spent += 1
-                current = asset
-                self.state.jobs[holder]?.assets.remove(asset)
-            }
-            _ = progress.popFirst()
-            // The interest is read for its lane and kind, all `reroute` reads, and its id is removed in the table. A copy
-            // of the interest held across the removal shares its ids' storage, so the removal copied them whole, once per
-            // id moved: a turn of 512 off one interest of 10,000 ids held the actor about 20 ms (the cycle-19 gate run's
-            // `BenchSync.sharedApplyTurns`, `divergenceTurns` and `inboundHolderTurns`).
-            guard let interest = self.state.jobs[holder]?.interests[item.token].map({ JobInterest(lane: $0.lane, kind: $0.kind, assets: []) }) else {
-                continue
-            }
-            guard self.state.jobs[holder]?.removeAsset(asset, for: item.token) == true else {
-                continue
-            }
-            self.reroute(item.token, interest: interest, asset: asset, from: holder, listing: listing)
-            moved = true
-            if self.state.jobs[holder]?.interests[item.token]?.assets.isEmpty == true {
-                if progress.supersedes {
-                    self.state.jobs[holder]?.setInterest(nil, for: item.token)
-                } else {
-                    self.removeInterest(item.token, from: holder)
+                guard self.state.jobs[holder]?.removeAsset(asset, for: item.token) == true else {
+                    continue
                 }
+                self.reroute(item.token, interest: interest, asset: asset, from: holder, listing: listing)
+                moved = true
+                if self.state.jobs[holder]?.interests[item.token]?.assets.isEmpty == true {
+                    if progress.supersedes {
+                        self.state.jobs[holder]?.setInterest(nil, for: item.token)
+                    } else {
+                        self.removeInterest(item.token, from: holder)
+                    }
+                }
+            }
+            // An interest that joined the holder in the id after the rest's items were fixed (an owed move's join, made at
+            // once) still holds it: the id stays in the job's ids, as a visit-first engine's join re-inserted it, so its
+            // publication binds it and a later apply's visit moves it (Stage 3 close-out cycle 21, ruling S3-R26 item 7;
+            // `analyse-state-cost.md` Q1, B-T5).
+            if self.state.jobs[holder]?.tokensByID[asset] != nil {
+                self.state.jobs[holder]?.assets.insert(asset)
             }
         }
         if progress.isDone, progress.supersedes, self.state.jobs[holder] != nil {
