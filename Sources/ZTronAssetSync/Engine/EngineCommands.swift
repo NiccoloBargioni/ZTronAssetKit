@@ -2045,8 +2045,9 @@ extension SyncEngine {
     }
 
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
-    /// drain is in progress (none, between turns), so none waits for ever; every failure verdict that waits names a
-    /// failed job with its event (Stage 3 close-out cycle 9, amendment (c) of S3-R11); the joins registered in
+    /// drain is in progress (none, between turns), so none waits for ever, and none once the engine stops running (cycle
+    /// 21, ruling S3-R26 item 6); every failure verdict that waits names a failed job with its event (Stage 3 close-out
+    /// cycle 9, amendment (c) of S3-R11); the joins registered in
     /// `joinsAfterFollow` are exactly the waiting `.join` events and the joins behind waiting verdicts (cycle 10; cycle
     /// 21, ruling S3-R26 item 2); the carried jobs are gone once the barrier is down (cycle 11); every waiting event has
     /// its decision instant in the world history, and once the barrier is down the history and the visits' and the
@@ -2062,6 +2063,11 @@ extension SyncEngine {
         // (`scheduleFollowFollowUp`; Stage 3 close-out cycle 20, ruling S3-R25 item 7).
         if !self.isRunning, self.followOwed {
             violations.append("a follow is owed while the engine is \(self.state.lifecycle)")
+        }
+        // Only a running engine drains, so no event waits once `spawn` refuses a drain's follow-up turn
+        // (`scheduleDrainFollowUp`; Stage 3 close-out cycle 21, ruling S3-R26 item 6).
+        if !self.isRunning, !events.isEmpty {
+            violations.append("\(events.count) events wait for a follow while the engine is \(self.state.lifecycle)")
         }
         var verdicts: Set<TransferID> = []
         var joins: [InterestToken: [AssetID: TransferID]] = [:]

@@ -394,27 +394,23 @@ extension SyncEngine {
         }
     }
 
-    /// Schedules one later turn for the events a drain turn left (C2).
+    /// Schedules one later turn for the events a drain turn left (C2). Only a running engine drains, so the task is
+    /// always spawned (`spawn` refuses one only while shutting down, shut down or degraded): every drain runs in a
+    /// running turn (a follow's last turn, a drain follow-up past its lifecycle guard, `drainFollowUp`), the engine
+    /// degrades only while starting, before any apply, and shutdown's first turn clears the waiting events with the
+    /// follow's tables (`drainEverything`), after which a scheduled follow-up returns at once. The branch that cleared
+    /// them when no task could be spawned, which no path reached, was removed under ruling S3-R26 item 6 (Stage 3
+    /// close-out cycle 21), as its twin in `scheduleFollowFollowUp` was; `followBarrierViolations` checks the assumption.
     private func scheduleDrainFollowUp() {
         guard !self.state.drainFollowUpScheduled else {
             return
         }
         self.state.drainFollowUpScheduled = true
-        let spawned = self.spawn(.entry) { engine in
+        self.spawn(.entry) { engine in
             // REENTRANCY: RE-S45 (proposed) — the drain's follow-up hops onto the actor and re-reads the waiting events
             // and each job, epoch and interest they name (`drainEventsAfterFollow` re-validates every one); a follow
             // begun meanwhile holds them again until its own end drains them.
             await engine.drainFollowUp()
-        }
-        if spawned == nil {
-            // Shutting down: nothing is admitted any more.
-            self.state.drainFollowUpScheduled = false
-            self.state.eventsAfterFollow = []
-            self.state.eventStamps = []
-            self.state.verdictsAfterFollow = [:]
-            self.state.joinsAfterFollow = [:]
-            self.state.worldHistory = []
-            self.state.followStamps = [:]
         }
     }
 
