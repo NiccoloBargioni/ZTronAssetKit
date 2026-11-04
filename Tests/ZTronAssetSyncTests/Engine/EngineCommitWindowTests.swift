@@ -78,6 +78,90 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 
+    /// The store can bind an id its job no longer holds, and the commit does not announce it (step C3's
+    /// `job.assets.contains`; `integrate-c21.md`'s unconfirmed claim that no reachable shape binds one): zz-a and zz-d
+    /// share X's content, each with a user waiter. v4 maps zz-a to Y's content while X downloads; X's publication then
+    /// begins, held at its first store unit, and v5 maps zz-a back to X's content, applied by the store while the
+    /// engine's side of it waits (`holdNextApplyFollow`). Swept first, the publication's binding holds zz-a, and v4's
+    /// owed visit takes zz-a off X before the store binds it (`Job.rerouteOnPass`); the store, which holds v5, then binds
+    /// both ids, but the engine's copy is v4, where zz-a is Y's, so X's commit announces zz-d alone, as
+    /// `job.assets.sorted()` did before step C3. Visited first, v4's visit took zz-a off X before the publication began,
+    /// so the store bound zz-d alone. In both orders v5's follow then answers zz-a's waiter with X's bytes.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func commitAnnouncesNoIDItsJobNoLongerHolds(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_022_151
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
+        let engine = s.engine
+        let xBytes = EngineFixture.bytes(seed + 3, count: 16)
+        let yBytes = EngineFixture.bytes(seed + 4, count: 20)
+        let aOnX = EngineHarness.onDemand("zz-a", xBytes)
+        let aOnY = EngineHarness.onDemand("zz-a", yBytes)
+        let d = EngineHarness.onDemand("zz-d", xBytes)
+        let x = aOnX.transferID
+        let y = aOnY.transferID
+        try #require(y != x, "setup: v4 maps zz-a to other content")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [aOnX, d] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(x, [.hold, .stage(xBytes), .stage(xBytes)])
+        await s.harness.source.script(y, [.hold, .stage(yBytes)])
+        let subscription = try await engine.subscribe().get()
+        let v = Task { await engine.awaitAsset(d.identifier, lane: .userInitiated) }
+        let w = Task { await engine.awaitAsset(aOnX.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[x]?.state == .downloading && $0.state.jobs[x]?.interests.count == 2 }
+        }
+        let v4 = [s.q] + FollowBarrier.fillers(seed + 200) + [aOnY, d] + Self.laterFillers(seed + 6_000)
+        try await Self.applyHeld(v4, tag: "v4-unheld-\(seed)", s, visit: visit)
+        let releaser = try await Self.holdPublication(of: x, s, bulk: bulk)
+        if visit == .sweepFollowsFirst {
+            let passing = await engine.readForTests { e in (e.followOwed, e.state.jobs[x]?.assets, e.state.jobs[x]?.rerouteOnPass) }
+            try #require(passing.0 && passing.1 == [aOnX.identifier, d.identifier] && passing.2 == [aOnX.identifier], "setup: X publishes both ids, and v4's owed visit re-routes zz-a at once: \(passing)")
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+            await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        }
+        let movedOff = await engine.readForTests { e in (e.state.jobs[x]?.assets, e.state.jobs[x]?.state, e.state.jobs[y]?.assets) }
+        try #require(movedOff.0 == [d.identifier] && movedOff.1 == .verifying && movedOff.2 == [aOnY.identifier], "setup: zz-a left X, which publishes, for Y's job: \(movedOff)")
+        let v5 = [s.q] + FollowBarrier.fillers(seed + 300) + [aOnX, d] + Self.laterFillers(seed + 9_000)
+        let manifest = try ValidatedManifest(entries: v5, digest: ContentHash.sha256(of: Data("v5-unheld-\(seed)".utf8)))
+        await engine.holdNextApplyFollow()
+        let applying = Task { await engine.applyAndFollow(manifest, etag: nil, eviction: nil) }
+        await engine.awaitCondition { $0.applyFollowHeld && $0.state.appliesInFlight == 1 }
+        releaser.cancel()
+        await releaser.value
+        await bulk.setHolding(false)
+        await engine.awaitCondition { $0.state.jobs[x] == nil }
+        if visit == .sweepFollowsFirst {
+            let stored = await s.harness.store.location(for: aOnX.identifier, extensions: [], recordingAccess: false)
+            try #require(stored != nil, "setup: the store, which holds v5, bound zz-a at X's commit")
+        }
+        let announced = await engine.readForTests { e -> [AssetID] in
+            guard let key = e.state.subscribers.keys.max() else {
+                return []
+            }
+            var ids: [AssetID] = []
+            while let event = e.state.subscribers[key]?.take() {
+                if case .assetAvailable(let id, _) = event, id == aOnX.identifier || id == d.identifier {
+                    ids.append(id)
+                }
+            }
+            return ids
+        }
+        #expect(announced == [d.identifier], "X's commit, under v4's copy, announces zz-d alone: \(announced)")
+        await engine.readForTests { $0.releaseApplyFollow() }
+        let applied = await applying.value
+        #expect((try? applied.get()) != nil, "setup: v5 is applied: \(applied)")
+        let vResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: v) }
+        let wResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: w) }
+        #expect((try? vResult.get())?.byteSize == 16, "V gets X's bytes for zz-d: \(vResult)")
+        #expect((try? wResult.get())?.byteSize == 16, "W gets X's bytes for zz-a, which v5 maps back to X's content: \(wResult)")
+        withExtendedLifetime(subscription) {}
+        await Self.finishHeld(s)
+    }
+
     // MARK: T-PG4: a commit leaves no progress key of its ids (step C4)
 
     /// X holds zz-p1, zz-p2 and zz-p3 for three user waiters, a subscriber reads nothing, and two progress elements
