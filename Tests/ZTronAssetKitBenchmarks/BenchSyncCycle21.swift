@@ -8,10 +8,34 @@ import ZTronAssetTransport
 
 @testable import ZTronAssetSync
 
-/// The C2 pins of Stage 3 close-out cycle 21 (ruling S3-R26 items 2 to 4 and 12; the cycle-20 verifiers' correct #5
-/// and reqs #10): the commit's own turn in four groupings (`commitTurns`). Each figure is printed with the host's load
-/// averages, which S3-R23 asks for beside every timing figure.
+/// The C2 pins of Stage 3 close-out cycle 21 (ruling S3-R26 items 2 to 4 and 12; the cycle-20 verifiers' reqs #3,
+/// correct #2, correct #5 and reqs #10): the joins a follow's visit defers behind a waiting exit verdict
+/// (`deferBehindVerdictTurns`) and the commit's own turn in four groupings (`commitTurns`). Each figure is printed with
+/// the host's load averages, which S3-R23 asks for beside every timing figure.
 extension ZTronAssetKitBenchmarks.SyncBenchmarks {
+    /// C2 of a follow whose visit moves 10,000 ids onto a content whose exit verdict waits (`SyncBench.deferBehind`):
+    /// every join waits behind that verdict (`deferBehindVerdict`). Each held follow and drain turn is timed inside the
+    /// actor, and the heartbeat covers the apply and every turn; the best of three of each against C2, after a warm-up.
+    @Test("R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(10)), arguments: DeferBehindShape.allCases)
+    @available(macOS 15.0, iOS 18.0, *)
+    func deferBehindVerdictTurns(_ shape: DeferBehindShape) async throws {
+        _ = try await SyncBench.deferBehind(members: 1_000, shape: shape)
+        var runs: [DeferBehindRun] = []
+        for _ in 0..<3 {
+            runs.append(try await SyncBench.deferBehind(members: 10_000, shape: shape))
+        }
+        for run in runs {
+            #expect(run.verdictWaited, "setup: O's verdict waited for the follow: \(run)")
+            #expect(run.onO == (shape.notFound ? 10_000 : 10_001), "setup: O's content holds every member once the drain is over: \(run)")
+            #expect(run.violations.isEmpty, "setup: \(run.violations.prefix(3))")
+        }
+        let turns = runs.map { $0.turns.max() ?? 0 }
+        let waits = runs.map { max($0.applyWait, $0.turnsWait) }
+        print("R-SYN-11 deferBehindVerdictTurns \(shape.rawValue) at 10,000: longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+        #expect((turns.min() ?? .infinity) <= Self.c2Budget, "longest held turn: \(turns)")
+        #expect((waits.min() ?? .infinity) <= Self.c2Budget, "heartbeat: \(waits)")
+    }
+
     /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
     /// verifiers' correct #5 and reqs #10), in four groupings: a user waiter per id, the same with a stalled subscriber,
     /// one prefetch group with a stalled subscriber, and 10,000 one-member prefetch groups. The heartbeat over the commit
@@ -52,6 +76,53 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         let waits = runs.map(\.wait)
         let turns = runs.map(\.turn)
         print("R-SYN-11 commitTurns waiters with two stalled subscribers at 10,000 (recorded, not gated): heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms; the commit's own turn \(turns) ms, best \(turns.min() ?? .infinity) ms; runs \(runs)")
+    }
+}
+
+/// The groupings of `SyncBench.deferBehind`: how the verdict that waits ends, and who wants the moved ids.
+enum DeferBehindShape: String, Sendable, CaseIterable {
+    /// O gets a 404 (`.resolve`); one prefetch group wants the ids.
+    case notFoundGroup
+    /// O times out (`.retry`); one prefetch group wants the ids.
+    case timeoutGroup
+    /// O gets a 404; each id has a user waiter of its own.
+    case notFoundUsers
+    /// O times out; each id has a user waiter of its own.
+    case timeoutUsers
+
+    /// Whether O's attempt ends in a 404.
+    var notFound: Bool {
+        self == .notFoundGroup || self == .notFoundUsers
+    }
+
+    /// Whether each id has a user waiter of its own.
+    var users: Bool {
+        self == .notFoundUsers || self == .timeoutUsers
+    }
+}
+
+/// What `SyncBench.deferBehind` measured and read.
+struct DeferBehindRun: CustomStringConvertible {
+    /// The heartbeat's longest wait over v4's apply, and over the held follow and drain turns.
+    var applyWait = 0.0
+    var turnsWait = 0.0
+    /// Each held follow or drain turn, timed inside the actor.
+    var turns: [Double] = []
+    /// The waiting events after each held follow turn (the queue the visits' joins went to on `8e1fb24`).
+    var eventsDuringFollow: [Int] = []
+    /// The waiting `.join` events once the follow's last turn ran.
+    var joinsAtFollowEnd = 0
+    /// Whether O's verdict waited for the follow.
+    var verdictWaited = false
+    /// The ids on O's content's job once the drain is over.
+    var onO = 0
+    /// The invariants once the drain is over.
+    var violations: [String] = []
+    /// The host's load averages before and after the run.
+    var load = ""
+
+    var description: String {
+        "turns \(self.turns.count) longest \(String(format: "%.2f", self.turns.max() ?? 0)) ms; apply \(String(format: "%.2f", self.applyWait)) ms, turns' heartbeat \(String(format: "%.2f", self.turnsWait)) ms; most events during the follow \(self.eventsDuringFollow.max() ?? 0); joins at the follow's end \(self.joinsAtFollowEnd); on O \(self.onO); load \(self.load)"
     }
 }
 
@@ -135,6 +206,157 @@ final class CommitTurnClock: Sendable {
 
 @available(macOS 15.0, iOS 18.0, *)
 extension SyncBench {
+    /// `count` changed on-demand entries of their own 16-byte contents that sort before the scenarios' ids: a follow's
+    /// first turn formats `followFormatsPerTurn` of them and stops before the scenario's entries, so it stays owed.
+    static func leadingFillers(_ seed: UInt64) -> [ManifestEntry] {
+        (0..<(SyncEngine.followFormatsPerTurn + 52)).map { SyncBench.entry(String(format: "f%05d", $0), GeneratedPayload.bytes(seed: seed + UInt64($0), offset: 0, length: 16), policy: .onDemand) }
+    }
+
+    /// Holds the follow's and the drain's follow-up turns.
+    static func holdTurns(_ engine: isolated SyncEngine) {
+        engine.holdFollowFollowUps()
+        engine.holdDrainFollowUps()
+    }
+
+    /// Whether no follow is owed, the barrier is down and no follow or drain turn is scheduled.
+    static func turnsSettled(_ engine: isolated SyncEngine) -> Bool {
+        !engine.followBarrier && !engine.state.followFollowUpScheduled && !engine.state.drainFollowUpScheduled
+    }
+
+    /// The waiting events, and the waiting `.join` events among them.
+    static func waitingEvents(_ engine: isolated SyncEngine) -> (events: Int, joins: Int) {
+        let events = engine.state.eventsAfterFollow
+        return (events.count, events.filter { if case .join = $0 { true } else { false } }.count)
+    }
+
+    /// The engine's invariants, from inside the actor.
+    static func violations(_ engine: isolated SyncEngine) -> [String] {
+        engine.invariantViolations()
+    }
+
+    /// Releases every held follow or drain turn, one at a time, each timed inside the actor, until the follow and its
+    /// drain are over; `perTurn` reads the engine after each.
+    static func releaseTurnsUntilSettled(_ engine: SyncEngine, perTurn: (Bool) async -> Void = { _ in }) async throws -> [Double] {
+        var turns: [Double] = []
+        var spins = 0
+        while !Task.isCancelled, !(await SyncBench.turnsSettled(engine)) {
+            let follow = await SyncBench.followWaiting(engine)
+            if let turn = await SyncBench.releaseOneHeldFollowOrDrainTurn(engine) {
+                turns.append(turn)
+                await perTurn(follow)
+            } else {
+                spins += 1
+                if spins > 50_000_000 {
+                    throw SyncBenchError.incomplete("the follow and its drain never settled: \(await SyncBench.followShape(engine))")
+                }
+                await Task.yield()
+            }
+        }
+        return turns
+    }
+
+    /// The joins a follow's visit defers behind a waiting exit verdict (Stage 3 close-out cycle 21, ruling S3-R26 item 2;
+    /// the cycle-20 requirements verifier's PROBE-C20R-DEFER-BEHIND-C2): `count` members share H's 16 bytes, one job,
+    /// downloading (held), wanted by one prefetch group or each by a user waiter (`shape`); O (a user waiter) downloads,
+    /// held, scripted to a 404 or a timeout. v3 changes only the leading fillers, so the follow stays owed (its follow-ups
+    /// held), and O's attempt ends: its verdict waits for the follow. v4 maps every member to O's content (and changes the
+    /// fillers again): H's visit moves the `count` ids over the follow's bounded turns, and each join onto O's content
+    /// waits behind O's verdict (`addInterest`, `deferBehindVerdict`). The heartbeat times v4's apply and then every held
+    /// follow and drain turn, each also timed inside the actor.
+    static func deferBehind(members count: Int, shape: DeferBehindShape) async throws -> DeferBehindRun {
+        var run = DeferBehindRun()
+        let loadBefore = SyncBench.loadAverages()
+        let bench = try await SyncBench.followBench()
+        let engine = bench.engine
+        let source = bench.source
+        let oBytes = Data(repeating: 0x6F, count: 16)
+        let hBytes = Data(repeating: 0x68, count: 16)
+        let o = SyncBench.entry("o", oBytes, policy: .onDemand)
+        let members = SyncBench.sharing(count, hBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData(SyncBench.leadingFillers(0x51_000) + members + [o]), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await bench.store.flush(.ordered)
+        let holder = members[0].transferID
+        let failure: TransferError = shape.notFound ? .permanentMissing(httpStatus: 404) : .transient(.timedOut, retryAfter: nil)
+        await source.script(o.transferID, [.hold, .fail(failure), .stage(oBytes)])
+        await source.script(holder, [.hold, .stage(hBytes)])
+        let waiter = Task { await engine.awaitAsset(o.identifier, lane: .userInitiated) }
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, o.transferID)) {
+            await Task.yield()
+        }
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        if shape.users {
+            for entry in members {
+                let id = entry.identifier
+                callers.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+            }
+        } else {
+            guard case .success = await engine.registerGroup(members.map(\.identifier), lane: .prefetch) else {
+                throw SyncBenchError.incomplete("the prefetch group was refused")
+            }
+        }
+        var spins = 0
+        while !Task.isCancelled {
+            let now = await SyncBench.userHolding(engine, holder)
+            if now.ids == count, now.interests == (shape.users ? count : 1), await SyncBench.isRunning(engine, holder) {
+                break
+            }
+            spins += 1
+            if spins > 5_000_000 {
+                throw SyncBenchError.incomplete("setup: H never held every id: \(now)")
+            }
+            await Task.yield()
+        }
+        await SyncBench.holdTurns(engine)
+        let v3 = try ValidatedManifest(entries: SyncBench.leadingFillers(0x52_000) + members + [o], digest: ContentHash.sha256(of: Data("v3-defer-\(shape.rawValue)-\(count)".utf8)))
+        _ = await engine.applyAndFollow(v3, etag: nil, eviction: nil)
+        guard await SyncBench.followOwedNow(engine) else {
+            throw SyncBenchError.incomplete("setup: v3's follow is not owed")
+        }
+        await source.release(o.transferID, with: .progress(received: 0, expected: nil))
+        while !Task.isCancelled, !(await SyncBench.verdictWaits(engine, o.transferID)) {
+            await Task.yield()
+        }
+        run.verdictWaited = await SyncBench.verdictWaits(engine, o.transferID)
+        let v4 = try ValidatedManifest(entries: SyncBench.leadingFillers(0x53_000) + SyncBench.sharing(count, oBytes) + [o], digest: ContentHash.sha256(of: Data("v4-defer-\(shape.rawValue)-\(count)".utf8)))
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        run.applyWait = try await SyncBench.longestWait(on: engine) {
+            _ = await engine.applyAndFollow(v4, etag: nil, eviction: nil)
+        }
+        var followEnded = false
+        var eventsDuringFollow: [Int] = []
+        var joinsAtFollowEnd = 0
+        var turns: [Double] = []
+        run.turnsWait = try await SyncBench.longestWait(on: engine) {
+            turns = try await SyncBench.releaseTurnsUntilSettled(engine) { follow in
+                guard follow, !followEnded else {
+                    return
+                }
+                let waiting = await SyncBench.waitingEvents(engine)
+                eventsDuringFollow.append(waiting.events)
+                if !(await SyncBench.followOwedNow(engine)) {
+                    followEnded = true
+                    joinsAtFollowEnd = waiting.joins
+                }
+            }
+        }
+        run.turns = turns
+        run.eventsDuringFollow = eventsDuringFollow
+        run.joinsAtFollowEnd = joinsAtFollowEnd
+        await SyncBench.releaseHeldTurns(engine)
+        run.onO = await SyncBench.holding(engine, o.transferID).ids
+        run.violations = await SyncBench.violations(engine)
+        await engine.shutdown()
+        _ = await waiter.value
+        for caller in callers {
+            _ = await caller.value
+        }
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
+        return run
+    }
+
     /// An engine as `followBench` builds it, with a stepped bulk executor (not holding) and `tuning`.
     static func heldPublicationBench(tuning: SyncTuning = SyncTuning()) async throws -> HeldPublicationBench {
         let time = ManualTimeSource()
