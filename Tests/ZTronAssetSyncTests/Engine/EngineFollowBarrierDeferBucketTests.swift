@@ -422,6 +422,103 @@ extension EngineFollowBarrierTests {
         #expect(others.allSatisfy { $0.verdictKey == nil }, "no other event gives a verdict")
     }
 
+    // MARK: A-T1-space: the joins behind an ENOSPC's waiting verdict
+
+    /// The joins a follow's visit waits behind an ENOSPC's waiting verdict (`.spaceFailure`) follow it at the drain, as
+    /// they follow an attempt's (`EventAfterFollow.verdictKey`; `integrate-c21.md`'s T1-space, on the ENOSPC shape of
+    /// `barrierLeavesAPassedIdToAPublicationsSpaceRetry`). C (zz-a's 100,000 bytes) publishes for A, a user waiter, and
+    /// its placement rename fails ENOSPC while v3's follow is owed, so its verdict waits; the 32 MB volume makes it a
+    /// retry, held, whose bytes then fail their checksum. H (zz-h's 16 bytes) downloads for W, a user waiter, held; v4
+    /// maps zz-h to C's content, and H's visit's join for W waits in C's bucket, behind the ENOSPC's verdict. Visited
+    /// first, the verdict was given at its arrival and v4's visit joined W to C's retry; swept first, the drain gives the
+    /// verdict, then the join behind it. Both orders: A and W get the retry's `integrityFailure`.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: the joins behind an ENOSPC's waiting verdict join its retry at the drain, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierJoinsTheJoinsBehindASpaceVerdictToItsRetry(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_022_791
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed)
+        let engine = s.engine
+        let cBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let wrong = EngineFixture.bytes(seed + 4, count: 100_000)
+        let hBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let a = EngineHarness.onDemand("zz-a", cBytes)
+        let h = EngineHarness.onDemand("zz-h", hBytes)
+        let hOnC = EngineHarness.onDemand("zz-h", cBytes)
+        let c = a.transferID
+        try #require(hOnC.transferID == c && h.transferID != c, "setup: v4 maps zz-h to C's content")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, h] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(c, [.hold, .stage(cBytes), .hold, .stage(wrong)])
+        await s.harness.source.script(h.transferID, [.hold, .stage(hBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[c]?.state == .downloading }
+        }
+        let wWaiter = Task { await engine.awaitAsset(h.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[h.transferID]?.state == .downloading }
+        let releaser = try await Self.holdPublication(of: c, s, bulk: bulk)
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [a, h] + Self.laterFillers(seed + 6_000), tag: "v3-space-bucket-\(seed)", s, visit: visit)
+        // The placement rename of C's verified bytes fails ENOSPC.
+        s.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".verifying"), occurrence: .nth(1), error: .noSpace))
+        if visit == .sweepFollowsFirst {
+            // The ENOSPC's free-space read runs one follow turn; the space sweep's own follow-up turns are held.
+            await engine.readForTests { $0.holdSpaceSweepFollowUps() }
+        }
+        releaser.cancel()
+        await releaser.value
+        await bulk.setHolding(false)
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.eventsAfterFollow.contains(where: Self.isSpaceFailure) }
+        } else {
+            // The verdict was given at its arrival, a retry after its backoff: C's retry downloads, held (C verified
+            // before, so only the retry downloads again).
+            await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[c]?.state == .downloading }
+            }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 300) + [a, hOnC] + Self.laterFillers(seed + 9_000), tag: "v4-space-bucket-\(seed)", s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            // The follow's turns run one at a time, the drain's held, until H's visit has waited W's join behind C's
+            // ENOSPC verdict, which waits in the queue once.
+            await engine.readForTests { $0.holdDrainFollowUps() }
+            var turns = 0
+            while await engine.readForTests({ e in e.followOwed && !e.state.joinsBehindVerdicts.keys.contains { $0.transfer == c } }) {
+                try #require(turns < 40, "setup: H's visit runs within 40 follow turns")
+                _ = await Self.runOneHeldTurn(engine)
+                turns += 1
+            }
+            let waiting = await engine.readForTests { e in
+                (
+                    behind: e.state.joinsBehindVerdicts.first { $0.key.transfer == c }?.value.map(\.join.asset) ?? [],
+                    verdicts: e.state.eventsAfterFollow.filter(Self.isSpaceFailure).count,
+                    violations: e.invariantViolations()
+                )
+            }
+            try #require(waiting.behind == [h.identifier] && waiting.verdicts == 1 && waiting.violations.isEmpty, "setup: W's join waits behind C's ENOSPC verdict, its one waiting event: \(waiting)")
+            await engine.readForTests { e in
+                e.releaseFollowFollowUps()
+                e.releaseDrainFollowUps()
+                e.releaseSpaceSweepFollowUps()
+            }
+        } else {
+            let none = await engine.readForTests { e in e.state.joinsBehindVerdicts.isEmpty && e.state.verdictsAfterFollow.isEmpty }
+            try #require(none, "visited first, no verdict waits and no join waits behind one")
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[c]?.state == .downloading && $0.state.jobs[c]?.interests.count == 2 }
+        }
+        await s.harness.source.release(c, with: .progress(received: 0, expected: nil))
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let wResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: wWaiter) }
+        #expect(aResult == .failure(.integrityFailure), "A gets the retry's integrity failure (visit-first): \(aResult)")
+        #expect(wResult == .failure(.integrityFailure), "W, joined to C's retry (visit-first at v4's visit), gets its integrity failure: \(wResult)")
+        await Self.finishHeld(s)
+    }
+
     // MARK: A-T-PURGE: a purge withdraws the joins behind a verdict
 
     /// A purge of the members, while their joins wait in O's bucket, withdraws them there, as it withdraws the waiting
