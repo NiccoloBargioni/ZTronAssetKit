@@ -96,8 +96,8 @@ struct VisitRemainder {
     /// The decision instant the visit read under (`SyncEngine.withReading`): its apply's (`followStamps`), or the
     /// drain's for its visit after a verdict.
     let stamp: WorldStamp
-    /// Whether it is the drain's visit after a verdict (`SyncEngine.followAfterVerdict`), whose joins the drain made at
-    /// once, never behind a verdict that waits (`addInterest`).
+    /// Whether it is the drain's visit after a verdict (`SyncEngine.followAfterVerdict`), whose joins are made as that
+    /// visit makes them (`SyncEngine.joinWaitsForVerdict`).
     let afterVerdict: Bool
     /// Whether the visit passed the job (`SyncEngine.rerouteOnVisit`): it spends the job's re-route set once its last id
     /// moved, so a publication or a verdict that meets the job meanwhile still reads the ids it moves

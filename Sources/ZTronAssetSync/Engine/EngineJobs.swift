@@ -96,6 +96,23 @@ extension SyncEngine {
 
     // MARK: Interests (H-3, ADR-020)
 
+    /// Whether a visit's join of `asset` (at `entry`'s content) onto a job whose exit verdict waits (`end`) waits behind
+    /// that verdict (`deferBehindVerdict`). A follow's visit's always waits: every id the copy mapped to the content when
+    /// the verdict deferred, and that an owed visit would move, was brought onto the job then (`bringInbound`), so this
+    /// one was moved there by a later apply, whose visit on a visit-first engine met the job as the verdict left it
+    /// (Stage 3 close-out cycle 17); a move brought in (`bringingInbound`) joins at once, on the job as the attempt left
+    /// it. The drain's visit after an earlier verdict (`followAfterVerdict`) makes the moves of the applies since that
+    /// verdict deferred, which the owed visits passed and `bringInbound` does not bring: its join waits unless the copy
+    /// this verdict deferred under (`AttemptEnd.copy`) already mapped `asset` to the content, the apply that mapped it
+    /// there having come before this verdict, so that engine's visit joined the job in its attempt and the verdict answers
+    /// it (Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 5, candidate 4).
+    private func joinWaitsForVerdict(_ asset: AssetID, entry: ManifestEntry, _ end: AttemptEnd) -> Bool {
+        if self.state.visitingAfterVerdict {
+            return !(end.copy?.entry(for: asset).map { SyncEngine.sameTransfer($0, entry) } ?? false)
+        }
+        return !self.state.bringingInbound
+    }
+
     /// Adds (or widens) interest `token` in the job of `entry`'s content for `asset`, creating the job (T1) or joining
     /// and promoting it (T15, T20). Promotion is issued synchronously, before any start of this actor turn
     /// (sync-1 S1-06).
@@ -116,10 +133,9 @@ extension SyncEngine {
             self.notifyObservers()
             return
         }
-        if self.state.inFollowVisit, !self.state.bringingInbound, let waiting = self.state.jobs[transfer], waiting.attemptEnd?.deferredAfter != nil {
-            // A visit that moves an interest onto a job whose exit verdict waits: every id the copy mapped to this content
-            // when the verdict deferred was brought onto it then (`bringInbound`), so this one was moved here by a later
-            // apply, whose visit on a visit-first engine met the job as the verdict left it (Stage 3 close-out cycle 17).
+        if self.state.inFollowVisit || self.state.visitingAfterVerdict, let waiting = self.state.jobs[transfer], let end = waiting.attemptEnd, end.deferredAfter != nil, self.joinWaitsForVerdict(asset, entry: entry, end) {
+            // A visit that moves an interest onto a job whose exit verdict waits, for an apply after the verdict deferred:
+            // a visit-first engine's visit at that apply met the job as the verdict left it (`joinWaitsForVerdict`).
             self.deferBehindVerdict(JoinAfterFollow(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: true), of: waiting)
             self.notifyObservers()
             return

@@ -96,6 +96,11 @@ struct EngineState {
     /// Set while an attempt's end brings onto its job the interests an owed visit moves there (`SyncEngine.bringInbound`):
     /// their joins are made at once, on the job as the attempt left it, never behind its verdict (`addInterest`).
     var bringingInbound = false
+    /// Set while the drain's visit after a verdict (`SyncEngine.followAfterVerdict`), or the rest of one
+    /// (`followMoving`), moves a job's ids: a join it makes onto a job whose own exit verdict waits waits behind that
+    /// verdict unless the copy the verdict deferred under already mapped the id there (`SyncEngine.joinWaitsForVerdict`;
+    /// Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 5, candidate 4).
+    var visitingAfterVerdict = false
     /// The moves an attempt's end or an apply owes onto a job (`SyncEngine.bringInbound`), in the order they were found:
     /// `inboundMoves[inboundNext...]` are still owed. The follow makes them a bounded number per turn, before any visit
     /// (`SyncEngine.continueInbound`; Stage 3 close-out cycle 18, ruling S3-R20 item 3), so a follow is owed while one is.
