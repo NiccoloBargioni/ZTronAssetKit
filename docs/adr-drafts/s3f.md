@@ -5090,15 +5090,20 @@ fix (S3-R26 item 11, "Red first").
 
 0. Baseline on `8e1fb24`: **done**. `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick` ended `VERIFY: PASS`
    (`.build-s3f/c21/quick0.log`, 1-minute load 12.17 at the end).
-1. Failing tests, pins and probes on `8e1fb24`: **in progress**. Committed: `210ff64` (the commit-turn seam and
-   item 8's figure). Written and run, waiting in `.build-s3f/c21/pending/`: `BenchSyncCycle21.swift` (the pins) and
-   `EngineFollowBarrierMoveIndexTests.swift` (B-T4, B-T5, Q1's stage-2 and variant-Y tests); results under "Step 1"
-   below. Next action: build and run the probes of item 12's answer 5, candidates 1, 2 and 4, then
-   `PROBE-RR21-JOIN-GAP` in `sweepFollowsFirst`, and record them under "Step 1".
-2. Item C, Phase 1: pending.
-3. Item A (A2–A11, K1–K4): pending.
-4. Item B (B2–B11, B8 with I2 and B-T5): pending.
-5. RR-21 (rr21-C0 to rr21-C7): pending.
+1. Failing tests, pins and probes on `8e1fb24`: **committed** (`210ff64`: the commit-turn seam and item 8's figure;
+   the step's last commit: `PROBE-RR21-JOIN-GAP`'s commit shape and these records). Waiting in
+   `.build-s3f/c21/pending/`, each until the commit right before its fix: `BenchSyncCycle21.swift` (the pins),
+   `EngineFollowBarrierMoveIndexTests.swift` (B-T4, B-T5, Q1's stage-2 and variant-Y tests),
+   `EngineFollowBarrierRunClaimTests.swift` (candidates 1 and 2), `EngineFollowBarrierLaterVerdictTests.swift`
+   (candidate 4) and `EngineFollowBarrierJoinGapFailureTests.swift` (the join gap's failure shape, until rr21-C4).
+   Results under "Step 1" below.
+2. Item C, Phase 1: pending. **Next action:** take the 'before' heartbeat and in-actor figures of
+   `concentrationPublicationTurns` and `commitTurns(.waiters)` (item C's "measure first"), then C2–C11 with the C9
+   clause and T-PG1 to T-PG4 and T-ORDER, the `commitTurns` pins committed failing right before the fix. Then
+   candidate 1's pair, then candidate 2's (failing test, then fix; "Step 1" below): pending.
+3. Item A (A2–A11, K1–K4): pending. Then candidate 4's pair: pending.
+4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending.
+5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5151,6 +5156,50 @@ figure here is **not measured at a quiet load** (S3-R23 item 3), and step 8 re-m
     fails its integrity check. `followVisitedFirst`: T1, T' and T_D get `.integrityFailure` (C_y's visit passes the
     publishing H). `sweepFollowsFirst`: T1 gets y's 22 bytes (`:336`), because R re-routes T1 under the copy at its
     turn after H's publication began. Blocking; its failing test and its fix follow B8 in step 4.
+- **Item 12's answer 5** (`.build-s3f/c21/probes-all.log`, 1-minute load 4.41 at the end). Each probe runs in both
+  orders and asserts visit-first's answers.
+  - **Candidate 1, a run's claim orphaned at a verdict replayed with the barrier down: breaks S3-R16 item 1.** The
+    first construction, a run's own claim deferred behind an earlier verdict, does not arise as built: a run applies
+    its plan and transfers only after its free-space read, and that read's sweep (`sweepSpaceParked(.read)`,
+    `EngineJobs.swift:772-781`) advances an owed follow (`advanceFollowForSpaceSweep`) and drains its queue in a
+    follow-up that the follow-up hold does not stop. The probe is therefore `critic-defer-bucket.md`'s T-RUN (its A3),
+    with a later apply in place of an ensure's manifest (`barrierKeepsARunsClaimAtTheVerdictItWaitsBehind`): the run's
+    last claim, zz-a, downloads on O; T downloads zz-t for a prefetch waiter; v3's follow is owed and T's 404 waits;
+    v4 maps zz-a to T's content, so O's visit re-routes the claim onto T, its join behind T's verdict.
+    `followVisitedFirst`: fetched 1, no failure (v4's visit, after T ended, made a new job of T's content).
+    `sweepFollowsFirst`: fetched 0, zz-a `.cancelled` (`EngineFollowBarrierRunClaimTests.swift:83`). The drain takes
+    its batch off the queue before replaying it (`EngineFollow.swift:199-201`), so the barrier reads down inside T's
+    replay: the run check there passes its guard (`EngineRuns.swift:576`), and the orphan pass (`:650-660`) fails the
+    claim, whose job does not hold the run's interest while its join waits; the join's replay then finds no claim
+    (`stillWants`, `EngineFollow.swift:724`). Blocking (P3).
+  - **Candidate 2, `recordRunOutcome`'s `outstanding[T] = nil`: breaks S3-R16 item 1.**
+    `barrierKeepsARunsClaimReroutedBehindAVerdict`: the run fetches zz-t1 on T and zz-o2 on O; T's 404 waits; v4 maps
+    zz-o2 to T's content. `followVisitedFirst`: fetched 1 (zz-o2), failures [zz-t1 `.notFound`]. `sweepFollowsFirst`:
+    fetched 0, one failure (`EngineFollowBarrierRunClaimTests.swift:143`): T's verdict empties T's claims
+    (`EngineRuns.swift:519`), zz-o2's with them, and zz-o2's join finds no claim, so zz-o2 is neither fetched nor
+    failed. Blocking (P3).
+  - **Candidate 3, variant Y's T1 half:** stage 3 above.
+  - **Candidate 4, the visit after a verdict joining at once onto a job whose own verdict waits later: breaks S3-R16
+    item 1.** `barrierJoinsTheVisitAfterAVerdictBehindALaterVerdict`: J1 (zz-m) fails transiently and J2 (zz-n) gets
+    a 404 while v3's follow is owed, both verdicts waiting in that order; v4 maps zz-m to J2's content.
+    `followVisitedFirst`: zz-n `.notFound`, zz-m J2's 20 bytes (v4's visit, after J2 ended, made a new job of J2's
+    content). `sweepFollowsFirst`: zz-m `.notFound` (`EngineFollowBarrierLaterVerdictTests.swift:74`): the visit after
+    J1's replayed verdict (`followAfterVerdict`) joins zz-m at once onto J2, since `EngineJobs.swift:117` defers only
+    a follow visit's joins, and J2's 404, later in the queue, answers it. Blocking (P3).
+- **`PROBE-RR21-JOIN-GAP`** (item 12's answer 6.4; `EngineFollowBarrierLaterApplyProbeTests.swift`), two shapes in both
+  orders:
+  - X's publication commits (`barrierReroutesAWaitingJoinAsACommitReroutesItsPassedInterests`): holds in both orders
+    (V gets X's 16 bytes, W Y's 20). Committed with this step as a passing test: it asserts answers (G4).
+  - X's publication fails its integrity check (`barrierAnswersAWaitingJoinWithAPassedPublicationsFailure`):
+    `followVisitedFirst` holds (V and W get `.integrityFailure`); `sweepFollowsFirst` breaks: W gets Y's 20 bytes
+    (`EngineFollowBarrierJoinGapFailureTests.swift:17`), because `replayJoin` re-routes W's join under the copy after
+    v4 (`EngineFollow.swift:704-707`). Evidence, as answer 6.4 says; it runs again at rr21-C4 in both orders, which
+    decides it.
+- **Where the blocking pairs found here land** (my choice: S3-R26 places none of them). Each lands after the step that
+  rewrites the code it changes, so that no line is rewritten twice: candidates 1 and 2 after step 2 (C6 and C11
+  rewrite `recordRunOutcome` and `releaseRunClaim` in place); candidate 4 after step 3 (item A rewrites
+  `deferBehindVerdict`, the deferral its fix extends); Q1's stage 2 with B8 in step 4, and variant Y right after B8.
+  Each pair is its failing test, run red again on the HEAD before its fix, then the fix.
 
 ## Items
 
