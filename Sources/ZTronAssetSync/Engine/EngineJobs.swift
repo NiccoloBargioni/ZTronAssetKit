@@ -4,8 +4,10 @@ import ZTronAssetStorage
 
 /// What an interest receives when its job ends for it.
 enum InterestOutcome {
-    /// The content committed: the bound locations by asset.
-    case committed([AssetID: AssetLocation])
+    /// The content committed: the bound locations by asset, and the publication's binding in ascending order (the ids
+    /// `publish` captured and sorted, of which the store binds a subset), so the terminal events walk the binding in
+    /// its order with no sort (Stage 3 close-out cycle 21, step C3).
+    case committed([AssetID: AssetLocation], ascending: [AssetID])
     /// The job failed for this interest.
     case failed(AssetError)
 }
@@ -440,7 +442,11 @@ extension SyncEngine {
             self.discardLater(adopt.name)
         }
         self.state.heap.remove(.retry(transfer, epoch: job.epoch))
-        for asset in job.assets {
+        // Only a key with a `lastEmitted` entry has anything to retire: a trailing emission, a scheduled flush and a
+        // subscriber's live slot each imply one (the progress gate's clauses P1-P3, `invariantViolations`), and
+        // progress is offered for one id of a job (`onProgress`), so the other ids skip a retire that does nothing
+        // (step C4).
+        for asset in job.assets where self.state.progress.lastEmitted[.transfer(asset)] != nil {
             self.retireProgress(.transfer(asset))
         }
         self.compactQueuesIfStale()
@@ -550,7 +556,7 @@ extension SyncEngine {
                 return
             }
             switch outcome {
-            case .committed(let locations):
+            case .committed(let locations, _):
                 if let location = locations[waiter.asset] {
                     waiter.continuation?.resume(returning: .success(location))
                 } else {
@@ -560,19 +566,18 @@ extension SyncEngine {
                 waiter.continuation?.resume(returning: .failure(error))
             }
         case .prefetch, .ensure:
-            guard var group = self.state.groups[token] else {
+            // In place through the table: a copy taken out and written back would copy the group's `pending` on every
+            // delivery, O(members) each (step C5).
+            guard self.state.groups[token] != nil else {
                 return
             }
-            for asset in interest.assets where group.pending[asset] == transfer {
-                group.pending[asset] = nil
+            self.state.groups[token]?.clearPending(interest.assets, on: transfer)
+            if interest.kind == .ensure, self.state.groups[token]?.spaceFailure == nil, case .failed(let error) = outcome, case .insufficientSpace = error {
+                self.state.groups[token]?.spaceFailure = error
             }
-            if interest.kind == .ensure, group.spaceFailure == nil, case .failed(let error) = outcome, case .insufficientSpace = error {
-                group.spaceFailure = error
-            }
-            self.state.groups[token] = group
-            if interest.kind == .ensure, group.isSettled {
+            if interest.kind == .ensure, self.state.groups[token]?.isSettled == true, let continuation = self.state.groups[token]?.continuation {
                 self.state.groups[token]?.continuation = nil
-                group.continuation?.resume(returning: true)
+                continuation.resume(returning: true)
             }
         case .run:
             self.recordRunOutcome(outcome, transfer: transfer, assets: interest.assets)
@@ -591,23 +596,26 @@ extension SyncEngine {
 
     /// Drops `asset` from group `token` while it still waits for `transfer` (the asset left the manifest, T21); an
     /// `ensureAvailable` group whose last member went completes.
+    /// In place through the table, as `deliver` changes a group: a copy written back would copy `pending` per dropped
+    /// member (step C10).
     func dropGroupMember(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
-        guard var group = self.state.groups[token], group.pending[asset] == transfer else {
+        guard self.state.groups[token]?.pending[asset] == transfer else {
             return
         }
-        group.pending[asset] = nil
-        self.state.groups[token] = group
-        if group.kind == .ensure, group.isSettled, let continuation = group.continuation {
-            self.state.groups[token]?.continuation = nil
-            continuation.resume(returning: true)
+        self.state.groups[token]?.pending[asset] = nil
+        guard let group = self.state.groups[token], group.kind == .ensure, group.isSettled, let continuation = group.continuation else {
+            return
         }
+        self.state.groups[token]?.continuation = nil
+        continuation.resume(returning: true)
     }
 
-    /// Resolves every interest of `transfer` with `outcome`, in token order, and removes the job; `follow` runs once
-    /// the job is gone and before the run is checked for settling (interests that move to a fresh job of the transfer).
-    /// A failure is not delivered to an id the copy moved while a follow is owed: behind the follow barrier the verdict
-    /// waits for the follow, whose visit moves that id first (`defersFailure`, F-28), so its interest waits for its new
-    /// content, never `.notFound` while it is listed (F-20; the close-out cycle-2 correctness lens, PROBE-W4).
+    /// Resolves every interest of `transfer` with `outcome`, in the table's order, and removes the job; `follow` runs
+    /// once the job is gone and before the run is checked for settling (interests that move to a fresh job of the
+    /// transfer). A failure is not delivered to an id the copy moved while a follow is owed: behind the follow barrier
+    /// the verdict waits for the follow, whose visit moves that id first (`defersFailure`, F-28), so its interest waits
+    /// for its new content, never `.notFound` while it is listed (F-20; the close-out cycle-2 correctness lens,
+    /// PROBE-W4).
     func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, then follow: () -> Void = {}) {
         if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
@@ -615,10 +623,11 @@ extension SyncEngine {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        for token in job.interests.keys.sorted() {
-            if let interest = self.state.jobs[transfer]?.interests[token] {
-                self.deliver(outcome, to: token, interest: interest, transfer: transfer)
-            }
+        // `deliver` never writes `state.jobs` (it writes waiters, groups, the run and heals; a resumed caller runs
+        // after this turn), so the copy's interests are the job's at every delivery: no sort and no re-read (step C2).
+        // The callers resume in the table's order, an accepted order (S3-R16 item 2; Stage 3 close-out cycle 21).
+        for (token, interest) in job.interests {
+            self.deliver(outcome, to: token, interest: interest, transfer: transfer)
         }
         self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
@@ -627,19 +636,23 @@ extension SyncEngine {
         self.checkRunSettled()
     }
 
-    /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023).
+    /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023), in ascending id order.
+    /// A commit walks its binding, which `publish` sorted: the store binds only ids of it, so the bound ids of
+    /// `job.assets` come in the order `job.assets.sorted()` gave them, with no sort (step C3). The subscriber keys are
+    /// sorted once for every event (step C8).
     func publishTerminal(job: Job, outcome: InterestOutcome) {
         guard job.lane > .bulk else {
             return
         }
-        for asset in job.assets.sorted() {
-            switch outcome {
-            case .committed(let locations):
-                if locations[asset] != nil {
-                    self.broadcast(.assetAvailable(asset, generation: self.state.generation))
-                }
-            case .failed(let error):
-                self.broadcast(.assetFailed(asset, error, .nextRun))
+        let keys = self.state.subscribers.keys.sorted()
+        switch outcome {
+        case .committed(let locations, let ascending):
+            for asset in ascending where locations[asset] != nil && job.assets.contains(asset) {
+                self.broadcast(.assetAvailable(asset, generation: self.state.generation), to: keys)
+            }
+        case .failed(let error):
+            for asset in job.assets.sorted() {
+                self.broadcast(.assetFailed(asset, error, .nextRun), to: keys)
             }
         }
     }

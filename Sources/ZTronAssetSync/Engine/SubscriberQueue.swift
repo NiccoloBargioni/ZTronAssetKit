@@ -102,6 +102,11 @@ struct SubscriberQueue {
         self.slots.isEmpty
     }
 
+    /// The live slots, in no order (the progress gate's clause P3, `SyncEngine.invariantViolations`).
+    var liveSlots: [EventSlot] {
+        Array(self.slots.keys)
+    }
+
     /// Publishes `event`; returns the continuation to resume with it when a pull was waiting on an empty queue (the
     /// caller resumes it outside the mutation), and whether it replaced or moved a live slot.
     mutating func publish(_ event: AssetEvent, sequence: UInt64) -> (handOff: CheckedContinuation<AssetEvent?, Never>?, coalesced: Bool) {

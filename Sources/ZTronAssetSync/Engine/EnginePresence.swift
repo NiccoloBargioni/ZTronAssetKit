@@ -62,6 +62,8 @@ extension SyncEngine {
         guard self.state.ledgerForgets == serial else {
             return
         }
+        // One growth for a commit's whole binding, not one rehash per doubling as its ids are inserted (step C7).
+        self.state.boundContent.reserveCapacity(self.state.boundContent.count + ids.underestimatedCount)
         for id in ids {
             self.state.boundContent[id] = transfer
         }

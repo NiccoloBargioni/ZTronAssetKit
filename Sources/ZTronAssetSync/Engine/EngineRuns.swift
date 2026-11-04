@@ -503,33 +503,39 @@ extension SyncEngine {
     /// Drops the run's claim on `asset` in `transfer` (the asset follows other content now, or left the manifest): a
     /// claim left on a job that will never report to the run would keep the run from settling.
     func releaseRunClaim(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
-        guard var run = self.state.run, run.token == token, var claimed = run.outstanding[transfer] else {
+        // In place through the run: a copy written back would copy `outstanding` per released claim (step C11).
+        guard self.state.run?.token == token, self.state.run?.outstanding[transfer] != nil else {
             return
         }
-        claimed.remove(asset)
-        run.outstanding[transfer] = claimed.isEmpty ? nil : claimed
-        self.state.run = run
+        self.state.run?.outstanding[transfer]?.remove(asset)
+        if self.state.run?.outstanding[transfer]?.isEmpty == true {
+            self.state.run?.outstanding[transfer] = nil
+        }
     }
 
     /// Records a job's outcome for the run.
+    ///
+    /// Written in place through the run: a copy written back would copy `outstanding` and `failures` per outcome; the
+    /// failures are dictionary entries, so no order is needed (step C6). A committed id the store did not bind is never
+    /// delivered here (`committed` moves its interest first); the loop that fails one is kept, pre-existing (S3-R19
+    /// item 3).
     func recordRunOutcome(_ outcome: InterestOutcome, transfer: TransferID, assets: Set<AssetID>) {
-        guard var run = self.state.run else {
+        guard self.state.run != nil else {
             return
         }
-        run.outstanding[transfer] = nil
+        self.state.run?.outstanding[transfer] = nil
         switch outcome {
-        case .committed(let locations):
-            run.fetched += assets.filter { locations[$0] != nil }.count
-            for asset in assets.sorted() where locations[asset] == nil {
-                run.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound)
+        case .committed(let locations, _):
+            self.state.run?.fetched += assets.lazy.filter { locations[$0] != nil }.count
+            for asset in assets where locations[asset] == nil {
+                self.state.run?.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound)
             }
         case .failed(let error):
             let failureClass = SyncEngine.failureClass(of: error)
-            for asset in assets.sorted() {
-                run.failures[asset] = AssetFailure(id: asset, error: error, failureClass: failureClass)
+            for asset in assets {
+                self.state.run?.failures[asset] = AssetFailure(id: asset, error: error, failureClass: failureClass)
             }
         }
-        self.state.run = run
         self.offerRunProgress()
     }
 

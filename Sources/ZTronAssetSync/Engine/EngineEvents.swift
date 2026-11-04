@@ -8,10 +8,17 @@ extension SyncEngine {
     /// Each queue is mutated in place through the dictionary (a copy taken out and written back would copy a stalled
     /// subscriber's slots on every publication: O(n) each, O(n²) for a mass prune announced in one turn).
     func broadcast(_ event: AssetEvent) {
+        self.broadcast(event, to: self.state.subscribers.keys.sorted())
+    }
+
+    /// `broadcast(_:)` to the subscribers `keys` names, in that order: a caller that publishes many events in one turn
+    /// sorts the keys once for all of them (`publishTerminal`; Stage 3 close-out cycle 21, step C8). No subscriber
+    /// registers within a turn, and a key whose subscriber finished meanwhile is skipped.
+    func broadcast(_ event: AssetEvent, to keys: [UInt64]) {
         self.state.lastEventSequence += 1
         let sequence = self.state.lastEventSequence
         var handOffs: [CheckedContinuation<AssetEvent?, Never>] = []
-        for key in self.state.subscribers.keys.sorted() {
+        for key in keys {
             guard let published = self.state.subscribers[key]?.publish(event, sequence: sequence) else {
                 continue
             }

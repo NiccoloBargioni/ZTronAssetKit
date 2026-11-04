@@ -954,6 +954,14 @@ struct Group {
     var isSettled: Bool {
         self.pending.isEmpty && self.cursor >= self.fetches.count
     }
+
+    /// Drops the members of `assets` that still wait for `transfer`, in place (a delivery of `transfer`'s outcome; a
+    /// member that moved to other content meanwhile keeps waiting for it).
+    mutating func clearPending(_ assets: Set<AssetID>, on transfer: TransferID) {
+        for asset in assets where self.pending[asset] == transfer {
+            self.pending[asset] = nil
+        }
+    }
 }
 
 /// A released group whose interests are still being removed (`SyncEngine.continueReleases`).

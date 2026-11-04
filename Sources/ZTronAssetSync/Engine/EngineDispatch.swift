@@ -1128,7 +1128,7 @@ extension SyncEngine {
                 deferred.append((token, interest, asset))
             }
         }
-        self.resolveAll(transfer, with: .committed(locations)) {
+        self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
             if refused {
                 self.holdForManifest(transfer)
             }

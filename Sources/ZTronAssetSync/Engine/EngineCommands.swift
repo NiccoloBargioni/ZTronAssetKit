@@ -1791,6 +1791,7 @@ extension SyncEngine {
         for (key, queue) in self.state.subscribers where queue.storedOrderCount > 2 * queue.liveCount + 16 {
             violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
         }
+        violations.append(contentsOf: self.progressGateViolations())
         if let unfired = self.unfiredDeadline() {
             violations.append(unfired)
         }
@@ -1861,6 +1862,31 @@ extension SyncEngine {
         }
         let timers = Set([self.state.alarm?.task, self.state.watcher?.task, self.state.pressure.task].compactMap { $0 })
         return self.state.tasks.keys.allSatisfy { timers.contains($0) }
+    }
+
+    /// The progress gate's clauses (Stage 3 close-out cycle 21, step C9): every key with a trailing emission (P1), with
+    /// a trailing flush in the heap (P2), or with a live `.transfer` slot in a subscriber's queue (P3) has a
+    /// `lastEmitted` entry. `offerProgress` sets the entry before any of them and `retireProgress` removes them with
+    /// it, so `removeJob` retires only the keys that have one (step C4) and leaves nothing behind.
+    private func progressGateViolations() -> [String] {
+        var violations: [String] = []
+        let lastEmitted = self.state.progress.lastEmitted
+        for slot in self.state.progress.trailing.keys where lastEmitted[slot] == nil {
+            violations.append("progress trailing \(slot) without lastEmitted")
+        }
+        for deadline in self.state.heap.entries {
+            if case .progress(let slot) = deadline.reason, lastEmitted[slot] == nil {
+                violations.append("progress deadline \(slot) without lastEmitted")
+            }
+        }
+        for (key, queue) in self.state.subscribers {
+            for slot in queue.liveSlots where lastEmitted[slot] == nil {
+                if case .transfer = slot {
+                    violations.append("subscriber \(key) holds \(slot) without lastEmitted")
+                }
+            }
+        }
+        return violations
     }
 
     /// The claim counters against the groups' pending claims and the released groups' claims left to drop (L5-R1).
