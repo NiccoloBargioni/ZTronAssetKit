@@ -5098,15 +5098,13 @@ fix (S3-R26 item 11, "Red first").
    (candidate 4) and `EngineFollowBarrierJoinGapFailureTests.swift` (the join gap's failure shape, until rr21-C4).
    Results under "Step 1" below.
 2. Item C, Phase 1: **committed** (`1645233` the `commitTurns` pins, red; `a78f913` C2–C11 with the C9 clause,
-   T-PG1 to T-PG4 and T-ORDER; `cf4719e` the T21 tests; `5f2f1b7` the C3 clause's test; the step's last commit: these
-   records). Results under "Step 2" below. Then candidate 1's pair, then candidate 2's: pending. **Next action:**
-   commit `barrierKeepsARunsClaimAtTheVerdictItWaitsBehind` failing (`.build-s3f/c21/pending/RunClaim-c1.swift`
-   becomes `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierRunClaimTests.swift`, run red on the HEAD first),
-   then its fix: `checkRunSettled` returns while a waiting run join targets a claim the run still holds. Then
-   `barrierKeepsARunsClaimReroutedBehindAVerdict` failing (added to that file from
-   `.build-s3f/c21/pending/EngineFollowBarrierRunClaimTests.swift`), then its fix: `recordRunOutcome` removes only the
-   answered ids from the transfer's claims.
-3. Item A (A2–A11, K1–K4): pending. Then candidate 4's pair: pending.
+   T-PG1 to T-PG4 and T-ORDER; `cf4719e` the T21 tests; `5f2f1b7` the C3 clause's test; `adfc1ad` its records).
+   Candidates 1 and 2, and their sibling: **committed** (`25c1da0`, `cefbe44`; `4337567`, `0a06be2`; `51ee67a`,
+   `68666e7`; the step's last commit: these records). Results under "Step 2" and "Step 2, continued" below.
+3. Item A (A2–A11, K1–K4): pending. **Next action:** read `integrate-c21.md` item A and the A-tests, then commit
+   `deferBehindVerdictTurns` with A12's `joinsBehindVerdicts` expectations failing (`BenchSyncCycle21.swift`'s
+   remaining part from `.build-s3f/c21/pending/`), then A2–A11 and K1–K4 with their tests. Then candidate 4's pair
+   (`.build-s3f/c21/pending/EngineFollowBarrierLaterVerdictTests.swift`): pending.
 4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending.
 5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
 6. Item C, Phase 2, if a trigger fires: pending.
@@ -5289,6 +5287,39 @@ R-SYN-12's order (`removeJob` before `publishTerminal`), F-20 and RE-S14 are unt
   Phase 1 (567 tests, `step2-sync.log`), and step 8's three Sync runs and TSan run check it again.
 - **The inventory (C0):** the commit's row and the `reroute` row of "The C2 inventory" carry these figures; the
   `reroute` row is corrected as `critic-commit-window.md` A5 asks.
+
+### Step 2, continued: candidates 1 and 2, and a sibling
+
+Each pair is its failing test, run red on the HEAD before its fix (P3), then the fix; every fix passed the Sync bundle
+(571, 572 and 573 tests: `.build-s3f/c21/c1-sync.log`, `c2-sync.log`, `mb-sync.log`, 1-minute loads 4.81 to 12.96).
+The tests are in `EngineFollowBarrierRunClaimTests.swift`; no await is added, so no REENTRANCY row changes.
+
+- **Candidate 1** (`25c1da0` red, `cefbe44` fix): `barrierKeepsARunsClaimAtTheVerdictItWaitsBehind` failed swept first
+  on `0a06be2`'s parent as recorded under "Step 1" (`c1-red.log`). Fix: `checkRunSettled` returns while a waiting run
+  join (`joinsAfterFollow`) targets a claim the run still holds on that transfer: the join's replay, later in the
+  batch, lands the claim, and the drain's end checks the run again. The narrow condition, not a check deferred for
+  the whole batch: a run that settles at a verdict mid-batch starts a pending run whose claims join jobs before the
+  batch's later verdicts, as a visit-first engine's did. Drop-mutant (`if false, …`): the test fails 2/2 swept first
+  (`mut-c1-drop.log`).
+- **Candidate 2** (`4337567` red, `0a06be2` fix): `barrierKeepsARunsClaimReroutedBehindAVerdict` failed swept first
+  (fetched 0; `c2-red.log`). Fix: `recordRunOutcome` subtracts the delivered ids from the transfer's claims, as
+  `releaseRunClaim` and the group arm do, instead of emptying them. The old line put back: the test fails 2/2 swept
+  first (`mut-c2-drop.log`). The other ids a transfer can still claim when its outcome arrives are re-routed by their
+  callers before or after the run check: `committed`'s deferred ids in `resolveAll`'s `then` (before it); the drain's
+  moved-before ids after it, which is the sibling below.
+- **The sibling, a run's claim the drain takes off a verdict's job before the verdict: breaks S3-R16 item 1; found
+  while fixing candidate 2** (`51ee67a` red, `68666e7` fix). `barrierKeepsARunsClaimTakenOffBeforeAVerdict`: the
+  run claims zz-a and zz-b on J; v3 maps zz-a to k while the follow is owed; J's 404 waits with zz-a moved before it
+  (`AttemptEnd.movedBefore`); v4 maps zz-a back. `followVisitedFirst`: fetched 1 (zz-a, from a new job of J's
+  content), failures [zz-b `.notFound`]. `sweepFollowsFirst`: the drain takes zz-a off J before the verdict and
+  re-routes it after (`takeOffMovedBefore`, `rerouteMovedBefore`), and the run check the verdict makes in between,
+  the barrier read down, settles the run without the claim: fetched 0, zz-a `.cancelled` (`mb-probe.log`); with the
+  old `recordRunOutcome` line it was fetched 0 and zz-a left out of the report (`mut-mb-oldcode.log`), so the break
+  predates this cycle. Blocking (P3). Fix: the take-off sets `EngineState.runClaimTakenOff` when it takes a run's
+  claim off, `checkRunSettled` waits while it is set, and `rerouteMovedBefore` clears it; the drain's end checks the
+  run. Drop-mutants, 2/2 swept first each: the guard (`mut-mb-guard.log`) and the set (`mut-mb-set.log`) fail the
+  test's report expectations; without the clear the run never settles, and the test fails at its time limit
+  (`mut-mb-clear.log`, 192 s a run).
 
 ## Items
 
