@@ -5090,8 +5090,11 @@ fix (S3-R26 item 11, "Red first").
 
 0. Baseline on `8e1fb24`: **done**. `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick` ended `VERIFY: PASS`
    (`.build-s3f/c21/quick0.log`, 1-minute load 12.17 at the end).
-1. Failing tests, pins and probes on `8e1fb24`: **in progress**. Next action: write B-T4 and B-T5 into
-   `.build-s3f/c21/pending/`, run them on `8e1fb24`, and record their failing lines here.
+1. Failing tests, pins and probes on `8e1fb24`: **in progress**. Committed: `210ff64` (the commit-turn seam and
+   item 8's figure). Written and run, waiting in `.build-s3f/c21/pending/`: `BenchSyncCycle21.swift` (the pins) and
+   `EngineFollowBarrierMoveIndexTests.swift` (B-T4, B-T5, Q1's stage-2 and variant-Y tests); results under "Step 1"
+   below. Next action: build and run the probes of item 12's answer 5, candidates 1, 2 and 4, then
+   `PROBE-RR21-JOIN-GAP` in `sweepFollowsFirst`, and record them under "Step 1".
 2. Item C, Phase 1: pending.
 3. Item A (A2–A11, K1–K4): pending.
 4. Item B (B2–B11, B8 with I2 and B-T5): pending.
@@ -5099,6 +5102,55 @@ fix (S3-R26 item 11, "Red first").
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
+
+### Step 1: failing tests, pins and probes on `8e1fb24`
+
+Every figure below was taken on `8e1fb24` plus the behaviour-neutral commit-turn seam (`210ff64`), in release
+(`swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks`), best of 3,
+with the 1-minute load averages it ran at (`sysctl -n vm.loadavg`, S3-R23). The host was busy throughout: every
+figure here is **not measured at a quiet load** (S3-R23 item 3), and step 8 re-measures each one. Logs:
+`.build-s3f/c21/bench-before.log`, `.build-s3f/c21/step1-moveindex.log`.
+
+- **Item 8, `recordDeferredVerdict`'s figure** (`movedBeforeDrainTurns`, J's release in its own `longestWait`
+  window): 3.19, 3.23, 3.19 ms; best 3.19 ms, within `c2Budget`, at a 1-minute load of 42.23. Committed with its
+  expectation (`210ff64`). The same case's actor wait is the pre-existing RR-21 site-2 miss: 45.20, 45.01, 45.07 ms
+  (item 1; step 5).
+- **The 'before' figures of the new pins** (`Tests/ZTronAssetKitBenchmarks/BenchSyncCycle21.swift`, pending until
+  the commit right before each fix):
+  - `deferBehindVerdictTurns` (item A; 10,000 members joining behind O's verdict, 38 follow turns): longest turn
+    36.98 (404, group), 36.86 (timeout, group), 36.88 (404, users), 36.92 ms (timeout, users); 1-minute loads 42.23 to
+    34.29. Without A12's `joinsBehindVerdicts` expectations, which step 3 adds.
+  - `manyMovesTurns` (item B; k owed moves off one 10,000-id holder): k = 1: 8.00 ms; k = 16: 78.84 ms; k = 64:
+    302.29 ms; k = 256: 1,184.96 ms; loads 34.29 to 31.86.
+  - `partialMoveTurns` (item B; 500 of 10,000 ids moved): 8.55 ms (groups), 9.57 ms (users); load 29.71. Both at the
+    edge (S3-R26 item 9).
+  - `commitTurns` (item C; heartbeat best / the commit's own turn inside the actor): `.waiters` 19.01 / 18.20 ms;
+    `.waitersStalledSubscriber` 24.45 / 23.74 ms; `.groupStalledSubscriber` 15.90 / 15.89 ms; `.manyGroups` 17.54 /
+    17.53 ms; loads 29.71 to 24.45. The in-actor `.waiters` turn is item 4's Phase 2 trigger (above 7.0 ms after
+    Phase 1).
+  - Two stalled subscribers (item 12's answer 4, figure only, not gated): heartbeat 30.41 ms, turn 29.28 ms; load
+    20.71.
+- **B-T4** (`barrierTakesABoundedMovesUnheldIDsOffTheHolder`, item B): fails in both orders, as `integrate-c21.md`
+  predicts. `EngineFollowBarrierMoveIndexTests.swift:66` (`violations.isEmpty`: "job c-9761… holds zz-o4, which the
+  copy maps elsewhere, and is not in unfollowed") and `:67` (H keeps zz-o1 … zz-o6 beside zz-w). Committed failing
+  right before item B's take-off fix (step 4).
+- **Q1, `analyse-state-cost.md`'s construction** (`restRejoin`, item 7). Built with eight B's, not seven: with seven,
+  R's second turn ends it at C_w and re-routes T1 onto H, so (A, T1) is never left owed. T1 is a prefetch group in
+  stages 1 and 2; in variant Y it is a prefetch waiter, so that its answer can be read (a group's id would be
+  re-routed by the same item).
+  - **Stage 1, B-T5** (`barrierKeepsARestsIDWhileAJoinedInterestHoldsIt`): `followVisitedFirst` passes (H binds A
+    and D; one start of h). `sweepFollowsFirst` fails at `:309` (H binds only zz-d while T' holds A on it) and `:312`
+    (two starts of h). T' and T_D get h's bytes in both orders: the analysis's "same answer, one more job and
+    request". Committed failing with B8 and I2's tests right before B8 (step 4).
+  - **Stage 2** (`barrierMovesARejoinedIDOffItsFailedHolder`): **breaks S3-R16 item 1.** H's publication fails
+    with an I/O error, C_z maps A to z, H's retry gets a 404. `followVisitedFirst`: T' gets z's 26 bytes.
+    `sweepFollowsFirst`: T' gets `.notFound` (`:323`). Blocking (item 7); the fix is B8's re-insertion, and the
+    test is committed failing right before it.
+  - **Stage 3, variant Y** (`barrierAnswersARestsIDOnItsPublishingHolderAsVisitedFirst`, item 12's answer 5,
+    candidate 3): **breaks S3-R16 item 1.** C_y maps A to y while H publishes, before R's last turn; H's publication
+    fails its integrity check. `followVisitedFirst`: T1, T' and T_D get `.integrityFailure` (C_y's visit passes the
+    publishing H). `sweepFollowsFirst`: T1 gets y's 22 bytes (`:336`), because R re-routes T1 under the copy at its
+    turn after H's publication began. Blocking; its failing test and its fix follow B8 in step 4.
 
 ## Items
 
