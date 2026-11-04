@@ -586,6 +586,16 @@ extension SyncEngine {
         guard var current = self.state.run else {
             return
         }
+        // A claim whose join waits in the drain counts as working: a visit re-routed it onto a job whose verdict replays
+        // first, and the drain's batch is off the queue while it replays, so the barrier reads down here. The join's
+        // replay, later in the batch, lands the claim (`replayJoin`), as a visit-first engine's join had, and the drain's
+        // end checks the run again. Without this the orphan pass below failed the claim, whose job does not hold the
+        // run's interest while its join waits (Stage 3 close-out cycle 21, S3-R26 item 12's answer 5, candidate 1).
+        if let waiting = self.state.joinsAfterFollow[current.token],
+            waiting.contains(where: { current.outstanding[$0.value]?.contains($0.key) == true })
+        {
+            return
+        }
         // One read of the job table: a closure over `self.state` would copy the whole engine state per claim.
         let jobs = self.state.jobs
         let owed = OwedRequeues(
