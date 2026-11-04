@@ -534,6 +534,95 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
   drop-mutant Equivalent (`:203`'s). Item 3's inventory is written, with RR-21's two misses open and four rows without
   a figure. Under item 7 the branch is removed and `waitingTarget`'s case is open. Items 9 to 11 are recorded.
 
+- **Orchestrator ruling (close-out) S3-R26 — added 2026-11-04 13:19 (cycle 20's verification and the cycle-20 fixer's
+  put-backs; drafted 2 Nov, reviewed twice, appended before run 7's cycle-21 fixer starts).** Cycle 20 fixed 7 of
+  cycle 19's 8 distinct blocking items; `waitingTarget` is the one left. The verifiers left 8 distinct blocking items
+  (`.build-orchestrator/s3f-c20-issues.json`; probes in `.build-orchestrator/s3f-probes-c20/`). Two read-only analyses
+  are the specifications to implement: `.build-orchestrator/s3f-c20-analysis/integrate-c21.md` (items A, B, C) and
+  `integrate-rr21.md` (RR-21); the rest of that folder is background. The ruling decides wherever those files differ.
+  Names: `integrate-rr21.md`'s numbered labels carry `rr21-` (rr21-T1, rr21-B1 to rr21-B32, rr21-C0 to rr21-C8);
+  `integrate-c21.md`'s numbered tests carry their item's letter (A-T1, B-T5); "C2" alone is the budget class, item
+  C's step is "step C2"; "P3" alone is CLAUDE.md P3, item C's clauses are "clauses P1–P3". `integrate-rr21.md`'s
+  interactions_changed replaces `integrate-c21.md`'s interactions 1, 3, 7, 11, 13 and 18. Every UNCONFIRMED claim is
+  confirmed in the code or by a probe; a false one takes the simplest change that keeps the specification's
+  invariants, recorded; a cost is confirmed by its figure, and a miss with no route is blocking.
+  1. *RR-21* (reqs #1, #2; correct #3, #4; blocking): implement `integrate-rr21.md` (R1–R19, its clauses and D1–D12,
+     its tests, pins, must_nots and branches table). Each site decides once, in its own turn, whether it owes; a site
+     that owes makes none of its re-routes at once and owes them all as one `.reroutes(RerouteBatch)` event, replayed
+     at most `drainIDsLeft` distinct ids a drain turn, each id with all its tokens, under the copy `rerouteListing`
+     gives from the layers `adoptApplied` records. While `reroutesWaiting > 0` no publication binds and no run
+     settles; while any event waits no binding is pruned and the watcher stays. Site 2 decides before its verdict.
+     Rejected: the copy at the replay, the hold as a fallback, the site's own prune of owed pairs, a pseudo-follow, a
+     hold per target, a layer per commit (unless answer 6.3's probe breaks). Lands after item 4's Phase 1, item 2 and
+     item 3's B2–B5. Pins: rr21-T1-edge, rr21-T1-fit, rr21-T2-edge with `concentrationCommitRerouteTurns` and
+     `supersededRerouteTurns`; rr21-T1's and rr21-T3's per-turn counts with `commitRerouteDivergentTurns` and
+     `movedBeforeDrainTurns`; RR21-VERDICT-ZERO and rr21-T3 with `movedBeforeDrainWaitersTurns` and
+     `movedBeforeAndAfterTurns`; every other named case is an inventory figure (`supersededUserTurns` from
+     `design-minimal.md:285`, `groupDelistedFit` from `critic-commit-window.md:83`). Four holes are blocking fixes,
+     red first by a scratch copy: RR21-HOP and RR21-WINDOW-GATE (sites 1 and 3), RR21-PRESENT-PRUNE (all three),
+     RR21-RUN-MIDDRAIN. Existing tests whose path changes keep every answer, MUST and invariant assertion; idle-guard
+     path changes take answer 6.5's narrow fallback first; a low-budget suite changed by the fit charge or the
+     reservation may be updated one to one, recorded. `followedLane`'s walk over owed items is an inventory row.
+  2. *`deferBehindVerdict` costs O(E) a join* (reqs #3, correct #2; blocking): item A (A1–A13, K1–K4): a bucket per
+     waiting verdict's (transfer, epoch), placed right behind its verdict, newest first, at batch formation. Rejected:
+     putting the joins back after the replay. Pins: A-T1's per-turn assertion and `deferBehindVerdictTurns` over {404,
+     timeout} × {one group, one waiter per id} at 10,000.
+  3. *`move` re-sorts its holder once per move* (correct #1, reqs #6; blocking): item B (B1–B13, I1–I3) but B8, I2 and
+     B-T5 (item 7). Lands after item 4's Phase 1 and before item 1. Merge gate: `concentrationPublicationTurns` with
+     the index, checked at step 4; a miss takes the lazy index and is blocking if it stays. Pins: `manyMovesTurns` at
+     k = 1, 16, 64, 256 and `partialMoveTurns` with and without users; the index's own costs are inventory rows.
+  4. *The commit turn's headroom* (correct #5, reqs #10; blocking): item C Phase 1 (C0–C11, C13, clauses P1–P3); C1
+     only with item 1's rewrite of `committed`, in R4's form (moved away when `applied.entry(for:)?.transferID !=
+     transfer`; `if !refused, captured.contains(a) { refused = true }` with `captured` lazy), with T-R1 and T-R2 in both
+     orders. Measure right after Phase 1 and again after rr21-C3. Phase 2 (C12, waiters and ensures only, jobs above
+     512 interests) applies if the in-actor `.waiters` commit turn is above 7.0 ms, a `.waiters` or
+     `waitersStalledSubscriber` heartbeat is above `c2Budget`, or at rr21-C3 `commitWaitersBoundTurns` or
+     `commitRerouteWaitersTurns` is above `c2Budget`. A miss Phase 2 cannot cut is blocking and reported. The table's
+     order of resumes is a residual risk; terminal events stay ascending.
+  5. *`waitingTarget`'s queued, blocked and downloading case* (reqs #4, correct #6; blocking): Reached only. Shape A
+     (the ENOENT window) or Shape B (the T20 window) of `analyse-g4-reach.md` as a test in both orders, reaching the arm
+     in `sweepFollowsFirst`, asserting visit-first's answers, and killing the fold mutant 2/2 by asserting the state
+     after one follow turn. The order, place and ticket difference is a residual risk. Three docs corrected (`enqueue`,
+     `Job.epoch`, the draft's one-path claim). Probes (i) the T20 verdict skip and (ii) the later-apply variant, each in
+     both orders; a break is blocking, P3.
+  6. *`scheduleDrainFollowUp`'s unspawnable branch* (reqs #5, correct #7; blocking): removed (A11), with clause K4
+     (`!isRunning && !eventsAfterFollow.isEmpty`), kept apart from `bf1d4eb`'s clause, and F-K4 with a control; the
+     argument covers all seven assignments, citing `drainEverything` and `drainFollowUp`'s guard; the
+     `notifyObservers` caveat checked.
+  7. *`continueMove` takes the id out of `Job.assets` before its guards* (reqs #9; not blocking by itself): B8 with I2
+     and B-T5, together; B-T5 fails first in `sweepFollowsFirst` on `8e1fb24`; Q1's stages 2 and 3 probed in both
+     orders. If B-T5 cannot be built, B8 and I2 drop together and Q1 and variant Y are residual risks.
+  8. *`recordDeferredVerdict`'s away filter* (reqs #8): its figure, from `movedBeforeDrain`'s release of J in its own
+     `SyncBench.longestWait` window, best of 3 against `c2Budget`.
+  9. *The fixer's own check*: S3-R25 item 10 on the final HEAD, the new work in the C2 inventory (every per-id,
+     per-event or per-owed-item operation of items 1–4, each with its cost and a figure at 10,000 unless O(1)
+     amortised and unnamed), every existing C2 case the cycle's code passes through re-measured, and a best of 3 above
+     8.5 ms listed "at the edge".
+  10. *Residual risks and non-blocking items*: the publication window is closed, not accepted; items 2–4's residual
+      risks recorded with class, condition and test; the accepted orders (newest-first joins behind a verdict, the
+      table's order of resumes, item 5's order, item 1's replay order and its jobs' places, site 2's two orders with
+      `PROBE-RR21-RESERVE-REJOIN`, the bulk release of run claims with rr21-T18); item B's earlier take-off with its
+      readers checked; reqs #7's replacement line reached by a deterministic test with its drop-mutant killed 2/2;
+      P-13 stays with WP-B; RR-20 and RR-23 stay where they are.
+  11. *Order of work*: `integrate-c21.md`'s steps 0–8, with step 1 also holding (on `8e1fb24`) answer 5's probes, item
+      7's stages 2 and 3, `PROBE-RR21-JOIN-GAP` in `sweepFollowsFirst` and item 8's figure; step 5 is item 1 by
+      `integrate-rr21.md`'s commit plan (rr21-C0 to rr21-C8, each committed on its own); step 6 is Phase 2 if
+      triggered; step 7 is item 5. Red first: a test whose shape exists before its fix is committed failing on its own
+      right before its fix; one whose fix comes later runs on `8e1fb24` in step 1 with its failing line recorded; item
+      1's four holes go red on a scratch copy without their guard. A deciding figure without a quiet load is decided
+      at the lowest load and recorded as "not measured at a quiet load".
+  12. *Answers*: (1) a branch whose state arises only in `sweepFollowsFirst` counts as reached in both orders if its
+      test runs and asserts visit-first's answers in both, reaches it in `sweepFollowsFirst` with its drop-mutant
+      killed 2/2 there, and the draft cites why `followVisitedFirst` cannot reach it (or a per-order `#require`);
+      (2) terminal events stay ascending; (3) yes, as item 7; (4) one subscriber, possibly stalled, with a
+      two-subscriber `commitTurns(.waiters)` measured once; (5) four candidates probed in step 1; (6) rulings 6.1–6.7
+      as `integrate-rr21.md` recommends, each timing class holding only while the event lands between the two
+      engines' answers; (7) `integrate-rr21.md`'s nine questions accepted, with `PROBE-RR21-RESERVE-REJOIN` at rr21-C6
+      and a figure for every allowed sort; (8) `waitingTarget`'s two callers (item 5's test and rr21-T8b); (9) the
+      inventory rows outside RR-21 go with their owners.
+
+  Applied in cycle 21: see "Cycle 21" below, whose "Status" list says which step is committed.
+
 ## Cycle 2: the cycle-1 verification findings
 
 Every finding of the two cycle-1 lenses, with its disposition. Blocking ones first; each fix is detailed under its item.
@@ -4984,6 +5073,32 @@ new test has `.timeLimit(.minutes(1))` (the shutdown test) or `.timeLimit(.minut
 is bounded by a `#require` (8 or 16 turns). The tests' times in the gate run's Sync bundle runs, with the loads, are
 under "Gate evidence (cycle 20)". `shutdownReleaseInboundWaitsDrop` is still killed only by a hang. The new shutdown
 test does not involve inbound waits, so it does not kill it either (S3-R25 item 11).
+
+## Cycle 21: the cycle-20 verifiers' findings, and S3-R26
+
+Cycle 21 applies S3-R26 (recorded under "Orchestrator rulings (close-out)") to the findings of the cycle-20 verifiers
+(`.build-orchestrator/s3f-c20-issues.json`, on `8e1fb24`; "correct #n" and "reqs #n" are the lenses' numbers). The
+specifications are `integrate-c21.md` (items A, B and C) and `integrate-rr21.md` (RR-21), under
+`.build-orchestrator/s3f-c20-analysis/`. The work follows S3-R26 item 11's order. Scratch files are under
+`.build-s3f/c21/`.
+
+### Status (resume here)
+
+A fixer resumed after an interruption continues from the worktree's HEAD with the first step that is not
+"committed". Tests written ahead of their fix wait in `.build-s3f/c21/pending/` until the commit right before their
+fix (S3-R26 item 11, "Red first").
+
+0. Baseline on `8e1fb24`: **done**. `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick` ended `VERIFY: PASS`
+   (`.build-s3f/c21/quick0.log`, 1-minute load 12.17 at the end).
+1. Failing tests, pins and probes on `8e1fb24`: **in progress**. Next action: write B-T4 and B-T5 into
+   `.build-s3f/c21/pending/`, run them on `8e1fb24`, and record their failing lines here.
+2. Item C, Phase 1: pending.
+3. Item A (A2–A11, K1–K4): pending.
+4. Item B (B2–B11, B8 with I2 and B-T5): pending.
+5. RR-21 (rr21-C0 to rr21-C7): pending.
+6. Item C, Phase 2, if a trigger fires: pending.
+7. Item 5 (`waitingTarget`) and its two probes: pending.
+8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
 
 ## Items
 
