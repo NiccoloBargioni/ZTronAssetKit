@@ -5108,9 +5108,11 @@ fix (S3-R26 item 11, "Red first").
    `68666e7`; the step's last commit: these records). Results under "Step 2" and "Step 2, continued" below.
 3. Item A (A2–A11, K1–K4): **committed** (`cbc9b36` the pins, red; `4783403` A2–A10 with K1–K3 and their tests;
    `deb218f` F-K4, red; `96ca019` A11 with K4; `02da8e3` T1-space). Candidate 4's pair: **committed** (`4657821` red,
-   `68ce0d7` the fix, `6a7834b` its C2 pin). Mutants: item A's running (`.build-s3f/c21/mut21-a.txt`), candidate 4's,
-   T1-space's and K4's queued after them (`MUT_EXTRA=.build-s3f/c21/tools/mut-c4.py python3
-   .build-s3f/c21/tools/mut21.py`); their table goes under "Step 3" when they end. Results under "Step 3" below.
+   `68ce0d7` the fix, `6a7834b` its C2 pin). Mutants: item A's **ended** (`.build-s3f/c21/mut21-a.txt`, 18:29 to
+   20:55); candidate 4's, T1-space's and K4's run after them (`MUT_EXTRA=.build-s3f/c21/tools/mut-c4.py python3
+   .build-s3f/c21/tools/mut21.py`); their table goes under "Step 3" with the records. Item A's run found a test race:
+   zz-x's waiter was read after the bucket test's shutdown and answered `.shutDown` at a load of 32 (fixed in
+   `323d706`). Results under "Step 3" below.
 4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: **committed** (`f9bce7a` B2–B4 with
    I1, I3 and `EngineIDTokensTests`; `203b901` T2, T3 and T6; `345801c` the pins and B-T4, red; `bbf5eaa` B5–B7 and
    B9–B11; `001471d` B-T5, Q1's stage 2 and the I2 injection, red; `9069a37` B8 with I2; `bb50d7e` variant Y's test,
@@ -5120,7 +5122,11 @@ fix (S3-R26 item 11, "Red first").
    `verify.sh --quick` ended `VERIFY: PASS` (`rr21-c0-quick.log`); the 'before' figures, best of 3
    (`rr21-c0-bench.log`, 1-minute loads 5.78 5.18 5.43 to 6.06 6.36 5.92): `concentrationCommitRerouteTurns` 47.12 ms
    (47.12, 47.29, 49.38) and `movedBeforeDrainTurns` 49.04 ms (56.91, 49.04, 56.28). rr21-C1 is step 1's probe
-   (recorded under "Step 1"). **Next action:** rr21-C2, the types and pure helpers, with no change in behaviour.
+   (recorded under "Step 1"). rr21-C2 **committed** (`20bf6b8`: MinHeap, the re-route types, the `.reroutes` event
+   and its replay, `reroutesWaiting`, `waitingTarget(_:epoch:)`, with `continueReroutes`, `rerouteListing` and
+   `releaseRerouteHolds` unreachable until rr21-C3; `verify.sh --quick` ended `VERIFY: PASS`, `c2-quick.log`; the
+   event's stride is 168 bytes with and without `indirect`, so it is not indirect). **Next action:** rr21-C3, the
+   readers and site 1 (red first: T1, T1-two, T1-fit, T-two-tokens and `commitRerouteDivergentTurns`).
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
