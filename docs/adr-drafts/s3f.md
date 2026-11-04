@@ -4936,8 +4936,8 @@ a commit is named.
 | The walk for the publications in flight (`findInbound`) | one pass over the jobs' ids, one lookup each | `inboundWalkTurns`, `concentrationNotFoundTurns` | met |
 | `reroute`, `addInterest` (a join in place) | O(1) amortised an id since `a78f913` (cycle 21, steps C10 and C11). Before it, a re-route that dropped a group member or released a run claim (T21) copied the group's `pending` or the run's `outstanding`: O(members) an id (`critic-commit-window.md` A5) | `concentrationFollowTurns`, `sharedApplyTurns` | met |
 | `removeInterest`, `dropInterest`, `relane`, `Job.lane`, `isSingleUser` | O(1) an id (`f066083`) | `userSharedApplyTurns`: 7.18 ms best (supersede) and 8.01 (keep) | met |
-| `deferBehindVerdict` (a visit's join behind a waiting verdict) | O(E) a call (a `lastIndex` scan and an insert) | no figure | no figure: put to the orchestrator |
-| The drain's events (`drainEventsAfterFollow`) | at most `eventsAfterFollowPerTurn` (512) events a turn; their visits after verdicts share the turn's ids (`ddb0ba1`) | `drainVerdictTurns` [500, 625]: 4.13 and 4.08 ms best | met |
+| `deferBehindVerdict` (a visit's join behind a waiting verdict) | O(1) a call since `4783403` (cycle 21, item A: a registration and a bucket append; the drain places the bucket behind its verdict at the batch's formation). Before it O(E) a call (a `lastIndex` scan and an insert) | `deferBehindVerdictTurns` (10,000 joins, four groupings): longest held turn best 4.81–5.52 ms, heartbeat 7.47–7.56 ms, at a 1-minute load of 5.76 to 5.31; 36.50–36.81 ms before (`cbc9b36`, at 11.77 to 9.90) | met |
+| The drain's events (`drainEventsAfterFollow`) | at most `eventsAfterFollowPerTurn` (512) events a turn; their visits after verdicts share the turn's ids (`ddb0ba1`); since `68ce0d7` (cycle 21, candidate 4) a turn also replays at most a turn's ids of the joins its visits waited behind a later verdict of the batch | `drainVerdictTurns` [500, 625]: 4.13 and 4.08 ms best (4.18 and 4.08 on `6a7834b`); `drainVerdictChainTurns` [500, 625]: 4.43 and 4.02 ms, heartbeat 5.05 and 6.60 ms, at a 1-minute load of 6.98 to 6.25 | met |
 | A retry verdict's answer for each interest (`verdictAnswers`, the lane `retryLater` reads) | O(1) an interest, O(I) a verdict (`f066083`); O(I²) a verdict before | O(1) amortised an id | met |
 | `followedLane` | O(I) a call | the 429 case of R-SYN-5, `concentrationNotFoundTurns` | met |
 | `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | inside `concentrationPublicationTurns` (the start) | met at the start; the verdict's has no figure |
@@ -5101,11 +5101,13 @@ fix (S3-R26 item 11, "Red first").
    T-PG1 to T-PG4 and T-ORDER; `cf4719e` the T21 tests; `5f2f1b7` the C3 clause's test; `adfc1ad` its records).
    Candidates 1 and 2, and their sibling: **committed** (`25c1da0`, `cefbe44`; `4337567`, `0a06be2`; `51ee67a`,
    `68666e7`; the step's last commit: these records). Results under "Step 2" and "Step 2, continued" below.
-3. Item A (A2–A11, K1–K4): pending. **Next action:** read `integrate-c21.md` item A and the A-tests, then commit
-   `deferBehindVerdictTurns` with A12's `joinsBehindVerdicts` expectations failing (`BenchSyncCycle21.swift`'s
-   remaining part from `.build-s3f/c21/pending/`), then A2–A11 and K1–K4 with their tests. Then candidate 4's pair
-   (`.build-s3f/c21/pending/EngineFollowBarrierLaterVerdictTests.swift`): pending.
-4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending.
+3. Item A (A2–A11, K1–K4): **committed** (`cbc9b36` the pins, red; `4783403` A2–A10 with K1–K3 and their tests;
+   `deb218f` F-K4, red; `96ca019` A11 with K4; `02da8e3` T1-space). Candidate 4's pair: **committed** (`4657821` red,
+   `68ce0d7` the fix, `6a7834b` its C2 pin). Mutants: item A's running (`.build-s3f/c21/mut21-a.txt`), candidate 4's,
+   T1-space's and K4's queued after them (`MUT_EXTRA=.build-s3f/c21/tools/mut-c4.py python3
+   .build-s3f/c21/tools/mut21.py`); their table goes under "Step 3" when they end. Results under "Step 3" below.
+4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: pending. **Next action:** B2–B4 with I1
+   and I3 and `EngineIDTokensTests`, green before any caller changes.
 5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
@@ -5295,7 +5297,7 @@ Each pair is its failing test, run red on the HEAD before its fix (P3), then the
 The tests are in `EngineFollowBarrierRunClaimTests.swift`; no await is added, so no REENTRANCY row changes.
 
 - **Candidate 1** (`25c1da0` red, `cefbe44` fix): `barrierKeepsARunsClaimAtTheVerdictItWaitsBehind` failed swept first
-  on `0a06be2`'s parent as recorded under "Step 1" (`c1-red.log`). Fix: `checkRunSettled` returns while a waiting run
+  on `adfc1ad` as recorded under "Step 1" (`c1-red.log`). Fix: `checkRunSettled` returns while a waiting run
   join (`joinsAfterFollow`) targets a claim the run still holds on that transfer: the join's replay, later in the
   batch, lands the claim, and the drain's end checks the run again. The narrow condition, not a check deferred for
   the whole batch: a run that settles at a verdict mid-batch starts a pending run whose claims join jobs before the
@@ -5320,6 +5322,117 @@ The tests are in `EngineFollowBarrierRunClaimTests.swift`; no await is added, so
   run. Drop-mutants, 2/2 swept first each: the guard (`mut-mb-guard.log`) and the set (`mut-mb-set.log`) fail the
   test's report expectations; without the clear the run never settles, and the test fails at its time limit
   (`mut-mb-clear.log`, 192 s a run).
+
+### Step 3: item A, item 6 and candidate 4
+
+Each pair is its failing test or pin, committed red on its own on the HEAD before its fix (P3), then the fix. The Sync
+bundle passed after each fix: 582 tests on `96ca019` (`sync-k4.log`), 583 on `68ce0d7` (`c4-sync.log`, 1-minute load
+5.09 at the end). The release build passed on `4783403` (`release-a.log`). Logs are under `.build-s3f/c21/`. Only
+`scheduleDrainFollowUp`'s existing await changes, so the REENTRANCY rows are unchanged (RE-S45 stays as it was).
+
+- **Item A** (`cbc9b36` red, `4783403` fix, `02da8e3` T1-space; ruling S3-R26 item 2; `integrate-c21.md` A2–A10, A12,
+  K1–K3).
+  - *Red on `be0e118`* (`step3-red.log`): `deferBehindVerdictTurns`' longest held turn, best of 3, was 36.81 (404,
+    group), 36.50 (timeout, group), 36.54 (404, users) and 36.55 ms (timeout, users), with the heartbeat within 0.01 ms
+    of each, against `c2Budget` (10 ms), at 1-minute loads of 11.77 to 9.90. A-T1 failed swept first in all four
+    groupings (`EngineFollowBarrierDeferBucketTests.swift:260` on `cbc9b36`: after a held follow turn the queue held O's verdict and
+    the joins inserted behind it), and passed visited first (`a-t1-red.log`).
+  - *The fix*, as specified: `VerdictKey` and `JoinBehindVerdict` (A2); `EventAfterFollow.verdictKey`, an exhaustive
+    switch (A3); `EngineState.joinsBehindVerdicts` (A4); `deferBehindVerdict` registers the join and appends it to its
+    verdict's bucket, two O(1) writes (A5); the drain's batch formation places each verdict's bucket right behind it,
+    newest first, with the joins it has no room for at the queue's head (A6); `followedLane` walks the buckets (A7);
+    the purge walks them at their verdict's position, newest first (A8); the invariants recount them there (K2) and
+    report a bucket without exactly one waiting event (K1) or with a stamp past the history (K3) (A9); shutdown clears
+    them (A10). A12's expectations count the bucket joins (`SyncBench.joinsBehindVerdicts`).
+  - *After* (`bench-defer-a.log`, `4783403`): longest held turn best 4.81, 5.48, 5.48 and 5.52 ms, heartbeat best
+    7.54, 7.47, 7.56 and 7.47 ms, 38 turns a run, at 1-minute loads of 5.76 to 5.31: **met**. Re-measured after
+    candidate 4 (`bench-c4.log`, `6a7834b`): 5.03, 5.65, 5.77 and 5.71 ms, heartbeat 7.41, 7.50, 7.49 and 7.45 ms, at
+    6.98 to 6.25. A-T1's per-turn pin (a bucket grows by at most a turn's ids, in arrival order) passes in both orders.
+  - *A13, the decision:* the bucket is placed at the batch formation (materialization), not put back after its
+    verdict's replay (the design's put-back, rejected by A6r): a put-back takes the joins out of the queue during the
+    verdict's replay, which changes `followBarrier` there (`EngineFollow.swift:97-99`, `followOwed ||
+    !eventsAfterFollow.isEmpty`) when the joins would have overflowed into the next batch, so the run check's barrier
+    guard and the orphan pass could run differently, and it adds a turn boundary. Materialization keeps the batches,
+    their boundaries, their order and the barrier inside every replay as a queue holding the joins right behind the
+    verdict gave them. RR-15's text stays true: a visit's join behind a waiting verdict is still placed right behind
+    the verdict.
+  - *Departures from `integrate-c21.md`'s tests*, each with its reason:
+    - **T1-space** was built (`02da8e3`) on the ENOSPC shape (`barrierLeavesAPassedIdToAPublicationsSpaceRetry`), and
+      F-SPACE (the unit check of `verdictKey`'s arms) stays beside it: a bucket behind a `.spaceFailure` verdict joins
+      the ENOSPC's retry at the drain; A and W get the retry's `integrityFailure` in both orders (`t1space.log`).
+    - **T-PURGE**: "none of the purged members is stored" holds swept first only. Visited first, O's retry binds the
+      purged members its job still holds, so the test pins each order's stored set (observation 1 below).
+    - **T-FL**: O's retry is held (`holdRetry`), so that the shape holds in both orders: visited first the retry
+      started at the verdict's arrival and consumed O's next script step.
+    - **A7**: the bucket walk keeps an early return at `.userInitiated`, the lane's maximum, as the queue loop's
+      `return .userInitiated` does: the result does not depend on the walk's order or on where it stops (the mutant
+      that drops it is E2, Equivalent, below).
+  - *Item 12's answer 1, per branch.* The bucket branches (A5's append, A6's materialization, A7's and A8's bucket
+    walks, A9's recount, A10's clear) are reached swept first only: visited first, `applyHeld` ends every follow at its
+    apply (`EngineFollowBarrierReachTests.swift:25-27`), so `defersToFollow` is false when a verdict arrives
+    (`EngineFollow.swift:103-105`), no verdict waits, and `addInterest`'s guard (`AttemptEnd.deferredAfter != nil`,
+    `EngineJobs.swift:136`) never holds. Each end-to-end test also pins the absence of buckets visited first:
+    `deferBucketApplyV4`'s `#require` (`EngineFollowBarrierDeferBucketTests.swift:168`) and T1-space's (`:508`).
+  - *Observations, not changed this cycle (put to the orchestrator):*
+    1. **A purge against a shared in-flight job** (T-PURGE; pre-existing since cycle 13). `withdrawPurged` withdraws
+       the purged members' interests and leaves `Job.assets`, the ids bound at the job's publication. Visited first,
+       O's retry still holds the members and binds them at its commit; swept first, the purge withdraws the joins
+       behind O's verdict before they replay, and none is stored. A difference in stored ids, not in any answer: every
+       purged member's waiter is answered the same in both orders. A candidate fix: `withdrawPurged` also trims from
+       `Job.assets` the purged ids no remaining interest holds.
+    2. **T-FL with `.stays`**: swept first, U and zz-o's waiter are answered `serverUnavailable`, where visited first
+       O's retry, started before C's 429, served them. O's retry starts at the drain on the live throttle the 429 left
+       (Retry-After 60 s, above the user lane's 30 s cap): an answer caused by a live origin gate changing during the
+       barrier, non-blocking under ruling S3-R17 item 2 (a residual risk; T-FL' is its probe).
+- **Item 6, the drain follow-up's branch for a refused spawn** (`deb218f` red, `96ca019` fix; ruling S3-R26 item 6;
+  `integrate-c21.md` A11 and K4).
+  - *Red on `4783403`* (`k4-red.log`): F-K4 (`invariantsReportAnEventWaitingOnceShutDown`) failed at
+    `EngineFollowShutdownTests.swift:96` (`forced == []`, where K4 is to report exactly one message); its control, a
+    running engine with an event waiting and its drain scheduled, reported nothing.
+  - *The fix*: `scheduleDrainFollowUp` calls `spawn` and drops its result, without the `if spawned == nil` block, and
+    its doc mirrors `scheduleFollowFollowUp`'s; K4 reports `!isRunning && !eventsAfterFollow.isEmpty`, separate from
+    `bf1d4eb`'s clause, whose exact expectation in `EngineFollowShutdownTests` is unchanged. F-K4 passes
+    (`k4-fix.log`), and the Sync bundle (582 tests, `sync-k4.log`).
+  - *Why the branch could not run, covering its seven assignments*: the six data resets (`eventsAfterFollow`,
+    `eventStamps`, `worldHistory`, `followStamps`, `verdictsAfterFollow`, `joinsAfterFollow`) are made by
+    `drainEverything` (`EngineShutdown.swift:118-124`, and `joinsBehindVerdicts` at `:125`), which shutdown's first
+    turn calls right after it sets `shuttingDown` (`EngineLifecycle.swift:490-498`); the flag,
+    `drainFollowUpScheduled`, is cleared by `drainFollowUp` itself (`EngineFollow.swift:434`), whose guard stops an
+    engine that is not running (`:435`). `spawn` refuses only while shutting down, shut down or degraded, the engine
+    degrades only while starting, and every drain runs in a running turn.
+  - *The caveat* (`notifyObservers` between `EngineLifecycle.swift:490` and `:498`, where the lifecycle is
+    `shuttingDown` and events may still wait): checked. No test condition calls `invariantViolations()` there: the
+    1,394 `awaitCondition` closures under `Tests/` call neither `invariantViolations()` nor `violations(`, nor do the 16
+    helpers they call (`.build-s3f/c21/tools/cond-check.py`); the only other observer registration
+    (`EventContinuityModelTests.swift:559`) reads `subscribers` only.
+- **Candidate 4, the drain's visit after a verdict joining onto a job whose own verdict waits later** (item 12's
+  answer 5; `4657821` red, `68ce0d7` fix, `6a7834b` its C2 pin). The probe broke S3-R16 item 1 (a different answer),
+  so P3 applied.
+  - *Red on `96ca019`* (`c4-red.log`): `barrierJoinsTheVisitAfterAVerdictAsVisitedFirst` failed swept first in three
+    shapes, each id answered J2's 404 where visited first a new job of J2's content fetched it
+    (`EngineFollowBarrierLaterVerdictTests.swift:135`, 12 issues: `sameFollow` 1, `beforeTheApply` 1,
+    `beforeTheApplyRest` 10); `afterTheApply`, `afterTheApplyRest` and every visit-first case passed.
+  - *The fix*: while the drain's visit after a verdict (`followAfterVerdict`), or the rest of one, moves ids
+    (`EngineState.visitingAfterVerdict`), a join onto a job whose own exit verdict waits waits behind that verdict
+    unless the copy the verdict deferred under (`AttemptEnd.copy`, recorded by `recordDeferredVerdict`) already mapped
+    the id to the job's content (`joinWaitsForVerdict`): the apply that mapped it there came before that verdict, so a
+    visit-first engine's visit joined the job in its attempt and the verdict answers it. A bucket made for a verdict of
+    the batch being drained follows it once it replays, newest first, as its bucket would have followed it into the
+    batch; a verdict the batch has not reached when the turn ends goes back to the queue's head with the rest, its
+    bucket kept (K1 holds at every turn's end). `AttemptEnd.copy` lives while the verdict waits (`endDeferral` clears
+    the record). The 10 cases pass (`c4-green.log`), and the Sync bundle (583 tests).
+  - *C2*: a drain turn replays at most a turn's ids (`followIDsPerTurn`, 512) of such joins besides its events.
+    `drainVerdictChainTurns` (`6a7834b`), `drainVerdictTurns`' shape with v4 mapping job k's members to job k + 1's
+    content: longest held turn best 4.43 ms (500 a job) and 4.02 ms (625), heartbeat 5.05 and 6.60 ms, up to 1,500
+    joins behind verdicts between turns, at 1-minute loads of 6.98 to 6.25 (`bench-c4.log`): **met**.
+    `drainVerdictTurns` itself: 4.18 and 4.08 ms.
+  - *Item 12's answer 1*: the branch is reached swept first only, for the reason given under item A (no verdict waits
+    visited first; the test's visit-first setup waits for J1's and J2's verdicts to be given,
+    `EngineFollowBarrierLaterVerdictTests.swift:93-100` and `failJ2`, `:143`).
+- **Mutants** (copy-based runner `.build-s3f/c21/tools/mut21.py`, each run on a copy of the worktree's sources, 2/2
+  runs of the item's tests, the Sync bundle for a survivor): item A's 18 are running (`mut21-a.txt`); candidate 4's
+  9, T1-space's and K4's are queued (`tools/mut-c4.py`). The table is filled in when they end. `a-queue-insert` (the
+  old queue insert put back) failed A-T1 2/2 swept first in place (`mut-a-queue-insert.log`).
 
 ## Items
 
