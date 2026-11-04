@@ -518,12 +518,18 @@ extension SyncEngine {
     /// Written in place through the run: a copy written back would copy `outstanding` and `failures` per outcome; the
     /// failures are dictionary entries, so no order is needed (step C6). A committed id the store did not bind is never
     /// delivered here (`committed` moves its interest first); the loop that fails one is kept, pre-existing (S3-R19
-    /// item 3).
+    /// item 3). Only the ids answered leave the transfer's claims: a claim a visit re-routed onto this job while its
+    /// verdict waited keeps its place, and its join's replay, after the verdict, lands it as a visit-first engine's
+    /// later visit had. Emptying the transfer's claims wiped it, and the join then found none (`stillWants`; Stage 3
+    /// close-out cycle 21, S3-R26 item 12's answer 5, candidate 2).
     func recordRunOutcome(_ outcome: InterestOutcome, transfer: TransferID, assets: Set<AssetID>) {
         guard self.state.run != nil else {
             return
         }
-        self.state.run?.outstanding[transfer] = nil
+        self.state.run?.outstanding[transfer]?.subtract(assets)
+        if self.state.run?.outstanding[transfer]?.isEmpty == true {
+            self.state.run?.outstanding[transfer] = nil
+        }
         switch outcome {
         case .committed(let locations, _):
             self.state.run?.fetched += assets.lazy.filter { locations[$0] != nil }.count
