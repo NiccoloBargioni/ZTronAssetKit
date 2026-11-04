@@ -131,20 +131,30 @@ extension SyncEngine {
         max(1, self.state.followIDsPerTurn / 2)
     }
 
-    /// Moves `moved`, ids of `job` the copy maps elsewhere, as `move` does, within `budget` ids: all of them at once when
-    /// they fit, else `budget` of the job's interests in them, by id and token, and returns the rest for the follow's next
-    /// turns (`continueMove`). A job whose every id leaves and that is not publishing is superseded as `move` supersedes
-    /// it: its running attempt is abandoned now, as a visit-first engine's visit abandoned it (no 429, failure or bytes of
-    /// it can arrive in the follow's later turns), and the job waits queued, behind the barrier, until its last interest
-    /// leaves and it is removed. Returns whether an id moved, the ids spent and the moves left.
-    func startMove(_ moved: Set<AssetID>, of job: Job, listing: ValidatedManifest?, budget: Int) -> (moved: Bool, spent: Int, rest: MoveProgress?) {
+    /// Moves `moved`, ids of `transfer`'s job the copy maps elsewhere, as `move` does, within `budget` ids: all of them at
+    /// once when they fit, else `budget` of the job's interests in them, by id and token, and returns the rest for the
+    /// follow's next turns (`continueMove`). A job whose every id leaves and that is not publishing is superseded as
+    /// `move` supersedes it: its running attempt is abandoned now, as a visit-first engine's visit abandoned it (no 429,
+    /// failure or bytes of it can arrive in the follow's later turns), and the job waits queued, behind the barrier, until
+    /// its last interest leaves and it is removed. Returns whether an id moved, the ids spent and the moves left; nothing
+    /// without a job, which no caller passes (S3-R19 item 3's default of the optional chain).
+    ///
+    /// The job is read once, before anything changes, and the items come from its index (`Job.moveItems`), so no copy of
+    /// its ids or interests is alive across the moves (Stage 3 close-out cycle 21, ruling S3-R26 item 3). The moved ids no
+    /// interest holds leave the job's ids at once, as `move` subtracts every moved id: no item takes them off, and the job
+    /// kept, after its visit, ids the copy maps elsewhere (B-T4).
+    func startMove(_ moved: Set<AssetID>, of transfer: TransferID, listing: ValidatedManifest?, budget: Int) -> (moved: Bool, spent: Int, rest: MoveProgress?) {
         guard moved.count > budget else {
-            return (self.move(moved, of: job, listing: listing), moved.count, nil)
+            return (self.move(moved, of: transfer, listing: listing), moved.count, nil)
         }
-        let transfer = job.transfer
-        let supersedes = moved.count == job.assets.count && job.state != .verifying && job.state != .committing
-        if supersedes, job.state == .downloading {
-            if let active = job.active {
+        let read = self.state.jobs[transfer].map { job in
+            (supersedes: moved.count == job.assets.count && job.state != .verifying && job.state != .committing, downloading: job.state == .downloading, active: job.active, lane: job.lane, built: job.moveItems(of: moved))
+        }
+        guard let read else {
+            return (false, 0, nil)
+        }
+        if read.supersedes, read.downloading {
+            if let active = read.active {
                 self.abandon(transfer, active)
             }
             // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
@@ -153,14 +163,10 @@ extension SyncEngine {
                 self.enqueue(transfer)
             }
         }
-        var items: [MoveItem] = []
-        items.reserveCapacity(moved.count)
-        for (token, interest) in job.interests {
-            for asset in interest.assets where moved.contains(asset) {
-                items.append(MoveItem(asset: asset, token: token))
-            }
+        if !read.built.unheld.isEmpty {
+            self.state.jobs[transfer]?.assets.subtract(read.built.unheld)
         }
-        var progress = MoveProgress(items, supersedes: supersedes, lane: job.lane)
+        var progress = MoveProgress(read.built.items, supersedes: read.supersedes, lane: read.lane)
         let made = self.continueMove(&progress, of: transfer, listing: listing, budget: budget)
         return (made.moved, made.spent, progress.isDone ? nil : progress)
     }

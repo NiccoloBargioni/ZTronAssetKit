@@ -931,6 +931,46 @@ struct Job {
         self.interestCounts = InterestCounts(self.interests.values)
     }
 
+    /// The holders of `moved`'s ids, one pair per id and interest that holds it, each with its interest's lane and kind
+    /// and no id (all `SyncEngine.reroute` reads, so no copy of the interest's ids is alive across the moves), by token
+    /// and then id: the order `SyncEngine.move` re-routes them in, where it walked every interest of the job, sorted, for
+    /// the same pairs. Read from the index, it costs O(moved + holders): 16 moves owed off one holder of 10,000 ids held
+    /// the actor 79.91 ms with the walk (`BenchSyncCycle21.manyMovesTurns`; Stage 3 close-out cycle 21, ruling S3-R26
+    /// item 3).
+    func holdings(of moved: Set<AssetID>) -> [(token: InterestToken, asset: AssetID, interest: JobInterest)] {
+        var pairs: [(token: InterestToken, asset: AssetID, interest: JobInterest)] = []
+        for asset in moved {
+            guard let holders = self.tokensByID[asset] else {
+                continue
+            }
+            holders.forEach { token in
+                if let interest = self.interests[token] {
+                    pairs.append((token, asset, JobInterest(lane: interest.lane, kind: interest.kind, assets: [])))
+                }
+            }
+        }
+        pairs.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+        return pairs
+    }
+
+    /// The interests in `moved`'s ids, one item per id and interest that holds it (`MoveProgress`), in no order (the
+    /// move's heap orders them), and the moved ids no interest holds, which a move takes off the job all the same
+    /// (`SyncEngine.startMove`), as `SyncEngine.move` subtracts every moved id. Read from the index, in O(moved +
+    /// holders).
+    func moveItems(of moved: Set<AssetID>) -> (items: [MoveItem], unheld: [AssetID]) {
+        var items: [MoveItem] = []
+        items.reserveCapacity(moved.count)
+        var unheld: [AssetID] = []
+        for asset in moved {
+            guard let holders = self.tokensByID[asset] else {
+                unheld.append(asset)
+                continue
+            }
+            holders.forEach { items.append(MoveItem(asset: asset, token: $0)) }
+        }
+        return (items, unheld)
+    }
+
     /// Test seam (the invariant oracle): forgets `asset`'s holders in the index, its interests unchanged, the state the
     /// index's clause reports (I1).
     mutating func forgetIndexForTests(_ asset: AssetID) {

@@ -937,8 +937,26 @@ extension SyncEngine {
     /// (`EngineState.followMoving`; Stage 3 close-out cycle 19, ruling S3-R22 item 1), and spends a passed job's set at
     /// its last. `afterVerdict`: the drain's visit (`followAfterVerdict`). Returns whether it moved, and the ids spent.
     private func follow(_ transfer: TransferID, ids budget: Int, afterVerdict: Bool) -> (moved: Bool, spent: Int) {
-        guard let job = self.state.jobs[transfer] else {
+        guard let visit = self.visitMoves(of: transfer) else {
             return (false, 0)
+        }
+        let made = visit.moved.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(visit.moved, of: transfer, listing: nil, budget: budget)
+        if let rest = made.rest {
+            let stamp = self.state.reading ?? self.worldStamp()
+            self.state.followMoving = VisitRemainder(holder: transfer, moves: rest, stamp: stamp, afterVerdict: afterVerdict, spends: visit.reroute != nil)
+        } else if visit.reroute != nil {
+            self.state.jobs[transfer]?.rerouteOnPass = []
+        }
+        return (made.moved, made.spent)
+    }
+
+    /// What `follow`'s visit of `transfer`'s job moves: the job's ids the copy maps elsewhere, less those the visit
+    /// passes, and the set it re-routes when it passes the job (`rerouteOnVisit`, `nil` when it moves every moved id);
+    /// `nil` without a job. A passed id puts the job in `unfollowed`, for the next follow, before any id moves. The job is
+    /// read here only, so no copy of it is alive across the moves (Stage 3 close-out cycle 21, ruling S3-R26 item 3).
+    private func visitMoves(of transfer: TransferID) -> (moved: Set<AssetID>, reroute: Set<AssetID>?)? {
+        guard let job = self.state.jobs[transfer] else {
+            return nil
         }
         let reroute = self.rerouteOnVisit(job)
         var moved = job.assets.filter { asset in self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? true }
@@ -949,14 +967,7 @@ extension SyncEngine {
             }
             moved.subtract(passed)
         }
-        let made = moved.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(moved, of: job, listing: nil, budget: budget)
-        if let rest = made.rest {
-            let stamp = self.state.reading ?? self.worldStamp()
-            self.state.followMoving = VisitRemainder(holder: transfer, moves: rest, stamp: stamp, afterVerdict: afterVerdict, spends: reroute != nil)
-        } else if reroute != nil {
-            self.state.jobs[transfer]?.rerouteOnPass = []
-        }
-        return (made.moved, made.spent)
+        return (moved, reroute)
     }
 
     /// Moves `moved`, ids of `job` the engine's copy maps elsewhere, as a visit moves them (`follow`, `continueInbound`):
@@ -965,11 +976,19 @@ extension SyncEngine {
     /// content (`reroute`), and an interest left with no id is removed. `listing` is the copy the move is made under, the
     /// engine's copy when `nil` (an owed move found under the copy an apply has since replaced, `InboundMove.copy`).
     /// `true` when it moved an id.
-    func move(_ moved: Set<AssetID>, of job: Job, listing: ValidatedManifest? = nil) -> Bool {
-        let transfer = job.transfer
-        if moved.count == job.assets.count, job.state != .verifying, job.state != .committing {
-            if job.state == .downloading {
-                if let active = job.active {
+    ///
+    /// The moved ids' holders are read from the job's index (`Job.holdings`), by token and then id as the walk of every
+    /// interest gave them, and no copy of the job is alive across the moves: the supersede reads the job's state and
+    /// attempt only, and each pair's removal and re-route is made in the table (Stage 3 close-out cycle 21, ruling S3-R26
+    /// item 3). An interest left with no id is removed at its last pair, which is where the walk removed it; one that
+    /// holds no moved id is never empty (the invariant check's I3).
+    func move(_ moved: Set<AssetID>, of transfer: TransferID, listing: ValidatedManifest? = nil) -> Bool {
+        let superseded = self.state.jobs[transfer].flatMap { job -> (downloading: Bool, active: ActiveAttempt?)? in
+            moved.count == job.assets.count && job.state != .verifying && job.state != .committing ? (job.state == .downloading, job.active) : nil
+        }
+        if let superseded {
+            if superseded.downloading {
+                if let active = superseded.active {
                     self.abandon(transfer, active)
                 }
                 // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
@@ -978,14 +997,13 @@ extension SyncEngine {
             self.supersede(transfer, settling: false, listing: listing)
             return true
         }
+        let pairs = self.state.jobs[transfer]?.holdings(of: moved) ?? []
         self.state.jobs[transfer]?.assets.subtract(moved)
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            for asset in interest.assets.sorted() where moved.contains(asset) {
-                _ = self.state.jobs[transfer]?.removeAsset(asset, for: token)
-                self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
-            }
-            if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
-                self.removeInterest(token, from: transfer)
+        for pair in pairs {
+            _ = self.state.jobs[transfer]?.removeAsset(pair.asset, for: pair.token)
+            self.reroute(pair.token, interest: pair.interest, asset: pair.asset, from: transfer, listing: listing)
+            if self.state.jobs[transfer]?.interests[pair.token]?.assets.isEmpty == true {
+                self.removeInterest(pair.token, from: transfer)
             }
         }
         return !moved.isEmpty
@@ -1249,14 +1267,16 @@ extension SyncEngine {
                 budget.holders -= 1
             }
             var rest: MoveProgress?
-            if self.waitingTarget(move) != nil, let holder = self.state.jobs[move.holder] {
+            // The holder is read in the table only, so no copy of its ids and interests is alive across the moves (Stage
+            // 3 close-out cycle 21, ruling S3-R26 item 3: a copy here was copied whole at a turn's first removal).
+            if self.waitingTarget(move) != nil, self.state.jobs[move.holder] != nil {
                 let made: (moved: Bool, spent: Int)
                 if var progress = move.progress {
                     made = self.continueMove(&progress, of: move.holder, listing: move.copy, budget: budget.ids)
                     rest = progress.isDone ? nil : progress
                 } else {
-                    let ids = holder.assets.intersection(move.ids)
-                    let started = ids.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(ids, of: holder, listing: move.copy, budget: budget.ids)
+                    let ids = self.state.jobs[move.holder]?.assets.intersection(move.ids) ?? []
+                    let started = ids.isEmpty ? (moved: false, spent: 0, rest: nil) : self.startMove(ids, of: move.holder, listing: move.copy, budget: budget.ids)
                     made = (started.moved, started.spent)
                     rest = started.rest
                 }

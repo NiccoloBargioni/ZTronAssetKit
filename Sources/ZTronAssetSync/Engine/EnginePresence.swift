@@ -336,20 +336,31 @@ extension SyncEngine {
     }
 
     /// Takes the interests in `present` out of `transfer`'s job and answers them from the store, so that an outcome of
-    /// the job (a 404 of its content) never reaches an asset the store holds (R-NET-6, L4-R5).
+    /// the job (a 404 of its content) never reaches an asset the store holds (R-NET-6, L4-R5). The interests are read
+    /// first, by token, each as its lane, kind and ids in `present` (no copy of the job or its interests is alive across
+    /// the removals); an interest whose every id is present leaves, another loses those ids in place, so the index is
+    /// changed for the ids that leave only (Stage 3 close-out cycle 21, ruling S3-R26 item 3; critique A10).
     func answerPresentMembers(of transfer: TransferID, _ present: Set<AssetID>) {
-        guard !present.isEmpty, let job = self.state.jobs[transfer] else {
+        guard !present.isEmpty else {
             return
         }
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            let held = interest.assets.intersection(present)
-            guard !held.isEmpty else {
-                continue
+        let rows = self.state.jobs[transfer].map { job in
+            job.interests.compactMap { token, interest -> (token: InterestToken, kind: InterestKind, lane: AssetPriority, held: Set<AssetID>, whole: Bool)? in
+                let held = interest.assets.intersection(present)
+                return held.isEmpty ? nil : (token, interest.kind, interest.lane, held, held.count == interest.assets.count)
+            }.sorted { $0.token < $1.token }
+        }
+        guard let rows else {
+            return
+        }
+        for row in rows {
+            if row.whole {
+                self.state.jobs[transfer]?.setInterest(nil, for: row.token)
+            } else {
+                self.state.jobs[transfer]?.subtractAssets(row.held, for: row.token)
             }
-            let left = interest.assets.subtracting(held)
-            self.state.jobs[transfer]?.setInterest(left.isEmpty ? nil : JobInterest(lane: interest.lane, kind: interest.kind, assets: left), for: token)
-            for asset in held.sorted() {
-                self.answerPresent(token, kind: interest.kind, lane: interest.lane, asset: asset, at: transfer, from: transfer)
+            for asset in row.held.sorted() {
+                self.answerPresent(row.token, kind: row.kind, lane: row.lane, asset: asset, at: transfer, from: transfer)
             }
         }
         self.state.jobs[transfer]?.assets.subtract(present)
