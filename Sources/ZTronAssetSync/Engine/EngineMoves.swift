@@ -176,7 +176,8 @@ extension SyncEngine {
     /// leaves the job's ids (`Job.assets`) at its first interest, as `move` subtracts them before it re-routes, and comes
     /// back after its last one when an interest that joined meanwhile still holds it (the invariant check's I2), and each
     /// interest is re-routed as `move` re-routes it (`reroute`, under `listing`; a visit's under the copy as it stands at
-    /// the turn) unless it left the job meanwhile. An id that an apply made since maps to the job's content again rejoins
+    /// the turn) unless it left the job meanwhile, or, of a visit's rest whose holder began publishing meanwhile, its id
+    /// is one the publication began with mapped to the job's content: such an interest is passed, as a visit passes it. An id that an apply made since maps to the job's content again rejoins
     /// the job through `reroute`, as that apply's visit on a visit-first engine moved it back: behind the job's exit
     /// verdict when that waits (`addInterest`), since that visit met the job as the verdict left it. An interest left
     /// with no id is removed (`removeInterest`), or, of a job being superseded, dropped without a re-lane: that job is
@@ -188,6 +189,13 @@ extension SyncEngine {
             progress.removeAll()
             return (false, 0)
         }
+        // A visit's rest (no `listing`) whose holder publishes now passes the ids its publication began with, as the
+        // visit of an apply that meets the job publishing passes them (`rerouteOnVisit`): a visit-first engine's visit at
+        // the apply that mapped such an id back to this content had moved its interests onto the job before the
+        // publication began, so a later apply's visit passed them and the publication's outcome answered them (Stage 3
+        // close-out cycle 21, Q1's stage 3, variant Y). The ids the publication began with mapped elsewhere are
+        // re-routed at their turn, as that visit re-routes them (`Job.rerouteOnPass`).
+        let rerouting = listing == nil ? self.state.jobs[holder].flatMap { job in job.state == .verifying || job.state == .committing ? self.rerouteOnVisit(job) : nil } : nil
         var spent = 0
         var moved = false
         while let first = progress.first {
@@ -199,6 +207,11 @@ extension SyncEngine {
             self.state.jobs[holder]?.assets.remove(asset)
             while let item = progress.first, item.asset == asset {
                 _ = progress.popFirst()
+                if let rerouting, !rerouting.contains(asset) {
+                    // Passed: the interest keeps the id, which comes back to the job's ids after its last item. The
+                    // follow's own visit of the job passes it too, and leaves the job for the next follow (`unfollowed`).
+                    continue
+                }
                 // The interest is read for its lane and kind, all `reroute` reads, and its id is removed in the table. A
                 // copy of the interest held across the removal shares its ids' storage, so the removal copied them whole,
                 // once per id moved: a turn of 512 off one interest of 10,000 ids held the actor about 20 ms (the
