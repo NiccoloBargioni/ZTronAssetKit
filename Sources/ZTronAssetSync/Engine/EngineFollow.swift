@@ -185,20 +185,39 @@ extension SyncEngine {
     /// Stage 3 close-out cycle 20, ruling S3-R25 item 1). Once they are spent the rest of the batch goes back to the
     /// head of `eventsAfterFollow`, in order, for the next drain turn, as it does after a visit that leaves a rest; the
     /// events wait in order either way, so no answer changes.
+    ///
+    /// A verdict's bucket (`EngineState.joinsBehindVerdicts`) joins its batch right behind the verdict, newest first, and
+    /// the joins the batch has no room for wait at the head of `eventsAfterFollow` in that order: the batches, their
+    /// boundaries, their order and the barrier inside each replay are those of a queue that held the joins right behind
+    /// the verdict (Stage 3 close-out cycle 21, ruling S3-R26 item 2).
     func drainEventsAfterFollow(ids: Int? = nil) {
         guard !self.followOwed, !self.state.eventsAfterFollow.isEmpty else {
             return
         }
-        var count = 0
-        for event in self.state.eventsAfterFollow.prefix(Self.eventsAfterFollowPerTurn) {
-            count += 1
+        // The waiting events in order, each verdict's bucket right behind it, newest first; the joins of a bucket the
+        // batch has no room for wait at the queue's head for the next batch, in that order.
+        var batch: [(EventAfterFollow, WorldStamp)] = []
+        var overflow: [(EventAfterFollow, WorldStamp)] = []
+        var consumed = 0
+        while consumed < self.state.eventsAfterFollow.count, batch.count < Self.eventsAfterFollowPerTurn {
+            let event = self.state.eventsAfterFollow[consumed]
+            batch.append((event, self.state.eventStamps[consumed]))
+            consumed += 1
+            if let key = event.verdictKey, let behind = self.state.joinsBehindVerdicts.removeValue(forKey: key) {
+                for entry in behind.reversed() {
+                    if batch.count < Self.eventsAfterFollowPerTurn {
+                        batch.append((.join(entry.join), entry.stamp))
+                    } else {
+                        overflow.append((.join(entry.join), entry.stamp))
+                    }
+                }
+            }
             if event.endsDrainBatch {
                 break
             }
         }
-        let batch = Array(zip(self.state.eventsAfterFollow.prefix(count), self.state.eventStamps.prefix(count)))
-        self.state.eventsAfterFollow.removeFirst(count)
-        self.state.eventStamps.removeFirst(min(count, self.state.eventStamps.count))
+        self.state.eventsAfterFollow.replaceSubrange(0..<consumed, with: overflow.map(\.0))
+        self.state.eventStamps.replaceSubrange(0..<consumed, with: overflow.map(\.1))
         self.state.drainingAfterFollow = true
         self.state.drainIDsLeft = ids ?? self.state.followIDsPerTurn
         for (offset, (event, stamp)) in batch.enumerated() {
@@ -960,27 +979,21 @@ extension SyncEngine {
         return !moved.isEmpty
     }
 
-    /// Waits `join` right behind the exit verdict that waits for `target` (its `.attemptFailed` or `.spaceFailure` at the
-    /// job's epoch), under the decision instant now (the visit's): the drain joins it to the job the verdict leaves, or to
-    /// a new job of the content, as a visit-first engine's visit at the apply that moved it there joined it once the
-    /// verdict had been given (`addInterest`; Stage 3 close-out cycle 17). Its place among the joins already waiting
-    /// there is an order only (they all join the same content), so none is kept: the skip past them was removed under
-    /// ruling S3-R16 item 3, its drop-mutant having survived. Only a follow's visit calls it, while the follow is owed and
-    /// every waiting event is queued.
+    /// Waits `join` behind the exit verdict that waits for `target` (its `.attemptFailed` or `.spaceFailure` at the job's
+    /// epoch), under the decision instant now (the visit's), in the verdict's bucket (`EngineState.joinsBehindVerdicts`):
+    /// the drain joins it to the job the verdict leaves, or to a new job of the content, as a visit-first engine's visit
+    /// at the apply that moved it there joined it once the verdict had been given (`addInterest`; Stage 3 close-out cycle
+    /// 17). Its place among the joins already waiting there is an order only (they all join the same content): the drain
+    /// places the bucket right behind the verdict, newest first, where an insert right behind the verdict put each (the
+    /// skip past them was removed under ruling S3-R16 item 3, its drop-mutant having survived). It costs two writes,
+    /// whatever waits there already: the queue insert it replaces, and that insert's search for the verdict, grew with
+    /// the joins behind it, and a follow that deferred 10,000 joins held the engine's actor about 37 ms a turn (Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 2; `deferBehindVerdictTurns`). Only a follow's visit calls it, outside a
+    /// move it brings in, on a job whose verdict waits (`addInterest`'s guard: `AttemptEnd.deferredAfter` is set when the
+    /// verdict defers and cleared when it replays), so the bucket always has its verdict (`invariantViolations()`).
     func deferBehindVerdict(_ join: JoinAfterFollow, of target: Job) {
-        let events = self.state.eventsAfterFollow
-        let verdict = events.lastIndex { event in
-            switch event {
-            case .attemptFailed(let transfer, let epoch, _), .spaceFailure(let transfer, let epoch, _):
-                return transfer == target.transfer && epoch == target.epoch
-            default:
-                return false
-            }
-        }
-        let index = (verdict ?? events.count - 1) + 1
         self.state.joinsAfterFollow[join.token, default: [:]][join.asset] = join.entry.transferID
-        self.state.eventsAfterFollow.insert(.join(join), at: index)
-        self.state.eventStamps.insert(self.worldStamp(), at: min(index, self.state.eventStamps.count))
+        self.state.joinsBehindVerdicts[VerdictKey(transfer: target.transfer, epoch: target.epoch), default: []].append(JoinBehindVerdict(join: join, stamp: self.worldStamp()))
     }
 
     /// Brings onto `transfer`'s job, as its attempt ends while a follow is owed (its publication begins, `publish`, or
@@ -1447,6 +1460,20 @@ enum EventAfterFollow: Sendable {
             return false
         }
     }
+
+    /// The attempt whose exit verdict the event gives, if it gives one (`.attemptFailed`, `.spaceFailure`): the joins a
+    /// follow's visit waits behind it (`EngineState.joinsBehindVerdicts`) join the drain's batch right behind it, and the
+    /// purge and the invariants walk them at its place in the queue.
+    var verdictKey: VerdictKey? {
+        switch self {
+        case .spaceFailure(let transfer, let epoch, _):
+            return VerdictKey(transfer: transfer, epoch: epoch)
+        case .attemptFailed(let transfer, let epoch, _):
+            return VerdictKey(transfer: transfer, epoch: epoch)
+        case .join, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
+            return nil
+        }
+    }
 }
 
 /// An exit verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
@@ -1593,4 +1620,25 @@ struct JoinAfterFollow: Sendable {
     /// Whether a purge withdrew it while it waited (`SyncEngine.withdrawPurgedJoins`): it is no longer in
     /// `EngineState.joinsAfterFollow`, and its replay joins nothing.
     var withdrawn = false
+}
+
+/// One attempt's exit verdict (`EventAfterFollow.verdictKey`): its job's transfer, and the job's epoch at the attempt's
+/// end. The epoch tells two attempts of one content apart (`EngineState.lastEpoch` grows at every job creation and every
+/// start), so the joins that wait behind one attempt's verdict (`EngineState.joinsBehindVerdicts`) never meet another's.
+struct VerdictKey: Hashable, Sendable {
+    /// The job's transfer.
+    let transfer: TransferID
+    /// The job's epoch at the attempt's end.
+    let epoch: UInt64
+}
+
+/// A join a follow's visit waits behind a waiting exit verdict (`SyncEngine.deferBehindVerdict`), with its decision
+/// instant: kept beside the queue, so a deferral costs the same whatever waits behind the verdict already, and placed
+/// in the drain's batch right behind the verdict (`SyncEngine.drainEventsAfterFollow`). `join` is mutable so that a
+/// purge withdraws it in place (`SyncEngine.withdrawPurgedJoins`).
+struct JoinBehindVerdict: Sendable {
+    /// The join.
+    var join: JoinAfterFollow
+    /// Its decision instant: the visit's (`SyncEngine.worldStamp()`).
+    let stamp: WorldStamp
 }

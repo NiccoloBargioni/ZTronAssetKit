@@ -122,6 +122,7 @@ extension SyncEngine {
         self.state.followStamps = [:]
         self.state.verdictsAfterFollow = [:]
         self.state.joinsAfterFollow = [:]
+        self.state.joinsBehindVerdicts = [:]
         self.state.followCarried = []
         self.state.drainingAfterFollow = false
         self.state.laneParksOwed.removeAll()

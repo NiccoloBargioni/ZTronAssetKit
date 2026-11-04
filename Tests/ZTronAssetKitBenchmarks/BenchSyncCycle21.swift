@@ -26,6 +26,8 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         }
         for run in runs {
             #expect(run.verdictWaited, "setup: O's verdict waited for the follow: \(run)")
+            #expect((run.joinsDuringFollow.max() ?? 0) == 0, "setup: no join entered eventsAfterFollow during the follow (joinsBehindVerdicts holds them): \(run)")
+            #expect(run.behindAtFollowEnd == 0 && run.joinsAtFollowEnd == 10_000 - (SyncEngine.eventsAfterFollowPerTurn - 1), "setup: the follow's last turn drained O's bucket into its first batch, behind O's verdict, and the rest wait at the queue's head: \(run)")
             #expect(run.onO == (shape.notFound ? 10_000 : 10_001), "setup: O's content holds every member once the drain is over: \(run)")
             #expect(run.violations.isEmpty, "setup: \(run.violations.prefix(3))")
         }
@@ -108,10 +110,14 @@ struct DeferBehindRun: CustomStringConvertible {
     var turnsWait = 0.0
     /// Each held follow or drain turn, timed inside the actor.
     var turns: [Double] = []
-    /// The waiting events after each held follow turn (the queue the visits' joins went to on `8e1fb24`).
+    /// The waiting events after each held follow turn, the joins behind a verdict included (the queue the visits' joins
+    /// went to on `8e1fb24`; `EngineState.joinsBehindVerdicts` since ruling S3-R26 item 2).
     var eventsDuringFollow: [Int] = []
-    /// The waiting `.join` events once the follow's last turn ran.
+    /// The waiting `.join` events of the queue after each held follow turn that left the follow owed.
+    var joinsDuringFollow: [Int] = []
+    /// The waiting `.join` events of the queue, and the joins behind a verdict, once the follow's last turn ran.
     var joinsAtFollowEnd = 0
+    var behindAtFollowEnd = 0
     /// Whether O's verdict waited for the follow.
     var verdictWaited = false
     /// The ids on O's content's job once the drain is over.
@@ -122,7 +128,7 @@ struct DeferBehindRun: CustomStringConvertible {
     var load = ""
 
     var description: String {
-        "turns \(self.turns.count) longest \(String(format: "%.2f", self.turns.max() ?? 0)) ms; apply \(String(format: "%.2f", self.applyWait)) ms, turns' heartbeat \(String(format: "%.2f", self.turnsWait)) ms; most events during the follow \(self.eventsDuringFollow.max() ?? 0); joins at the follow's end \(self.joinsAtFollowEnd); on O \(self.onO); load \(self.load)"
+        "turns \(self.turns.count) longest \(String(format: "%.2f", self.turns.max() ?? 0)) ms; apply \(String(format: "%.2f", self.applyWait)) ms, turns' heartbeat \(String(format: "%.2f", self.turnsWait)) ms; most events during the follow \(self.eventsDuringFollow.max() ?? 0), most queued joins \(self.joinsDuringFollow.max() ?? 0); joins at the follow's end \(self.joinsAtFollowEnd) queued, \(self.behindAtFollowEnd) behind a verdict; on O \(self.onO); load \(self.load)"
     }
 }
 
@@ -223,10 +229,11 @@ extension SyncBench {
         !engine.followBarrier && !engine.state.followFollowUpScheduled && !engine.state.drainFollowUpScheduled
     }
 
-    /// The waiting events, and the waiting `.join` events among them.
-    static func waitingEvents(_ engine: isolated SyncEngine) -> (events: Int, joins: Int) {
+    /// The waiting events, the waiting `.join` events among them, and the joins that wait behind a verdict
+    /// (`EngineState.joinsBehindVerdicts`), which the drain replays as `.join` events.
+    static func waitingEvents(_ engine: isolated SyncEngine) -> (events: Int, joins: Int, behind: Int) {
         let events = engine.state.eventsAfterFollow
-        return (events.count, events.filter { if case .join = $0 { true } else { false } }.count)
+        return (events.count, events.filter { if case .join = $0 { true } else { false } }.count, SyncBench.joinsBehindVerdicts(engine))
     }
 
     /// The engine's invariants, from inside the actor.
@@ -327,7 +334,9 @@ extension SyncBench {
         }
         var followEnded = false
         var eventsDuringFollow: [Int] = []
+        var joinsDuringFollow: [Int] = []
         var joinsAtFollowEnd = 0
+        var behindAtFollowEnd = 0
         var turns: [Double] = []
         run.turnsWait = try await SyncBench.longestWait(on: engine) {
             turns = try await SyncBench.releaseTurnsUntilSettled(engine) { follow in
@@ -335,16 +344,21 @@ extension SyncBench {
                     return
                 }
                 let waiting = await SyncBench.waitingEvents(engine)
-                eventsDuringFollow.append(waiting.events)
+                eventsDuringFollow.append(waiting.events + waiting.behind)
                 if !(await SyncBench.followOwedNow(engine)) {
                     followEnded = true
                     joinsAtFollowEnd = waiting.joins
+                    behindAtFollowEnd = waiting.behind
+                } else {
+                    joinsDuringFollow.append(waiting.joins)
                 }
             }
         }
         run.turns = turns
         run.eventsDuringFollow = eventsDuringFollow
+        run.joinsDuringFollow = joinsDuringFollow
         run.joinsAtFollowEnd = joinsAtFollowEnd
+        run.behindAtFollowEnd = behindAtFollowEnd
         await SyncBench.releaseHeldTurns(engine)
         run.onO = await SyncBench.holding(engine, o.transferID).ids
         run.violations = await SyncBench.violations(engine)

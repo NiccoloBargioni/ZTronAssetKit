@@ -66,9 +66,14 @@ extension EngineFollowBarrierTests {
                     default:
                         return "other"
                     }
+                }, e.state.joinsBehindVerdicts.map { key, behind in
+                    (key.transfer == t ? "T" : "other verdict", behind.map { $0.join.asset == aOnO.identifier ? "a" : "other join" })
                 })
             }
-            try #require(queue.1 == ["T", "a"], "setup: the queue holds T's verdict and the run's join behind it, nothing else: \(queue)")
+            // The run's join waits in T's bucket (`EngineState.joinsBehindVerdicts`; ruling S3-R26 item 2), which the
+            // drain's batch places right behind T's verdict.
+            let behind = queue.2.first
+            try #require(queue.1 == ["T"] && queue.2.count == 1 && behind?.0 == "T" && behind?.1 == ["a"], "setup: the queue holds T's verdict and the run's join waits behind it, nothing else: \(queue)")
             await engine.readForTests { $0.releaseFollowFollowUps() }
         }
         let outcome = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: sync) }

@@ -155,10 +155,17 @@ struct EngineState {
     /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
     /// event that asks for it); `removeJob` forgets it.
     var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
-    /// The joins that wait in `eventsAfterFollow` (`.join`), by interest and asset, with the transfer each joins: the
-    /// waiter, group member or run fetch they stand for holds no interest until the drain joins it
-    /// (`invariantViolations()`).
+    /// The joins that wait in `eventsAfterFollow` (`.join`) or behind a waiting exit verdict (`joinsBehindVerdicts`), by
+    /// interest and asset, with the transfer each joins: the waiter, group member or run fetch they stand for holds no
+    /// interest until the drain joins it (`invariantViolations()`).
     var joinsAfterFollow: [InterestToken: [AssetID: TransferID]] = [:]
+    /// The joins a follow's visit waits behind a waiting exit verdict (`SyncEngine.deferBehindVerdict`), by the verdict's
+    /// attempt, oldest first, each with its decision instant. The drain places a bucket right behind its verdict, newest
+    /// first, when it forms that verdict's batch (`SyncEngine.drainEventsAfterFollow`), where an insert into the queue
+    /// right behind the verdict had put each, at a cost that grew with the joins already behind it (Stage 3 close-out
+    /// cycle 21, ruling S3-R26 item 2). They are registered in `joinsAfterFollow` like any waiting join, and a bucket
+    /// exists only while its verdict waits in `eventsAfterFollow` (`invariantViolations()`).
+    var joinsBehindVerdicts: [VerdictKey: [JoinBehindVerdict]] = [:]
     /// The jobs an older follow left in `unfollowed` that a later apply found owed no visit while an older pass was
     /// still owed: they join `followOrder` once the older passes end, where a visit-first engine, whose older passes had
     /// ended at that apply, placed them (`FollowScan.carried`; amendment (e) of S3-R11, cycle 11).

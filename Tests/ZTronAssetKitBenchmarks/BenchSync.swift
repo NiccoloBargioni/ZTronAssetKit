@@ -2635,7 +2635,8 @@ struct FollowReleaseTurn: CustomStringConvertible {
     let owedVisits: Int
     /// Whether the follow still owed a pass over a replaced copy when the turn began.
     let owedPass: Bool
-    /// The events that waited for the follow and were applied in the turn.
+    /// The events that waited for the follow and were applied in the turn, the joins behind a verdict included
+    /// (`SyncBench.joinsBehindVerdicts`).
     let drained: Int
     /// Whether the follow was still owed when the turn ended.
     let followOwedAfter: Bool
@@ -2927,7 +2928,7 @@ extension SyncBench {
         let clock = ContinuousClock()
         let owedVisits = engine.state.followOrder.count - engine.state.followNext
         let owedPass = !engine.state.followScans.isEmpty
-        let waiting = engine.state.eventsAfterFollow.count
+        let waiting = engine.state.eventsAfterFollow.count + SyncBench.joinsBehindVerdicts(engine)
         let start = clock.now
         engine.releaseFollowFollowUps()
         let span = clock.now - start
@@ -2935,9 +2936,15 @@ extension SyncBench {
             milliseconds: SyncBench.milliseconds(span),
             owedVisits: owedVisits,
             owedPass: owedPass,
-            drained: waiting - engine.state.eventsAfterFollow.count,
+            drained: waiting - engine.state.eventsAfterFollow.count - SyncBench.joinsBehindVerdicts(engine),
             followOwedAfter: engine.followOwed
         )
+    }
+
+    /// The joins that wait behind a verdict (`EngineState.joinsBehindVerdicts`; Stage 3 close-out cycle 21, ruling
+    /// S3-R26 item 2): the drain replays them as `.join` events, so a count of the waiting events includes them.
+    static func joinsBehindVerdicts(_ engine: isolated SyncEngine) -> Int {
+        engine.state.joinsBehindVerdicts.values.reduce(0) { $0 + $1.count }
     }
 
     /// Whether at least `count` events wait for the follow.

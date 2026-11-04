@@ -701,7 +701,8 @@ extension SyncEngine {
     ///   moves onto it after the verdict (`followAfterVerdict`), less those the verdict answers (`verdictAnswers`, on the
     ///   job the verdict meets, `jobAtVerdict`, under the verdict's own decision instant): a visit-first engine's visit at
     ///   that apply moved them onto this content (cycle 16, ruling S3-R19 item 1; cycle 17 for the partial answers);
-    /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, re-routed as `replayJoin` re-routes them);
+    /// - the waiting joins that join it at the drain (`EventAfterFollow.join`, and those behind a waiting verdict,
+    ///   `EngineState.joinsBehindVerdicts`), re-routed as `replayJoin` re-routes them;
     /// - in each of these, an interest in an id an owed move carries (`EngineState.inboundMoves`) as an interest of the
     ///   move's job, while that job waits at its attempt's end, by that job's rule: the visit the move stands for had joined
     ///   it there (Stage 3 close-out cycle 19).
@@ -716,8 +717,10 @@ extension SyncEngine {
     /// withdrawal's interest the reverse (PROBE-C13-EXHAUST-LANE; Stage 3 close-out cycle 14). Only whether the lane is
     /// user-initiated chooses the policy, so the walks stop there. The walk over the jobs runs only while a follow owes
     /// its visits or a verdict waits, the only times another job holds an interest it moves (with neither, no job
-    /// contributes: the walk's guard saves its cost and decides nothing), and the walk over the events only while events
-    /// wait: one lookup in the copy per id, no transfer formatted (C2).
+    /// contributes: the walk's guard saves its cost and decides nothing), and the walks over the events and over the joins
+    /// behind waiting verdicts only while events wait (a bucket waits only with its verdict): one lookup in the copy per
+    /// id, no transfer formatted (C2). The joins behind verdicts are walked in the table's order: the lane they raise
+    /// does not depend on it (Stage 3 close-out cycle 21, ruling S3-R26 item 2).
     func followedLane(_ job: Job) -> AssetPriority {
         let copy = self.state.applied
         func here(_ asset: AssetID) -> Bool {
@@ -818,19 +821,34 @@ extension SyncEngine {
                 }
             }
         }
+        // Whether a waiting join joins this job at the drain, re-routed as `replayJoin` re-routes it.
+        func reaches(_ join: JoinAfterFollow) -> Bool {
+            guard !join.withdrawn, !withdrawn.contains(join.token) else {
+                return false
+            }
+            let listed = copy.entry(for: join.asset)
+            let target = join.listed && !(listed.map { SyncEngine.sameTransfer($0, join.entry) } ?? false) ? listed : join.entry
+            guard let target, SyncEngine.sameTransfer(target, job.entry) else {
+                return false
+            }
+            return self.stillWants(join)
+        }
         if lane != .userInitiated {
             for event in self.state.eventsAfterFollow {
-                guard case .join(let join) = event, !join.withdrawn, !withdrawn.contains(join.token) else {
-                    continue
-                }
-                let listed = copy.entry(for: join.asset)
-                let target = join.listed && !(listed.map { SyncEngine.sameTransfer($0, join.entry) } ?? false) ? listed : join.entry
-                guard let target, SyncEngine.sameTransfer(target, job.entry), self.stillWants(join) else {
+                guard case .join(let join) = event, reaches(join) else {
                     continue
                 }
                 raise(join.lane)
                 if lane == .userInitiated {
-                    break
+                    return .userInitiated
+                }
+            }
+            for behind in self.state.joinsBehindVerdicts.values {
+                for entry in behind where reaches(entry.join) {
+                    raise(entry.join.lane)
+                    if lane == .userInitiated {
+                        return .userInitiated
+                    }
                 }
             }
         }

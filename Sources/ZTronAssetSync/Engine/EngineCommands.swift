@@ -1043,33 +1043,57 @@ extension SyncEngine {
     /// withdrew them, so the group stopped waiting for the member, a heal was forgotten, and no job was left for the
     /// purged id. Applied at once without them (Stage 3 close-out cycle 13, removal 7), the drain made the join after the
     /// purge, and the purged id was downloaded and stored again (PROBE-C13-PURGE-JOIN; cycle 14). Each such join leaves
-    /// `joinsAfterFollow`, so its replay joins nothing (`replayJoin`), and stays in the queue marked withdrawn
-    /// (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that arrived. One pass
-    /// over the waiting events (C2).
+    /// `joinsAfterFollow`, so its replay joins nothing (`replayJoin`), and stays in the queue, or behind its verdict,
+    /// marked withdrawn (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that
+    /// arrived. One pass over the waiting events, each verdict's joins (`EngineState.joinsBehindVerdicts`) at the
+    /// verdict's place, newest first, where the queue held them when each was inserted right behind the verdict, so the
+    /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2).
     private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
         guard !self.state.joinsAfterFollow.isEmpty else {
             return
         }
         for index in self.state.eventsAfterFollow.indices {
-            guard case .join(var join) = self.state.eventsAfterFollow[index], !join.withdrawn, join.lane < .userInitiated, join.kind != .waiter, isPurged(join.asset) else {
+            let event = self.state.eventsAfterFollow[index]
+            if case .join(var join) = event {
+                if self.withdrawPurgedJoin(&join, isPurged) {
+                    self.state.eventsAfterFollow[index] = .join(join)
+                }
                 continue
             }
-            if let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) {
-                if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
-                    self.state.joinsAfterFollow[join.token] = nil
-                }
-                switch join.kind {
-                case .prefetch, .ensure:
-                    self.dropGroupMember(join.token, asset: join.asset, from: transfer)
-                case .system:
-                    self.state.heals[join.asset] = nil
-                case .run, .waiter:
-                    break
+            guard let key = event.verdictKey, let count = self.state.joinsBehindVerdicts[key]?.count else {
+                continue
+            }
+            for slot in (0..<count).reversed() {
+                if var join = self.state.joinsBehindVerdicts[key]?[slot].join, self.withdrawPurgedJoin(&join, isPurged) {
+                    self.state.joinsBehindVerdicts[key]?[slot].join = join
                 }
             }
-            join.withdrawn = true
-            self.state.eventsAfterFollow[index] = .join(join)
         }
+    }
+
+    /// Withdraws `join`, a waiting join, if the purge removes its interest (`withdrawPurgedJoins`): a non-user interest
+    /// other than a waiter's in a purged id leaves `joinsAfterFollow`, its group stops waiting for the member or its heal
+    /// is forgotten, and the join is marked withdrawn. Returns whether it withdrew it: the caller writes its copy back
+    /// then, the join being held in the state this mutates.
+    private func withdrawPurgedJoin(_ join: inout JoinAfterFollow, _ isPurged: (AssetID) -> Bool) -> Bool {
+        guard !join.withdrawn, join.lane < .userInitiated, join.kind != .waiter, isPurged(join.asset) else {
+            return false
+        }
+        if let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) {
+            if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+                self.state.joinsAfterFollow[join.token] = nil
+            }
+            switch join.kind {
+            case .prefetch, .ensure:
+                self.dropGroupMember(join.token, asset: join.asset, from: transfer)
+            case .system:
+                self.state.heals[join.asset] = nil
+            case .run, .waiter:
+                break
+            }
+        }
+        join.withdrawn = true
+        return true
     }
 
     private func purgeTask(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
@@ -2023,9 +2047,11 @@ extension SyncEngine {
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
     /// drain is in progress (none, between turns), so none waits for ever; every failure verdict that waits names a
     /// failed job with its event (Stage 3 close-out cycle 9, amendment (c) of S3-R11); the joins registered in
-    /// `joinsAfterFollow` are exactly the waiting `.join` events (cycle 10); the carried jobs are gone once the barrier
-    /// is down (cycle 11); every waiting event has its decision instant in the world history, and once the barrier is
-    /// down the history and the visits' and the places' decision instants are gone (cycle 12, S3-R15).
+    /// `joinsAfterFollow` are exactly the waiting `.join` events and the joins behind waiting verdicts (cycle 10; cycle
+    /// 21, ruling S3-R26 item 2); the carried jobs are gone once the barrier is down (cycle 11); every waiting event has
+    /// its decision instant in the world history, and once the barrier is down the history and the visits' and the
+    /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
+    /// event, each with its decision instant in the history (cycle 21).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -2039,6 +2065,13 @@ extension SyncEngine {
         }
         var verdicts: Set<TransferID> = []
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
+        var waitingVerdicts: [VerdictKey: Int] = [:]
+        func register(_ join: JoinAfterFollow) {
+            // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
+            if !join.withdrawn {
+                joins[join.token, default: [:]][join.asset] = join.entry.transferID
+            }
+        }
         for event in events {
             switch event {
             case .attemptFailed(let transfer, let epoch, _):
@@ -2046,12 +2079,16 @@ extension SyncEngine {
                     verdicts.insert(transfer)
                 }
             case .join(let join):
-                // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
-                if !join.withdrawn {
-                    joins[join.token, default: [:]][join.asset] = join.entry.transferID
-                }
+                register(join)
             case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
                 break
+            }
+            // A verdict's joins count at its place, newest first, where the queue held them (`joinsBehindVerdicts`).
+            if let key = event.verdictKey {
+                waitingVerdicts[key, default: 0] += 1
+                for entry in (self.state.joinsBehindVerdicts[key] ?? []).reversed() {
+                    register(entry.join)
+                }
             }
         }
         if joins != self.state.joinsAfterFollow {
@@ -2059,6 +2096,18 @@ extension SyncEngine {
         }
         if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
             violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")
+        }
+        // A bucket waits only behind its verdict's one waiting event (`deferBehindVerdict`, `drainEventsAfterFollow`), so
+        // the barrier holds, the history is kept and a drain is owed while it waits.
+        let unplaced = self.state.joinsBehindVerdicts.filter { key, behind in behind.isEmpty || waitingVerdicts[key] != 1 }.count
+        if unplaced > 0 {
+            violations.append("\(unplaced) verdicts hold joins behind them without exactly one waiting event")
+        }
+        let unstamped = self.state.joinsBehindVerdicts.values.reduce(0) { count, behind in
+            count + behind.filter { $0.stamp.view >= self.state.worldHistory.count }.count
+        }
+        if unstamped > 0 {
+            violations.append("\(unstamped) joins wait behind verdicts with decision instants over \(self.state.worldHistory.count) views")
         }
         if !self.followBarrier, !self.state.followCarried.isEmpty {
             violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
