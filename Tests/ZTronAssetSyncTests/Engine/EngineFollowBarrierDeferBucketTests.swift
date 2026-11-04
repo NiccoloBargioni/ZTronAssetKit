@@ -240,13 +240,16 @@ extension EngineFollowBarrierTests {
         let served: [Int64]
         let o: Result<AssetLocation, AssetError>?
         let failed: [AssetID]
+        /// The answers of `deferBucketFinish`'s `extra` waiters, in order.
+        let extra: [Result<AssetLocation, AssetError>]
     }
 
     /// Ends `deferBucket`'s scenario: lets the follow and its drain end, then reads every answer. A member of the group
     /// is served once the events report it available, with its stored bytes; zz-o's failure is reported before any
-    /// member is (the drain gives O's verdict before the joins behind it; visited first, before v4).
+    /// member is (the drain gives O's verdict before the joins behind it; visited first, before v4). The `extra`
+    /// waiters' answers are read before the engine shuts down, so none of them is answered `.shutDown`.
     @available(macOS 15.0, iOS 18.0, *)
-    func deferBucketFinish(_ b: DeferBucket) async throws -> DeferBucketOutcome {
+    func deferBucketFinish(_ b: DeferBucket, extra: [Task<Result<AssetLocation, AssetError>, Never>] = []) async throws -> DeferBucketOutcome {
         let engine = b.s.engine
         await engine.readForTests { e in
             e.releaseFollowFollowUps()
@@ -279,6 +282,10 @@ extension EngineFollowBarrierTests {
         if let waiter = b.oWaiter {
             oResult = await EngineRegressionCycle6Tests.driving([b.s.time], fence: engine) { await EngineHarness.value(of: waiter) }
         }
+        var extraResults: [Result<AssetLocation, AssetError>] = []
+        for waiter in extra {
+            extraResults.append(await EngineRegressionCycle6Tests.driving([b.s.time], fence: engine) { await EngineHarness.value(of: waiter) })
+        }
         let failed = await b.probe.received.compactMap { event -> AssetID? in
             if case .assetFailed(let id, _, _) = event {
                 return id
@@ -290,7 +297,7 @@ extension EngineFollowBarrierTests {
             await engine.releaseGroup(group)
         }
         await Self.finishHeld(b.s)
-        return DeferBucketOutcome(served: served, o: oResult, failed: failed)
+        return DeferBucketOutcome(served: served, o: oResult, failed: failed, extra: extraResults)
     }
 
     // MARK: A-T1: the joins behind a waiting verdict wait outside the queue
@@ -365,9 +372,9 @@ extension EngineFollowBarrierTests {
         } else {
             xWaiter = Task { await engine.awaitAsset(x.identifier, lane: .userInitiated) }
         }
-        let outcome = try await self.deferBucketFinish(b)
+        let outcome = try await self.deferBucketFinish(b, extra: [xWaiter])
         #expect(outcome.served == Array(repeating: 20, count: count), "every member is served O's 20 bytes (visit-first): \(outcome.served)")
-        let xResult = await EngineRegressionCycle6Tests.driving([b.s.time], fence: engine) { await EngineHarness.value(of: xWaiter) }
+        let xResult = try #require(outcome.extra.first)
         #expect((try? xResult.get())?.byteSize == 16, "zz-x is served X's bytes: \(xResult)")
     }
 
