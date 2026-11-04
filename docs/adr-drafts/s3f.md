@@ -4930,9 +4930,14 @@ a commit is named.
 |---|---|---|---|
 | The follow's passes over the copy (`continueFollow`'s scans) | at most 16,384 entries and 2,048 formats a turn (`followScansPerTurn`, `followFormatsPerTurn`) | bounded a turn; `concentrationNotFoundTurns` | met |
 | A visit's filter of the job's ids the copy moved (`rerouteOnVisit`) | O(N) once a visit; ≤ 10,000 a turn over the visits | `sharedApplyTurns`, `divergenceTurns` | met |
-| `startMove` building a move's items | O(moved ids) once a move | `sharedApplyTurns`, `inboundHolderTurns` | met |
+| `startMove` building a move's items (`Job.moveItems`) | O(moved ids + their holders) once a move, from the job's index since `bbf5eaa` (cycle 21, item B); before it O(I) a move over every interest, with a copy of the job alive across the moves | `manyMovesTurns` (k = 1 to 256 owed moves off one 10,000-id holder): 3.22–3.69 ms best; `partialMoveTurns` 5.54 and 6.18 ms (`b7-pins.log`, loads 5.85 to 5.70); `sharedApplyTurns`, `inboundHolderTurns` | met |
 | `continueMove`, `continueInbound` (its intersection at the move's first turn), `continueVisitRemainder` | O(log ids) a moved id; at most `followIDsPerTurn` ids and `followsPerTurn` holders a turn | the turn-total tests; `sharedApplyTurns`, `divergenceTurns`, `inboundHolderTurns` | met |
-| `move` (a move that fits the turn's ids) | sorts each interest's whole ids: O(N log N) a holder, ≤ 10,000 ids a turn over the holders | no figure of its own (inside the shared cases' visits) | no figure: put to the orchestrator |
+| `move` (a move that fits the turn's ids; `Job.holdings`) | O(moved ids + their holders), and the sort of its p (id, holder) pairs, O(p log p), since `bbf5eaa` (cycle 21, item B). Before it, a sort of each interest's whole ids, O(N log N) a move | `manyMovesTurns`: 3.22–3.69 ms best, where it was 79.91 ms at 16 moves and 305.57 at 64 before `bbf5eaa` (`bpins-red.log`, at 17.54) | met |
+| The index's upkeep in `Job`'s mutators (`setInterest`, `insertAsset`, `removeAsset`, `subtractAssets`, `setAssets`, `removeAllInterests`, `keepInterests`) | O(1) amortised an id an interest gains or loses (`f9bce7a`) | inside every case that changes interests: `handleReleaseTurns` 5.67 ms best, `throttleExtensionTurns` 8.39 ms (`b7-pins.log`, loads 5.85 to 5.70), `concentrationPublicationTurns` | met |
+| The index's release when an interest leaves (`dropInterest`) | O(the interest's ids) | `indexOwnCosts`: 3.51 ms for an interest of 10,000 ids (`rr21-c0-bench.log`, loads 5.78 to 6.06) | met |
+| `keepInterests` dropping an interest of `jobAtVerdict`'s copy (it copies `tokensByID` once) | O(N) once a verdict | `indexOwnCosts`: 4.06 ms at 10,000 ids | met |
+| Freeing a job's index at its removal (the commit window) | O(N) once a job | `indexOwnCosts`: 0.78 ms at 10,000 ids; inside `concentrationPublicationTurns`' commit window, 6.16 ms best (`b7-pins.log`) and 6.38 ms (`rr21-c0-bench.log`) | met |
+| `answerPresentMembers`' rows (`EnginePresence.swift`) | O(held ids) a row's index work, and a sort of the rows by token, since `bbf5eaa` (B11); before it a replacement of each interest, O(its ids) | re-measured at the close (step 8) | figure at step 8 |
 | The walk for the publications in flight (`findInbound`) | one pass over the jobs' ids, one lookup each | `inboundWalkTurns`, `concentrationNotFoundTurns` | met |
 | `reroute`, `addInterest` (a join in place) | O(1) amortised an id since `a78f913` (cycle 21, steps C10 and C11). Before it, a re-route that dropped a group member or released a run claim (T21) copied the group's `pending` or the run's `outstanding`: O(members) an id (`critic-commit-window.md` A5) | `concentrationFollowTurns`, `sharedApplyTurns` | met |
 | `removeInterest`, `dropInterest`, `relane`, `Job.lane`, `isSingleUser` | O(1) an id (`f066083`) | `userSharedApplyTurns`: 7.18 ms best (supersede) and 8.01 (keep) | met |
@@ -4942,8 +4947,8 @@ a commit is named.
 | `followedLane` | O(I) a call | the 429 case of R-SYN-5, `concentrationNotFoundTurns` | met |
 | `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | inside `concentrationPublicationTurns` (the start) | met at the start; the verdict's has no figure |
 | The commit's binding (`committed`, then `resolveAll`, `publishTerminal`, `removeJob`, and the pump's `materializeEnsures`) | O(N log N) once a commit: `committed` sorts the job's interests. Since `a78f913` (cycle 21, item C's Phase 1) `resolveAll`, `publishTerminal` and `removeJob` sort nothing and retire only keys with a progress entry; `materializeEnsures` sorts every group's token at the commit's pump, O(G log G) | `concentrationPublicationTurns` through the commit: 9.86 ms best before cycle 21, 6.16 ms after Phase 1. `commitTurns` (cycle 21, heartbeat best after Phase 1, load 7.06 to 6.67): `.waiters` 12.09 ms, `.waitersStalledSubscriber` 15.49 ms, `.groupStalledSubscriber` 9.24 ms, `.manyGroups` 10.79 ms | **miss:** `.waiters` and `.waitersStalledSubscriber` go to Phase 2 (step 6); `.manyGroups` is open until rr21-C3 (cycle 21, step 2) |
-| The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn | `concentrationCommitRerouteTurns`: 48.68 ms best (48.47 before `c03c0e8` was committed) | **miss: blocking, open** |
-| `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn | `movedBeforeDrainTurns`: 45.67 ms best (45.51 before `c03c0e8` was committed) | **miss: blocking, open** |
+| The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn | `concentrationCommitRerouteTurns`: 48.68 ms best (48.47 before `c03c0e8` was committed); 47.12 ms on `82ba8a1` (rr21-C0, `rr21-c0-bench.log`) | **miss: blocking, RR-21 (step 5)** |
+| `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn | `movedBeforeDrainTurns`: 45.67 ms best (45.51 before `c03c0e8` was committed); 49.04 ms on `82ba8a1` (rr21-C0) | **miss: blocking, RR-21 (step 5)** |
 | `supersede` of a superseded publication (`publicationFailed`'s `.superseded`) | O(N) re-routes in one turn | no figure; outside the follow and the drain | no figure: put to the orchestrator |
 
 ### A holder re-created between turns (correct #4; S3-R25 item 9)
@@ -5106,11 +5111,16 @@ fix (S3-R26 item 11, "Red first").
    `68ce0d7` the fix, `6a7834b` its C2 pin). Mutants: item A's running (`.build-s3f/c21/mut21-a.txt`), candidate 4's,
    T1-space's and K4's queued after them (`MUT_EXTRA=.build-s3f/c21/tools/mut-c4.py python3
    .build-s3f/c21/tools/mut21.py`); their table goes under "Step 3" when they end. Results under "Step 3" below.
-4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: B2–B4 with I1 and I3 and
-   `EngineIDTokensTests` **committed** (`f9bce7a`; the whole Sync suite green with the two clauses, 587 tests).
-   **Next action:** item B's pins (`manyMovesTurns`, `partialMoveTurns`) and B-T4, red on `f9bce7a`, committed alone;
-   then B5–B7 and B9–B11 with T2, T3, T6 and T7's I1 and I3 injections (already in `EngineIDTokensTests`).
-5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): pending.
+4. Item B (B2–B11, B8 with I2, B-T5 and Q1's stage 2), then variant Y's pair: **committed** (`f9bce7a` B2–B4 with
+   I1, I3 and `EngineIDTokensTests`; `203b901` T2, T3 and T6; `345801c` the pins and B-T4, red; `bbf5eaa` B5–B7 and
+   B9–B11; `001471d` B-T5, Q1's stage 2 and the I2 injection, red; `9069a37` B8 with I2; `bb50d7e` variant Y's test,
+   red; `2ae5a34` its fix; `82ba8a1` `indexOwnCosts`; `ee8f34a` B7's missing job; the step's last commit: these
+   records). Item B's mutants are queued (`mut21-b.txt`). Results under "Step 4" below.
+5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): rr21-C0 **done** on `82ba8a1`:
+   `verify.sh --quick` ended `VERIFY: PASS` (`rr21-c0-quick.log`); the 'before' figures, best of 3
+   (`rr21-c0-bench.log`, 1-minute loads 5.78 5.18 5.43 to 6.06 6.36 5.92): `concentrationCommitRerouteTurns` 47.12 ms
+   (47.12, 47.29, 49.38) and `movedBeforeDrainTurns` 49.04 ms (56.91, 49.04, 56.28). rr21-C1 is step 1's probe
+   (recorded under "Step 1"). **Next action:** rr21-C2, the types and pure helpers, with no change in behaviour.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5435,6 +5445,117 @@ bundle passed after each fix: 582 tests on `96ca019` (`sync-k4.log`), 583 on `68
   runs of the item's tests, the Sync bundle for a survivor): item A's 18 are running (`mut21-a.txt`); candidate 4's
   9, T1-space's and K4's are queued (`tools/mut-c4.py`). The table is filled in when they end. `a-queue-insert` (the
   old queue insert put back) failed A-T1 2/2 swept first in place (`mut-a-queue-insert.log`).
+
+### Step 4: item B, item 7 and variant Y
+
+Each pair is its failing test or pin, committed red on its own on the HEAD before its fix (P3), then the fix. The Sync
+bundle passed after each fix: 587 tests on `f9bce7a` (`b4-sync.log`), 591 on `bbf5eaa` (`b7-sync.log`), 593 on
+`9069a37` (`b8-sync.log`) and 594 on `2ae5a34` (`vy-sync.log`). rr21-C0's `verify.sh --quick` on `82ba8a1` ended
+`VERIFY: PASS` (`rr21-c0-quick.log`, 1-minute load 10.03 at the end). Item B adds and removes no await, so the
+REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
+
+- **Item B, the per-job index from id to holders** (ruling S3-R26 item 3; `integrate-c21.md` B2–B13).
+  - *Commits, in the specification's order*: `f9bce7a` (B2–B4: `IDTokens`, `Job.tokensByID` and every mutator, with
+    I1 and I3 and `EngineIDTokensTests`, green before any caller changed); `203b901` (T2, T3 and T6, which pin what the
+    old walk already did: the re-route order by token, every holder of a moved id, and the ids a turn moves off one
+    holder; green before and after); `345801c` (the pins and B-T4, red); `bbf5eaa` (B5–B7, B9–B11); `001471d` (B-T5,
+    Q1's stage 2 and the I2 injection, red); `9069a37` (B8 with I2); `bb50d7e` (variant Y's test, red); `2ae5a34` (its
+    fix); `82ba8a1` (`indexOwnCosts`, the index's own costs).
+  - *Red on `203b901`* (`bpins-red.log`, `bt4-red.log`). `manyMovesTurns`' longest follow turn, best of 3, was 8.04 ms
+    (k = 1), 79.91 (16), 305.57 (64) and 1,204.70 ms (256), against `c2Budget`, at 1-minute loads of 17.54 (k up to 64)
+    and 16.61 (256): the specification's quiet-load figures were 8.22, 79.55 and 304.79 ms. `partialMoveTurns`' heartbeat
+    was 8.82 ms (users false) and 9.73 ms (users true) at 15.52, within the budget before the fix as the reqs #6 figures
+    (8.44–9.50 ms) were. B-T4 (`barrierTakesABoundedMovesUnheldIDsOffTheHolder`) failed in both orders at
+    `EngineFollowBarrierMoveIndexTests.swift:64` (the I5 orphan clause: H's bounded visit left the moved ids no interest
+    holds on it) and `:65` (H held them beside zz-w).
+  - *After* (`b7-pins.log`, `bbf5eaa`, at 1-minute loads of 5.85 to 5.70): `manyMovesTurns` best 3.22, 3.35, 3.69 and
+    3.69 ms (k = 1, 16, 64 and 256; every k makes its k moves in the first held turn), `partialMoveTurns` best 5.54 and
+    6.18 ms (setup: 501 ids on O, 9,500 on H): **met**. T2, T3 and T6 pass in both orders (`b7-run.log`).
+  - *The merge gate*: `concentrationPublicationTurns` with the index in place, best of 3: 6.16 ms (`b7-pins.log`, at
+    5.85 to 5.70), 6.12 ms (`idx-pins.log`, `82ba8a1`, at 11.01 to 10.18) and 6.38 ms (`rr21-c0-bench.log`, `82ba8a1`,
+    at 5.78 5.18 5.43 to 6.06 6.36 5.92), longest held turn 3.81–3.85 ms: **met**. Item C's lazy-index contingency is
+    not needed.
+  - *The index's own costs* (`indexOwnCosts`, `82ba8a1`, 10,000 ids, best of 3; `rr21-c0-bench.log`, at 5.78 to 6.06):
+    the release of a 10,000-id interest (`dropInterest`) 3.51 ms, `keepInterests` dropping one on a copy (it copies
+    `tokensByID` once, as `jobAtVerdict`'s copy does) 4.06 ms, and freeing the index (the job's removal in the commit
+    window) 0.78 ms. The specification's estimates, all UNCONFIRMED, were 0.5–1 ms, one copy, and 50–150 µs.
+  - *Existing cases the index passes through* (`b7-pins.log`, at 5.85 to 5.70): `handleReleaseTurns` 5.67 ms best (a
+    10,000-member prefetch handle's release, R-SYN-4) and `throttleExtensionTurns` 8.39 ms best (R-SYN-5); 5.68 and 8.50
+    ms in `idx-pins.log` (at 11.01 to 10.18, not a quiet load). `commitTurns` with the index (`idx-pins.log`, not a quiet
+    load): `.waiters` 12.66 ms heartbeat and 12.45 ms in the actor, `.waitersStalledSubscriber` 15.65 and 15.28,
+    `.groupStalledSubscriber` 9.07 and 9.07, `.manyGroups` 10.69 and 10.68 ms, against step 2's 12.09 and 11.72, 15.49
+    and 15.24, and 10.79 and 10.78 after Phase 1. The two `.waiters` groupings stay red until Phase 2 (step 6), and
+    `.manyGroups` is re-measured at rr21-C3, as step 2 recorded.
+  - *Departures from the specification, each with its reason*:
+    - **B7's missing job** (`ee8f34a`; the Sync bundle passed, 594 tests, `nojob-sync.log`). `startMove`'s scoped
+      read has no branch of its own for a missing job (S3-R19 item 3, first option): both callers hold a job in the same turn (`follow`'s visit read it, `continueInbound` checks it), and an
+      explicit `return (false, 0, nil)`, which `bbf5eaa` had as B7 says, is a statement no path reaches. The read's
+      optional instead makes no items, and `continueMove`'s guard, reached by a holder removed between a rest's turns,
+      ends the move with nothing moved, which is B7's `(false, 0, nil)`.
+    - **B8's re-insertion** is made after an id's last item in the per-id loop, as B8 says, and `current` is gone.
+  - *Item 7 and Q1* (ruling S3-R26 item 7). B-T5 was built and failed first in `sweepFollowsFirst` on `bbf5eaa`
+    (`bt5-red.log`; committed red as `001471d`): H's ids lost A, which T' held on H (`EngineFollowBarrierMoveIndexTests.swift:309`, H's ids `[zz-d]`),
+    and H's content was downloaded twice (`:312`, 2 starts). Q1's stage 2, the probe of a later apply's visit off the
+    failed H, broke S3-R16 item 1 (a different answer): T' got H's retry's 404 where visited first it is served Z's
+    bytes (`:323`), so it was committed failing with B-T5 under P3. The I2 injection failed alone
+    (`EngineIDTokensTests.swift:157`). `9069a37` (B8 with I2) passes all of them in both orders (`b8-run.log`). B8 and
+    I2 are kept: B-T5 could be built, so the fallback of dropping them does not apply.
+  - *Variant Y, Q1's stage 3* (item 12's answer 5; `bb50d7e` red, `2ae5a34` fix). The probe broke S3-R16 item 1 on
+    `9069a37`: swept first, T1 (a prefetch waiter that stays) was served Y's 22 bytes, where visited first C_y's visit passed H,
+    publishing, and H's integrity failure answers T1 (`vy-red.log`, `:336`). The rest re-routed T1 under the copy at its
+    turn, which C_y had changed, while a visit-first engine's visit had already passed the publishing H.
+    - *The fix*: a visit's rest whose holder is publishing (`verifying` or `committing`) passes, as the visit itself
+      passes, every id outside the holder's `rerouteOnVisit` set: the id leaves the rest and its interests stay on the
+      holder for the publication's answer (`continueMove`, `rerouting`). The follow's own visit of that holder passes the
+      id too and puts the job in `unfollowed` for the next follow, so the rest adds no `unfollowed` insert of its own: one
+      was tried and removed, since nothing reads it before the visit's (its drop-mutant could not fail). An owed move
+      (`listing` set) is unchanged. The three cases pass in both orders (`vy-run.log`), and the Sync bundle.
+  - *Item B's earlier take-off, the reader check* (ruling S3-R26 item 10). On the bounded path the moved ids no interest
+    holds now leave the holder at the move's first turn, as the fit path's `assets.subtract(moved)` takes them. Each
+    reader that `integrate-c21.md` B's residual risks lists, on the new code (8e1fb24's line, then the current one):
+    - the supersede decisions, `EngineFollow.swift:933` (now `move`, `:987`) and `EngineMoves.swift:145` (now `:151`):
+      read before the take-off in the same call. A later move of the same job counts the ids still on it, as after a
+      fit move.
+    - the publication's binding, `EngineDispatch.swift:1049`: it offers `job.assets`, read after `awaitInboundMoves`.
+      The store binds only the offered ids whose current identity is the job's (`AssetStore.publish`), so an id the
+      copy maps elsewhere was not bound before the fix either; now it is not offered.
+    - the failure records, `EngineFailures.swift:77` and `:80` (`failed`: the breaker's distinct asset of an ambiguous
+      403, and the diagnostics ring), and `EngineDispatch.swift:1247` (the ring): each names `job.assets.min()`, now an
+      id the job still serves.
+    - `sparePresent` and `integrityFailed`, `EngineFailures.swift:145`, `:193` and `EngineDispatch.swift:1216` (now
+      `:1218`): `sparePresent` answers from the store only ids the copy maps to this content, and
+      `recordIntegrityFailure` leaves alone a record whose identity changed, so an id the copy maps elsewhere got no
+      answer or failure count there before the fix either. Now it is not offered, and `forgetBound` no longer drops
+      its `boundContent` entry here (the prune below drops it).
+    - the presence prune, `EnginePresence.swift:87` (now `:89`): an id taken off earlier stops being wanted earlier,
+      so its `boundContent` entry, to H's content, is dropped sooner, never kept longer.
+    - progress, `EngineDispatch.swift:905`: offered for `job.assets.min()`, an id still on the job.
+    - `removeJob`'s `retireProgress`, `EngineJobs.swift:443-445` (now `:466`): an id taken off earlier leaves without
+      it, as on the fit path. Pre-existing (the fit path's gap, `integrate-c21.md` B's residual risks), and the same in
+      both orders: both take the id off before the job is removed.
+
+    No reader gives a different answer or makes a stale binding or failure record: the take-off runs at the same step
+    of H's visit in both orders, and only ids that no interest holds and the copy maps elsewhere leave. In both orders,
+    a reader between turns still sees the held ids not yet moved: that is the bounded move's own timing (S3-R16 item
+    2), which item B does not change.
+  - *Residual risks of item B* (ruling S3-R26 item 10, `integrate-c21.md` B's residual risks), each with its class,
+    what would make it blocking, and its test or probe:
+    1. *The earlier take-off*: order and timing (S3-R16 item 2). Blocking if a reader gives a different answer
+       (S3-R16 1(a)). B-T4 and the reader check above.
+    2. *Q1's holder now binds A*: one transport start fewer, the same answer. B-T5 pins one start in both orders.
+    3. *Variant Y's T1 half*: was an open 1(a) candidate; probed, it broke S3-R16 item 1 and is fixed (`2ae5a34`). Its
+       test runs in both orders.
+    4. *The index's memory and costs*: about 0.5 MB a job of 10,000 ids (estimated, not measured). Release, the copy
+       and freeing are measured above. A cost: blocking if a C2 case through them misses `c2Budget` at a 1-minute load
+       of 10 or less (S3-R22 item 1).
+    5. *An id with many holders moves whole in one turn*, O(h log h) for its pairs' sort. A cost: blocking if a case
+       with h near 10,000 misses `c2Budget` at a quiet load. No BenchSync case holds one id by thousands of interests
+       yet; it is measured at the close (step 8), or put to the orchestrator.
+    6. *Pre-existing*: moved ids leave `Job.assets` without `retireProgress` (above); an empty binding can occur on the
+       bounded path (RR-20's family, S3-R24 item 1).
+- **Mutants** (`.build-s3f/c21/tools/mut-b.py`, 32, on the snapshot `.build-s3f/c21/snap-b` of `82ba8a1`) are queued
+  after item A's and candidate 4's (`.build-s3f/c21/tools/chain-mut.sh`, `mut21-b.txt`). The table is filled in when
+  they end.
 
 ## Items
 
