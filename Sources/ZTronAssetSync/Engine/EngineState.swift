@@ -691,6 +691,56 @@ struct AttemptAdmission: Equatable, Sendable {
     let attempt: TransferAttempt
 }
 
+/// The interests that hold one id of a job (`Job.tokensByID`): the holder that indexed the id first apart from the
+/// others, so the common id, held by one interest, costs no `Set` (the empty set allocates nothing). It has no `==`: the
+/// invariant check reads its holders from its fields, as a set, against a recount made from the interests directly
+/// (Stage 3 close-out cycle 21, ruling S3-R26 item 3; the design's `==` was not symmetric).
+struct IDTokens: Sendable {
+    /// The holder that indexed the id first, or the one promoted when it left (`remove`).
+    private(set) var first: InterestToken
+    /// The other holders; never `first`.
+    private(set) var others: Set<InterestToken> = []
+
+    /// One holder.
+    init(_ token: InterestToken) {
+        self.first = token
+    }
+
+    /// Adds `token` as a holder; `first` again changes nothing.
+    mutating func add(_ token: InterestToken) {
+        if token != self.first {
+            self.others.insert(token)
+        }
+    }
+
+    /// Removes `token` as a holder, and returns whether a holder is left: removing `first` promotes one of the others,
+    /// or leaves none when it held the id alone.
+    mutating func remove(_ token: InterestToken) -> Bool {
+        if token != self.first {
+            self.others.remove(token)
+            return true
+        }
+        guard let next = self.others.popFirst() else {
+            return false
+        }
+        self.first = next
+        return true
+    }
+
+    /// Every holder.
+    var tokens: Set<InterestToken> {
+        var all = self.others
+        all.insert(self.first)
+        return all
+    }
+
+    /// Calls `body` with each holder, `first` first.
+    func forEach(_ body: (InterestToken) -> Void) {
+        body(self.first)
+        self.others.forEach(body)
+    }
+}
+
 /// One transfer's outstanding work (ARCHITECTURE §7.1).
 struct Job {
     /// The content.
@@ -707,11 +757,17 @@ struct Job {
     /// Bumped on every (re)start, supersede and abandon; a stale continuation is dropped (ARCHITECTURE §10).
     var epoch: UInt64
     /// Interests by token. Changed only through `setInterest` and the other mutators below, which keep
-    /// `interestCounts` with it.
+    /// `interestCounts` and the index of their ids (`tokensByID`) with it.
     private(set) var interests: [InterestToken: JobInterest] = [:]
     /// How many of `interests` ask for each lane (`InterestCounts`), kept by every change to them, so the job's lane is
     /// read without a walk of its interests; the invariant check recounts them (`SyncEngine.invariantViolations`).
     var interestCounts = InterestCounts()
+    /// The interests that hold each id (`IDTokens`), kept in step with `interests` by every mutator below, so a move
+    /// reads a moved id's holders in O(holders) (`holdings`, `moveItems`) where it walked and sorted every interest of
+    /// the job: 16 moves owed off one holder of 10,000 ids held the actor 79.55 ms (Stage 3 close-out cycle 21, ruling
+    /// S3-R26 item 3; the cycle-20 correctness verifier's PROBE-C20C-MANY-MOVES). The invariant check recounts it from
+    /// the interests (I1).
+    private(set) var tokensByID: [AssetID: IDTokens] = [:]
     /// The lane-queue ticket (lazy deletion).
     var ticket: UInt64 = 0
     /// Its entry's place in its lane queue (`LaneQueues.Entry.place`), where `reinstate` puts it back.
@@ -805,40 +861,92 @@ struct Job {
         case (nil, nil):
             break
         }
+        let old = self.interests[token]?.assets ?? []
+        let new = interest?.assets ?? []
+        for asset in old where !new.contains(asset) {
+            self.release(asset, token)
+        }
+        for asset in new where !old.contains(asset) {
+            self.index(asset, token)
+        }
         self.interests[token] = interest
     }
 
     /// Adds `asset` to `token`'s interest, in place; nothing without one. Its lane and kind, and so the counts, stay.
     mutating func insertAsset(_ asset: AssetID, for token: InterestToken) {
-        self.interests[token]?.assets.insert(asset)
+        if self.interests[token]?.assets.insert(asset).inserted == true {
+            self.index(asset, token)
+        }
     }
 
     /// Removes `asset` from `token`'s interest, in place; whether the interest held it. The interest stays, with its lane
     /// and kind, when it is left with no id: its caller removes it (`setInterest`).
     mutating func removeAsset(_ asset: AssetID, for token: InterestToken) -> Bool {
-        self.interests[token]?.assets.remove(asset) != nil
+        guard self.interests[token]?.assets.remove(asset) != nil else {
+            return false
+        }
+        self.release(asset, token)
+        return true
     }
 
     /// Removes `assets` from `token`'s interest, in place, as `removeAsset` does each.
     mutating func subtractAssets(_ assets: Set<AssetID>, for token: InterestToken) {
-        self.interests[token]?.assets.subtract(assets)
+        for asset in assets where self.interests[token]?.assets.remove(asset) != nil {
+            self.release(asset, token)
+        }
     }
 
     /// Replaces the ids of `token`'s interest, in place; nothing without one. Its lane and kind stay.
     mutating func setAssets(_ assets: Set<AssetID>, for token: InterestToken) {
+        guard let old = self.interests[token]?.assets else {
+            return
+        }
+        for asset in old where !assets.contains(asset) {
+            self.release(asset, token)
+        }
+        for asset in assets where !old.contains(asset) {
+            self.index(asset, token)
+        }
         self.interests[token]?.assets = assets
     }
 
-    /// Removes every interest, and their counts.
+    /// Removes every interest, their counts and their index.
     mutating func removeAllInterests() {
         self.interests.removeAll()
         self.interestCounts = InterestCounts()
+        self.tokensByID.removeAll()
     }
 
-    /// Keeps the interests `isIncluded` accepts, and recounts them (`SyncEngine.jobAtVerdict`'s copy of a job).
+    /// Keeps the interests `isIncluded` accepts, and recounts them (`SyncEngine.jobAtVerdict`'s copy of a job). The
+    /// predicate is evaluated once an interest; a dropped interest's ids leave the index, which is untouched, and so
+    /// not copied, when none is dropped.
     mutating func keepInterests(where isIncluded: (InterestToken, JobInterest) -> Bool) {
-        self.interests = self.interests.filter { isIncluded($0.key, $0.value) }
+        let dropped = self.interests.filter { !isIncluded($0.key, $0.value) }
+        for (token, interest) in dropped {
+            for asset in interest.assets {
+                self.release(asset, token)
+            }
+            self.interests[token] = nil
+        }
         self.interestCounts = InterestCounts(self.interests.values)
+    }
+
+    /// Test seam (the invariant oracle): forgets `asset`'s holders in the index, its interests unchanged, the state the
+    /// index's clause reports (I1).
+    mutating func forgetIndexForTests(_ asset: AssetID) {
+        self.tokensByID[asset] = nil
+    }
+
+    /// Indexes `token` as a holder of `asset`.
+    private mutating func index(_ asset: AssetID, _ token: InterestToken) {
+        self.tokensByID[asset, default: IDTokens(token)].add(token)
+    }
+
+    /// Removes `token` as a holder of `asset`, and the entry once it has none.
+    private mutating func release(_ asset: AssetID, _ token: InterestToken) {
+        if self.tokensByID[asset]?.remove(token) == false {
+            self.tokensByID[asset] = nil
+        }
     }
 }
 

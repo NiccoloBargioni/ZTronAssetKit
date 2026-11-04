@@ -1754,6 +1754,24 @@ extension SyncEngine {
             if job.interestCounts != recount {
                 violations.append("job \(transfer) counts its interests \(job.interestCounts), which count \(recount)")
             }
+            // The index a move reads its ids' holders from is its interests' (`Job.tokensByID`, I1; Stage 3 close-out
+            // cycle 21, ruling S3-R26 item 3), recounted from the interests directly, never through `IDTokens`.
+            var holders: [AssetID: Set<InterestToken>] = [:]
+            for (token, interest) in job.interests {
+                for asset in interest.assets {
+                    holders[asset, default: []].insert(token)
+                }
+            }
+            let indexed = job.tokensByID.mapValues { $0.others.union([$0.first]) }
+            let misindexed = Set(indexed.keys).union(holders.keys).filter { indexed[$0] != holders[$0] }.count
+            let doubled = job.tokensByID.values.filter { $0.others.contains($0.first) }.count
+            if misindexed > 0 || doubled > 0 {
+                violations.append("job \(transfer) indexes the holders of \(misindexed) ids unlike its interests, \(doubled) with its first holder among the others")
+            }
+            // Every writer removes an interest its last id leaves (I3): a move's per-holder removal relies on it.
+            if let empty = job.interests.filter({ $0.value.assets.isEmpty }).keys.min() {
+                violations.append("job \(transfer) holds interest \(empty.rawValue) with no id")
+            }
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
                 let key = ClaimKey(job: job)
                 if self.state.claims[key] == nil {
