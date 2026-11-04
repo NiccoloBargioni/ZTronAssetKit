@@ -63,4 +63,36 @@ extension EngineFollowBarrierTests {
         let forced = await engine.violations { $0.followOrder = [b.transferID] }
         #expect(forced == ["a follow is owed while the engine is shutDown"], "\(forced)")
     }
+
+    /// F-K4 (Stage 3 close-out cycle 21, ruling S3-R26 item 6; `integrate-c21.md` A11 and K4): only a running engine
+    /// drains, so no event waits for a follow once the engine stops running. `scheduleDrainFollowUp`'s branch for a
+    /// refused spawn, which cleared the waiting events and the follow's tables, could not run (shutdown's first turn
+    /// clears them, `drainEverything`), and the invariant checks the assumption instead. A running engine with an event
+    /// waiting and its drain scheduled reports nothing; the same event after shutdown reports exactly K4.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-15: an event that waits for a follow once the engine stopped running is reported (F-28)", .timeLimit(.minutes(1)))
+    func invariantsReportAnEventWaitingOnceShutDown() async throws {
+        let harness = EngineHarness.make()
+        let b = EngineHarness.onDemand("b", EngineFixture.bytes(2_022_801))
+        await harness.serveManifest([b])
+        let engine = harness.engine
+        try await harness.start()
+        await engine.awaitCondition { $0.state.run == nil && $0.state.manifestFetch == nil && $0.state.appliedETag != nil }
+        let view = WorldView(throttle: nil, breaker: nil, conditions: ConditionsSnapshot(conditions: nil, pausedForThermal: false), edgeSerial: 0)
+        let waiting: @Sendable (inout EngineState) -> Void = { state in
+            state.eventsAfterFollow = [.throttleAnswers]
+            state.eventStamps = [WorldStamp(at: .zero, view: 0)]
+            state.worldHistory = [view]
+        }
+        let running = await engine.violations { state in
+            waiting(&state)
+            state.drainFollowUpScheduled = true
+        }
+        #expect(running.isEmpty, "a running engine's waiting event, its drain scheduled, is consistent: \(running)")
+        await engine.shutdown()
+        let settled = await engine.invariantViolations()
+        #expect(settled.isEmpty, "\(settled)")
+        let forced = await engine.violations(after: waiting)
+        #expect(forced == ["1 events wait for a follow while the engine is shutDown"], "\(forced)")
+    }
 }
