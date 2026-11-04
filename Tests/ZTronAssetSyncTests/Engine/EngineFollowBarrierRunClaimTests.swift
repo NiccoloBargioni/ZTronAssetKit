@@ -144,4 +144,60 @@ extension EngineFollowBarrierTests {
         #expect(report?.failures.map(\.id) == [t1.identifier] && report?.failures.first?.error == .notFound, "the run fails zz-t1 with T's 404: \(outcome)")
         await Self.finishHeld(s)
     }
+
+    // MARK: A run's claim the drain takes off a verdict's job before the verdict and re-routes after it
+
+    /// A forced sync's run claims zz-a and zz-b, both of content j (job J), held downloading. v3 maps zz-a to content k
+    /// while the follow is owed, and J's attempt then gets a 404: its verdict waits, with zz-a among the ids a
+    /// visit-first engine's visit had moved off J before it (`AttemptEnd.movedBefore`). v4 maps zz-a back to content j.
+    /// The drain takes zz-a off J before the verdict and re-routes it after (`takeOffMovedBefore`,
+    /// `rerouteMovedBefore`), and the verdict's run check falls between the two, with the barrier read down (found
+    /// while fixing candidate 2, whose `recordRunOutcome` change keeps zz-a's claim on J through the verdict). Visited
+    /// first, v3's visit moved the claim to K, J's 404 failed zz-b, and v4's visit moved the claim back to a new job of
+    /// content j, which fetched it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierKeepsARunsClaimTakenOffBeforeAVerdict(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_022_601
+        let (s, _) = try await FollowBarrier.setUp(seed: seed)
+        let engine = s.engine
+        let jBytes = EngineFixture.bytes(seed + 3, count: 16)
+        let kBytes = EngineFixture.bytes(seed + 4, count: 20)
+        let a = EngineFixture.entry("zz-a", jBytes)
+        let b = EngineFixture.entry("zz-b", jBytes)
+        let aOnK = EngineFixture.entry("zz-a", kBytes)
+        let j = a.transferID
+        let k = aOnK.transferID
+        try #require(b.transferID == j && k != j, "setup: zz-a and zz-b share content j, and v3 maps zz-a to content k")
+        await s.harness.source.script(j, [.hold, .fail(.permanentMissing(httpStatus: 404)), .stage(jBytes)])
+        await s.harness.source.script(k, [.hold, .stage(kBytes)])
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, b] + Self.laterFillers(seed + 3_000), etag: "v2")
+        let sync = Task { await engine.sync(.force) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in e.state.jobs[j]?.state == .downloading && e.state.run?.outstanding[j] == [a.identifier, b.identifier] }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [aOnK, b] + Self.laterFillers(seed + 6_000), tag: "v3-run-moved-before-\(seed)", s, visit: visit)
+        await s.harness.source.release(j, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { e in
+            visit == .sweepFollowsFirst ? e.state.jobs[j]?.attemptEnd?.deferredAfter != nil : e.state.jobs[j] == nil
+        }
+        if visit == .sweepFollowsFirst {
+            let movedBefore = await engine.readForTests { $0.state.jobs[j]?.attemptEnd?.movedBefore }
+            try #require(movedBefore == [a.identifier], "setup: J's verdict waits, zz-a moved off J before it (visit-first): \(String(describing: movedBefore))")
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 300) + [a, b] + Self.laterFillers(seed + 9_000), tag: "v4-run-moved-before-\(seed)", s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        let outcome = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: sync) }
+        let report: SyncReport? = switch outcome {
+        case .completeWithFailures(let report), .complete(let report):
+            report
+        default:
+            nil
+        }
+        #expect(report?.fetched == 1, "the run fetches zz-a with content j's next attempt (visit-first): \(outcome)")
+        #expect(report?.failures.map(\.id) == [b.identifier] && report?.failures.first?.error == .notFound, "the run fails zz-b with J's 404: \(outcome)")
+        await Self.finishHeld(s)
+    }
 }
