@@ -685,8 +685,10 @@ extension ZTronAssetKitBenchmarks {
             }
             let waits = runs.map(\.wait)
             let turns = runs.map { $0.turns.max() ?? 0 }
-            print("R-SYN-11 the drain's verdict on a job holding 10,000 ids moved off before it and back: longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            let endings = runs.map(\.ending)
+            print("R-SYN-11 the drain's verdict on a job holding 10,000 ids moved off before it and back: longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms; J's 500 deferring its verdict \(endings) ms, best \(endings.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); load \(SyncBench.loadAverages()); runs \(runs)")
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
+            #expect((endings.min() ?? .infinity) <= Self.c2Budget, "J's ending: \(endings)")
         }
 
         /// Runs `SyncBench.concentration` once at 1,000 members and three times at 10,000, and checks the best of the
@@ -1216,6 +1218,14 @@ struct ScaleBench {
 
 /// Helpers of `SyncBenchmarks` (namespaced so no other package's helpers can collide).
 enum SyncBench {
+    /// The host's 1-, 5- and 15-minute load averages, printed with a figure (ruling S3-R23: a C2 figure counts at a
+    /// 1-minute load of 10 or less).
+    static func loadAverages() -> String {
+        var loads = [Double](repeating: 0, count: 3)
+        _ = getloadavg(&loads, 3)
+        return loads.map { String(format: "%.2f", $0) }.joined(separator: " ")
+    }
+
     /// An entry for `bytes`.
     static func entry(_ id: String, _ bytes: Data, policy: AssetPolicy = .standard) -> ManifestEntry {
         ManifestEntry(
@@ -3019,6 +3029,10 @@ struct MovedBeforeRun: CustomStringConvertible {
     /// The heartbeat's longest wait, in milliseconds, from the release of the follow's held turns until the drain gave
     /// J's verdict.
     var wait: Double = 0
+    /// The heartbeat's longest wait, in milliseconds, over J's 500 until its verdict waits: the attempt's end turn,
+    /// whose deferral filters J's ids against the copy (`recordDeferredVerdict`) and walks every job (`bringInbound`;
+    /// Stage 3 close-out cycle 21, ruling S3-R26 item 8).
+    var ending: Double = 0
     /// The follow's held turns released in that window, each timed inside the actor, in milliseconds.
     var turns: [Double] = []
     /// The ids J's waiting verdict recorded as moved before it.
@@ -3032,7 +3046,7 @@ struct MovedBeforeRun: CustomStringConvertible {
 
     var description: String {
         let sorted = self.turns.sorted()
-        return "wait \(self.wait) ms; moved before \(self.movedBefore), held \(self.held), verdict given \(self.given), re-routed \(self.rerouted); \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms"
+        return "wait \(self.wait) ms; J's ending \(self.ending) ms; moved before \(self.movedBefore), held \(self.held), verdict given \(self.given), re-routed \(self.rerouted); \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms"
     }
 }
 
@@ -3359,10 +3373,14 @@ extension SyncBench {
             await Task.yield()
         }
         var run = MovedBeforeRun()
-        // J's 500 waits for the follow, every id it holds moved before it.
-        await source.release(j.transferID, with: .progress(received: 0, expected: nil))
-        while !Task.isCancelled, !(await SyncBench.verdictWaits(engine, j.transferID)) {
-            await Task.yield()
+        // J's 500 waits for the follow, every id it holds moved before it: its turn, timed in a window of its own (as
+        // `concentration` times its ending), filters J's 10,000 ids against the copy (`recordDeferredVerdict`).
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        run.ending = try await SyncBench.longestWait(on: engine) {
+            await source.release(j.transferID, with: .progress(received: 0, expected: nil))
+            while !Task.isCancelled, !(await SyncBench.verdictWaits(engine, j.transferID)) {
+                await Task.yield()
+            }
         }
         run.movedBefore = await SyncBench.movedBefore(engine, j.transferID)
         // v4 maps every member back to C, while the follow still owes J's visit. It goes through the engine's apply path:

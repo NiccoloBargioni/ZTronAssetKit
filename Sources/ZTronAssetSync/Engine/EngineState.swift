@@ -80,6 +80,11 @@ struct EngineState {
     /// test of the order of admissions reads it here (Stage 3 close-out cycle 20, ruling S3-R25 item 4). No production
     /// path sets it.
     var admissionsForTests: [AttemptAdmission]?
+    /// Test seam: told when a commit's turn begins (`false`, once the store's publication returned) and when its
+    /// delivery ends (`true`), so a benchmark times that one turn inside the actor, apart from the turns of the callers
+    /// it resumes (Stage 3 close-out cycle 21, ruling S3-R26 item 4; `BenchSync.commitTurns`). No production path sets
+    /// it.
+    var commitTurnMarksForTests: (@Sendable (_ ended: Bool) -> Void)?
     /// A pump found the follow barrier up (`SyncEngine.followBarrier`, F-28) and admitted nothing: every follow turn
     /// pumps again, and the drain's last batch pumps once the barrier is down (Stage 3, close-out cycles 3 and 9).
     var pumpWaitsForFollow = false

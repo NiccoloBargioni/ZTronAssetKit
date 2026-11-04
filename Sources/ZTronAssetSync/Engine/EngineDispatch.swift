@@ -1069,6 +1069,7 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
+        self.state.commitTurnMarksForTests?(false)
         self.recordBreaker(.objectSuccess(transfer))
         guard let current = self.state.jobs[transfer], current.epoch == epoch else {
             // The job ended while its content was published (its asset pruned, its content superseded): the publication's
@@ -1087,6 +1088,7 @@ extension SyncEngine {
         // while the store still published its bytes. It was removed in Stage 3 close-out cycle 13 under ruling S3-R16
         // item 3 (recorded in the WP-F draft as a residual risk).
         self.committed(transfer, binding: ids, locations: locations, since: serial)
+        self.state.commitTurnMarksForTests?(true)
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()
     }
