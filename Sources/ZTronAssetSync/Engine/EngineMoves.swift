@@ -136,8 +136,10 @@ extension SyncEngine {
     /// follow's next turns (`continueMove`). A job whose every id leaves and that is not publishing is superseded as
     /// `move` supersedes it: its running attempt is abandoned now, as a visit-first engine's visit abandoned it (no 429,
     /// failure or bytes of it can arrive in the follow's later turns), and the job waits queued, behind the barrier, until
-    /// its last interest leaves and it is removed. Returns whether an id moved, the ids spent and the moves left; nothing
-    /// without a job, which no caller passes (S3-R19 item 3's default of the optional chain).
+    /// its last interest leaves and it is removed. Returns whether an id moved, the ids spent and the moves left. Both
+    /// callers pass a job the table holds in this turn (`follow`'s visit read it, `continueInbound` checks it), so the
+    /// read has no branch of its own for a missing one: it would make no items, and `continueMove`'s guard, which a
+    /// holder removed between a rest's turns reaches, would end the move having moved nothing (ruling S3-R19 item 3).
     ///
     /// The job is read once, before anything changes, and the items come from its index (`Job.moveItems`), so no copy of
     /// its ids or interests is alive across the moves (Stage 3 close-out cycle 21, ruling S3-R26 item 3). The moved ids no
@@ -150,10 +152,7 @@ extension SyncEngine {
         let read = self.state.jobs[transfer].map { job in
             (supersedes: moved.count == job.assets.count && job.state != .verifying && job.state != .committing, downloading: job.state == .downloading, active: job.active, lane: job.lane, built: job.moveItems(of: moved))
         }
-        guard let read else {
-            return (false, 0, nil)
-        }
-        if read.supersedes, read.downloading {
+        if let read, read.supersedes, read.downloading {
             if let active = read.active {
                 self.abandon(transfer, active)
             }
@@ -163,10 +162,10 @@ extension SyncEngine {
                 self.enqueue(transfer)
             }
         }
-        if !read.built.unheld.isEmpty {
-            self.state.jobs[transfer]?.assets.subtract(read.built.unheld)
+        if let unheld = read?.built.unheld, !unheld.isEmpty {
+            self.state.jobs[transfer]?.assets.subtract(unheld)
         }
-        var progress = MoveProgress(read.built.items, supersedes: read.supersedes, lane: read.lane)
+        var progress = MoveProgress(read?.built.items ?? [], supersedes: read?.supersedes == true, lane: read?.lane ?? .bulk)
         let made = self.continueMove(&progress, of: transfer, listing: listing, budget: budget)
         return (made.moved, made.spent, progress.isDone ? nil : progress)
     }
