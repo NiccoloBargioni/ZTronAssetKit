@@ -20,9 +20,10 @@ extension EngineFollowBarrierTests {
         (0..<(SyncEngine.followFormatsPerTurn + 52)).map { EngineHarness.onDemand(String(format: "zzz%05d", $0), EngineFixture.bytes(seed + UInt64($0), count: 16)) }
     }
 
-    /// `FollowBarrier.setUp` with a stepped bulk executor, so a test can hold a publication at its first store unit.
+    /// `FollowBarrier.setUp` with a stepped bulk executor, so a test can hold a publication at its first store unit, and
+    /// `network` as the engine's network policy.
     @available(macOS 15.0, iOS 18.0, *)
-    static func setUpHeldPublications(seed: UInt64, tuning: SyncTuning = SyncTuning()) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
+    static func setUpHeldPublications(seed: UInt64, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy()) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
         let fileSystem = FakeFileSystem(
@@ -31,7 +32,7 @@ extension EngineFollowBarrierTests {
             configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
         )
         let bulk = SteppedBlockingExecutor(holding: false)
-        let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), bulk: bulk, fileSystem: fileSystem)
+        let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), network: network, bulk: bulk, fileSystem: fileSystem)
         let qBytes = EngineFixture.bytes(seed, count: 300)
         let q = EngineFixture.entry("q", qBytes)
         await harness.serveManifest([q])

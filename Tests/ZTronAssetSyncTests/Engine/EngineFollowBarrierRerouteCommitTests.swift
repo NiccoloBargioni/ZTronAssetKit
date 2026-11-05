@@ -233,6 +233,19 @@ extension EngineFollowBarrierTests {
         #expect(run.served == atOnce.served && run.served == Self.commitRerouteServed(kept: 1, moved: 10), "the answers equal the at-once commit's: \(run.served) \(atOnce.served)")
     }
 
+    /// One kept id and eight moved: the drain makes the batch 4 and 4 ids a turn, so its second turn spends the drain
+    /// turn's ids exactly as the batch ends: the replay owes no rest then (rr21-B14), the batch is counted down in that
+    /// turn, and no third turn runs.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an owed batch whose last ids spend a drain turn's exactly ends in that turn (F-28, C2)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedBatchEndingAtTheTurnsLastIDEndsInThatTurn(_ visit: LaneDropVisit) async throws {
+        let run = try await self.commitReroute(visit, seed: 2_027_161, kept: 1, moved: 8, idsPerTurn: 4)
+        #expect(run.commitMade == [0] && run.owedAfterCommit == [8] && run.batchesAfterCommit == [1], "the commit owes the eight ids as one batch: \(run)")
+        #expect(run.made == [4, 4] && run.turns.last?.made == 4, "the drain makes the batch in two whole turns, the last held turn its second: \(run)")
+        #expect(run.violations.isEmpty, "\(run.violations.prefix(3))")
+        #expect(run.served == Self.commitRerouteServed(kept: 1, moved: 8), "every waiter gets its content's bytes: \(run.served)")
+    }
+
     /// Two contents, each with one kept id and three moved: each commit's 1 + 3 do not fit, so each owes a batch of three
     /// ids while the drain is held, and the drain makes each batch in a turn of its own (a batch ends its drain turn).
     @available(macOS 15.0, iOS 18.0, *)

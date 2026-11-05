@@ -1099,41 +1099,75 @@ extension SyncEngine {
     /// copy still maps to this content moves to a fresh job of it once this one is gone, because it joined after the
     /// publication's binding was captured (the next publication binds it; the store deduplicates the bytes, ADR-020),
     /// or because the store refused it while holding a newer manifest than the copy (held until the copy catches up).
+    ///
+    /// The re-routes share the commit's turn with its answers (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 1): a
+    /// commit whose answers and re-routes fit `inboundIDsNow` together makes the re-routes in this turn, the calls and
+    /// their order unchanged (each list by token, then id; the moved ones at once, the others once the job is gone); one
+    /// whose do not owes every re-route as one batch, which the drain makes at its place, a drain turn's ids a turn
+    /// (`deferReroutes`). The interests are read once, unsorted, and trimmed in place afterwards, no copy of the job
+    /// alive across a change (D11). The trims come before the moved ones' re-routes, which interleaved with them: a
+    /// re-route reads only the item's lane and kind, and writes the run, a waiter, a group, a heal and the job of the
+    /// id's new content, never this one (a moved id's entry names another content), so the two touch disjoint state.
     private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
-        guard let job = self.state.jobs[transfer] else {
+        guard self.state.jobs[transfer] != nil else {
             return
         }
-        let captured = Set(ids)
         // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).
         self.bind(locations.keys, to: transfer, since: serial)
-        var deferred: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
+        var trims: [(token: InterestToken, whole: Bool, unbound: Set<AssetID>)] = []
+        var moved: [RerouteItem] = []
+        var deferred: [RerouteItem] = []
         var refused = false
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            let unbound = interest.assets.filter { locations[$0] == nil }
-            guard !unbound.isEmpty else {
-                continue
-            }
-            let bound = interest.assets.subtracting(unbound)
-            if bound.isEmpty {
-                self.state.jobs[transfer]?.setInterest(nil, for: token)
-            } else {
-                self.state.jobs[transfer]?.setAssets(bound, for: token)
-            }
-            for asset in unbound.sorted() {
-                guard self.state.applied.entry(for: asset)?.transferID == transfer else {
-                    self.reroute(token, interest: interest, asset: asset, from: transfer)
+        // The publication's binding, built only for an id the copy still maps here (C1).
+        lazy var captured = Set(ids)
+        if let interests = self.state.jobs[transfer]?.interests {
+            for (token, interest) in interests {
+                let unbound = interest.assets.filter { locations[$0] == nil }
+                guard !unbound.isEmpty else {
                     continue
                 }
-                refused = refused || captured.contains(asset)
-                deferred.append((token, interest, asset))
+                trims.append((token, unbound.count == interest.assets.count, unbound))
+                for asset in unbound {
+                    let item = RerouteItem(asset: asset, token: token, lane: interest.lane, kind: interest.kind)
+                    if self.state.applied.entry(for: asset)?.transferID != transfer {
+                        moved.append(item)
+                        continue
+                    }
+                    if !refused, captured.contains(asset) {
+                        refused = true
+                    }
+                    deferred.append(item)
+                }
             }
         }
-        self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
-            if refused {
-                self.holdForManifest(transfer)
+        for trim in trims {
+            if trim.whole {
+                self.state.jobs[transfer]?.setInterest(nil, for: trim.token)
+            } else {
+                self.state.jobs[transfer]?.subtractAssets(trim.unbound, for: trim.token)
             }
-            for item in deferred {
-                self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
+        }
+        let rerouted = moved.count + deferred.count
+        if rerouted > 0, locations.count + rerouted > self.inboundIDsNow {
+            self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
+                if refused {
+                    self.holdForManifest(transfer)
+                }
+                self.deferReroutes(moved + deferred, from: transfer)
+            }
+        } else {
+            moved.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+            deferred.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+            for item in moved {
+                self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: transfer)
+            }
+            self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
+                if refused {
+                    self.holdForManifest(transfer)
+                }
+                for item in deferred {
+                    self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: transfer)
+                }
             }
         }
         self.pump()

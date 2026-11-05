@@ -613,6 +613,75 @@ extension SyncEngine {
         self.state.runClaimTakenOff = false
     }
 
+    /// Owes `items`, re-routes of interests that left `transfer`'s job, as one batch (`RerouteBatch`) under the engine's
+    /// copy and its serial now, the owing instant (Stage 3 close-out cycle 21, ruling S3-R26 item 1): heapified, not
+    /// sorted. The run's claims on `transfer` for its own owed items are released now, in place, so the run claims none
+    /// of them while they wait (`invariantViolations()`); each re-route claims its id again at its new job (`reroute`).
+    func oweReroutes(_ items: [RerouteItem], from transfer: TransferID) -> RerouteBatch {
+        let run = self.state.run?.token
+        self.state.run?.outstanding[transfer]?.subtract(items.lazy.filter { $0.kind == .run && $0.token == run }.map(\.asset))
+        if self.state.run?.outstanding[transfer]?.isEmpty == true {
+            self.state.run?.outstanding[transfer] = nil
+        }
+        self.state.reroutesWaiting += 1
+        return RerouteBatch(from: transfer, copy: self.state.applied, serial: self.state.copySerial, items: MinHeap(items), layers: [])
+    }
+
+    /// Owes `items` (`oweReroutes`) as an event that waits for the follow at its place (`EventAfterFollow.reroutes`), with
+    /// the owing instant's decision instant (`deferToFollow`), and schedules a drain turn for it: a follow owed meanwhile
+    /// drains it at its end instead, and the extra turn returns at the drain's guard. The sites owe from a publication's
+    /// turn after its await, never inside a drain (`committed`), and never an empty list.
+    func deferReroutes(_ items: [RerouteItem], from transfer: TransferID) {
+        self.deferToFollow(.reroutes(self.oweReroutes(items, from: transfer)))
+        self.scheduleDrainFollowUp()
+    }
+
+    /// Records the copy an apply replaces on every batch of owed re-routes (`RerouteBatch.layers`; `adoptApplied`, before
+    /// the copy changes): the copy, the applies followed before it, and the jobs then at an attempt's end
+    /// (`RerouteLayer.ends`), whose interests a visit-first engine's visit at this apply passed. Those are the jobs
+    /// publishing (verifying or committing), read once, at the first batch, from the jobs in flight, and the jobs whose
+    /// exit verdict waits behind the batch and is still live (`waitingTarget`), a `.spaceFailure`'s as an
+    /// `.attemptFailed`'s (ruling S3-R26 item 12's answer 6.7). From a batch's second layer on, a waiting verdict counts
+    /// only if it deferred after the apply of the batch's last layer: one deferred before had met that apply's visit,
+    /// which moved the pairs onto its job, at its end already, on a visit-first engine. One backward pass over the waiting
+    /// events, O(events + jobs in flight); nothing is appended when no batch waits (`integrate-rr21.md` R11).
+    func layerOwedReroutes() {
+        var publishing: [TransferID: UInt64]?
+        var verdicts: [(transfer: TransferID, epoch: UInt64, deferredAfter: UInt64)] = []
+        for index in self.state.eventsAfterFollow.indices.reversed() {
+            let event = self.state.eventsAfterFollow[index]
+            if let key = event.verdictKey {
+                if let job = self.waitingTarget(key.transfer, epoch: key.epoch) {
+                    verdicts.append((key.transfer, key.epoch, job.attemptEnd?.deferredAfter ?? 0))
+                }
+                continue
+            }
+            guard case .reroutes(var batch) = event else {
+                continue
+            }
+            let inFlight = publishing ?? self.publishingEnds()
+            publishing = inFlight
+            var ends = inFlight
+            let previous = batch.layers.last?.applies
+            for verdict in verdicts where previous.map({ verdict.deferredAfter > $0 }) ?? true {
+                ends[verdict.transfer] = verdict.epoch
+            }
+            batch.layers.append(RerouteLayer(outgoing: self.state.applied, applies: self.state.appliesFollowed, ends: ends))
+            self.state.eventsAfterFollow[index] = .reroutes(batch)
+        }
+    }
+
+    /// The jobs in flight that publish (verifying or committing), with their epochs (`layerOwedReroutes`).
+    private func publishingEnds() -> [TransferID: UInt64] {
+        var ends: [TransferID: UInt64] = [:]
+        for transfer in self.state.inFlight {
+            if let job = self.state.jobs[transfer], job.state == .verifying || job.state == .committing {
+                ends[transfer] = job.epoch
+            }
+        }
+        return ends
+    }
+
     /// Makes the re-routes of `batch` the drain turn's ids still cover (`EngineState.drainIDsLeft`), in (id, token)
     /// order, each id whole with all its tokens as `continueMove` moves a holder's ids, and spends them (C2; Stage 3
     /// close-out cycle 21, ruling S3-R26 item 1). Each id follows the copy a visit-first engine's re-route followed
@@ -1279,12 +1348,14 @@ extension SyncEngine {
         return pending
     }
 
-    /// Whether a move onto or off `transfer`'s job is owed, or the rest of its visit (`EngineState.followMoving`): its
-    /// publication binds the ids it holds once none is (`publish`), those a visit-first engine's visits had moved onto it
-    /// included, and none they had moved off it. The moves off it are looked for among the owed moves, one pass, only
-    /// while one is owed and a publication asks.
+    /// Whether a move onto or off `transfer`'s job is owed, or the rest of its visit (`EngineState.followMoving`), or any
+    /// re-route (`EngineState.reroutesWaiting`): its publication binds the ids it holds once none is (`publish`), those a
+    /// visit-first engine's visits and re-routes had moved onto it included, and none they had moved off it. An owed
+    /// re-route holds every publication, since its target is known only at its replay (`rerouteListing`; Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 1: binding only the ids that had joined gave other answers, RR21-WINDOW-GATE).
+    /// The moves off it are looked for among the owed moves, one pass, only while one is owed and a publication asks.
     func inboundBlocks(_ transfer: TransferID) -> Bool {
-        if self.state.followMoving?.holder == transfer {
+        if self.state.followMoving?.holder == transfer || self.state.reroutesWaiting > 0 {
             return true
         }
         guard self.inboundOwed else {
@@ -1410,9 +1481,10 @@ extension SyncEngine {
         }
     }
 
-    /// Waits until no move is owed onto or off `transfer`'s job and no rest of its visit (`inboundBlocks`): its
-    /// publication binds the ids it holds then. The caller found one owed in this turn (`publish`), so the wait registers
-    /// at once; the last move or the visit's rest resumes it (`inboundMade`, `continueVisitRemainder`), and shutdown
+    /// Waits until no move is owed onto or off `transfer`'s job, no rest of its visit and no re-route (`inboundBlocks`):
+    /// its publication binds the ids it holds then. The caller found one owed in this turn (`publish`), so the wait
+    /// registers at once; the last move or the visit's rest resumes it (`inboundMade`, `continueVisitRemainder`), the last
+    /// owed re-route resumes every wait (`releaseRerouteHolds`, when nothing else holds a publication), and shutdown
     /// resumes every one (`releaseInboundWaits`), which also drops what was owed, so no wait registers after it. The
     /// cycle-18 early return and the re-check inside the continuation, which no path reached (the caller's check runs in
     /// the same turn), were removed under ruling S3-R19 item 3 (cycle 19).

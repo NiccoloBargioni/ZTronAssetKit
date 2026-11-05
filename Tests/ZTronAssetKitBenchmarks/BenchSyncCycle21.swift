@@ -335,6 +335,8 @@ struct CommitRun: CustomStringConvertible {
 struct HeldPublicationBench {
     let bench: FollowBench
     let bulk: SteppedBlockingExecutor
+    /// The engine's clock (and the store's): a purge waits out the deletion grace on it (`awaitReclaim`).
+    let time: ManualTimeSource
 }
 
 /// A thread-safe record of the commit turn's marks (`EngineState.commitTurnMarksForTests`).
@@ -565,7 +567,7 @@ extension SyncBench {
         guard await engine.sync(.force).isComplete else {
             throw SyncBenchError.incomplete("the setup sync did not complete")
         }
-        return HeldPublicationBench(bench: FollowBench(engine: engine, source: source, store: store, fileSystem: fileSystem), bulk: bulk)
+        return HeldPublicationBench(bench: FollowBench(engine: engine, source: source, store: store, fileSystem: fileSystem), bulk: bulk, time: time)
     }
 
     /// `k` moves owed off one holder onto `k` publications in flight (Stage 3 close-out cycle 21, ruling S3-R26 item 3;

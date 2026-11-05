@@ -7,7 +7,7 @@ extension SyncEngine {
     /// Whether anything needs the conditions: a job, a run, a pending run, a manifest fetch or an unknown-id waiter.
     var hasWork: Bool {
         !self.state.jobs.isEmpty || self.state.run != nil || self.state.pendingRun != nil || self.state.manifestFetch != nil
-            || !self.state.unknownWaiters.isEmpty || !self.state.conditionWaiters.isEmpty
+            || !self.state.unknownWaiters.isEmpty || !self.state.conditionWaiters.isEmpty || !self.state.eventsAfterFollow.isEmpty
     }
 
     /// Stops the watcher when no work is left (its stream ends, so the source stops observing) and keeps the alarm

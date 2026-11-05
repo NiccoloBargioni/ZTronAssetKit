@@ -650,8 +650,9 @@ extension ZTronAssetKitBenchmarks {
 
         /// As `concentrationPublicationTurns`, when v4 maps the 10,000 members to another content while the publication
         /// waits at the store (Stage 3 close-out cycle 20, rulings S3-R24 item 2 and S3-R25 item 11, RR-21): the store
-        /// binds only O's own id, and the commit re-routes the other 10,000 interests to the content v4 names (one job).
-        /// The heartbeat's longest wait over the commit, the best of three against C2.
+        /// binds only O's own id, and the commit owes the other 10,000 interests' re-routes to the content v4 names as one
+        /// batch, which the drain makes at most 512 ids a turn (cycle 21, ruling S3-R26 item 1). The heartbeat's longest
+        /// wait over the commit and over the drain's held turns, up to the last re-route, the best of three against C2.
         @Test("R-SYN-11: the commit of a publication whose 10,000 converged ids an apply moved away re-routes them holding the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)))
         @available(macOS 15.0, iOS 18.0, *)
         func concentrationCommitRerouteTurns() async throws {
@@ -713,15 +714,20 @@ extension ZTronAssetKitBenchmarks {
                 case .bound:
                     #expect(run.served && run.committed, "setup: the commit answered O's waiter and ended O's job: \(run)")
                 case .movedAway:
-                    #expect(run.served && run.committed && run.rerouted == 10_000, "setup: the commit answered O's waiter and re-routed the 10,000 members' interests to v4's content: \(run)")
+                    #expect(run.served && run.committed && run.madeAtCommit == 0 && run.batchesAtCommit == 1 && run.owedAtCommit == 10_000, "setup: the commit answered O's waiter, re-routed none of the 10,000 members and owed them as one batch: \(run)")
+                    #expect(!run.drainMade.isEmpty && run.drainMade.allSatisfy { $0 <= SyncEngine.followIDsPerTurn } && run.rerouted == 10_000, "setup: the drain re-routed the 10,000 members' interests to v4's content, at most 512 ids a turn: \(run)")
                 }
             }
             let waits = runs.map(\.wait)
             let commits = runs.map(\.commit)
             let turns = runs.map { $0.turns.max() ?? 0 }
             let lanes = runs.compactMap(\.lane)
-            print("R-SYN-11 10,000 ids converging on one content during an owed follow, \(label): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; the commit window \(commits) ms; longest held turn \(turns) ms; followedLane with the moves owed \(lanes) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+            let drains = runs.map { $0.drainTurns.max() ?? 0 }
+            print("R-SYN-11 10,000 ids converging on one content during an owed follow, \(label): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; the commit window \(commits) ms; longest held turn \(turns) ms; the drain's window \(runs.map(\.drain)) ms, its longest held turn \(drains) ms; followedLane with the moves owed \(lanes) ms (budget \(Self.c2Budget) ms best); load \(SyncBench.loadAverages()); runs \(runs)")
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(label): \(waits)")
+            if commit == .movedAway {
+                #expect((drains.min() ?? .infinity) <= Self.c2Budget, "\(label), the drain's held turns: \(drains)")
+            }
             if ending == .notFound {
                 #expect((lanes.min() ?? .infinity) <= Self.c2Budget, "followedLane with the moves owed: \(lanes)")
             }
@@ -3021,8 +3027,17 @@ struct ConcentrationRun: CustomStringConvertible {
     var committed = false
     /// Whether O's user waiter was answered with a location.
     var served = false
-    /// The ids the job of v4's content held after the commit (`ConcentrationCommit.movedAway`).
+    /// The ids the job of v4's content held after the drain (`ConcentrationCommit.movedAway`).
     var rerouted = 0
+    /// For `.movedAway`: the ids the job of v4's content held right after the commit, the distinct ids the commit owed
+    /// and its batches; then the heartbeat's longest wait over the drain's held turns, in milliseconds, each of those
+    /// turns timed inside the actor, and the distinct ids each turn re-routed, for the turns that re-routed any.
+    var madeAtCommit = 0
+    var owedAtCommit = 0
+    var batchesAtCommit = 0
+    var drain: Double = 0
+    var drainTurns: [Double] = []
+    var drainMade: [Int] = []
     /// The heartbeat's longest wait in O's ending's own window (its turn), in milliseconds; 0 with no ending.
     var ending: Double = 0
     /// The follow's held turns released in that window, each timed inside the actor, in milliseconds.
@@ -3044,7 +3059,7 @@ struct ConcentrationRun: CustomStringConvertible {
     var description: String {
         let sorted = self.turns.sorted()
         let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
-        return "wait \(self.wait) ms, ending \(self.ending) ms, commit \(self.commit) ms (committed \(self.committed), served \(self.served), re-routed \(self.rerouted)); \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), \(self.left) jobs left, verdict waits \(self.verdictWaits), followedLane \(String(describing: self.lane)) ms; \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
+        return "wait \(self.wait) ms, ending \(self.ending) ms, commit \(self.commit) ms (committed \(self.committed), served \(self.served), made at the commit \(self.madeAtCommit), owed \(self.owedAtCommit) in \(self.batchesAtCommit) batches; drain \(self.drain) ms, \(self.drainTurns.count) held turns, longest \(self.drainTurns.max() ?? 0) ms, made \(self.drainMade); re-routed \(self.rerouted)); \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), \(self.left) jobs left, verdict waits \(self.verdictWaits), followedLane \(String(describing: self.lane)) ms; \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
     }
 }
 
@@ -3237,7 +3252,7 @@ extension SyncBench {
         run.left = after.jobs
         if ending == .publication, commit != .none {
             try await SyncBench.timeCommit(of: o, members: count, commit: commit, engine: engine, source: source, bulk: bulk, waiter: waiter, into: &run)
-            run.wait = max(run.wait, run.commit)
+            run.wait = max(run.wait, run.commit, run.drain)
         }
         await engine.releaseFollowFollowUps()
         await bulk.setHolding(false)
@@ -3250,8 +3265,11 @@ extension SyncBench {
 
     /// The commit window of `concentration` (`ConcentrationCommit`): the follow's remaining turns run first, outside
     /// it; for `.movedAway`, v4 maps every member to D (16 bytes, one job, its download held) and is applied while O's
-    /// publication stays at its first store unit (every later unit runs). Then the publication's unit is released, and
-    /// the heartbeat times the turns until O's job is gone.
+    /// publication stays at its first store unit (every later unit runs), and the follow's and the drain's turns are
+    /// held. Then the publication's unit is released, and the heartbeat times the turns until O's job is gone; for
+    /// `.movedAway` the commit owes the members' re-routes, and the held turns are then released one at a time, each
+    /// timed inside the actor, under the heartbeat, until the drain made them (Stage 3 close-out cycle 21, ruling S3-R26
+    /// item 1).
     static func timeCommit(of o: ManifestEntry, members count: Int, commit: ConcentrationCommit, engine: SyncEngine, source: FakeRemoteSource, bulk: SteppedBlockingExecutor, waiter: Task<Result<AssetLocation, AssetError>, Never>, into run: inout ConcentrationRun) async throws {
         await engine.releaseFollowFollowUps()
         while !Task.isCancelled, await SyncBench.barrierUp(engine) {
@@ -3287,6 +3305,7 @@ extension SyncBench {
             // O's publication stays at its unit until the window releases it.
             releaser.cancel()
             _ = await releaser.value
+            await SyncBench.holdTurns(engine)
         }
         run.commit = try await SyncBench.longestWait(on: engine) {
             await bulk.setHolding(false)
@@ -3301,6 +3320,22 @@ extension SyncBench {
             run.served = true
         }
         if let away {
+            run.madeAtCommit = await SyncBench.inbound(engine, away.transferID).ids
+            run.owedAtCommit = await SyncBench.owedReroutes(engine)
+            run.batchesAtCommit = await SyncBench.rerouteState(engine, []).batches
+            var owed = run.owedAtCommit
+            var made: [Int] = []
+            run.drain = try await SyncBench.longestWait(on: engine) {
+                run.drainTurns = try await SyncBench.releaseTurnsUntilSettled(engine) { _ in
+                    let now = await SyncBench.owedReroutes(engine)
+                    if owed - now > 0 {
+                        made.append(owed - now)
+                    }
+                    owed = now
+                }
+            }
+            run.drainMade = made
+            await SyncBench.releaseHeldTurns(engine)
             run.rerouted = await SyncBench.inbound(engine, away.transferID).ids
         }
     }

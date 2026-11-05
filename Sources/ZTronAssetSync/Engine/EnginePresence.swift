@@ -70,11 +70,13 @@ extension SyncEngine {
     }
 
     /// Keeps only the bindings something could still consult: everything while a run exists (its plan is a snapshot),
-    /// while an `ensureAvailable` group has fetches left to materialise, or while a store read whose answer registers an
-    /// interest is in flight; otherwise only the ids of jobs (an interest that follows its asset's entry may meet them).
-    /// The ledger therefore scales with outstanding work and a plan in progress, never with the catalog.
+    /// while an `ensureAvailable` group has fetches left to materialise, while a store read whose answer registers an
+    /// interest is in flight, or while events wait for the follow: an owed re-route or a waiting join reads its binding at
+    /// its replay (`reroute`; Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 6.5, RR21-PRESENT-PRUNE);
+    /// otherwise only the ids of jobs (an interest that follows its asset's entry may meet them). The ledger therefore
+    /// scales with outstanding work and a plan in progress, never with the catalog.
     func pruneBoundContent() {
-        guard !self.state.boundContent.isEmpty, self.state.run == nil, self.state.presenceReaders == 0 else {
+        guard !self.state.boundContent.isEmpty, self.state.run == nil, self.state.presenceReaders == 0, self.state.eventsAfterFollow.isEmpty else {
             return
         }
         guard !self.state.groups.values.contains(where: { $0.cursor < $0.fetches.count }) else {

@@ -5117,7 +5117,8 @@ fix (S3-R26 item 11, "Red first").
    I1, I3 and `EngineIDTokensTests`; `203b901` T2, T3 and T6; `345801c` the pins and B-T4, red; `bbf5eaa` B5–B7 and
    B9–B11; `001471d` B-T5, Q1's stage 2 and the I2 injection, red; `9069a37` B8 with I2; `bb50d7e` variant Y's test,
    red; `2ae5a34` its fix; `82ba8a1` `indexOwnCosts`; `ee8f34a` B7's missing job; the step's last commit: these
-   records). Item B's mutants are queued (`mut21-b.txt`). Results under "Step 4" below.
+   records). Item B's mutants **ended** (`mut21-b.txt`, 21:20 to 23:24): two survivors, `vy-owed-moves-too` and
+   `vy-not-committing`, to be killed or recorded at rr21-C7. Results under "Step 4" below.
 5. RR-21 (rr21-C0 to rr21-C7; the join gap's failure shape runs again at rr21-C4): rr21-C0 **done** on `82ba8a1`:
    `verify.sh --quick` ended `VERIFY: PASS` (`rr21-c0-quick.log`); the 'before' figures, best of 3
    (`rr21-c0-bench.log`, 1-minute loads 5.78 5.18 5.43 to 6.06 6.36 5.92): `concentrationCommitRerouteTurns` 47.12 ms
@@ -5125,8 +5126,25 @@ fix (S3-R26 item 11, "Red first").
    (recorded under "Step 1"). rr21-C2 **committed** (`20bf6b8`: MinHeap, the re-route types, the `.reroutes` event
    and its replay, `reroutesWaiting`, `waitingTarget(_:epoch:)`, with `continueReroutes`, `rerouteListing` and
    `releaseRerouteHolds` unreachable until rr21-C3; `verify.sh --quick` ended `VERIFY: PASS`, `c2-quick.log`; the
-   event's stride is 168 bytes with and without `indirect`, so it is not indirect). **Next action:** rr21-C3, the
-   readers and site 1 (red first: T1, T1-two, T1-fit, T-two-tokens and `commitRerouteDivergentTurns`).
+   event's stride is 168 bytes with and without `indirect`, so it is not indirect). rr21-C3's red step **committed**
+   (`94795ca`: T1, T1-two, T1-fit, T-two-tokens, with T1-edge and T1-zero, and `commitRerouteDivergentTurns`; red
+   evidence under "Step 5"). rr21-C3's green commit: the readers, site 1, the layers and the idle guards, with 25
+   tests passing in both orders (`reroute-all-pty.log`: the red step's six, T3-captured's five, T4-T11 with RR21-HOP's
+   two variants, T14, T17-hold, T17, RR21-WINDOW-GATE and the invariant test), then T12's six shapes, T13, T15, T16
+   (`owner-pty.log`), T18 with T18-partial and RR21-RUN-MIDDRAIN (`run-pty.log`), RR21-PRESENT-PRUNE's three gates and
+   T-WATCH (`present-pty.log`), all passing in both orders. The four holes' red copies run in
+   `.build-s3f/c21/red-holes/` (`hole-red.py`; failing lines under "Step 5"). T1-whole-turns, rr21-T8b and
+   `PROBE-RR21-HEAL-T21` pass in both orders (`each/t8b-pty.log`, `each/heal-pty.log`); the probe breaks nothing
+   (under "Step 5"). The whole Sync suite passes: 631 tests in 56 suites, the low-budget, idle and ledger suites among
+   them (`each/sync-full-pty.log`). The passing site-1 pins land with it (`BenchSyncReroutes.swift`); their setup, the
+   figures, the four pins that miss C2 and their route, and RR-21's UNCONFIRMED claims are under "Step 5". rr21-C3's
+   mutants run on a snapshot of these sources (`snap-c3`, `MUT_EXTRA=.build-s3f/c21/tools/mut-c3.py`): b1 to b12 in
+   `mut21-c3.txt` (from 23:50), the rest from b12-no-release in `mut21-c3b.txt` with a 300 s hang limit
+   (`MUT_TIMEOUT=300`; a hang counts as a kill, as a test's time limit does). On this state `verify.sh --quick` ended
+   `VERIFY: PASS` (`c3-quick.log`, 1-minute loads 4.75 to 8.75, the mutants running), and the release build with
+   warnings as errors, `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%) passed (`c3-release.log`, `c3-gates.log`).
+   **Next action:** the five pins that miss C2, red (`.build-s3f/c21/pending/BenchSyncReroutePins.swift`), then the
+   commit turn's and `followedLane`'s fix; then the mutants' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5562,6 +5580,119 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
 - **Mutants** (`.build-s3f/c21/tools/mut-b.py`, 32, on the snapshot `.build-s3f/c21/snap-b` of `82ba8a1`) are queued
   after item A's and candidate 4's (`.build-s3f/c21/tools/chain-mut.sh`, `mut21-b.txt`). The table is filled in when
   they end.
+
+### Step 5: RR-21 (S3-R26 items 1 and 11)
+
+- **rr21-C3's red step** (`94795ca`): the site-1 bound tests (`EngineFollowBarrierRerouteCommitTests.swift`) and
+  `commitRerouteDivergentTurns` (`BenchSyncReroutes.swift`), run on a scratch copy of `8b1fbee` (`git archive` into
+  `.build-s3f/c21/red`, the two files added; `.build-s3f/c21/tools/red-c3.sh`, logs in `.build-s3f/c21/red-c3/`;
+  1-minute loads 6.71 at the start, 33.75 after the tests, 36.05 after the bench). Debug tests: T1
+  (`commitOwesItsReroutesAndTheDrainMakesThemBounded`) fails at `:227` and `:228` in both orders, T1-two
+  (`twoCommitsOweABatchEach`) at `:242` and `:243`, T1-fit (`commitOwesWhenItsAnswersAndReroutesPassTheBound`) at
+  `:255` and `:256`, T-two-tokens (`drainReroutesAnOwedIDWithAllItsTokensInOneTurn`) at `:291` and `:292`; T1-edge
+  (`commitReroutesAtOnceWhenItFits`) and T1-zero (`commitWithNothingToRerouteOwesNothing`) pass, as they should
+  before the fix (they pin the fit path). Release bench: `BenchSyncReroutes.swift:29:13` and `:30:13` (made at the
+  commit 10000, owed 0 in 0 batches) in each of the three runs, and `:36:9`: the heartbeat 758.26, 950.91, 764.70 ms,
+  best 758.26 ms against `c2Budget` (the commit's own turn 758.22, 950.86, 764.64 ms; not measured at a quiet load).
+- **rr21-C3's four holes, red first** (S3-R26 item 11): each run on a scratch copy of the working tree (`94795ca` plus
+  the uncommitted rr21-C3 sources and tests, `rsync` into `.build-s3f/red`) with the hole's guard removed, then the
+  test committed with its guard (`.build-s3f/c21/tools/hole-red.py`, logs and `summary.txt` in
+  `.build-s3f/c21/red-holes/`, 23:27 to 23:35, 1-minute loads 4.96 at the start, 13.83 after RR21-HOP, 5.54 at the
+  end):
+  - RR21-HOP, `ends`' publishing term dropped (`let inFlight = publishing ?? [:]` in `layerOwedReroutes`): both
+    variants fail in both orders, 10 issues, among them `EngineFollowBarrierRerouteLayerTests.swift:174:9`:
+    `Expectation failed: await Self.pins(pT, c) == [true]`, and `:197:9`:
+    `Expectation failed: outcome.w.allSatisfy { $0 == .failure(.integrityFailure) }` (the storage variant at `:210`).
+  - RR21-WINDOW-GATE, `inboundBlocks`' `reroutesWaiting > 0` term dropped: both orders fail at
+    `EngineFollowBarrierRerouteHoldTests.swift:218:9`: `Expectation failed: Self.sizes([outcome.k]) == [16] &&
+    Self.sizes(outcome.others + outcome.w) == [18, 18, 18, 18]`, at `:220:9`: `Expectation failed: createdAfter ==
+    created && pStarts == 1`, and at `:187:6`: `Time limit was exceeded: 180.0`.
+  - RR21-PRESENT-PRUNE, `pruneBoundContent`'s `eventsAfterFollow.isEmpty` guard dropped: all six cases (three gates,
+    both orders) fail at `EngineFollowBarrierReroutePresentTests.swift:89:9`: `Expectation failed: owing.kept` and at
+    `:115:13`: `Expectation failed: created == owing.created && !dJob` (a job of D's content).
+  - RR21-RUN-MIDDRAIN, `checkRunSettled`'s `reroutesWaiting == 0` dropped: `sweepFollowsFirst` fails at
+    `EngineFollowBarrierRerouteRunTests.swift:181:9`: `Expectation failed: claimsOnX == ["zz-a1", "zz-a2", "zz-a3"]`
+    and at `:187:9`: `Expectation failed: report?.fetched == 3`; `followVisitedFirst` passes, as it must: the test's
+    `#require` on the queue (`["V", "B"]` swept first, `["B"]` visited first) pins the state's absence there (ruling
+    S3-R26 item 12's answer 1; rr21-B26). Visited first, Y's 404 is given at once, before O's commit owes B, and an
+    event that arrives once B waits queues behind it; B ends its drain batch (`EventAfterFollow.endsDrainBatch`), so
+    no verdict replays in B's drain batch after B's owing in that order.
+- **T1-whole-turns** (`owedBatchEndingAtTheTurnsLastIDEndsInThatTurn`, seed 2,027,161): K and eight moved ids at
+  `followIDsPerTurn` 8; the commit makes none and owes the eight, and the drain makes them in two turns of four, the
+  batch ending in the turn that made its last id (`run.turns.last?.made == 4`): the replay arm's `nil` for an emptied
+  batch (rr21-B14) is reached in both orders.
+- **rr21-T8b** (`owedReroutePinnedToARequeuedJobFollowsTheCopy`, `EngineFollowBarrierRerouteRequeueTests.swift`, seed
+  2,027,451): X's drained, cancelled attempt publishes with its file gone, and its claim at the store (held on the
+  metadata executor) answers ENOENT; X is queued again at the same epoch (`publicationFailed`'s `.fileSystem(.notFound)
+  where cancelledAttempt`). The owed re-routes of zz-a1…zz-a3, pinned to X's publishing job by K1's layer
+  (`pins == [epoch]`), then follow the copy to W: `waitingTarget` reads a `.queued` job as no target (rr21-B30's pin
+  caller), in both orders. X holds only zz-x, W holds zz-a1…zz-a3, and K, V2 and W1…W3 get their bytes.
+- **`PROBE-RR21-HEAL-T21`** (`healOfAnOwedT21SystemInterest`, `EngineFollowBarrierRerouteHealTests.swift`, seeds
+  2,027,461, 471 and 481): K0 drops zz-a1…zz-a3, whose re-routes O's commit owes (`followIDsPerTurn` 4) or makes at
+  once (512); the T21 re-route of zz-a1's heal interest forgets the heal. A second heal scheduled before the site is
+  forgotten in both engines, and one scheduled after the replay fetches zz-a1 in both; one scheduled between the
+  owing instant and the replay is forgotten by the owed replay and kept by the at-once engine, which had forgotten
+  only the first. That is the timing class of ruling S3-R26 item 12's answer 6.1 (the outcomes differ only for an
+  event between the two answers): **not blocking**, recorded; the test pins all three in both orders. W1…W3 get
+  `.notFound` in every case.
+- **rr21-C3's BenchSync pins, their setup** (`BenchSyncReroutes.swift`, `commitReroute`): v5 and v6 are applied through
+  the engine's apply path (`applyAndFollow`), as `movedBeforeDrainTurns` applies v4: a forced sync joined v4's run,
+  which settles only once the barrier is down (`checkRunSettled`), and each sync's free-space read swept behind the
+  barrier, whose follow-up turns drained the batch before v6 (`advanceFollowForSpaceSweep`), so the batch had no layer
+  (`layers []` in the first runs). P's publication is waited for in the engine (`publishingNow`): its binding waits
+  for the owed batch (`inboundBlocks`), so it never reached the store unit the first version waited for, which hung.
+  The purge's store work waits out the deletion grace of the blobs it dooms (60 s, `awaitReclaim`) on the bench's
+  manual clock, which a ticker moves to each next deadline while the purge runs (`HeldPublicationBench.time`); the
+  first version hung there.
+- **rr21-C3's figures** (release, best of 3, heartbeat / longest held drain turn; logs in `.build-s3f/c21/each/`).
+  Under `sim.lock` (`c3-final-1.log`, 1-minute loads 5.55 4.39 4.36 to 4.85 4.40 4.36): `concentrationPublicationTurns`
+  5.88 ms (7.11, 5.88, 5.95; item B's merge gate holds); `concentrationCommitRerouteTurns` 8.16 ms (8.28, 8.16, 8.17),
+  its drain's held turns 3.86 ms (47.12 ms before, rr21-C0); `commitRerouteDivergentTurns` 9.80 ms (10.09, 10.35, 9.80),
+  held 3.60 ms (758.26 ms at the red step); `groupMovedToBound` 9.98 ms (10.10, 9.98, 10.89), held 1.11 ms;
+  `groupDelistedAll` 5.67 ms for the group (held 0.60 ms) and 7.21 ms for the waiters (held 0.79 ms);
+  `purgeWhileOwedTurns` 9.94 ms (9.94, 10.07, 9.95); `commitFitBoundaryTurns` 1.40 ms at once (255 re-routes in the
+  commit's turn) and, owing, 0.28 ms for the commit's turn and 1.13 ms for the one drain turn of 256 ids. Item C's
+  `commitTurns` (item 4's re-measure): `.waiters` 11.03 ms (11.99, 11.03, 11.58), `.waitersStalledSubscriber` 14.84 ms,
+  `.groupStalledSubscriber` 8.82 ms, `.manyGroups` 10.05 ms (10.20, 10.66, 10.05); with two stalled subscribers 18.11
+  ms (recorded, not gated). The three misses are item 4's Phase 2 triggers (step 6); `.manyGroups`, open until rr21-C3,
+  now misses too.
+- **rr21-C3's C2 misses at site 1, and their route.** At a quiet load, best of 3: `commitRerouteWaitersTurns` 11.54 ms
+  (11.66, 11.54, 11.65), `commitTwoTokensTurns` 18.43 ms (19.39, 18.82, 18.43) and `userMovedToBound` 11.46 ms
+  (12.08, 11.78, 11.46), each the commit's own turn (`c3-pins.log`, 1-minute loads 7.57 7.59 8.81 to 6.48 7.33 8.68);
+  `applyWhileOwedLayers` 10.06 ms (10.18, 10.08, 10.06), the commit's own turn, its two applies 4.08 to 4.13 ms and
+  its 18 held turns at most 3.03 ms (`applies5-1.log`, 4.09 4.81 5.33); `lane429WhileOwed` 14.00 ms (14.16, 14.00,
+  14.16), the 429's turn, `followedLane` alone 13.96 to 14.10 ms, the median of 21 calls (`rest2-1.log`, 4.62 4.90
+  5.35). A profile of the commit's own turn at 10,000 pairs (temporary marks in `committed`, never committed; release,
+  `prof1-1.log`, `prof2-1.log`): the classification 5.4 to 5.7 ms, of which 4.5 to 5.0 ms is the per-pair
+  `applied.entry(for:)?.transferID != transfer`, since `ManifestEntry.transferID` formats the content hash
+  (`TransferID.content`); the trims 3.2 to 4.8 ms, the index releases of a job the same turn retires; `resolveAll`
+  0.7 to 0.9 ms; the owing 0.5 ms; two tokens an id double each part. `followedLane`'s `.reroutes` arm formats each
+  item's transfer up to three times (`rerouteListing`'s `ends` at each layer, `isBound`). The fix: the classification
+  compares the copy's entry with the job's (`sameTransfer`, as `publish` does), the owing path delivers the commit's
+  narrowed interests and leaves the job it retires untrimmed, and the arm checks the content before the binding and
+  reads `ends` only where a layer has one. The five pins are committed red right before that fix (S3-R26 item 11).
+  `commitWaitersBoundTurns` (11.45 ms; 11.45, 11.46, 11.88) owes nothing: with `commitTurns`' three misses it is item
+  4's Phase 2 trigger, and it waits in `.build-s3f/c21/pending/BenchSyncWaitersBound.swift` until Phase 2's red commit
+  (step 6).
+- **RR-21's UNCONFIRMED claims, checked** (`integrate-rr21.md` "unconfirmed"): every cost is measured above or in
+  rr21-C5 and rr21-C6. Confirmed in the code: no synchronous replay path reaches `reconcileIdle` while a batch is
+  owed (the replay reaches it only through `checkRunSettled`, which returns while `followBarrier` holds or
+  `reroutesWaiting > 0`; `advanceFollowForSpaceSweep` calls it only after the turn that ended an owed follow, once that
+  turn's drain batch has returned, never inside a replay);
+  the purge arm's predicate is `withdrawPurged`'s own closure under the copy now, so it cannot drift, and the arm drops
+  in (id, token) order where `withdrawPurged` drops by job: an order difference only (S3-R16 item 2); a cancelled
+  run's owed items join nothing at their replay (`reroute`'s `.run` guard on the run's token), so `finishRun` has
+  nothing of theirs to remove. Confirmed by the compiler: `ValidatedManifest` is `Sendable` (`RerouteBatch` holds
+  it); the event's stride was measured at rr21-C2 (168 bytes either way). Built and run: T5 to T11, rr21-T8b's ENOENT
+  shape, RR21-HOP's storage variant, RR21-RUN-MIDDRAIN (unreachable visited first, pinned by its `#require`), and
+  `PROBE-RR21-HEAL-T21`. Moot: the watcher premise (a deferred join with no watcher), since the `hasWork` disjunct
+  keeps the watcher while a batch waits (T-WATCH). Which existing tests change path: a probe counted each test's
+  owings (`.build-s3f/c21/tools/path-probe.py`, `path-probe/summary.txt`, the whole Sync suite, 631 tests passing);
+  the one pre-existing test it names is `R-SYN-4: ids converging on one content while a follow is owed` with
+  `.publicationApply` (an owing of 400 ids, visited first), which passes. The attribution is not reliable: swift-testing
+  ran the tests concurrently (`--no-parallel` does not serialise it; 1,405 overlapping starts). **Unconfirmed:**
+  that C1's `lazy var` compiles under Swift 6.3 (only 6.4 is installed; it compiles there with warnings as errors),
+  and `PROBE-RR21-RESERVE-REJOIN`'s reachability (rr21-C6).
 
 ## Items
 

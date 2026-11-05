@@ -1047,17 +1047,37 @@ extension SyncEngine {
     /// marked withdrawn (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that
     /// arrived. One pass over the waiting events, each verdict's joins (`EngineState.joinsBehindVerdicts`) at the
     /// verdict's place, newest first, where the queue held them when each was inserted right behind the verdict, so the
-    /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2).
+    /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2). An owed
+    /// re-route of such an interest leaves its batch (`EventAfterFollow.reroutes`), as that engine's purge withdrew the
+    /// interest from the job the re-route had joined: its group stops waiting for the member and its heal is forgotten,
+    /// in (id, token) order, as `withdrawPurged` drops them; a batch the purge empties stays queued, and its replay
+    /// counts it done (`continueReroutes`). The walk runs whether or not a join waits: an empty walk costs nothing
+    /// (ruling S3-R26 item 1; the early return on no waiting join was removed with it).
     private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
-        guard !self.state.joinsAfterFollow.isEmpty else {
-            return
-        }
         for index in self.state.eventsAfterFollow.indices {
             let event = self.state.eventsAfterFollow[index]
             if case .join(var join) = event {
                 if self.withdrawPurgedJoin(&join, isPurged) {
                     self.state.eventsAfterFollow[index] = .join(join)
                 }
+                continue
+            }
+            if case .reroutes(var batch) = event {
+                let removed = batch.items.removeAll { $0.lane < .userInitiated && $0.kind != .waiter && isPurged($0.asset) }
+                guard !removed.isEmpty else {
+                    continue
+                }
+                for item in removed.sorted() {
+                    switch item.kind {
+                    case .prefetch, .ensure:
+                        self.dropGroupMember(item.token, asset: item.asset, from: batch.from)
+                    case .system:
+                        self.state.heals[item.asset] = nil
+                    case .run, .waiter:
+                        break
+                    }
+                }
+                self.state.eventsAfterFollow[index] = .reroutes(batch)
                 continue
             }
             guard let key = event.verdictKey, let count = self.state.joinsBehindVerdicts[key]?.count else {
@@ -1728,9 +1748,20 @@ extension SyncEngine {
         if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
             violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
         }
-        // A waiter whose join waits for a failure verdict (`joinsAfterFollow`) holds no interest until the drain.
+        // The pairs owed a re-route (`EventAfterFollow.reroutes`), with the job each left: its owner names that job until
+        // the drain re-routes it (`continueReroutes`).
+        var owed: [MoveItem: TransferID] = [:]
+        for event in self.state.eventsAfterFollow {
+            if case .reroutes(let batch) = event {
+                for item in batch.items.elements {
+                    owed[MoveItem(asset: item.asset, token: item.token)] = batch.from
+                }
+            }
+        }
+        // A waiter whose join waits for a failure verdict (`joinsAfterFollow`), or whose re-route is owed, holds no interest
+        // until the drain.
         for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
-            if self.state.joinsAfterFollow[token]?[waiter.asset] != waiter.transfer {
+            if self.state.joinsAfterFollow[token]?[waiter.asset] != waiter.transfer, owed[MoveItem(asset: waiter.asset, token: token)] != waiter.transfer {
                 violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
             }
         }
@@ -1824,7 +1855,7 @@ extension SyncEngine {
         }
         for (token, group) in self.state.groups {
             for (asset, transfer) in group.pending where self.state.jobs[transfer]?.interests[token] == nil {
-                if self.state.joinsAfterFollow[token]?[asset] != transfer {
+                if self.state.joinsAfterFollow[token]?[asset] != transfer, owed[MoveItem(asset: asset, token: token)] != transfer {
                     violations.append("group \(token.rawValue) member \(asset) without an interest")
                 }
             }
@@ -2068,6 +2099,37 @@ extension SyncEngine {
         return violations
     }
 
+    /// What must hold of one owed re-route (`EventAfterFollow.reroutes`) from `transfer`'s job: its owner, if still
+    /// there, waits for it at that job (a waiter for its id, not from the store; a group's member pending there), the run
+    /// claims it nowhere (its claim was released when it was owed, `oweReroutes`), no job of that content holds it, and no
+    /// waiting join carries it too (Stage 3 close-out cycle 21, `integrate-rr21.md` R17, D3).
+    private func owedRerouteViolations(_ item: RerouteItem, from transfer: TransferID) -> [String] {
+        var violations: [String] = []
+        switch item.kind {
+        case .waiter:
+            if let waiter = self.state.waiters[item.token], waiter.fromStore || waiter.asset != item.asset || waiter.transfer != transfer {
+                violations.append("waiter \(item.token.rawValue) owed a re-route of \(item.asset) from \(transfer) waits for \(waiter.asset) in \(waiter.transfer)")
+            }
+        case .prefetch, .ensure:
+            if let group = self.state.groups[item.token], group.pending[item.asset] != transfer {
+                violations.append("group \(item.token.rawValue) member \(item.asset) owed a re-route from \(transfer) is pending at \(String(describing: group.pending[item.asset]))")
+            }
+        case .run:
+            if self.state.run?.token == item.token, self.state.run?.outstanding[transfer]?.contains(item.asset) == true {
+                violations.append("the run claims \(item.asset) on \(transfer), which a re-route owes")
+            }
+        case .system:
+            break
+        }
+        if self.state.jobs[transfer]?.interests[item.token]?.assets.contains(item.asset) == true {
+            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) is still held there")
+        }
+        if let join = self.state.joinsAfterFollow[item.token]?[item.asset] {
+            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) also waits to join \(join)")
+        }
+        return violations
+    }
+
     /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
     /// drain is in progress (none, between turns), so none waits for ever, and none once the engine stops running (cycle
     /// 21, ruling S3-R26 item 6); every failure verdict that waits names a failed job with its event (Stage 3 close-out
@@ -2076,7 +2138,9 @@ extension SyncEngine {
     /// 21, ruling S3-R26 item 2); the carried jobs are gone once the barrier is down (cycle 11); every waiting event has
     /// its decision instant in the world history, and once the barrier is down the history and the visits' and the
     /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
-    /// event, each with its decision instant in the history (cycle 21).
+    /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
+    /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
+    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -2096,6 +2160,8 @@ extension SyncEngine {
         var verdicts: Set<TransferID> = []
         var joins: [InterestToken: [AssetID: TransferID]] = [:]
         var waitingVerdicts: [VerdictKey: Int] = [:]
+        var batches = 0
+        var owedCounts: [MoveItem: Int] = [:]
         func register(_ join: JoinAfterFollow) {
             // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
             if !join.withdrawn {
@@ -2110,7 +2176,16 @@ extension SyncEngine {
                 }
             case .join(let join):
                 register(join)
-            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep, .reroutes:
+            case .reroutes(let batch):
+                batches += 1
+                if UInt64(batch.layers.count) != self.state.copySerial &- batch.serial {
+                    violations.append("a re-route batch from \(batch.from) holds \(batch.layers.count) copies for \(self.state.copySerial &- batch.serial) adopted since it was owed")
+                }
+                for item in batch.items.elements {
+                    owedCounts[MoveItem(asset: item.asset, token: item.token), default: 0] += 1
+                    violations.append(contentsOf: self.owedRerouteViolations(item, from: batch.from))
+                }
+            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
                 break
             }
             // A verdict's joins count at its place, newest first, where the queue held them (`joinsBehindVerdicts`).
@@ -2123,6 +2198,14 @@ extension SyncEngine {
         }
         if joins != self.state.joinsAfterFollow {
             violations.append("\(self.state.joinsAfterFollow.count) interests' joins wait for the follow, \(joins.count) with their event")
+        }
+        // Each owed pair is owed once, and every batch not replayed whole is counted: between turns every batch waits in
+        // the queue (a drain turn puts back what it did not make, `drainEventsAfterFollow`).
+        for (pair, count) in owedCounts.sorted(by: { $0.key < $1.key }) where count > 1 {
+            violations.append("interest \(pair.token.rawValue) in \(pair.asset) is owed \(count) re-routes")
+        }
+        if self.state.reroutesWaiting != batches {
+            violations.append("\(self.state.reroutesWaiting) re-route batches counted, \(batches) waiting")
         }
         if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
             violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")

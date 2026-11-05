@@ -586,8 +586,10 @@ extension SyncEngine {
     private func checkRunSettled(spaceSwept: Bool) {
         // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again. While the
         // drain gives a verdict whose job it took a run's claim off first, the claim is on no job's interest until its
-        // re-route lands it (`runClaimTakenOff`): the drain's end checks again.
-        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier, !self.state.runClaimTakenOff else {
+        // re-route lands it (`runClaimTakenOff`): the drain's end checks again. While re-routes are owed, their run items
+        // hold no claim (`oweReroutes`), queued or in a drain turn's batch, where the barrier reads down mid-drain: the
+        // drain's end checks again once the last is made (Stage 3 close-out cycle 21, RR21-RUN-MIDDRAIN).
+        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier, !self.state.runClaimTakenOff, self.state.reroutesWaiting == 0 else {
             return
         }
         self.materializeRun()

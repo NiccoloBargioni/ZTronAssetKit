@@ -1046,6 +1046,8 @@ extension SyncEngine {
     /// would drop ids only that fetch lists from the S1-13 checks.
     func adoptApplied(_ manifest: ValidatedManifest, etag: ETag?) {
         self.state.copySerial &+= 1
+        // The owed re-routes record the copy this replaces, before it changes (`layerOwedReroutes`).
+        self.layerOwedReroutes()
         self.state.applied = manifest
         self.state.appliedETag = etag
         if (self.state.newest?.sequence ?? 0) == 0 {

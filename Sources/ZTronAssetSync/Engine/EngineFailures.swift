@@ -833,14 +833,55 @@ extension SyncEngine {
             }
             return self.stillWants(join)
         }
+        // Whether an owed re-route joins this job at the drain (`continueReroutes`): its owner still waits for it at the
+        // job it left, as `stillWants` reads a waiting join's (a run item needs only the run: its claim was released when
+        // it was owed, `oweReroutes`), and its id follows the copy its re-route follows (`rerouteListing`) to this job's
+        // content without being answered present there (Stage 3 close-out cycle 21, ruling S3-R26 item 1).
+        func reaches(_ item: RerouteItem, _ batch: RerouteBatch) -> Bool {
+            guard !withdrawn.contains(item.token) else {
+                return false
+            }
+            switch item.kind {
+            case .waiter:
+                guard let waiter = self.state.waiters[item.token], !waiter.fromStore, waiter.asset == item.asset, waiter.transfer == batch.from else {
+                    return false
+                }
+            case .prefetch, .ensure:
+                guard self.state.groups[item.token]?.pending[item.asset] == batch.from else {
+                    return false
+                }
+            case .run:
+                guard self.state.run?.token == item.token else {
+                    return false
+                }
+            case .system:
+                break
+            }
+            guard let entry = (self.rerouteListing(item.asset, batch) ?? copy).entry(for: item.asset), !self.isBound(item.asset, to: entry.transferID) else {
+                return false
+            }
+            return SyncEngine.sameTransfer(entry, job.entry)
+        }
         if lane != .userInitiated {
             for event in self.state.eventsAfterFollow {
-                guard case .join(let join) = event, reaches(join) else {
+                switch event {
+                case .join(let join):
+                    guard reaches(join) else {
+                        continue
+                    }
+                    raise(join.lane)
+                    if lane == .userInitiated {
+                        return .userInitiated
+                    }
+                case .reroutes(let batch):
+                    for item in batch.items.elements where reaches(item, batch) {
+                        raise(item.lane)
+                        if lane == .userInitiated {
+                            return .userInitiated
+                        }
+                    }
+                default:
                     continue
-                }
-                raise(join.lane)
-                if lane == .userInitiated {
-                    return .userInitiated
                 }
             }
             for behind in self.state.joinsBehindVerdicts.values {
