@@ -5186,12 +5186,23 @@ fix (S3-R26 item 11, "Red first").
    the whole Sync suite passes). Its pins missed C2 on `e437c28` (27.66 ms all held, 17.48 ms half held); the take-off
    in one access (`Job.takeOff(_:)`, `settleRemoval`): **committed** next (7.26 ms and 6.17 ms at a 1-minute load of
    5.27; under "Step 5"). T-shared, PRESENT-PRUNE at site 2 (with its red copy) and `PROBE-RR21-RESERVE-REJOIN`:
-   **committed** next (16 cases pass in both orders; under "Step 5"). **Next action:** site 2's mutants
-   (`tools/mut-c6.py` on `snap-c6`), the timing window (the site-3 figures with step 8's), then the mutant runs'
-   results and survivors (rr21-C7).
-6. Item C, Phase 2, if a trigger fires: pending.
-7. Item 5 (`waitingTarget`) and its two probes: pending.
-8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
+   **committed** next (16 cases pass in both orders; under "Step 5"). Site 2's mutants **ended** (`mut21-c6.txt`,
+   11:51 to 12:56 on 5 Nov): six survivors, three of which `27b278a`'s tests kill 2/2 (`mut21-c6b.txt`). rr21-C7:
+   **committed** (`2c351e8` removes the two checks no path reaches, i5-move-no-end's and vy-not-committing's, under
+   S3-R19 item 3, and the whole Sync suite passes, 681 tests in 56 suites, `each/both-removed-sync.log`; the mutation
+   table with per-order kill counts, every survivor's disposition and R19's records are under "rr21-C7" below). Twelve
+   survivors are **open**: no test kills them and none is shown Equivalent (under "rr21-C7", "Open"). The site-3
+   figures are step 8's (under "Gate evidence (cycle 21)").
+6. Item C, Phase 2: triggered and **committed** (`06d5e40` the waiters-bound pin, red; `28d533e` C12, the owed
+   answers, with T-A1 to T-A5 and the ensure arm; `57d5d8c` `materializeEnsures`' sort of only the ensure groups with
+   fetches left, for `manyGroups`). On `2c351e8`, at a 1-minute load of 4.18, every gated case meets C2 but
+   `waitersStalledSubscriber`, 10.31 ms best: a miss Phase 2 cannot cut, **blocking and reported** (S3-R26 item 4).
+   Under "Step 6".
+7. Item 5 and its two probes: **committed** (`4aeb321` Shape A; `3412ec3` and `d85eb02` probe (ii), red; `58b278e`
+   its fix; `2130e61` probe (i), red; `dff8946` its fix with two controls; `adf650d` the transfer's sibling, red;
+   `b171e8b` its fix; `46e3669` the three docs). Under "Step 7".
+8. Close: the gate run on `2c351e8` (`.build-s3f/c21/gates21.sh`), under "Gate evidence (cycle 21)", with what was
+   not run.
 
 ### Step 1: failing tests, pins and probes on `8e1fb24`
 
@@ -5511,7 +5522,7 @@ bundle passed after each fix: 582 tests on `96ca019` (`sync-k4.log`), 583 on `68
     `EngineFollowBarrierLaterVerdictTests.swift:93-100` and `failJ2`, `:143`).
 - **Mutants** (copy-based runner `.build-s3f/c21/tools/mut21.py`, each run on a copy of the worktree's sources, 2/2
   runs of the item's tests, the Sync bundle for a survivor): item A's 18 are running (`mut21-a.txt`); candidate 4's
-  9, T1-space's and K4's are queued (`tools/mut-c4.py`). The table is filled in when they end. `a-queue-insert` (the
+  9, T1-space's and K4's are queued (`tools/mut-c4.py`). They ended; the table is under "rr21-C7". `a-queue-insert` (the
   old queue insert put back) failed A-T1 2/2 swept first in place (`mut-a-queue-insert.log`).
 
 ### Step 4: item B, item 7 and variant Y
@@ -5622,8 +5633,8 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
     6. *Pre-existing*: moved ids leave `Job.assets` without `retireProgress` (above); an empty binding can occur on the
        bounded path (RR-20's family, S3-R24 item 1).
 - **Mutants** (`.build-s3f/c21/tools/mut-b.py`, 32, on the snapshot `.build-s3f/c21/snap-b` of `82ba8a1`) are queued
-  after item A's and candidate 4's (`.build-s3f/c21/tools/chain-mut.sh`, `mut21-b.txt`). The table is filled in when
-  they end.
+  after item A's and candidate 4's (`.build-s3f/c21/tools/chain-mut.sh`, `mut21-b.txt`). They ended; the table
+  is under "rr21-C7".
 
 ### Step 5: RR-21 (S3-R26 items 1 and 11)
 
@@ -6069,6 +6080,536 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   - Results: the three tests pass in both orders (16 cases) with the site-2 tests (8 tests, `each/c6-site2-all.log`,
     30.6 s, a 1-minute load of 8.77 at the end), and PRESENT-PRUNE's six cases on their own (`each/c6-present-pty3.log`,
     6.2 s, load 4.09).
+
+### rr21-C7: the mutation table, the survivors and R19's records
+
+**The runs.** Every mutant was applied to a copy of the sources named in its file's heading (the copy-based runners
+`tools/mut21.py`, `mut21s.py`, `mut21u.py`, with the item lists in `tools/mut-*.py`; item 5's and T20's were applied to
+the worktree one at a time and reverted), built in debug, and run twice on its item's tests; a mutant both runs left
+alive ran once more on the whole Sync bundle. A hang past the run's time limit counts as a kill, as a test's time limit
+does; a run that crashed counts too (each crash in the table is the runtime's trap on a continuation resumed twice).
+"Item runs" marks each run by the orders of its failing test cases (integrate-rr21.md C7's per-order counts): **S** a
+case run `sweepFollowsFirst`, **V** one run `followVisitedFirst`, **U** a test with no order argument, **H** a hang,
+**C** a crash, `pass` none. `FB` stands for `EngineFollowBarrier` and a file's `Tests.swift` is left out. The marks are
+read from the runs' logs (`tools/muttable.py`, `tools/perorder.py`); a mutant run again in a later file keeps its later
+logs. A kill in `S` only is a branch whose state arises swept first. S3-R26 item 12's answer 1 counts it reached in
+both orders when its test asserts the visit-first answers in both and the draft cites why `followVisitedFirst` cannot
+reach it, or the test requires the state per order (as Shape A does, under "Step 7"); that is recorded with each test
+where Steps 1 to 7 describe it, and this table does not re-check it.
+
+`mut21-a.txt`: item A (step 3), 18:29 to 20:55 on 4 Nov, from a 1-minute load of 3.75:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `a-drop-append` | S+U, S+U | - | FBDeferBucket:304:6, FBDeferBucket:316:17, FBDeferBucket:320:13 |
+| `a-drop-materialize` | H, H | - | - |
+| `a-arrival-order` | S, S | - | FBDeferBucket:363:13 |
+| `a-tail-materialize` | S, S | - | FBDeferBucket:362:17, FBPublication:107:25 |
+| `a-given-verdict-only` | S, S | - | FBDeferBucket:380:6, FBDeferBucket:402:9, FBReach:38:9 |
+| `a-drop-space-arm` | U, U | - | FBDeferBucket:414:9 |
+| `a-drop-attempt-arm` | S+U, S+U | - | FBDeferBucket:304:6, FBDeferBucket:320:13, FBDeferBucket:323:9 |
+| `a8-drop-bucket-arm` | S, S | - | FBDeferBucket:460:9, FBDeferBucket:463:13, FBDeferBucket:485:13 |
+| `a8-drop-bucket-writeback` | S, S | - | FBDeferBucket:461:9, FBDeferBucket:463:13 |
+| `a9-recount-no-withdrawn-filter` | S, S | - | FBDeferBucket:461:9 |
+| `a9-drop-recount-walk` | U, U | - | FBDeferBucket:320:13, FBDeferBucket:622:13 |
+| `a7-drop-bucket-walk` | S, S | - | FBDeferBucket:517:6, FBDeferBucket:589:13, FBDeferBucket:592:13 |
+| `a7-count-without-reaches` | S, S | - | FBDeferBucket:517:6, FBDeferBucket:594:13, FBDeferBucket:595:13 |
+| `a10-drop-clear` | S, S | - | FBDeferBucket:673:9, FBDeferBucket:675:9 |
+| `k1-drop` | U, U | - | FBDeferBucket:627:9, FBDeferBucket:634:9, FBDeferBucket:639:9 |
+| `k3-drop` | U+V, U+V | - | FBDeferBucket:646:9, FBDeferBucket:677:9, FBDeferBucket:682:9 |
+| `e1-event-loop-break` | V, pass | - | FBDeferBucket:371:9 |
+| `e2-bucket-loop-no-return` | pass | pass | - |
+
+`mut21-c4.txt`: candidate 4, T1-space and K4 (step 3), on `82ba8a1`, from 20:55:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `c4-drop-flag` | U, U | - | FBLaterVerdict:135:17 |
+| `c4-guard-drop` | U, U | - | FBLaterVerdict:135:17 |
+| `c4-copy-always-waits` | U, U | - | FBLaterVerdict:133:17 |
+| `c4-copy-never-waits` | U, U | - | FBLaterVerdict:135:17 |
+| `c4-copy-record-drop` | U, U | - | FBLaterVerdict:133:17 |
+| `c4-remainder-flag-drop` | U, U | - | FBLaterVerdict:133:17 |
+| `c4-drop-post-replay` | U, U | - | FBLaterVerdict:135:17, FBLaterVerdict:62:6, FBReach:38:9 |
+| `c4-post-replay-arrival-order` | pass | V, pass | FBDeferBucket:371:9 |
+| `a-drop-space-arm-t1space` | U, U | - | FBDeferBucket:500:17 |
+| `k4-drop` | U, U | - | EngineFollowShutdown:96:9 |
+
+`mut21-b.txt`: item B and variant Y (step 4), on `snap-b` (`82ba8a1`), 21:20 to 23:24:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `nb1-add-first` | U, U | - | EngineIDTokens:108:9, EngineIDTokens:113:9, EngineIDTokens:120:9 |
+| `nb2-remove-other` | U, U | - | EngineIDTokens:123:9, EngineIDTokens:49:9, EngineIDTokens:51:9 |
+| `nb3-no-promote` | S+U+V, S+U+V | - | FBMoveHolders:102:6, FBMoveHolders:146:9, FBMoveHolders:148:9 |
+| `nb3-skip-promotion` | S+U+V, S+U+V | - | FBMoveHolders:102:6, FBMoveHolders:146:9, FBMoveHolders:148:9 |
+| `nb4-keep-empty-entry` | U, U | - | EngineIDTokens:108:9, EngineIDTokens:113:9, EngineIDTokens:120:9 |
+| `nb5-insert-always` | U, U | - | EngineIDTokens:104:9, EngineIDTokens:108:9, EngineIDTokens:113:9 |
+| `nb6-set-no-release` | U, U | - | EngineIDTokens:108:9, EngineIDTokens:120:9, EngineIDTokens:123:9 |
+| `nb6-set-no-index` | U, U | - | EngineIDTokens:108:9, EngineIDTokens:120:9, EngineIDTokens:125:9 |
+| `nb6b-remove-no-release` | U, U | - | EngineIDTokens:108:9, EngineIDTokens:120:9, EngineIDTokens:123:9 |
+| `nb6c-subtract-no-release` | U, U | - | EngineIDTokens:120:9, EngineIDTokens:123:9, EngineIDTokens:70:13 |
+| `nb6d-setassets-no-release` | U, U | - | EngineIDTokens:113:9, EngineIDTokens:120:9, EngineIDTokens:123:9 |
+| `nb6e-setassets-no-index` | U, U | - | EngineIDTokens:113:9, EngineIDTokens:120:9, EngineIDTokens:123:9 |
+| `nb7-keep-no-release` | U, U | - | EngineIDTokens:123:9 |
+| `nb8-clear-no-index` | U, U | - | EngineIDTokens:131:9, EngineIDTokens:70:13 |
+| `nb9-no-reinsert` | S, S | - | FBMoveIndex:309:9, FBMoveIndex:312:9, FBMoveIndex:313:9 |
+| `nb9b-one-slot-many-ids` | S+U+V, S+U+V | - | FBMoveHolders:269:17, FBMoveHolders:276:9, FBMoveHolders:278:9 |
+| `nb10-no-unheld-subtract` | S+V, S+V | - | FBMoveIndex:66:9, FBMoveIndex:67:9 |
+| `nb10b-no-unheld-append` | S+V, S+V | - | FBMoveIndex:66:9, FBMoveIndex:67:9 |
+| `nb11-no-sort` | S+V, S+V | - | FBMoveHolders:82:9 |
+| `nb11b-sort-by-asset` | S+V, S+V | - | FBMoveHolders:82:9 |
+| `nb12-holdings-first-only` | S+V, S+V | - | FBMoveHolders:102:6, FBMoveHolders:164:9, FBMoveHolders:165:9 |
+| `nb12b-items-first-only` | S+V, S+V | - | FBMoveHolders:164:9, FBMoveHolders:165:9, FBMoveHolders:167:9 |
+| `nb13-drop-i1` | U, U | - | EngineIDTokens:153:9 |
+| `nb13-drop-i2` | U, U | - | EngineIDTokens:157:9 |
+| `nb13-drop-i3` | U, U | - | EngineIDTokens:155:9 |
+| `t6-no-budget-spend` | U, U | - | FBMoveHolders:275:9, FBTurnTotal:106:13 |
+| `vy-no-pass` | S, S | - | FBMoveIndex:336:9 |
+| `vy-owed-moves-too` | pass | pass | - |
+| `vy-not-committing` | pass | pass | - |
+| `b11-always-subtract` | S+U, S+U | - | EngineCommitWindow:160:9, EngineLegacyMigrationTransfer:1034:9, EngineLegacyMigrationTransfer:1209:9 |
+| `b9-no-unfollowed` | S+V, S+V | - | FBAnswer:650:13, FBAnswer:798:9, FBApply:103:13 |
+| `b6-no-supersede` | S, S | - | FBVerdictApply:273:6, FBVerdictApply:316:9, FBVerdictApply:325:9 |
+
+`mut21-c3.txt`: rr21-C3 (site 1, the readers, the layers), on `snap-c3` (`2d6b147`'s sources), from 23:50:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `b1-owe-empty` | S+V, S+V | - | FBRerouteCommit:291:9 |
+| `b2-drop-locations` | S+V, S+V | - | FBRerouteCommit:268:9, FBRerouteCommit:269:9 |
+| `b2-ge` | U, U | - | FBRerouteCommit:280:9 |
+| `b2-always-owe` | U, U | - | FBRerouteCommit:232:9, FBRerouteCommit:280:9 |
+| `b2-never-owe` | S+U+V, S+U+V | - | FBRerouteCommit:227:9, FBRerouteCommit:228:9, FBRerouteCommit:243:9 |
+| `b3-never-refused` | S+U+V, S+U+V | - | FBRerouteCaptured:83:9, FBRerouteCaptured:96:9 |
+| `b4-owing-no-hold` | S+V, S+V | - | FBRerouteCaptured:96:9 |
+| `b10-per-item` | S+V, S+V | - | FBRerouteCommit:305:9 |
+| `b11-no-bound` | S+U+V, S+U+V | - | FBRerouteCommit:228:9, FBRerouteCommit:229:9, FBRerouteCommit:244:9 |
+| `b12-no-countdown` | H, H | - | - |
+| `b12-no-release` | S+V | - | FBReach:38:9, FBRerouteHold:121:6, FBRerouteHold:150:9 |
+
+`mut21-c3b.txt`: rr21-C3 from b12-no-release, the same snapshot, a 300 s hang limit:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `b12-no-release` | H, H | - | - |
+| `b13-no-guard` | S+V, S+V | - | FBRerouteHold:146:9, FBRerouteHold:152:9 |
+| `b14-always-nil` | S+U+V, S+U+V | - | FBReach:38:9, FBRerouteCommit:228:9, FBRerouteCommit:229:9 |
+| `b14-always-returned` | S+V, S+V | - | FBReach:38:9, FBRerouteCommit:244:9, FBRerouteCommit:245:9 |
+| `b15-no-owed-prefix` | S+U+V, S+U+V | - | FBReach:38:9, FBRerouteCommit:228:9, FBRerouteCommit:229:9 |
+| `b16-t21-follows-now` | S+V, S+V | - | FBRerouteLayer:115:9, FBRerouteLayer:116:9, FBRerouteLayer:120:9 |
+| `b17-pin-always` | H, H | - | - |
+| `b17-pin-never` | S+V, S+V | - | FBRerouteLayer:197:9, FBRerouteLayer:198:9, FBRerouteLayer:210:9 |
+| `b17-no-ends` | S+V, S+V | - | FBRerouteLayer:197:9, FBRerouteLayer:198:9, FBRerouteLayer:210:9 |
+| `b18-dropped-follows-now` | S, S | - | FBRerouteLayer:326:9, FBRerouteLayer:329:9, FBRerouteLayer:442:9 |
+| `b19-incoming-applied` | S+V, S+V | - | FBRerouteLayer:326:9, FBRerouteLayer:329:9, FBRerouteLayer:411:9 |
+| `b20-no-publishing` | S+V, S+V | - | FBRerouteLayer:174:9, FBRerouteLayer:197:9, FBRerouteLayer:198:9 |
+| `b20-no-verdicts` | S+U+V, S+U+V | - | FBRerouteLayer:241:9, FBRerouteLayer:243:9, FBRerouteLayer:245:9 |
+| `b20-ge` | U, U | - | FBRerouteLayer:480:9, FBRerouteLayer:483:9 |
+| `b20-every-layer` | U, U | - | FBRerouteLayer:480:9, FBRerouteLayer:483:9 |
+| `b20-verdicts-ahead` | S+U+V, S+U+V | - | FBRerouteLayer:241:9, FBRerouteLayer:243:9, FBRerouteLayer:245:9 |
+| `b20-no-layer-call` | S+U+V, S+U+V | - | FBRerouteLayer:122:9, FBRerouteLayer:174:9, FBRerouteLayer:197:9 |
+
+`mut21-c3c.txt`: rr21-C3 from b21-no-hold-term, the same snapshot (a whole-suite run past 300 s counted as a hang):
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `b21-no-hold-term` | H, H | - | - |
+| `b24-no-prune-guard` | U, U | - | FBReroutePresent:115:13, FBReroutePresent:89:9 |
+| `b25-no-work-disjunct` | S+V, S+V | - | FBReroutePresent:155:9, FBReroutePresent:167:9, FBReroutePresent:168:9 |
+| `b26-no-run-guard` | S, S | - | FBRerouteRun:181:9, FBRerouteRun:187:9 |
+| `b27-no-run-release` | S+V, S+V | - | FBRerouteRun:112:9, FBRerouteRun:115:9, FBRerouteRun:127:9 |
+| `b27-no-nil-write` | S+V, S+V | - | FBRerouteRun:112:9, FBRerouteRun:127:9, FBRerouteRun:189:9 |
+| `b28-no-schedule` | H, H | - | - |
+| `b29-no-zeroing` | S+V, S+V | - | FBRerouteOwner:277:9, FBRerouteOwner:279:9 |
+| `b30-queued-pins` | H, H | - | - |
+| `b22-no-withdrawn` | S+V, S+V | - | FBRerouteOwner:138:13, FBRerouteOwner:139:13 |
+| `b22-no-waiter-owner` | pass | H, H | - |
+| `b22-no-group-owner` | S+V, S+V | - | FBRerouteOwner:147:13, FBRerouteOwner:148:13 |
+| `b22-no-run-owner` | pass | H, H | - |
+| `b22-no-bound-skip` | S+V, S+V | - | FBRerouteOwner:144:13, FBRerouteOwner:145:13 |
+| `b22-no-listing` | S+V, S+V | - | FBRerouteOwner:141:13, FBRerouteOwner:142:13 |
+| `b22-no-arm` | S+V, S+V | - | FBRerouteOwner:121:13, FBRerouteOwner:125:33 |
+| `b22-arm-no-early-return` | pass | H, H | - |
+| `b23-no-lane` | pass | H, H | - |
+| `b23-no-kind` | pass | H, H | - |
+| `b23-no-purged` | S+V, S+V | - | FBRerouteOwner:187:9, FBRerouteOwner:188:9, FBRerouteOwner:194:9 |
+| `b23-no-group-drop` | S+V, S+V | - | FBReach:38:9, FBRerouteOwner:188:9, FBRerouteOwner:200:9 |
+| `b23-no-heal-forget` | S+V, S+V | - | FBRerouteOwner:189:9, FBRerouteOwner:200:9 |
+| `b23-no-writeback` | S+V, S+V | - | FBRerouteOwner:187:9, FBRerouteOwner:194:9, FBRerouteOwner:201:9 |
+| `b31-no-waiter-acceptance` | S+U+V, S+U+V | - | FBRerouteCommit:230:9, FBRerouteCommit:245:9, FBRerouteCommit:257:9 |
+| `b31-no-group-acceptance` | S+U+V, S+U+V | - | FBRerouteCommit:306:9, FBRerouteInvariant:41:13, FBRerouteOwner:201:9 |
+| `b31-no-waiter-clause` | U, U | - | FBRerouteInvariant:49:9 |
+| `b31-no-group-clause` | U, U | - | \(String(describing |
+| `b31-no-run-clause` | S+V, S+V | - | FBRerouteRun:115:9 |
+| `b31-no-held-clause` | U, U | - | FBRerouteInvariant:60:9 |
+| `b31-no-join-clause` | U, U | - | FBRerouteInvariant:63:9 |
+| `b31-no-layers-clause` | U, U | - | FBRerouteInvariant:85:9 |
+| `b31-no-twice-clause` | U, U | - | FBRerouteInvariant:73:9 |
+| `b31-no-counter-clause` | U, U | - | FBRerouteInvariant:76:9 |
+
+`mut21-c3d.txt`: the five rr21-C3 mutants killed only by a whole-suite run past 300 s, again with 900 s, on `snap-c3`, from 10:00 on 5 Nov:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `b22-no-waiter-owner` | pass | pass | - |
+| `b22-no-run-owner` | pass | pass | - |
+| `b22-arm-no-early-return` | pass | pass | - |
+| `b23-no-lane` | pass | pass | - |
+| `b23-no-kind` | pass | pass | - |
+
+`mut21-c3fix.txt`: the commit turn's and `followedLane`'s fix (after `f4f35bd`), on `snap-c3fix`:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `f1-no-bound-only` | H, H | - | - |
+| `f2-partial-whole` | S+U+V, S+U+V | - | FBRerouteCommit:306:9, FBRerouteInvariant:41:13, FBRerouteLayer:122:9 |
+| `f3-whole-delivered` | H, H | - | - |
+| `f4-lane-untrimmed` | U, U | - | FBRerouteAnnounce:129:9 |
+| `f5-lane-bulk` | U, U | - | FBRerouteAnnounce:129:9 |
+| `f6-classify-inverted` | S+U+V, S+U+V | - | FBRerouteCaptured:120:9, FBRerouteCaptured:164:9, FBRerouteCaptured:170:9 |
+| `f7-delisted-stays` | pass | - | - |
+
+`mut21-c3fix2.txt`: f7 to f11 again on `snap-c3fix` (checked against `b1d37df`), from 08:58:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `f7-delisted-stays` | pass | pass | - |
+| `f8-at-once-no-trims` | S+U+V, S+U+V | - | FBReach:38:9, FBRerouteCaptured:164:9, FBRerouteCaptured:170:9 |
+| `f9-no-bound-skip` | S+V, S+V | - | FBRerouteOwner:144:13, FBRerouteOwner:145:13 |
+| `f10-no-content` | S+V, S+V | - | FBRerouteOwner:129:13, FBRerouteOwner:130:13, FBRerouteOwner:134:33 |
+| `f11-no-ends` | S+V, S+V | - | FBRerouteLayer:197:9, FBRerouteLayer:198:9, FBRerouteLayer:210:9 |
+
+`mut21-c4fix.txt`: PROBE-RR21-PIN-END's fix and R18 (rr21-C4), on `snap-c4fix` (`2c62e85`), from 09:05:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `p1-no-record` | S+U+V, S+U+V | - | FBJoinGapFailure:85:9, FBReach:38:9, FBReroutePinEnd:129:9 |
+| `p2-record-always` | S+U+V, S+U+V | - | FBReach:38:9, FBReroutePinEnd:250:9 |
+| `p2b-record-only-with-batch` | U, U | - | FBJoinGapFailure:85:9 |
+| `p3-record-epoch-zero` | S+U+V, S+U+V | - | FBJoinGapFailure:85:9, FBReroutePinEnd:129:9, FBReroutePinEnd:130:9 |
+| `p4-skip-commit-copy` | S+U+V, S+U+V | - | FBJoinGapFailure:85:9, FBReroutePinEnd:129:9, FBReroutePinEnd:130:9 |
+| `p5-no-walk-on` | S+V, S+V | - | FBReroutePinEnd:140:9, FBReroutePinEnd:141:9 |
+| `p6-no-forget` | S+U+V, S+U+V | - | FBReach:38:9, FBReroutePinEnd:120:9, FBReroutePinEnd:131:9 |
+| `p7-forget-at-last-batch` | pass | pass | - |
+| `p8-shutdown-keeps` | U, U | - | FBReroutePinEnd:285:9, FBReroutePinEnd:287:9 |
+| `p9-clause-unended-off` | U, U | - | its end"] |
+| `p10-clause-ahead-off` | U, U | - | FBReroutePinEnd:254:9 |
+| `p11-clause-idle-off` | U, U | - | FBReroutePinEnd:260:9 |
+| `r1-no-chain` | S+U+V, S+U+V | - | FBJoinGapFailure:117:9, FBJoinGapFailure:128:9, FBJoinGapFailure:133:9 |
+| `r1b-chain-serial-ahead` | H, H | - | - |
+| `r2-no-join-layer` | S+U+V, S+U+V | - | FBJoinGapFailure:133:9, FBJoinGapFailure:135:9, FBJoinGapFailure:146:9 |
+| `r2b-made-ignores-previous` | pass | pass | - |
+| `r2c-made-ignores-verdicts` | pass | pass | - |
+| `r2d-no-batch-layer` | S+U+V, S+U+V | - | FBRerouteLayer:122:9, FBRerouteLayer:185:9, FBRerouteLayer:208:9 |
+| `r2e-no-verdict-key` | S+U+V, S+U+V | - | FBRerouteLayer:252:9, FBRerouteLayer:254:9, FBRerouteLayer:256:9 |
+| `r3-listing-engine-copy` | S+U+V, S+U+V | - | FBJoinGapFailure:146:9, FBJoinGapFailure:148:9, FBJoinGapFailure:160:9 |
+| `r4-replay-no-listing` | S+U+V, S+U+V | - | FBJoinGapFailure:146:9, FBJoinGapFailure:148:9, FBJoinGapFailure:160:9 |
+| `r4b-replay-reroute-engine-copy` | U, U | - | FBJoinGapFailure:85:9 |
+| `r5-lane-engine-copy` | pass | pass | - |
+| `r6-fast-drops-here` | S, S | - | FBAnswer:531:9, FBAnswer:534:25, FBLane:271:9 |
+| `r7-fast-ignores-end` | pass | pass | - |
+| `r8-fast-any-join` | pass | pass | - |
+| `r9-clause-chain-off` | U, U | - | FBJoinGapFailure:128:9 |
+
+`mut21-c5.txt`: rr21-C5 (site 3), on `42a3689`, from 10:24:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `s1-nil-bound` | S+U+V, S+U+V | - | FBRerouteLayer:51:13, FBReroutePresent:97:13, FBRerouteSupersede:138:9 |
+| `s2-ge` | U, U | - | FBRerouteSupersede:125:9, FBRerouteSupersede:63:9 |
+| `s3-always-owe` | S+U+V, S+U+V | - | FBRerouteSupersede:125:9, FBRerouteSupersede:33:9, FBRerouteSupersede:53:9 |
+| `s4-never-owe` | S+U+V, S+U+V | - | FBRerouteLayer:51:13, FBReroutePresent:97:13, FBRerouteSupersede:138:9 |
+| `s5-hold-at-once-only` | H, H | - | - |
+| `s6-kind-waiter` | S+V, S+V | - | FBReach:38:9, FBRerouteSupersede:51:9, FBRerouteSupersede:52:9 |
+| `s7-lane-bulk` | S+U+V, S+U+V | - | FBRerouteSupersede:35:9, FBRerouteSupersede:51:9, FBRerouteSupersede:54:9 |
+| `s8-no-defer` | H, H | - | - |
+| `s9-hop-no-publishing` | S+V, S+V | - | FBRerouteLayer:187:9, FBRerouteSupersede:156:9, FBRerouteSupersede:157:9 |
+| `s10-window-no-hold` | H, H | - | - |
+| `s11-present-no-guard` | U, U | - | FBReroutePresent:124:13, FBReroutePresent:98:9 |
+
+`mut21-c6.txt`: rr21-C6 (site 2), on `e5b4df9`, 11:51 to 12:56:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `c6-no-zero` | H, H | - | - |
+| `c6-no-charge` | S, S | - | FBRerouteTakeOff:79:13, FBRerouteTakeOff:80:13, FBRerouteTakeOff:81:13 |
+| `c6-always-owe` | S+U, S+U | - | FBRerouteTakeOffShare:167:17, FBRerouteTakeOff:78:13, FBRerouteTakeOff:79:13 |
+| `c6-never-owe` | S+U, S+U | - | FBRerouteCompose:42:13, FBRerouteCompose:43:13, FBRerouteCompose:45:29 |
+| `c6-owe-at-edge` | U, U | - | FBRerouteTakeOffShare:167:17 |
+| `c6-land-desc` | pass | pass | - |
+| `c6-land-unsorted` | pass | pass | - |
+| `c6-removal-desc` | S, S | - | FBRerouteTakeOff:143:13 |
+| `c6-removal-unsorted` | S+U, S | - | FBRerouteTakeOffShare:167:17, FBRerouteTakeOff:143:13, FBRerouteTakeOff:81:13 |
+| `c6-settle-first-lane` | pass | pass | - |
+| `c6-partial-as-whole` | S, S | - | FBRerouteTakeOff:45:13, FBRerouteTakeOff:57:9, FBRunClaim:205:9 |
+| `c6-no-run-held` | pass | pass | - |
+| `c6-no-claim-taken-off` | S, S | - | FBRunClaim:204:9, FBRunClaim:205:9 |
+| `c6-no-claim-clear-owed` | pass | pass | - |
+| `c6-batch-after-rest` | S, S | - | FBRerouteCompose:43:13, FBRerouteCompose:48:13, FBRerouteTakeOff:39:13 |
+| `c6-batch-at-tail` | S, S | - | FBRerouteCompose:43:13, FBRerouteCompose:48:13, FBRerouteTakeOff:39:13 |
+| `c6-batch-after-overflow` | S, S | - | FBRerouteCompose:43:13, FBRerouteCompose:48:13, FBRerouteTakeOff:39:13 |
+| `c6-continue-full-turn` | S, S | - | FBRerouteTakeOffShare:39:13, FBRerouteTakeOffShare:40:13, FBRerouteTakeOffShare:41:13 |
+| `c6-charge-after-visit` | S, S | - | FBRerouteCompose:42:13, FBRerouteTakeOff:110:13 |
+| `c6-space-charge-after-visit` | pass | pass | - |
+
+`mut21-c6b.txt`: site 2's three survivors against `27b278a`'s tests, on `57d5d8c` with them, from 14:23:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `c6-settle-first-lane` | S, S | - | FBRerouteTakeOff:199:13 |
+| `c6-no-claim-clear-owed` | S, S | - | FBRunClaim:271:13, FBRunClaim:273:17 |
+| `c6-space-charge-after-visit` | S, S | - | FBRerouteTakeOff:140:13 |
+
+`mut21-c12.txt`: Phase 2 (step 6), on `28d533e`, from 12:57 (stopped after c12-waiter-in-turn's first run):
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `c12-fit-ge` | H, H | - | - |
+| `c12-always-owe` | H, H | - | - |
+| `c12-never-owe` | H, H | - | - |
+| `c12-waiter-in-turn` | H | - | - |
+
+`mut21-c12b.txt`: Phase 2 from c12-waiter-in-turn, on `28d533e`, from 13:37:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `c12-waiter-in-turn` | H, H | - | - |
+| `c12-ensure-in-turn` | S+V, S+V | - | EngineOwedAnswers:152:9, EngineOwedAnswers:155:9 |
+| `c12-waiter-kept` | V, V | - | FBReach:38:9 |
+| `c12-no-schedule` | H, H | - | - |
+| `c12-unbounded-turn` | H, H | - | - |
+| `c12-no-reschedule` | H, H | - | - |
+| `c12-no-empty` | S+V, S+V | - | EngineOwedAnswers:135:9 |
+| `c12-head-kept` | C, C | - | - |
+| `c12-no-running-guard` | pass | pass | - |
+| `c12-drain-no-flush` | H, H | - | - |
+| `c12-drain-from-start` | C, C | - | - |
+| `c12-drain-shutdown` | S+V, S+V | - | EngineOwedAnswers:202:9 |
+| `c12-clause-no-head` | S+V, S+V | - | EngineOwedAnswers:261:9 |
+| `c12-clause-no-unscheduled` | S+V, S+V | - | EngineOwedAnswers:254:9 |
+| `c12-clause-no-registered` | S+V, S+V | - | EngineOwedAnswers:271:9 |
+| `c12-clause-unwired` | S+V, S+V | - | EngineOwedAnswers:254:9, EngineOwedAnswers:261:9, EngineOwedAnswers:271:9 |
+
+`mut21-i5.txt`: item 5 (step 7), each applied in turn to the worktree at `58b278e`:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `i5-move-drop` | S, S | - | FBWaitingTarget:194:13, FBWaitingTarget:253:9, FBWaitingTarget:254:9 |
+| `i5-move-no-end` | pass, pass | - | - |
+| `i5-visit-drop` | S, S | - | FBWaitingTarget:269:9, FBWaitingTarget:270:9 |
+| `i5-visit-no-applies` | S, S | - | FBWaitingTarget:305:9, FBWaitingTarget:306:9 |
+| `i5-visit-no-end` | pass, pass | - | - |
+| `i5-pin-fold` | S+V, S+V | - | FBRerouteRequeue:124:9, FBRerouteRequeue:130:31, FBRerouteRequeue:25:6 |
+
+`mut21-i5s.txt`: item 5's two survivors against the whole Sync suite, on `58b278e`'s sources:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `i5-move-no-end` | - | pass | - |
+| `i5-visit-no-end` | - | H | - |
+
+`mut21-t20.txt`: probe (i)'s fix and its controls (step 7), on a copy of the tree at `dff8946`:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `t20-m1-no-clause` | U, U | - | FBSpaceRead:104:9, FBSpaceRead:105:9, FBSpaceRead:106:9 |
+| `t20-m2-no-visit` | U, U | - | EngineRunPath:288:9 |
+| `t20-m3-no-applies` | S+V, S+V | - | FBSpaceRead:168:9 |
+
+`mut21-t20b.txt`: the transfer's fix (step 7), on a copy of the tree at `b171e8b`:
+
+| Mutant | Item runs | Whole suite | First failing lines |
+|---|---|---|---|
+| `t20-m4-no-transfer-end` | U, U | - | FBSpaceRead:164:13, FBSpaceRead:173:9, FBSpaceRead:174:9 |
+| `t20-m5-no-record` | U, U | - | FBSpaceRead:164:13, FBSpaceRead:173:9, FBSpaceRead:174:9 |
+| `t20-m6-no-clear` | pass, pass | pass | - |
+
+**The survivors and their dispositions.** Every mutant not killed 2/2 above, with what became of it.
+
+| Mutant | Site (on `2c351e8`) | Disposition |
+|---|---|---|
+| `i5-move-no-end` | `waitingTarget(_ move:)`'s `attemptEnd != nil` (`EngineFollow.swift`) | **Removed** (`2c351e8`, S3-R19 item 3): an owed move's job queued at the move's epoch still has its end. Only a start, which takes a new epoch (`Job.epoch`), and the drain's verdict replays (`EngineFollow.swift:390`, `:887`) clear an end, and the drain waits for every owed move (`drainEventsAfterFollow`'s `!followOwed`, which covers `inboundOwed`) |
+| `vy-not-committing` | `continueMove`'s `.committing` disjunct (`EngineMoves.swift:308`) | **Removed** (`2c351e8`): a committing holder is never met. `.committing` is set only at `EngineDispatch.swift:1090`, and `committed`, which is synchronous, retires the job through `resolveAll` (`removeJob`) before any await. Of the calls that run before the removal (`transition`, `bind`, `reroute` with `releaseRunClaim`, `dropGroupMember`, `answerPresent`, `addInterest`, and `deliver`), none reaches a visit, a move or `bringInbound` (`tools/callgraph.py` over the `self.` calls); `resolveAll`'s `checkRunSettled`, which can reach a visit through a space sweep, runs after `removeJob` |
+| `c6-settle-first-lane`, `c6-space-charge-after-visit`, `c6-no-claim-clear-owed` | `settleRemoval`'s lane; the `.spaceFailure` replay's charge; `runClaimTakenOff`'s clear | **Killed 2/2** (S) by `27b278a`'s tests (`mut21-c6b.txt`): the reversed RR21-HELDLANE (`TakeOff:199`), RR21-VERDICT-ZERO with an ENOSPC (`TakeOff:140`), and a run's three claims in a take-off that does not fit a drain turn of two (`RunClaim:271`, `:273`) |
+| `i5-visit-no-end` | `rerouteOnVisit`'s queued arm without its end | **Killed** by the whole suite (`mut21-i5s.txt`): `FBClass:135`, `:141`, `:142` in both orders, then time limits |
+| `e2-bucket-loop-no-return`, `b22-arm-no-early-return`, `e1-event-loop-break` | `followedLane`'s early returns at `.userInitiated` (`EngineFailures.swift:905`, `:894`, `:888`) | **Equivalent** (S3-R19 item 2, cost only): `.userInitiated` is the top lane and `raise` takes a maximum, so the walks the mutants continue leave the lane `.userInitiated`, and they only read (`reaches`, `stillWants`, `joinListing`, `rerouteListing`). e1's one kill (`FBDeferBucket:371`, V, at a load of 32) was the bucket test's race fixed in `323d706` |
+| `c6-no-run-held` | the take-off's `run.held` removal (`EngineFollow.swift:609`) | **Equivalent**: `run.held` is an index; its reader, `finishRun` (`EngineRuns.swift:825`), takes only the transfers whose job still holds the run's interest, and the invariant clause (`EngineCommands.swift:1839`) checks only interest ⇒ held. A stale entry changes no decision, answer or state another path reads |
+| `t20-m6-no-clear` | a start's `transferSpaceEnd = nil` (`EngineDispatch.swift:743`) | **Equivalent**: the end is read only by `relane`'s failed arm during a follow's visit (`inFollowVisit`, set only by `visit`, `continueVisitRemainder` and `continueInbound`, all while the follow is owed), against `appliesFollowed`. A start runs only with the barrier down (`pump`'s `!followBarrier && !drainingAfterFollow`), and a visit after it belongs to a later apply, whose `followApplied` raised `appliesFollowed` past the stale value. Unequal and `nil` decide alike |
+| `c12-no-running-guard` | the answer follow-up's `isRunning` guard (`EngineJobs.swift:757`) | **Equivalent** apart from one observer pass: `drainEverything` empties `owedAnswers` in the turn the lifecycle leaves running (`EngineShutdown.swift:57-60`), and an engine that never ran owes none, so a follow-up without the guard resumes nothing and only notifies |
+| `c6-land-desc`, `c6-land-unsorted` | `landTakeOff`'s sort of the take-off's re-routes (`EngineFollow.swift:634`) | **Order only** (S3-R16 item 2), kept: onto one target the order changes only tickets; onto several (a later apply's) it changes the order in which the new jobs are created and start. The sort keeps the order the same run to run (a `Set`'s order differs between processes), as cycle 14's `failureMoveBehindBarrier` did |
+| `c4-post-replay-arrival-order` | the post-replay bucket's newest-first order (`EngineFollow.swift:233`) | **Order only**: newest-first joins behind a verdict, an accepted order (S3-R26 item 10). Its one whole-suite kill was the `:371` race above |
+
+**Open** (no test kills them, none is shown Equivalent; G4 for code that stays, S3-R16 1(e), so they are reported, not
+claimed). Each names the state where it would change an answer; no test this cycle builds it.
+
+- `vy-owed-moves-too` (`EngineMoves.swift:308`, `listing == nil ?` to `true ?`): the passing rule also on an owed
+  move (`continueInbound`, whose `listing` is the move's copy). It decides when the move's holder is publishing with a
+  moved id among the ids its publication began with that the copy mapped elsewhere (`rerouteOnVisit`): the mutant leaves
+  the id's interests to the holder's visit, which re-routes them later, behind the target's waiting verdict, where the
+  move put them on the target before it. The state: a holder publishing (held) after an apply behind the barrier, then
+  the target's attempt ending with its verdict deferred while the move off the holder is owed.
+- `b22-no-waiter-owner`, `b22-no-run-owner` (`EngineFailures.swift:860`, `:868`): `followedLane` counts an owed item
+  only while its waiter still waits for it at the batch's job, or its run is the engine's. A cancel's removal waits
+  behind the batch and marks the token withdrawn (rr21-T12's `cancelled` shape passes under both mutants), so the guards
+  decide only for an owner that left by a path that leaves no waiting removal (a waiter answered from the store, a run
+  replaced) before a verdict whose lane the item would raise. Not shown unreachable.
+- `b23-no-lane`, `b23-no-kind` (`EngineCommands.swift:1066`): the purge arm withdraws the owed non-user, non-waiter
+  items of purged ids. The mutants would also withdraw a user-lane group member's item, or a prefetch-lane waiter's;
+  rr21-T13's batch holds user waiters and a prefetch group only. Extending it with both kinds would decide them.
+- `f7-delisted-stays` (`EngineDispatch.swift:1152`, `?? false` to `?? true`): a commit's unbound id the copy no longer
+  lists is classified as staying; captured, it sets `refused` and the commit holds the content for a manifest catch-up
+  (`holdForManifest`), which the correct classification never does for a delisted id. Its answer, `.notFound`, is the
+  same; the hold is the difference no test reads.
+- `p7-forget-at-last-batch` (`EngineFollow.swift:760`): forgetting `reroutePinCommits` when the last batch is made.
+  Waiting joins' chains also read them (`followLayers`), so a chained join behind the last batch, pinned to a job that
+  committed, would follow another copy. No test has such a join behind the last batch.
+- `r2b-made-ignores-previous`, `r2c-made-ignores-verdicts` (`EngineFollow.swift:702`): `layerOwedReroutes`' cache of
+  the last layer made. Without either key a layer is reused for an event whose last layer's apply, or whose verdicts
+  behind it, differ, so its `ends` can miss a verdict that a visit-first engine's visit met at its end. The state: two
+  owing events deferred across an apply, with a verdict behind both deferred between their applies.
+- `r5-lane-engine-copy` (`EngineFailures.swift:843`): a waiting join's reach read under the engine's copy instead of
+  its chain's (R18's `joinListing`). It decides for a chained join whose chain pins its id to a copy that maps it
+  differently from the engine's, met by a verdict whose lane it would raise.
+- `r7-fast-ignores-end`, `r8-fast-any-join` (`EngineFailures.swift:840`): the fast path that passes a chained join the
+  copy maps elsewhere. r7 passes it also while the job is at an attempt's end (where a pin of this job can hold it); r8
+  passes an unchained join too, which an unlisted join's own entry (`join.entry`) can still bring to this job. Each
+  needs a lane-deciding verdict with such a join waiting.
+
+**R19's arguments** (`integrate-rr21.md`).
+
+- *Site 1, call for call.* A commit whose answers and re-routes fit `inboundIDsNow` together makes the calls a
+  commit made before RR-21, in the same order (`committed`, `EngineDispatch.swift:1163-1190`): the trims, then the
+  moved items' `reroute`s sorted by token and id, then `resolveAll`, whose closure, after the job's removal, holds for
+  the manifest when an id was refused and makes the deferred items' `reroute`s in the same sort. Only a commit that does
+  not fit owes, and it then makes none of its re-routes at once (`boundOnly`, `deferReroutes`).
+- *Site 2's charge and its two orders* (recorded under "Step 5", rr21-C6): a take-off is charged to the drain turn's
+  `drainIDsLeft` before the verdict, so a fitting one is made after the verdict and its visit, in today's order, and
+  one that does not fit spends the turn and is owed as one batch right behind the verdict and the visit's rest (R8's
+  order); `PROBE-RR21-RESERVE-REJOIN` holds at the edge and past it.
+- *The release* (`releaseRerouteHolds`, `EngineFollow.swift:827`): it resumes every publication's wait once the last
+  batch is made. Only the drain makes owed re-routes (`continueReroutes`, from `replay`), the drain runs only while no
+  follow is owed (`drainEventsAfterFollow`'s guard; `followOwed` covers `inboundOwed` and `followMoving`), it stops at
+  the first event after which a visit's rest is owed (`followMoving`), and no replay owes a move then (`bringInbound`
+  returns unless a follow is owed). So when the counter reaches 0, `inboundBlocks` is false for every job and each
+  resumed publication binds: a filter `!inboundBlocks` on the waits it resumes would keep every one (the design's
+  filter, which `integrate-rr21.md`'s amendments removed under S3-R16 item 3, was never written). Shutdown resumes
+  every wait (`releaseInboundWaits`) and zeroes the counter (`EngineShutdown.swift:129`).
+- *Removed and Equivalent branches*: the two removals above; `integrate-rr21.md`'s own removals from its design, never
+  written (`withdrawPurgedJoins`' early return, the layer append's guard, the sites' `!followOwed &&
+  !drainingAfterFollow`, the release's `!inboundBlocks` filter, the drain's `left != nil` disjunct; its
+  amendments_decided); and the Equivalent survivors above.
+
+### Step 6: item C, Phase 2
+
+- **The trigger** (S3-R26 item 4). On `e5b4df9` with `06d5e40`'s pin (`each/c12-red.out`, release, under `sim.lock`,
+  1-minute loads 9.69 before and 7.45 after), best of 3: `commitTurns(.waiters)`'s own turn 11.27 ms (heartbeat
+  11.51), above the 7.0 ms trigger; `waitersStalledSubscriber` 14.44 ms; `groupStalledSubscriber` 8.75; `manyGroups`
+  10.01; two stalled subscribers 18.04 (recorded, not gated); and `commitWaitersBoundTurns` (`06d5e40`: 10,000 user
+  waiters all bound, owing nothing) 11.56. Phase 2 applies.
+- **C12** (`28d533e`). A resolution of more than `answersPerTurn` (512) interests computes every waiter's answer and
+  takes every waiter and every settled ensure out of the state in its own turn, and leaves only the resumes to the
+  answer follow-ups, oldest first, `answersPerTurn` a turn (`owedAnswers`, `answerFollowUp`); shutdown resumes the rest
+  with their stored values (`drainEverything`). Each caller gets the value it got when every resume was made in the
+  commit's turn; only the moment it returns moves (the table's order of resumes, an accepted order, S3-R26 item 10). The
+  owed answers have an invariant clause, and the commit pins' windows end at the last resume. T-A1 to T-A5 and the
+  ensure arm (`EngineOwedAnswersTests.swift`) run in both orders at four a turn; 18 of the 19 Phase 2 mutants are killed
+  2/2 (`mut21-c12.txt`, `mut21-c12b.txt`), and `c12-no-running-guard` is Equivalent (under "rr21-C7").
+- **Figures after C12** (on `28d533e`, `each/c12-green.out`, 1-minute loads 8.65 before and 8.11 after), best of 3:
+  `.waiters` 7.89 ms (its own turn 7.89), `waitersStalledSubscriber` 10.77 (**miss**), `groupStalledSubscriber` 9.09,
+  `manyGroups` 10.57 (**miss**), two subscribers 14.35 (recorded), `waitersBound` 7.64, and 10,000 user waiters moved
+  onto one content with 511 joins behind the batch 7.68 ms.
+- **`manyGroups`** (`57d5d8c`). Every pump runs `materializeEnsures`, which sorted every group's token to visit the
+  ensure groups with fetches left: 10,000 one-member prefetch groups' tokens at a commit's pump. It now sorts only those
+  candidates, in the order it visited them: a group's kind never changes, its fetches are only consumed, and nothing in
+  the loop registers a group. The whole Sync suite passes (678 tests in 56 suites, `each/ensure-sort-sync.log`).
+- **Figures on `2c351e8`** (`each/c12-sort.out`, release, under `sim.lock`, 1-minute loads 4.18 before and 4.33 after),
+  best of 3: `.waiters` 7.27 ms (7.62, 7.35, 7.27; its own turn 7.27); `waitersStalledSubscriber` **10.31** (10.68,
+  10.31, 19.50); `groupStalledSubscriber` 8.71 (8.74, 9.40, 8.71), at the edge; `manyGroups` 9.34 (9.38, 9.34, 10.93),
+  at the edge; two stalled subscribers 13.74 (13.74, 13.97, 13.90), recorded, not gated; `waitersBound` 7.41; and the
+  511 joins behind the batch 7.45 (its longest held turn 3.11).
+- **The miss, blocking and reported** (S3-R26 item 4: "A miss Phase 2 cannot cut is blocking and reported").
+  `waitersStalledSubscriber` misses `c2Budget` by 0.31 ms at a quiet load. The stalled subscriber holds an event per id
+  of the commit (the pin's setup requires `run.buffered` of 10,000 or more), and each costs about 0.3 µs a subscriber in
+  the commit's turn: 10.31 − 7.27 = 3.04 ms for one subscriber, 6.47 ms for two. Phase 2 owes only the waiters' and the
+  ensures' resumes (S3-R26 item 4), and terminal events stay ascending in the commit's turn (S3-R26 answer 2), so no
+  change within the rulings cuts it. The routes, which are the owner's to rule on: owe the events past the commit's
+  turn in their order, as the answers are owed, or carry many ids in one event (an event-shape change). The
+  two-subscriber figure is "open, for the owner" (answer 4).
+
+### Step 7: item 5 (`waitingTarget`'s queued arm) and its two probes
+
+- **Shape A** (`4aeb321`, `EngineFollowBarrierWaitingTargetTests.swift`'s
+  `barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued`): T's drained publication fails ENOENT while v3b's walk owes
+  the move H → T [zz-x]; swept first, the follow turn that makes the owed moves finds T queued at the move's epoch, the
+  arm. It is Reached under S3-R26 item 12's answer 1: the test runs in both orders, asserts the visit-first answers in
+  both, and requires per order the state (swept first the owed move, visited first none, since v3's visit moved zz-x
+  onto T while it published); the fold mutant (`i5-pin-fold`) fails the one-turn state assertion 2/2, and rr21-T8b
+  (`RerouteRequeue:124`, `:130`) kills it in both orders.
+- **Probe (ii)**, the later apply (`3412ec3`, then `d85eb02` with the re-queued job in the turn's follow order; both red
+  swept first): v4 maps zz-x to a third content U while T's drained publication runs; the ENOENT re-queues T and its
+  fresh attempt gets a 404. Visited first, v4's visit passed T with zz-x on it and the 404 answered X; swept first the
+  owed move onto T was dropped and H's visit sent zz-x to U, so X got U's bytes and U started once: an answer
+  difference, blocking (S3-R16 1(a)). **Fixed** (`58b278e`): the move is made onto the queued job at its epoch, its end
+  still recorded (`waitingTarget(_:)`), and an owed visit passes such a job as still publishing while no apply was
+  followed since its end, else moves its ids as met queued (`rerouteOnVisit`'s queued arm). A fourth test covers an
+  apply after the end (`barrierMovesAReQueuedJobsIdForAnApplyAfterItsEnd`). Shape A's assertion changed with the fix,
+  one to one (G3): `afterTurn.h == [t.x.identifier] && afterTurn.t == [t.a.identifier]` (the move dropped) became
+  `afterTurn.h == nil && afterTurn.t == [t.a.identifier, t.x.identifier]` (the move made, H gone), and its setup's
+  `#require` gained `&& requeued.end` (the end still recorded). The whole Sync suite passed (674 tests in 56 suites,
+  `each/i5-fix-sync.log`).
+- **Probe (i)**, the T20 window (`2130e61`, `EngineFollowBarrierSpaceReadTests.swift`; `analyse-g4-reach.md`'s Shape
+  B): an ENOSPC's free-space read runs a follow turn behind the barrier whose join re-lanes the failed job before its
+  verdict defers, and a user interest's T20 re-queues it, so the verdict is skipped (`decideSpaceFailure` returns for a
+  queued job). Swept first, at an interactive cap of one attempt, A and X got T's bytes from a second request, where a
+  visit-first engine's verdict answered both with the space figures and requested T once: red in `sweepFollowsFirst` at
+  `:93`, `:102`, `:103` and `:104`, walked or not (`each/i5-probe1-red.log`, 8 issues), passing visited first.
+  **Fixed** (`dff8946`): the follow's own visit or move made with no apply since the publication's end leaves the job
+  failed (`relane`'s failed arm), as a visit-first engine's visit met it publishing. Two controls hold the clause's
+  sides: a user request after a publication's failure with no follow skips the backoff (`EngineRunPathTests`), and a
+  visit for an apply made after the end skips it too, in both orders (`each/i5-probe1-green.log`,
+  `each/i5-t20-controls.log`). The first control failed once in a whole-suite run (`each/t20-sync.log`, `:288`: its job
+  was read after its re-queued attempt had begun); it now accepts a job no longer failed or gone (`!= false`), its
+  other expectations (the second attempt's bytes, two requests) unchanged, and the suite then passed twice (677 and 678
+  tests, `each/t20-sync2.log`, `each/t20-sync3.log`).
+- **The transfer's sibling** (`analyse-g4-reach.md` (c)): a transfer's ENOSPC sets its job failed before its resume
+  point's and free-space reads, and the read's follow turn joined zz-x to it behind the barrier, re-queueing it (T20):
+  red in `sweepFollowsFirst` at `EngineFollowBarrierSpaceReadTests.swift:163`, `:172`, `:173` and `:174` (`adf650d`;
+  `each/t20-transfer-red.log`, `-red2.log`). **Fixed** (`b171e8b`): the transfer's end is recorded
+  (`Job.transferSpaceEnd`), `relane`'s failed arm reads it as it reads a publication's end, and a start clears it
+  (`each/t20-transfer-green.log`, 4 tests).
+- **The docs** (`46e3669`): `enqueue`'s list of the paths that give a place behind the barrier, `Job.epoch`'s (only
+  creation and a start take one), and the cycle-20 draft's one-path claim, corrected under it.
+- **Mutants**: `i5-move-drop`, `i5-visit-drop` and `i5-visit-no-applies` killed 2/2 (S), `i5-pin-fold` 2/2 (S and
+  V), `t20-m1` to `t20-m5` 2/2; `i5-move-no-end` removed, `i5-visit-no-end` killed by the whole suite, `t20-m6-no-clear`
+  Equivalent (under "rr21-C7").
+- **UNCONFIRMED siblings** (from the code; not probed this cycle): the pin's caller with a terminal failure of the
+  fresh attempt; the drain's replay of a user join during the read; `followAfterVerdict`'s joins during the read;
+  `analyse-g4-reach.md` (b)'s park at the same epoch while the barrier stays up; and `metrics.promotions`, not counted
+  for a join in the transfer's window (a metric only).
+- **Residual risk** (S3-R26 item 5): item 5's order, place and ticket difference (S3-R16 item 2).
+
+### Residual risks and accepted orders (cycle 21)
+
+- **Accepted orders** (S3-R26 item 10; S3-R16 item 2): newest-first joins behind a verdict (item A); the table's order
+  of resumes (Phase 2); item 5's order, place and ticket; RR-21's replay order, by id then token, and the places of the
+  jobs its replays create; site 2's two orders (at-once re-routes before the visit's rest, owed ones after the whole
+  visit), with `PROBE-RR21-RESERVE-REJOIN` holding; and the bulk release of run claims, with rr21-T18. The take-off's
+  land sort (`c6-land-desc`, `c6-land-unsorted`) is of the same class.
+- **RR-21's residuals** (`integrate-rr21.md`'s residual_risks, each a timing class only while the event lands between
+  the two engines' answers, S3-R24 item 5): a cancel or a release between the owing instant and a T21 or present pair's
+  replay gives `.cancelled` (ruling 1); the global hold delays unrelated publications, and an apply during it can drop
+  a held job's ids (ruling 2); a pin whose job committed, was superseded or was re-queued by ENOENT between the apply
+  and the replay follows the copy at the replay, exact unless another apply landed between (ruling 3, rr21-T8b's
+  class); a purge's dropped bindings, an eviction or a quarantine between the owing instant and the replay turn a
+  present answer into a join (ruling 5); a heal of a T21 system item's asset in that window is forgotten at the replay
+  (ruling 1's class; `PROBE-RR21-HEAL-T21` breaks nothing, under "Step 5"); the broad idle guards keep every binding
+  and the watcher while any event waits; admissions and run settlement wait for every owed batch (about 20 drain turns
+  at 10,000 ids); each owed batch keeps its copy and its layers' outgoing copies alive (memory only).
+- **Items 2 to 4**: item A's bucket order is an accepted order (above; under "Step 3"); item B's residual risks are
+  listed with their class, condition and test under "Step 4"; item C's are the table's order of resumes (above),
+  `waitersStalledSubscriber`'s miss (blocking, under "Step 6") and the two-subscriber figure (for the owner).
+- **The open survivors** under "rr21-C7".
 
 ## Items
 
