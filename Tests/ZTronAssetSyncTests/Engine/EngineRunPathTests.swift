@@ -254,6 +254,47 @@ struct EngineRunPathTests {
         await engine.shutdown()
     }
 
+    /// A user request for an asset whose publication failed skips the backoff as one after a failed transfer does (T20):
+    /// the publication's end stays recorded on the job until its next start (`recordPublicationEnd`), and only the
+    /// follow's own visit for an apply made before the end leaves such a job failed (`relane`; Stage 3 close-out cycle 21,
+    /// ruling S3-R26 item 5, probe (i)). With no follow the request re-queues the job before the clock moves: re-lanes on
+    /// the recorded end alone left it failed until its backoff ran out.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a user request for an asset whose publication failed skips the backoff", .timeLimit(.minutes(1)))
+    func userSkipsAFailedPublicationsBackoff() async throws {
+        let harness = EngineHarness.make()
+        let bytes = EngineFixture.bytes(414)
+        let entry = EngineHarness.onDemand("published-backoff", bytes)
+        let transfer = entry.transferID
+        await harness.serveManifest([entry])
+        await harness.source.script(transfer, [.stage(bytes), .stage(bytes)])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".part"), occurrence: .nth(1), error: .io))
+        let engine = harness.engine
+        let group = try await engine.registerGroup([entry.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { e in
+            guard case .failed(.at(_))? = e.state.jobs[transfer]?.state else {
+                return false
+            }
+            return true
+        }
+        let setup = await engine.readForTests { e in (end: e.state.jobs[transfer]?.attemptEnd, applies: e.state.appliesFollowed, owed: e.followOwed) }
+        try #require(setup.end != nil && setup.end?.deferredAfter == nil && setup.end?.failedAfter == setup.applies && !setup.owed, "setup: the publication's end is recorded and its verdict, a backoff, given at once with no follow owed: \(setup)")
+        let before = harness.time.now()
+        let waiter = Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[transfer]?.interests.count == 2 }
+        // Gone is served: the re-queued attempt can end before this read.
+        let state = await engine.readForTests { $0.state.jobs[transfer]?.state }
+        #expect(state.map { $0.kind != .failed } != false, "the request re-queued the job at once, skipping its backoff (T20): \(String(describing: state))")
+        #expect(harness.time.now() == before, "the clock did not move")
+        let location = await harness.withClock { await EngineHarness.value(of: waiter) }
+        #expect((try? location.get())?.byteSize == Int64(bytes.count), "the asset arrives from the second attempt: \(location)")
+        #expect(await harness.source.starts.count == 2, "the failed publication cost one more attempt")
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a user request waits for a short origin throttle and fails fast on a long one", .timeLimit(.minutes(1)))
     func userAndThrottle() async throws {

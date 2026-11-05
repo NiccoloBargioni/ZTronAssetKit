@@ -278,7 +278,9 @@ extension SyncEngine {
     }
 
     /// Re-evaluates a job after its lane changed: promotion re-queues or re-prioritises it, demotion re-runs
-    /// admission (sync-1 S1-07), and a user request skips a backoff (T20).
+    /// admission (sync-1 S1-07), and a user request skips a backoff (T20), unless the job's attempt is still at its end
+    /// for the follow: its verdict waiting, or being booked while the follow's own visit stands for one at an apply
+    /// before the end (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)).
     func relane(_ transfer: TransferID, from before: AssetPriority) {
         guard let job = self.state.jobs[transfer] else {
             return
@@ -302,7 +304,7 @@ extension SyncEngine {
                 self.pauseIfRefused(transfer)
             }
         case .failed(let disposition):
-            if job.attemptEnd?.deferredAfter != nil {
+            if let end = job.attemptEnd, end.deferredAfter != nil || (self.state.inFollowVisit && self.state.appliesFollowed == end.failedAfter) {
                 // The attempt's verdict waits for the follow (`defersFailure`, or an ENOSPC's in `spaceFailed`;
                 // `recordDeferredVerdict`). Only the follow's own visit, an attempt's end that brings a visit's interests
                 // forward (`bringInbound`), or an event the drain applies before the verdict, re-lanes such a job: each
@@ -311,6 +313,16 @@ extension SyncEngine {
                 // skipped for the re-queue until Stage 3 close-out cycle 17). Every other re-lane comes from an input
                 // that waits behind the verdict as an event of its own (a join, a withdrawal), so the cycle-10 `.relane`
                 // event is gone (S3-R14 item 4).
+                //
+                // So does the follow's own visit or move (`inFollowVisit`) while the publication's end is recorded and its
+                // verdict not yet deferred, with no apply followed since the end (`recordPublicationEnd`): an ENOSPC's
+                // free-space read runs a follow turn behind the barrier (`advanceFollowForSpaceSweep`) before its verdict
+                // defers (`spaceFailed`), and that turn's joins and removals stand for visits at applies before the end,
+                // which met the job publishing on a visit-first engine. Re-queued for a user interest (T20), the job's
+                // ENOSPC verdict was skipped (`decideSpaceFailure` returns for a queued job): the attempt went uncounted,
+                // and at the cap the interests got a second request's answer where that engine's verdict gave them the
+                // space figures (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)). A visit for an apply made
+                // since the end met the job failed, as that engine's did, and skips the backoff (T20).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {

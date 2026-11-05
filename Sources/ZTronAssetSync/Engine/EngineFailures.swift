@@ -584,7 +584,8 @@ extension SyncEngine {
         let figures = self.spaceFigures(job, required: required)
         self.state.jobs[transfer]?.lastError = figures
         guard case .failed = job.state, let measured = self.state.jobs[transfer] else {
-            // A user request re-queued it meanwhile (T20): the gate's ledger decides with the figures just read.
+            // A user request, or a follow's visit for an apply made since the end, re-queued it meanwhile (T20,
+            // `relane`): the gate's ledger decides with the figures just read.
             return
         }
         let verdict = self.spaceVerdict(measured)
