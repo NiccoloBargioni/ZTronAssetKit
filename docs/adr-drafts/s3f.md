@@ -5170,9 +5170,11 @@ fix (S3-R26 item 11, "Red first").
    (`tools/chain-c21c.sh`, from 10:00 on 5 Nov). rr21-C6's red step: **committed** (the commit after `42a3689`: rr21-T3,
    rr21-T3-two, RR21-VERDICT-ZERO, RR21-HELDLANE, T-COMPOSE and the two site-2 pins, failing before the fix; evidence
    under "Step 5"). rr21-C6's fix: **committed** right after it (R6 and R7; the five site-2 tests pass in both orders and
-   the whole Sync suite passes). **Next action:** the site-2 figures under `sim.lock`, then T-shared, PRESENT-PRUNE at
-   site 2 and `PROBE-RR21-RESERVE-REJOIN`, site 2's mutants, the timing window (the site-3 figures with step 8's), then
-   the mutant runs' results and survivors.
+   the whole Sync suite passes). Its pins missed C2 on `e437c28` (27.66 ms all held, 17.48 ms half held); the take-off
+   in one access (`Job.takeOff(_:)`, `settleRemoval`): **committed** next (7.26 ms and 6.17 ms at a 1-minute load of
+   5.27; under "Step 5"). **Next action:** T-shared, PRESENT-PRUNE at site 2 and `PROBE-RR21-RESERVE-REJOIN`
+   (`c6/fixture-y-d.py`, `c6/EngineFollowBarrierRerouteTakeOffShareTests.swift`), site 2's mutants, the timing window
+   (the site-3 figures with step 8's), then the mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5969,6 +5971,34 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   (stricter; on `42a3689` it fails, the take-off re-joining it in the verdict's turn). Results: the five site-2 tests
   pass in both orders (12 cases, `each/c6-fix-2.log`), and the whole Sync suite passes (661 tests in 56 suites,
   `each/c6-fix-sync1.log`, 307.6 s, 1-minute loads 10.51 to 6.37).
+- **rr21-C6: the take-off in one access** (the commit after `e437c28`). The site-2 pins on `e437c28`
+  (`each/c6-pins-fix.out`, `each/c6-pins-fix-1.log`, release, under `sim.lock`, 1-minute loads 6.49 before and 8.64
+  after) pass their setups and miss C2 (`BenchSyncRerouteTakeOff.swift:57:9` and `:58:9`, twice each): the verdict's
+  turn takes 27.66 ms (29.11, 28.56, 27.66; heartbeat 27.66) for 10,000 user waiters all held and 17.48 ms (17.48,
+  19.93, 17.87; heartbeat 17.52) half held; 5,000 moved before and 5,000 after take 5.54 ms (5.95, 5.54, 11.39), and
+  rr21-C3's pin (`movedBeforeDrainTurns`, its longest actor wait) 6.04 ms (6.04, 6.09, 10.78), within. The per-token work was each wholly held
+  interest's removal through the engine (`removeInterest`, `dropInterest`): several lookups and copies of the job (its
+  lane, the claim key, `relane`'s read) and an observer pass (`notifyObservers`), once per token. `Job.takeOff(_:)` now
+  takes the held ids off in one access to the job: the index's holders, the count per token, whole or partial decided
+  before any change, the items read from each interest, the partial interests' subtraction, then the removals in
+  ascending token order with the job's lane read before each (`JobTakeOff.laneBeforeFirst`, `laneBeforeLast`).
+  `dropInterest`'s tail is `settleRemoval(_:before:last:)`, which the take-off calls once after its last removal and
+  `dropInterest` after its one: a job left with no interest holds `last`, its lane before the last removal
+  (`Job.heldLane`), kept for a claim or retired; one left with interests is re-laned from `before`. The equivalence
+  with a removal at a time: only the last removal can leave the job empty; a re-lane does nothing to a job `failed`
+  with its verdict deferred (`relane`), which every `.attemptFailed` replay's job is (`replayVerdict`'s guard); an
+  ENOSPC's job that a user's request re-queued during its free-space read (T20, `spaceFailed`) is re-queued, with a
+  fresh ticket, by each re-lane that changes its lane or finds it user-initiated, and by the one re-lane if by any
+  (removals never raise a lane), at the last lane: the same place among the other jobs (`enqueue`); the run's `held`
+  loses the transfer when its token is among the removed, as the removal of that token did; observers are notified
+  once, where each removal notified: no other caller sees the states between two removals of one turn (a `package`
+  `waitUntil` predicate that held only between two of them would no longer be resumed; no wait in the suite is one).
+  Results (release, `each/c6-pins-one.out`, `each/c6-pins-one-1.log`, under `sim.lock`, 1-minute loads 5.38 before
+  and 5.09 after, within S3-R23's 10): all held, the verdict's turn 7.26 ms (7.26, 7.47, 7.30; heartbeat 7.43); half
+  held 6.17 ms (6.18, 6.17, 6.23; heartbeat 7.40); 5,000 and 5,000, 5.52 ms (5.58, 5.55, 5.52; heartbeat 5.52); and
+  `movedBeforeDrainTurns` 5.12 ms (5.15, 5.21, 5.12; J's 500 deferring 3.00): every site-2 case within C2, with its
+  setup. The take-off's 11 tests pass in both orders (`each/c6-one-1.log`), and the whole Sync suite passes (661 tests
+  in 56 suites, `each/c6-one-sync1.log`, 298.3 s, 1-minute loads 3.76 to 4.41).
 
 ## Items
 

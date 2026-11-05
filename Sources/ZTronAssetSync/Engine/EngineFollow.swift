@@ -581,50 +581,37 @@ extension SyncEngine {
     ///
     /// Returns the re-routes, one item per held id and interest that holds it, in no order, and the held ids some
     /// interest holds: the drain decides from them, in the verdict's turn, whether they fit the ids the turn has left
-    /// (`chargeTakeOff`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, `integrate-rr21.md` R6, site 2). The holders
-    /// are read from the index (`Job.moveItems(of:)`, O(held + holders)), each token's lane and kind once, and the job is
-    /// changed in place: a partial interest loses its held ids (`subtractAssets`), and the interests wholly held are
-    /// removed in ascending token order (`removeInterest`), so that a job a claim keeps holds the lane of the last one
-    /// removed (`Job.heldLane`), as the walk over every interest, sorted, left it before cycle 21 (a sort of 10,000
-    /// interests, where only the wholly held ones are sorted now). A held id no interest holds leaves the job all the
-    /// same, as a move's does (`startMove`), and is not counted. A run's claim among them is on no job's interest until
-    /// its re-route lands it or the batch that owes it releases it (`runClaimTakenOff`, `landTakeOff`).
+    /// (`chargeTakeOff`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, `integrate-rr21.md` R6, site 2). The job is
+    /// changed in place, in one access (`Job.takeOff(_:)`, O(held + holders)): a partial interest loses its held ids, and
+    /// the interests wholly held are removed in ascending token order, so that a job a claim keeps holds the lane of the
+    /// last one removed (`Job.heldLane`, `settleRemoval`), as the walk over every interest, sorted, left it before cycle
+    /// 21 (a sort of 10,000 interests, where only the wholly held ones are sorted now). A held id no interest holds
+    /// leaves the job all the same, as a move's does (`startMove`), and is not counted. A run's claim among them is on no
+    /// job's interest until its re-route lands it or the batch that owes it releases it (`runClaimTakenOff`,
+    /// `landTakeOff`).
     private func takeOffMovedBefore(_ transfer: TransferID) -> (items: [RerouteItem], ids: Int) {
         let held: Set<AssetID> = self.state.jobs[transfer].map { $0.assets.intersection($0.attemptEnd?.movedBefore ?? []) } ?? []
-        guard !held.isEmpty, let holders = self.state.jobs[transfer]?.moveItems(of: held) else {
+        guard !held.isEmpty, let off = self.state.jobs[transfer]?.takeOff(held) else {
             return ([], 0)
         }
-        self.state.jobs[transfer]?.assets.subtract(held)
-        var byToken: [InterestToken: Set<AssetID>] = [:]
-        for item in holders.items {
-            byToken[item.token, default: []].insert(item.asset)
+        if off.items.contains(where: { $0.kind == .run }) {
+            // The run's claim is on no job's interest until its re-route lands it: the run check waits.
+            self.state.runClaimTakenOff = true
         }
-        var whole: [InterestToken] = []
-        var items: [RerouteItem] = []
-        items.reserveCapacity(holders.items.count)
-        for (token, taken) in byToken {
-            // One scoped read of the interest: its lane, its kind, and whether it holds no id but held ones.
-            guard let read = self.state.jobs[transfer]?.interests[token].map({ (lane: $0.lane, kind: $0.kind, whole: $0.assets.count == taken.count) }) else {
-                continue
+        // What `dropInterest` does after each removal, once for them all (`settleRemoval`): only the last removal can
+        // leave the job empty, and a re-lane does nothing to a job `failed` with its verdict deferred (`relane`). An
+        // ENOSPC's job a user's request re-queued during its free-space read (T20, `spaceFailed`) is re-queued, with a
+        // fresh ticket, by each re-lane that changes its lane or finds it user-initiated, and by this one if by any
+        // (removals never raise a lane), at the last lane: the same place among the other jobs (`enqueue`). Observers
+        // are notified once, where each removal notified: no other caller sees the states between two removals of one
+        // turn.
+        if let before = off.laneBeforeFirst, let last = off.laneBeforeLast {
+            if let run = self.state.run?.token, off.removed.contains(run) {
+                self.state.run?.held.remove(transfer)
             }
-            if read.kind == .run {
-                // The run's claim is on no job's interest until its re-route lands it: the run check waits.
-                self.state.runClaimTakenOff = true
-            }
-            for asset in taken {
-                items.append(RerouteItem(asset: asset, token: token, lane: read.lane, kind: read.kind))
-            }
-            if read.whole {
-                whole.append(token)
-            } else {
-                self.state.jobs[transfer]?.subtractAssets(taken, for: token)
-            }
+            self.settleRemoval(transfer, before: before, last: last)
         }
-        whole.sort()
-        for token in whole {
-            self.removeInterest(token, from: transfer)
-        }
-        return (items, held.count - holders.unheld.count)
+        return (off.items, off.ids)
     }
 
     /// Whether the re-routes of a verdict's take-off of `ids` distinct ids do not fit the ids the drain turn has left

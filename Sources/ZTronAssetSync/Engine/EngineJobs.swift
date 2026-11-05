@@ -370,8 +370,16 @@ extension SyncEngine {
         if self.state.run?.token == token {
             self.state.run?.held.remove(transfer)
         }
+        self.settleRemoval(transfer, before: before, last: before)
+    }
+
+    /// Settles `transfer`'s job once interests left it (`dropInterest`, one; `SyncEngine.takeOffMovedBefore`, several,
+    /// removed in one access, `Job.takeOff(_:)`): a job left with no interest keeps `last`, its lane before the last
+    /// removal (`Job.heldLane`), while a claim on its content keeps it, and is retired otherwise; one left with interests
+    /// is re-laned from `before`, its lane before the first removal.
+    func settleRemoval(_ transfer: TransferID, before: AssetPriority, last: AssetPriority) {
         if self.state.jobs[transfer]?.interests.isEmpty == true, let key = self.state.jobs[transfer].map(ClaimKey.init(job:)) {
-            self.state.jobs[transfer]?.heldLane = before
+            self.state.jobs[transfer]?.heldLane = last
             if self.state.claims[key] != nil {
                 // Kept for the claim: its last end retires the job (`dropClaim`).
                 self.state.claimHeld[key] = transfer

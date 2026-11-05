@@ -991,6 +991,59 @@ struct Job {
         return (items, unheld)
     }
 
+    /// Takes `held` off the job in place, as the drain gives its waiting exit verdict (`SyncEngine.takeOffMovedBefore`;
+    /// Stage 3 close-out cycle 21, `integrate-rr21.md` R6): the ids leave `assets`; each interest in them, read from the
+    /// index (`moveItems(of:)`), loses them (`subtractAssets`) or, when they are all it holds, is removed, in ascending
+    /// token order (`setInterest`), its lane read before each removal. One access to the job does it all: through the
+    /// engine, each removal looked the job up and copied it several times, 27.66 ms for 10,000 user waiters' interests
+    /// against 7.26 ms in one access (`movedBeforeDrainWaitersTurns`, the verdict's turn, best of 3, at 1-minute loads of
+    /// 6.26 and 5.27). Returns the re-routes, one item per held id and interest that held it, each with its interest's
+    /// lane and kind, in no order; the tokens removed, ascending; the job's lane before the first removal and before the
+    /// last; and how many held ids an interest held.
+    mutating func takeOff(_ held: Set<AssetID>) -> JobTakeOff {
+        let holders = self.moveItems(of: held)
+        self.assets.subtract(held)
+        var counts: [InterestToken: Int] = [:]
+        counts.reserveCapacity(holders.items.count)
+        for item in holders.items {
+            counts[item.token, default: 0] += 1
+        }
+        // Whole or partial, decided before any interest changes: a partial interest's count drops as it loses ids.
+        var off = JobTakeOff(ids: held.count - holders.unheld.count)
+        var partial: [InterestToken: Set<AssetID>] = [:]
+        for (token, taken) in counts {
+            guard let count = self.interests[token]?.assets.count else {
+                continue
+            }
+            if count == taken {
+                off.removed.append(token)
+            } else {
+                partial[token] = []
+            }
+        }
+        off.items.reserveCapacity(holders.items.count)
+        for item in holders.items {
+            guard let interest = self.interests[item.token] else {
+                continue
+            }
+            off.items.append(RerouteItem(asset: item.asset, token: item.token, lane: interest.lane, kind: interest.kind))
+            if partial[item.token] != nil {
+                partial[item.token]?.insert(item.asset)
+            }
+        }
+        for (token, assets) in partial {
+            self.subtractAssets(assets, for: token)
+        }
+        off.removed.sort()
+        for token in off.removed {
+            let before = self.lane
+            off.laneBeforeLast = before
+            off.laneBeforeFirst = off.laneBeforeFirst ?? before
+            self.setInterest(nil, for: token)
+        }
+        return off
+    }
+
     /// Test seam (the invariant oracle): forgets `asset`'s holders in the index, its interests unchanged, the state the
     /// index's clause reports (I1).
     mutating func forgetIndexForTests(_ asset: AssetID) {
@@ -1008,6 +1061,21 @@ struct Job {
             self.tokensByID[asset] = nil
         }
     }
+}
+
+/// What `Job.takeOff(_:)` took off a job.
+struct JobTakeOff {
+    /// The re-routes, one per held id and interest that held it, in no order.
+    var items: [RerouteItem] = []
+    /// The tokens whose interests it removed, ascending.
+    var removed: [InterestToken] = []
+    /// The job's lane before the first removal (`nil` without one): a job left with interests is re-laned from it.
+    var laneBeforeFirst: AssetPriority?
+    /// The job's lane before the last removal (`nil` without one): a job left with none that a claim keeps holds it
+    /// (`Job.heldLane`).
+    var laneBeforeLast: AssetPriority?
+    /// The held ids an interest held.
+    var ids = 0
 }
 
 /// How many of a job's interests ask for each lane, and how many of its user-initiated ones are single requests (no
