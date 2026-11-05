@@ -165,6 +165,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
         - the cycle-21 pin mutants are rewritten in `.build-s3f/c22/tools/`;
         - a `.scope` miss counts as other-wp:a only when measured to be the entry copy alone.
     - Run 9's focus now names items 11 and 12, the e1 and e2 analyses, and the owner's ruling.
+  - **Run 9 launched at 23:21:** `wf_a75defe9-e68` (task `ww9s29wq4`), from `.build-orchestrator/s3-fix-args-run9.json`, with cycle 22 as its first cycle. Its fixer, `fix:s3f:c22` (agent `a792241b…`), started at once on `d5b2ab9`; the worktree was clean, there was no `sim.lock`, and set 1 was shut down.
+    - The watcher for the fixer's result (`watch_journal.py <run 9's journal> 0 1`) runs as task `bsdzvourq`.
+    - The keep-awake was renewed at 23:21 as task `bmt90jpqj` (`caffeinate -ims -t 345600`, up to about Mon 9 Nov 23:25). Stop it when run 9 ends.
+    - Expected: the weekly limit cuts cycle 22 off, probably inside the fixer. Every finished step is committed on `wp/s3f`, and the cycle resumes after the reset (Thu 12 Nov 03:00).
+    - Next: when the fixer returns, check its report against S3-R27 items 1–12, rule its put-backs, and let run 9's verifiers run.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
