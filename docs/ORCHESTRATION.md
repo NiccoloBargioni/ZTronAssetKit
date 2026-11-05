@@ -63,7 +63,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Not run: `verify.sh --full` and `--gates-only`; their steps ran on their own.
     - The verifiers `verify:s3f:reqs:c21` (`a0dbaa44…`) and `verify:s3f:correct:c21` (`a06aaa2f…`) started at 17:54. The host's 1-minute load was 3.81 at 17:55.
   - **Usage at 17:55:** weekly all models **24 %**, Fable 21 %. That is 4 points in 2 h 15 min since 15:40, or 1.8 an hour.
-  - **S3-R27's analysis, launched about 18:30:** `wf_cbf1b459-e34` (task `wgzpso5k4`).
+  - **S3-R27's analysis, launched 18:03:** `wf_cbf1b459-e34` (task `wgzpso5k4`).
     - It is read-only: no build, test or benchmark runs while the verifiers take their C2 figures.
     - Five analysts, each writing its report to `.build-orchestrator/s3f-c21-analysis/`:
       - D1, `waitersStalledSubscriber`;
@@ -72,8 +72,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - D4, the 12 survivors and the 4 unreached places;
       - D5, the audit of the `while followOwed` readers.
     - An adversarial reviewer checks D1, D2 and D4 (`*-review.md`).
-    - S3-R27 is written from these reports and appended before the cycle-22 fixer starts. If the verifiers finish first, stop run 8 as soon as the cycle-22 fixer starts, and relaunch it after S3-R27 is appended, as on 1 Nov (see S3-R25's second ruling). That relaunch is `fromCycle: 22`, with the verifiers' findings in `s3f-c21-issues.json`.
+    - S3-R27 is written from these reports and appended to `s3-rulings-s3f.md`.
     - The watcher for the first verifier result, `watch_journal.py <journal> 1 2`, is task `bap4d120y`.
+  - **Cycle 22 runs as run 9, not inside run 8.** Run 8's focus calls S3-R26 "this cycle's ruling" and carries cycle 21's cut-off paragraph, so a cycle-22 fixer started inside run 8 could put S3-R26 above S3-R27. So:
+    1. Once both verifier results are in run 8's journal, stop run 8 (`TaskStop wr2wci9rf`) as soon as its cycle-22 fixer starts.
+    2. Check that `.worktrees/s3f` is clean at `d5b2ab9`, that there is no `sim.lock`, and that set 1 is shut down.
+    3. Write `.build-orchestrator/s3f-c21-issues.json` from the two verifier results, in `s3f-c20-issues.json`'s shape (`cycle`, `head`, `lenses.reqs`, `lenses.correct`).
+    4. Write `s3-fix-args-run9.json` from run 8's, with `fromCycle: 22` and `findingsFile: s3f-c21-issues.json`. Its focus names S3-R27 as the cycle's ruling and drops the cut-off paragraph.
+    5. Launch run 9 once S3-R27 is appended, as on 1 Nov (S3-R25's second ruling).
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
 - **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
