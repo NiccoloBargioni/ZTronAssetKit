@@ -3,7 +3,36 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. Read this bullet first; the 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
+- **Now (5 Nov 08:57 CET): run 8 resumes cycle 21, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+  - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
+  - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
+  - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
+  - **State at the cut-off (checked 08:52–08:55):**
+    - `wp/s3f` is at `7876a28`, 49 commits from `8e1fb24`. Per the draft's "Status (resume here)" list, steps 0 to 4 are committed, and so are step 5's rr21-C0 to rr21-C4. Next: rr21-C5, then rr21-C6, then the mutant results. Steps 6 to 8 are pending.
+    - No `sim.lock`; simulator set 1 is shut down; no build or test process runs; no keep-awake or watcher is left from 4 Nov.
+  - **The uncommitted work is saved** as `.build-orchestrator/s3f-c21-interrupted.patch`, which applies cleanly to `7876a28`. It is rr21-C5's red step, never run (6 files, +361/−52):
+    - site 3's tests rr21-T2, rr21-T2-two and rr21-T2-edge, in a new `EngineFollowBarrierRerouteSupersedeTests.swift`;
+    - the fixture's `away` shape;
+    - the benches `supersededRerouteTurns`, `supersededUserTurns` and `runSuperseded`, and a pin.
+    - The worktree was then reverted to `7876a28`. `.build-s3f/c21/pending/` (10 entries) is untouched.
+  - **Mutants at the cut-off:**
+    - `mut21-c3c.txt` is complete.
+    - `mut21-c3fix.txt` ran f1 to f6 twice. f7-delisted-stays ran once and **passed**, so it survives unless its second run fails. f8 to f11 never ran.
+    - `mut21-pinend.txt` and `mut21-c4fix.txt` were never started.
+  - **Run 8 launched 08:56:** `wf_f90e12fa-faa` (task `wr2wci9rf`).
+    - Script and args: `.claude/workflows/assetkit-stage3-fix.js` with `.build-orchestrator/s3-fix-args-run8.json`. That is run 7's fields with `fromCycle: 21`: Opus fixer and verifiers, simulator set 1, no usage stop. The focus adds the cut-off, the patch and the mutant state.
+    - Journal: `~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/subagents/workflows/wf_f90e12fa-faa/journal.jsonl`. Fixer agent `a0286a63…` started at 08:56.
+    - Keep-awake `caffeinate -ims -t 259200` runs as background task `b1drmseq1`. The watcher `watch_journal.py <journal> 0 1` runs as task `bcvg68496`.
+    - The host's 1-minute load was 4.69 at 08:56.
+  - **Forecast (08:57):**
+    - Run 7's fixer took 14 h 34 min for steps 0 to 4 and rr21-C0 to rr21-C4. That covers most of S3-R26's code: items A and B, item C's Phase 1, the candidates, and RR-21's sites 1 and 2 with the layers and R18.
+    - What is left: rr21-C5 to rr21-C7 with the mutant runs, Phase 2 if a trigger fires (step 6), item 5 (step 7) and the close (step 8). Expect 7–12 h of fixing, so the fixer should finish about 16:00–21:00. Verification then takes 2–3 h, so cycle 21's verdict is due about 18:00–24:00.
+    - Cost: on 4 Nov the meter rose 0.5–0.9 points an hour with one fixer running (90 → 96 % in 6 h 50 min, with the profiling alongside; 96 → 100 % in 8 h 14 min). The rest of cycle 21 is about 5–13 weekly points.
+    - The integrator put a clean cycle 21 at about 0.12 for the whole plan. So plan for 1–3 more cycles: 7–12 h and 4–11 points each. The merge, the gates, ADR-057 and Stage 5 add 10–20 points.
+    - All of this fits before the 12 Nov reset.
+  - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
+  - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
+- **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
   - **Usage at 12:50:** weekly all models **90 %**, Fable 4 %, 5-hour 3 %. The reset is **Fri 6 Nov 19:00 CET** (18:00 UTC). A cycle costs 10–13 weekly points, so this run is expected to be cut off by the limit before cycle 21 ends. The owner accepted that: no usage stop is set (the 29 Oct ruling stands), and the state is saved here after every step so that the next session resumes cold.
   - **Path:** the owner's words choose path B (continue the cycles). The profiling (the 2 Nov step 1a) runs alongside, read-only, because the host was quiet (1-minute load 5.7 at 12:47).
   - **Done so far this session:**
