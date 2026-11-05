@@ -108,6 +108,74 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 
+    /// A transfer's ENOSPC has the same window (`analyse-g4-reach.md` (c), UNCONFIRMED there): its exit sets the job
+    /// `failed(.nextRun)` before its awaits, the resume point's and the free-space read's, and its verdict defers only
+    /// after them (`spaceFailed`), and the read runs one follow turn behind the barrier. T (zz-a, 100 kB) downloads for
+    /// A, a user waiter, and zz-x waits on H (16 bytes, held) for X, a user waiter; v3 maps zz-x to T's content while T
+    /// downloads, and T's transfer then fails ENOSPC. Visited first, v3's visit joined zz-x to T downloading, whose re-lane
+    /// re-queues nothing, and at an interactive cap of one attempt the verdict answered A and X with the space figures.
+    /// Swept first, the read's turn moves zz-x off H onto T.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierGivesATransferENOSPCsVerdictAtTheCapAfterTheFollowsJoinInItsRead(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_901
+        var interactive = RetryPolicy.interactive
+        interactive.maxAttemptsPerRun = 1
+        let (s, _) = try await FollowBarrier.setUp(seed: seed, tuning: SyncTuning(interactiveRetry: interactive))
+        let engine = s.engine
+        let tBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let hBytes = EngineFixture.bytes(seed + 4, count: 16)
+        let a = EngineHarness.onDemand("zz-a", tBytes)
+        let x = EngineHarness.onDemand("zz-x", hBytes)
+        let xOnT = EngineHarness.onDemand("zz-x", tBytes)
+        try #require(xOnT.transferID == a.transferID && x.transferID != a.transferID, "setup: v3 maps zz-x from H to T")
+        let tID = a.transferID
+        let h = x.transferID
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [a, x] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(tID, [.hold, .fail(.insufficientSpace(requiredBytes: Int64(tBytes.count))), .stage(tBytes)])
+        await s.harness.source.script(h, [.hold, .stage(hBytes)])
+        let aWaiter = Task { await engine.awaitAsset(a.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[tID]?.state == .downloading }
+        }
+        let xWaiter = Task { await engine.awaitAsset(x.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.jobs[h]?.state == .downloading }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [a, xOnT] + Self.laterFillers(seed + 6_000), tag: "v3-transfer-space-read-\(seed)", s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            let owed = await engine.readForTests { e in (h: e.state.jobs[h]?.assets.sorted(), t: e.state.jobs[tID]?.state) }
+            try #require(owed.h == [x.identifier] && owed.t == .downloading, "setup: H's visit is owed while T downloads: \(owed)")
+            await engine.readForTests { $0.holdSpaceSweepFollowUps() }
+        }
+        // T's transfer fails ENOSPC; swept first its free-space read runs one follow turn.
+        await s.harness.source.release(tID, with: .progress(received: 0, expected: nil))
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.eventsAfterFollow.contains(where: Self.isSpaceFailure) }
+            let read = await engine.readForTests { e in
+                (t: e.state.jobs[tID]?.assets.sorted(), h: e.state.jobs[h] != nil, owed: e.followOwed, state: e.state.jobs[tID]?.state)
+            }
+            try #require(read.t == [a.identifier, x.identifier] && !read.h && read.owed, "setup: the read's follow turn joined zz-x to T (H, its only id moved, is gone), and the verdict waits behind the owed follow: \(read)")
+            #expect(read.state?.kind == .failed, "the follow's join met T as its transfer left it, its verdict to come, and re-queued nothing (visit-first: the join met T downloading): \(String(describing: read.state))")
+            await engine.readForTests { e in
+                e.releaseFollowFollowUps()
+                e.releaseSpaceSweepFollowUps()
+            }
+        }
+        let aResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: aWaiter) }
+        let xResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: xWaiter) }
+        let tStarts = await s.harness.source.starts.filter { $0.id == tID }.count
+        #expect(Self.isNoSpace(aResult), "the ENOSPC's verdict answers A at its cap with the space figures (visit-first): \(aResult)")
+        #expect(xResult == aResult, "and X, which v3's visit joined to T downloading, with the same figures (visit-first): \(xResult)")
+        #expect(tStarts == 1, "T's content is not requested past the interactive cap (R-SYN-5; visit-first): \(tStarts)")
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        await Self.finishHeld(s)
+    }
+
     /// The other side of `relane`'s count of applies: a follow's visit for an apply made since a publication's failed end
     /// met the job failed with its verdict given on a visit-first engine too, so a user interest it moves onto the job
     /// skips the backoff (T20). T (zz-a, 100 kB) downloads for A, a user waiter, and its publication fails with an I/O
