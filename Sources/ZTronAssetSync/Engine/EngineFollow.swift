@@ -235,8 +235,9 @@ extension SyncEngine {
             // A visit after a verdict too large for the ids left (`followAfterVerdict`): a visit-first engine made it at
             // once, before the next event, so the events after it wait for its rest, in order (C2; cycle 19). With the
             // turn's ids spent and no rest, they wait for the next drain turn (cycle 20). What the replay still owes, the
-            // rest of a batch of re-routes, waits first, with its decision instant: a replay returns it only once it spent
-            // the turn's ids (`continueReroutes`), so it is never left behind here (cycle 21, `integrate-rr21.md` R8).
+            // rest of a batch of re-routes or a verdict's take-off that did not fit, waits first, with its decision
+            // instant: a replay returns one only once it spent the turn's ids (`continueReroutes`, `chargeTakeOff`), so it
+            // is never left behind here (cycle 21, `integrate-rr21.md` R8).
             if self.state.followMoving != nil || self.state.drainIDsLeft <= 0 {
                 let rest: [(EventAfterFollow, WorldStamp)] = (owed.map { [($0, stamp)] } ?? []) + batch[(offset + 1)...]
                 self.state.eventsAfterFollow.insert(contentsOf: rest.map(\.0), at: 0)
@@ -372,23 +373,27 @@ extension SyncEngine {
     }
 
     /// Applies one event that waited for the follow (`drainEventsAfterFollow`), and returns what of it the turn still
-    /// owes: the rest of a batch of re-routes the turn's ids did not cover (`continueReroutes`), which waits at the
-    /// queue's head for the next drain turn; `nil` once the event is applied whole.
+    /// owes: the rest of a batch of re-routes the turn's ids did not cover (`continueReroutes`), or the re-routes of a
+    /// verdict's take-off that did not fit them (`chargeTakeOff`), which waits at the queue's head for the next drain
+    /// turn; `nil` once the event is applied whole.
     private func replay(_ event: EventAfterFollow) -> EventAfterFollow? {
         switch event {
         case .spaceFailure(let transfer, let epoch, let required):
             // A job that ended or was superseded meanwhile has nobody left to answer; one the drain's earlier join created
-            // for the same content is not the job that failed (PROBE-C15R-SPACE-EPOCH).
-            guard let job = self.state.jobs[transfer], job.epoch == epoch else {
+            // for the same content is not the job that failed (PROBE-C15R-SPACE-EPOCH). The guard binds no copy of the
+            // job, which the take-off changes in place (`integrate-rr21.md` R7).
+            guard self.state.jobs[transfer]?.epoch == epoch else {
                 return nil
             }
-            let off = self.takeOffMovedBefore(job)
-            let movesAfter = self.endDeferral(job)
+            let movesAfter = self.state.jobs[transfer].map(self.movesAfterVerdict) ?? false
+            let off = self.takeOffMovedBefore(transfer)
+            self.state.jobs[transfer]?.attemptEnd = nil
+            let owes = self.chargeTakeOff(off.ids)
             self.decideSpaceFailure(transfer, required: required)
             self.followAfterVerdict(transfer, movesAfter)
-            self.rerouteMovedBefore(off, from: transfer)
+            return self.landTakeOff(off.items, owes: owes, from: transfer)
         case .attemptFailed(let transfer, let epoch, let verdict):
-            self.replayVerdict(transfer, epoch: epoch, verdict)
+            return self.replayVerdict(transfer, epoch: epoch, verdict)
         case .join(let join):
             self.replayJoin(join)
         case .removal(let token, let transfer):
@@ -565,59 +570,104 @@ extension SyncEngine {
         job.attemptEnd?.deferredAfter.map { self.state.appliesFollowed > $0 } ?? false
     }
 
-    /// Ends the deferral of `job`'s exit verdict as the drain gives it, and returns whether the drain moves its ids after
-    /// the verdict (`movesAfterVerdict`).
-    private func endDeferral(_ job: Job) -> Bool {
-        let moves = self.movesAfterVerdict(job)
-        self.state.jobs[job.transfer]?.attemptEnd = nil
-        return moves
-    }
-
-    /// Takes off `job`, as the drain gives its waiting exit verdict, the interests in the ids a visit-first engine's
-    /// visits had moved off it before the verdict arrived (`AttemptEnd.movedBefore`) that are still on it, and returns
-    /// them for `rerouteMovedBefore`, after the verdict: a later apply moved them back to the job's content before the
-    /// follow visited it (the visit then finds nothing moved, and a pass that compares with the copy as it stands may not
-    /// find the job at all), and that engine's visit at that apply met the job as the verdict left it (Stage 3 close-out
-    /// cycle 17; the cycle-16 verifiers' PROBE-C16C-VERDICT-MAPPED-BACK: left on the job, the drain's 404 answered them
-    /// too, where that engine's fresh job of the content served them). A job left with no interest is retired before the
-    /// verdict, as that engine's visit retired it.
-    private func takeOffMovedBefore(_ job: Job) -> [(token: InterestToken, interest: JobInterest, asset: AssetID)] {
-        let held = job.assets.intersection(job.attemptEnd?.movedBefore ?? [])
-        guard !held.isEmpty else {
-            return []
+    /// Takes off `transfer`'s job, as the drain gives its waiting exit verdict, the interests in the ids a visit-first
+    /// engine's visits had moved off it before the verdict arrived (`AttemptEnd.movedBefore`) that are still on it, and
+    /// returns them for their re-routes after the verdict (`landTakeOff`): a later apply moved them back to the job's
+    /// content before the follow visited it (the visit then finds nothing moved, and a pass that compares with the copy
+    /// as it stands may not find the job at all), and that engine's visit at that apply met the job as the verdict left
+    /// it (Stage 3 close-out cycle 17; the cycle-16 verifiers' PROBE-C16C-VERDICT-MAPPED-BACK: left on the job, the
+    /// drain's 404 answered them too, where that engine's fresh job of the content served them). A job left with no
+    /// interest is retired before the verdict, as that engine's visit retired it.
+    ///
+    /// Returns the re-routes, one item per held id and interest that holds it, in no order, and the held ids some
+    /// interest holds: the drain decides from them, in the verdict's turn, whether they fit the ids the turn has left
+    /// (`chargeTakeOff`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, `integrate-rr21.md` R6, site 2). The holders
+    /// are read from the index (`Job.moveItems(of:)`, O(held + holders)), each token's lane and kind once, and the job is
+    /// changed in place: a partial interest loses its held ids (`subtractAssets`), and the interests wholly held are
+    /// removed in ascending token order (`removeInterest`), so that a job a claim keeps holds the lane of the last one
+    /// removed (`Job.heldLane`), as the walk over every interest, sorted, left it before cycle 21 (a sort of 10,000
+    /// interests, where only the wholly held ones are sorted now). A held id no interest holds leaves the job all the
+    /// same, as a move's does (`startMove`), and is not counted. A run's claim among them is on no job's interest until
+    /// its re-route lands it or the batch that owes it releases it (`runClaimTakenOff`, `landTakeOff`).
+    private func takeOffMovedBefore(_ transfer: TransferID) -> (items: [RerouteItem], ids: Int) {
+        let held: Set<AssetID> = self.state.jobs[transfer].map { $0.assets.intersection($0.attemptEnd?.movedBefore ?? []) } ?? []
+        guard !held.isEmpty, let holders = self.state.jobs[transfer]?.moveItems(of: held) else {
+            return ([], 0)
         }
-        var off: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
-        self.state.jobs[job.transfer]?.assets.subtract(held)
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            if interest.kind == .run, !interest.assets.isDisjoint(with: held) {
-                // The run's claim is on no job's interest until `rerouteMovedBefore` lands it: the run check waits.
+        self.state.jobs[transfer]?.assets.subtract(held)
+        var byToken: [InterestToken: Set<AssetID>] = [:]
+        for item in holders.items {
+            byToken[item.token, default: []].insert(item.asset)
+        }
+        var whole: [InterestToken] = []
+        var items: [RerouteItem] = []
+        items.reserveCapacity(holders.items.count)
+        for (token, taken) in byToken {
+            // One scoped read of the interest: its lane, its kind, and whether it holds no id but held ones.
+            guard let read = self.state.jobs[transfer]?.interests[token].map({ (lane: $0.lane, kind: $0.kind, whole: $0.assets.count == taken.count) }) else {
+                continue
+            }
+            if read.kind == .run {
+                // The run's claim is on no job's interest until its re-route lands it: the run check waits.
                 self.state.runClaimTakenOff = true
             }
-            for asset in interest.assets.sorted() where held.contains(asset) {
-                _ = self.state.jobs[job.transfer]?.removeAsset(asset, for: token)
-                off.append((token, interest, asset))
+            for asset in taken {
+                items.append(RerouteItem(asset: asset, token: token, lane: read.lane, kind: read.kind))
             }
-            if self.state.jobs[job.transfer]?.interests[token]?.assets.isEmpty == true {
-                self.removeInterest(token, from: job.transfer)
+            if read.whole {
+                whole.append(token)
+            } else {
+                self.state.jobs[transfer]?.subtractAssets(taken, for: token)
             }
         }
-        return off
+        whole.sort()
+        for token in whole {
+            self.removeInterest(token, from: transfer)
+        }
+        return (items, held.count - holders.unheld.count)
+    }
+
+    /// Whether the re-routes of a verdict's take-off of `ids` distinct ids do not fit the ids the drain turn has left
+    /// (`EngineState.drainIDsLeft`), decided once, in the verdict's turn, before the verdict (Stage 3 close-out cycle 21,
+    /// `integrate-rr21.md` R7): ones that fit are charged to the turn, so the turn makes at most its ids; ones that do not
+    /// spend it, so the visit after the verdict moves nothing in it (its whole move is the follow's rest, `startMove`
+    /// with no budget) and the drain's break puts the owed batch back at the queue's head (`drainEventsAfterFollow`).
+    private func chargeTakeOff(_ ids: Int) -> Bool {
+        let owes = ids > self.state.drainIDsLeft
+        self.state.drainIDsLeft = owes ? 0 : self.state.drainIDsLeft - ids
+        return owes
+    }
+
+    /// Makes, after the verdict and its visit, the re-routes `takeOffMovedBefore` took off `transfer`'s job, or owes them
+    /// (`chargeTakeOff`) as one batch the drain puts back at the queue's head, which this returns: the batch's counter
+    /// then holds the run check that the taken-off claims held (`checkRunSettled`), and the run's claims it owes are
+    /// released (`oweReroutes`). Made at once, they go in today's order, by token and then id (`rerouteMovedBefore`).
+    private func landTakeOff(_ items: [RerouteItem], owes: Bool, from transfer: TransferID) -> EventAfterFollow? {
+        guard owes else {
+            self.rerouteMovedBefore(items.sorted { ($0.token, $0.asset) < ($1.token, $1.asset) }, from: transfer)
+            return nil
+        }
+        let batch = self.oweReroutes(items, from: transfer)
+        self.state.runClaimTakenOff = false
+        return .reroutes(batch)
     }
 
     /// Re-routes, after the verdict, the interests `takeOffMovedBefore` took off `transfer`'s job: each follows its id's
     /// entry in the copy (`reroute`), to the job the verdict left or a new job of the content, or another content. A
     /// run's claim among them is landed then, so the run check that waited for it may run again (`runClaimTakenOff`).
-    private func rerouteMovedBefore(_ off: [(token: InterestToken, interest: JobInterest, asset: AssetID)], from transfer: TransferID) {
-        for item in off {
-            self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
+    private func rerouteMovedBefore(_ items: [RerouteItem], from transfer: TransferID) {
+        for item in items {
+            self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: transfer)
         }
         self.state.runClaimTakenOff = false
     }
 
     /// Owes `items`, re-routes of interests that left `transfer`'s job, as one batch (`RerouteBatch`) under the engine's
     /// copy and its serial now, the owing instant (Stage 3 close-out cycle 21, ruling S3-R26 item 1): heapified, not
-    /// sorted. The run's claims on `transfer` for its own owed items are released now, in place, so the run claims none
-    /// of them while they wait (`invariantViolations()`); each re-route claims its id again at its new job (`reroute`).
+    /// sorted. A commit and a superseded exit defer the batch (`deferReroutes`); a verdict's take-off returns it to the
+    /// drain, which puts it back at the queue's head (`landTakeOff`, site 2). The run's claims on `transfer` for its own
+    /// owed items are released now, in place, so the run claims none of them while they wait (`invariantViolations()`);
+    /// each re-route claims its id again at its new job (`reroute`).
     func oweReroutes(_ items: [RerouteItem], from transfer: TransferID) -> RerouteBatch {
         let run = self.state.run?.token
         self.state.run?.outstanding[transfer]?.subtract(items.lazy.filter { $0.kind == .run && $0.token == run }.map(\.asset))
@@ -799,7 +849,8 @@ extension SyncEngine {
     }
 
     /// The visit a visit-first engine made, after it gave the verdict, at each apply since: the job the verdict left
-    /// moves the ids those applies moved, which the owed visits passed to the verdict (`moves`, from `endDeferral`). A job
+    /// moves the ids those applies moved, which the owed visits passed to the verdict (`moves`, `movesAfterVerdict`, read
+    /// before the take-off). A job
     /// the verdict ended has nobody left to move (`follow` finds no job). No verdict creates a job in its own turn, so the
     /// job found is the verdict's: the cycle-16 epoch check was redundant (its drop-mutant survived) and was removed in
     /// Stage 3 close-out cycle 17 under ruling S3-R16 item 3. The job follows the copy afterwards, so the next follow owes
@@ -833,20 +884,24 @@ extension SyncEngine {
     /// the ids an apply moved since the verdict deferred move from the job it leaves (`followAfterVerdict`), as a
     /// visit-first engine's visit at that apply moved them (cycle 16, ruling S3-R19 item 1). The ids that engine's visits
     /// had moved off the job before the verdict arrived and that are still on it are not the verdict's: taken off before
-    /// it and re-routed after it (`takeOffMovedBefore`, cycle 17).
-    private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) {
+    /// it and re-routed after it (`takeOffMovedBefore`, cycle 17), or, when they do not fit the drain turn's ids, owed as
+    /// one batch, which this returns for the drain to put back at the queue's head (`chargeTakeOff`, `landTakeOff`; cycle
+    /// 21, `integrate-rr21.md` R7). The guards bind no copy of the job, which the take-off changes in place.
+    private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) -> EventAfterFollow? {
         guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
-            return
+            return nil
         }
         self.state.verdictsAfterFollow[transfer] = nil
-        guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed = job.state else {
-            return
+        guard self.state.jobs[transfer]?.epoch == epoch, case .failed? = self.state.jobs[transfer]?.state else {
+            return nil
         }
-        let off = self.takeOffMovedBefore(job)
-        let movesAfter = self.endDeferral(job)
+        let movesAfter = self.state.jobs[transfer].map(self.movesAfterVerdict) ?? false
+        let off = self.takeOffMovedBefore(transfer)
+        self.state.jobs[transfer]?.attemptEnd = nil
+        let owes = self.chargeTakeOff(off.ids)
         self.giveVerdict(transfer, verdict)
         self.followAfterVerdict(transfer, movesAfter)
-        self.rerouteMovedBefore(off, from: transfer)
+        return self.landTakeOff(off.items, owes: owes, from: transfer)
     }
 
     /// `replayVerdict`'s verdict for a job still `failed` at its epoch.

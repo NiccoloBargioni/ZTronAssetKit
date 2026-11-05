@@ -5169,10 +5169,10 @@ fix (S3-R26 item 11, "Red first").
    b22-arm-no-early-return, b23-no-lane, b23-no-kind) run again with 900 s, then `tools/mut-c5.py`
    (`tools/chain-c21c.sh`, from 10:00 on 5 Nov). rr21-C6's red step: **committed** (the commit after `42a3689`: rr21-T3,
    rr21-T3-two, RR21-VERDICT-ZERO, RR21-HELDLANE, T-COMPOSE and the two site-2 pins, failing before the fix; evidence
-   under "Step 5"). **Next action:** rr21-C6's fix (R6 and R7; the patch is `.build-s3f/c21/c6/apply-fix.py`), its
-   tests in both orders and the whole Sync suite, then T-shared, PRESENT-PRUNE at site 2 and
-   `PROBE-RR21-RESERVE-REJOIN`, the site-2 figures under `sim.lock`, the timing window (the site-3 figures with step
-   8's), then the mutant runs' results and survivors.
+   under "Step 5"). rr21-C6's fix: **committed** right after it (R6 and R7; the five site-2 tests pass in both orders and
+   the whole Sync suite passes). **Next action:** the site-2 figures under `sim.lock`, then T-shared, PRESENT-PRUNE at
+   site 2 and `PROBE-RR21-RESERVE-REJOIN`, site 2's mutants, the timing window (the site-3 figures with step 8's), then
+   the mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5873,7 +5873,8 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   by rr21-T2, rr21-T2-two and rr21-T2-edge in both orders. rr21-T2 and rr21-T2-two also compare W's job's interests,
   each its kind, lane and ids, with the same exit's at `followIDsPerTurn = 512` (`CommitRerouteRun.onW`, a field the
   site-1 tests do not read), so a replay that made an interest with another kind or lane fails them.
-  The holes at site 3 (S3-R26 item 1; `critic-rr21-answers.md:103` places none at site 2): `publishingPin`,
+  The holes at site 3 (S3-R26 item 1; `critic-rr21-answers.md:103` places refutations 1 and 2 at no site-2 target, J's
+  content, which cannot start or publish behind the barrier, and refutation 3 at site 2 too): `publishingPin`,
   `windowGate` (RR21-WINDOW-GATE's body, moved out of its site-1 test unchanged) and `presentPrune` (RR21-PRESENT-PRUNE's
   body, likewise) take `superseded`, under which the test's applies map zz-o onto the content the moved ids go to (P's,
   or D's, present), so O's publication is refused and its exit owes K's re-route with the moved ids' (`OwedCommit.away`,
@@ -5946,6 +5947,28 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   three times: the visit after the verdict moves its ids in that turn) and C2 (`:57:9`, `:58:9`, once a case): the
   verdict's turn is the heartbeat, 82.81 ms (85.56, 82.81, 82.95) for 10,000 user waiters all held, 45.76 ms (47.66,
   45.76, 45.94) half held, and 30.73 ms (30.73, 31.16, 30.88) for 5,000 moved before and 5,000 after the deferral.
+- **rr21-C6: site 2** (R6 and R7; the commit after `c99d82a`). `takeOffMovedBefore(_:)` takes the transfer, not a copy
+  of the job, and changes the job in place: the held ids are the job's ids that `AttemptEnd.movedBefore` lists; their
+  holders come from the index (`Job.moveItems(of:)`, O(held + holders)), each token's lane and kind read once; a partial
+  interest loses its held ids (`subtractAssets`), and the wholly held interests are removed in ascending token order
+  (`removeInterest`), so that a job a claim keeps holds the last one's lane (`Job.heldLane`), as the sorted walk over
+  every interest left it (only the wholly held tokens are sorted now). It returns the re-route items, unsorted, and the
+  held ids some interest holds. The replays (`replayVerdict`, the `.spaceFailure` arm) bind no copy of the job: each
+  reads `movesAfterVerdict` first, takes off, ends the deferral (`attemptEnd = nil`; `endDeferral` is removed), and
+  decides once, before the verdict (`chargeTakeOff`): ids that fit the turn's `drainIDsLeft` are charged to it and made
+  after the verdict and its visit, in today's order, by token and then id (`rerouteMovedBefore`); ids that do not fit
+  spend the turn (`drainIDsLeft = 0`), so the visit after the verdict moves nothing in it and leaves its whole move as
+  the follow's rest (`startMove` with no budget), and the replay returns the batch (`oweReroutes`), which the drain's
+  break puts back at the queue's head (`landTakeOff`; R8's order: the verdict, the visit's rest, the batch, the
+  verdict's bucket newest first, its overflow, later events). `runClaimTakenOff` is cleared once the batch is owed, whose
+  counter then holds the run check (`reroutesWaiting`). `replay` returns `EventAfterFollow?` from both arms. Since
+  `drainIDsLeft` never goes below 0 (`continueReroutes` and the visits spend at most what is left), an owing take-off has
+  at least one id, so no empty batch is owed. A test of this cycle changed with the fix (G3): rr21-T3's `:43` searched
+  every turn for m05's re-joined interest, which O0 holds until the take-off, so it found the setup's reading; it now
+  searches the turns after the verdict's, and also requires the verdict's turn to have taken the interest off
+  (stricter; on `42a3689` it fails, the take-off re-joining it in the verdict's turn). Results: the five site-2 tests
+  pass in both orders (12 cases, `each/c6-fix-2.log`), and the whole Sync suite passes (661 tests in 56 suites,
+  `each/c6-fix-sync1.log`, 307.6 s, 1-minute loads 10.51 to 6.37).
 
 ## Items
 

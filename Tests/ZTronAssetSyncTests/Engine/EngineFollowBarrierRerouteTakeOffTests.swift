@@ -39,8 +39,9 @@ extension EngineFollowBarrierTests {
             #expect(atVerdict.queue == ["reroutes", "removal"], "the batch waits at the queue's head, right behind the verdict and ahead of the removal that waited behind it: \(atVerdict)")
             #expect(made.allSatisfy { $0 <= Self.takeOffIDsPerTurn }, "no turn re-routes more than a drain turn's \(Self.takeOffIDsPerTurn) ids: \(made) \(turns)")
             #expect(made.suffix(from: given).filter { $0 > 0 } == [4, 4, 2], "the batch replays four ids a turn: \(made) \(turns)")
-            let rejoined = turns.firstIndex { $0.removalOnJob }
-            #expect(rejoined.map { $0 > given } == true && turns.last?.removalOnJob == false, "the batch re-joins m05's cancelled waiter, and the removal behind it then removes its interest: \(turns)")
+            // O0 holds m05's interest until the take-off: the re-join is searched for after the verdict's turn.
+            let rejoined = turns.indices.first { $0 > given && turns[$0].removalOnJob }
+            #expect(!atVerdict.removalOnJob && rejoined != nil && turns.last?.removalOnJob == false, "the take-off takes m05's cancelled waiter's interest off, the batch re-joins it, and the removal behind it then removes it: \(turns)")
             #expect(turns.allSatisfy { $0.violations.isEmpty }, "the invariants hold after every held turn: \(turns)")
         }
         let outcome = try await self.takeOffFinish(t)

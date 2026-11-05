@@ -178,14 +178,17 @@ struct EngineState {
     /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
     var drainingAfterFollow = false
     /// Set while the drain gives a waiting verdict whose job it took a run's claim off first (`takeOffMovedBefore`), until
-    /// `rerouteMovedBefore` lands the claim: until then it is on no job's interest, so the run check waits
-    /// (`checkRunSettled`), and the drain's end checks the run again (Stage 3 close-out cycle 21, found while fixing
-    /// S3-R26 item 12's answer 5, candidate 2: a check the verdict made between the two settled the run without the claim).
+    /// `rerouteMovedBefore` lands the claim or the batch that owes it takes the run check over (`landTakeOff`,
+    /// `reroutesWaiting`): until then it is on no job's interest, so the run check waits (`checkRunSettled`), and the
+    /// drain's end checks the run again (Stage 3 close-out cycle 21, found while fixing S3-R26 item 12's answer 5,
+    /// candidate 2: a check the verdict made between the two settled the run without the claim).
     var runClaimTakenOff = false
-    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), and its
-    /// owed re-routes re-route (`SyncEngine.continueReroutes`), set at each batch to what the turn has left: one turn's
-    /// ids cover the whole batch, the follow's last turn included (Stage 3 close-out cycle 20, ruling S3-R25 item 1; each
-    /// visit had a whole turn's ids, so a batch of verdicts moved that many times more in one turn).
+    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), its
+    /// owed re-routes re-route (`SyncEngine.continueReroutes`) and its verdicts' take-offs re-route at once
+    /// (`SyncEngine.chargeTakeOff`, which spends them all on one that does not fit), set at each batch to what the turn
+    /// has left: one turn's ids cover the whole batch, the follow's last turn included (Stage 3 close-out cycle 20,
+    /// ruling S3-R25 item 1; each visit had a whole turn's ids, so a batch of verdicts moved that many times more in one
+    /// turn).
     var drainIDsLeft = 0
     /// The batches of owed re-routes (`EventAfterFollow.reroutes`) not yet replayed whole, whether they wait in
     /// `eventsAfterFollow` or in a drain turn's batch: a batch's last item counts it down (`SyncEngine.continueReroutes`;
