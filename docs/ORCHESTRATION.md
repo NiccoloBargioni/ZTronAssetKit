@@ -97,6 +97,24 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - use Sonnet verifiers, which are cheaper but weaken the bar (the owner's choice).
       Under "near the limit: launch anyway", the cycles run until the limit, and the rest resumes after the reset.
     - **Twenty-six more cycles** fit neither budget: 150–600 h of wall time and several hundred points. Run 9's `maxCycle` is 30 in any case.
+  - **S3-R27's analysis finished at 19:24.** 8 agents, 81 min, 2.35 M subagent tokens, no errors. Its reports are in `.build-orchestrator/s3f-c21-analysis/` (d1 to d5, and reviews of d1, d2 and d4). All three reviews returned CORRECTED, not UNSOUND.
+    - D1 (`waitersStalledSubscriber`): a cheaper publish path (a1 to a3) with c3, expected at about 7.8–8.5 ms. Owing the events past the turn (route (b)) is left for a new ruling.
+    - D2 (APM): branch-free cuts and batched store reads (B1), expected group 5.1–6.6, groups about 8.8, users about 7.4 ms. A7 and R1 are pre-ruled, with the group walks as the next cut.
+    - D3 (HOLDERS): outside S3-R25's letter (2 ids) and implausible in ZTronCarousel, so the shape goes to the owner. The same mismatch inside the letter (k = 2 or 4 interests per id) is measured, and pair counting (P1–P4) is built only if that misses.
+    - D4 (survivors): 2 removals (r7's `atEnd`, and `replayVerdict`'s second guard with an epoch clause), 13 kills, and r2b open. About 24–30 h of fixer work and 28–30 mutant runs.
+    - D5: no racy reader; one optional pin.
+  - **S3-R27 is drafted** at `.build-orchestrator/s3f-c21-analysis/s3-r27-draft.md`, about 19:35 (10 items, with the order of work in item 10).
+    - Two read-only reviews are running: `wf_414dfb0b-d80` (task `wfxlfc7yn`), lenses consistency and fidelity, writing `s3-r27-review-*.md`.
+    - Next: apply their must-fix items, append the draft to `s3-rulings-s3f.md`, then run 9 by the steps above.
+    - Run 9's focus: "S3-R27 is this cycle's ruling (S3-R26 applies where S3-R27 does not change it)". Cycles 1–21 are on `wp/s3f` at `d5b2ab9`. It drops run 8's cut-off paragraph, and adds "keep the cycle-22 status list current; the weekly limit may cut this cycle off".
+  - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
+    - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
+    - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
+    - Committed steps survive a cut-off, and the cycle resumes after the reset (Thu 12 Nov 03:00, or earlier if the meter resets early again).
+  - **Questions for the owner** (both "open, for the owner"; neither blocks cycle 22):
+    1. Is one id with thousands of interests inside the 10 ms bar? d3 proposes sizing the per-id dimension, for example at most 1,000 interests on one id.
+    2. Is a second stalled subscriber? It measured 13.7 ms today, and d1 expects about 9.1–10.2 ms after item 1.
+  - **This session's context was at 83 % at 19:40.** If it compacts or ends, a fresh session resumes from this bullet.
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
 - **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
