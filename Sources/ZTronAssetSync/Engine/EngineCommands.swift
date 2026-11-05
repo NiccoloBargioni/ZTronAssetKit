@@ -2165,8 +2165,9 @@ extension SyncEngine {
     /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
     /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); every
     /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the ends a
-    /// pin follows (commits, and ENOENT re-queues) are kept only while the barrier is up, each an attempt no longer at its
-    /// end, at a copy adopted by then (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END; cycle 22, e1-R1).
+    /// pin follows (commits, superseded publications and ENOENT re-queues) are kept only while the barrier is up, each an
+    /// attempt no longer at its end, at a copy adopted by then (`EngineState.reroutePinCommits`; cycle 21,
+    /// PROBE-RR21-PIN-END; cycle 22, e1-R1 and e1-PS).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow

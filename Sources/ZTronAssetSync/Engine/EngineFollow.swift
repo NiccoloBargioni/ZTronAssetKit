@@ -766,15 +766,15 @@ extension SyncEngine {
     /// owing instant, then, at each apply since (`RerouteBatch.layers`), the copy the apply's visit moved the id to. An
     /// entry whose job was at an attempt's end at that apply pins the id to the copy the apply replaced while the job is
     /// still at that end (`waitingTarget`): a visit-first engine's interest that had joined it stayed through the visit,
-    /// which passed the publishing job (RR-14), and is re-routed at that end only. A job that committed since
-    /// (`EngineState.reroutePinCommits`) hands the id on to the copy in force at its commit, which re-routed that
-    /// interest, and the walk goes on from the layers adopted after it (Stage 3 close-out cycle 21, PROBE-RR21-PIN-END).
-    /// One that an ENOENT re-queued at that epoch keeps the pin: that engine re-routed nothing there (D-13), and the
-    /// interest rode the fresh attempt until the first visit after the re-queue moved it under the copy that visit's
-    /// apply adopted, from which the walk goes on (Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-R1). One
-    /// that left its end otherwise (superseded, or re-queued with no end kept, behind its verdict) hands it to the
-    /// engine's copy. A copy without the id is returned as it is, so the re-route ends the interest (T21), as that visit
-    /// did.
+    /// which passed the publishing job (RR-14), and is re-routed at that end only. A job that committed since, or whose
+    /// publication the store refused as superseded (`EngineState.reroutePinCommits`), hands the id on to the copy in
+    /// force at that end, which re-routed that interest, and the walk goes on from the layers adopted after it (Stage 3
+    /// close-out cycle 21, PROBE-RR21-PIN-END; the supersede in cycle 22, ruling S3-R27 item 12.2's e1-PS). One that an
+    /// ENOENT re-queued at that epoch keeps the pin: that engine re-routed nothing there (D-13), and the interest rode the
+    /// fresh attempt until the first visit after the re-queue moved it under the copy that visit's apply adopted, from
+    /// which the walk goes on (Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-R1). One that left its end
+    /// otherwise (superseded by a visit, or re-queued with no end kept, behind its verdict) hands it to the engine's
+    /// copy. A copy without the id is returned as it is, so the re-route ends the interest (T21), as that visit did.
     func rerouteListing(_ asset: AssetID, _ batch: RerouteBatch) -> ValidatedManifest? {
         guard let entry = batch.copy.entry(for: asset) else {
             return batch.copy
@@ -806,9 +806,10 @@ extension SyncEngine {
                     return layer.outgoing
                 }
                 // The layers hold one per copy adopted from `serial` on: the copy in force at the end is layer `after`'s
-                // outgoing one, or the engine's. A commit re-routed the id under it. An ENOENT re-queue kept the id on
-                // the job: with no layer adopted since, it rides the fresh attempt; otherwise the first layer after the
-                // re-queue moved it under the copy that layer's apply adopted (e1-R1).
+                // outgoing one, or the engine's. A commit or a superseded publication re-routed the id under it (e1-PS
+                // for the latter). An ENOENT re-queue kept the id on the job: with no layer adopted since, it rides the
+                // fresh attempt; otherwise the first layer after the re-queue moved it under the copy that layer's apply
+                // adopted (e1-R1).
                 guard let end = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
                     return nil
                 }
@@ -1999,14 +2000,16 @@ struct VerdictKey: Hashable, Sendable {
 }
 
 /// How an attempt that a pin names left its end, kept while events wait for the follow (`EngineState.reroutePinCommits`,
-/// read by `followLayers`): the copy's serial then, and whether the job kept the pinned ids. A commit re-routed them
-/// under the copy in force at it; an ENOENT re-queue, which keeps the epoch, kept them on the job, as a visit-first
-/// engine's interests rode its fresh attempt until a visit after the re-queue moved them (Stage 3 close-out cycle 22,
-/// ruling S3-R27 item 12.2's e1-R1; the cycle-21 verifiers' correct #1).
+/// read by `followLayers`): the copy's serial then, and whether the job kept the pinned ids. A commit, or a publication
+/// the store refused as superseded, re-routed them under the copy in force at it (the supersede: ruling S3-R27 item
+/// 12.2's e1-PS); an ENOENT re-queue, which keeps the epoch, kept them on the job, as a visit-first engine's interests
+/// rode its fresh attempt until a visit after the re-queue moved them (Stage 3 close-out cycle 22, ruling S3-R27 item
+/// 12.2's e1-R1; the cycle-21 verifiers' correct #1).
 struct PinEnd: Hashable, Sendable {
     /// `EngineState.copySerial` at the end.
     let serial: UInt64
-    /// Whether the job kept the ids: an ENOENT re-queue's end (`true`), or a commit's (`false`).
+    /// Whether the job kept the ids: an ENOENT re-queue's end (`true`), or a commit's or a superseded publication's
+    /// (`false`).
     let keepsEntry: Bool
 }
 

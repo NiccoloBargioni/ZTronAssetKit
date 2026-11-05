@@ -1264,6 +1264,13 @@ extension SyncEngine {
             // (`addInterest`). The cycle-12 deferral of this exit (`AttemptVerdict.supersede`) made only their places equal
             // to a visit-first engine's and was removed in cycle 13 under ruling S3-R16 item 3. Re-routes that do not fit
             // this turn are owed (`supersede`'s `bound`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, site 3).
+            // While events wait, the exit is kept as a commit is (`EngineState.reroutePinCommits`): an owed re-route or a
+            // waiting join a layer pinned to this attempt follows the copy now, as a visit-first engine's supersede
+            // re-routed the interests that had joined the job (`followLayers`; Stage 3 close-out cycle 22, ruling S3-R27
+            // item 12.2's e1-PS).
+            if !self.state.eventsAfterFollow.isEmpty {
+                self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: false)
+            }
             self.transition(transfer, to: .queued)
             self.supersede(transfer, bound: self.inboundIDsNow)
         case .integrity:
