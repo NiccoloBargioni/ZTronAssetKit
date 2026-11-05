@@ -205,4 +205,82 @@ extension EngineFollowBarrierTests {
         #expect(report?.failures.map(\.id) == [b.identifier] && report?.failures.first?.error == .notFound, "the run fails zz-b with J's 404: \(outcome)")
         await Self.finishHeld(s)
     }
+
+    /// `barrierKeepsARunsClaimTakenOffBeforeAVerdict` with three claims moved before the verdict, zz-a, zz-c and zz-d, and
+    /// a drain turn of two ids: the take-off of the three does not fit the verdict's turn, so it owes their re-routes as
+    /// one batch (`landTakeOff`), which releases the run's claims on J (`oweReroutes`) and takes the run check over from
+    /// the take-off (`runClaimTakenOff`, `reroutesWaiting`): once the batch is made, the run settles. Swept first, the
+    /// drain's turns run one at a time and each is read. Visited first, v3's visit moved the three claims to K, J's 404
+    /// failed zz-b, and v4's visit moved them back to a new job of content j, which fetched them.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a run's claims the drain takes off a waiting verdict's job and owes as one batch are fetched after it, as visited first (F-28, rr21-C6)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierKeepsARunsClaimsTakenOffBeforeAVerdictInAnOwedBatch(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_022_611
+        let (s, _) = try await FollowBarrier.setUp(seed: seed)
+        let engine = s.engine
+        await engine.readForTests { $0.state.followIDsPerTurn = 2 }
+        let jBytes = EngineFixture.bytes(seed + 3, count: 16)
+        let kBytes = EngineFixture.bytes(seed + 4, count: 20)
+        let moved = ["zz-a", "zz-c", "zz-d"].map { EngineFixture.entry($0, jBytes) }
+        let b = EngineFixture.entry("zz-b", jBytes)
+        let movedOnK = ["zz-a", "zz-c", "zz-d"].map { EngineFixture.entry($0, kBytes) }
+        let j = b.transferID
+        let k = movedOnK[0].transferID
+        try #require(moved.allSatisfy { $0.transferID == j } && k != j, "setup: zz-a, zz-b, zz-c and zz-d share content j, and v3 maps three of them to content k")
+        await s.harness.source.script(j, [.hold, .fail(.permanentMissing(httpStatus: 404)), .stage(jBytes)])
+        await s.harness.source.script(k, [.hold, .stage(kBytes)])
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [moved[0], b] + moved.dropFirst() + Self.laterFillers(seed + 3_000), etag: "v2")
+        let sync = Task { await engine.sync(.force) }
+        let claimed = Set(moved.map(\.identifier) + [b.identifier])
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in e.state.jobs[j]?.state == .downloading && e.state.run?.outstanding[j] == claimed }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + [movedOnK[0], b] + movedOnK.dropFirst() + Self.laterFillers(seed + 6_000), tag: "v3-run-owed-take-off-\(seed)", s, visit: visit)
+        await s.harness.source.release(j, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { e in
+            visit == .sweepFollowsFirst ? e.state.jobs[j]?.attemptEnd?.deferredAfter != nil : e.state.jobs[j] == nil
+        }
+        if visit == .sweepFollowsFirst {
+            let movedBefore = await engine.readForTests { $0.state.jobs[j]?.attemptEnd?.movedBefore }
+            try #require(movedBefore == Set(moved.map(\.identifier)), "setup: J's verdict waits, the three moved off J before it (visit-first): \(String(describing: movedBefore))")
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 300) + [moved[0], b] + moved.dropFirst() + Self.laterFillers(seed + 9_000), tag: "v4-run-owed-take-off-\(seed)", s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            // Each held turn's reading: the run's claims a waiting batch owes, whether the take-off still holds the run
+            // check, and the batches owed.
+            await engine.readForTests { $0.holdDrainFollowUps() }
+            var readings: [(owedRun: Int, takenOff: Bool, waiting: Int)] = []
+            while await engine.readForTests({ $0.followOwed || !$0.state.eventsAfterFollow.isEmpty }) {
+                try #require(readings.count < 200, "the follow and its drain end within 200 turns: \(readings)")
+                _ = await Self.runOneHeldTurn(engine)
+                readings.append(await engine.readForTests { e in
+                    let owedRun = e.state.eventsAfterFollow.reduce(0) { count, event in
+                        guard case .reroutes(let batch) = event else {
+                            return count
+                        }
+                        return count + batch.items.elements.filter { $0.kind == .run }.count
+                    }
+                    return (owedRun, e.state.runClaimTakenOff, e.state.reroutesWaiting)
+                })
+            }
+            await engine.readForTests { e in
+                e.releaseDrainFollowUps()
+                e.releaseFollowFollowUps()
+            }
+            try #require(readings.contains { $0.owedRun == 3 }, "setup: the verdict's take-off owes the run's three claims as one batch: \(readings)")
+            #expect(readings.allSatisfy { $0.owedRun == 0 || !$0.takenOff }, "an owed batch takes the run check over from the take-off: \(readings)")
+            // Required: with the run check still held the run never settles, and the wait for the sync below would hang.
+            try #require(readings.last.map { $0.owedRun == 0 && !$0.takenOff && $0.waiting == 0 } == true, "once the batch is made no claim is taken off and no re-route is owed: \(readings)")
+        }
+        let outcome = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: sync) }
+        let report: SyncReport? = switch outcome {
+        case .completeWithFailures(let report), .complete(let report):
+            report
+        default:
+            nil
+        }
+        #expect(report?.fetched == 3, "the run fetches zz-a, zz-c and zz-d with content j's next attempt (visit-first): \(outcome)")
+        #expect(report?.failures.map(\.id) == [b.identifier] && report?.failures.first?.error == .notFound, "the run fails zz-b with J's 404: \(outcome)")
+        await Self.finishHeld(s)
+    }
 }

@@ -120,6 +120,36 @@ extension EngineFollowBarrierTests {
         #expect(outcome.jobs == 0, "no job is left once every caller is answered: \(outcome.jobs)")
     }
 
+    /// RR21-VERDICT-ZERO's shape with an ENOSPC for room in place of the timeout: its verdict waits as a `.spaceFailure`,
+    /// whose replay charges the take-off before its verdict and its visit as `.attemptFailed`'s does (`replay`). Swept
+    /// first, the take-off owes its six and spends the turn, so the visit after the verdict moves nothing in it and leaves
+    /// its whole move as the follow's rest. Visited first, O0 backed off at its ENOSPC, v4's visit moved the six from N
+    /// back onto it and the p-ids to P, and O0's retry served zz-c0k and the six.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an ENOSPC verdict's take-off that owes its re-routes spends the verdict's turn, so the visit after the verdict moves its ids before the batch replays (C2, F-28, RR21-VERDICT-ZERO)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func drainSpendsTheSpaceVerdictsTurnOnATakeOffThatOwes(_ visit: LaneDropVisit) async throws {
+        let shape = TakeOffShape(ending: .spaceRetry, moved: 6, after: 6)
+        let t = try await self.takeOffSetUp(visit, seed: 2_028_336, shape: shape)
+        try await self.takeOffApplyV4(t, visit)
+        if visit == .sweepFollowsFirst {
+            let turns = try await Self.takeOffTurns(t)
+            let made = Self.takeOffMade(turns)
+            let given = try #require(turns.firstIndex { $0.verdicts == 0 }, "the drain gives O0's verdict: \(turns)")
+            try #require(given > 0, "setup: O0's verdict waits until a held turn: \(turns)")
+            let atVerdict = turns[given]
+            #expect(atVerdict.moving && atVerdict.onP == 0 && made[given - 1] == 0 && atVerdict.batches == 1 && atVerdict.owedIDs == 6, "the verdict's turn owes the six, moves none of the visit's ids and leaves the visit's whole move as the follow's rest: \(made) \(turns)")
+            let firstMade = try #require(made.indices.first { $0 >= given && made[$0] > 0 }, "the batch replays: \(made) \(turns)")
+            #expect(turns[firstMade + 1].onP == 6 && !turns[firstMade + 1].moving, "the visit's rest moves the six to P, in the follow's next turns, before the batch replays: \(made) \(turns)")
+            #expect(made.allSatisfy { $0 <= Self.takeOffIDsPerTurn }, "no turn re-routes more than a drain turn's \(Self.takeOffIDsPerTurn) ids: \(made) \(turns)")
+            #expect(turns.allSatisfy { $0.violations.isEmpty }, "the invariants hold after every held turn: \(turns)")
+        }
+        let outcome = try await self.takeOffFinish(t)
+        #expect(outcome.moved == [Array(repeating: 16, count: 6)], "O0's retry serves the six (visit-first): \(outcome.moved)")
+        #expect(outcome.kept.map { (try? $0.get())?.byteSize } == [16], "O0's retry serves zz-c0k (visit-first): \(outcome.kept)")
+        #expect(outcome.after == Array(repeating: 20, count: 6), "P serves the p-ids (visit-first): \(outcome.after)")
+        #expect(outcome.jobs == 0, "no job is left once every caller is answered: \(outcome.jobs)")
+    }
+
     // MARK: RR21-HELDLANE: the lane a claim keeps once the take-off empties the job
 
     /// O0's only interests are 64 moved-before waiters, zz-c0m63's user-initiated and the rest bulk, registered in id
@@ -141,6 +171,32 @@ extension EngineFollowBarrierTests {
             let given = try #require(turns.firstIndex { $0.verdicts == 0 }, "the drain gives O0's verdict: \(turns)")
             try #require(given > 0, "setup: O0's verdict waits until a held turn: \(turns)")
             #expect(turns[given].heldLane == .userInitiated && turns[given].o0Interests == 0 && turns[given].owedIDs == 64, "the take-off leaves O0 to the claim with its greatest token's lane, user-initiated, and owes the 64: \(turns[given])")
+            #expect(Self.takeOffMade(turns).allSatisfy { $0 <= Self.takeOffIDsPerTurn }, "no turn re-routes more than a drain turn's ids: \(turns)")
+            #expect(turns.allSatisfy { $0.violations.isEmpty }, "the invariants hold after every held turn: \(turns.first { !$0.violations.isEmpty }.map(\.description) ?? "")")
+        }
+        let outcome = try await self.takeOffFinish(t)
+        #expect(outcome.moved == [Array(repeating: 16, count: 64)], "O0's retry serves the 64 (visit-first): \(outcome.moved)")
+        #expect(outcome.jobs == 0, "no job is left once every caller is answered: \(outcome.jobs)")
+    }
+
+    /// RR21-HELDLANE with the lanes the other way round: zz-c0m00's waiter, the least token, is user-initiated and the
+    /// other 63 bulk, so O0's lane before the take-off, user-initiated, is not the lane of the last interest it removes.
+    /// Swept first, the job a claim keeps holds the lane before that last removal, bulk, as today's take-off left it
+    /// (`settleRemoval`'s `last`, `JobTakeOff.laneBeforeLast`), not the lane before the first. Visited first, v3's visit
+    /// moved every id O0 held and superseded it, and v4's visit moved the 64 from N to a fresh job of its content, which
+    /// served them, as O0's retry serves them swept first.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a take-off that empties a job a claim keeps leaves it its greatest token's lane, below the job's lane before the take-off, as the visit-first move does (F-28, RR21-HELDLANE)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func takeOffLeavesAClaimKeptJobTheLaneOfItsLastInterestBelowItsOwn(_ visit: LaneDropVisit) async throws {
+        let lanes = [AssetPriority.userInitiated] + Array(repeating: .bulk, count: 63)
+        let shape = TakeOffShape(ending: .timeout, moved: 64, keptWaiters: false, lanes: lanes)
+        let t = try await self.takeOffSetUp(visit, seed: 2_028_346, shape: shape)
+        try await self.takeOffApplyV4(t, visit)
+        if visit == .sweepFollowsFirst {
+            let turns = try await Self.takeOffTurns(t)
+            let given = try #require(turns.firstIndex { $0.verdicts == 0 }, "the drain gives O0's verdict: \(turns)")
+            try #require(given > 0, "setup: O0's verdict waits until a held turn: \(turns)")
+            #expect(turns[given].heldLane == .bulk && turns[given].o0Interests == 0 && turns[given].owedIDs == 64, "the take-off leaves O0 to the claim with its greatest token's lane, bulk, and owes the 64: \(turns[given])")
             #expect(Self.takeOffMade(turns).allSatisfy { $0 <= Self.takeOffIDsPerTurn }, "no turn re-routes more than a drain turn's ids: \(turns)")
             #expect(turns.allSatisfy { $0.violations.isEmpty }, "the invariants hold after every held turn: \(turns.first { !$0.violations.isEmpty }.map(\.description) ?? "")")
         }
