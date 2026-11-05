@@ -139,6 +139,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - E1 (correct #1) and E2 (correct #2), each with an independent review, writing `e1-pin-requeue*.md` and `e2-purge*.md` in `s3f-c21-analysis/`;
       - then S3-R27 gets an item 12 from them, and run 9 launches after it.
     - Forecast: about 1.5 h and 2–4 weekly points for the analysis and item 12.
+    - **The analysis runs from 20:20:** `wf_0f693655-120` (task `wkh0oee0f`), 4 agents: analyse e1 and e2, then a review of each, pipelined. If this session ends before it returns, read its journal and the four files, and continue from "S3-R27 gets an item 12".
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
