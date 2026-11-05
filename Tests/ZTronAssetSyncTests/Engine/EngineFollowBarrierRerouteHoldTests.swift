@@ -186,13 +186,21 @@ extension EngineFollowBarrierTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: a publication that begins while re-routes are owed binds their ids though the gate closed before the site (F-28, RR21-WINDOW-GATE)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func publicationDuringTheWindowBindsTheOwedIDsBehindAClosedGate(_ visit: LaneDropVisit) async throws {
-        let seed: UInt64 = 2_027_531
+        try await self.windowGate(visit, seed: 2_027_531, superseded: false)
+    }
+
+    /// RR21-WINDOW-GATE's shape (`publicationDuringTheWindowBindsTheOwedIDsBehindAClosedGate`). With `superseded` (site
+    /// 3), K0 also maps zz-o onto P's content: the store refuses O's publication, and its exit owes K's re-route with
+    /// W1…W3's. Visited first, the exit joined all four to P downloading, and P's binding held them, so K gets P's bytes
+    /// too.
+    @available(macOS 15.0, iOS 18.0, *)
+    func windowGate(_ visit: LaneDropVisit, seed: UInt64, superseded: Bool) async throws {
         let tuning = SyncTuning(breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let pBytes = EngineFixture.bytes(seed + 5, count: 18)
         let eBytes = EngineFixture.bytes(seed + 6, count: 16)
         let p = EngineHarness.onDemand("zz-p", pBytes)
         let e = EngineHarness.onDemand("zz-e", eBytes)
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p, e], tuning: tuning)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p, e], tuning: tuning, away: superseded ? pBytes : nil)
         let engine = c.engine
         let pT = p.transferID
         let origin = c.s.harness.source.originID
@@ -215,7 +223,8 @@ extension EngineFollowBarrierTests {
         let created = await engine.readForTests { $0.state.jobsCreated }
         let outcome = await Self.finishOwed(c, held: held, others: [q])
         let createdAfter = await engine.readForTests { $0.state.jobsCreated }
-        #expect(Self.sizes([outcome.k]) == [16] && Self.sizes(outcome.others + outcome.w) == [18, 18, 18, 18], "K gets O's bytes, Q and W1…W3 P's (visit-first): \(outcome)")
+        let kBytes: Int64 = superseded ? 18 : 16
+        #expect(Self.sizes([outcome.k]) == [kBytes] && Self.sizes(outcome.others + outcome.w) == [18, 18, 18, 18], "K gets \(superseded ? "P's" : "O's") bytes, Q and W1…W3 P's (visit-first): \(outcome)")
         let pStarts = await Self.starts(pT, c)
         #expect(createdAfter == created && pStarts == 1, "no fresh job of P's content: \(created) -> \(createdAfter), P's starts \(pStarts)")
         #expect(outcome.violations.isEmpty, "\(outcome.violations.prefix(3))")

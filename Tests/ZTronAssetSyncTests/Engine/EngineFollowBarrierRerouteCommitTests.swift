@@ -41,6 +41,9 @@ extension EngineFollowBarrierTests {
         var served: [Int64] = []
         /// Whether the prefetch group waited for no member at the end (`waitersAndGroup`).
         var groupDone = true
+        /// W's job's interests once the follow and the drain are over, each its kind and lane, sorted: the interests the
+        /// re-routes made there, the same whether they were made at once or owed.
+        var onW: [String] = []
 
         /// The ids re-routed by the turns that re-routed any, in order.
         var made: [Int] {
@@ -48,7 +51,7 @@ extension EngineFollowBarrierTests {
         }
 
         var description: String {
-            "commits made \(self.commitMade), owed \(self.owedAfterCommit), batches \(self.batchesAfterCommit), events \(self.eventsAfterCommit); turns \(self.turns.map { "\($0.kind.rawValue)\($0.owedBefore ? "(owed)" : ""):\($0.made)" }); split \(self.split); served \(self.served); group done \(self.groupDone); violations \(self.violations.prefix(3))"
+            "commits made \(self.commitMade), owed \(self.owedAfterCommit), batches \(self.batchesAfterCommit), events \(self.eventsAfterCommit); turns \(self.turns.map { "\($0.kind.rawValue)\($0.owedBefore ? "(owed)" : ""):\($0.made)" }); split \(self.split); served \(self.served); group done \(self.groupDone); on W \(self.onW); violations \(self.violations.prefix(3))"
         }
     }
 
@@ -184,6 +187,7 @@ extension EngineFollowBarrierTests {
             e.releaseFollowFollowUps()
         }
         let complete = await engine.readForTests { e in movedIDs.isEmpty || (e.state.jobs[w]?.assets.isSuperset(of: movedIDs) ?? false) }
+        run.onW = await engine.readForTests { e in (e.state.jobs[w]?.interests.values.map { "\($0.kind)/\($0.lane)/\($0.assets.count)" } ?? []).sorted() }
         if complete, !movedIDs.isEmpty {
             await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
                 await engine.awaitCondition { $0.state.jobs[w]?.state == .downloading }

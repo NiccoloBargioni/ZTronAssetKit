@@ -36,15 +36,18 @@ extension EngineFollowBarrierTests {
     /// still publishes, and X commits, before the replay. W's publication then begins (and waits: a re-route is owed),
     /// unless K2 comes while W downloads (`later`). W's bytes fail their check. Visited first, the commit re-routed
     /// W1…W3 onto X publishing, K1's visit passed X, and X's commit re-routed them under K1's copy to W's job; K2's
-    /// visit passed W publishing (RR-14), so W's failure answered them, or moved them off W downloading to Z's job.
+    /// visit passed W publishing (RR-14), so W's failure answered them, or moved them off W downloading to Z's job. With
+    /// `superseded` (after site 3, rr21-C5), the applies map zz-o to a content of its own (17 bytes, `pinEndOwn`): the
+    /// store refuses O's publication, and its exit owes K's re-route with W1…W3's; K follows its id to that content.
     @available(macOS 15.0, iOS 18.0, *)
-    func pinEnd(_ visit: LaneDropVisit, seed: UInt64, later: PinEndLater) async throws -> PinEndOutcome {
+    func pinEnd(_ visit: LaneDropVisit, seed: UInt64, later: PinEndLater, superseded: Bool = false) async throws -> PinEndOutcome {
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
         let wBytes = EngineFixture.bytes(seed + 6, count: 20)
         let zBytes = EngineFixture.bytes(seed + 7, count: 24)
         let x = EngineHarness.onDemand("zz-x", xBytes)
         let wEntry = EngineHarness.onDemand("zz-w", wBytes)
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x, wEntry])
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x, wEntry], away: superseded ? Self.pinEndOwn(seed) : nil)
+        await Self.scriptAway(c)
         let engine = c.engine
         let xT = x.transferID
         let wT = wEntry.transferID
@@ -82,13 +85,14 @@ extension EngineFollowBarrierTests {
     /// zz-a1…zz-a3 to X's content, O's commit owes their re-routes, K1 drops them while X still publishes, X commits, and
     /// K2 lists them again on Z's content, all before the replay. Visited first, the commit re-routed W1…W3 onto X
     /// publishing, K1's visit passed X, and X's commit re-routed them under K1's copy, which does not list them (T21):
-    /// each waiter got `.notFound`, and K2 found no interest to move.
+    /// each waiter got `.notFound`, and K2 found no interest to move. With `superseded`, as `pinEnd`'s.
     @available(macOS 15.0, iOS 18.0, *)
-    func pinEndDropped(_ visit: LaneDropVisit, seed: UInt64) async throws -> PinEndOutcome {
+    func pinEndDropped(_ visit: LaneDropVisit, seed: UInt64, superseded: Bool = false) async throws -> PinEndOutcome {
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
         let zBytes = EngineFixture.bytes(seed + 7, count: 24)
         let x = EngineHarness.onDemand("zz-x", xBytes)
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x])
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x], away: superseded ? Self.pinEndOwn(seed) : nil)
+        await Self.scriptAway(c)
         let engine = c.engine
         let xT = x.transferID
         let onX = Self.movedOnto(xBytes, c)
@@ -107,6 +111,20 @@ extension EngineFollowBarrierTests {
         let zStarts = await Self.starts(z, c)
         await Self.finishHeld(c.s)
         return PinEndOutcome(layer: layer, u: nil, v: layer.others[0], zStarts: zStarts)
+    }
+
+    /// zz-o's own content in `pinEnd`'s and `pinEndDropped`'s site-3 shapes: 17 bytes.
+    static func pinEndOwn(_ seed: UInt64) -> Data {
+        EngineFixture.bytes(seed + 8, count: 17)
+    }
+
+    /// Scripts the download of zz-o's own content, where the test's applies map it to one (`OwedCommit.away`).
+    @available(macOS 15.0, iOS 18.0, *)
+    static func scriptAway(_ c: OwedCommit) async {
+        guard let away = c.away else {
+            return
+        }
+        await c.s.harness.source.script(away.transferID, [.stage(Self.pinEndOwn(c.seed))])
     }
 
     /// PROBE-RR21-PIN-END without a later apply (rr21-T8's class): X's commit is the last event before the replay, which

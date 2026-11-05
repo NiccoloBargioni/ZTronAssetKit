@@ -5161,10 +5161,14 @@ fix (S3-R26 item 11, "Red first").
    mutant chain resumed (`tools/chain-c21b.sh`: the commit fix's f7 to f11 again on `snap-c3fix`, then
    `tools/mut-c4fix.py` on `snap-c4fix`, both snapshots checked against their REV; `mut21-c3fix2.txt`,
    `mut21-c4fix.txt`; a whole-suite run now has 900 s, since the suite takes 200 to 360 s under load and the 300 s
-   limit counted a slow run as a hang). rr21-C5's red step: **committed** (rr21-T2, rr21-T2-two, rr21-T2-captured
-   and the three site-3 pins, failing before the fix; evidence under "Step 5"). **Next action:** rr21-C5's fix (R5),
-   with RR21-HOP, RR21-WINDOW-GATE and RR21-PRESENT-PRUNE at site 3 (red copies), PROBE-RR21-PIN-END again, and the
-   site-3 figures; then rr21-C6, then the mutant runs' results and survivors.
+   limit counted a slow run as a hang). rr21-C5's red step: **committed** (`ddecf1f`: rr21-T2, rr21-T2-two,
+   rr21-T2-captured and the three site-3 pins, failing before the fix; evidence under "Step 5"). rr21-C5's fix:
+   **committed** right after it (R5, with RR21-HOP, RR21-WINDOW-GATE and RR21-PRESENT-PRUNE at site 3, their red
+   copies, and PROBE-RR21-PIN-END after site 3, which holds; under "Step 5"). Five rr21-C3 mutants that `mut21-c3c.txt`
+   counts as killed only by a whole-suite run past 300 s (b22-no-waiter-owner, b22-no-run-owner,
+   b22-arm-no-early-return, b23-no-lane, b23-no-kind) run again with 900 s, then `tools/mut-c5.py`. **Next action:**
+   rr21-C6 (site 2), then the timing window (the site-3 figures under `sim.lock` with step 8's), then the mutant runs'
+   results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5838,6 +5842,72 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   whole Sync suite passes with the two changes (644 tests in 56 suites, `each/c4fix-sync2.log`, 1-minute loads 10.87
   to 8.48); `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%). Mutants: PIN-END's p1 to p11 on the new anchors and
   R18's (`tools/mut-c4fix.py`), on a snapshot of `2c62e85`, after rr21-C3's and its fix's.
+- **rr21-C5's red step** (`ddecf1f`; written by the fixer cut off at `7876a28`, re-applied unchanged from
+  `.build-orchestrator/s3f-c21-interrupted.patch` and run before its commit). Debug tests
+  (`EngineFollowBarrierRerouteSupersedeTests.swift`, `each/supersededPublication|supersededExit.log`, 1-minute load
+  about 8): rr21-T2 (`supersededPublicationOwesItsReroutesAndTheDrainMakesThemBounded`; `commitReroute` with no kept
+  id, so no record wants X's bytes and the store refuses its publication) fails at `:28` and `:29` in both orders,
+  rr21-T2-two (`supersededPublicationCountsItsPairsAgainstItsTurn`) at `:46` and `:47`, rr21-T2-captured's owing path
+  (`supersededExitHoldsTheFreshJobOnTheOwingPath`) at `:133` (`outcome.batches == 1`); rr21-T2-edge
+  (`supersededPublicationReroutesAtOnceWhenItFits`) and the captured fit path pass, as they should before the fix (they
+  pin the fit path); the answers already equal the at-once exit's. Release (`each/c5-red-benches.out`, 1-minute loads
+  8.15 to 7.46): `supersededRerouteTurns` fails its setup (`BenchSync.swift:732:21` and `:733:21`: 10,000 made at the
+  exit, none owed) and C2 at `:742:13`, the heartbeat 40.98 ms (44.97, 40.98, 41.39); `supersededUserTurns` (the
+  shape `supersededUserTurns` of `design-minimal.md:285`, built in `BenchSyncReroutes.swift`) fails its setup
+  (`BenchSyncReroutes.swift:118:13`: "the commit (or the exit) makes no re-route and owes the 10001 ids as one
+  batch") and C2 at `:126:9`, 55.33 ms (56.12, 55.33, 55.62); `runSuperseded` fails in its `.runSuperseded` shape,
+  76.32 ms (76.32, 78.74, 76.75), while its two site-1 shapes pass (`.runMovedAway` 7.70 ms, `.runToBound` 4.75 ms).
+- **rr21-C5: site 3** (R5; the commit after `ddecf1f`). `publicationFailed`'s `.superseded` arm passes `bound:
+  self.inboundIDsNow` to `supersede`, whose job removal, index release and F-20 hold run as before on both paths; when
+  the job's pairs (each interest's ids, summed, counted only when `bound` is set) pass the bound, it builds one
+  `RerouteItem` a pair from the interests, unsorted, and owes them as one batch (`deferReroutes`, under the engine's
+  copy, which is the copy the at-once loop follows when no `listing` is passed); otherwise the loop is unchanged.
+  `move`'s supersede passes no bound (its moves are bounded by the follow's turns, `startMove`). The replay makes the
+  pairs in (id, token) order, where the at-once loop went by token and then id: item 1's accepted replay order (S3-R26
+  item 10). `checkRunSettled` and `pump` after it return behind the barrier, which the owed event raises
+  (`followBarrier`), and the arm's `reconcileIdle` keeps the owed pairs' bindings (rr21-C3's guards). rr21-B5 is reached
+  by rr21-T2, rr21-T2-two and rr21-T2-edge in both orders. rr21-T2 and rr21-T2-two also compare W's job's interests,
+  each its kind, lane and ids, with the same exit's at `followIDsPerTurn = 512` (`CommitRerouteRun.onW`, a field the
+  site-1 tests do not read), so a replay that made an interest with another kind or lane fails them.
+  The holes at site 3 (S3-R26 item 1; `critic-rr21-answers.md:103` places none at site 2): `publishingPin`,
+  `windowGate` (RR21-WINDOW-GATE's body, moved out of its site-1 test unchanged) and `presentPrune` (RR21-PRESENT-PRUNE's
+  body, likewise) take `superseded`, under which the test's applies map zz-o onto the content the moved ids go to (P's,
+  or D's, present), so O's publication is refused and its exit owes K's re-route with the moved ids' (`OwedCommit.away`,
+  `owedPairs`); the site-1 tests call them unchanged. Visited first, the exit re-routed K with the others at once, so K
+  gets what they get: P's failure (RR21-HOP's two variants, `supersededReroutePinnedToAPublishingJobGetsItsIntegrityFailure`
+  and `…StorageFailure`), P's bytes with no fresh job (`publicationDuringASupersededExitsWindowBindsTheOwedIDs`), and
+  D's bytes from the store, `gate` notwithstanding (`supersededReroutesOntoAPresentContentAreServedFromTheStore`, three
+  gates). Red first (S3-R26 item 11), each on a scratch copy of the working tree with the hole's guard removed
+  (`tools/hole-red-c5.py`, `red-holes-c5/summary.txt`, 09:16 to 09:23, 1-minute loads 40.28 at the start, 5.08 at the
+  end): RR21-HOP without `ends`' publishing term (`let inFlight: [TransferID: UInt64] = [:]`) fails in both orders at
+  `EngineFollowBarrierRerouteLayerTests.swift:187:9` (`await Self.pins(pT, c) == [true]`), at
+  `EngineFollowBarrierRerouteSupersedeTests.swift:151:9` (`outcome.w.count == 3 && outcome.w.allSatisfy { $0 ==
+  .failure(.integrityFailure) }`) and `:152:9` (`zStarts == 0`), the storage variant at `:165:9` (`zStarts == 0`; W1…W3
+  get the storage failure either way, from Z's failed publication); RR21-WINDOW-GATE without `inboundBlocks`'
+  `reroutesWaiting > 0` term fails in both orders at `EngineFollowBarrierRerouteHoldTests.swift:227:9` (the sizes) and
+  `:229:9` (`createdAfter == created && pStarts == 1`), with `Time limit was exceeded: 180.000 seconds`; RR21-PRESENT-PRUNE
+  without `pruneBoundContent`'s `eventsAfterFollow.isEmpty` guard fails in all six cases at
+  `EngineFollowBarrierReroutePresentTests.swift:98:9` (`owing.kept`) and `:124:13` (`created == owing.created &&
+  !dJob`). With the guards, the 13 site-1 and site-3 hole and bound tests pass in both orders (`each/c5-fix-tests.log`),
+  and the whole Sync suite passes: 653 tests in 56 suites (`each/c5-fix-sync1.log`, 316 s, 1-minute loads 4.63 to
+  6.57).
+  **`PROBE-RR21-PIN-END` after site 3** (ruling S3-R26 item 12's answer 6.3): `pinEnd` and `pinEndDropped` take
+  `superseded` too (zz-o on a content of its own, 17 bytes, `pinEndOwn`), so the batch is owed by O's superseded exit;
+  `supersededRerouteWhosePinCommittedFollowsTheCopyAtThatCommit` (K2 while W publishes), `…FollowsTheAppliesAfterThatCommit`
+  (K2 while W downloads) and `…EndsUnderTheCopyAtThatCommit` (T21) expect the visit-first answers of their site-1
+  shapes, and K its own content's bytes. They pass in both orders, as do the seven site-1 PIN-END tests on the site-3
+  code (24 tests with the bound tests, `each/c5-fix-tests2.log`): **the probe holds**; it stays as tests, since they
+  assert answers (G4).
+  Cost (S3-R26 item 9), the exit's own turn on the owing path: the job's removal and index release (`removeAllInterests`,
+  O(1) a dictionary), the F-20 hold's walk (one copy lookup a pair), the pair count and the item build (O(pairs), no
+  sort), and the owing (`oweReroutes`: the run claims' release, O(items), and a heapify, O(items)). The first figures
+  on the fix, release, each case best of its three runs (`each/c5-fix-benches-a.out`, 1-minute loads 8.02 to 7.69,
+  **without `sim.lock`**; re-measured under it at step 8): `supersededRerouteTurns` 7.63 ms (8.17, 7.63, 7.80; the
+  exit's window 1.48 to 1.61 ms, the drain's held turns at most 3.51 ms), `supersededUserTurns` 7.63 ms (8.22, 8.17,
+  7.63; held turns at most 3.20 ms), `runSuperseded` 7.68 ms at the exit (7.83, 7.68, 7.92), 7.69 ms at the commit and
+  4.84 ms onto a present content: all within C2, from 40.98, 55.33 and 76.32 ms at the red step. Mutants: `tools/mut-c5.py`
+  (s1 to s11: `nil` for the bound, `>=`, always and never owing, the hold on the at-once path only, the item's kind and
+  lane, the owing call dropped, and the three hole guards at site 3) on a snapshot of the fix (`snap-c5fix`).
 
 ## Items
 

@@ -631,7 +631,8 @@ extension SyncEngine {
     /// Owes `items` (`oweReroutes`) as an event that waits for the follow at its place (`EventAfterFollow.reroutes`), with
     /// the owing instant's decision instant (`deferToFollow`), and schedules a drain turn for it: a follow owed meanwhile
     /// drains it at its end instead, and the extra turn returns at the drain's guard. The sites owe from a publication's
-    /// turn after its await, never inside a drain (`committed`), and never an empty list.
+    /// turn after its await, never inside a drain (`committed`, a superseded exit's `supersede`), and never an empty
+    /// list.
     func deferReroutes(_ items: [RerouteItem], from transfer: TransferID) {
         self.deferToFollow(.reroutes(self.oweReroutes(items, from: transfer)))
         self.scheduleDrainFollowUp()

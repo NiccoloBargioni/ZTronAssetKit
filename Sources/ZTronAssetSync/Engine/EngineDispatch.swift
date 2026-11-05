@@ -1253,9 +1253,10 @@ extension SyncEngine {
             // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the
             // follow barrier too, as before Stage 3 close-out cycle 12: the re-routed joins wait for the drain
             // (`addInterest`). The cycle-12 deferral of this exit (`AttemptVerdict.supersede`) made only their places equal
-            // to a visit-first engine's and was removed in cycle 13 under ruling S3-R16 item 3.
+            // to a visit-first engine's and was removed in cycle 13 under ruling S3-R16 item 3. Re-routes that do not fit
+            // this turn are owed (`supersede`'s `bound`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, site 3).
             self.transition(transfer, to: .queued)
-            self.supersede(transfer)
+            self.supersede(transfer, bound: self.inboundIDsNow)
         case .integrity:
             // The store counts publication integrity failures itself (`StoreMetrics.integrityFailures`).
             self.state.metrics.failures[.integrity] += 1
@@ -1300,7 +1301,16 @@ extension SyncEngine {
     /// copy does not show yet: it waits on a fresh, held job of the content until the copy catches up (F-20), never
     /// `.notFound` while the asset is listed. A follow passes `settling: false` and checks the run and pumps once per
     /// turn instead (C2). `listing` is the copy the interests follow, the engine's copy when `nil` (`reroute`).
-    func supersede(_ transfer: TransferID, settling: Bool = true, listing: ValidatedManifest? = nil) {
+    ///
+    /// `bound` is the pairs (an interest's ids, over the job's interests) the exit re-routes in its own turn (C2; Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 1, `integrate-rr21.md` R5, site 3). A publication's superseded exit passes
+    /// `inboundIDsNow`: when its pairs pass it, the exit makes none of the re-routes and owes them all as one batch
+    /// under the engine's copy, which the drain makes at its place, a drain turn's ids a turn, each id with all its
+    /// tokens (`deferReroutes`); made here, the 10,000 interests of one content held the actor 41 ms (the cycle-20
+    /// verifiers' PROBE-C20C-SUPERSEDE-C2). The job's removal and the F-20 hold come first on both paths, so a re-route
+    /// made at the replay finds the hold as one made here does. A visit's supersede passes none: the follow's turns
+    /// bound its moves already (`startMove`), and its re-routes follow its visit's copy.
+    func supersede(_ transfer: TransferID, settling: Bool = true, listing: ValidatedManifest? = nil, bound: Int? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
@@ -1310,12 +1320,22 @@ extension SyncEngine {
         if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0).map { SyncEngine.sameTransfer($0, job.entry) } ?? false } }) {
             self.holdForManifest(transfer)
         }
-        for token in job.interests.keys.sorted() {
-            guard let interest = job.interests[token] else {
-                continue
+        if let bound, job.interests.values.reduce(0, { $0 + $1.assets.count }) > bound {
+            var items: [RerouteItem] = []
+            for (token, interest) in job.interests {
+                for asset in interest.assets {
+                    items.append(RerouteItem(asset: asset, token: token, lane: interest.lane, kind: interest.kind))
+                }
             }
-            for asset in interest.assets.sorted() {
-                self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
+            self.deferReroutes(items, from: transfer)
+        } else {
+            for token in job.interests.keys.sorted() {
+                guard let interest = job.interests[token] else {
+                    continue
+                }
+                for asset in interest.assets.sorted() {
+                    self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
+                }
             }
         }
         guard settling else {

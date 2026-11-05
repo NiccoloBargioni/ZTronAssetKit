@@ -145,14 +145,16 @@ extension EngineFollowBarrierTests {
     /// W1…W3 get P's failure and Z is never requested. With `joining` (RR21-HOP's join variant, `integrate-rr21.md` R18),
     /// v2 and K0 also list zz-j on P's content, which J requests once O's commit owes its batch: J's join waits behind the
     /// batch in both orders, and K1 maps zz-j to Z's content too. Visited first, J joined P at once, K1's visit passed P
-    /// and P's end answered J. Returns Q's answer (and J's) with the outcome, and Z's starts.
+    /// and P's end answered J. With `superseded` (RR21-HOP at site 3), K0 and K1 also map zz-o onto P's content: the store
+    /// refuses O's publication, and its exit owes K's re-route with W1…W3's, all four pinned to P. Returns Q's answer
+    /// (and J's) with the outcome, and Z's starts.
     @available(macOS 15.0, iOS 18.0, *)
-    func publishingPin(_ visit: LaneDropVisit, seed: UInt64, end: PinnedEnd, joining: Bool = false) async throws -> (outcome: LayerOutcome, zStarts: Int) {
+    func publishingPin(_ visit: LaneDropVisit, seed: UInt64, end: PinnedEnd, joining: Bool = false, superseded: Bool = false) async throws -> (outcome: LayerOutcome, zStarts: Int) {
         let pBytes = EngineFixture.bytes(seed + 5, count: 18)
         let zBytes = EngineFixture.bytes(seed + 6, count: 20)
         let p = EngineHarness.onDemand("zz-p", pBytes)
         let joined = joining ? [EngineHarness.onDemand("zz-j", pBytes)] : []
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p] + joined)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p] + joined, away: superseded ? pBytes : nil)
         let engine = c.engine
         let pT = p.transferID
         let onP = Self.movedOnto(pBytes, c)

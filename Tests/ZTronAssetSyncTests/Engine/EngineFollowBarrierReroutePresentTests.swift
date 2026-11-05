@@ -34,14 +34,22 @@ extension EngineFollowBarrierTests {
     @Test("R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, PresentGate.allCases)
     func owedReroutesOntoAPresentContentAreServedFromTheStore(_ visit: LaneDropVisit, _ gate: PresentGate) async throws {
         let seeds: [PresentGate: UInt64] = [.breakerOpen: 2_027_901, .offline: 2_027_911, .insufficientSpace: 2_027_921]
-        let seed = try #require(seeds[gate])
+        try await self.presentPrune(visit, gate, seed: try #require(seeds[gate]), superseded: false)
+    }
+
+    /// RR21-PRESENT-PRUNE's shape (`owedReroutesOntoAPresentContentAreServedFromTheStore`). With `superseded` (site 3),
+    /// K0 also maps zz-o onto D's content, which binds it to D's blob too: the store refuses O's publication, and its
+    /// exit, which removes the last job, owes K's re-route with W1…W6's. Visited first, the exit re-routed all seven at
+    /// once to D's content, present, and the store served them, K too.
+    @available(macOS 15.0, iOS 18.0, *)
+    func presentPrune(_ visit: LaneDropVisit, _ gate: PresentGate, seed: UInt64, superseded: Bool) async throws {
         let moved = 6
         let dBytes = EngineFixture.bytes(seed + 5, count: 4_000)
         let eBytes = EngineFixture.bytes(seed + 6, count: 16)
         let d = EngineHarness.onDemand("zz-d", dBytes)
         let e = EngineHarness.onDemand("zz-e", eBytes)
         let tuning = SyncTuning(breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
-        let c = try await Self.stageOwedCommit(seed: seed, moved: moved, extra: [d, e], tuning: tuning)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: moved, extra: [d, e], tuning: tuning, away: superseded ? dBytes : nil)
         let engine = c.engine
         let o = c.transfer
         let dT = d.transferID
@@ -73,9 +81,9 @@ extension EngineFollowBarrierTests {
             await engine.awaitCondition { $0.state.conditions == EngineRegressionCycle10Tests.offline }
         }
         try await Self.applyHeld(c.manifest([d, e] + onD, round: 1), tag: "k0-present-\(seed)", c.s, visit: visit)
-        let ids = onD.map(\.identifier)
+        let ids = onD.map(\.identifier) + (superseded ? [c.o.identifier] : [])
         let bound = await engine.readForTests { e in ids.allSatisfy { e.state.boundContent[$0] == dT } }
-        try #require(bound, "setup: K0 binds the moved ids to D's content, whose blob the store holds")
+        try #require(bound, "setup: K0 binds the moved ids\(superseded ? " and zz-o" : "") to D's content, whose blob the store holds")
         if gate == .insufficientSpace {
             try await Self.leaveRoom(1_000, harness: c.s.harness, fileSystem: c.s.fileSystem)
         }
@@ -85,8 +93,9 @@ extension EngineFollowBarrierTests {
         let owing = await engine.readForTests { e in
             (items: Self.owedBatches(e).map(\.items.count), jobs: e.state.jobs.count, kept: ids.allSatisfy { e.state.boundContent[$0] == dT }, created: e.state.jobsCreated)
         }
-        try #require(owing.items == [moved] && owing.jobs == 0, "setup: O's commit removes the last job and owes the \(moved) re-routes as one batch: \(owing)")
-        #expect(owing.kept, "the owed pairs' bindings outlive the commit's idle pass")
+        let site = superseded ? "superseded exit" : "commit"
+        try #require(owing.items == [c.owedPairs] && owing.jobs == 0, "setup: O's \(site) removes the last job and owes the \(c.owedPairs) re-routes as one batch: \(owing)")
+        #expect(owing.kept, "the owed pairs' bindings outlive the \(site)'s idle pass")
         let tokens = await engine.readForTests { e in Set(Self.owedBatches(e).flatMap { $0.items.elements.map(\.token) }) }
         var made: [Int] = []
         var servedFromStore = true
@@ -113,10 +122,11 @@ extension EngineFollowBarrierTests {
         }
         let created = await engine.readForTests { $0.state.jobsCreated }
         try #require(created == owing.created && !dJob, "no job of D's content: \(owing.created) -> \(created) jobs created, D's job seen \(dJob)")
-        #expect(servedFromStore && made.allSatisfy({ $0 <= Self.owedIDsPerTurn }) && made.reduce(0, +) == moved, "each drain turn answers at most its 4 ids, each from the store: \(made), from the store \(servedFromStore)")
+        #expect(servedFromStore && made.allSatisfy({ $0 <= Self.owedIDsPerTurn }) && made.reduce(0, +) == c.owedPairs, "each drain turn answers at most its 4 ids, each from the store: \(made), from the store \(servedFromStore)")
         await held.stop()
         let answers = await Self.owedAnswers(c)
-        #expect(Self.sizes([answers.k]) == [16] && Self.sizes(answers.w) == Array(repeating: 4_000, count: moved), "K gets O's bytes, W1…W6 D's from the store (visit-first): K \(answers.k), W \(Self.sizes(answers.w))")
+        let kBytes: Int64 = superseded ? 4_000 : 16
+        #expect(Self.sizes([answers.k]) == [kBytes] && Self.sizes(answers.w) == Array(repeating: 4_000, count: moved), "K gets \(superseded ? "D's from the store" : "O's bytes"), W1…W6 D's from the store (visit-first): K \(answers.k), W \(Self.sizes(answers.w))")
         #expect(violations.isEmpty, "\(violations.prefix(3))")
         await Self.finishHeld(c.s)
     }
