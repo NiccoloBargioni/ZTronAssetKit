@@ -5,12 +5,15 @@ import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// `waitingTarget`'s `queued` arm (Stage 3 close-out cycle 21, ruling S3-R26 item 5; `analyse-g4-reach.md`'s Shape A, the
-/// ENOENT window): a move owed onto a job whose drained publication failed ENOENT finds the job queued at the move's
-/// epoch, re-queued as that cancellation (`publicationFailed`), and is dropped; the holder's own visit moves the id. The
-/// window exists only in `sweepFollowsFirst`: visited first, the holder's visit moved the id onto the job while it
-/// published, before the ENOENT, so nothing is owed onto it then. Each test runs in both orders and expects the
-/// visit-first answers in both.
+/// A move owed onto a job whose drained publication then fails ENOENT (Stage 3 close-out cycle 21, ruling S3-R26 item 5;
+/// `analyse-g4-reach.md`'s Shape A, the ENOENT window): the ENOENT is that cancellation (`publicationFailed`), which
+/// queues the job again at the move's epoch with its end still recorded. A visit-first engine's visit had joined the id
+/// to the job publishing, and the id rode the re-queued attempt; the barrier makes the owed move onto the queued job
+/// (`waitingTarget(_:)`), and an owed visit of an apply before the end passes it (`rerouteOnVisit`). Before the fix the
+/// move was dropped and the holder's visit moved the id under the copy as it stands, which a later apply had mapped
+/// elsewhere (probe (ii)). The window exists only in `sweepFollowsFirst`: visited first, the holder's visit moved the id
+/// onto the job while it published, before the ENOENT, so nothing is owed onto it then. Each test runs in both orders and
+/// expects the visit-first answers in both.
 extension EngineFollowBarrierTests {
     /// Changed on-demand entries that sort between `FollowBarrier.fillers` and the scenario's `zz-` ids: with them a pass
     /// formats two turns' worth before it reaches the scenario's entries, so the follow turn after a walk makes the walk's
@@ -156,17 +159,17 @@ extension EngineFollowBarrierTests {
         await t.bulk.setHolding(false)
     }
 
-    // MARK: The queued arm (S3-R26 item 5, Shape A)
+    // MARK: The move onto the re-queued job (S3-R26 item 5, Shape A)
 
-    /// Swept first, the move v3b's walk owes onto T finds T queued at the move's epoch once its drained publication fails
-    /// ENOENT, and the follow turn that makes the owed moves drops it: zz-x stays on H, and nothing is owed onto T. The
-    /// next turns' visit of H moves zz-x under the copy as it stands, onto T, queued, whose fresh attempt serves A and X
-    /// T's bytes, as visited first, where v3's visit joined X to T publishing, and the ENOENT re-queued T with both. T's
-    /// content starts twice in both orders (the drained attempt, then the fresh one). A move made onto the queued T (the
-    /// arm folded into `return job`) moves zz-x onto T in that first turn.
+    /// Swept first, the move v3b's walk owes onto T finds T queued again at the move's epoch, its end recorded, once its
+    /// drained publication fails ENOENT, and the follow turn that makes the owed moves makes it: zz-x is on T and no
+    /// longer on H (superseded, its only id moved), and nothing is owed onto T, as visited first, where v3's visit joined
+    /// X to T publishing and the ENOENT re-queued T with both. T's fresh attempt serves A and X T's bytes in both orders,
+    /// and T's content starts twice (the drained attempt, then the fresh one). Before the fix (`4aeb321`) the turn dropped
+    /// the move and left zz-x on H (`waitingTarget`'s queued arm); the old assertion is in the WP-F draft, cycle 21.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is dropped, and the holder's visit moves the id, with the visit-first answers (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func barrierDropsAMoveOntoAJobItsDrainedPublicationReQueued(_ visit: LaneDropVisit) async throws {
+    @Test("R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued(_ visit: LaneDropVisit) async throws {
         let t = try await self.drainedRequeueSetUp(visit, seed: 2_028_601, tLater: [.stage(EngineFixture.bytes(2_028_601 + 3, count: 100_000))])
         let engine = t.engine
         let h = t.x.transferID
@@ -181,14 +184,14 @@ extension EngineFollowBarrierTests {
         if visit == .sweepFollowsFirst {
             await engine.awaitCondition { $0.state.jobs[tID]?.state == .queued }
             let requeued = await engine.readForTests { e in
-                (epoch: e.state.jobs[tID]?.epoch, owed: Self.owedMove(e, from: h, onto: tID) != nil, onto: e.state.inboundOnto[tID])
+                (epoch: e.state.jobs[tID]?.epoch, owed: Self.owedMove(e, from: h, onto: tID) != nil, onto: e.state.inboundOnto[tID], end: e.state.jobs[tID]?.attemptEnd != nil)
             }
-            try #require(requeued.epoch == move?.epoch && requeued.owed && requeued.onto == 1, "setup: the ENOENT re-queued T at the move's epoch, and the move is still owed: \(requeued)")
+            try #require(requeued.epoch == move?.epoch && requeued.owed && requeued.onto == 1 && requeued.end, "setup: the ENOENT re-queued T at the move's epoch, its end recorded, and the move is still owed: \(requeued)")
             await Self.runOneFollowTurn(engine)
             let afterTurn = await engine.readForTests { e in
                 (h: e.state.jobs[h]?.assets.sorted(), t: e.state.jobs[tID]?.assets.sorted(), onto: e.state.inboundOnto[tID], owed: e.inboundOwed)
             }
-            #expect(afterTurn.h == [t.x.identifier] && afterTurn.t == [t.a.identifier], "the turn dropped the move: zz-x is still on H and not on T: \(afterTurn)")
+            #expect(afterTurn.h == nil && afterTurn.t == [t.a.identifier, t.x.identifier], "the turn made the move onto the queued T: zz-x is on T, and H, its only id moved, is gone: \(afterTurn)")
             #expect(afterTurn.onto == nil && !afterTurn.owed, "nothing is owed onto T: \(afterTurn)")
             await engine.readForTests { $0.releaseFollowFollowUps() }
         }
@@ -235,9 +238,10 @@ extension EngineFollowBarrierTests {
 
     /// Visited first, v4's visit passed T publishing with zz-x on it (an id a later apply moved while the job already
     /// published is passed, S3-R18a), the ENOENT re-queued T with A and X, and the fresh attempt's 404 answered both: U's
-    /// content was never requested. Swept first, the move v3b's walk owes onto T is made once T is queued at the move's
-    /// epoch only if the job's re-queue keeps the publication's end; dropped, zz-x waits on H for the holder's own visit,
-    /// which v4's copy sends to U.
+    /// content was never requested. Swept first, the move v3b's walk owes onto T is made once T is queued again at the
+    /// move's epoch, its end recorded (`waitingTarget(_:)`); the join, under v3's copy, marks T for the next follow, so no
+    /// visit of this follow moves zz-x on. Before the fix (`3412ec3`) the move was dropped and H's visit sent zz-x to U:
+    /// X got U's 16 bytes and U started once.
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func barrierLeavesALaterAppliesIdToTheReQueuedJobsFreshAttempt(_ visit: LaneDropVisit) async throws {
@@ -264,5 +268,42 @@ extension EngineFollowBarrierTests {
         #expect(answers.aResult == .failure(.notFound), "T's fresh attempt's 404 answers A: \(answers.aResult)")
         #expect(answers.xResult == .failure(.notFound), "v4's visit passed T publishing with zz-x on it: the fresh attempt's 404 answers X (visit-first): \(answers.xResult)")
         #expect(answers.uStarts == 0, "U's content is never requested (visit-first): \(answers.uStarts)")
+    }
+
+    /// An apply after T's end: v4 maps zz-x to U once the ENOENT has queued T again. Visited first, T's fresh attempt
+    /// started at once (held), and v4's visit met T downloading and moved zz-x to U: X gets U's 16 bytes, A the fresh
+    /// attempt's 404, and U starts once. Swept first, the owed move onto T is made (`waitingTarget(_:)`), and v4's visit,
+    /// in the follow order of the turn that makes it (`scannedFirst`), meets T queued again with its end recorded and an
+    /// apply followed since: moved, as met queued (`rerouteOnVisit`). Passed, zz-x stayed on T for the 404.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierMovesAReQueuedJobsIdForAnApplyAfterItsEnd(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_631
+        let t = try await self.drainedRequeueSetUp(visit, seed: seed, tLater: [.hold, .fail(.permanentMissing(httpStatus: 404))], layout: DrainedRequeueManifests.scannedFirst)
+        let engine = t.engine
+        let tID = t.a.transferID
+        let uBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let xOnU = EngineHarness.onDemand("zz-x", uBytes)
+        try #require(xOnU.transferID != tID && xOnU.transferID != t.x.transferID, "setup: v4 maps zz-x to a third content, U")
+        await t.s.harness.source.script(xOnU.transferID, [.stage(uBytes)])
+        await Self.failDrainedPublication(t)
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.jobs[tID]?.state == .queued }
+        } else {
+            await engine.awaitCondition { $0.state.jobs[tID]?.state == .downloading }
+        }
+        try await Self.applyHeld([t.s.q] + FollowBarrier.fillers(seed + 200) + [t.a, xOnU] + Self.laterFillers(seed + 3_000), tag: "v4-after-\(seed)", t.s, visit: visit)
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled && $0.state.jobs[tID]?.state == .downloading }
+        await t.s.harness.source.release(tID, with: .progress(received: 0, expected: nil))
+        let aResult = await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: t.aWaiter) }
+        let xResult = await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: t.xWaiter) }
+        let uStarts = await t.s.harness.source.starts.filter { $0.id == xOnU.transferID }.count
+        #expect(aResult == .failure(.notFound), "T's fresh attempt's 404 answers A: \(aResult)")
+        #expect(xResult.map(\.byteSize) == .success(16), "v4's visit met T after its end and moved zz-x to U: U's bytes answer X (visit-first): \(xResult)")
+        #expect(uStarts == 1, "U's content starts once (visit-first): \(uStarts)")
+        await Self.finishHeld(t.s)
     }
 }

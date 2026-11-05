@@ -1130,7 +1130,11 @@ extension SyncEngine {
     /// - failed in its publication's bookkeeping, before the verdict defers: passed as still publishing while no apply was
     ///   followed since the publication's end, else moved, as met failed (`recordPublicationEnd`;
     ///   PROBE-C15C-INTEGRITY-WINDOW);
-    /// - otherwise (downloading, queued, parked, failed with its verdict given) moved.
+    /// - queued again at its publication's end, its end still recorded (an ENOENT of a cancelled attempt's file,
+    ///   `publicationFailed`; only a start clears the end): passed as still publishing while no apply was followed since
+    ///   the end, else moved, as met queued (Stage 3 close-out cycle 21, ruling S3-R26 item 5 (ii): a visit-first engine's
+    ///   visit at an earlier apply passed the job publishing, and the ids rode the re-queued attempt);
+    /// - otherwise (downloading, queued without an end, parked, failed with its verdict given) moved.
     /// Also read by `followedLane`.
     func rerouteOnVisit(_ job: Job) -> Set<AssetID>? {
         // The set serves only the follow owed when it was recorded (`Job.rerouteFor`).
@@ -1146,16 +1150,22 @@ extension SyncEngine {
                 return nil
             }
             return reroute
-        case .queued, .blocked, .downloading:
+        case .queued:
+            guard let end = job.attemptEnd, self.state.appliesFollowed == end.failedAfter else {
+                return nil
+            }
+            return reroute
+        case .blocked, .downloading:
             return nil
         }
     }
 
     /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job the visit passes
-    /// (`rerouteOnVisit`: publishing, its exit verdict waiting, or failed in its publication's bookkeeping) keeps its
-    /// bytes, its ledger entry and its publication (R-SYN-11): its commit binds only the ids the copy still maps to it, and
-    /// the ids it does not bind follow their content then (`committed`). Of its moved ids, the visit re-routes at once
-    /// those a visit-first engine had moved before the publication began or the verdict arrived (`Job.rerouteOnPass`):
+    /// (`rerouteOnVisit`: publishing, its exit verdict waiting, failed in its publication's bookkeeping, or queued again by
+    /// its publication's ENOENT) keeps its bytes, its ledger entry and its publication (R-SYN-11): its commit binds only
+    /// the ids the copy still maps to it, and the ids it does not bind follow their content then (`committed`). Of its
+    /// moved ids, the visit re-routes at once those a visit-first engine had moved before the publication began or the
+    /// verdict arrived (`Job.rerouteOnPass`):
     /// that engine visited the job at the apply, while it still downloaded (Stage 3 close-out cycle 15, ruling S3-R18
     /// item 2). The others, which an apply moved while the job already published or after its verdict, are passed, as that
     /// engine passed them or met the job as its verdict left it (S3-R18a item 1, S3-R19 item 1): they are answered with
@@ -1483,8 +1493,9 @@ extension SyncEngine {
     /// (`EngineState.bringingInbound`). A move found under a copy an apply has replaced since is made as any other: its
     /// job is at its attempt's end, so the newer copy's visit of it leaves it to its verdict or passes its publication
     /// (`rerouteOnVisit`), and a join that names an entry the newer copy does not list marks it for the next follow
-    /// (`noteJoin`). A move whose job the epoch no longer names, or whose job is
-    /// past its attempt's end (neither publishing nor failed with its end recorded, `Job.attemptEnd`), is dropped: the
+    /// (`noteJoin`). A move whose job the epoch no longer names, or whose job is past its attempt's end (neither
+    /// publishing, nor failed or queued again by its publication's ENOENT with its end recorded, `Job.attemptEnd`,
+    /// `waitingTarget(_:)`), is dropped: the
     /// holder's own visit moves the ids under the copy as it stands, as a visit-first engine's interests on that job
     /// followed the copy when the job ended (a superseded publication re-routes its interests, a commit's unbound ids
     /// follow their content). No visit is made, so the moves read no decision instant: a join onto a job at its
@@ -1537,10 +1548,19 @@ extension SyncEngine {
         return moved
     }
 
-    /// `move`'s job while it is still at the attempt's end the move was found for (`waitingTarget(_:epoch:)`); `nil` once
-    /// it left it, which drops the move (`continueInbound`). Also read by `followedLane`.
+    /// `move`'s job while it is still at the attempt's end the move was found for (`waitingTarget(_:epoch:)`), or queued
+    /// again at that end's epoch with the end still recorded: its publication of a file a cancelled attempt staged found
+    /// ENOENT, that cancellation (`publicationFailed`), and only a start clears the end (`Job.attemptEnd`). A visit-first
+    /// engine's visit the move stands for had joined the ids to the job publishing, and they rode its re-queued attempt,
+    /// whose outcome answered them (Stage 3 close-out cycle 21, ruling S3-R26 item 5 (ii): dropped, the holder's visit
+    /// moved them under a later apply's copy, and a 404 of the fresh attempt that answered the visit-first engine's
+    /// caller became the later content's bytes). `nil` once it left it, which drops the move (`continueInbound`). Also
+    /// read by `followedLane`. An owed re-route's pin keeps the end's own window (`rerouteListing`).
     func waitingTarget(_ move: InboundMove) -> Job? {
-        self.waitingTarget(move.target, epoch: move.epoch)
+        if let job = self.state.jobs[move.target], job.epoch == move.epoch, job.state == .queued, job.attemptEnd != nil {
+            return job
+        }
+        return self.waitingTarget(move.target, epoch: move.epoch)
     }
 
     /// `transfer`'s job while it is still at the attempt's end of `epoch`: the same epoch, publishing, or failed with its
