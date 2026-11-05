@@ -302,8 +302,10 @@ extension SyncEngine {
         // the apply that mapped such an id back to this content had moved its interests onto the job before the
         // publication began, so a later apply's visit passed them and the publication's outcome answered them (Stage 3
         // close-out cycle 21, Q1's stage 3, variant Y). The ids the publication began with mapped elsewhere are
-        // re-routed at their turn, as that visit re-routes them (`Job.rerouteOnPass`).
-        let rerouting = listing == nil ? self.state.jobs[holder].flatMap { job in job.state == .verifying || job.state == .committing ? self.rerouteOnVisit(job) : nil } : nil
+        // re-routed at their turn, as that visit re-routes them (`Job.rerouteOnPass`). A committing holder is never met
+        // here: its commit is one turn, from `.committing` to the job's removal (`committed`, `resolveAll`), with no turn
+        // of the follow between (rr21-C7: that check, which no path reached, is removed under ruling S3-R19 item 3).
+        let rerouting = listing == nil ? self.state.jobs[holder].flatMap { job in job.state == .verifying ? self.rerouteOnVisit(job) : nil } : nil
         var spent = 0
         var moved = false
         while let first = progress.first {

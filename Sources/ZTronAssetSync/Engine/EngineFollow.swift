@@ -1549,15 +1549,18 @@ extension SyncEngine {
     }
 
     /// `move`'s job while it is still at the attempt's end the move was found for (`waitingTarget(_:epoch:)`), or queued
-    /// again at that end's epoch with the end still recorded: its publication of a file a cancelled attempt staged found
-    /// ENOENT, that cancellation (`publicationFailed`), and only a start clears the end (`Job.attemptEnd`). A visit-first
+    /// again at that end's epoch: its publication of a file a cancelled attempt staged found ENOENT, that cancellation
+    /// (`publicationFailed`), or a user request skipped its failure's backoff (T20, `relane`). Its end is still recorded
+    /// then: only a start, which takes a new epoch, and the drain's verdict replays clear it (`Job.attemptEnd`), and the
+    /// drain waits for every owed move (`drainEventsAfterFollow`), so the end is not checked here (Stage 3 close-out
+    /// cycle 21, rr21-C7: that check, which no path reached, is removed under ruling S3-R19 item 3). A visit-first
     /// engine's visit the move stands for had joined the ids to the job publishing, and they rode its re-queued attempt,
     /// whose outcome answered them (Stage 3 close-out cycle 21, ruling S3-R26 item 5 (ii): dropped, the holder's visit
     /// moved them under a later apply's copy, and a 404 of the fresh attempt that answered the visit-first engine's
     /// caller became the later content's bytes). `nil` once it left it, which drops the move (`continueInbound`). Also
     /// read by `followedLane`. An owed re-route's pin keeps the end's own window (`rerouteListing`).
     func waitingTarget(_ move: InboundMove) -> Job? {
-        if let job = self.state.jobs[move.target], job.epoch == move.epoch, job.state == .queued, job.attemptEnd != nil {
+        if let job = self.state.jobs[move.target], job.epoch == move.epoch, job.state == .queued {
             return job
         }
         return self.waitingTarget(move.target, epoch: move.epoch)
