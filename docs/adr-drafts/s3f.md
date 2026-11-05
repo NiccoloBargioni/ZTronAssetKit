@@ -4924,7 +4924,10 @@ Equivalent (`moveInterestGoneDrop`).
 Every operation the follow's turns and the drain do per id or per event. "Ids" means the turn's ids, at most
 `followIDsPerTurn` (512); N is a job's ids, I a job's interests, E the events waiting. The reference set is 10,000 ids,
 however their interests are grouped (item 2). The figures are the gate run's (under "Gate evidence (cycle 20)") unless
-a commit is named.
+a commit is named. A figure marked "(cycle 21's gate run)" is from the first gate run's release benchmarks ("Gate
+evidence (cycle 21)", "The first run"), on `2c351e8`, whose `Sources` the final HEAD keeps, best of 3; a best above
+8.5 ms is "at the edge" (S3-R26 item 9). The second run's, on `e599ae1`, are listed there: 51 of 53 are higher, by a
+median of 3.3 %, and the one status they change, `purgeWhileOwedTurns`', is noted in its row.
 
 | Operation | Cost | Bound or figure | Status |
 |---|---|---|---|
@@ -4932,24 +4935,30 @@ a commit is named.
 | A visit's filter of the job's ids the copy moved (`rerouteOnVisit`) | O(N) once a visit; ≤ 10,000 a turn over the visits | `sharedApplyTurns`, `divergenceTurns` | met |
 | `startMove` building a move's items (`Job.moveItems`) | O(moved ids + their holders) once a move, from the job's index since `bbf5eaa` (cycle 21, item B); before it O(I) a move over every interest, with a copy of the job alive across the moves | `manyMovesTurns` (k = 1 to 256 owed moves off one 10,000-id holder): 3.22–3.69 ms best; `partialMoveTurns` 5.54 and 6.18 ms (`b7-pins.log`, loads 5.85 to 5.70); `sharedApplyTurns`, `inboundHolderTurns` | met |
 | `continueMove`, `continueInbound` (its intersection at the move's first turn), `continueVisitRemainder` | O(log ids) a moved id; at most `followIDsPerTurn` ids and `followsPerTurn` holders a turn | the turn-total tests; `sharedApplyTurns`, `divergenceTurns`, `inboundHolderTurns` | met |
-| `move` (a move that fits the turn's ids; `Job.holdings`) | O(moved ids + their holders), and the sort of its p (id, holder) pairs, O(p log p), since `bbf5eaa` (cycle 21, item B). Before it, a sort of each interest's whole ids, O(N log N) a move | `manyMovesTurns`: 3.22–3.69 ms best, where it was 79.91 ms at 16 moves and 305.57 at 64 before `bbf5eaa` (`bpins-red.log`, at 17.54) | met |
+| `move` (a move that fits the turn's ids; `Job.holdings`) | O(moved ids + their holders), and the sort of its p (id, holder) pairs, O(p log p), since `bbf5eaa` (cycle 21, item B). Before it, a sort of each interest's whole ids, O(N log N) a move | `manyMovesTurns`: 3.22–3.69 ms best, where it was 79.91 ms at 16 moves and 305.57 at 64 before `bbf5eaa` (`bpins-red.log`, at 17.54). One id held by 10,000 interests (item B's residual 5; PROBE-C21-HOLDERS, scratch, in the same apm stage): the visit's turn 39.01 ms best with user waiters and 40.98 with one-member groups, through `move`'s supersede branch (the holder held only that id) | met for many ids; **miss** for one id with many holders: blocking, reported ("Step 8") |
 | The index's upkeep in `Job`'s mutators (`setInterest`, `insertAsset`, `removeAsset`, `subtractAssets`, `setAssets`, `removeAllInterests`, `keepInterests`) | O(1) amortised an id an interest gains or loses (`f9bce7a`) | inside every case that changes interests: `handleReleaseTurns` 5.67 ms best, `throttleExtensionTurns` 8.39 ms (`b7-pins.log`, loads 5.85 to 5.70), `concentrationPublicationTurns` | met |
 | The index's release when an interest leaves (`dropInterest`) | O(the interest's ids) | `indexOwnCosts`: 3.51 ms for an interest of 10,000 ids (`rr21-c0-bench.log`, loads 5.78 to 6.06) | met |
 | `keepInterests` dropping an interest of `jobAtVerdict`'s copy (it copies `tokensByID` once) | O(N) once a verdict | `indexOwnCosts`: 4.06 ms at 10,000 ids | met |
 | Freeing a job's index at its removal (the commit window) | O(N) once a job | `indexOwnCosts`: 0.78 ms at 10,000 ids; inside `concentrationPublicationTurns`' commit window, 6.16 ms best (`b7-pins.log`) and 6.38 ms (`rr21-c0-bench.log`) | met |
-| `answerPresentMembers`' rows (`EnginePresence.swift`) | O(held ids) a row's index work, and a sort of the rows by token, since `bbf5eaa` (B11); before it a replacement of each interest, O(its ids) | re-measured at the close (step 8) | figure at step 8 |
+| `answerPresentMembers`' rows (`EnginePresence.swift`) | O(held ids) a row's index work, and a sort of the rows by token, since `bbf5eaa` (B11); before it a replacement of each interest, O(its ids) | no BenchSync case gives it present ids at 10,000: its callers are an attempt's presence check before the source is asked and `sparePresent` before a 404's or an integrity failure's record, and the cases with a stored content answer it at the re-route (`answerPresent`), with no job. PROBE-C21-APM (a scratch probe, release, in the second gate run's apm stage at a 1-minute load of 7.56 to 6.98) times the answer turn's work, the binding and the rows, inside the actor: 10.79 ms best for one group of 10,000 members, 12.76 for 10,000 one-member groups, 14.17 for a user waiter per id | **miss**: blocking, reported ("Step 8"); before step 8 it had no figure |
 | The walk for the publications in flight (`findInbound`) | one pass over the jobs' ids, one lookup each | `inboundWalkTurns`, `concentrationNotFoundTurns` | met |
 | `reroute`, `addInterest` (a join in place) | O(1) amortised an id since `a78f913` (cycle 21, steps C10 and C11). Before it, a re-route that dropped a group member or released a run claim (T21) copied the group's `pending` or the run's `outstanding`: O(members) an id (`critic-commit-window.md` A5) | `concentrationFollowTurns`, `sharedApplyTurns` | met |
 | `removeInterest`, `dropInterest`, `relane`, `Job.lane`, `isSingleUser` | O(1) an id (`f066083`) | `userSharedApplyTurns`: 7.18 ms best (supersede) and 8.01 (keep) | met |
 | `deferBehindVerdict` (a visit's join behind a waiting verdict) | O(1) a call since `4783403` (cycle 21, item A: a registration and a bucket append; the drain places the bucket behind its verdict at the batch's formation). Before it O(E) a call (a `lastIndex` scan and an insert) | `deferBehindVerdictTurns` (10,000 joins, four groupings): longest held turn best 4.81–5.52 ms, heartbeat 7.47–7.56 ms, at a 1-minute load of 5.76 to 5.31; 36.50–36.81 ms before (`cbc9b36`, at 11.77 to 9.90) | met |
 | The drain's events (`drainEventsAfterFollow`) | at most `eventsAfterFollowPerTurn` (512) events a turn; their visits after verdicts share the turn's ids (`ddb0ba1`); since `68ce0d7` (cycle 21, candidate 4) a turn also replays at most a turn's ids of the joins its visits waited behind a later verdict of the batch | `drainVerdictTurns` [500, 625]: 4.13 and 4.08 ms best (4.18 and 4.08 on `6a7834b`); `drainVerdictChainTurns` [500, 625]: 4.43 and 4.02 ms, heartbeat 5.05 and 6.60 ms, at a 1-minute load of 6.98 to 6.25 | met |
 | A retry verdict's answer for each interest (`verdictAnswers`, the lane `retryLater` reads) | O(1) an interest, O(I) a verdict (`f066083`); O(I²) a verdict before | O(1) amortised an id | met |
-| `followedLane` | O(I) a call | the 429 case of R-SYN-5, `concentrationNotFoundTurns` | met |
-| `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | inside `concentrationPublicationTurns` (the start) | met at the start; the verdict's has no figure |
-| The commit's binding (`committed`, then `resolveAll`, `publishTerminal`, `removeJob`, and the pump's `materializeEnsures`) | O(N log N) once a commit: `committed` sorts the job's interests. Since `a78f913` (cycle 21, item C's Phase 1) `resolveAll`, `publishTerminal` and `removeJob` sort nothing and retire only keys with a progress entry; `materializeEnsures` sorts every group's token at the commit's pump, O(G log G) | `concentrationPublicationTurns` through the commit: 9.86 ms best before cycle 21, 6.16 ms after Phase 1. `commitTurns` (cycle 21, heartbeat best after Phase 1, load 7.06 to 6.67): `.waiters` 12.09 ms, `.waitersStalledSubscriber` 15.49 ms, `.groupStalledSubscriber` 9.24 ms, `.manyGroups` 10.79 ms | **miss:** `.waiters` and `.waitersStalledSubscriber` go to Phase 2 (step 6); `.manyGroups` is open until rr21-C3 (cycle 21, step 2) |
-| The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn | `concentrationCommitRerouteTurns`: 48.68 ms best (48.47 before `c03c0e8` was committed); 47.12 ms on `82ba8a1` (rr21-C0, `rr21-c0-bench.log`) | **miss: blocking, RR-21 (step 5)** |
-| `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn | `movedBeforeDrainTurns`: 45.67 ms best (45.51 before `c03c0e8` was committed); 49.04 ms on `82ba8a1` (rr21-C0) | **miss: blocking, RR-21 (step 5)** |
-| `supersede` of a superseded publication (`publicationFailed`'s `.superseded`) | O(N) re-routes in one turn | no figure; outside the follow and the drain | no figure: put to the orchestrator |
+| `followedLane` | O(I) a call; since cycle 21 also a walk over the owed re-routes' items (`2d6b147`, R14) and the waiting joins' chains (`2c62e85`, R18), one copy lookup an id, no transfer formatted, each walk stopping at the first user-initiated interest | the 429 case of R-SYN-5: 2.98 ms best; `lane429WhileOwed` (10,000 owed prefetch items, two layers, nothing user-initiated, so no walk stops early): 5.49 ms best; `joinChainTurns` (10,000 chained joins): 4.47 ms best (cycle 21's gate run) | met |
+| `recordDeferredVerdict`'s and the publication start's `away` filters | O(N) once an event | the start: inside `concentrationPublicationTurns`. The verdict's (S3-R26 item 8): `movedBeforeDrainTurns`' release of J's 500 in its own `longestWait` window, 3.19 ms best on `210ff64` ("Step 1") and 3.00 ms (cycle 21's gate run) | met (the row's "the verdict's has no figure" before cycle 21's step 8 was stale: item 8's figure is this one) |
+| The commit's binding (`committed`, then `resolveAll`, `publishTerminal`, `removeJob`, and the pump's `materializeEnsures`) | O(N log N) once a commit: `committed` sorts the job's interests. Since `a78f913` (cycle 21, item C's Phase 1) `resolveAll`, `publishTerminal` and `removeJob` sort nothing and retire only keys with a progress entry; `materializeEnsures` sorted every group's token at the commit's pump, O(G log G), and since `57d5d8c` sorts only the ensure groups with fetches left. Since `28d533e` (Phase 2) a resolution of more than `answersPerTurn` (512) interests owes its waiters' and settled ensures' resumes to the answer follow-ups | `concentrationPublicationTurns` through the commit: 9.86 ms best before cycle 21, 6.16 ms after Phase 1, 5.79 ms (cycle 21's gate run). `commitTurns`, heartbeat best: after Phase 1 (load 7.06 to 6.67) `.waiters` 12.09 ms, `.waitersStalledSubscriber` 15.49, `.groupStalledSubscriber` 9.24, `.manyGroups` 10.79; (cycle 21's gate run) `.waiters` 7.30, `.waitersStalledSubscriber` 10.45, `.groupStalledSubscriber` 8.69, `.manyGroups` 9.17, two stalled subscribers 13.68 (recorded, not gated); `commitWaitersBoundTurns` 7.33 | **miss:** `.waitersStalledSubscriber`, blocking and reported (Phase 2 cannot cut it: "Step 6: item C, Phase 2"); `.groupStalledSubscriber` and `.manyGroups` met, at the edge |
+| The commit's re-routes of the ids an apply moved away (`committed`) | O(N) in one turn before cycle 21. Since `2d6b147` and `b1d37df` (RR-21 site 1, R4) the commit's turn makes them only when its answers and re-routes fit `inboundIDsNow`, and otherwise owes them as one batch, which the drain makes `drainIDsLeft` ids a turn; the commit classifies an id by comparing the copy's entry with the job's (`sameTransfer`), with no transfer formatted | before: `concentrationCommitRerouteTurns` 48.68 ms best, and 47.12 ms on `82ba8a1` (rr21-C0). (cycle 21's gate run), heartbeat best: `concentrationCommitRerouteTurns` 7.40 ms; `commitRerouteDivergentTurns` 5.05; `commitRerouteWaitersTurns` 7.46; `commitTwoTokensTurns` 8.82; `groupMovedToBound` 5.33; `userMovedToBound` 4.45; `groupDelistedAll` 3.89 (the group) and 3.30 (the waiters); `groupDelistedFit` 0.42; `commitFitBoundaryTurns` 1.34 at once and 1.16 owed; `runSuperseded`'s commit cases 7.49 (moved away) and 4.76 (onto a present content) | met; `commitTwoTokensTurns` at the edge |
+| `replayVerdict`'s take-off and re-route of a job's moved-before ids (`takeOffMovedBefore`, `rerouteMovedBefore`; also the `.spaceFailure` replay) | O(N) in one turn before cycle 21. Since `e437c28` and `8647760` (RR-21 site 2, R6 and R7) the held ids leave the job in one access (`Job.takeOff`, O(held ids + their holders)), and their re-routes are charged to the drain turn's `drainIDsLeft` or owed as one batch | before: `movedBeforeDrainTurns` 45.67 ms best, and 49.04 ms on `82ba8a1` (rr21-C0). (cycle 21's gate run): `movedBeforeDrainTurns` 5.08 ms (J's 500 deferring, 3.00); `movedBeforeDrainWaitersTurns` 7.43 ms all held and 7.44 half held (the verdict's turn 7.11 and 6.13); `movedBeforeAndAfterTurns` 5.57 | met |
+| `supersede` of a superseded publication (`publicationFailed`'s `.superseded`) | O(N) re-routes in one turn before cycle 21. Since `42a3689` (RR-21 site 3, R5) made at once only within `inboundIDsNow`, and otherwise owed as one batch | (cycle 21's gate run): `supersededRerouteTurns` 7.48 ms best; `supersededUserTurns` 7.49; `runSuperseded`'s exit case 7.44 | met |
+| The drain's owed re-routes (`continueReroutes`, R8 to R10) | at most `drainIDsLeft` distinct ids a drain turn, each whole with all its tokens, each under the copy `rerouteListing` reads from the batch's layers, O(layers) an id | the owing cases above: the longest held turn of a site-1 or site-3 case is at most 4.89 ms best (`commitTwoTokensTurns`, 1,024 interests a turn); in the take-off cases the longest is the verdict's own turn (7.11 ms). `applyWhileOwedLayers` (two applies while 10,000 are owed, then the replay through two layers): 7.49 ms best (cycle 21's gate run) | met |
+| An apply's layers on the waiting events (`layerOwedReroutes`, R11 and R18) | one backward pass once an apply, O(events + jobs in flight); the events after a layer with no verdict between and the same last apply share it | `joinChainTurns` (10,000 chained joins, two layers): the pass alone 0.84 ms, the applies' heartbeat 6.33 ms best, the drain's 5.45 (cycle 21's gate run) | met |
+| A purge while re-routes are owed (`withdrawPurgedJoins`' `.reroutes` arm, R15) | O(items) once a purge: each batch's items filtered, and the removed ones sorted | `purgeWhileOwedTurns` (a purge of everything while 10,000 are owed): 9.57 ms best (cycle 21's gate run); 10.04 ms in the second gate run, at a 1-minute load of mean 5.23; alone, 9.62 and 9.75 ms best (at 5.35 to 5.60). The walk of the owed batch is the turn's synchronous work: 9.14 to 9.22 ms of its own (PROBE-C21-PURGE-PARTS, "Step 8") | **miss** in the second gate run: blocking by S3-R24 item 2, reported ("Step 8"); at the edge in every other run |
+| The owed answers' resumes (`answerFollowUp`, Phase 2) | `answersPerTurn` (512) resumes a turn | inside `commitTurns` and `commitWaitersBoundTurns` above, whose windows end at the last resume | met |
+| `deliver`, `dropGroupMember`, `releaseRunClaim` | O(1) amortised an interest since `a78f913` (steps C10 and C11: the group's `pending` and the run's `outstanding` changed in place, not copied) | inside every commit case above | met (no figure of their own) |
+| `releaseRerouteHolds` (R12) | once, when the last batch is made: the waiting publications' transfers sorted and each resumed, O(P log P) for P publications, at most one a job | no figure | no figure: put to the orchestrator |
 
 ### A holder re-created between turns (correct #4; S3-R25 item 9)
 
@@ -5201,8 +5210,14 @@ fix (S3-R26 item 11, "Red first").
 7. Item 5 and its two probes: **committed** (`4aeb321` Shape A; `3412ec3` and `d85eb02` probe (ii), red; `58b278e`
    its fix; `2130e61` probe (i), red; `dff8946` its fix with two controls; `adf650d` the transfer's sibling, red;
    `b171e8b` its fix; `46e3669` the three docs). Under "Step 7".
-8. Close: the gate run on `2c351e8` (`.build-s3f/c21/gates21.sh`), under "Gate evidence (cycle 21)", with what was
-   not run.
+8. Close: the first gate run on `2c351e8` (`.build-s3f/c21/gates21.sh`, 14:45:40 to 15:52:29) failed its third Sync
+   run on the reservation-edge flake, a test race (under "Step 8"). Its red step and its fix: **committed** (`a380c78`,
+   `e599ae1`). That run was stopped once TSan ended, and every stage ran again on `e599ae1` (`gates21b.sh`, after S3-R13's
+   tools-6.4 check, `tools/t64-c21b.sh`), with PROBE-C21-APM and PROBE-C21-HOLDERS after it. **Done**: the results are
+   under "Gate evidence (cycle 21)", and what was not run under "Not verified here" (the step's last commit: these
+   records). The close found four more blocking items, reported, not fixed: `purgeWhileOwedTurns`' miss in the
+   second run, the two probes' misses, and four places with changed lines no test reaches (under "Step 8", "Not
+   reached and structural lines (cycle 21)" and "Open at the close (cycle 21)").
 
 ### Step 1: failing tests, pins and probes on `8e1fb24`
 
@@ -5629,7 +5644,8 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
        of 10 or less (S3-R22 item 1).
     5. *An id with many holders moves whole in one turn*, O(h log h) for its pairs' sort. A cost: blocking if a case
        with h near 10,000 misses `c2Budget` at a quiet load. No BenchSync case holds one id by thousands of interests
-       yet; it is measured at the close (step 8), or put to the orchestrator.
+       yet; it is measured at the close (step 8), or put to the orchestrator. (Measured at step 8 by PROBE-C21-HOLDERS:
+       39.01 and 40.98 ms best at a quiet load, a miss, blocking and reported, under "Step 8".)
     6. *Pre-existing*: moved ids leave `Job.assets` without `retireProgress` (above); an empty binding can occur on the
        bounded path (RR-20's family, S3-R24 item 1).
 - **Mutants** (`.build-s3f/c21/tools/mut-b.py`, 32, on the snapshot `.build-s3f/c21/snap-b` of `82ba8a1`) are queued
@@ -6069,7 +6085,9 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
     and times out; capped, its retry times out too (`maxAttemptsPerRun` 2). All eight cases pass: at the edge (four)
     the take-off is charged to the verdict's turn and made in it, no batch; past it (five) it is owed as one batch;
     either way the ids rejoin O0 backed off with its retry state, as v4's visit rejoined them visited first, and O0's
-    retry serves them all, or, capped, answers them all with its failure. The probe finds no defect.
+    retry serves them all, or, capped, answers them all with its failure. The probe finds no defect. (Corrected under
+    "Step 8": the ids rejoin O0 with its retry state, its attempts, but not backed off, since their user waiters'
+    join skips the backoff, T20; the probe's test raced with that retry at the edge.)
   - A site-2 observation, in RR-16's family (S3-R24 item 5; UNCONFIRMED, no probe run, none required): were a gate to
     close after the verdict defers and before v4, a visit-first engine's v4 visit would place the six on a fresh job of
     O0's content that parks and fails its waiters fast (`failFastError`), before v5; swept first the take-off
@@ -6589,6 +6607,200 @@ claimed). Each names the state where it would change an answer; no test this cyc
   for a join in the transfer's window (a metric only).
 - **Residual risk** (S3-R26 item 5): item 5's order, place and ticket difference (S3-R16 item 2).
 
+### Step 8: the close
+
+- **The first gate run** (`.build-s3f/c21/gates21.sh` on `2c351e8`, the code of `28c2700`, from 14:45:40; logs under
+  `.build-s3f/c21/gates/`). The benchmarks failed only on their two known issues, P-13 (WP-B's) and
+  `waitersStalledSubscriber`'s miss (reported, "Step 6"); `verify.sh --quick`, the release build, the two gates, the
+  first two Sync runs and TSan passed. The third Sync run failed (`15:23:50 sync3 exit 1`), with one issue, the flake
+  below. The run was stopped once TSan ended (`tools/stop-after-tsan.sh`): its next stages would have built the fix.
+  Every stage ran again on the fixed HEAD (`gates21b.sh`, under "Gate evidence (cycle 21)").
+- **The reservation-edge flake** (`PROBE-RR21-RESERVE-REJOIN`, `(.sweepFollowsFirst, .atTheEdgeCapped)`; `sync3.log`):
+  `EngineFollowBarrierRerouteTakeOffShareTests.swift:167:17: Expectation failed: made[given - 1] == moved &&
+  turns[given].batches == 0`, with `made` [0, 0, 0, 0]. The verdict's turn was read as `follow owed=false … verdicts=0
+  settled=0 batches=0/0 queue=[](0) … o0=0 … jobs=0`: O0 was already gone. Its other expectations, the visit-first
+  answers among them, held. The quick run, the first two Sync runs and both of reqs #7's whole-suite mutant runs passed
+  it. The third Sync run ran at a 1-minute load of mean 20.88 (5.12 to 32.51; `suite-load.txt`), beside those mutant
+  runs.
+  - **The mechanism, a test race.** At the edge, the verdict's turn is the drain's last: it leaves the barrier down,
+    and its pump starts O0's retry at once (the pump admits nothing behind the barrier, `pump`). The take-off's user
+    re-routes joined O0 while it was backed off, and a user-initiated join skips the backoff (T20, `relane`'s failed
+    arm), as v4's visit's join did visited first. The fake runs the capped retry's `.fail` inside `transfer(_:)`, and
+    its verdict at the cap answers all five ids and ends O0. `takeOffTurns` reads the turn in its next actor call. When
+    the retry's driver reaches the engine first, the reading shows O0 gone. The engine's answers are the same in both
+    orders.
+  - **Red first** (S3-R26 item 11: the shape exists before the fix). `a380c78` adds `takeOffTurns`' `settle` step.
+    After a turn that leaves the barrier down, the test waits until O0's retry has its terminal, held or applied, and
+    then reads the turn: the worst order the scheduler may give (PROBE-C21-RESERVE-SETTLE). It fails 2/2 at `:179`, the
+    same expectation, with the same readings (`.build-s3f/c21/flake/red-run.log`, `red-run2.log`).
+  - **The fix** (`e599ae1`). While `takeOffTurns` reads the held turns, it holds the attempts' terminals
+    (`holdAttemptTerminals()`), and it releases them with the follow-ups. With the settle step it passes 2/2
+    (`green-run1.log`, `green-run2.log`), and the ten `takeOffTurns` tests pass 2/2 (`family1.log`, `family2.log`).
+  - **The test changes** (G3, one to one; the test and the fixture are this cycle's, so not in `MIGRATION.md`).
+    `takeOffTurns(t)` became `takeOffTurns(t) { … }`, with the settle wait. No expectation changed. The doc comment's
+    "rejoin O0, backed off with its retry state" became "rejoin O0 with its retry state (its attempts) … and their user
+    waiters' join skips its backoff (T20)".
+  - **The other held-turn readers.** I checked each for a reading, after the turn that drops the barrier, of a job
+    whose attempt can start and end then:
+    - `EngineFollowBarrierRerouteRequeueTests`: the store's publications are held;
+    - `EngineFollowBarrierRerouteCommitTests`: W and X are held at the source;
+    - `EngineFollowBarrierDrainBoundTests`: `held` counts J's and B's ids. J's retry waits for the clock, since its
+      members are prefetch interests and get no T20; B is held;
+    - `EngineFollowBarrierRunClaimTests`: it reads events and flags only;
+    - `EngineFollowBarrierReroutePresentTests`: `dJob` could only pass falsely;
+    - `RerouteHold`, `RerouteRun`, `RerouteAnnounce` and `releaseOwedTurns`: they read invariants, events and flags.
+
+    The readers whose loops end with the follow (`while followOwed`, in the MoveHolders, Convergence,
+    MoveRevalidation, MoveIndex, SharedMove, TurnTotal and DeferBucket tests) were not audited one by one. RestOrder
+    stops before its reading once H's move is made. Put to the orchestrator.
+- **reqs #7** (S3-R26 item 10). The line that replaced `8e1fb24`'s `EngineDispatch.swift:1118` is `:1176`,
+  `subtractAssets(trim.unbound, for: trim.token)`: the commit's partial trim, made at once.
+  - `runJoinsSharedJobWhileItVerifies` (`EngineRegressionRound2Tests.swift:461`) reaches it deterministically, in the
+    ruling's shape: one token (the run's), with one bound id (a, which the publication binds) and one unbound id (b,
+    which joined while `NextUnitGate` held the publication at its first store unit).
+  - The line's drop-mutant, `r7-partial-trim-drop` (`tools/mut-r7.py`; "r7" is reqs #7, not `integrate-rr21.md`'s
+    R7), failed the whole Sync suite 2/2 (`mut21-r7.txt`, on `28c2700`). Both runs failed only at `:486:9`
+    (`outcome.completeReport != nil`): 351.426 s at a 1-minute load of 13.39, and 419.364 s at 11.52. The revert's
+    diff was empty.
+  - The test needs no follow, so the orders do not apply (U).
+  - The line's count on the final HEAD is 3, in the second gate run's coverage stage and in its `--quick` run
+    (`covdiff-gate.txt`, `covdiff-quick.txt`; under "Not reached and structural lines (cycle 21)" below).
+- **`purgeWhileOwedTurns`' miss** (the second gate run's benchmarks, under "Gate evidence (cycle 21)"): the purge's
+  turn while 10,000 re-routes are owed, [10.22, 11.55, 10.04] ms, best 10.04, at a 1-minute load of mean 5.23 over
+  SyncBenchmarks (the case's own reading `4.88 7.02 9.09`). The first run gave [9.57, 9.59, 9.58], on the same
+  `Sources`.
+  - *Re-run alone* (S3-R22 item 3; `tools/purge-rerun.sh`, under `sim.lock` from 17:42:20, at a 1-minute load of 5.35
+    to 5.60; the gate's own release build with `--skip-build --filter "SyncBenchmarks/purgeWhileOwedTurns"`): [11.81,
+    9.62, 10.33] ms, best 9.62 (`purge-runs/rerun1.log`), and [9.75, 9.98, 9.84], best 9.75 (`rerun2.log`). Both
+    passed.
+  - *Its parts* (PROBE-C21-PURGE-PARTS, a scratch copy in `.build-s3f/c21/purge`: `e599ae1` with `withdrawPurgedJoins`
+    made internal, and the case timing `performPurge`'s synchronous parts inside the actor, in its order, before the
+    purge). In `parts2.log` (`tools/purge-parts2.sh`, 17:47:30 to 17:47:34, at a 1-minute load of 9.74) the walk is
+    timed inside `withdrawPurged` itself, with its own predicate. At 10,000 owed items, with no job and no binding left
+    by then: `dropBindings` 0.00 ms, `settleRun` 0.00, the walk of the waiting events 9.15, 9.22 and 9.14, the jobs
+    0.00. The first form (`parts.log`, 17:42:27 to 17:42:34) timed the walk with `{ _ in true }` as its predicate:
+    7.93, 8.03 and 8.46 ms. The walk of the owed batch is the whole of the turn's synchronous work, and its predicate's
+    copy lookup, once per item, is about 1 ms of it.
+  - *Disposition*: at the edge in every run (best above 8.5 ms), and a miss in one gate run at a quiet load. By S3-R24
+    item 2's letter (a miss at a 1-minute load of 10 or less, best of 3) it is **blocking**, and it is reported; that
+    the case passed alone twice does not change the gate run's figure. The orchestrator rules.
+  - *Route* (measured parts, no change at the close): the predicate looks the id up in the copy before it reads the
+    request, and a purge of `.all` purges every id either way (`withdrawPurged`), so reading the request first saves
+    the lookup (about 1 ms here). The walk then sorts the removed items and drops each group member
+    (`dropGroupMember`). The sort fixes only the order of the drops, and so the order in which the groups the purge
+    empties are answered: an order-only difference (S3-R16 item 2), not measured.
+- **PROBE-C21-APM** (S3-R26 item 9; the inventory row of `answerPresentMembers`, which item B's B11 changed). It is a
+  scratch probe in `.build-s3f/c21/apm` (`e599ae1`'s package with `ProbeC21APM.swift` added to the benchmarks, not
+  committed), because no BenchSync case reaches the answer site with present ids. On a job of 10,000 ids sharing one
+  content whose download is held, it times the answer turn's own work inside the engine's actor: the binding (`bind`)
+  and `answerPresentMembers`, as `indexOwnCosts` times the index's. It ran in release, in the second gate run's apm
+  stage (`gates-b/apm.log`, under `sim.lock`, 17:30:15 to 17:30:44, at a 1-minute load of 7.56 to 6.98; the 5- and
+  15-minute loads were still 26 to 34 after the simulator stage). Best of 3, with every id answered from the store in
+  every run:
+  - one prefetch group of 10,000 members (one row of 10,000 ids): [10.81, 11.59, 10.79] ms, best 10.79;
+  - 10,000 one-member prefetch groups (10,000 rows): [12.76, 12.76, 13.50], best 12.76;
+  - a user waiter per id (10,000 rows; the 10,000 waiters move to store reads): [14.17, 14.48, 14.45], best 14.17.
+
+  All three miss C2 at a quiet load: **blocking** by S3-R24 item 2 and S3-R26's "a miss with no route is blocking",
+  and reported. The probe ran once more alone after the purge's runs (`tools/apm-rerun.sh`, `apm-runs/apm2.log`,
+  under `sim.lock`, 17:47:52 to 17:48:19, at a 1-minute load of 8.33 to 6.92), the same binary: 10.51, 12.26 and
+  13.27 ms best ([10.51, 10.72, 10.83], [12.26, 12.61, 12.35], [13.66, 14.58, 13.27]). No route was found at the close:
+  the turn binds the present ids and answers their interests together, so that no outcome of the job reaches an
+  asset the store holds (R-NET-6, L4-R5). Splitting them over turns would leave interests in present ids on the job
+  between turns, where an outcome of the job could reach them; that state needs its own invariants. Put to the
+  orchestrator.
+- **PROBE-C21-HOLDERS** (item B's residual 5, under "Step 4": "blocking if a case with h near 10,000 misses `c2Budget`
+  at a quiet load"; `ProbeC21Holders.swift` in the same scratch copy). One id, m, of H's content is held by 10,000
+  interests: a user waiter each, or a one-member prefetch group each. O, a user request's 16 bytes, downloads, held.
+  v3 maps m to O's content, so H's visit moves m with every holder. H holds only m (`ids: 1` before), so the move is
+  `move`'s supersede branch: `supersede` without a bound re-routes the 10,000 interests in the visit's turn, as a
+  visit's supersede of any job does. `move`'s other branch (a holder keeping other ids) re-routes the same 10,000
+  pairs in one turn after sorting them; it was not measured. The heartbeat times the apply's sync and its whole
+  follow, as `partialMoveTurns` does, best of 3 after a warm-up at 1,000, in the same apm stage:
+  - user waiters: [39.01, 39.16, 39.08] ms, best 39.01;
+  - one-member groups: [41.09, 41.56, 40.98], best 40.98.
+
+  Every run ended with O holding both ids and all 10,001 interests, and H with none. Both miss C2 by about four times at
+  a quiet load: **blocking**, reported. Alone, in the same re-run as PROBE-C21-APM's: 37.80 ms best with user waiters
+  ([38.12, 37.80, 37.93]) and 40.12 with groups ([40.48, 40.93, 40.12]). No route was found within the design: a move
+  takes an id whole, all its interests in one turn (`continueMove`), and an owed batch replays each id with all its
+  tokens in one drain turn (RR-21's R8). Splitting one id's holders over turns needs a state in which the id has left
+  the job while holders still hold it, with that state's own invariants (I2's class). Put to the orchestrator.
+
+### Not reached and structural lines (cycle 21)
+
+S3-R26 item 9 asks for S3-R25 item 10's check on the final HEAD. `.build-s3f/c21/covdiff21c.py` is the verifier's
+`reqs/covdiff.py`, adapted to this scratch path and to `8e1fb24..HEAD`, run on a copy of a run's profile and bundles.
+The counts are the second gate run's coverage stage (`.build-s3f/c21/gates-b/cov.profdata`, every bundle but the
+benchmarks, on `e599ae1`, with its bundles copied at its end to `.build-s3f/c21/cov-gate/`; `covdiff-gate.txt`). Its
+`--quick` run's profile, copied the same way (`cov-quick/`, `covdiff-quick.txt`), gives the same lines. Of the 1,915
+lines changed in `Sources` this cycle, 30 are at zero count: `EngineCommands.swift` 4 of 259, `EngineDispatch.swift` 1
+of 111, `EngineFailures.swift` 9 of 89, `EngineFollow.swift` 2 of 554, `EngineJobs.swift` 2 of 227,
+`EnginePresence.swift` 1 of 29, `EngineRuns.swift` 1 of 41, `EngineShutdown.swift` 6 of 25 and `EngineState.swift` 4
+of 341. `EngineConditions.swift` (1), `EngineEvents.swift` (8), `EngineMoves.swift` (225) and `SubscriberQueue.swift`
+(5) have none.
+
+- **Comment lines** (2): `EngineFailures.swift:591-592`, the reworded comment of `decideSpaceFailure`'s re-queued arm.
+  The arm's `return` (`:593`) is not a changed line.
+- **Structural** (11): an Optional's empty case, or an arm or a loop's continuation with no statement to drop
+  (S3-R25 item 10).
+  - `EngineDispatch.swift:1343`: `supersede`'s `guard let interest = job.interests[token] else { continue }`, over
+    that dictionary's own sorted keys.
+  - `EngineState.swift:1047` and `:1058`: `Job.takeOff`'s lookups of the tokens it read from the index. Every indexed
+    token holds an interest in the id (I1, the index's `invariantViolations()` clause), and no interest changes before
+    both loops end.
+  - `EngineState.swift:995`: `holdings(of:)`'s moved id with no holder, which gives no pair (`moveItems`' own case
+    has 14 hits).
+  - `EnginePresence.swift:356`: `answerPresentMembers`' job that is gone. Both callers pass a job they have just read.
+  - `EngineState.swift:1109`: `JobTakeOff.ids`' default, which no initializer uses: `JobTakeOff(ids:)` is its only
+    construction.
+  - `EngineCommands.swift:1077` and `:1112`: the purge's `case .run, .waiter: break` arms. A waiter's item never
+    reaches them (`:1066`'s filter and `withdrawPurgedJoin`'s guard exclude waiters). A run's has nothing to drop: the
+    purge settles the run first (`settleRun(.cancelled)` before `withdrawPurged`).
+  - `EngineFailures.swift:872`: `followedLane`'s `.system` arm. A system item has no owner to check. No test walks an
+    owed system item.
+  - `EngineFailures.swift:898`: the walk's continuation after an owed item that raised the lane below user-initiated.
+    It has no statement. In the suites, the two owed items that reach a job are user-initiated (`:894`, 2 hits, both
+    returning at `:896`).
+  - `EngineCommands.swift:2253`: the closing brace of a pre-existing `invariantViolations()` arm (`:2251-2252` are
+    `2e22cf6`'s, cycle 12). Only a broken invariant reaches it.
+- **Equivalent** (3): cost only (S3-R16 1(e), S3-R19 item 2).
+  - `EngineCommands.swift:1068`: the purge's `guard !removed.isEmpty else { continue }`. With nothing removed,
+    `MinHeap.removeAll(where:)` leaves the heap as it was (no heapify), the loop runs zero times, and the write-back
+    stores the same batch. The guard saves that write.
+  - `EngineFollow.swift:610`: the take-off's `run.held.remove(transfer)` when the run's whole interest leaves the job,
+    as `dropInterest` does (`EngineJobs.swift:385`). Only two readers use `run.held`. `finishRun` skips a job without
+    the run's interest (`EngineRuns.swift:825`). An invariant clause checks the other direction
+    (`EngineCommands.swift:1839`). `removeJob` removes the entry when the job ends. A stale entry costs `finishRun` one
+    skipped lookup.
+  - `EngineJobs.swift:758`: `answerFollowUp`'s `guard self.isRunning`. A shutdown's `drainEverything` empties
+    `owedAnswers` and resets its head (`EngineShutdown.swift:57-59`) before any later follow-up runs, and no
+    resolution owes an answer while the engine shuts down. Without the guard, the follow-up resumes nothing, empties an
+    empty table and notifies the observers once more, with nothing changed.
+- **Pre-existing, outside the follow-barrier class** (2; S3-R19 item 3's third option).
+  - `EngineJobs.swift:625`: `deliver`'s `return` for a group that is gone. It predates Stage 3 (`61b6eb9`, in
+    `s3-base`). Step C5 changed only the guard above it, to write the group in place.
+  - `EngineRuns.swift:537`: `recordRunOutcome`'s failure of a committed id the store did not bind. Its doc comment
+    records it as kept and pre-existing (S3-R19 item 3). Step C6 rewrote it in place.
+- **Not reached: open** (12 lines in four places). S3-R25 item 10 is not met for these. Each is a replay or deferral
+  branch with no test that reaches it, so it is blocking under S3-R16 1(e), as the twelve open survivors are, and
+  reported, not claimed.
+  - `EngineFailures.swift:861-862` and `:868-870`: `followedLane`'s owner checks of an owed waiter's item and an owed
+    run's item. These are the survivors `b22-no-waiter-owner` and `b22-no-run-owner` (under "rr21-C7", "Open"),
+    with the state that would reach them.
+  - `EngineShutdown.swift:178-183`: `settle`'s slice over the owed answers, reached by a shutdown while more than
+    `shutdownStepsPerTurn` (512) answers are owed. In the suites `settle` resumed 32 owed answers in all (`:175`).
+    One test would reach it and kill the slice's drop-mutant: hold the follow-ups over more than 512 owed answers, shut
+    down, and assert every slice is at most 512, as R-SYN-15's shutdown test does for the waiters.
+  - `EngineFollow.swift:883`: `replayVerdict`'s second guard, for a waiting verdict whose job is no longer failed at
+    its epoch. No path was found that builds that state: `removeJob` clears the job's verdict, `relane` leaves alone a
+    failed job whose verdict waits (`EngineJobs.swift:307`), and only the verdict schedules its retry. The `.failed`
+    half is an `invariantViolations()` clause ("jobs whose failure verdict waits for a follow are not failed"), which
+    no test breaks on purpose; the epoch half has no clause. S3-R19 item 3 asks for the guard's removal, or for a
+    clause that a test exercises.
+- **No change at the close.** A `Sources` or `Tests` change would void the final gate run, so none was made for these
+  lines. The four open places are reported with the twelve open survivors ("Not verified here", cycle 21).
+
 ### Residual risks and accepted orders (cycle 21)
 
 - **Accepted orders** (S3-R26 item 10; S3-R16 item 2): newest-first joins behind a verdict (item A); the table's order
@@ -6610,6 +6822,27 @@ claimed). Each names the state where it would change an answer; no test this cyc
   listed with their class, condition and test under "Step 4"; item C's are the table's order of resumes (above),
   `waitersStalledSubscriber`'s miss (blocking, under "Step 6") and the two-subscriber figure (for the owner).
 - **The open survivors** under "rr21-C7".
+
+### Open at the close (cycle 21; blocking, reported)
+
+1. **`commitTurns(.waitersStalledSubscriber)` misses C2**: 10.45 ms best in the first gate run and 11.09 in the second,
+   at 1-minute loads of mean 5.60 and 5.23. Phase 2 cannot cut it (S3-R26 item 4; under "Step 6").
+2. **`purgeWhileOwedTurns` misses C2 in the second gate run**: 10.04 ms best, where the first run gave 9.57. It is
+   blocking by S3-R24 item 2. Alone it passed twice, at the edge (9.62 and 9.75); the walk of the owed batch is the
+   turn's work, and reading the purge's request before the copy saves about 1 ms of it (under "Step 8").
+3. **Twelve mutants survive** with no killing test (S3-R16 1(e); under "rr21-C7", "Open").
+4. **Four places with changed lines that no test reaches** (S3-R25 item 10, S3-R16 1(e); under "Not reached and
+   structural lines (cycle 21)"). Two of them are survivors in item 3.
+5. **`answerPresentMembers`' answer turn misses C2 at 10,000 present ids** (PROBE-C21-APM, a scratch probe): 10.79,
+   12.76 and 14.17 ms best for one group, 10,000 groups and 10,000 user waiters, at a 1-minute load of 7.56 to 6.98
+   (under "Step 8"). No route was found within the answer turn.
+6. **One id held by 10,000 interests moves in one turn** (item B's residual 5; PROBE-C21-HOLDERS, a scratch probe):
+   39.01 and 40.98 ms best, in the same stage (under "Step 8"). A move takes an id whole, and an owed batch replays
+   an id with all its tokens, so no route was found within the design.
+
+Put to the orchestrator with them: the held-turn readers whose loops end with the follow, not audited one by one
+for the reservation-edge race ("Step 8"); `releaseRerouteHolds`' inventory row, which has no figure; and the
+two-subscriber figure, for the owner (S3-R26 item 12's answer 4).
 
 ## Items
 
@@ -9172,6 +9405,244 @@ TSan's end; nothing of theirs was touched (S3-R23 item 4).
   - P-11: `speedup 3.6992047607935787 (min 3.0)`, concurrency 1 3.824 s and 5 1.034 s. P-9 p99 15.121 ms (budget
     50.0, WP-G's). P-4 plan 10,000 11.50 ms (budget 20.0), ratio 2.02 (max 2.5).
 
+## Gate evidence (cycle 21)
+
+Two gate runs were made at step 8, on the shared 8-core host, one gate at a time; S3-R23 item 1's three load averages
+are in each run's `times.txt` beside every stage. The final HEAD's code and tests are `e599ae1`'s: `git diff --stat
+e599ae1 HEAD -- Sources Tests Package.swift` is empty, and the commits after it change this draft only. `e599ae1` keeps
+`2c351e8`'s `Sources`, `Package.swift` and benchmarks (`git diff --stat 2c351e8 e599ae1 -- Sources Package.swift
+Tests/ZTronAssetKitBenchmarks` is empty): `a380c78` and `e599ae1` change the reservation-edge test and its fixture
+only. A system daemon, `PerfPowerServices`, used 193 % CPU when `ps` sampled it at 16:00, 150 % at 16:04 and none
+at 16:15.
+
+### The first run, on `2c351e8`
+
+`.build-s3f/c21/gates21.sh`, 14:45:40 to 15:52:29, logs under `.build-s3f/c21/gates/`; the tree was clean at its start
+(`start head 2c351e8 dirty 0`). Its load was sampled every 5 s over the benchmarks (`bench-load.txt`) and from 15:04:35
+to TSan's end (`suite-load.txt`, `tools/sampler-suites.sh`). Reqs #7's two mutant runs (`mut21-r7.txt`, 15:11:13
+to 15:24:14) and the APM probe's build (15:18:26 to 15:22:02) ran beside its second and third Sync runs.
+
+- **Benchmarks** under `sim.lock` (taken 14:45:41, released 14:54:54), first, before this run's own builds and suites
+  (S3-R23): the release test build (`swift build -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing
+  --build-tests`, exit 0, `bench-build.log`), then `swift test -c release --scratch-path .build-s3f-perf -Xswiftc
+  -enable-testing --filter Benchmarks` (`bench.log`, `bench-load.txt`).
+  - When the suites ran: the test command's own build took `Build complete! (177,87 s)`, and the run reported `after
+    371.620 seconds`, so the serialized suites ran from about 14:48:42 to 14:54:54. SyncBenchmarks, the fifth, ran
+    from about 14:50:59 (`failed after 235.198 seconds`).
+  - Load (`bench-load.txt`, every 5 s): over SyncBenchmarks the 1-minute load was mean 5.60, min 4.55, max 7.58 over 48
+    samples, from { 5.34 5.82 6.79 } to { 5.73 5.76 6.52 }; over all the suites, mean 5.47 (4.55 to 7.58, 75
+    samples). Over the build before them it was mean 7.87 (4.04 to 13.32), above 10 from 14:46:32 to 14:47:17, while no
+    suite ran. Every figure below was taken at a 1-minute load of 10 or less (S3-R23).
+  - Result: `✘ Test run with 81 tests in 8 suites failed after 371.620 seconds with 2 issues.`
+    - One is P-13's (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 7.786 ms
+      against 5.0 ms in 514 units; WP-B's, `other-wp:b`, as in every cycle).
+    - One is item C's (`✘ Suite "SyncBenchmarks" failed after 235.198 seconds with 1 issue.`):
+      `commitTurns(.waitersStalledSubscriber)` (`BenchSyncCycle21.swift:153:9: Expectation failed: (waits.min() ??
+      .infinity) <= Self.c2Budget`), heartbeat [10.45, 10.50, 10.59] ms, best 10.45, the commit's own turn best 10.44.
+      It is the miss Phase 2 cannot cut, blocking and reported (under "Step 6: item C, Phase 2").
+    - Every other WP-F benchmark is within S3-R5's budgets (best of three ≤ 10 ms, median ≤ 50 ms), RR-21's two
+      cycle-20 misses among them. Four are at the edge, best above 8.5 ms (S3-R26 item 9): `groupStalledSubscriber`
+      8.69, `manyGroups` 9.17, `commitTwoTokensTurns` 8.82 and `purgeWhileOwedTurns` 9.57 ms.
+  - RR-21, site 1 (the commit's re-routes), longest actor wait or heartbeat, best of 3 (cycle 20's gate run in
+    brackets):
+    - `concentrationCommitRerouteTurns`: [7.40, 11.23, 7.48] ms, best 7.40 ([48.68, 48.88, 49.27], best 48.68). The
+      commit window 3.83 ms best; owed 10,000 ids in one batch, made 512 a drain turn over 20 held turns, the drain's
+      longest held turn 2.42 ms best.
+    - `commitRerouteWaitersTurns` (10,000 user waiters, 511 joins behind the batch) 7.46 ms, longest held turn 3.14;
+      `commitTwoTokensTurns` [8.92, 8.82, 18.46] ms, best 8.82, longest held turn 4.89 (1,024 interests a turn);
+      `userMovedToBound` 4.45; `applyWhileOwedLayers` 7.49 (the commit's own turn 4.89, while owed 4.14);
+      `lane429WhileOwed` 5.51 (its `followedLane`, the median of 21 calls a run, [5.60, 7.49, 5.49], best 5.49);
+      `commitRerouteDivergentTurns` 5.05; `groupMovedToBound` 5.33; `groupDelistedAll` 3.89 (the group) and 3.30 (the
+      waiters); `groupDelistedFit` 0.42; `commitFitBoundaryTurns` 1.34 at once and 1.16 owed; `commitWaitersBoundTurns`
+      7.33; `runSuperseded`'s commit cases 7.49 (moved away) and 4.76 (onto a present content).
+    - `purgeWhileOwedTurns` (a purge of everything while 10,000 re-routes are owed): [9.57, 9.59, 9.58] ms, best 9.57,
+      the purge's turn while owed; the commit's own turn 4.78 ms best, and nothing left for the drain.
+  - RR-21, site 3 (the superseded exit): `supersededRerouteTurns` [7.52, 7.57, 7.48] ms, best 7.48 (owed 10,001 in one
+    batch, 20 held turns, the longest 2.45 ms best); `supersededUserTurns` 7.49; `runSuperseded`'s exit case 7.44.
+  - RR-21, site 2 (the take-off): `movedBeforeDrainTurns` [5.08, 5.41, 5.13] ms, best 5.08 ([46.65, 46.82, 45.67],
+    best 45.67), J's 500 deferring 3.00; `movedBeforeDrainWaitersTurns` 7.43 ms all held (the verdict's turn 7.11) and
+    7.44 half held (6.13); `movedBeforeAndAfterTurns` 5.57.
+  - R18: `joinChainTurns` (10,000 chained joins, two layers): the applies' heartbeat 6.33 ms, the layer pass alone
+    0.84, `followedLane` 4.47 (every chain empty, 4.41), the drain's heartbeat 5.45.
+  - Item C: `commitTurns(.waiters)` 7.30 ms (its own turn 7.30); `.groupStalledSubscriber` [8.84, 8.75, 8.69], best
+    8.69; `.manyGroups` [9.42, 12.35, 9.17], best 9.17; two stalled subscribers 13.68 (recorded, not gated);
+    `concentrationPublicationTurns` through the commit [5.86, 5.79, 6.11], best 5.79 (9.86).
+  - Items A and B: `deferBehindVerdictTurns`' longest held turn 5.39 (404, group), 6.10 (timeout, group), 6.16 (404,
+    users) and 6.21 ms (timeout, users), their heartbeats 7.44, 7.50, 7.52 and 7.46; `drainVerdictChainTurns` 4.98 and
+    4.07 (heartbeats 5.15 and 5.80); `manyMovesTurns` 3.26, 3.36, 3.68 and 3.75 ms (k = 1, 16, 64, 256);
+    `partialMoveTurns` 5.49 (groups) and 6.14 (users); `indexOwnCosts` release 3.27, `keepInterests` on a copy 3.73,
+    freeing 0.70.
+  - The follow barrier's other C2 figures at 10,000 ids, best of 3 (cycle 20's gate run in brackets):
+    - `sharedApplyTurns` 7.29 and 7.68 (6.82 and 7.24); `divergenceTurns` 7.55 and 7.66 (7.03 and 7.04);
+      `inboundHolderTurns` 6.59 (7.18); `userSharedApplyTurns` supersede 7.37 and keep 8.28 (7.18 and 8.01);
+      `drainVerdictTurns` 4.55 at 500 a job and 4.42 at 625 (4.13 and 4.08).
+    - `concentrationNotFoundTurns` 5.62 (6.24), its 429's `followedLane` with the moves owed [3.56, 3.62, 3.58]
+      ([3.51, 3.45, 3.46]); `concentrationFollowTurns` 3.76 (3.64).
+    - `publicationApplyTurns`: the walk's median of 21 calls best 2.20 (2.10), the apply's longest wait 4.29 (4.02),
+      with a move found for nearly every member 6.21 (5.86).
+    - `inboundWalkTurns`: the 404's turn [3.74, 3.69, 3.75] ms ([3.31, 3.43, 3.37]); the 429's `followedLane`
+      [2.98, 2.99, 3.07] ms ([2.74, 2.73, 2.79]).
+    - The reclaim during an owed follow: [3.84, 3.86, 3.84] ms with one handle and [5.07, 5.19, 5.13] with two; mixed
+      (1 member in 20 changed) [7.01, 6.29, 6.32] and [8.18, 7.83, 7.94].
+    - The follow end and drain of 10,000 places [5.36, 5.30, 5.33] ms ([4.93, 4.90, 4.86]); the follow's last turn
+      plus the drain's first batch: the turn [4.97, 4.88, 5.10] ms, the longest wait [5.45, 5.39, 5.42].
+    - Throttle extension (correct #6): [7.56, 7.63, 8.08] ms, best 7.56 (7.20).
+  - The other R-SYN cases' longest actor waits, as the log reports them (space parking and re-admission, network
+    edges, releases, a cancelled resolve, shutdown, refreshes, the prune announcement, retries, re-joins and the
+    breaker's cases): 0.05 to 5.66 ms.
+  - P-11: `speedup 3.6986750332511265 (min 3.0)`, concurrency 1 3.803 s and 5 1.028 s. P-9 p99 15.435 ms (budget
+    50.0, WP-G's). P-4 plan 10,000 11.43 ms (budget 20.0), ratio 2.05 (max 2.5). P-7 resident delta 0.80 MiB for 256
+    MiB and 0.09 MiB for 1,024 MiB (max 48.0). P-14: 0 armed timers, 0 owned tasks, 0 sleepers.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (14:54:54 to 15:03:44; `quick.log`): `VERIFY:
+  PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines. Tests passed: Transport 151, Sync 681
+  (`passed after 334.052 seconds`; cycle 20's gate run had 561), Storage 459, Model 84, Kit 85, Compatibility
+  71, AppleHosted 104. The 1-minute load at its end was 10.35.
+- **Release build** with `-warnings-as-errors` (ended 15:04:17, `release.log`): `Build complete! (32,45 s)`, 0
+  `warning:` lines. **Gates** (15:04:17): `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (15:04:17 to 15:23:50; `sync{1,2,3}.log`):
+  - `✔ Test run with 681 tests in 56 suites passed after 333.630 seconds.` (1-minute load mean 12.50, 4.08 to 38.08)
+    and `… after 343.396 seconds.` (mean 6.68, 4.43 to 10.84);
+  - `✘ Test run with 681 tests in 56 suites failed after 428.771 seconds with 1 issue.` (mean 20.88, 5.12 to 32.51):
+    the reservation-edge flake, under "Step 8".
+  - Durations against guards (`python3 .build-s3f/c20/guards.py`, 618 of the 681 matched to their `.timeLimit`, the
+    other 63 at most 0.61 s): none over half; the largest 5.9 %, 6.1 % and 6.7 % of theirs.
+- **TSan** (15:23:50 to 15:52:28; `tsan.log`): `✔ Test run with 681 tests in 56 suites passed after 1627.380
+  seconds.`; 0 `ThreadSanitizer` lines, 0 `Time limit` lines. Load mean 10.26, 4.48 to 85.15, over 343 samples.
+  Guards: none over half; the largest 28.5 % (`R-SYN-5: a 429 counts the interest a waiting verdict leaves to move
+  after it, not one it answers (F-28)`, 51.35 s of 3 minutes), then 25.4 % (15.23 s of 1 minute).
+- **Stopped** after TSan (`15:52:29 stopped gates21.sh (36439) after TSan; children killed: 58976`, the iOS build it
+  had just started): its later stages would have built the fix's tests. They ran in the second run.
+
+### The second run, on `e599ae1`
+
+`.build-s3f/c21/gates21b.sh`, 15:55:24 to 17:42:10, logs under `.build-s3f/c21/gates-b/`. Only this draft was changed in
+the tree (`start head e599ae1 dirty 1`), and only the draft was edited while the run ran. The whole run's load was
+sampled every 5 s (`all-load.txt`), and each locked stage's on its own (`bench-load.txt`, `cov-load.txt`,
+`sim-load.txt`, `apm-load.txt`, `covsync-load.txt`). No mutant ran during it. Beside its `--quick` stage ran the
+probe copy's rebuild for PROBE-C21-HOLDERS and that probe's smoke run (`tools/apm-rebuild.sh`, 16:08:13 to 16:09:12),
+and the purge copy's two release builds for PROBE-C21-PURGE-PARTS (`.build-s3f/c21/purge`, 16:12:32 to 16:13:36, which
+failed to compile on an availability error in the probe, and 16:13:57 to 16:17:58).
+
+- **S3-R13's tools-6.4 check** (`tools/t64-c21b.sh`, right before the run, 15:53:31 to 15:55:24; `t64.txt`): `git
+  archive` of `e599ae1` into `.build-s3f/t64-c21`, line 1 set to `// swift-tools-version: 6.4` there only (`Apple Swift
+  version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)`; 0 differences from the worktree's `Sources` and `Tests`).
+  `swift build --build-tests -Xswiftc -warnings-as-errors`: exit 0, `Build complete! (71,50 s)`, 0 `warning:` lines;
+  `swift build -c release`: exit 0, `Build complete! (39,46 s)`, 0 `warning:` lines. `Package.swift` is not edited in
+  the worktree.
+- **The gates' selftest and the trace check** (16:03, read-only; `selftest.log`, `trace.log`): `SELFTEST: PASS`;
+  `python3 Scripts/gates.py trace --spec SPEC.md --tests "$PWD/Tests"`, without `--write`: `TRACE requirements=90
+  (MUST=78) budgets=14 tests-with-ids=1558` / `TRACE: PASS`; `docs/TRACEABILITY.md` unchanged.
+- **Benchmarks** under `sim.lock` (taken 15:58:35, released 16:07:58), first, as in the first run: the release test
+  build (`bench-build.log`, exit 0), then `swift test -c release --scratch-path .build-s3f-perf -Xswiftc
+  -enable-testing --filter Benchmarks` (`bench.log`, `bench-load.txt`).
+  - When the suites ran: the test command's own build took `Build complete! (190,14 s)`, and the run reported `after
+    369.961 seconds`, so the suites ran from about 16:01:48 to 16:07:58; SyncBenchmarks from about 16:04:10 (`failed
+    after 228.413 seconds`).
+  - Load: over SyncBenchmarks the 1-minute load was mean 5.23, min 4.73, max 5.85 over 46 samples; over all the
+    suites, mean 5.63 (4.73 to 7.85, 74 samples); over the build before them, mean 11.61 (5.89 to 23.31), while no
+    suite ran. Every figure below was taken at a 1-minute load of 10 or less.
+  - Result: `✘ Test run with 81 tests in 8 suites failed after 369.961 seconds with 3 issues.`
+    - P-13's (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 10.529 ms against 5.0
+      ms in 613 units; WP-B's, `other-wp:b`).
+    - `commitTurns(.waitersStalledSubscriber)` (`BenchSyncCycle21.swift:153:9`): heartbeat [11.60, 11.09, 12.27] ms,
+      best 11.09, the commit's own turn best 11.08. It is the miss Phase 2 cannot cut, blocking and reported.
+    - **`purgeWhileOwedTurns`** (`BenchSyncReroutes.swift:126:9: Expectation failed: (waits.min() ?? .infinity) <=
+      Self.c2Budget`): the purge's turn while owed [10.22, 11.55, 10.04] ms, best 10.04, where the first run gave
+      [9.57, 9.59, 9.58]; the commit's own turn [5.02, 5.10, 5.06] ms; the case's load `4.88 7.02 9.09`. A miss by
+      0.04 ms at a quiet load, so blocking by S3-R24 item 2 (a miss at a 1-minute load of 10 or less, best of 3), and
+      reported, with its re-runs alone under "Step 8".
+  - Against the first run, 51 of the 53 BenchSync cases' bests are higher, by a median of 3.3 % (from -0.48 ms,
+    `groupMovedToBound`, to +0.96 ms, the half-held take-off), at a lower load over SyncBenchmarks (mean 5.23 against
+    5.60). The load averages do not explain the difference; six other projects' simulators (`i2-*`) were booted at
+    16:07, untouched (S3-R23 item 4).
+  - At the edge (best above 8.5 ms; the first run in brackets): `groupStalledSubscriber` 9.45 (8.69), `manyGroups`
+    9.48 (9.17), `commitTwoTokensTurns` 8.90 (8.82); `purgeWhileOwedTurns` is the miss above (9.57).
+  - RR-21's two cycle-20 misses: `concentrationCommitRerouteTurns` 7.66 ms best (7.40); `movedBeforeDrainTurns` 5.17
+    (5.08), J's 500 deferring 3.12 (3.00).
+  - P-11: `speedup 3.4287105379884975 (min 3.0)`, concurrency 1 3.576 s and 5 1.043 s. P-9 p99 15.746 ms (budget
+    50.0, WP-G's). P-4 plan 10,000 12.57 ms (budget 20.0), ratio 2.02 (max 2.5). P-7 resident delta 0.83 MiB for 256
+    MiB and 0.14 MiB for 1,024 MiB (max 48.0). P-14: 0 armed timers, 0 owned tasks, 0 sleepers.
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (16:07:58 to 16:18:39; `quick.log`): `VERIFY:
+  PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines. Tests passed: Transport 151, Sync 681
+  (`passed after 383.551 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104. The 1-minute
+  load over it was mean 23.77 (4.67 to 60.23, 127 samples), with the probe copy's rebuild and the purge copy's two
+  builds beside it.
+- **Release build** with `-warnings-as-errors` (ended 16:19:12, `release.log`): `Build complete! (32,61 s)`, 0
+  `warning:` lines. **Gates** (16:19:12 to 16:19:13): `UNSAFE escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public
+  declarations=1281 documented=1281 exempt=0 fraction=100.0%` / `DOCS: PASS`.
+- **ZTronAssetSyncTests ×3** (16:19:13 to 16:37:27; `sync{1,2,3}.log`), the reservation-edge test among them:
+  - `✔ Test run with 681 tests in 56 suites passed after 339.922 seconds.` (1-minute load mean 17.84, 4.94 to 53.55);
+  - `… passed after 339.635 seconds.` (mean 6.46, 4.58 to 13.40);
+  - `… passed after 338.963 seconds.` (mean 6.03, 4.66 to 11.29).
+  - Durations against guards (`python3 .build-s3f/c20/guards.py`, 618 of the 681 matched, the other 63 at most 0.68
+    s): none over half; the largest 6.0 % in each run (`R-SYN-5: a 429 counts the interest a waiting verdict leaves to
+    move after it, not one it answers (F-28)`, 10.84 to 10.88 s of 3 minutes).
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, 16:37:27 to 17:05:13; `tsan.log`): `✔ Test run with 681 tests in 56 suites passed after
+  1599.140 seconds.`; 0 `ThreadSanitizer` lines, 0 `Time limit` lines, 0 `warning:` lines. Load mean 5.75, 3.86 to
+  22.43, over 333 samples. Guards: none over half; the largest 28.1 % (`R-SYN-5: a 429 counts the interest a waiting
+  verdict leaves to move after it, not one it answers (F-28)`, 50.54 s of 3 minutes), then 25.4 % (15.21 s of 1
+  minute).
+- **iOS generic build** (`xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, 17:05:13 to 17:05:25, `ios.log`): exit 0;
+  it rebuilt `ZTronAssetSync.o`, and the only output line is the usual `IDERunDestination: Supported platforms for the
+  buildables in the current scheme is empty.`
+- **Coverage** under `sim.lock` (taken 17:05:25, released 17:14:26; `swift test --scratch-path .build-s3f
+  --enable-code-coverage --skip Benchmarks`; `cov.log`, `cov-gate.log`).
+  - Load (`cov-load.txt`, every 5 s): mean 14.91, min 4.48, max 51.71 over 108 samples.
+  - Every bundle passed: Transport 151, Sync 681 (`passed after 337.697 seconds`), Storage 459, Model 84, Kit 85,
+    Compatibility 71, AppleHosted 104.
+  - `xcrun llvm-cov export -summary-only` to `.build-s3f/cov.json` (exit 0, nothing on stderr), then `python3
+    Scripts/gates.py coverage --json .build-s3f/cov.json`:
+    - `COVERAGE target=ZTronAssetSync           lines= 94.86% (12155/12814) min=90.0 OK`;
+    - `COVERAGE overall lines=96.77% (28665/29622) min=80.0 OK`;
+    - `COVERAGE device-only-excluded lines=177 share=0.59% max=3.0% OK` / `COVERAGE: PASS`;
+    - the other targets: AppleHosted 99.68 %, Kit 97.83 %, Model 99.31 %, Storage 97.40 %, Transport 99.08 %.
+  - The changed lines' counts are under "Cycle 21", "Not reached and structural lines (cycle 21)": 30 at zero count,
+    four places of them open; `EngineDispatch.swift:1176` (reqs #7) has 3.
+- **iOS Simulator** under `sim.lock` (taken 17:14:26, released 17:30:12), on WP-F's own simulator
+  `897F9D8D-B10D-4D91-8E22-417A2B9D70AA` (iPhone 18 Pro, iOS 27.0), shut down afterwards: `xcrun simctl shutdown`
+  found it already shut down (`Unable to shutdown device in current state: Shutdown`, exit 149), and `simctl list`
+  shows it `(Shutdown)`.
+  - `caffeinate -i xcodebuild test -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=897F9D8D…"
+    -derivedDataPath .build-s3f/xcode-sim -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never
+    OTHER_SWIFT_FLAGS='-warnings-as-errors'` (`.build-s3f/sim.log`, copied to `gates-b/sim.log`): `** TEST SUCCEEDED
+    **`, 17:14:26 to 17:24:10. The only `warning:` lines are four of `appintentsmetadataprocessor`'s `Metadata
+    extraction skipped, no AppIntents.framework dependency found`, none from the compiler.
+  - `xcrun xcresulttool get test-results summary` (`sim.xcresult`, `sim-summary.json`): `result: Passed`,
+    `totalTestCount: 1635`, `passedTests: 1635`, `failedTests: 0`, `skippedTests: 0` (the device's 3,318 test runs,
+    0 failed; cycle 20's gate run had 1,515), on `iPhone 18 Pro` `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0,
+    from 17:14:34 to 17:24:06.
+  - **Four tests 30 times** (`test-without-building`, `-only-testing:` the reservation-edge test
+    `takeOffAtTheReservationsEdgeRejoinsItsJobWithItsRetryState(_:_:)` and three of this cycle's barrier tests,
+    `barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued(_:)`, `drainSpendsTheSpaceVerdictsTurnOnATakeOffThatOwes(_:)`
+    and `barrierGivesATransferENOSPCsVerdictAtTheCapAfterTheFollowsJoinInItsRead(_:)`, `-test-iterations 30`;
+    `sim-rep30.xcresult`): `** TEST EXECUTE SUCCEEDED **` (17:24:18 to 17:30:08); `result: Passed`, the device's
+    `passedTests: 420` and `failedTests: 0`: 30 iterations of each of the 14 cases, 0 failures.
+  - Load (`sim-load.txt`, every 5 s): the build and suite at mean 70.21 (8.50 to 302.47, other projects' simulators),
+    the 30 iterations at mean 37.02 (6.95 to 131.68).
+- **PROBE-C21-APM and PROBE-C21-HOLDERS** under `sim.lock` (taken 17:30:15, the 1-minute load already 10 or less,
+  released 17:30:44): `swift test -c release --scratch-path ../apm-build -Xswiftc -enable-testing --skip-build
+  --filter ProbeC21APM` in `.build-s3f/c21/apm` (`apm.log`, `apm-load.txt`): `✔ Test run with 2 tests in 1 suite
+  passed after 26.588 seconds.` The probes' expectations check their setups and answers only; their figures miss C2
+  (under "Cycle 21", "Step 8"). The 1-minute load was mean 7.35 (6.98 to 7.56, 6 samples).
+- **The Sync bundle twice more under coverage** (S3-R25 item 4's form, under `sim.lock`, taken 17:30:44, released
+  17:42:10; `swift test --scratch-path .build-s3f --enable-code-coverage --skip Benchmarks --filter
+  ZTronAssetSyncTests`):
+  - `covsync2.log`: `✔ Test run with 681 tests in 56 suites passed after 340.467 seconds.`, at a 1-minute load of
+    mean 7.19 (4.96 to 14.65, 70 samples);
+  - `covsync3.log`: `… passed after 337.086 seconds.`, at mean 7.59 (5.48 to 15.06, 68 samples).
+  - Their durations against guards were at most 6.3 % and 5.9 %.
+
+  With the coverage stage's run, the quick run's, the three plain runs and TSan, the Sync bundle passed eight times
+  on `e599ae1`, the reservation-edge test among them, and once on the simulator, where four of its tests then ran
+  30 times.
+- **`git status`** after the gates and after the probes (`status-after.txt`, `status-post.txt`): ` M
+  docs/adr-drafts/s3f.md` only; `.build-s3f*` is untracked scratch. `docs/TRACEABILITY.md` is unchanged (the trace
+  gate ran without `--write`).
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -9319,3 +9790,22 @@ TSan's end; nothing of theirs was touched (S3-R23 item 4).
   rule 1 asks for 5 s or less). The cycle-19 verifiers' probes were adapted into tests (their shapes kept), not re-run
   as probes. The R1 boundary probes were not re-run. The C2 figures are this host's only (no device run).
   `other-wp:b` (P-13) is not WP-F's.
+- Cycle 21: twelve mutants survive with no killing test and none shown Equivalent (under "rr21-C7", "Open"); each
+  names the state where it would change an answer, and no test builds it. The UNCONFIRMED siblings under "Step 7" and
+  the site-2 observation under "Step 5" are analysed, not probed. `commitTurns(.waitersStalledSubscriber)` misses C2
+  (blocking, reported: Phase 2 cannot cut it, "Step 6"), and the two-subscriber figure is recorded, not gated, for the
+  owner. `purgeWhileOwedTurns` missed C2 in the second gate run (blocking by S3-R24 item 2, reported; its re-runs
+  alone and its parts under "Step 8"), and so did the two scratch probes of the close, PROBE-C21-APM and
+  PROBE-C21-HOLDERS (blocking, reported, "Step 8"). Four places with changed lines that no test reaches are open
+  (under "Not reached and structural lines (cycle 21)"). `verify.sh --full` was not run: its benchmark step fails on
+  those misses and on P-13, so it would end `VERIFY: FAIL`. Its other steps ran on their own (under "Gate evidence
+  (cycle 21)") but for two differences: TSan and the three repeated runs covered the Sync bundle only (every bundle
+  ran in `--quick` and under coverage), and the trace gate ran without `--write`, so `docs/TRACEABILITY.md` was not
+  regenerated. One row of the C2 inventory has no figure, `releaseRerouteHolds` (R12); `answerPresentMembers`' figure
+  and the many-holders move's come from scratch probes (PROBE-C21-APM and PROBE-C21-HOLDERS in `.build-s3f/c21/apm`,
+  not committed), not from a committed benchmark, and the purge's parts from another (`.build-s3f/c21/purge`). On the
+  simulator four tests ran 30 times (`sim-rep30`), the rest once. The held-turn readers whose loops end with the
+  follow (`while followOwed`) were not audited one by one for the reservation-edge race ("Step 8"). The cycle-20
+  verifiers' probes were not re-run as probes; those this cycle used were adapted into tests and benchmarks (their
+  shapes kept, as PROBE-C20C-MANY-MOVES and PROBE-C20R-PARTIAL-MOVE-C2). The R1 boundary probes were not re-run. The
+  C2 figures are this host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
