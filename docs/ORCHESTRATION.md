@@ -145,12 +145,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - E2, correct #2: the purge need not withdraw everything in its first turn (not a MUST). Route A1 (branch-free, plus a `.all` fast path), then A2 if a case is still above 8.5 ms. Estimate: A1 5–8 h, A2 6–10 h.
       - Route B (slices across turns) is **not authorised in cycle 22**. Its review found answer breaks: a waiter arriving between slices inherits the old job's attempt count, and the take-off filter misses RR-21's commit re-routes. B needs "visit on touch" and its own review. It goes to a later ruling (S3-R28), so a k = 4 purge that still misses after A2 (estimated 9–20 ms) stays blocking in cycle 22.
       - Eleven purge cases at 10,000 are gated, including k = 4 over 10,000 jobs, 10,000 jobs waiting for a retry (`removeJob` scans the whole heap per job) and 10,000 jobs held only by user waiters.
-    - **S3-R27 item 12 is being written from 22:05:** `wf_91931045-ebe` (task `wwcvisbz6`). A writer drafts it from the orchestrator's decisions, fidelity and consistency checkers check it, and an editor applies their must-fix items. Its output is `s3-r27-item12-draft.md`. Next:
+    - **S3-R27 item 12 is being written from 21:57:** `wf_91931045-ebe` (task `wwcvisbz6`). A writer drafts it from the orchestrator's decisions, fidelity and consistency checkers check it, and an editor applies their must-fix items. Its output is `s3-r27-item12-draft.md`. Next:
       1. decide its "For the orchestrator" items;
       2. append item 12 to `s3-r27-draft.md` and to `s3-rulings-s3f.md`;
       3. update run 9's focus: S3-R27 items 1–12, and the e1 and e2 analyses with their reviews;
       4. launch run 9.
-    - **Re-forecast at 22:05** (weekly **39 %**, Fable 21 %): with item 12, cycle 22's fixer work is about 55–90 h. At 0.65–1.8 points an hour that is well above the 61 points left, so the weekly limit will cut off cycle 22. It resumes after the reset (Thu 12 Nov 03:00). Wall time would fit: about 148 h are left.
+    - **Re-forecast at 21:58** (weekly **39 %**, Fable 21 %): with item 12, cycle 22's fixer work is about 55–90 h. At 0.65–1.8 points an hour that is well above the 61 points left, so the weekly limit will cut off cycle 22. It resumes after the reset (Thu 12 Nov 03:00). Wall time would fit: about 148 h are left.
     - **Follow-up (orchestrator):** have route B re-specified, with its review's corrections, and reviewed, for S3-R28. Do it after cycle 22's fixer reports, or after the reset.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
