@@ -797,7 +797,8 @@ extension SyncBench {
     /// `integrate-c21.md` item C's pins): the ids share H's 16 bytes, one job, downloading (held), wanted as `shape`
     /// says, with `subscribers` subscribers that read nothing. H's download is released with the bulk executor holding,
     /// so its publication waits at its first store unit; then the unit is released, and the heartbeat times the turns
-    /// until H's job is gone, while the engine's seam times the commit's own turn inside the actor.
+    /// until H's job is gone and every answer its commit owed is resumed (`commitUnanswered`), while the engine's seam
+    /// times the commit's own turn inside the actor.
     static func commitTurn(count: Int, shape: CommitShape, subscribers: Int? = nil) async throws -> CommitRun {
         var run = CommitRun()
         let loadBefore = SyncBench.loadAverages()
@@ -863,7 +864,7 @@ extension SyncBench {
         run.wait = try await SyncBench.longestWait(on: engine) {
             await bulk.setHolding(false)
             await bulk.releaseAll()
-            while !Task.isCancelled, await SyncBench.jobExists(engine, holder) {
+            while !Task.isCancelled, await SyncBench.commitUnanswered(engine, holder) {
                 await bulk.releaseAll()
                 await Task.yield()
             }
@@ -885,6 +886,13 @@ extension SyncBench {
         await engine.shutdown()
         run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
         return run
+    }
+
+    /// Whether `transfer` has a job, or a resolution still owes its callers answers (`EngineState.owedAnswers`): a
+    /// commit's window ends once its last caller is resumed, so the answer follow-ups' turns are timed under its
+    /// heartbeat too (Stage 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12).
+    static func commitUnanswered(_ engine: isolated SyncEngine, _ transfer: TransferID) -> Bool {
+        engine.state.jobs[transfer] != nil || engine.state.owedAnswers.count > engine.state.owedAnswersHead
     }
 
     /// Sets or clears the commit turn's marks (`EngineState.commitTurnMarksForTests`).

@@ -573,22 +573,29 @@ extension SyncEngine {
         self.dropInterest(token, from: transfer)
     }
 
-    /// Delivers `outcome` to the owner of `token` without touching the job.
-    func deliver(_ outcome: InterestOutcome, to token: InterestToken, interest: JobInterest, transfer: TransferID) {
+    /// Delivers `outcome` to the owner of `token` without touching the job. With `owing`, a waiter's or a settled
+    /// ensure group's caller is not resumed here: the answer, computed and taken out of the state as without it, is
+    /// owed to the answer follow-ups (`EngineState.owedAnswers`; `resolveAll`).
+    func deliver(_ outcome: InterestOutcome, to token: InterestToken, interest: JobInterest, transfer: TransferID, owing: Bool = false) {
         switch interest.kind {
         case .waiter:
             guard let waiter = self.state.waiters.removeValue(forKey: token) else {
                 return
             }
+            let result: Result<AssetLocation, AssetError>
             switch outcome {
             case .committed(let locations, _):
-                if let location = locations[waiter.asset] {
-                    waiter.continuation?.resume(returning: .success(location))
-                } else {
-                    waiter.continuation?.resume(returning: .failure(.notFound))
-                }
+                result = locations[waiter.asset].map { .success($0) } ?? .failure(.notFound)
             case .failed(let error):
-                waiter.continuation?.resume(returning: .failure(error))
+                result = .failure(error)
+            }
+            guard let continuation = waiter.continuation else {
+                return
+            }
+            if owing {
+                self.state.owedAnswers.append(.waiter(token, continuation, result))
+            } else {
+                continuation.resume(returning: result)
             }
         case .prefetch, .ensure:
             // In place through the table: a copy taken out and written back would copy the group's `pending` on every
@@ -602,7 +609,11 @@ extension SyncEngine {
             }
             if interest.kind == .ensure, self.state.groups[token]?.isSettled == true, let continuation = self.state.groups[token]?.continuation {
                 self.state.groups[token]?.continuation = nil
-                continuation.resume(returning: true)
+                if owing {
+                    self.state.owedAnswers.append(.ensure(token, continuation))
+                } else {
+                    continuation.resume(returning: true)
+                }
             }
         case .run:
             self.recordRunOutcome(outcome, transfer: transfer, assets: interest.assets)
@@ -646,6 +657,13 @@ extension SyncEngine {
     /// all, as it answers a job trimmed to them first (`committed`, which owes the other ids' re-routes and retires the
     /// job untrimmed); the terminal events read the lane of the interests it answered, as they read a trimmed job's.
     /// Counting an interest's unbound ids allocates nothing, and only a partly bound interest is copied.
+    ///
+    /// A job of more than `answersPerTurn` interests owes its waiters' and its settled ensure groups' resumes (`deliver`'s
+    /// `owing`) to the answer follow-ups, `answersPerTurn` a turn (Stage 3 close-out cycle 21, ruling S3-R26 item 4's
+    /// Phase 2, `integrate-c21.md` C12): every answer is still computed here, from this turn's state, and every waiter
+    /// leaves `waiters` here, so each caller gets the value it got when every resume was made in this turn; only the
+    /// moment it returns moves. 10,000 user waiters' resumes held a commit's turn 11.0 to 11.6 ms (C2). The other
+    /// deliveries (prefetch groups, a run, heals) resume no caller and are made here.
     func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, boundOnly: Bool = false, then follow: () -> Void = {}) {
         if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
@@ -661,9 +679,10 @@ extension SyncEngine {
             bound = locations
         }
         var answered = InterestCounts()
+        let owing = job.interests.count > self.state.answersPerTurn
         for (token, interest) in job.interests {
             guard let bound else {
-                self.deliver(outcome, to: token, interest: interest, transfer: transfer)
+                self.deliver(outcome, to: token, interest: interest, transfer: transfer, owing: owing)
                 continue
             }
             let unbound = interest.assets.reduce(0) { count, asset in bound[asset] == nil ? count + 1 : count }
@@ -672,13 +691,79 @@ extension SyncEngine {
             }
             let narrowed = unbound == 0 ? interest : JobInterest(lane: interest.lane, kind: interest.kind, assets: interest.assets.filter { bound[$0] != nil })
             answered.add(narrowed)
-            self.deliver(outcome, to: token, interest: narrowed, transfer: transfer)
+            self.deliver(outcome, to: token, interest: narrowed, transfer: transfer, owing: owing)
         }
         self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
         self.publishTerminal(job: job, outcome: outcome, lane: bound == nil ? job.lane : job.lane(counting: answered))
         follow()
         self.checkRunSettled()
+        // Scheduled on what is owed, not on `owing`: a job's prefetch groups and run owe no resume.
+        if self.state.owedAnswers.count > self.state.owedAnswersHead {
+            self.scheduleAnswerFollowUp()
+        }
+    }
+
+    /// The interests a resolution answers in its own turn, and the owed answers an answer follow-up resumes, at most
+    /// (`resolveAll`; `answersPerTurn` in `EngineState` is the seam): a resume costs about 1 µs in release
+    /// (`shutdownStepsPerTurn`'s figure), so a turn of 512 stays well under a millisecond (C2).
+    static let answersPerTurn = 512
+
+    /// Schedules the answer follow-up for the owed answers, unless one is scheduled. Its task is the one the invariants
+    /// expect while answers are owed and the engine runs (`answerViolations`): `spawn` refuses one only once shutdown
+    /// began, whose drain resumes the owed answers (`drainEverything`).
+    private func scheduleAnswerFollowUp() {
+        guard self.state.answerFollowUp == nil else {
+            return
+        }
+        self.state.answerFollowUp = self.spawn(.entry) { engine in
+            // REENTRANCY: RE-S21 — nothing: it resumes answers stored in the resolution's turn, from the head the state
+            // holds then; a shutdown meanwhile resumed them and emptied the table (`drainEverything`).
+            await engine.answerFollowUp()
+        }
+    }
+
+    /// The scheduled answer follow-up: resumes at most `answersPerTurn` owed answers, oldest first, empties the table
+    /// once its last is resumed, and schedules itself again while answers remain.
+    private func answerFollowUp() {
+        if self.state.answerFollowUpsHeld {
+            // Test seam: the answers stay owed and the follow-up stays scheduled until the release runs it.
+            self.state.answerFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
+        self.state.answerFollowUp = nil
+        guard self.isRunning else {
+            return
+        }
+        let end = min(self.state.owedAnswers.count, self.state.owedAnswersHead + self.state.answersPerTurn)
+        for index in self.state.owedAnswersHead..<end {
+            self.state.owedAnswers[index].resume()
+        }
+        self.state.owedAnswersHead = end
+        if end == self.state.owedAnswers.count {
+            self.state.owedAnswers.removeAll()
+            self.state.owedAnswersHead = 0
+        } else {
+            self.scheduleAnswerFollowUp()
+        }
+        self.notifyObservers()
+    }
+
+    /// Test seam: the answer follow-ups keep their answers owed until `releaseAnswerFollowUps()`, so a test meets the
+    /// engine between two of them.
+    func holdAnswerFollowUps() {
+        self.state.answerFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held answer follow-up run in this turn, or disarms a hold nothing reached.
+    func releaseAnswerFollowUps() {
+        self.state.answerFollowUpsHeld = false
+        guard self.state.answerFollowUpWaiting else {
+            return
+        }
+        self.state.answerFollowUpWaiting = false
+        self.answerFollowUp()
     }
 
     /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023), in ascending id order.

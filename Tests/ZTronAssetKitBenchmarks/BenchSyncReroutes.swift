@@ -356,7 +356,8 @@ extension SyncBench {
     /// wanted as `shape` says, K by a user waiter too. H's download is released with the bulk executor holding, so its
     /// publication waits at its first store unit; v4 maps the members as `shape` says and is applied, its follow ended.
     /// Then the follow's and the drain's turns are held, the unit is released, and the heartbeat times the turns until
-    /// H's job is gone, while the engine's seam times the commit's own turn inside the actor. What `shape` does while the
+    /// H's job is gone and every answer its commit owed is resumed (`SyncBench.commitUnanswered`), while the engine's
+    /// seam times the commit's own turn inside the actor. What `shape` does while the
     /// batch is owed runs in a window of its own; then the held turns are released one at a time, each timed inside the
     /// actor, under the heartbeat, until the drain is over and, for `.userToBound`, the store answered every waiter.
     static func commitReroute(count: Int, shape: CommitRerouteShape) async throws -> CommitRerouteBenchRun {
@@ -544,7 +545,7 @@ extension SyncBench {
         run.commit = try await SyncBench.longestWait(on: engine) {
             await bulk.setHolding(false)
             await bulk.releaseAll()
-            while !Task.isCancelled, await SyncBench.jobExists(engine, holder) {
+            while !Task.isCancelled, await SyncBench.commitUnanswered(engine, holder) {
                 await bulk.releaseAll()
                 await Task.yield()
             }

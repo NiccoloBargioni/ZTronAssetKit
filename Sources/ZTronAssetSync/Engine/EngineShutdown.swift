@@ -7,6 +7,9 @@ import ZTronAssetModel
 /// all of them (C2): at SPEC §6's 10,000, answering every waiter and group and freeing the job table in one turn held it
 /// 17 to 22 ms (Stage 3, S3-PERF-01), also while the app runs, when a vanished root retires the engine.
 struct ShutdownDrain {
+    /// The answers a resolution owed its callers (`EngineState.owedAnswers`), oldest first: each is resumed with the
+    /// value it was given, as an answer follow-up would have resumed it.
+    var owedAnswers: [OwedAnswer] = []
     /// The `resolve` waiters' continuations (known ids, then unknown ids), each in token order.
     var waiters: [CheckedContinuation<Result<AssetLocation, AssetError>, Never>] = []
     /// The groups' join continuations, in token order.
@@ -49,6 +52,12 @@ extension SyncEngine {
     /// (`cancelRunningHandles()`).
     func drainEverything(with error: AssetError) -> ShutdownDrain {
         var drain = ShutdownDrain()
+        // The owed answers leave the table in this turn, so a follow-up that runs later resumes none of them again; their
+        // waiters left `waiters` in the resolution's turn, so none is answered the shutdown too.
+        drain.owedAnswers = Array(self.state.owedAnswers[self.state.owedAnswersHead...])
+        self.state.owedAnswers = []
+        self.state.owedAnswersHead = 0
+        self.state.answerFollowUp = nil
         let waiters = self.state.waiters
         self.state.waiters = [:]
         drain.waiters.reserveCapacity(waiters.count + self.state.unknownWaiters.count)
@@ -160,6 +169,19 @@ extension SyncEngine {
     /// the table.
     func settle(_ drain: consuming ShutdownDrain, with error: AssetError) async {
         var steps = 0
+        var owed: [OwedAnswer] = []
+        swap(&owed, &drain.owedAnswers)
+        for answer in owed {
+            answer.resume()
+            steps += 1
+            if steps == SyncEngine.shutdownStepsPerTurn {
+                self.state.shutdownSlices.append(steps)
+                steps = 0
+                // REENTRANCY: RE-S43 (proposed) — nothing: the drained answers belong to this call, and while the
+                // lifecycle is `shuttingDown` no resolution owes a new one a follow-up would resume.
+                await Task.yield()
+            }
+        }
         var waiters: [CheckedContinuation<Result<AssetLocation, AssetError>, Never>] = []
         swap(&waiters, &drain.waiters)
         for continuation in waiters {

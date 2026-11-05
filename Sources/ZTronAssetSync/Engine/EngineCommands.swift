@@ -1871,6 +1871,7 @@ extension SyncEngine {
             violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
         }
         violations.append(contentsOf: self.progressGateViolations())
+        violations.append(contentsOf: self.answerViolations())
         if let unfired = self.unfiredDeadline() {
             violations.append(unfired)
         }
@@ -1963,6 +1964,28 @@ extension SyncEngine {
                 if case .transfer = slot {
                     violations.append("subscriber \(key) holds \(slot) without lastEmitted")
                 }
+            }
+        }
+        return violations
+    }
+
+    /// The owed answers' clause (Stage 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12): the
+    /// head lies within the table, a running engine with answers owed has an answer follow-up scheduled (`spawn` refuses
+    /// one only once shutdown began, whose drain resumes them), and no owed waiter is registered, so no withdrawal or
+    /// shutdown answers it a second time.
+    private func answerViolations() -> [String] {
+        var violations: [String] = []
+        let head = self.state.owedAnswersHead
+        let count = self.state.owedAnswers.count
+        if head > count {
+            violations.append("the owed answers' head \(head) is past their \(count)")
+        }
+        if self.isRunning, count > head, self.state.answerFollowUp == nil {
+            violations.append("\(count - head) answers are owed and no answer follow-up is scheduled")
+        }
+        for answer in self.state.owedAnswers[min(head, count)...] {
+            if case .waiter(let token, _, _) = answer, self.state.waiters[token] != nil {
+                violations.append("owed answer \(token.rawValue) has a registered waiter")
             }
         }
         return violations

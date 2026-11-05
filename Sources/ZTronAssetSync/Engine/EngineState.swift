@@ -116,6 +116,26 @@ struct EngineState {
     /// end or an apply's turn (`SyncEngine.followIDsPerTurn`). A seam: a test sets it small to pin the bound (S3-R23
     /// item 3); no production path writes it.
     var followIDsPerTurn = SyncEngine.followIDsPerTurn
+    /// The answers a resolution of more than `answersPerTurn` interests owes its callers (`SyncEngine.resolveAll`; Stage
+    /// 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12): each is computed in the resolution's
+    /// turn from that turn's state, its waiter or its ensure group's continuation taken out of the state there as before,
+    /// and only the resume is left to the answer follow-ups (`SyncEngine.answerFollowUp`), oldest first.
+    /// `owedAnswers[owedAnswersHead...]` are still owed; the array is emptied once its last answer is resumed, and the
+    /// shutdown drain resumes the rest (`SyncEngine.drainEverything`).
+    var owedAnswers: [OwedAnswer] = []
+    /// The first owed answer not resumed yet.
+    var owedAnswersHead = 0
+    /// The owned task of the answer follow-up scheduled for the owed answers (`SyncEngine.scheduleAnswerFollowUp`).
+    var answerFollowUp: UInt64?
+    /// The interests a resolution answers in its own turn, and the answers an answer follow-up resumes, at most
+    /// (`SyncEngine.answersPerTurn`). A seam: a test sets it small to pin the bound (S3-R23 item 3); no production path
+    /// writes it.
+    var answersPerTurn = SyncEngine.answersPerTurn
+    /// Test seam: while set, the answer follow-up keeps its answers owed and stays scheduled instead of resuming them
+    /// (`holdAnswerFollowUps()`, `releaseAnswerFollowUps()`). No production path sets it.
+    var answerFollowUpsHeld = false
+    /// Test seam: an answer follow-up reached the hold and waits for its release.
+    var answerFollowUpWaiting = false
     /// The owed moves onto each job, counted once per walk: the job's publication binds its ids only once none is owed
     /// onto it or off it (`SyncEngine.inboundBlocks`). The moves off a job are found among the owed moves when its
     /// publication asks, so a walk that finds thousands of holders records no holder twice (C2).
@@ -1159,6 +1179,34 @@ struct Waiter {
     /// Answered by a store read in an owned task instead of a job: the engine knows the asset is bound to `transfer`'s
     /// content (L4-R5). Such a waiter holds no interest; a read that finds nothing puts it on the job path.
     var fromStore = false
+}
+
+/// An answer a resolution owes its caller past its own turn (`EngineState.owedAnswers`): computed in that turn, from
+/// that turn's state, and resumed exactly once, by an answer follow-up or by the shutdown drain, with the value stored.
+enum OwedAnswer {
+    /// A `resolve` waiter's result; the waiter left `EngineState.waiters` in the owing turn, so a later withdrawal finds
+    /// nothing to cancel, as after an answer given in that turn.
+    case waiter(InterestToken, CheckedContinuation<Result<AssetLocation, AssetError>, Never>, Result<AssetLocation, AssetError>)
+    /// A settled `ensureAvailable` group's join; its continuation left the group in the owing turn.
+    case ensure(InterestToken, CheckedContinuation<Bool, Never>)
+
+    /// The caller's token.
+    var token: InterestToken {
+        switch self {
+        case .waiter(let token, _, _), .ensure(let token, _):
+            return token
+        }
+    }
+
+    /// Resumes the caller with the stored answer.
+    func resume() {
+        switch self {
+        case .waiter(_, let continuation, let result):
+            continuation.resume(returning: result)
+        case .ensure(_, let continuation):
+            continuation.resume(returning: true)
+        }
+    }
 }
 
 /// A `resolve` caller of an identifier the applied manifest does not list.
