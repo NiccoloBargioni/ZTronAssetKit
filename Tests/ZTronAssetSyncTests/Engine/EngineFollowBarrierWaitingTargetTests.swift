@@ -165,4 +165,37 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(t.s)
     }
 
+    // MARK: The later-apply variant (S3-R26 item 5, probe (ii))
+
+    /// v4 maps zz-x to a third content U while T's drained publication still runs, before it fails ENOENT, and T's fresh
+    /// attempt then gets a 404. Visited first, v4's visit passed T publishing with zz-x on it (an id a later apply moved
+    /// while the job already published is passed, S3-R18a), the ENOENT re-queued T with A and X, and the fresh attempt's
+    /// 404 answered both: U's content was never requested. Swept first, the move v3b's walk owes onto T is made once T is
+    /// queued at the move's epoch only if the job's re-queue keeps the publication's end; dropped, zz-x waits on H for
+    /// the holder's own visit, which v4's copy sends to U.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierLeavesALaterAppliesIdToTheReQueuedJobsFreshAttempt(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_611
+        let t = try await self.drainedRequeueSetUp(visit, seed: seed, tLater: [.fail(.permanentMissing(httpStatus: 404))])
+        let engine = t.engine
+        let uBytes = EngineFixture.bytes(seed + 5, count: 16)
+        let xOnU = EngineHarness.onDemand("zz-x", uBytes)
+        try #require(xOnU.transferID != t.a.transferID && xOnU.transferID != t.x.transferID, "setup: v4 maps zz-x to a third content, U")
+        await t.s.harness.source.script(xOnU.transferID, [.stage(uBytes)])
+        try await Self.applyHeld([t.s.q] + FollowBarrier.fillers(seed + 400) + Self.middleFillers(seed + 250) + [t.a, xOnU] + Self.laterFillers(seed + 6_000), tag: "v4-drained-\(seed)", t.s, visit: visit)
+        await Self.failDrainedPublication(t)
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { $0.state.jobs[t.a.transferID]?.state == .queued }
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let aResult = await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: t.aWaiter) }
+        let xResult = await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: t.xWaiter) }
+        let uStarts = await t.s.harness.source.starts.filter { $0.id == xOnU.transferID }.count
+        #expect(aResult == .failure(.notFound), "T's fresh attempt's 404 answers A: \(aResult)")
+        #expect(xResult == .failure(.notFound), "v4's visit passed T publishing with zz-x on it, and the ENOENT re-queued T with X: the fresh attempt's 404 answers X (visit-first): \(xResult)")
+        #expect(uStarts == 0, "U's content is never requested (visit-first): \(uStarts)")
+        await Self.finishHeld(t.s)
+    }
 }
