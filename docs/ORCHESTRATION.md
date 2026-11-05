@@ -30,6 +30,22 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Cost: on 4 Nov the meter rose 0.5–0.9 points an hour with one fixer running (90 → 96 % in 6 h 50 min, with the profiling alongside; 96 → 100 % in 8 h 14 min). The rest of cycle 21 is about 5–13 weekly points.
     - The integrator put a clean cycle 21 at about 0.12 for the whole plan. So plan for 1–3 more cycles: 7–12 h and 4–11 points each. The merge, the gates, ADR-057 and Stage 5 add 10–20 points.
     - All of this fits before the 12 Nov reset.
+  - **Progress at 15:40 (6 h 44 min in):** 21 commits since `7876a28` (70 in cycle 21); the last is `28c2700`, at 14:53. Per the draft's status list:
+    - **Step 5 committed.**
+      - rr21-C5, site 3: the patch was re-applied unchanged, red at `ddecf1f`, fixed at `42a3689`.
+      - rr21-C6, site 2: `e437c28`, plus the take-off in one access (`8647760`).
+      - rr21-C7: `2c351e8` removes two checks no path reaches. Its mutation table leaves **12 survivors open**: no test kills them and none is shown Equivalent, so they are reported, not claimed.
+    - **Step 6 committed:** Phase 2 was triggered (`06d5e40`, `28d533e`, `57d5d8c`). At a 1-minute load of 4.18, every gated case meets C2 except `waitersStalledSubscriber`, at **10.31 ms** best. That is blocking and reported (S3-R26 item 4).
+    - **Step 7 committed:** item 5 (`waitingTarget` reached, `4aeb321`). Its probes found three real bugs, each fixed red-first:
+      - an ENOENT window's later apply;
+      - an ENOSPC read's visit re-queueing its job;
+      - the same in the transfer's ENOSPC read.
+    - **Now in step 8:** the gate run on `2c351e8` (TSan was running at 15:40). The draft has uncommitted edits.
+    - **Expected when the fixer returns:** at least two blocking put-backs, the 0.31 ms miss and the 12 survivors. So cycle 22 is likely, and they need rulings before its fixer starts.
+  - **Usage at 15:40:** weekly all models **20 %** (2 % at 08:56): 18 points in 6 h 44 min, or 2.7 an hour account-wide. Weekly Fable went 0 → 21 %. Run 8 is all Opus, so part of the 18 points is the owner's other use. The 08:57 rate of 0.5–0.9 an hour was too low.
+  - **Re-forecast (15:40), taking 2.7 an hour as the upper bound:**
+    - The fixer should finish about 16:30–18:30, and the verdict is due about 19:00–21:30. The rest of cycle 21 costs about 8–16 points, which puts the meter at about 28–36 %.
+    - Each further cycle (7–12 h) costs up to 19–32 points. Two more cycles plus the merge and Stage 5 (10–20 points) fit before the 12 Nov reset. A third cycle at this rate would likely reach the limit first.
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
 - **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
