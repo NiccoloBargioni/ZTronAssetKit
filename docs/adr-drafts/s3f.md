@@ -5166,9 +5166,13 @@ fix (S3-R26 item 11, "Red first").
    **committed** right after it (R5, with RR21-HOP, RR21-WINDOW-GATE and RR21-PRESENT-PRUNE at site 3, their red
    copies, and PROBE-RR21-PIN-END after site 3, which holds; under "Step 5"). Five rr21-C3 mutants that `mut21-c3c.txt`
    counts as killed only by a whole-suite run past 300 s (b22-no-waiter-owner, b22-no-run-owner,
-   b22-arm-no-early-return, b23-no-lane, b23-no-kind) run again with 900 s, then `tools/mut-c5.py`. **Next action:**
-   rr21-C6 (site 2), then the timing window (the site-3 figures under `sim.lock` with step 8's), then the mutant runs'
-   results and survivors.
+   b22-arm-no-early-return, b23-no-lane, b23-no-kind) run again with 900 s, then `tools/mut-c5.py`
+   (`tools/chain-c21c.sh`, from 10:00 on 5 Nov). rr21-C6's red step: **committed** (the commit after `42a3689`: rr21-T3,
+   rr21-T3-two, RR21-VERDICT-ZERO, RR21-HELDLANE, T-COMPOSE and the two site-2 pins, failing before the fix; evidence
+   under "Step 5"). **Next action:** rr21-C6's fix (R6 and R7; the patch is `.build-s3f/c21/c6/apply-fix.py`), its
+   tests in both orders and the whole Sync suite, then T-shared, PRESENT-PRUNE at site 2 and
+   `PROBE-RR21-RESERVE-REJOIN`, the site-2 figures under `sim.lock`, the timing window (the site-3 figures with step
+   8's), then the mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5908,6 +5912,40 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   4.84 ms onto a present content: all within C2, from 40.98, 55.33 and 76.32 ms at the red step. Mutants: `tools/mut-c5.py`
   (s1 to s11: `nil` for the bound, `>=`, always and never owing, the hold on the at-once path only, the item's kind and
   lane, the owing call dropped, and the three hole guards at site 3) on a snapshot of the fix (`snap-c5fix`).
+- **rr21-C6's red step** (the commit after `42a3689`; S3-R26 item 11): the site-2 tests
+  (`EngineFollowBarrierRerouteTakeOffTests.swift`, `EngineFollowBarrierRerouteComposeTests.swift`, their setup in
+  `EngineFollowBarrierRerouteTakeOffFixture.swift`) and pins (`BenchSyncRerouteTakeOff.swift`), run on `42a3689` with
+  the four files added. The setup (`takeOffSetUp`): content O<c> holds zz-c<c>k and moved ids zz-c<c>m00…, each with a
+  user waiter; v3 maps the moved ids to N, O<c>'s attempt ends while v3's follow is owed, so swept first its verdict
+  waits with exactly those ids moved before it (`AttemptEnd.movedBefore`, required per content), and v4 maps them back
+  before the follow visits O<c>. Visited first no verdict waits (`applyHeld` ends every follow at its apply), which the
+  setup requires too: the state arises swept first only (ruling S3-R26 item 12's answer 1), and visited first each test
+  asserts the answers only. Two setup lessons: an ENOSPC's free-space read runs one follow turn
+  (`advanceFollowForSpaceSweep`), which visited O0 before the verdict waited and left 6 of the 10 ids moved before it,
+  so changed entries without jobs (`takeOffFillers`) sort ahead of the `zz-` ids and absorb that turn; and the waits
+  for a verdict to defer do not move the clock, since a moved clock fired the short interactive retry early. Debug
+  tests (`each/c6-red2.log`, `each/c6-red3.log`; no figure, loads not recorded), each failing in `sweepFollowsFirst`
+  only: rr21-T3 (`drainOwesATakeOffThatDoesNotFitItsTurnRightBehindTheVerdict`, a 404 and an ENOSPC with room; ten
+  moved ids at four a turn, a partial prefetch group, m05's waiter withdrawn behind the verdict) at `:38` (the verdict's
+  turn makes the ten and owes none), `:39` (no batch ahead of the removal), `:40` and `:41` (the turns make
+  `[0, 0, 0, 10]` swept first with the 404, `[0, 0, 0, 0, 10]` with the ENOSPC, where the bound wants `[4, 4, 2]` after
+  the verdict) and `:43`; rr21-T3-two (`drainChargesAFittingTakeOffToItsTurnAndOwesTheNext`, two verdicts of three ids
+  in one drain batch) at `:78`, `:79` and `:80` (`[0, 0, 0, 6]`: a six-id turn); RR21-VERDICT-ZERO
+  (`drainSpendsTheVerdictsTurnOnATakeOffThatOwes`, six moved ids and six the visit after the verdict moves to P) at
+  `:109` (the verdict's turn makes the six and moves the visit's ids in it) and `:110` (no batch replays); RR21-HELDLANE
+  (`takeOffLeavesAClaimKeptJobTheLaneOfItsLastInterest`, 64 moved-before interests, the greatest token's
+  user-initiated, a recorded group's claim keeping O0) at `:142` (the 64 made at once, back on O0, no batch owed; the
+  lane, user-initiated, already holds today, so the line pins the owing, and the sort's mutants pin the lane) and `:143`
+  (a turn makes 64); T-COMPOSE
+  (`drainPlacesAnOwingTakeOffsBatchAheadOfTheVerdictsBucket`, 130 moved ids at 128 a turn, a bucket of 520 joins behind
+  the verdict, two ids the visit moves to P, zz-x's join at the tail) at `ComposeTests.swift:42`, `:43` and `:45`. The
+  visited-first cases pass, and so do the sweep-first answers: the take-off made at once gives the visit-first answers;
+  only the turn's bound and the batch's place differ. Release pins (`each/c6-pins-red.out`, `each/c6-pins-red-1.log`,
+  under `sim.lock`, 1-minute loads 25.88 before and 22.99 after, **not quiet**): every run fails its setup
+  (`BenchSyncRerouteTakeOff.swift:47:13`, nine times: the verdict's turn owes nothing and makes the held ids; `:50:17`,
+  three times: the visit after the verdict moves its ids in that turn) and C2 (`:57:9`, `:58:9`, once a case): the
+  verdict's turn is the heartbeat, 82.81 ms (85.56, 82.81, 82.95) for 10,000 user waiters all held, 45.76 ms (47.66,
+  45.76, 45.94) half held, and 30.73 ms (30.73, 31.16, 30.88) for 5,000 moved before and 5,000 after the deferral.
 
 ## Items
 
