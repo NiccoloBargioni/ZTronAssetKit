@@ -6917,9 +6917,10 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `snap0/Tests/ZTronAssetKitBenchmarks/BenchSyncCycle22.swift`) is kept for the later steps' comparisons. Item 3's and
    item 4's 'before' figures are taken at the start of steps 5 and 6 (the deviation below).
 1. Item 12.2 (correct #1), then the unnamed blocking findings of class S3-R16 1(a) to 1(d): **in progress**. Committed:
-   `b603475` (T-E1, T-E3 and T-E4, red). Next: e1-R1 with rr21-T8b's and the PIN-END invariants test's changes, T-E2
-   and T-E5; the regression controls in both orders; the probes e1-PS, e1-P1, e1-P2, e1-P3 and e1-PR. No unnamed 1(a)
-   to 1(d) finding exists: every blocking finding of the file is named by S3-R27 (the mapping below).
+   `b603475` (T-E1, T-E3 and T-E4, red); `5ad245d` (e1-R1, with rr21-T8b's and the PIN-END invariants test's changes,
+   T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix). Next:
+   the probes e1-P1, e1-P2, e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of the file
+   is named by S3-R27 (the mapping below).
 2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
 3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
 4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
@@ -7036,6 +7037,58 @@ behaviour-free factoring as their seam, and item 4's cases are built only if ite
 'before' figures are taken at the start of steps 5 and 6, on a scratch copy of `d5b2ab9` with the same seams, so that
 the figures are the same `d5b2ab9` figures the ruling asks for. This keeps step 0 short before a likely cut-off by the
 weekly limit (item 10, "Expect the weekly limit").
+
+### Step 1: item 12.2 (correct #1), e1-R1 and the probes
+
+**e1-R1** (`5ad245d`, on `b603475`'s red T-E1, T-E3 and T-E4). `EngineState.reroutePinCommits` maps a `VerdictKey` to a
+`PinEnd`: the copy's serial at the end and whether the job kept the pinned ids. The ENOENT arm of `publicationFailed`
+writes a kept end (`keepsEntry: true`) while events wait, inside `if self.transition(transfer, to: .queued)` (12.5.5);
+a commit's write is `keepsEntry: false`. `followLayers` reads a kept end: with no layer adopted since the re-queue the
+pin layer's outgoing copy is returned (the ids ride the fresh attempt); otherwise the walk goes on from the first layer
+after the re-queue (`index = after + 1`). The ruling's kill table calls that index `next` ("`next < layers.count`",
+"`index = next + 1`"); the code calls it `after`, the number of copies adopted from the batch's serial to the end, and
+the table's rows apply to it as written. The code docs of `rerouteListing`, `followLayers`, `waitingTarget(_:)`,
+`endWorldHistory`, the ENOENT arm, `EngineState.reroutePinCommits` and `followBarrierViolations` say the new rule
+(e1 §7 step 5's list).
+
+The test changes, one to one (G3; these are WP-F's own tests, not pre-existing CDN tests, so `MIGRATION.md` takes no
+entry):
+
+- rr21-T8b (`EngineFollowBarrierRerouteRequeueTests.swift`): `owedReroutePinnedToARequeuedJobFollowsTheCopy`, "R-SYN-11:
+  an owed re-route pinned to a job an ENOENT re-queued before the replay follows the copy then (F-28, T22)", becomes
+  `owedReroutePinnedToARequeuedJobKeepsThePin`, "… before the replay keeps the pin, and X's commit re-routes it (F-28,
+  D-13, T22)". The replay's assertion (cycle 21's `:124`) was `replayed.x == [xID] && replayed.w == ids` ("the replay
+  follows K1's copy: W's job holds zz-a1…zz-a3, X only zz-x"); it is `replayed.x == (ids + [xID]).sorted() &&
+  replayed.w.isEmpty` ("the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job"). The serving loop (`:127`) went
+  W then X; it goes X then W, since W's job appears only at X's commit, which re-routes W1…W3 under K1's copy. The answers
+  are unchanged (K 16 bytes, V2 18, W1…W3 20), and the docs say the kept pin.
+- The PIN-END invariants test (`invariantsReportCommitsKeptForOwedReroutes`, its name kept): its writes of the map are
+  `PinEnd(serial:keepsEntry: false)`, and its three expected messages read "pin ends kept for owed re-routes" where they
+  read "commits kept for owed re-routes", as the engine's do now.
+- `enoentAfterCancelIsTheCancellation` (`EngineRaceTests.swift`, the D-13 test) reads `invariantViolations()` after the
+  fresh attempt and expects none: the killer the ruling names for the write's `!eventsAfterFollow.isEmpty` forced true
+  (a record kept with the barrier down). The test has no follow, so its orders are moot (must-fix 2).
+- T-E2 and T-E5 (green on `d5b2ab9`, step 0) land with the fix.
+
+On `5ad245d` (`.build-s3f/c22/e1r1-tests.log`): 23 tests in 2 suites passed, each in both orders (T-E1 in orders ×
+owe): rr21-T8b as changed, T-E1 to T-E5, and the regression controls of 12.5.7 (the PIN-END suite's seven tests,
+`FBJoinGapFailure`'s five, Shape A and probe (ii)'s four, and the D-13 test). e1-R1's kills are step 7's.
+
+**The probes** (12.2; each asserts visit-first's answers and runs in every order that reaches it):
+
+- **e1-PS: red, fixed.** `EngineFollowBarrierReroutePinSupersedeTests.swift` (`pinSuperseded`) is `pinEnd`'s shape with
+  X's own publication superseded: K1 maps zz-a1…zz-a3 to W's content and zz-x off X's content (to X2's, 26 bytes) while
+  X publishes, so the store refuses X's publication (the setup requires that it bound nothing). (i) K2 maps the pair to
+  Z's content while W publishes, W's bytes failing their check; (ii) K2 drops the pair while W downloads, and K3 lists it
+  again on Z's content. Visit-first: (i) W's integrity failure for W1…W3 (and U), (ii) `.notFound` for W1…W3; V gets
+  X2's bytes, K O's, and Z is never requested. On `5ad245d` both were red in both orders (`34b299c`, the failing test
+  alone; `.build-s3f/c22/e1-ps-red.log`): W1…W3 got Z's 24 bytes and Z was requested once; U, V and K got visit-first's
+  answers. The fix (`b4eebb1`) is the ruling's route: the `.superseded` arm writes the commit-shaped record
+  (`keepsEntry: false`) while events wait, before `supersede` (which may owe a batch of its own); the docs of `PinEnd`,
+  `EngineState.reroutePinCommits`, `rerouteListing`, `followLayers` and `followBarrierViolations` name the supersede.
+  On `b4eebb1` both e1-PS tests and the controls above passed in both orders (25 tests,
+  `.build-s3f/c22/ps-fix-run.log`), and the Sync bundle passed whole: "Test run with 688 tests in 56 suites passed after
+  354.368 seconds" (`.build-s3f/c22/ps-fix-sync.log`). Its branches' kills are step 7's (12.5.4).
 
 ## Items
 
