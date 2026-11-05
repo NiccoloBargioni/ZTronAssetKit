@@ -140,6 +140,18 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - then S3-R27 gets an item 12 from them, and run 9 launches after it.
     - Forecast: about 1.5 h and 2–4 weekly points for the analysis and item 12.
     - **The analysis runs from 20:20:** `wf_0f693655-120` (task `wkh0oee0f`), 4 agents: analyse e1 and e2, then a review of each, pipelined. If this session ends before it returns, read its journal and the four files, and continue from "S3-R27 gets an item 12".
+    - **The analysis finished at 21:54:** 4 agents, 94 min, 1.06 M subagent tokens, no errors. Both reviews returned CORRECTED.
+      - E1, correct #1: confirmed and blocking. Route R1: while events wait, the ENOENT arm keeps the pin's (X, epoch) with its copy serial. Tests T-E1 to T-E5; probes P-S, P-1, P-2, P-3 and P-R for the siblings. Estimate: 6–10 h, plus 3.7–5.5 h of mutant runs and 3–5 h of probes.
+      - E2, correct #2: the purge need not withdraw everything in its first turn (not a MUST). Route A1 (branch-free, plus a `.all` fast path), then A2 if a case is still above 8.5 ms. Estimate: A1 5–8 h, A2 6–10 h.
+      - Route B (slices across turns) is **not authorised in cycle 22**. Its review found answer breaks: a waiter arriving between slices inherits the old job's attempt count, and the take-off filter misses RR-21's commit re-routes. B needs "visit on touch" and its own review. It goes to a later ruling (S3-R28), so a k = 4 purge that still misses after A2 (estimated 9–20 ms) stays blocking in cycle 22.
+      - Eleven purge cases at 10,000 are gated, including k = 4 over 10,000 jobs, 10,000 jobs waiting for a retry (`removeJob` scans the whole heap per job) and 10,000 jobs held only by user waiters.
+    - **S3-R27 item 12 is being written from 22:05:** `wf_91931045-ebe` (task `wwcvisbz6`). A writer drafts it from the orchestrator's decisions, fidelity and consistency checkers check it, and an editor applies their must-fix items. Its output is `s3-r27-item12-draft.md`. Next:
+      1. decide its "For the orchestrator" items;
+      2. append item 12 to `s3-r27-draft.md` and to `s3-rulings-s3f.md`;
+      3. update run 9's focus: S3-R27 items 1–12, and the e1 and e2 analyses with their reviews;
+      4. launch run 9.
+    - **Re-forecast at 22:05** (weekly **39 %**, Fable 21 %): with item 12, cycle 22's fixer work is about 55–90 h. At 0.65–1.8 points an hour that is well above the 61 points left, so the weekly limit will cut off cycle 22. It resumes after the reset (Thu 12 Nov 03:00). Wall time would fit: about 148 h are left.
+    - **Follow-up (orchestrator):** have route B re-specified, with its review's corrections, and reviewed, for S3-R28. Do it after cycle 22's fixer reports, or after the reset.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
@@ -148,8 +160,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     1. Is one id with thousands of interests inside the 10 ms bar? d3 proposes sizing the per-id dimension, for example at most 1,000 interests on one id.
     2. Is a second stalled subscriber? It measured 13.7 ms today, and d1 expects about 9.1–10.2 ms after item 1.
     - **The owner answered at 21:15 on 5 Nov: "Yes, keep it"**, to "Should the 10 ms bar cover only 10,000 assets with one subscriber?". So the bar covers only the reference set: 10,000 assets however grouped, with one subscriber, which may be stalled. Both shapes are outside the bar:
-      - one id held by more interests than S3-R27 item 4's 4 per id (PROBE-C21-HOLDERS: 39–46 ms at 10,000 interests on one id; correct #5);
-      - a second stalled subscriber (13.7–13.9 ms; reqs #12).
+      - one id held by more interests than S3-R27 item 4's 4 per id (PROBE-C21-HOLDERS: 37–46 ms at 10,000 interests on one id; correct #5 and reqs #6);
+      - a second stalled subscriber (13.7–15.6 ms; reqs #12's 15.57 at a load of 7.44).
     - Their figures are recorded as residual risks; they are neither gated nor blocking. C2 stays 10 ms, and k = 2 and k = 4 at 10,000 ids stay gated (S3-R27 item 4).
     - S3-R27 item 12 records the ruling for the fixer and the verifiers: it closes item 1's and item 4's "open, for the owner" clauses, and item 10's close-out FAIL rule then names P-13 only.
   - **This session's context was at 83 % at 19:40.** If it compacts or ends, a fresh session resumes from this bullet.
