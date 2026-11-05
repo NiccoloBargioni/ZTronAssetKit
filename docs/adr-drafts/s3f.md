@@ -5151,9 +5151,13 @@ fix (S3-R26 item 11, "Red first").
    after rr21-C3: it holds without a later apply and breaks in both orders with one, so its three failing tests are
    **committed** red on their own (`819ea9d`), then the kept-commit fix with its tests and clauses, **committed** right
    after it (under "Step 5"); its mutants (`tools/mut-pinend.py`, `mut21-pinend.txt`) run on a snapshot of the fix
-   after the fix's of rr21-C3 (`tools/chain-pinend.sh`); the probe runs again after rr21-C5. **Next action:** rr21-C4
-   (the join gap's failure shape, `pending/EngineFollowBarrierJoinGapFailureTests.swift`, in both orders); then the
-   three mutant runs' results and survivors.
+   after the fix's of rr21-C3 (`tools/chain-pinend.sh`, stopped before it ran: they run with rr21-C4's); the probe runs
+   again after rr21-C5. rr21-C4: the join gap's failure shape breaks in `sweepFollowsFirst`, so it is **committed** red
+   with the shapes R18 covers (`2e9d23f`), then R18 with RR21-HOP's join variant, **committed** right after it
+   (`2c62e85`), and its C2 pin `joinChainTurns` with these records (under "Step 5"). PIN-END's and R18's mutants
+   (`tools/mut-c4fix.py`, `mut21-c4fix.txt`) run on a snapshot of `2c62e85` after rr21-C3's and its fix's
+   (`tools/chain-c4fix.sh`). **Next action:** rr21-C5 (site 3: `supersededRerouteTurns`, `supersededUserTurns`,
+   `runSuperseded`; PROBE-RR21-PIN-END again after it), then rr21-C6, then the mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5769,7 +5773,64 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   `each/pinend-fix-sync2.log`, 1-minute load 31.54 at the start), and `UNSAFE: PASS` (0 escapes) and `DOCS: PASS`
   (100.0%). Cost: one dictionary insert a commit while a batch waits and one lookup an id at a pin that left its end,
   O(1), no figure (S3-R26 item 9); the C2 cases through `committed` and the drain are re-measured at step 8. Mutants:
-  `tools/mut-pinend.py` (p1 to p11), on a snapshot of the fix.
+  `tools/mut-pinend.py` (p1 to p11) were queued on a snapshot of the fix and stopped before they ran
+  (`tools/chain-pinend.sh`): rr21-C4 moved the kept commits' record and their forgetting, so they run with rr21-C4's,
+  on a snapshot of its fix (`tools/mut-c4fix.py`).
+- **rr21-C4: the join gap's failure shape** (ruling S3-R26 item 12's answer 6.4; `EngineFollowBarrierJoinGapFailureTests.swift`,
+  from `pending/`, both orders). On `226ce81` the failure shape, `barrierAnswersAWaitingJoinWithAPassedPublicationsFailure`
+  (X's bytes corrupt), **breaks in `sweepFollowsFirst`** in each of three runs (`each/joingap-1.log` to `-3.log`): W
+  gets Y's bytes where, visited first, W had joined X at once, v4's visit passed X publishing (RR-14) and X's
+  integrity failure answered W; the commit shape passes in both orders. As answer 6.4 rules, the probe is committed
+  failing on its own, with the shapes R18 covers (`2e9d23f`; `each/c4red-1.log`, 8 issues in 6 tests):
+  `barrierEndsAWaitingJoinAtItsPassedJobsCommitUnderACopyThatDroppedIt` (T21: v4 drops zz-a, v5 lists it again;
+  visited first, X's commit ends W `.notFound` under v4's copy and Y is never requested) fails in `sweepFollowsFirst`,
+  and RR21-HOP's join variant, `waitingJoinPinnedToAPublishingJobGetsItsIntegrityFailure` and `…StorageFailure` (a
+  request's join waiting behind owed re-routes, `publishingPin`'s `joining` variant: the join gets W's failure, K gets
+  its 16 bytes and Z is never requested), fails in both orders.
+
+  R18 (`integrate-rr21.md`) with RR21-HOP's join variant (`2c62e85`): a listed join that waits in `eventsAfterFollow`
+  carries a chain (`JoinChain`: `copySerial` when it deferred and a layer per copy adopted since; `addInterest`), which
+  `layerOwedReroutes` extends at each apply by the batches' rule (the jobs publishing at the apply, and the exit
+  verdicts waiting behind the join, from its second layer on only those deferred after its last layer's apply), one
+  layer shared by the joins of a stretch of the queue with no verdict between them. `replayJoin` and `followedLane`
+  read the join's copy through it (`joinListing`, the batches' walk, now `followLayers`): a job still at the attempt's
+  end a layer pinned holds the join, whose end answers or re-routes it as the job's own interests; one that committed
+  hands it the copy in force at that commit. A join behind a waiting verdict (`joinsBehindVerdicts`) and an unlisted
+  one carry no chain and follow the engine's copy, as before. The kept commits (`reroutePinCommits`) are now recorded
+  while any event waits for the follow, since a join's pin needs them with no batch waiting (`joinGapDropped`), and
+  kept until the barrier is down (`endWorldHistory`) or shutdown, no longer until the last batch's replay: PIN-END's
+  clause "none while no batch waits" becomes "none once the barrier is down", and
+  `invariantsReportCommitsKeptForOwedReroutes` checks the new message and the forgetting at the barrier's end (a test
+  of this cycle, changed with the clause it checks). A new clause checks each chain's length against the copies adopted
+  since its join deferred (`invariantsReportAWaitingJoinsChainWithoutItsCopies`, seed 2,027,441: an injected layer is
+  reported exactly, and the drain then joins J). Residual: a join requeued or superseded behind its pin follows the
+  engine's copy, as a batch's re-route does (the judge's approximation; **residual risk**).
+
+  Cost (S3-R26 item 9) and its figure, `joinChainTurns` (`BenchSyncJoinChains.swift`): two applies while 10,000 listed
+  joins wait for an owed follow over 10,000 changed members, `followedLane` over them, and the drain through two
+  layers, the best of 3 of each against C2. As first written, each apply copied every join's chain (the pass alone 2.96
+  to 3.15 ms) and `followedLane` walked every chain: 10.49 ms (10.49, 11.00, 11.48), from 6.75 to 7.65 ms with the
+  chains empty, a **miss** at a 1-minute load of 9 (`each/c4bench-a.out`); the applies' heartbeat was 9.42 ms. Two
+  behaviour-neutral changes landed in `2c62e85` before it: the pass appends in place (`EventAfterFollow.appendLayer`
+  consumes the event and makes it again, so no layer array is shared while it grows, and the pass reads the engine's
+  state before it), and `followedLane` passes a chained join without its walk when the job is not at an attempt's end
+  and the engine's copy maps the join's id elsewhere (the walk can only turn a reach away then: a pin of another job
+  still at its end, or a copy that dropped the id). The only caller decides a downloading job's 429, so the job is never
+  at an attempt's end there: the `atEnd` term keeps the shortcut exact for any job, and a mutant that drops it is
+  equivalent under that caller. Figures, best of 3 (`each/c4bench-c.out`, 1-minute loads 10.99 to 13.19, **not
+  measured at a quiet load**): the applies' heartbeat 8.27 ms (8.45, 8.33, 8.27), the pass alone 1.07 to 1.94 ms,
+  `followedLane` 5.89 ms (7.13, 7.29, 5.89; 5.90 with the chains empty), the drain's heartbeat 6.47 ms (6.47, 6.53,
+  7.83): all within C2 (`each/c4bench-b.out`, in-place append by a placeholder instead of `consume`: the applies 8.90 ms
+  and the pass 1.91 to 2.22 ms). A replay's walk is O(layers) a join, at most a drain turn's events a turn; the kept
+  commits' insert and lookup are O(1). Step 8 re-measures `joinChainTurns` at a quiet load with every C2 case through
+  these paths (`followDrainTurns`, `followEndTurn`, `inboundWalkTurns`, `applyWhileOwedLayers`, `lane429WhileOwed`,
+  `commitTurns`, `deferBehindVerdictTurns`).
+
+  Results: the four red tests, the chain clause's test, the seven PIN-END tests, RR21-HOP's two re-route variants, the
+  invariants tests and the commit shape pass in both orders (15 tests, `each/c4fix-1.log`; `each/c4fix-3.log`); the
+  whole Sync suite passes with the two changes (644 tests in 56 suites, `each/c4fix-sync2.log`, 1-minute loads 10.87
+  to 8.48); `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%). Mutants: PIN-END's p1 to p11 on the new anchors and
+  R18's (`tools/mut-c4fix.py`), on a snapshot of `2c62e85`, after rr21-C3's and its fix's.
 
 ## Items
 
