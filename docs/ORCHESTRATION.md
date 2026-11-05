@@ -147,6 +147,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Questions for the owner** (both "open, for the owner"; neither blocks cycle 22):
     1. Is one id with thousands of interests inside the 10 ms bar? d3 proposes sizing the per-id dimension, for example at most 1,000 interests on one id.
     2. Is a second stalled subscriber? It measured 13.7 ms today, and d1 expects about 9.1–10.2 ms after item 1.
+    - **The owner answered at 21:15 on 5 Nov: "Yes, keep it"**, to "Should the 10 ms bar cover only 10,000 assets with one subscriber?". So the bar covers only the reference set: 10,000 assets however grouped, with one subscriber, which may be stalled. Both shapes are outside the bar:
+      - one id held by more interests than S3-R27 item 4's 4 per id (PROBE-C21-HOLDERS: 39–46 ms at 10,000 interests on one id; correct #5);
+      - a second stalled subscriber (13.7–13.9 ms; reqs #12).
+    - Their figures are recorded as residual risks; they are neither gated nor blocking. C2 stays 10 ms, and k = 2 and k = 4 at 10,000 ids stay gated (S3-R27 item 4).
+    - S3-R27 item 12 records the ruling for the fixer and the verifiers: it closes item 1's and item 4's "open, for the owner" clauses, and item 10's close-out FAIL rule then names P-13 only.
   - **This session's context was at 83 % at 19:40.** If it compacts or ends, a fresh session resumes from this bullet.
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
