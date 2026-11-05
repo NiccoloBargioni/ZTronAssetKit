@@ -260,22 +260,22 @@ extension EngineFollowBarrierTests {
         let engine = c.engine
         let key = staged.key
         var held = staged.held
-        let publishing = await engine.violations { $0.reroutePinCommits[key] = $0.copySerial }
-        #expect(publishing == ["1 commits kept for owed re-routes name an attempt still at its end"], "a commit kept for X while X publishes: \(publishing)")
+        let publishing = await engine.violations { $0.reroutePinCommits[key] = PinEnd(serial: $0.copySerial, keepsEntry: false) }
+        #expect(publishing == ["1 pin ends kept for owed re-routes name an attempt still at its end"], "a commit kept for X while X publishes: \(publishing)")
         await held.release(held.kept[0])
         await engine.awaitCondition { $0.state.jobs[key.transfer] == nil }
-        let kept = await engine.readForTests { e in e.state.reroutePinCommits == [key: e.state.copySerial] }
+        let kept = await engine.readForTests { e in e.state.reroutePinCommits == [key: PinEnd(serial: e.state.copySerial, keepsEntry: false)] }
         #expect(kept, "X's commit is kept with the copy's serial then")
         let clean = await engine.invariantViolations()
         #expect(clean.isEmpty, "\(clean.prefix(3))")
-        let ahead = await engine.violations { $0.reroutePinCommits[key] = $0.copySerial &+ 1 }
-        #expect(ahead == ["1 commits kept for owed re-routes name a copy not yet adopted"], "a commit kept at a copy no apply adopted: \(ahead)")
+        let ahead = await engine.violations { $0.reroutePinCommits[key] = PinEnd(serial: $0.copySerial &+ 1, keepsEntry: false) }
+        #expect(ahead == ["1 pin ends kept for owed re-routes name a copy not yet adopted"], "a commit kept at a copy no apply adopted: \(ahead)")
         let layer = await Self.finishOwed(c, held: held, others: [staged.v])
         #expect(layer.w.allSatisfy { $0 == .failure(.notFound) } && layer.violations.isEmpty, "W1…W3 follow K1's copy at X's commit: \(layer)")
         let forgotten = await engine.readForTests { !$0.followBarrier && $0.state.reroutePinCommits.isEmpty }
         #expect(forgotten, "the barrier's end forgets the commits")
-        let idle = await engine.violations { $0.reroutePinCommits[key] = 0 }
-        #expect(idle == ["the follow barrier is down with 1 commits kept for owed re-routes"], "a commit kept once the barrier is down: \(idle)")
+        let idle = await engine.violations { $0.reroutePinCommits[key] = PinEnd(serial: 0, keepsEntry: false) }
+        #expect(idle == ["the follow barrier is down with 1 pin ends kept for owed re-routes"], "a commit kept once the barrier is down: \(idle)")
         await Self.finishHeld(c.s)
     }
 

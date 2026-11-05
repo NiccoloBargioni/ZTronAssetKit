@@ -5,25 +5,26 @@ import ZTronAssetStorage
 @testable import ZTronAssetSync
 import ZTronAssetTestSupport
 
-/// A pin left by an ENOENT re-queue (Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 6.3;
-/// `integrate-rr21.md`'s rr21-T8b): a batch layer pins its ids to a job publishing at that layer's apply, and the job's
-/// publication then ends in ENOENT for an attempt the engine had cancelled, which re-queues the job at the same epoch
-/// (`publicationFailed`, ARCHITECTURE §7.6). `waitingTarget`'s `.queued` arm leaves the pin, so the replay follows the
-/// copy then. The transfers run on `RacingSource`, whose cancel does not end the stream, so a cancelled attempt's
-/// completion arrives after its cancel; the test writes every staged file itself.
+/// The pin an ENOENT re-queue keeps (Stage 3 close-out cycle 21, `integrate-rr21.md`'s rr21-T8b; cycle 22, ruling S3-R27
+/// item 12.2's e1-R1): a batch layer pins its ids to a job publishing at that layer's apply, and the job's publication
+/// then ends in ENOENT for an attempt the engine had cancelled, which re-queues the job at the same epoch
+/// (`publicationFailed`, ARCHITECTURE §7.6, D-13). The re-queue is kept (`EngineState.reroutePinCommits`), so the pin
+/// holds: with no apply since, the replay keeps the ids on the fresh attempt. The transfers run on `RacingSource`, whose
+/// cancel does not end the stream, so a cancelled attempt's completion arrives after its cancel; the test writes every
+/// staged file itself.
 extension EngineFollowBarrierTests {
-    /// rr21-T8b (rr21-B17's left pin, `waitingTarget`'s `.queued` arm): O (zz-o, K's, and zz-a1…zz-a3, W1…W3's) and X
+    /// rr21-T8b (rr21-B17's pin, kept by the ENOENT re-queue's end): O (zz-o, K's, and zz-a1…zz-a3, W1…W3's) and X
     /// (zz-x) download; V's request for zz-x is cancelled and V2's arrives while X's cancelled attempt drains, whose
     /// completion then comes with no staged bytes, so X's job publishes the drained file, held at its claim (on the
     /// store's metadata executor), while O publishes too. K0 maps zz-a1…zz-a3 to X's content, O's commit owes their
     /// re-routes, K1 maps them to W's content while X still publishes (K1's layer pins X), and X's claim then finds
     /// ENOENT: a fresh attempt at the same epoch, queued behind the barrier. Visited first, the commit re-routed W1…W3
     /// onto X publishing, K1's visit passed X, and X's fresh attempt's commit, under K1's copy, re-routed them to W's
-    /// content. The replay finds X queued, not at the end K1's layer recorded, and follows the copy then: W1…W3 join W's
-    /// job, and X holds none of their ids.
+    /// content. The re-queue keeps the pin (e1-R1), and no apply came after it: the replay keeps W1…W3 on X's fresh
+    /// attempt, so X holds zz-a1…zz-a3 and zz-x and W has no job, and X's commit re-routes them to W's content.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay follows the copy then (F-28, T22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func owedReroutePinnedToARequeuedJobFollowsTheCopy(_ visit: LaneDropVisit) async throws {
+    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedReroutePinnedToARequeuedJobKeepsThePin(_ visit: LaneDropVisit) async throws {
         let seed: UInt64 = 2_027_451
         let oBytes = Self.owedOBytes(seed)
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
@@ -121,10 +122,11 @@ extension EngineFollowBarrierTests {
             e.releaseFollowFollowUps()
         }
         let replayed = await engine.readForTests { e in (x: e.state.jobs[xT]?.assets.sorted() ?? [], w: e.state.jobs[wT]?.assets.sorted() ?? []) }
-        #expect(replayed.x == [xID] && replayed.w == ids, "the replay follows K1's copy: W's job holds zz-a1…zz-a3, X only zz-x: \(replayed)")
+        #expect(replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty, "the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: \(replayed)")
         await held.stop()
         await claim.stop()
-        for (transfer, bytes) in [(wT, wBytes), (xT, xBytes)] {
+        // X first: W's job appears only at X's commit, which re-routes W1…W3 under K1's copy.
+        for (transfer, bytes) in [(xT, xBytes), (wT, wBytes)] {
             await engine.awaitCondition { $0.state.jobs[transfer]?.state == .downloading }
             await engine.waitForHandle(transfer)
             let request = try #require(await source.requests.last { $0.id == transfer })
@@ -374,6 +376,17 @@ extension EngineFollowBarrierTests {
         #expect(run.violations.isEmpty, "\(run.violations.prefix(3))")
     }
 
+    /// T-E2: K1 drops the pair while X publishes, and K2 lists it on U's content after X's re-queue. Visited first, K2's
+    /// visit moved the pair off the queued X onto U's content: W1…W3 get U's bytes, V2 X's 404.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedReroutePinnedToARequeuedJobFollowsTheNextApply(_ visit: LaneDropVisit) async throws {
+        let run = try await Self.requeuePin(visit, k1: .dropped, later: [RequeueApply(pair: .u)], seed: 2_027_621)
+        #expect(Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && Self.sizes(run.w) == [22, 22, 22], "K gets O's bytes, V2 X's 404, W1…W3 U's bytes (visit-first): \(run)")
+        #expect(run.requested == ["O", "X", "U"], "only O, X and U are requested: \(run)")
+        #expect(run.violations.isEmpty, "\(run.violations.prefix(3))")
+    }
+
     /// T-E3: K1 maps the pair to W's content while X publishes; after X's re-queue, K2 drops the pair and K3 lists it on
     /// U's content. Visited first, K2's visit moved the pair off the queued X under K2's copy, which does not list it
     /// (T21): W1…W3 get `.notFound`, and U's content is never requested.
@@ -395,6 +408,17 @@ extension EngineFollowBarrierTests {
         let run = try await Self.requeuePin(visit, later: [RequeueApply(pair: .dropped, xToY: true), RequeueApply(pair: .u, xToY: true)], seed: 2_027_641)
         #expect(Self.sizes([run.k, run.v2]) == [16, 26] && run.w.allSatisfy { $0 == .failure(.notFound) }, "K gets O's bytes, V2 Y's, W1…W3 .notFound at K2 (visit-first): \(run)")
         #expect(run.requested == ["O", "X", "Y"], "neither W nor U is requested: \(run)")
+        #expect(run.violations.isEmpty, "\(run.violations.prefix(3))")
+    }
+
+    /// T-E5: after X's re-queue, K2 lists the pair on U's content (no job of U at an end) and K3 on Z's. Visited first,
+    /// K2's visit moved the pair off the queued X onto U's content and K3's on to Z's: W1…W3 get Z's bytes.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedReroutePinnedToARequeuedJobWalksOnAfterTheNextApply(_ visit: LaneDropVisit) async throws {
+        let run = try await Self.requeuePin(visit, later: [RequeueApply(pair: .u), RequeueApply(pair: .z)], seed: 2_027_651)
+        #expect(Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && Self.sizes(run.w) == [24, 24, 24], "K gets O's bytes, V2 X's 404, W1…W3 Z's bytes (visit-first): \(run)")
+        #expect(run.requested == ["O", "X", "Z"], "only O, X and Z are requested: \(run)")
         #expect(run.violations.isEmpty, "\(run.violations.prefix(3))")
     }
 }

@@ -214,12 +214,14 @@ struct EngineState {
     /// `eventsAfterFollow` or in a drain turn's batch: a batch's last item counts it down (`SyncEngine.continueReroutes`;
     /// Stage 3 close-out cycle 21, ruling S3-R26 item 1).
     var reroutesWaiting = 0
-    /// The attempts that committed while events waited for the follow, keyed as an attempt's verdict is, each with
-    /// `copySerial` at its commit, until the barrier is down (`SyncEngine.endWorldHistory`): an owed re-route or a
-    /// waiting join a layer pinned to one of them (`RerouteLayer.ends`) follows the copy in force at that commit, as a
-    /// visit-first engine's commit re-routed the interests that had joined the job (`SyncEngine.rerouteListing`,
-    /// `SyncEngine.joinListing`; Stage 3 close-out cycle 21, PROBE-RR21-PIN-END, ruling S3-R26 item 12's answer 6.3).
-    var reroutePinCommits: [VerdictKey: UInt64] = [:]
+    /// The attempts that committed, or that an ENOENT re-queued at their epoch, while events waited for the follow, keyed
+    /// as an attempt's verdict is, each with `copySerial` then and whether the job kept the pinned ids (`PinEnd`), until
+    /// the barrier is down (`SyncEngine.endWorldHistory`) or shutdown. An owed re-route or a waiting join a layer pinned to
+    /// one of them (`RerouteLayer.ends`) follows the copy in force at that commit, as a visit-first engine's commit
+    /// re-routed the interests that had joined the job (`SyncEngine.rerouteListing`, `SyncEngine.joinListing`; Stage 3
+    /// close-out cycle 21, PROBE-RR21-PIN-END, ruling S3-R26 item 12's answer 6.3), or, after such a re-queue, rides the
+    /// fresh attempt until the first copy adopted after it (Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-R1).
+    var reroutePinCommits: [VerdictKey: PinEnd] = [:]
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false
     /// Test seam: while set, the drain's scheduled follow-up keeps its events waiting and stays scheduled instead of

@@ -362,7 +362,7 @@ extension SyncEngine {
     }
 
     /// Ends the world history once the barrier is down (`EngineState.worldHistory`): no decision reads an older view
-    /// any more, and no owed re-route or waiting join a kept commit (`EngineState.reroutePinCommits`).
+    /// any more, and no owed re-route or waiting join a kept end (`EngineState.reroutePinCommits`).
     func endWorldHistory() {
         guard !self.followBarrier, self.state.reading == nil else {
             return
@@ -768,9 +768,13 @@ extension SyncEngine {
     /// still at that end (`waitingTarget`): a visit-first engine's interest that had joined it stayed through the visit,
     /// which passed the publishing job (RR-14), and is re-routed at that end only. A job that committed since
     /// (`EngineState.reroutePinCommits`) hands the id on to the copy in force at its commit, which re-routed that
-    /// interest, and the walk goes on from the layers adopted after it (Stage 3 close-out cycle 21, PROBE-RR21-PIN-END);
-    /// one that left its end otherwise (requeued or superseded behind its verdict) hands it to the engine's copy. A copy
-    /// without the id is returned as it is, so the re-route ends the interest (T21), as that visit did.
+    /// interest, and the walk goes on from the layers adopted after it (Stage 3 close-out cycle 21, PROBE-RR21-PIN-END).
+    /// One that an ENOENT re-queued at that epoch keeps the pin: that engine re-routed nothing there (D-13), and the
+    /// interest rode the fresh attempt until the first visit after the re-queue moved it under the copy that visit's
+    /// apply adopted, from which the walk goes on (Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-R1). One
+    /// that left its end otherwise (superseded, or re-queued with no end kept, behind its verdict) hands it to the
+    /// engine's copy. A copy without the id is returned as it is, so the re-route ends the interest (T21), as that visit
+    /// did.
     func rerouteListing(_ asset: AssetID, _ batch: RerouteBatch) -> ValidatedManifest? {
         guard let entry = batch.copy.entry(for: asset) else {
             return batch.copy
@@ -801,12 +805,22 @@ extension SyncEngine {
                 if self.waitingTarget(entry.transferID, epoch: epoch) != nil {
                     return layer.outgoing
                 }
-                // The layers hold one per copy adopted from `serial` to the commit: the copy in force then is the next
-                // layer's outgoing one, or the engine's.
-                guard let committed = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
+                // The layers hold one per copy adopted from `serial` on: the copy in force at the end is layer `after`'s
+                // outgoing one, or the engine's. A commit re-routed the id under it. An ENOENT re-queue kept the id on
+                // the job: with no layer adopted since, it rides the fresh attempt; otherwise the first layer after the
+                // re-queue moved it under the copy that layer's apply adopted (e1-R1).
+                guard let end = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
                     return nil
                 }
-                index = Int(committed &- serial)
+                let after = Int(end.serial &- serial)
+                if end.keepsEntry {
+                    guard after < layers.count else {
+                        return layer.outgoing
+                    }
+                    index = after + 1
+                } else {
+                    index = after
+                }
             } else {
                 index += 1
             }
@@ -1558,7 +1572,9 @@ extension SyncEngine {
     /// whose outcome answered them (Stage 3 close-out cycle 21, ruling S3-R26 item 5 (ii): dropped, the holder's visit
     /// moved them under a later apply's copy, and a 404 of the fresh attempt that answered the visit-first engine's
     /// caller became the later content's bytes). `nil` once it left it, which drops the move (`continueInbound`). Also
-    /// read by `followedLane`. An owed re-route's pin keeps the end's own window (`rerouteListing`).
+    /// read by `followedLane`. An owed re-route's pin holds while the end's own window does, and, after an ENOENT re-queue
+    /// at that epoch, until the first copy adopted after it (`rerouteListing`, `EngineState.reroutePinCommits`; Stage 3
+    /// close-out cycle 22, ruling S3-R27 item 12.2's e1-R1).
     func waitingTarget(_ move: InboundMove) -> Job? {
         if let job = self.state.jobs[move.target], job.epoch == move.epoch, job.state == .queued {
             return job
@@ -1980,6 +1996,18 @@ struct VerdictKey: Hashable, Sendable {
     let transfer: TransferID
     /// The job's epoch at the attempt's end.
     let epoch: UInt64
+}
+
+/// How an attempt that a pin names left its end, kept while events wait for the follow (`EngineState.reroutePinCommits`,
+/// read by `followLayers`): the copy's serial then, and whether the job kept the pinned ids. A commit re-routed them
+/// under the copy in force at it; an ENOENT re-queue, which keeps the epoch, kept them on the job, as a visit-first
+/// engine's interests rode its fresh attempt until a visit after the re-queue moved them (Stage 3 close-out cycle 22,
+/// ruling S3-R27 item 12.2's e1-R1; the cycle-21 verifiers' correct #1).
+struct PinEnd: Hashable, Sendable {
+    /// `EngineState.copySerial` at the end.
+    let serial: UInt64
+    /// Whether the job kept the ids: an ENOENT re-queue's end (`true`), or a commit's (`false`).
+    let keepsEntry: Bool
 }
 
 /// A join a follow's visit waits behind a waiting exit verdict (`SyncEngine.deferBehindVerdict`), with its decision

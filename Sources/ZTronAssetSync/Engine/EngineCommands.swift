@@ -2164,9 +2164,9 @@ extension SyncEngine {
     /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
     /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
     /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); every
-    /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the commits
-    /// a pin follows are kept only while the barrier is up, each an attempt no longer at its end, at a copy adopted by then
-    /// (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END).
+    /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the ends a
+    /// pin follows (commits, and ENOENT re-queues) are kept only while the barrier is up, each an attempt no longer at its
+    /// end, at a copy adopted by then (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END; cycle 22, e1-R1).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -2238,15 +2238,15 @@ extension SyncEngine {
         }
         let pinCommits = self.state.reroutePinCommits
         if !self.followBarrier, !pinCommits.isEmpty {
-            violations.append("the follow barrier is down with \(pinCommits.count) commits kept for owed re-routes")
+            violations.append("the follow barrier is down with \(pinCommits.count) pin ends kept for owed re-routes")
         }
         let unended = pinCommits.keys.filter { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil }.count
         if unended > 0 {
-            violations.append("\(unended) commits kept for owed re-routes name an attempt still at its end")
+            violations.append("\(unended) pin ends kept for owed re-routes name an attempt still at its end")
         }
-        let ahead = pinCommits.values.filter { $0 > self.state.copySerial }.count
+        let ahead = pinCommits.values.filter { $0.serial > self.state.copySerial }.count
         if ahead > 0 {
-            violations.append("\(ahead) commits kept for owed re-routes name a copy not yet adopted")
+            violations.append("\(ahead) pin ends kept for owed re-routes name a copy not yet adopted")
         }
         if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
             violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")

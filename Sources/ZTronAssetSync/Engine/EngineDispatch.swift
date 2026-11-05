@@ -1130,7 +1130,7 @@ extension SyncEngine {
         }
         // An owed re-route or a waiting join a layer pinned to this attempt follows the copy now (`followLayers`).
         if !self.state.eventsAfterFollow.isEmpty, let epoch = self.state.jobs[transfer]?.epoch {
-            self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = self.state.copySerial
+            self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: false)
         }
         // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).
         self.bind(locations.keys, to: transfer, since: serial)
@@ -1275,9 +1275,16 @@ extension SyncEngine {
             // ENOENT for an attempt the engine cancelled is that cancellation (ARCHITECTURE §7.6, D-13): a fresh
             // attempt, no failure, no backoff. Behind the follow barrier too: the place it takes ahead of the visits'
             // places is an order difference only, and the pump admits it on the live gates once the barrier is down. The
-            // cycle-12 deferral of this exit was removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3.
+            // cycle-12 deferral of this exit was removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3. While
+            // events wait, the re-queue is kept with the copy's serial (`EngineState.reroutePinCommits`): an owed
+            // re-route or a waiting join a layer pinned to this attempt rides the fresh attempt until the first copy
+            // adopted after the re-queue, as a visit-first engine's re-routed nothing here (`followLayers`; Stage 3
+            // close-out cycle 22, ruling S3-R27 item 12.2's e1-R1).
             self.state.jobs[transfer]?.resume = nil
             if self.transition(transfer, to: .queued) {
+                if !self.state.eventsAfterFollow.isEmpty, let epoch = self.state.jobs[transfer]?.epoch {
+                    self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: true)
+                }
                 self.enqueue(transfer)
             }
             self.pump()
