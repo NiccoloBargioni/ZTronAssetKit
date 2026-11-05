@@ -5128,7 +5128,7 @@ fix (S3-R26 item 11, "Red first").
    `releaseRerouteHolds` unreachable until rr21-C3; `verify.sh --quick` ended `VERIFY: PASS`, `c2-quick.log`; the
    event's stride is 168 bytes with and without `indirect`, so it is not indirect). rr21-C3's red step **committed**
    (`94795ca`: T1, T1-two, T1-fit, T-two-tokens, with T1-edge and T1-zero, and `commitRerouteDivergentTurns`; red
-   evidence under "Step 5"). rr21-C3's green commit: the readers, site 1, the layers and the idle guards, with 25
+   evidence under "Step 5"). rr21-C3's green commit **committed** (`2d6b147`): the readers, site 1, the layers and the idle guards, with 25
    tests passing in both orders (`reroute-all-pty.log`: the red step's six, T3-captured's five, T4-T11 with RR21-HOP's
    two variants, T14, T17-hold, T17, RR21-WINDOW-GATE and the invariant test), then T12's six shapes, T13, T15, T16
    (`owner-pty.log`), T18 with T18-partial and RR21-RUN-MIDDRAIN (`run-pty.log`), RR21-PRESENT-PRUNE's three gates and
@@ -5143,8 +5143,9 @@ fix (S3-R26 item 11, "Red first").
    (`MUT_TIMEOUT=300`; a hang counts as a kill, as a test's time limit does). On this state `verify.sh --quick` ended
    `VERIFY: PASS` (`c3-quick.log`, 1-minute loads 4.75 to 8.75, the mutants running), and the release build with
    warnings as errors, `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%) passed (`c3-release.log`, `c3-gates.log`).
-   **Next action:** the five pins that miss C2, red (`.build-s3f/c21/pending/BenchSyncReroutePins.swift`), then the
-   commit turn's and `followedLane`'s fix; then the mutants' results and survivors.
+   The five pins that miss C2 are committed red on their own (`BenchSyncReroutePins.swift`; their figures under
+   "Step 5"). **Next action:** the commit turn's and `followedLane`'s fix and its figures; then the mutants' results
+   and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
