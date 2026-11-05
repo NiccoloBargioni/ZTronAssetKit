@@ -23,14 +23,22 @@ extension EngineFollowBarrierTests {
         }
     }
 
+    /// When `pinEnd` applies K2, which maps zz-a1…zz-a3 to Z's content: never, while W publishes, or while W still
+    /// downloads (its download released once the drain is over).
+    enum PinEndLater {
+        case none
+        case whilePublishing
+        case whileDownloading
+    }
+
     /// zz-x (V's) is X's content and zz-w (U's) W's; both download. X publishes, held at its first store unit, while O
     /// does; K0 maps zz-a1…zz-a3 to X's content, O's commit owes their re-routes, K1 maps them to W's content while X
     /// still publishes, and X commits, before the replay. W's publication then begins (and waits: a re-route is owed),
-    /// and, with `laterApply`, K2 maps the ids to Z's content while W publishes. W's bytes fail their check. Visited
-    /// first, the commit re-routed W1…W3 onto X publishing, K1's visit passed X, X's commit re-routed them under K1's copy
-    /// to W's job, which published them, and K2's visit passed W (RR-14): W's failure answered them.
+    /// unless K2 comes while W downloads (`later`). W's bytes fail their check. Visited first, the commit re-routed
+    /// W1…W3 onto X publishing, K1's visit passed X, and X's commit re-routed them under K1's copy to W's job; K2's
+    /// visit passed W publishing (RR-14), so W's failure answered them, or moved them off W downloading to Z's job.
     @available(macOS 15.0, iOS 18.0, *)
-    func pinEnd(_ visit: LaneDropVisit, seed: UInt64, laterApply: Bool) async throws -> PinEndOutcome {
+    func pinEnd(_ visit: LaneDropVisit, seed: UInt64, later: PinEndLater) async throws -> PinEndOutcome {
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
         let wBytes = EngineFixture.bytes(seed + 6, count: 20)
         let zBytes = EngineFixture.bytes(seed + 7, count: 24)
@@ -56,13 +64,15 @@ extension EngineFollowBarrierTests {
         #expect(await Self.pins(xT, c) == [true], "setup: K1's layer pins X, which publishes")
         await held.release(held.kept[0])
         await engine.awaitCondition { $0.state.jobs[xT] == nil }
-        await c.s.harness.source.release(wT, with: .progress(received: 0, expected: nil))
-        await engine.awaitCondition { $0.state.jobs[wT]?.state == .verifying && $0.state.inboundWaits[wT] != nil }
-        if laterApply {
-            try await Self.applyBehindBatch(c.manifest([x, wEntry] + onZ, round: 3), tag: "k2-pin-end-\(seed)", c)
-            #expect(await Self.pins(wT, c) == [false, true], "setup: K2's layer pins W, which publishes")
+        if later != .whileDownloading {
+            await c.s.harness.source.release(wT, with: .progress(received: 0, expected: nil))
+            await engine.awaitCondition { $0.state.jobs[wT]?.state == .verifying && $0.state.inboundWaits[wT] != nil }
         }
-        let layer = await Self.finishOwed(c, held: held, others: [u, v])
+        if later != .none {
+            try await Self.applyBehindBatch(c.manifest([x, wEntry] + onZ, round: 3), tag: "k2-pin-end-\(seed)", c)
+            #expect(await Self.pins(wT, c) == [false, later == .whilePublishing], "setup: K2's layer pins W only while W publishes")
+        }
+        let layer = await Self.finishOwed(c, held: held, others: [u, v], releasing: later == .whileDownloading ? [wT] : [])
         let zStarts = await Self.starts(z, c)
         await Self.finishHeld(c.s)
         return PinEndOutcome(layer: layer, u: layer.others[0], v: layer.others[1], zStarts: zStarts)
@@ -104,7 +114,7 @@ extension EngineFollowBarrierTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func owedRerouteWhosePinCommittedJoinsTheNextPublishingJob(_ visit: LaneDropVisit) async throws {
-        let outcome = try await self.pinEnd(visit, seed: 2_027_481, laterApply: false)
+        let outcome = try await self.pinEnd(visit, seed: 2_027_481, later: .none)
         #expect(outcome.u == .failure(.integrityFailure) && outcome.w.allSatisfy { $0 == .failure(.integrityFailure) }, "U and W1…W3 get W's integrity failure (visit-first): \(outcome)")
         #expect(Self.sizes([outcome.layer.k, outcome.v]) == [16, 18] && outcome.zStarts == 0, "K gets O's bytes, V X's, and Z is never requested: \(outcome)")
         #expect(outcome.layer.violations.isEmpty, "\(outcome.layer.violations.prefix(3))")
@@ -115,9 +125,20 @@ extension EngineFollowBarrierTests {
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func owedRerouteWhosePinCommittedFollowsTheCopyAtThatCommit(_ visit: LaneDropVisit) async throws {
-        let outcome = try await self.pinEnd(visit, seed: 2_027_491, laterApply: true)
+        let outcome = try await self.pinEnd(visit, seed: 2_027_491, later: .whilePublishing)
         #expect(outcome.u == .failure(.integrityFailure) && outcome.w.allSatisfy { $0 == .failure(.integrityFailure) }, "U and W1…W3 get W's integrity failure (visit-first): \(outcome)")
         #expect(Self.sizes([outcome.layer.k, outcome.v]) == [16, 18] && outcome.zStarts == 0, "K gets O's bytes, V X's, and Z is never requested: \(outcome)")
+        #expect(outcome.layer.violations.isEmpty, "\(outcome.layer.violations.prefix(3))")
+    }
+
+    /// PROBE-RR21-PIN-END with K2 while W still downloads: visited first, X's commit had re-routed W1…W3 to W's job
+    /// under K1's copy, and K2's visit moved them to Z's job, which W1…W3's re-routes follow from the copy at that commit.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedRerouteWhosePinCommittedFollowsTheAppliesAfterThatCommit(_ visit: LaneDropVisit) async throws {
+        let outcome = try await self.pinEnd(visit, seed: 2_027_521, later: .whileDownloading)
+        #expect(outcome.u == .failure(.integrityFailure) && Self.sizes(outcome.w) == [24, 24, 24], "U gets W's integrity failure, W1…W3 Z's bytes (visit-first): \(outcome)")
+        #expect(Self.sizes([outcome.layer.k, outcome.v]) == [16, 18] && outcome.zStarts == 1, "K gets O's bytes, V X's, and Z is requested once: \(outcome)")
         #expect(outcome.layer.violations.isEmpty, "\(outcome.layer.violations.prefix(3))")
     }
 
@@ -183,6 +204,87 @@ extension EngineFollowBarrierTests {
         #expect((layer.w + layer.others.suffix(2)).allSatisfy { $0 == .failure(.notFound) }, "W1…W3, B1 and B2 get .notFound (visit-first): \(layer)")
         #expect(Self.sizes([layer.k] + layer.others.prefix(2)) == [16, 18, 22] && zStarts == 0, "K, V and R get their contents' bytes, and Z is never requested: \(layer), Z's starts \(zStarts)")
         #expect(layer.violations.isEmpty, "\(layer.violations.prefix(3))")
+    }
+
+    /// What `stageKeptCommit` staged: the owed commit, the units still held (X's), V's waiter and X's attempt.
+    @available(macOS 15.0, iOS 18.0, *)
+    struct KeptCommit {
+        let c: OwedCommit
+        let held: HeldUnits
+        let v: Task<Result<AssetLocation, AssetError>, Never>
+        let key: VerdictKey
+    }
+
+    /// `pinEndDropped`'s shape visited first, up to K1's apply, whose layer pins X publishing: X's commit, once its unit
+    /// is released, is kept for the batch (`EngineState.reroutePinCommits`).
+    @available(macOS 15.0, iOS 18.0, *)
+    func stageKeptCommit(seed: UInt64) async throws -> KeptCommit {
+        let xBytes = EngineFixture.bytes(seed + 5, count: 18)
+        let x = EngineHarness.onDemand("zz-x", xBytes)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x])
+        let xT = x.transferID
+        await c.s.harness.source.script(xT, [.hold, .stage(xBytes)])
+        let v = await Self.downloadingWaiter(x, c)
+        let held = try await Self.oweThroughK0(c, k0: [x] + Self.movedOnto(xBytes, c), publishing: [xT], visit: .followVisitedFirst)
+        try await Self.applyBehindBatch(c.manifest([x], round: 2), tag: "k1-pin-commits-\(seed)", c)
+        let epoch = try #require(await c.engine.readForTests { $0.state.jobs[xT]?.epoch })
+        return KeptCommit(c: c, held: held, v: v, key: VerdictKey(transfer: xT, epoch: epoch))
+    }
+
+    /// The commits an owed re-route's pin follows (`EngineState.reroutePinCommits`): X's commit, while K1's layer pins
+    /// X, is kept with the copy's serial then until the drain replays the batch whole. Each clause, broken alone through
+    /// the test seam (`violations(after:)`), reports its exact message.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: the invariants report a commit kept for owed re-routes at an attempt still at its end, ahead of the copy or with no batch waiting (F-28, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)))
+    func invariantsReportCommitsKeptForOwedReroutes() async throws {
+        let staged = try await self.stageKeptCommit(seed: 2_027_511)
+        let c = staged.c
+        let engine = c.engine
+        let key = staged.key
+        var held = staged.held
+        let publishing = await engine.violations { $0.reroutePinCommits[key] = $0.copySerial }
+        #expect(publishing == ["1 commits kept for owed re-routes name an attempt still at its end"], "a commit kept for X while X publishes: \(publishing)")
+        await held.release(held.kept[0])
+        await engine.awaitCondition { $0.state.jobs[key.transfer] == nil }
+        let kept = await engine.readForTests { e in e.state.reroutePinCommits == [key: e.state.copySerial] }
+        #expect(kept, "X's commit is kept with the copy's serial then")
+        let clean = await engine.invariantViolations()
+        #expect(clean.isEmpty, "\(clean.prefix(3))")
+        let ahead = await engine.violations { $0.reroutePinCommits[key] = $0.copySerial &+ 1 }
+        #expect(ahead == ["1 commits kept for owed re-routes name a copy not yet adopted"], "a commit kept at a copy no apply adopted: \(ahead)")
+        let layer = await Self.finishOwed(c, held: held, others: [staged.v])
+        #expect(layer.w.allSatisfy { $0 == .failure(.notFound) } && layer.violations.isEmpty, "W1…W3 follow K1's copy at X's commit: \(layer)")
+        let forgotten = await engine.readForTests { $0.state.reroutesWaiting == 0 && $0.state.reroutePinCommits.isEmpty }
+        #expect(forgotten, "the batch's last item forgets the commits")
+        let idle = await engine.violations { $0.reroutePinCommits[key] = 0 }
+        #expect(idle == ["1 commits are kept for owed re-routes, none waiting"], "a commit kept with no batch waiting: \(idle)")
+        await Self.finishHeld(c.s)
+    }
+
+    /// A shutdown while the batch waits forgets X's kept commit with the batch (`shutdown`): the waiters are answered
+    /// `.shutDown`, and no batch, publication wait or kept commit is left.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a shutdown while owed re-routes wait forgets the commits kept for them (F-28, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)))
+    func shutdownForgetsTheCommitsKeptForOwedReroutes() async throws {
+        let staged = try await self.stageKeptCommit(seed: 2_027_531)
+        let c = staged.c
+        let engine = c.engine
+        let key = staged.key
+        var held = staged.held
+        await held.release(held.kept[0])
+        await engine.awaitCondition { $0.state.jobs[key.transfer] == nil }
+        let kept = await engine.readForTests { $0.state.reroutePinCommits.keys.contains(key) }
+        try #require(kept, "setup: X's commit is kept for the batch")
+        let shutdown = Task { await engine.shutdown() }
+        let answers = await Self.owedAnswers(c)
+        let others = await Self.answers(of: [staged.v], c)
+        await shutdown.value
+        await held.stop()
+        let after = await engine.readForTests { e in (waiting: e.state.reroutesWaiting, waits: e.state.inboundWaits.count, kept: e.state.reroutePinCommits.count) }
+        #expect(Self.sizes([answers.k] + others) == [16, 18] && answers.w.allSatisfy { $0 == .failure(.shutDown) }, "K and V got their bytes at their commits, W1…W3 .shutDown: \(answers), V \(others)")
+        #expect(after.waiting == 0 && after.waits == 0 && after.kept == 0, "no counted batch, publication wait or kept commit is left: \(after)")
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
     }
 }
 

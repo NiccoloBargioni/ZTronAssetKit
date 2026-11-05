@@ -118,6 +118,7 @@ extension SyncEngine {
         self.state.eventsAfterFollow = []
         self.state.eventStamps = []
         self.state.reroutesWaiting = 0
+        self.state.reroutePinCommits = [:]
         self.state.reading = nil
         self.state.worldHistory = []
         self.state.followStamps = [:]

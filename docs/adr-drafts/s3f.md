@@ -5146,9 +5146,14 @@ fix (S3-R26 item 11, "Red first").
    The five pins that miss C2 are committed red on their own (`f4f35bd`, `BenchSyncReroutePins.swift`; their figures
    under "Step 5"), then the commit turn's and `followedLane`'s fix with T-ANNOUNCE-OWED and `groupDelistedFit`: all
    five pass (figures under "Step 5"). rr21-C3's mutants were stopped after b20-no-layer-call for the timing runs
-   (b21-no-hold-term's first run, in progress, left no result and runs again). **Next action:** the C3 mutants from b21-no-hold-term
-   (`mut21-c3c.txt`), then the fix's (`mut21-c3fix.txt`), their results and survivors; meanwhile the PIN-END probe and
-   rr21-C4.
+   (b21-no-hold-term's first run, in progress, left no result and runs again); they resumed from b21-no-hold-term in
+   `mut21-c3c.txt`, the fix's follow in `mut21-c3fix.txt` (`tools/mut-c3-rest.sh`). `PROBE-RR21-PIN-END` (answer 6.3)
+   after rr21-C3: it holds without a later apply and breaks in both orders with one, so its three failing tests are
+   **committed** red on their own (`819ea9d`), then the kept-commit fix with its tests and clauses, **committed** right
+   after it (under "Step 5"); its mutants (`tools/mut-pinend.py`, `mut21-pinend.txt`) run on a snapshot of the fix
+   after the fix's of rr21-C3 (`tools/chain-pinend.sh`); the probe runs again after rr21-C5. **Next action:** rr21-C4
+   (the join gap's failure shape, `pending/EngineFollowBarrierJoinGapFailureTests.swift`, in both orders); then the
+   three mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5734,6 +5739,37 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   (recorded); the commit owes no re-route in any of them, so these are item 4's figures: Phase 2's triggers still fire
   (step 6), and `.manyGroups`, which Phase 2 cannot cut, passes by 0.04 ms. The fix's mutants (`tools/mut-c3fix.py`,
   f1 to f11, on a snapshot of the fixed sources) run after rr21-C3's resume.
+- **`PROBE-RR21-PIN-END`** (ruling S3-R26 item 12's answer 6.3, after rr21-C3; `EngineFollowBarrierReroutePinEndTests.swift`,
+  both orders). O's commit owes the re-routes of zz-a1…zz-a3 (W1…W3) under K0's copy, which maps them to X's content;
+  K1's layer pins X, publishing; X commits before the replay. Without a later apply the replay follows the copy then,
+  K1's, onto W's job, publishing, and W's integrity failure answers W1…W3, as visited first
+  (`owedRerouteWhosePinCommittedJoinsTheNextPublishingJob`, seed 2,027,481; it passed on `b1d37df`). With K2, which
+  maps the ids to Z's content, between X's commit and the replay, the probe **breaks in both orders**: W1…W3 get Z's
+  24 bytes and Z is requested, where a visit-first engine's commit of X had re-routed them under K1's copy, onto W
+  publishing, whose failure answered them (`owedRerouteWhosePinCommittedFollowsTheCopyAtThatCommit`, seed 2,027,491),
+  or, K1 not listing them, with `.notFound` (`owedRerouteWhosePinCommittedEndsUnderTheCopyAtThatCommit`, T21, seed
+  2,027,501); a second batch, P's, replayed after O's, breaks alike (`secondOwedBatchFollowsTheCommitOfItsPinAfterTheFirstBatch`,
+  seed 2,027,541). A different answer is blocking (S3-R21 item 4), so the three are committed red on their own
+  (`819ea9d`; on a scratch copy of it, `each/red-pinend-tests.log`: 12 issues, 4 a test over both orders, the
+  no-later-apply test passing). The fix starts from the judge's "layer per commit" (`judge-rr21.md`, open questions)
+  in its smallest form: no copy is kept, since the copy in force at a commit is one the batch already holds. A commit
+  while a batch waits keeps its attempt (`VerdictKey`) with `copySerial` then (`EngineState.reroutePinCommits`, set
+  in `committed`: one insert). `rerouteListing`, at a layer whose pinned job left its end, takes the copy in force at
+  that commit, the batch's layer `serial - batch.serial` (a batch holds a layer per copy adopted since it was owed) or
+  the engine's copy, and walks on from that layer; without a kept commit (a job requeued or superseded behind its
+  verdict) it follows the engine's copy as before, rr21-T8b's class, exact unless the requeued job publishes again
+  across a later apply (the judge's approximation; **residual risk**). The records go when the last batch is replayed
+  whole (`continueReroutes`) and at shutdown. Clauses (`followBarrierViolations`): no kept commit while no batch waits,
+  none for an attempt still at its end, none at a copy not yet adopted. Tests with the fix:
+  `owedRerouteWhosePinCommittedFollowsTheAppliesAfterThatCommit` (K2 while W downloads: the walk goes on from the
+  commit's copy and K2 moves W1…W3 to Z, 24 bytes each, Z requested once; it passes without the fix too, which follows
+  the engine's copy there), `invariantsReportCommitsKeptForOwedReroutes` (each clause broken alone; X's commit kept
+  with the copy's serial then, forgotten after the last batch) and `shutdownForgetsTheCommitsKeptForOwedReroutes`.
+  The seven tests pass in both orders (`each/pinend-5.log`), the whole Sync suite passes (639 tests in 56 suites,
+  `each/pinend-fix-sync2.log`, 1-minute load 31.54 at the start), and `UNSAFE: PASS` (0 escapes) and `DOCS: PASS`
+  (100.0%). Cost: one dictionary insert a commit while a batch waits and one lookup an id at a pin that left its end,
+  O(1), no figure (S3-R26 item 9); the C2 cases through `committed` and the drain are re-measured at step 8. Mutants:
+  `tools/mut-pinend.py` (p1 to p11), on a snapshot of the fix.
 
 ## Items
 

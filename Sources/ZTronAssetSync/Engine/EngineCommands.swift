@@ -2140,7 +2140,9 @@ extension SyncEngine {
     /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
     /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
     /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
-    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1).
+    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); the commits
+    /// a pinned re-route follows are kept only while a batch waits, each an attempt no longer at its end, at a copy
+    /// adopted by then (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -2206,6 +2208,18 @@ extension SyncEngine {
         }
         if self.state.reroutesWaiting != batches {
             violations.append("\(self.state.reroutesWaiting) re-route batches counted, \(batches) waiting")
+        }
+        let pinCommits = self.state.reroutePinCommits
+        if self.state.reroutesWaiting == 0, !pinCommits.isEmpty {
+            violations.append("\(pinCommits.count) commits are kept for owed re-routes, none waiting")
+        }
+        let unended = pinCommits.keys.filter { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil }.count
+        if unended > 0 {
+            violations.append("\(unended) commits kept for owed re-routes name an attempt still at its end")
+        }
+        let ahead = pinCommits.values.filter { $0 > self.state.copySerial }.count
+        if ahead > 0 {
+            violations.append("\(ahead) commits kept for owed re-routes name a copy not yet adopted")
         }
         if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
             violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")

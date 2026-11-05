@@ -708,6 +708,9 @@ extension SyncEngine {
         self.state.drainIDsLeft -= spent
         if batch.items.isEmpty {
             self.state.reroutesWaiting -= 1
+            if self.state.reroutesWaiting == 0 {
+                self.state.reroutePinCommits = [:]
+            }
             self.releaseRerouteHolds()
         }
     }
@@ -716,18 +719,33 @@ extension SyncEngine {
     /// owing instant, then, at each apply since (`RerouteBatch.layers`), the copy the apply's visit moved the id to. An
     /// entry whose job was at an attempt's end at that apply pins the id to the copy the apply replaced while the job is
     /// still at that end (`waitingTarget`): a visit-first engine's interest that had joined it stayed through the visit,
-    /// which passed the publishing job (RR-14), and is re-routed at that end only. A copy without the id is returned as
-    /// it is, so the re-route ends the interest (T21), as that visit did.
+    /// which passed the publishing job (RR-14), and is re-routed at that end only. A job that committed since
+    /// (`EngineState.reroutePinCommits`) hands the id on to the copy in force at its commit, which re-routed that
+    /// interest, and the walk goes on from the layers adopted after it (Stage 3 close-out cycle 21, PROBE-RR21-PIN-END);
+    /// one that left its end otherwise (requeued or superseded behind its verdict) hands it to the engine's copy. A copy
+    /// without the id is returned as it is, so the re-route ends the interest (T21), as that visit did.
     func rerouteListing(_ asset: AssetID, _ batch: RerouteBatch) -> ValidatedManifest? {
         guard var entry = batch.copy.entry(for: asset) else {
             return batch.copy
         }
-        for (index, layer) in batch.layers.enumerated() {
+        var index = 0
+        while index < batch.layers.count {
+            let layer = batch.layers[index]
             // A layer no job was at an attempt's end at (most) is passed without formatting the entry's transfer.
             if !layer.ends.isEmpty, let epoch = layer.ends[entry.transferID] {
-                return self.waitingTarget(entry.transferID, epoch: epoch) != nil ? layer.outgoing : nil
+                if self.waitingTarget(entry.transferID, epoch: epoch) != nil {
+                    return layer.outgoing
+                }
+                // The batch held a layer per copy adopted from its owing instant to the commit (`RerouteBatch.serial`):
+                // the copy in force then is the next layer's outgoing one, or the engine's.
+                guard let serial = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
+                    return nil
+                }
+                index = Int(serial &- batch.serial)
+            } else {
+                index += 1
             }
-            let incoming = index + 1 < batch.layers.count ? batch.layers[index + 1].outgoing : self.state.applied
+            let incoming = index < batch.layers.count ? batch.layers[index].outgoing : self.state.applied
             guard let next = incoming.entry(for: asset) else {
                 return incoming
             }
