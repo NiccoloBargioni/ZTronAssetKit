@@ -106,6 +106,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **S3-R27 is drafted** at `.build-orchestrator/s3f-c21-analysis/s3-r27-draft.md`, about 19:35 (10 items, with the order of work in item 10).
     - Two read-only reviews are running: `wf_414dfb0b-d80` (task `wfxlfc7yn`), lenses consistency and fidelity, writing `s3-r27-review-*.md`.
     - Next: apply their must-fix items, append the draft to `s3-rulings-s3f.md`, then run 9 by the steps above.
+    - **Reviews done at 19:41**, both CORRECTED: consistency 16 must-fix, fidelity 9.
+    - One editor agent applies them, and an independent checker then checks the edit: `wf_94639329-f82` (task `w16wcd2xz`), from 19:44.
+    - The v1 draft is kept as `s3-r27-draft-v1.md`, and the change log is `s3-r27-changes.md`.
+    - Fixed decisions given to the editor:
+      - C2 stays 10 ms;
+      - for cycle 22, the per-id dimension is sized at up to 4 interests on one id. k = 2 and k = 4 at 10,000 ids are gated and decide pair counting. More than 4 interests on one id is "open, for the owner";
+      - the second subscriber stays open for the owner;
+      - route (b) is not authorised;
+      - S3-R27 is the cycle's ruling.
+    - After the checker: read its "remaining" list, decide each item, append the draft, and commit this file.
     - Run 9's focus: "S3-R27 is this cycle's ruling (S3-R26 applies where S3-R27 does not change it)". Cycles 1–21 are on `wp/s3f` at `d5b2ab9`. It drops run 8's cut-off paragraph, and adds "keep the cycle-22 status list current; the weekly limit may cut this cycle off".
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
