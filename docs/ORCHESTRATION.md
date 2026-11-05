@@ -129,6 +129,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - 11.7: `commitTurns(.manyGroups)` is blocking. Its route, in order: c3 and c1, then c6, then the group-walk cut in the commit's turn. At `d5b2ab9`, `committed` ends with `pump()` and `reconcileIdle()` (`EngineDispatch.swift:1193-1194`). The verifier suggested owing the group deliveries across follow-ups; that needs a new ruling, because S3-R26 item 4 keeps the commit to one turn.
     - 11.8: the correctness verifier's findings reach the fixer through the findings file, under the "named finding" rule.
     - Next: read the correctness verifier's blocking items when it returns. Add an S3-R27 item only for a finding that needs a route this ruling does not give; any other unnamed finding follows S3-R16, as the ruling's header says. Then follow the run 9 steps above.
+    - Run 9's arguments are drafted at `.build-orchestrator/s3-fix-args-run9.json` (20:10): run 8's, with `fromCycle: 22`, `findingsFile: s3f-c21-issues.json` and cycle 22's focus. Usage at 20:05: weekly 35 %, Fable 21 %.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
