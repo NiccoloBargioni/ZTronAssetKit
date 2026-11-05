@@ -524,14 +524,24 @@ extension EngineFollowBarrierTests {
     /// each, until no follow is owed and no event waits; then lets later turns run. Returns the readings, v4's apply's
     /// own turn first.
     ///
+    /// The attempts' terminals are held meanwhile (`holdAttemptTerminals()`) and released with the follow-ups at the
+    /// end. The pump admits nothing behind the barrier (`pump`), and the drain's last batch pumps once it is down: an
+    /// attempt it starts (a retry the take-off's user re-routes skip the backoff for, T20, a fresh job's, P's or W's)
+    /// would otherwise end between that turn and its reading, in an order the scheduler picks, and the reading would show
+    /// that end rather than the turn (the cycle-21 gate run's third Sync run, PROBE-RR21-RESERVE-REJOIN). An attempt a
+    /// held turn cancels keeps its terminal until the end too; no reading reads a transfer's drain.
+    ///
     /// `settle`, when given, runs after each held turn that leaves the barrier down, before that turn is read: the
-    /// drain's last batch pumps (`pump`), and the attempts it starts run between the turn and its reading, in an order
-    /// the scheduler picks. A test passes the worst of those orders (PROBE-C21-RESERVE-SETTLE).
+    /// attempts the drain's last batch started reach their terminals then, in the worst order the scheduler may give
+    /// them (PROBE-C21-RESERVE-SETTLE).
     @available(macOS 15.0, iOS 18.0, *)
     static func takeOffTurns(_ t: TakeOff, settle: (@Sendable (SyncEngine) async -> Void)? = nil) async throws -> [TakeOffTurn] {
         let engine = t.engine
         let ids = t.ids
-        await engine.readForTests { $0.holdDrainFollowUps() }
+        await engine.readForTests { e in
+            e.holdDrainFollowUps()
+            e.holdAttemptTerminals()
+        }
         var turns = [await engine.readForTests { e in Self.takeOffTurn(e, .follow, ids) }]
         while await engine.readForTests({ $0.followOwed || !$0.state.eventsAfterFollow.isEmpty }) {
             // The time limit's cancellation ends the wait for a held turn, not this loop.
@@ -546,6 +556,7 @@ extension EngineFollowBarrierTests {
             e.releaseDrainFollowUps()
             e.releaseFollowFollowUps()
             e.releaseSpaceSweepFollowUps()
+            e.releaseAttemptTerminals()
         }
         return turns
     }
