@@ -787,7 +787,12 @@ struct Job {
     var assets: Set<AssetID>
     /// The in-flight state.
     var state: JobState
-    /// Bumped on every (re)start, supersede and abandon; a stale continuation is dropped (ARCHITECTURE §10).
+    /// Taken from `EngineState.lastEpoch` when the job is created (`addInterest`) and at every attempt's start
+    /// (`start`), and at no other instant: a supersede removes the job, so a fresh job of its content takes a new
+    /// epoch, and an abandoned attempt's job keeps its own until its next start. A continuation that carries an older
+    /// epoch is dropped (ARCHITECTURE §10). A job queued again without a start (a publication's ENOENT re-queue, a user
+    /// request's backoff skip, a retry's timer) keeps its attempt's epoch, which owed moves and waiting verdicts name
+    /// (`waitingTarget`; Stage 3 close-out cycle 21, ruling S3-R26 item 5).
     var epoch: UInt64
     /// Interests by token. Changed only through `setInterest` and the other mutators below, which keep
     /// `interestCounts` and the index of their ids (`tokensByID`) with it.

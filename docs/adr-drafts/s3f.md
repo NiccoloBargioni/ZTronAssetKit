@@ -5049,6 +5049,19 @@ The counts are from the gate run's coverage (`.build-s3f/c20/gates/cov.profdata`
    after a cancelled attempt's staging, as `EngineRaceTests` does) and kill its drop-mutant, or rule the
    order-and-ticket difference a residual risk (S3-R16 item 2).
 
+   **Corrected in cycle 21** (S3-R26 item 5; `analyse-g4-reach.md` (b) and (c)). The `queued` claim above is false:
+   the ENOENT re-queue is not the only path to `queued` at a move's epoch. `relane`'s failed arm re-queues a failed
+   job for a user interest (T20) with no start, so with no new epoch, and an ENOSPC's exit sets its job failed before
+   its free-space read, whose turn runs one follow turn behind the barrier (`advanceFollowForSpaceSweep`): a join that
+   turn makes onto the job re-queued it. Cycle 21 keeps the follow's visits that stand for an apply made before the end
+   from re-queueing (probe (i), for a publication's ENOSPC and for a transfer's), but a visit for an apply made during
+   the read still re-queues the job, as a visit-first engine's visit then met it failed. The `blocked` claim holds only
+   while the barrier stays up: in that window the follow and its drain can end during the read, the drain's pump can
+   dispatch the re-queued job, and the gate can park it at the same epoch (UNCONFIRMED there, from the code; not probed
+   in cycle 21). The `downloading` claim stands: only a start makes a job download again, and a start takes a new
+   epoch (`Job.epoch`, whose doc said a supersede and an abandon bump it too, which they do not). The arm is Reached in
+   cycle 21 (Shape A, under "Step 7").
+
 ### Residual risks (cycle 20)
 
 - **RR-21** (rewritten): see "Open" item 1. The commit window itself meets C2, at 9.86 ms best in the gate run (9.81

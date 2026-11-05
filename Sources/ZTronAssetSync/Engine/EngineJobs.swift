@@ -512,10 +512,17 @@ extension SyncEngine {
     /// Behind the follow barrier a place is given by a follow's visit or by the drain's replay of an event, each in the
     /// visit-first order (F-28), and by one path at once: a publication's ENOENT re-queue of an attempt the engine
     /// cancelled, whose place ahead of the visits' places is an order difference only (Stage 3 close-out cycle 13,
-    /// ruling S3-R16 item 3). Every other path that queues a job waits as an event of its own (a join, a verdict, a
-    /// re-admission), so the cycle-9 `.enqueue` event is gone. The barrier-end pump admits every place on the live
-    /// throttle, breaker, slots and space alone (`gate`; Stage 3 close-out cycle 15, ruling S3-R18 item 1): the cycle-12
-    /// to cycle-14 place stamps, which refused a place on its decision instant's throttle, are gone.
+    /// ruling S3-R16 item 3). A follow's visit is every join, move and removal the follow makes, wherever its turn
+    /// runs: its own turns, an attempt's end turn (`makeInboundNow`) and an ENOSPC's free-space read
+    /// (`advanceFollowForSpaceSweep`). Their re-lanes give places too (`relane`: a lane change, a user request's
+    /// backoff skip for a visit at an apply made since the job's attempt ended, T20, and a park a raise clears), and so
+    /// does a joiner's re-check of a space park (`failFastJoiner`). None of these starts the job, so it keeps its
+    /// attempt's epoch and an owed move found at that attempt's end still names it (`waitingTarget(_:)`; Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 5). Every other path that queues a job waits as an event of its own (a
+    /// join, a verdict, a re-admission), so the cycle-9 `.enqueue` event is gone. The barrier-end pump admits every
+    /// place on the live throttle, breaker, slots and space alone (`gate`; Stage 3 close-out cycle 15, ruling S3-R18
+    /// item 1): the cycle-12 to cycle-14 place stamps, which refused a place on its decision instant's throttle, are
+    /// gone.
     func enqueue(_ transfer: TransferID, front: Bool = false) {
         guard var job = self.state.jobs[transfer], job.state == .queued else {
             return
