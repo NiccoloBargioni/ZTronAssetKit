@@ -219,9 +219,17 @@ extension SyncEngine {
 
     /// Turns `ensureAvailable` groups' planned fetches into members and jobs while fewer than the limit are pending. A
     /// fetch follows its asset's current entry (T22) and is dropped when the asset left the manifest (T21).
+    ///
+    /// Every pump runs this, so it sorts only the tokens of the ensure groups with fetches left, in the order it visited
+    /// them when it sorted every group's: a group's kind never changes, its fetches are only consumed, and nothing here
+    /// registers a group, so no other group can become one during the loop. Sorting 10,000 prefetch groups' tokens at a
+    /// commit's pump held its turn (`.manyGroups`, C2; Stage 3 close-out cycle 21, step 6).
     func materializeEnsures() {
         let limit = self.materializationLimit
-        for token in self.state.groups.keys.sorted() {
+        let candidates = self.state.groups.compactMap { token, group in
+            group.kind == .ensure && group.cursor < group.fetches.count ? token : nil
+        }
+        for token in candidates.sorted() {
             guard var group = self.state.groups[token], group.kind == .ensure, group.cursor < group.fetches.count, group.pending.count < limit else {
                 continue
             }
