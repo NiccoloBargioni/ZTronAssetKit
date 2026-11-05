@@ -523,8 +523,12 @@ extension EngineFollowBarrierTests {
     /// Swept first: holds the drain's turns and releases the follow's and the drain's held turns one at a time, reading
     /// each, until no follow is owed and no event waits; then lets later turns run. Returns the readings, v4's apply's
     /// own turn first.
+    ///
+    /// `settle`, when given, runs after each held turn that leaves the barrier down, before that turn is read: the
+    /// drain's last batch pumps (`pump`), and the attempts it starts run between the turn and its reading, in an order
+    /// the scheduler picks. A test passes the worst of those orders (PROBE-C21-RESERVE-SETTLE).
     @available(macOS 15.0, iOS 18.0, *)
-    static func takeOffTurns(_ t: TakeOff) async throws -> [TakeOffTurn] {
+    static func takeOffTurns(_ t: TakeOff, settle: (@Sendable (SyncEngine) async -> Void)? = nil) async throws -> [TakeOffTurn] {
         let engine = t.engine
         let ids = t.ids
         await engine.readForTests { $0.holdDrainFollowUps() }
@@ -533,6 +537,9 @@ extension EngineFollowBarrierTests {
             // The time limit's cancellation ends the wait for a held turn, not this loop.
             try #require(turns.count < 80, "the follow and its drain end within 80 turns: \(turns)")
             let kind = await Self.runOneHeldTurn(engine)
+            if let settle, await engine.readForTests({ !$0.followBarrier }) {
+                await settle(engine)
+            }
             turns.append(await engine.readForTests { e in Self.takeOffTurn(e, kind, ids) })
         }
         await engine.readForTests { e in

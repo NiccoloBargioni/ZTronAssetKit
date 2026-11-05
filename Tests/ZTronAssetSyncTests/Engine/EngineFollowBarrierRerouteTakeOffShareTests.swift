@@ -148,8 +148,14 @@ extension EngineFollowBarrierTests {
     /// results): O0 holds zz-c0k and four or five moved-before ids, at four a turn, and times out; capped, its retry
     /// times out too, at the interactive cap. Swept first, the verdict's turn takes the four off and re-routes them at
     /// once, charged to the turn, all its ids (the reservation's edge), or takes the five off and owes them; either way
-    /// they rejoin O0, backed off with its retry state, as v4's visit rejoined them visited first, so O0's retry serves
-    /// them all or, capped, answers them all with its own failure.
+    /// they rejoin O0 with its retry state (its attempts), as v4's visit rejoined them visited first, and their user
+    /// waiters' join skips its backoff (T20, `relane`), so O0's retry serves them all or, capped, answers them all with
+    /// its own failure.
+    ///
+    /// The drain's last turn leaves the barrier down, and its pump starts that retry, which runs before the turn is read
+    /// or after it, as the scheduler orders them (the cycle-21 gate run's third Sync run read it after a capped retry had
+    /// ended O0: `made` [0, 0, 0, 0]). `settle` reads each such turn in the worst order, once O0's retry has its terminal
+    /// (PROBE-C21-RESERVE-SETTLE).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, ReserveRejoin.allCases)
     func takeOffAtTheReservationsEdgeRejoinsItsJobWithItsRetryState(_ visit: LaneDropVisit, _ edge: ReserveRejoin) async throws {
@@ -159,7 +165,13 @@ extension EngineFollowBarrierTests {
         let t = try await self.takeOffSetUp(visit, seed: 2_028_401 + UInt64(moved) * 10 + (capped ? 1 : 0), shape: shape)
         try await self.takeOffApplyV4(t, visit)
         if visit == .sweepFollowsFirst {
-            let turns = try await Self.takeOffTurns(t)
+            let o0 = try #require(t.ids.contents.first)
+            let turns = try await Self.takeOffTurns(t) { engine in
+                // O0's retry started (queued or downloading) has its terminal: held, or applied (O0 left those states).
+                await engine.awaitCondition { e in
+                    e.heldAttemptTerminalCount > 0 || !(e.state.jobs[o0].map { $0.state == .queued || $0.state == .downloading } ?? false)
+                }
+            }
             let made = Self.takeOffMade(turns)
             let given = try #require(turns.firstIndex { $0.verdicts == 0 }, "the drain gives O0's verdict: \(turns)")
             try #require(given > 0, "setup: O0's verdict waits until a held turn: \(turns)")
