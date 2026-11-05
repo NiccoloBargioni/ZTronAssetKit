@@ -232,10 +232,10 @@ extension EngineFollowBarrierTests {
     }
 
     /// The commits an owed re-route's pin follows (`EngineState.reroutePinCommits`): X's commit, while K1's layer pins
-    /// X, is kept with the copy's serial then until the drain replays the batch whole. Each clause, broken alone through
-    /// the test seam (`violations(after:)`), reports its exact message.
+    /// X, is kept with the copy's serial then until the barrier is down. Each clause, broken alone through the test seam
+    /// (`violations(after:)`), reports its exact message.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: the invariants report a commit kept for owed re-routes at an attempt still at its end, ahead of the copy or with no batch waiting (F-28, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)))
+    @Test("R-SYN-11: the invariants report a commit kept for owed re-routes at an attempt still at its end, ahead of the copy or once the barrier is down (F-28, PROBE-RR21-PIN-END)", .timeLimit(.minutes(3)))
     func invariantsReportCommitsKeptForOwedReroutes() async throws {
         let staged = try await self.stageKeptCommit(seed: 2_027_511)
         let c = staged.c
@@ -254,10 +254,10 @@ extension EngineFollowBarrierTests {
         #expect(ahead == ["1 commits kept for owed re-routes name a copy not yet adopted"], "a commit kept at a copy no apply adopted: \(ahead)")
         let layer = await Self.finishOwed(c, held: held, others: [staged.v])
         #expect(layer.w.allSatisfy { $0 == .failure(.notFound) } && layer.violations.isEmpty, "W1…W3 follow K1's copy at X's commit: \(layer)")
-        let forgotten = await engine.readForTests { $0.state.reroutesWaiting == 0 && $0.state.reroutePinCommits.isEmpty }
-        #expect(forgotten, "the batch's last item forgets the commits")
+        let forgotten = await engine.readForTests { !$0.followBarrier && $0.state.reroutePinCommits.isEmpty }
+        #expect(forgotten, "the barrier's end forgets the commits")
         let idle = await engine.violations { $0.reroutePinCommits[key] = 0 }
-        #expect(idle == ["1 commits are kept for owed re-routes, none waiting"], "a commit kept with no batch waiting: \(idle)")
+        #expect(idle == ["the follow barrier is down with 1 commits kept for owed re-routes"], "a commit kept once the barrier is down: \(idle)")
         await Self.finishHeld(c.s)
     }
 

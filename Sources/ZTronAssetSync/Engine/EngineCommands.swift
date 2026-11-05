@@ -2140,9 +2140,10 @@ extension SyncEngine {
     /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
     /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
     /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
-    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); the commits
-    /// a pinned re-route follows are kept only while a batch waits, each an attempt no longer at its end, at a copy
-    /// adopted by then (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END).
+    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); every
+    /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the commits
+    /// a pin follows are kept only while the barrier is up, each an attempt no longer at its end, at a copy adopted by then
+    /// (`EngineState.reroutePinCommits`; cycle 21, PROBE-RR21-PIN-END).
     private func followBarrierViolations() -> [String] {
         var violations: [String] = []
         let events = self.state.eventsAfterFollow
@@ -2178,6 +2179,9 @@ extension SyncEngine {
                 }
             case .join(let join):
                 register(join)
+                if let chain = join.chain, UInt64(chain.layers.count) != self.state.copySerial &- chain.serial {
+                    violations.append("a waiting join of interest \(join.token.rawValue) in \(join.asset) holds \(chain.layers.count) copies for \(self.state.copySerial &- chain.serial) adopted since it deferred")
+                }
             case .reroutes(let batch):
                 batches += 1
                 if UInt64(batch.layers.count) != self.state.copySerial &- batch.serial {
@@ -2210,8 +2214,8 @@ extension SyncEngine {
             violations.append("\(self.state.reroutesWaiting) re-route batches counted, \(batches) waiting")
         }
         let pinCommits = self.state.reroutePinCommits
-        if self.state.reroutesWaiting == 0, !pinCommits.isEmpty {
-            violations.append("\(pinCommits.count) commits are kept for owed re-routes, none waiting")
+        if !self.followBarrier, !pinCommits.isEmpty {
+            violations.append("the follow barrier is down with \(pinCommits.count) commits kept for owed re-routes")
         }
         let unended = pinCommits.keys.filter { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil }.count
         if unended > 0 {

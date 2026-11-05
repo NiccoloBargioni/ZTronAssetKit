@@ -1112,14 +1112,15 @@ extension SyncEngine {
     /// and writes the run, a waiter, a group, a heal and the job of the id's new content, never this one (a moved id's
     /// entry names another content), so the two touch disjoint state. One that owes them answers each interest its
     /// bound ids only and retires the job untrimmed (`resolveAll`'s `boundOnly`): the trims released the index an id
-    /// for a job removed whole in the same turn, 3.2 to 4.8 ms of that turn. A commit while a batch of owed re-routes
-    /// waits is kept with the copy's serial (`EngineState.reroutePinCommits`), for the batch's ids a layer pinned here.
+    /// for a job removed whole in the same turn, 3.2 to 4.8 ms of that turn. A commit while events wait for the follow
+    /// is kept with the copy's serial (`EngineState.reroutePinCommits`), for the ids of owed re-routes and waiting joins
+    /// a layer pinned here.
     private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
         guard let jobEntry = self.state.jobs[transfer]?.entry else {
             return
         }
-        // An owed re-route a layer pinned to this attempt follows the copy now (`rerouteListing`).
-        if self.state.reroutesWaiting > 0, let epoch = self.state.jobs[transfer]?.epoch {
+        // An owed re-route or a waiting join a layer pinned to this attempt follows the copy now (`followLayers`).
+        if !self.state.eventsAfterFollow.isEmpty, let epoch = self.state.jobs[transfer]?.epoch {
             self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = self.state.copySerial
         }
         // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).

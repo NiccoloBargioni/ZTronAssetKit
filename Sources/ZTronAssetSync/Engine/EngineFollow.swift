@@ -361,13 +361,14 @@ extension SyncEngine {
     }
 
     /// Ends the world history once the barrier is down (`EngineState.worldHistory`): no decision reads an older view
-    /// any more.
+    /// any more, and no owed re-route or waiting join a kept commit (`EngineState.reroutePinCommits`).
     func endWorldHistory() {
         guard !self.followBarrier, self.state.reading == nil else {
             return
         }
         self.state.worldHistory = []
         self.state.followStamps = [:]
+        self.state.reroutePinCommits = [:]
     }
 
     /// Applies one event that waited for the follow (`drainEventsAfterFollow`), and returns what of it the turn still
@@ -639,39 +640,50 @@ extension SyncEngine {
     /// Records the copy an apply replaces on every batch of owed re-routes (`RerouteBatch.layers`; `adoptApplied`, before
     /// the copy changes): the copy, the applies followed before it, and the jobs then at an attempt's end
     /// (`RerouteLayer.ends`), whose interests a visit-first engine's visit at this apply passed. Those are the jobs
-    /// publishing (verifying or committing), read once, at the first batch, from the jobs in flight, and the jobs whose
+    /// publishing (verifying or committing), read once a pass from the jobs in flight, and the jobs whose
     /// exit verdict waits behind the batch and is still live (`waitingTarget`), a `.spaceFailure`'s as an
     /// `.attemptFailed`'s (ruling S3-R26 item 12's answer 6.7). From a batch's second layer on, a waiting verdict counts
     /// only if it deferred after the apply of the batch's last layer: one deferred before had met that apply's visit,
-    /// which moved the pairs onto its job, at its end already, on a visit-first engine. One backward pass over the waiting
-    /// events, O(events + jobs in flight); nothing is appended when no batch waits (`integrate-rr21.md` R11).
+    /// which moved the pairs onto its job, at its end already, on a visit-first engine. A listed waiting join's chain
+    /// takes its layer in the same pass, by the same rule (`JoinChain`, `integrate-rr21.md` R18). One backward pass over
+    /// the waiting events, O(events + jobs in flight), each layer appended in place (`EventAfterFollow.appendLayer`):
+    /// with a copy of each join's chain made at each apply, the pass took 2.96 to 3.15 ms for 10,000 waiting joins
+    /// (`BenchSync.joinChainTurns`, a 1-minute load of 9). Nothing is appended when no batch or chained join waits
+    /// (`integrate-rr21.md` R11).
     func layerOwedReroutes() {
-        var publishing: [TransferID: UInt64]?
+        // Read here, so the layers are made with no access to the engine's state while an event grows in place.
+        let applied = self.state.applied
+        let applies = self.state.appliesFollowed
+        let inFlight = self.publishingEnds()
         var verdicts: [(transfer: TransferID, epoch: UInt64, deferredAfter: UInt64)] = []
-        for index in self.state.eventsAfterFollow.indices.reversed() {
-            let event = self.state.eventsAfterFollow[index]
-            if let key = event.verdictKey {
-                if let job = self.waitingTarget(key.transfer, epoch: key.epoch) {
-                    verdicts.append((key.transfer, key.epoch, job.attemptEnd?.deferredAfter ?? 0))
-                }
-                continue
+        // The layer last made, for the events after it with no verdict between and the same last apply (the joins one
+        // stretch of the queue deferred, most): it is theirs too, its `ends` shared, not rebuilt an event.
+        var made: (previous: UInt64?, verdicts: Int, layer: RerouteLayer)?
+        // The layer of an event whose last layer's apply is `previous`, with the verdicts that wait behind it.
+        func layer(after previous: UInt64?) -> RerouteLayer {
+            if let made, made.previous == previous, made.verdicts == verdicts.count {
+                return made.layer
             }
-            guard case .reroutes(var batch) = event else {
-                continue
-            }
-            let inFlight = publishing ?? self.publishingEnds()
-            publishing = inFlight
             var ends = inFlight
-            let previous = batch.layers.last?.applies
             for verdict in verdicts where previous.map({ verdict.deferredAfter > $0 }) ?? true {
                 ends[verdict.transfer] = verdict.epoch
             }
-            batch.layers.append(RerouteLayer(outgoing: self.state.applied, applies: self.state.appliesFollowed, ends: ends))
-            self.state.eventsAfterFollow[index] = .reroutes(batch)
+            let layer = RerouteLayer(outgoing: applied, applies: applies, ends: ends)
+            made = (previous, verdicts.count, layer)
+            return layer
+        }
+        for index in self.state.eventsAfterFollow.indices.reversed() {
+            guard let key = self.state.eventsAfterFollow[index].appendLayer(layer(after:)) else {
+                continue
+            }
+            if let job = self.waitingTarget(key.transfer, epoch: key.epoch) {
+                verdicts.append((key.transfer, key.epoch, job.attemptEnd?.deferredAfter ?? 0))
+            }
         }
     }
 
-    /// The jobs in flight that publish (verifying or committing), with their epochs (`layerOwedReroutes`).
+    /// The jobs in flight that publish (verifying or committing), with their epochs (`layerOwedReroutes`): O(jobs in
+    /// flight).
     private func publishingEnds() -> [TransferID: UInt64] {
         var ends: [TransferID: UInt64] = [:]
         for transfer in self.state.inFlight {
@@ -708,9 +720,6 @@ extension SyncEngine {
         self.state.drainIDsLeft -= spent
         if batch.items.isEmpty {
             self.state.reroutesWaiting -= 1
-            if self.state.reroutesWaiting == 0 {
-                self.state.reroutePinCommits = [:]
-            }
             self.releaseRerouteHolds()
         }
     }
@@ -725,27 +734,45 @@ extension SyncEngine {
     /// one that left its end otherwise (requeued or superseded behind its verdict) hands it to the engine's copy. A copy
     /// without the id is returned as it is, so the re-route ends the interest (T21), as that visit did.
     func rerouteListing(_ asset: AssetID, _ batch: RerouteBatch) -> ValidatedManifest? {
-        guard var entry = batch.copy.entry(for: asset) else {
+        guard let entry = batch.copy.entry(for: asset) else {
             return batch.copy
         }
+        return self.followLayers(asset, from: entry, batch.layers, serial: batch.serial)
+    }
+
+    /// The copy whose entry a waiting join's asset follows at its replay (`replayJoin`, `followedLane`), `nil` for the
+    /// engine's: a listed join's chain, walked from its entry as an owed re-route's layers are (`followLayers`), since a
+    /// visit-first engine's request had joined that entry's job at once (`integrate-rr21.md` R18); a join without one
+    /// follows the engine's copy.
+    func joinListing(_ join: JoinAfterFollow) -> ValidatedManifest? {
+        guard let chain = join.chain else {
+            return nil
+        }
+        return self.followLayers(join.asset, from: join.entry, chain.layers, serial: chain.serial)
+    }
+
+    /// `rerouteListing`'s walk of `layers` for `asset`, from `start`, its entry before the first of them, with `serial`
+    /// the copy's serial before them (`RerouteBatch.serial`, `JoinChain.serial`).
+    private func followLayers(_ asset: AssetID, from start: ManifestEntry, _ layers: [RerouteLayer], serial: UInt64) -> ValidatedManifest? {
+        var entry = start
         var index = 0
-        while index < batch.layers.count {
-            let layer = batch.layers[index]
+        while index < layers.count {
+            let layer = layers[index]
             // A layer no job was at an attempt's end at (most) is passed without formatting the entry's transfer.
             if !layer.ends.isEmpty, let epoch = layer.ends[entry.transferID] {
                 if self.waitingTarget(entry.transferID, epoch: epoch) != nil {
                     return layer.outgoing
                 }
-                // The batch held a layer per copy adopted from its owing instant to the commit (`RerouteBatch.serial`):
-                // the copy in force then is the next layer's outgoing one, or the engine's.
-                guard let serial = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
+                // The layers hold one per copy adopted from `serial` to the commit: the copy in force then is the next
+                // layer's outgoing one, or the engine's.
+                guard let committed = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
                     return nil
                 }
-                index = Int(serial &- batch.serial)
+                index = Int(committed &- serial)
             } else {
                 index += 1
             }
-            let incoming = index < batch.layers.count ? batch.layers[index].outgoing : self.state.applied
+            let incoming = index < layers.count ? layers[index].outgoing : self.state.applied
             guard let next = incoming.entry(for: asset) else {
                 return incoming
             }
@@ -890,7 +917,9 @@ extension SyncEngine {
     /// PROBE-C10-JOIN-RETIRE, the cycle-10 verifiers' request join). A request answered meanwhile (a waiter answered, a
     /// group released, a run ended) joins nothing; a withdrawn waiter's join is made, and its withdrawal removes it next,
     /// as a visit-first engine did both. An id a later apply moved meanwhile is re-routed as that apply's follow would
-    /// have (`reroute`).
+    /// have (`reroute`), under the copy the join's chain gives (`joinListing`): a job a later apply passed publishing
+    /// still holds the join while it is at that end (RR-14), and its commit re-routes it under the copy then
+    /// (Stage 3 close-out cycle 21, rr21-C4, `integrate-rr21.md` R18).
     private func replayJoin(_ join: JoinAfterFollow) {
         let transfer = join.entry.transferID
         guard self.state.joinsAfterFollow[join.token]?[join.asset] == transfer else {
@@ -903,8 +932,9 @@ extension SyncEngine {
         guard self.stillWants(join) else {
             return
         }
-        if join.listed, self.state.applied.entry(for: join.asset).map({ !SyncEngine.sameTransfer($0, join.entry) }) ?? true {
-            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer)
+        let listing = self.joinListing(join)
+        if join.listed, (listing ?? self.state.applied).entry(for: join.asset).map({ !SyncEngine.sameTransfer($0, join.entry) }) ?? true {
+            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer, listing: listing)
             return
         }
         self.addInterest(join.token, asset: join.asset, entry: join.entry, lane: join.lane, kind: join.kind)
@@ -1686,6 +1716,28 @@ enum EventAfterFollow: Sendable {
             return nil
         }
     }
+
+    /// Appends the layer `make` gives for its last layer's apply (`nil` before the first) to a batch of owed re-routes or
+    /// a listed join's chain, in place (`SyncEngine.layerOwedReroutes`): the event is consumed and made again, so its
+    /// layers are never shared while they grow and the append copies none of them (C2). Returns an exit verdict's
+    /// attempt (`verdictKey`), which takes no layer; any other event is left as it was.
+    mutating func appendLayer(_ make: (_ previous: UInt64?) -> RerouteLayer) -> VerdictKey? {
+        switch consume self {
+        case .join(var join):
+            if let previous = join.chain.map({ $0.layers.last?.applies }) {
+                join.chain?.layers.append(make(previous))
+            }
+            self = .join(join)
+        case .reroutes(var batch):
+            batch.layers.append(make(batch.layers.last?.applies))
+            self = .reroutes(batch)
+        case let other:
+            let key = other.verdictKey
+            self = other
+            return key
+        }
+        return nil
+    }
 }
 
 /// An exit verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
@@ -1836,6 +1888,22 @@ struct JoinAfterFollow: Sendable {
     /// Whether a purge withdrew it while it waited (`SyncEngine.withdrawPurgedJoins`): it is no longer in
     /// `EngineState.joinsAfterFollow`, and its replay joins nothing.
     var withdrawn = false
+    /// The copies its replay follows from `entry` (`SyncEngine.joinListing`): set for a listed join that waits in
+    /// `EngineState.eventsAfterFollow` (`addInterest`); `nil` for one not listed or behind a verdict, which follows the
+    /// engine's copy (Stage 3 close-out cycle 21, `integrate-rr21.md` R18).
+    var chain: JoinChain?
+}
+
+/// The copies a listed waiting join's replay follows from its entry (`JoinAfterFollow.chain`), as an owed re-route
+/// follows its batch's (`RerouteBatch`): a visit-first engine's request had joined the job of that entry at once, and
+/// each apply since passed a publishing job (RR-14) or moved the interest (Stage 3 close-out cycle 21, rr21-C4,
+/// `integrate-rr21.md` R18).
+struct JoinChain: Sendable {
+    /// `EngineState.copySerial` when the join deferred: the chain holds one layer for each copy adopted since
+    /// (`SyncEngine.invariantViolations()`).
+    let serial: UInt64
+    /// The copies adopted since, oldest first (`SyncEngine.layerOwedReroutes`).
+    var layers: [RerouteLayer]
 }
 
 /// One attempt's exit verdict (`EventAfterFollow.verdictKey`): its job's transfer, and the job's epoch at the attempt's

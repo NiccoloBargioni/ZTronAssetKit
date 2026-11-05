@@ -85,6 +85,59 @@ extension EngineFollowBarrierTests {
         #expect(w == .failure(.notFound) && yStarts == 0, "W, passed on X by v4's visit (visit-first), gets .notFound at X's commit, and Y is never requested: \(w), Y's starts \(yStarts)")
     }
 
+    /// The layer counts of the chains of the joins that wait in `eventsAfterFollow`, in queue order.
+    static func waitingJoinChains(_ e: isolated SyncEngine) -> [Int] {
+        e.state.eventsAfterFollow.compactMap { event in
+            if case .join(let join) = event {
+                return join.chain?.layers.count
+            }
+            return nil
+        }
+    }
+
+    /// A waiting join's chain (`JoinChain`): J's join for zz-j, on P's content, waits behind O's owed batch with a chain
+    /// and no layer, and K1 gives it one. A layer no apply adopted, injected through the test seam (`violations(after:)`),
+    /// reports the clause's exact message; J's replay follows the chain to P's job, which serves it.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: the invariants report a waiting join whose chain holds a copy no apply adopted (F-28, rr21-C4)", .timeLimit(.minutes(3)))
+    func invariantsReportAWaitingJoinsChainWithoutItsCopies() async throws {
+        let seed: UInt64 = 2_027_441
+        let pBytes = EngineFixture.bytes(seed + 5, count: 18)
+        let p = EngineHarness.onDemand("zz-p", pBytes)
+        let j = EngineHarness.onDemand("zz-j", pBytes)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p, j])
+        let engine = c.engine
+        await c.s.harness.source.script(p.transferID, [.stage(pBytes)])
+        let held = try await Self.oweThroughK0(c, k0: [p, j] + Self.movedOnto(pBytes, c), visit: .followVisitedFirst)
+        let jID = j.identifier
+        let joiner = Task { await engine.awaitAsset(jID, lane: .userInitiated) }
+        await engine.awaitCondition { FollowBarrier.joinWaits($0, j) }
+        let token = try #require(await engine.readForTests { e in e.state.waiters.first { $0.value.asset == jID }?.key })
+        let deferred = await engine.readForTests { e in Self.waitingJoinChains(e) }
+        #expect(deferred == [0], "J's join waits with a chain and no layer: \(deferred)")
+        let layered = await engine.violations { state in
+            for index in state.eventsAfterFollow.indices {
+                guard case .join(var join) = state.eventsAfterFollow[index], var chain = join.chain else {
+                    continue
+                }
+                chain.layers.append(RerouteLayer(outgoing: state.applied, applies: 0, ends: [:]))
+                join.chain = chain
+                state.eventsAfterFollow[index] = .join(join)
+            }
+        }
+        #expect(layered == ["a waiting join of interest \(token.rawValue) in \(jID) holds 1 copies for 0 adopted since it deferred"], "a chain with a copy no apply adopted: \(layered)")
+        // Nothing is in flight, so K1's follow ends in its turn and replays the batch at its end; J's join waits for the
+        // drain's next turn, with the layer K1 gave its chain.
+        try await Self.applyBehindBatch(c.manifest([p, j], round: 2), tag: "k1-chain-\(seed)", c, waits: false)
+        let after = await engine.readForTests { e in Self.waitingJoinChains(e) }
+        #expect(after == [1], "K1 gives J's chain its layer: \(after)")
+        let clean = await engine.invariantViolations()
+        #expect(clean.isEmpty, "\(clean.prefix(3))")
+        let outcome = await Self.finishOwed(c, held: held, others: [joiner])
+        #expect(Self.sizes(outcome.others) == [18] && outcome.violations.isEmpty, "J gets P's bytes: \(outcome)")
+        await Self.finishHeld(c.s)
+    }
+
     /// RR21-HOP's join variant, integrity (`publishingPin` with `joining`).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)

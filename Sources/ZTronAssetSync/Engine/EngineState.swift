@@ -191,11 +191,11 @@ struct EngineState {
     /// `eventsAfterFollow` or in a drain turn's batch: a batch's last item counts it down (`SyncEngine.continueReroutes`;
     /// Stage 3 close-out cycle 21, ruling S3-R26 item 1).
     var reroutesWaiting = 0
-    /// The attempts that committed while a batch of owed re-routes waited, keyed as an attempt's verdict is, each with
-    /// `copySerial` at its commit, until no batch waits: an owed re-route a layer pinned to one of them
-    /// (`RerouteLayer.ends`) follows the copy in force at that commit, as a visit-first engine's commit re-routed the
-    /// interests that had joined the job (`SyncEngine.rerouteListing`; Stage 3 close-out cycle 21, PROBE-RR21-PIN-END,
-    /// ruling S3-R26 item 12's answer 6.3).
+    /// The attempts that committed while events waited for the follow, keyed as an attempt's verdict is, each with
+    /// `copySerial` at its commit, until the barrier is down (`SyncEngine.endWorldHistory`): an owed re-route or a
+    /// waiting join a layer pinned to one of them (`RerouteLayer.ends`) follows the copy in force at that commit, as a
+    /// visit-first engine's commit re-routed the interests that had joined the job (`SyncEngine.rerouteListing`,
+    /// `SyncEngine.joinListing`; Stage 3 close-out cycle 21, PROBE-RR21-PIN-END, ruling S3-R26 item 12's answer 6.3).
     var reroutePinCommits: [VerdictKey: UInt64] = [:]
     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
     var drainFollowUpScheduled = false

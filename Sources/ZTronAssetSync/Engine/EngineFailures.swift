@@ -821,12 +821,21 @@ extension SyncEngine {
                 }
             }
         }
+        // A pin of this job holds a waiting join only while the job is at an attempt's end (`waitingTarget`). When it is
+        // not, a chained join reaches it only where the engine's copy maps the join's id here, and the chain's walk can
+        // only turn that away (a pin of another job still at its end, or a copy that dropped the id), so a join the copy
+        // maps elsewhere is passed without its walk: walked, 10,000 joins through two layers took the lane from 6.75 to
+        // 10.49 ms (`BenchSync.joinChainTurns`, a 1-minute load of 9).
+        let atEnd = self.state.jobs[job.transfer].map { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil } ?? false
         // Whether a waiting join joins this job at the drain, re-routed as `replayJoin` re-routes it.
         func reaches(_ join: JoinAfterFollow) -> Bool {
             guard !join.withdrawn, !withdrawn.contains(join.token) else {
                 return false
             }
-            let listed = copy.entry(for: join.asset)
+            if join.chain != nil, !atEnd, !here(join.asset) {
+                return false
+            }
+            let listed = (self.joinListing(join) ?? copy).entry(for: join.asset)
             let target = join.listed && !(listed.map { SyncEngine.sameTransfer($0, join.entry) } ?? false) ? listed : join.entry
             guard let target, SyncEngine.sameTransfer(target, job.entry) else {
                 return false

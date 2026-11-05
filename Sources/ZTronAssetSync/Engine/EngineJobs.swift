@@ -129,7 +129,8 @@ extension SyncEngine {
         if self.defersToFollow {
             let listed = self.state.applied.entry(for: asset).map { SyncEngine.sameTransfer($0, entry) } ?? false
             self.state.joinsAfterFollow[token, default: [:]][asset] = transfer
-            self.deferToFollow(.join(JoinAfterFollow(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: listed)))
+            let chain = listed ? JoinChain(serial: self.state.copySerial, layers: []) : nil
+            self.deferToFollow(.join(JoinAfterFollow(token: token, asset: asset, entry: entry, lane: lane, kind: kind, listed: listed, chain: chain)))
             self.notifyObservers()
             return
         }
