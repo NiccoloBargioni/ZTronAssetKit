@@ -116,6 +116,10 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - route (b) is not authorised;
       - S3-R27 is the cycle's ruling.
     - After the checker: read its "remaining" list, decide each item, append the draft, and commit this file.
+  - **The cycle-21 requirements verifier returned at about 19:50:** not converged, **8 blocking** and 7 non-blocking. Six of the blocking items are the fixer's open items 1 to 6, routed by S3-R27 items 1 to 6. Two are new, and S3-R27 rules them in an added item 11:
+    - **ownership:** six new `Tests/ZTronAssetKitBenchmarks/BenchSync*.swift` files sit outside ARCHITECTURE §1.2's WP-F row. Planned ruling: authorise those exact paths (benchmark extensions only). The draft records the §1.2 addition as a proposed document change and corrects `s3f.md:7273-7274`.
+    - **`commitTurns(.manyGroups)` flaps:** best 10.27 and 10.96 ms in 2 of 4 runs at loads of 10 or less. Blocking, as the commit window was (S3-R26 item 4). Planned route: item 1's c3 and c1, c6 at the top of `publishTerminal`, and item 3's group-walk cut (no `Group` copy), all with item 1's decision rule.
+    - The correctness verifier is still running. The watcher for its result (`watch_journal.py <journal> 2 3`) runs as a background task.
     - Run 9's focus: "S3-R27 is this cycle's ruling (S3-R26 applies where S3-R27 does not change it)". Cycles 1–21 are on `wp/s3f` at `d5b2ab9`. It drops run 8's cut-off paragraph, and adds "keep the cycle-22 status list current; the weekly limit may cut this cycle off".
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
