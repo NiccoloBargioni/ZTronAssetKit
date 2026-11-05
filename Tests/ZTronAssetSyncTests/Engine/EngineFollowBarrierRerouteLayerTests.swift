@@ -142,13 +142,17 @@ extension EngineFollowBarrierTests {
     /// K0 maps zz-a1…zz-a3 to it, O's commit owes their re-routes, and K1 maps them to Z's content while P publishes (see
     /// `PinnedEnd`). P's publication then fails. Visited first, the commit re-routed W1…W3 onto P, K1's visit passed P
     /// publishing (RR-14) and P's end answered them. The replay pins the ids to P (K1's layer holds P among its ends), so
-    /// W1…W3 get P's failure and Z is never requested. Returns Q's answer with the outcome, and Z's starts.
+    /// W1…W3 get P's failure and Z is never requested. With `joining` (RR21-HOP's join variant, `integrate-rr21.md` R18),
+    /// v2 and K0 also list zz-j on P's content, which J requests once O's commit owes its batch: J's join waits behind the
+    /// batch in both orders, and K1 maps zz-j to Z's content too. Visited first, J joined P at once, K1's visit passed P
+    /// and P's end answered J. Returns Q's answer (and J's) with the outcome, and Z's starts.
     @available(macOS 15.0, iOS 18.0, *)
-    func publishingPin(_ visit: LaneDropVisit, seed: UInt64, end: PinnedEnd) async throws -> (outcome: LayerOutcome, zStarts: Int) {
+    func publishingPin(_ visit: LaneDropVisit, seed: UInt64, end: PinnedEnd, joining: Bool = false) async throws -> (outcome: LayerOutcome, zStarts: Int) {
         let pBytes = EngineFixture.bytes(seed + 5, count: 18)
         let zBytes = EngineFixture.bytes(seed + 6, count: 20)
         let p = EngineHarness.onDemand("zz-p", pBytes)
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p])
+        let joined = joining ? [EngineHarness.onDemand("zz-j", pBytes)] : []
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [p] + joined)
         let engine = c.engine
         let pT = p.transferID
         let onP = Self.movedOnto(pBytes, c)
@@ -164,13 +168,20 @@ extension EngineFollowBarrierTests {
         var held: HeldUnits
         switch end {
         case .integrity:
-            held = try await Self.oweThroughK0(c, k0: [p] + onP, publishing: [pT], visit: visit)
+            held = try await Self.oweThroughK0(c, k0: [p] + onP + joined, publishing: [pT], visit: visit)
         case .storageUnavailable:
-            held = try await Self.oweThroughK0(c, k0: [p] + onP, visit: visit)
+            held = try await Self.oweThroughK0(c, k0: [p] + onP + joined, visit: visit)
             await c.s.harness.source.release(pT, with: .progress(received: 0, expected: nil))
             await engine.awaitCondition { $0.state.jobs[pT]?.state == .verifying && $0.state.inboundWaits[pT] != nil }
         }
-        try await Self.applyBehindBatch(c.manifest([p] + onZ, round: 2), tag: "k1-hop-\(seed)", c)
+        var others = [q]
+        for entry in joined {
+            let id = entry.identifier
+            others.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, entry) }
+        }
+        let movedJoins = joined.map { EngineHarness.onDemand($0.identifier.rawValue, zBytes) }
+        try await Self.applyBehindBatch(c.manifest([p] + onZ + movedJoins, round: 2), tag: "k1-hop-\(seed)", c)
         #expect(await Self.pins(pT, c) == [true], "setup: K1's layer pins P, which publishes")
         switch end {
         case .integrity:
@@ -182,7 +193,7 @@ extension EngineFollowBarrierTests {
             let reason = await c.s.harness.store.verifyRootNow()
             try #require(reason == .rootVanished, "setup: the store's root no longer verifies: \(String(describing: reason))")
         }
-        let outcome = await Self.finishOwed(c, held: held, others: [q])
+        let outcome = await Self.finishOwed(c, held: held, others: others)
         let zStarts = await Self.starts(z, c)
         await Self.finishHeld(c.s)
         return (outcome, zStarts)
