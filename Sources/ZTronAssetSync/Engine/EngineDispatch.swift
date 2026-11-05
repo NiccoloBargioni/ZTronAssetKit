@@ -728,10 +728,11 @@ extension SyncEngine {
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
         self.state.admissionsForTests?.append(AttemptAdmission(transfer: transfer, ticket: job.ticket, place: job.queuePlace, attempt: attempt))
-        // A new attempt: the last publication's ids, its end and its verdict are behind it (`Job.rerouteOnPass`,
-        // `Job.attemptEnd`).
+        // A new attempt: the last publication's ids, its end and its verdict, and a transfer's ENOSPC end, are behind it
+        // (`Job.rerouteOnPass`, `Job.attemptEnd`, `Job.transferSpaceEnd`).
         job.rerouteOnPass = nil
         job.attemptEnd = nil
+        job.transferSpaceEnd = nil
         // The edge in force when the attempt starts, also for a place given behind the barrier: it starts on the live
         // gates (Stage 3 close-out cycle 15, ruling S3-R18 item 1), so an edge before this start is no edge it missed.
         job.active?.edgeSerial = self.state.networkEdgeSerial

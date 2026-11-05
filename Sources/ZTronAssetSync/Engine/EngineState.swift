@@ -837,6 +837,12 @@ struct Job {
     /// The applies followed when the latest attempt ended in a failure, and when its exit verdict deferred to the follow
     /// (`AttemptEnd`); `nil` from the start of an attempt (`start`) and once the drain gives the verdict.
     var attemptEnd: AttemptEnd?
+    /// The applies followed when the latest attempt's transfer ended in ENOSPC (`failed`): the job is failed from that
+    /// instant, and its verdict waits for the resume point's read and the free-space read (`spaceFailed`). A follow's
+    /// visit inside them for an apply made before it stands for a visit-first engine's visit, which met the job
+    /// downloading, whose re-lane re-queues nothing (`relane`; Stage 3 close-out cycle 21, the transfer's side of ruling
+    /// S3-R26 item 5, probe (i)). A publication's end is `attemptEnd`'s. `nil` from the start of an attempt (`start`).
+    var transferSpaceEnd: UInt64?
     /// The error interests will receive if the job ends now.
     var lastError: AssetError?
 

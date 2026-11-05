@@ -194,6 +194,10 @@ extension SyncEngine {
         case .insufficientSpace(let required):
             // Undecided until the free space is read: parked, retried or awaiting the reaper (`spaceFailed`).
             self.transition(transfer, to: .failed(.nextRun))
+            // The transfer ended, in this turn, before the reads below (`Job.transferSpaceEnd`). Read before the job is
+            // written: an optional-chained assignment holds the state across its right side.
+            let applies = self.state.appliesFollowed
+            self.state.jobs[transfer]?.transferSpaceEnd = applies
             // The bytes written before ENOSPC stay in the attempt's partial and occupy the space that is short: kept
             // for resume when a sidecar makes them resumable, otherwise discarded now (R-CLN-3, L4-R6).
             // REENTRANCY: f-2 (proposed) — the lifecycle and the epoch, re-checked right below.

@@ -304,7 +304,7 @@ extension SyncEngine {
                 self.pauseIfRefused(transfer)
             }
         case .failed(let disposition):
-            if let end = job.attemptEnd, end.deferredAfter != nil || (self.state.inFollowVisit && self.state.appliesFollowed == end.failedAfter) {
+            if job.attemptEnd?.deferredAfter != nil || (self.state.inFollowVisit && self.state.appliesFollowed == (job.attemptEnd?.failedAfter ?? job.transferSpaceEnd)) {
                 // The attempt's verdict waits for the follow (`defersFailure`, or an ENOSPC's in `spaceFailed`;
                 // `recordDeferredVerdict`). Only the follow's own visit, an attempt's end that brings a visit's interests
                 // forward (`bringInbound`), or an event the drain applies before the verdict, re-lanes such a job: each
@@ -321,8 +321,10 @@ extension SyncEngine {
                 // which met the job publishing on a visit-first engine. Re-queued for a user interest (T20), the job's
                 // ENOSPC verdict was skipped (`decideSpaceFailure` returns for a queued job): the attempt went uncounted,
                 // and at the cap the interests got a second request's answer where that engine's verdict gave them the
-                // space figures (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)). A visit for an apply made
-                // since the end met the job failed, as that engine's did, and skips the backoff (T20).
+                // space figures (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)). A transfer's ENOSPC has the
+                // same window before its reads (`failed`), its end recorded as `Job.transferSpaceEnd`: that engine's visit
+                // met the job downloading, whose re-lane re-queues nothing either. A visit for an apply made since the end
+                // met the job failed, as that engine's did, and skips the backoff (T20).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {

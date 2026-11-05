@@ -11,9 +11,10 @@ import ZTronAssetTestSupport
 /// read's turn runs one follow turn behind the barrier (`advanceFollowForSpaceSweep`), whose join re-lanes the job. A
 /// visit-first engine's visit had joined the id to the job publishing, whose re-lane re-queues nothing (`relane`), so
 /// the ENOSPC's verdict stood: at an interactive cap of one attempt it answers every interest with the space figures
-/// and ends the job. Each test runs in both orders and expects the visit-first answers in both; the last one is the
-/// window's other side, a visit for an apply made after the end, and `EngineRunPathTests` holds the request outside any
-/// follow (`userSkipsAFailedPublicationsBackoff`).
+/// and ends the job. A transfer's ENOSPC opens the same window before its reads (the second test). Each test runs in
+/// both orders and expects the visit-first answers in both; the last one is the window's other side, a visit for an
+/// apply made after the end, and `EngineRunPathTests` holds the request outside any follow
+/// (`userSkipsAFailedPublicationsBackoff`).
 extension EngineFollowBarrierTests {
     /// Whether `result` is the ENOSPC verdict's answer, the space figures.
     static func isNoSpace(_ result: Result<AssetLocation, AssetError>) -> Bool {
