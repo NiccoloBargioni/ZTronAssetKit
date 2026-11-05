@@ -632,7 +632,12 @@ extension SyncEngine {
     /// the verdict waits for the follow, whose visit moves that id first (`defersFailure`, F-28), so its interest waits
     /// for its new content, never `.notFound` while it is listed (F-20; the close-out cycle-2 correctness lens,
     /// PROBE-W4).
-    func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, then follow: () -> Void = {}) {
+    ///
+    /// With `boundOnly`, a commit answers each interest only the ids it bound, and an interest it bound none of not at
+    /// all, as it answers a job trimmed to them first (`committed`, which owes the other ids' re-routes and retires the
+    /// job untrimmed); the terminal events read the lane of the interests it answered, as they read a trimmed job's.
+    /// Counting an interest's unbound ids allocates nothing, and only a partly bound interest is copied.
+    func resolveAll(_ transfer: TransferID, with outcome: InterestOutcome, boundOnly: Bool = false, then follow: () -> Void = {}) {
         if case .failed(let answer) = outcome, self.defersFailure(transfer, .resolve(answer)) {
             return
         }
@@ -642,12 +647,27 @@ extension SyncEngine {
         // `deliver` never writes `state.jobs` (it writes waiters, groups, the run and heals; a resumed caller runs
         // after this turn), so the copy's interests are the job's at every delivery: no sort and no re-read (step C2).
         // The callers resume in the table's order, an accepted order (S3-R16 item 2; Stage 3 close-out cycle 21).
+        var bound: [AssetID: AssetLocation]?
+        if boundOnly, case .committed(let locations, _) = outcome {
+            bound = locations
+        }
+        var answered = InterestCounts()
         for (token, interest) in job.interests {
-            self.deliver(outcome, to: token, interest: interest, transfer: transfer)
+            guard let bound else {
+                self.deliver(outcome, to: token, interest: interest, transfer: transfer)
+                continue
+            }
+            let unbound = interest.assets.reduce(0) { count, asset in bound[asset] == nil ? count + 1 : count }
+            if unbound > 0, unbound == interest.assets.count {
+                continue
+            }
+            let narrowed = unbound == 0 ? interest : JobInterest(lane: interest.lane, kind: interest.kind, assets: interest.assets.filter { bound[$0] != nil })
+            answered.add(narrowed)
+            self.deliver(outcome, to: token, interest: narrowed, transfer: transfer)
         }
         self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
-        self.publishTerminal(job: job, outcome: outcome)
+        self.publishTerminal(job: job, outcome: outcome, lane: bound == nil ? job.lane : job.lane(counting: answered))
         follow()
         self.checkRunSettled()
     }
@@ -655,9 +675,10 @@ extension SyncEngine {
     /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023), in ascending id order.
     /// A commit walks its binding, which `publish` sorted: the store binds only ids of it, so the bound ids of
     /// `job.assets` come in the order `job.assets.sorted()` gave them, with no sort (step C3). The subscriber keys are
-    /// sorted once for every event (step C8).
-    func publishTerminal(job: Job, outcome: InterestOutcome) {
-        guard job.lane > .bulk else {
+    /// sorted once for every event (step C8). `lane` is the lane of the interests the outcome answers: the job's, unless
+    /// a commit answered each interest only its bound ids (`resolveAll`'s `boundOnly`).
+    func publishTerminal(job: Job, outcome: InterestOutcome, lane: AssetPriority) {
+        guard lane > .bulk else {
             return
         }
         let keys = self.state.subscribers.keys.sorted()

@@ -841,7 +841,14 @@ struct Job {
     /// of 512 ids off a job of 10,000 user waiters held the actor 33 to 71 ms (Stage 3 close-out cycle 20, ruling S3-R25
     /// item 2; the cycle-19 correctness verifier's PROBE-C19C-USER-SHARED-C2, `BenchSync.userSharedApplyTurns`).
     var lane: AssetPriority {
-        self.interestCounts.highest ?? self.heldLane ?? .bulk
+        self.lane(counting: self.interestCounts)
+    }
+
+    /// The lane the job has with the interests `counts` counts: their highest, else the lane a claim keeps, else bulk
+    /// (`lane`). A commit that answered each interest only its bound ids reads its terminal events' lane here, from the
+    /// interests it answered (`SyncEngine.resolveAll`).
+    func lane(counting counts: InterestCounts) -> AssetPriority {
+        counts.highest ?? self.heldLane ?? .bulk
     }
 
     /// Whether a user-initiated interest is a single request (served before batches, sync.md §7.2).

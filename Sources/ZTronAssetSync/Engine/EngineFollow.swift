@@ -723,7 +723,8 @@ extension SyncEngine {
             return batch.copy
         }
         for (index, layer) in batch.layers.enumerated() {
-            if let epoch = layer.ends[entry.transferID] {
+            // A layer no job was at an attempt's end at (most) is passed without formatting the entry's transfer.
+            if !layer.ends.isEmpty, let epoch = layer.ends[entry.transferID] {
                 return self.waitingTarget(entry.transferID, epoch: epoch) != nil ? layer.outgoing : nil
             }
             let incoming = index + 1 < batch.layers.count ? batch.layers[index + 1].outgoing : self.state.applied

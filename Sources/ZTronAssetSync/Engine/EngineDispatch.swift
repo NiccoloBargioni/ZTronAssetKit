@@ -1104,12 +1104,17 @@ extension SyncEngine {
     /// commit whose answers and re-routes fit `inboundIDsNow` together makes the re-routes in this turn, the calls and
     /// their order unchanged (each list by token, then id; the moved ones at once, the others once the job is gone); one
     /// whose do not owes every re-route as one batch, which the drain makes at its place, a drain turn's ids a turn
-    /// (`deferReroutes`). The interests are read once, unsorted, and trimmed in place afterwards, no copy of the job
-    /// alive across a change (D11). The trims come before the moved ones' re-routes, which interleaved with them: a
-    /// re-route reads only the item's lane and kind, and writes the run, a waiter, a group, a heal and the job of the
-    /// id's new content, never this one (a moved id's entry names another content), so the two touch disjoint state.
+    /// (`deferReroutes`). The interests are read once, unsorted, and each id is classified by its entry in the copy
+    /// against the job's (`sameTransfer`; a job's entry is its transfer's, `addInterest`), no transfer formatted: a
+    /// format an id held a 10,000-id commit's turn 4.5 to 5.0 ms (`BenchSync.commitRerouteWaitersTurns`). A commit that
+    /// re-routes in this turn trims the interests in place afterwards, no copy of the job alive across a change (D11),
+    /// before the moved ones' re-routes, which interleaved with them: a re-route reads only the item's lane and kind,
+    /// and writes the run, a waiter, a group, a heal and the job of the id's new content, never this one (a moved id's
+    /// entry names another content), so the two touch disjoint state. One that owes them answers each interest its
+    /// bound ids only and retires the job untrimmed (`resolveAll`'s `boundOnly`): the trims released the index an id
+    /// for a job removed whole in the same turn, 3.2 to 4.8 ms of that turn.
     private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
-        guard self.state.jobs[transfer] != nil else {
+        guard let jobEntry = self.state.jobs[transfer]?.entry else {
             return
         }
         // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).
@@ -1129,7 +1134,7 @@ extension SyncEngine {
                 trims.append((token, unbound.count == interest.assets.count, unbound))
                 for asset in unbound {
                     let item = RerouteItem(asset: asset, token: token, lane: interest.lane, kind: interest.kind)
-                    if self.state.applied.entry(for: asset)?.transferID != transfer {
+                    if !(self.state.applied.entry(for: asset).map({ SyncEngine.sameTransfer($0, jobEntry) }) ?? false) {
                         moved.append(item)
                         continue
                     }
@@ -1140,22 +1145,22 @@ extension SyncEngine {
                 }
             }
         }
-        for trim in trims {
-            if trim.whole {
-                self.state.jobs[transfer]?.setInterest(nil, for: trim.token)
-            } else {
-                self.state.jobs[transfer]?.subtractAssets(trim.unbound, for: trim.token)
-            }
-        }
         let rerouted = moved.count + deferred.count
         if rerouted > 0, locations.count + rerouted > self.inboundIDsNow {
-            self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
+            self.resolveAll(transfer, with: .committed(locations, ascending: ids), boundOnly: true) {
                 if refused {
                     self.holdForManifest(transfer)
                 }
                 self.deferReroutes(moved + deferred, from: transfer)
             }
         } else {
+            for trim in trims {
+                if trim.whole {
+                    self.state.jobs[transfer]?.setInterest(nil, for: trim.token)
+                } else {
+                    self.state.jobs[transfer]?.subtractAssets(trim.unbound, for: trim.token)
+                }
+            }
             moved.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
             deferred.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
             for item in moved {

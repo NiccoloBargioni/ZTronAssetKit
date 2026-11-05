@@ -55,6 +55,16 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         try await Self.commitRerouteTurns(shape, label: "10,000 ids v4 dropped")
     }
 
+    /// C2 of a commit at the fit edge for a 10,000-member prefetch group (`critic-commit-window.md`'s fit case, in the
+    /// commit's turn): 255 of its members share H's content with K, and v4 drops them while H publishes, so K's location
+    /// and the 255 re-routes fit `inboundIDsNow` and the commit's own turn ends the 255 interests (T21), the group
+    /// dropping each member in place; its other 9,744 members wait on G's content.
+    @Test("R-SYN-11: a commit that ends the interests of 255 delisted members of a 10,000-member group in its own turn holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(10)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func groupDelistedFit() async throws {
+        try await Self.commitRerouteTurns(.delistedGroupFit, label: "255 delisted members of a 10,000-member group, at the fit edge")
+    }
+
     /// C2 of a purge of everything while a 10,000-pair batch of prefetch re-routes waits (`withdrawPurgedJoins`' arm:
     /// `removeAll(where:)`, the sort of the removed items, and `dropGroupMember` for each).
     @Test("R-SYN-11: a purge while 10,000 re-routes are owed holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(10)))
@@ -141,6 +151,10 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
     case delistedGroup
     /// v4 drops every moved id, a user waiter per id (`groupDelistedAll`).
     case delistedWaiters
+    /// 255 members on H's content, which v4 drops, and the group's other members on G's content (its download held),
+    /// one prefetch group of K and every member: K's location and the 255 re-routes fit the commit's turn
+    /// (`groupDelistedFit`).
+    case delistedGroupFit
     /// Every moved id to D's content, one prefetch group; while the batch is owed, P's publication begins (its binding
     /// waits for the batch) and v5 and v6 are applied (`applyWhileOwedLayers`).
     case appliesWhileOwed
@@ -186,6 +200,11 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
         }
         need(run.committed && run.served, "the commit bound K and answered its waiter")
         need(run.violations.isEmpty, "no invariant violation")
+        if self == .delistedGroupFit {
+            need(run.batchesAtCommit == 0 && run.owedAtCommit == 0, "the commit owes nothing: K and the 255 re-routes fit its turn")
+            need(run.pendingAtCommit == count - SyncEngine.followIDsPerTurn / 2, "the group waits for G's \(count - SyncEngine.followIDsPerTurn / 2) members only after the commit: \(run.pendingAtCommit)")
+            return issues
+        }
         if self == .waitersBound {
             need(run.batchesAtCommit == 0 && run.owedAtCommit == 0, "the commit owes nothing")
             need(run.answered == count, "the commit answers every waiter")
@@ -204,6 +223,8 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
             need(run.groupsAnswered, "the group stops waiting for every member")
         case .delistedWaiters:
             need(run.notFound == count, "every waiter is answered .notFound")
+        case .delistedGroupFit:
+            break
         case .purgeWhileOwed:
             need(run.owedBeforeDrain == 0 && run.groupsAnswered, "the purge withdraws every owed re-route, and the group stops waiting for its members")
         case .waitersBound:
@@ -255,6 +276,8 @@ struct CommitRerouteBenchRun: CustomStringConvertible {
     var notFound = 0
     /// Whether every group had no member left to answer at the end.
     var groupsAnswered = false
+    /// The members the groups still waited for after the commit (`.delistedGroupFit`).
+    var pendingAtCommit = 0
     /// Whether D's content had a job after a held turn (`.userToBound`, `.groupToBound`).
     var targetJob = false
     /// The joins waiting behind the batch (`.waiters`).
@@ -313,11 +336,15 @@ extension SyncBench {
         let dBytes = Data(repeating: 0x64, count: 16)
         let pBytes = Data(repeating: 0x70, count: 16)
         let kept = SyncBench.entry("k", hBytes, policy: .onDemand)
-        let members = SyncBench.sharing(count, hBytes)
+        // At the fit edge, K and H's members are `inboundIDsNow`; the group's other members share G's content.
+        let onH = shape == .delistedGroupFit ? SyncEngine.followIDsPerTurn / 2 - 1 : count
+        let members = SyncBench.sharing(onH, hBytes)
+        let gBytes = Data(repeating: 0x67, count: 16)
+        let elsewhere = shape == .delistedGroupFit ? (0..<(count - 1 - onH)).map { SyncBench.entry(String(format: "g%05d", $0), gBytes, policy: .onDemand) } : []
         let d = SyncBench.entry("d", dBytes, policy: .onDemand)
         let p = SyncBench.entry("p", pBytes, policy: .onDemand)
         let extra = (shape.listsD ? [d] : []) + (shape == .appliesWhileOwed ? [p] : [])
-        await source.scriptManifest([.fetched(SyncBench.manifestData([kept] + members + extra), etag: ETag(rawValue: "\"v2\""))])
+        await source.scriptManifest([.fetched(SyncBench.manifestData([kept] + members + extra + elsewhere), etag: ETag(rawValue: "\"v2\""))])
         guard await engine.sync(.force).isComplete else {
             throw SyncBenchError.incomplete("the second sync did not complete")
         }
@@ -339,6 +366,10 @@ extension SyncBench {
             await source.script(d.transferID, [.hold])
         case .waiters, .twoTokens, .purgeWhileOwed:
             await source.script(d.transferID, [.hold])
+        case .delistedGroupFit:
+            if let away = elsewhere.first {
+                await source.script(away.transferID, [.hold])
+            }
         case .divergent, .waitersBound, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters:
             break
         }
@@ -352,7 +383,7 @@ extension SyncBench {
         }
         var groups: [InterestToken] = []
         for _ in 0..<shape.groups {
-            guard case .success(let token) = await engine.registerGroup(([kept] + members).map(\.identifier), lane: .prefetch) else {
+            guard case .success(let token) = await engine.registerGroup(([kept] + members + elsewhere).map(\.identifier), lane: .prefetch) else {
                 throw SyncBenchError.incomplete("the prefetch group was refused")
             }
             groups.append(token)
@@ -364,6 +395,9 @@ extension SyncBench {
             }
             others.append(d.transferID)
         }
+        if let away = elsewhere.first {
+            others.append(away.transferID)
+        }
         var pWaiter: Task<Result<AssetLocation, AssetError>, Never>?
         if shape == .appliesWhileOwed {
             pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .userInitiated) }
@@ -373,7 +407,7 @@ extension SyncBench {
         var spins = 0
         while !Task.isCancelled {
             let now = await SyncBench.userHolding(engine, holder)
-            if now.ids == count + 1, now.interests == interests, await SyncBench.isRunning(engine, holder), await SyncBench.allRunning(engine, others) {
+            if now.ids == onH + 1, now.interests == interests, await SyncBench.isRunning(engine, holder), await SyncBench.allRunning(engine, others) {
                 break
             }
             spins += 1
@@ -404,6 +438,9 @@ extension SyncBench {
         case .delistedGroup, .delistedWaiters:
             moved = []
             v4 = [kept]
+        case .delistedGroupFit:
+            moved = []
+            v4 = [kept] + elsewhere
         case .waiters, .twoTokens, .userToBound, .groupToBound, .appliesWhileOwed, .rateLimitWhileOwed, .purgeWhileOwed:
             moved = SyncBench.sharing(count, dBytes)
             v4 = [kept] + moved + extra
@@ -441,6 +478,7 @@ extension SyncBench {
         run.owedAtCommit = atCommit.owed
         run.batchesAtCommit = atCommit.batches
         run.pairsAtCommit = await SyncBench.owedPairs(engine)
+        run.pendingAtCommit = await SyncBench.groupsPending(engine, groups)
         run.violations += atCommit.violations
         switch shape {
         case .waiters:
@@ -506,7 +544,7 @@ extension SyncBench {
                 ticker.cancel()
                 _ = await ticker.value
             }
-        case .divergent, .waitersBound, .twoTokens, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters:
+        case .divergent, .waitersBound, .twoTokens, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters, .delistedGroupFit:
             break
         }
         var owed = await SyncBench.owedReroutes(engine)
@@ -600,6 +638,11 @@ extension SyncBench {
     /// Whether every one of `transfers` has a job that runs.
     static func allRunning(_ engine: isolated SyncEngine, _ transfers: [TransferID]) -> Bool {
         transfers.allSatisfy { SyncBench.isRunning(engine, $0) }
+    }
+
+    /// The members `groups` still wait for, together.
+    static func groupsPending(_ engine: isolated SyncEngine, _ groups: [InterestToken]) -> Int {
+        groups.reduce(0) { total, token in total + (engine.state.groups[token]?.pending.count ?? 0) }
     }
 
     /// The distinct ids every waiting batch of re-routes owes.

@@ -301,7 +301,7 @@ extension SyncEngine {
         guard let remaining = self.state.jobs[transfer], !remaining.interests.isEmpty || (claimOnly && self.claimRetries(remaining, attempts: attempts)) else {
             if self.state.jobs[transfer] != nil {
                 self.transition(transfer, to: .failed(.nextRun))
-                self.publishTerminal(job: job, outcome: .failed(assetError))
+                self.publishTerminal(job: job, outcome: .failed(assetError), lane: job.lane)
                 self.removeJob(transfer)
             }
             self.checkRunSettled()
@@ -857,10 +857,12 @@ extension SyncEngine {
             case .system:
                 break
             }
-            guard let entry = (self.rerouteListing(item.asset, batch) ?? copy).entry(for: item.asset), !self.isBound(item.asset, to: entry.transferID) else {
+            // The content before the binding, which is then read at this job's transfer: no transfer is formatted (an
+            // item formatted up to three, 14 ms for 10,000 items through two layers; `BenchSync.lane429WhileOwed`).
+            guard let entry = (self.rerouteListing(item.asset, batch) ?? copy).entry(for: item.asset), SyncEngine.sameTransfer(entry, job.entry) else {
                 return false
             }
-            return SyncEngine.sameTransfer(entry, job.entry)
+            return !self.isBound(item.asset, to: job.transfer)
         }
         if lane != .userInitiated {
             for event in self.state.eventsAfterFollow {

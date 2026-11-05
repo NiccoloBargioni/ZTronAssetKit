@@ -5143,9 +5143,12 @@ fix (S3-R26 item 11, "Red first").
    (`MUT_TIMEOUT=300`; a hang counts as a kill, as a test's time limit does). On this state `verify.sh --quick` ended
    `VERIFY: PASS` (`c3-quick.log`, 1-minute loads 4.75 to 8.75, the mutants running), and the release build with
    warnings as errors, `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%) passed (`c3-release.log`, `c3-gates.log`).
-   The five pins that miss C2 are committed red on their own (`BenchSyncReroutePins.swift`; their figures under
-   "Step 5"). **Next action:** the commit turn's and `followedLane`'s fix and its figures; then the mutants' results
-   and survivors.
+   The five pins that miss C2 are committed red on their own (`f4f35bd`, `BenchSyncReroutePins.swift`; their figures
+   under "Step 5"), then the commit turn's and `followedLane`'s fix with T-ANNOUNCE-OWED and `groupDelistedFit`: all
+   five pass (figures under "Step 5"). rr21-C3's mutants were stopped after b20-no-layer-call for the timing runs
+   (b21-no-hold-term's first run, in progress, left no result and runs again). **Next action:** the C3 mutants from b21-no-hold-term
+   (`mut21-c3c.txt`), then the fix's (`mut21-c3fix.txt`), their results and survivors; meanwhile the PIN-END probe and
+   rr21-C4.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5694,6 +5697,43 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   ran the tests concurrently (`--no-parallel` does not serialise it; 1,405 overlapping starts). **Unconfirmed:**
   that C1's `lazy var` compiles under Swift 6.3 (only 6.4 is installed; it compiles there with warnings as errors),
   and `PROBE-RR21-RESERVE-REJOIN`'s reachability (rr21-C6).
+- **The commit turn's and `followedLane`'s fix** (after `f4f35bd`, the five pins' red commit). `committed` classifies
+  each unbound id by its entry in the copy against the job's (`sameTransfer`; a job's entry is its transfer's,
+  `addInterest`), no transfer formatted. A commit that re-routes at once is unchanged: it trims, then makes the moved
+  re-routes, then answers. One that owes them answers through `resolveAll(_:with:boundOnly:then:)` and does not trim:
+  each interest is answered only its bound ids (its unbound ids counted without an allocation; a partly bound one
+  copied, a wholly unbound one skipped), and the terminal events read the lane of the interests answered
+  (`Job.lane(counting:)`, `publishTerminal(job:outcome:lane:)`), so the answers, the run's claims, the groups' pending
+  members, the heals and the events are those of the trimmed job; only the delivery order is the untrimmed table's, an
+  accepted order (S3-R16 item 2), as the trimmed table's was. `followedLane`'s `.reroutes` arm checks the content
+  before the binding, which it then reads at the job's own transfer, and `rerouteListing` reads a layer's `ends` only
+  where the layer has one. **T-ANNOUNCE-OWED** (`EngineFollowBarrierRerouteAnnounceTests.swift`, both orders, the
+  kept id wanted by a bulk group and by a prefetch group): the owing commit and the at-once commit announce the same
+  ids, none for the bulk group and zz-o for the prefetch one, and give the same answers; 4 cases pass
+  (`each/announce-1.log`). The whole Sync suite passes on the fix (631 tests, `each/fix-sync-1.log`), and on the
+  fix with T-ANNOUNCE-OWED `verify.sh --quick` ended `VERIFY: PASS` (632 Sync tests; `c3fix-quick.log`), with the
+  release build with warnings as errors, `UNSAFE: PASS` (0 escapes) and `DOCS: PASS` (100.0%) (`c3fix-release.log`,
+  `c3fix-gates.log`).
+  The figures after it, release, best of 3, the timing lock held, 1-minute loads 7.20 to 5.69 (`each/fixA-1.log`,
+  `each/fixB-1.log`): `commitRerouteWaitersTurns` 7.53 ms (the commit's own turn 4.32 to 4.38 ms; it was 11.54),
+  `commitTwoTokensTurns` 8.86 ms (its own turn 8.85 to 9.36 ms; 18.43), `userMovedToBound` 4.47 ms (11.46),
+  `applyWhileOwedLayers` 7.54 ms (its own turn 4.95 to 5.05 ms, the two applies 4.08 to 4.37 ms; 10.06),
+  `lane429WhileOwed` 5.36 ms (`followedLane` 5.24 to 5.33 ms, the median of 21 calls; 14.00): all five pass.
+  `concentrationPublicationTurns` 6.00 ms, `concentrationCommitRerouteTurns` 7.43 ms, `commitRerouteDivergentTurns`
+  4.93 ms, `groupMovedToBound` 4.80 ms, `groupDelistedAll` 4.03 ms (group) and 3.55 ms (waiters),
+  `purgeWhileOwedTurns` 9.51 ms (9.74, 9.72, 9.51), `commitFitBoundaryTurns` 1.29 ms at once and 1.13 ms owed. The
+  purge's margin is thin: the arm sorts the removed items by (asset, token), 2.26 ms for 10,000 items in a standalone
+  `-O` measurement (`.build-s3f/tmp/sortbench`), an order no caller sees, since an ensure group's interest is user
+  work the arm never withdraws and the other drops change only their own entries. `integrate-rr21.md` R15 sorts, so the
+  sort stays; dropping it is the remedy if a later figure misses. **`groupDelistedFit`** (the commit-window critic's fit
+  case, built here: 255 members of a 10,000-member group on H's content delisted while H publishes, the other 9,744 on
+  G's) 0.43 ms, its own turn 0.42 to 0.44 ms; it passed on its first run, so it lands with the fix.
+  `commitTurns` re-measured after the rewrite (ruling S3-R26's step 2, "after `committed`'s rewrite"; `each/fixC-1.log`,
+  loads 4.47 to 4.80): `.waiters` 11.57 ms (its own turn 11.37 ms), `.waitersStalledSubscriber` 15.11 ms (14.85 ms),
+  `.groupStalledSubscriber` 8.80 ms, `.manyGroups` 9.96 ms (9.96 to 10.14), two stalled subscribers 18.14 ms
+  (recorded); the commit owes no re-route in any of them, so these are item 4's figures: Phase 2's triggers still fire
+  (step 6), and `.manyGroups`, which Phase 2 cannot cut, passes by 0.04 ms. The fix's mutants (`tools/mut-c3fix.py`,
+  f1 to f11, on a snapshot of the fixed sources) run after rr21-C3's resume.
 
 ## Items
 
