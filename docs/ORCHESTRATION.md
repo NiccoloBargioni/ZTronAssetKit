@@ -130,6 +130,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - 11.8: the correctness verifier's findings reach the fixer through the findings file, under the "named finding" rule.
     - Next: read the correctness verifier's blocking items when it returns. Add an S3-R27 item only for a finding that needs a route this ruling does not give; any other unnamed finding follows S3-R16, as the ruling's header says. Then follow the run 9 steps above.
     - Run 9's arguments are drafted at `.build-orchestrator/s3-fix-args-run9.json` (20:10): run 8's, with `fromCycle: 22`, `findingsFile: s3f-c21-issues.json` and cycle 22's focus. Usage at 20:05: weekly 35 %, Fable 21 %.
+  - **Run 8 stopped at 20:15.** The correctness verifier's result landed at 20:14, and run 8 then started its cycle-22 fixer (`fix:s3f:c22`); it was stopped before it changed anything. The worktree is clean at `d5b2ab9`, there is no `sim.lock`, and set 1 is shut down.
+    - `s3f-c21-issues.json` is written: reqs 15 issues, 8 blocking; correct 7 issues, 6 blocking.
+    - Correct #3 to #6 are named by S3-R27: items 1, 3, 4, and 5 with 6. Correct #7 is P-13 (WP-B's). Two are new:
+      - **Correct #1, a wrong answer** (S3-R16 1(a)). An owed re-route or a waiting join is pinned to a job that a drained publication's ENOENT re-queued at the same epoch. It follows the later copy and answers ok, where visit-first answers notFound from the re-queued attempt's 404 (PROBE-C21C-PIN-ENOENT-404, 2/2 per case). This falsifies S3-R26 answer 6.3's "this equals the reference" for a terminal failure of the fresh attempt.
+      - **Correct #2, the purge's first turn** (S3-R16 1(f)). `withdrawPurged` walks every job in one turn: 53.9 ms best at 10,000 jobs (one per member of one prefetch group), and 12.2 ms for one job of 10,000 ids. `withdrawPurgedJoins` takes 11.5–13.0 ms with about 9,200–9,500 waiting joins. All were measured at loads under 8. S3-R27 item 2 had estimated the jobs' side at 17–33 ms and allowed it only a branch-free route.
+    - Both need a route before the fixer starts. So a read-only analysis runs first:
+      - E1 (correct #1) and E2 (correct #2), each with an independent review, writing `e1-pin-requeue*.md` and `e2-purge*.md` in `s3f-c21-analysis/`;
+      - then S3-R27 gets an item 12 from them, and run 9 launches after it.
+    - Forecast: about 1.5 h and 2–4 weekly points for the analysis and item 12.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
