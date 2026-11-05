@@ -152,6 +152,19 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       4. launch run 9.
     - **Re-forecast at 21:58** (weekly **39 %**, Fable 21 %): with item 12, cycle 22's fixer work is about 55–90 h. At 0.65–1.8 points an hour that is well above the 61 points left, so the weekly limit will cut off cycle 22. It resumes after the reset (Thu 12 Nov 03:00). Wall time would fit: about 148 h are left.
     - **Follow-up (orchestrator):** have route B re-specified, with its review's corrections, and reviewed, for S3-R28. Do it after cycle 22's fixer reports, or after the reset.
+  - **S3-R27 item 12 was appended at 23:20.** It is at rulings lines 1049–1276, so S3-R27 now spans lines 722–1276. The file before it is kept as `s3-rulings-s3f.md.before-item12`.
+    - The item-12 run (`wf_91931045-ebe`) took 4 agents, 79 min and 1.15 M subagent tokens. Both checks returned CORRECTED (fidelity 2 must-fix items, consistency 5), and the editor applied all 7.
+    - Item 12's sub-items:
+      - 12.1: the owner's ruling.
+      - 12.2: correct #1. The route is e1-R1, with tests T-E1 to T-E5 and probes e1-PS, e1-P1, e1-P2, e1-P3 and e1-PR.
+      - 12.3: correct #2, with reqs #4. e2-A1 comes first, then e2-A2 if a case is still above 8.5 ms. e2-B is not authorised. Eleven purge cases are gated, the user-waiter case in two variants.
+      - 12.4: the order of work.
+      - 12.5: 20 points settled by the orchestrator. Among them:
+        - the Benchmarks stage alone may stay red across e2-A1's and e2-A2's part commits, for the 12.3 cases only;
+        - a probe is blocking only when it breaks S3-R16 item 1;
+        - the cycle-21 pin mutants are rewritten in `.build-s3f/c22/tools/`;
+        - a `.scope` miss counts as other-wp:a only when measured to be the entry copy alone.
+    - Run 9's focus now names items 11 and 12, the e1 and e2 analyses, and the owner's ruling.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
