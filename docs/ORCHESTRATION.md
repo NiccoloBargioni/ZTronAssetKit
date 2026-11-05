@@ -80,6 +80,23 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     3. Write `.build-orchestrator/s3f-c21-issues.json` from the two verifier results, in `s3f-c20-issues.json`'s shape (`cycle`, `head`, `lenses.reqs`, `lenses.correct`).
     4. Write `s3-fix-args-run9.json` from run 8's, with `fromCycle: 22` and `findingsFile: s3f-c21-issues.json`. Its focus names S3-R27 as the cycle's ruling and drops the cut-off paragraph.
     5. Launch run 9 once S3-R27 is appended, as on 1 Nov (S3-R25's second ruling).
+  - **Usage at 18:57:** weekly all models **30 %**, Fable 21 %. That is 6 points in 62 min, with the two verifiers, the five analysts and this session running: about 0.85 points an hour an agent.
+  - **Forecast for five more cycles, 22 to 26** (the owner asked at 18:57: "Assume we need 26 cycles, would this fit within this week"):
+    - **Wall time fits.** About 150 h are left before the Thu 12 Nov 03:00 reset. Cycle 22 takes about 12–22 h, since it carries S3-R27's design changes; cycles 23–26 about 6–12 h each, as cycles 19 and 20 did. That is 50–100 h, plus 8–16 h for the merge, the post-convergence checks and Stage 5.
+    - **Usage does not, at today's rates.**
+      - About 60–64 points are left when cycle 22 starts (about 21:00, at 36–40 %).
+      - Cycle 22 costs about 15–30 points; each later cycle about 10–16 (the fixer 0.65–1.8 points an hour, and 4–6 for the two verifiers). Cycle 21 cost about 30–38 in all.
+      - Five cycles therefore need about 55–95 points, before the merge and Stage 5 (10–20).
+      - Central case: 37 → 57 % after cycle 22 (Fri afternoon), then about 70, 83 and 96 % after cycles 23–25 (Sat evening). The limit arrives early in cycle 26, so about four days are left idle before the reset.
+      - Five fit only in the optimistic case (15, then 10 a cycle), with nothing left for the merge.
+    - **Levers that would bring five within reach:**
+      - rule between cycles from the fixer's report alone, with no read-only analysis run (S3-R27's cost about 6–10 points);
+      - start a fresh orchestrator session each cycle (this one's context is about 240 k tokens, which makes every turn dearer);
+      - merge and run Stage 5 after the reset;
+      - get the owner's scope rulings on PROBE-C21-HOLDERS and the second subscriber;
+      - use Sonnet verifiers, which are cheaper but weaken the bar (the owner's choice).
+      Under "near the limit: launch anyway", the cycles run until the limit, and the rest resumes after the reset.
+    - **Twenty-six more cycles** fit neither budget: 150–600 h of wall time and several hundred points. Run 9's `maxCycle` is 30 in any case.
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
 - **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
