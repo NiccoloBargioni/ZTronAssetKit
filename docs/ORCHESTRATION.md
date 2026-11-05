@@ -170,6 +170,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - The keep-awake was renewed at 23:21 as task `bmt90jpqj` (`caffeinate -ims -t 345600`, up to about Mon 9 Nov 23:25). Stop it when run 9 ends.
     - Expected: the weekly limit cuts cycle 22 off, probably inside the fixer. Every finished step is committed on `wp/s3f`, and the cycle resumes after the reset (Thu 12 Nov 03:00).
     - Next: when the fixer returns, check its report against S3-R27 items 1–12, rule its put-backs, and let run 9's verifiers run.
+    - Usage at 23:27: weekly **42 %**, Fable 21 %. The two analysis runs for item 12 cost about 7 points (35 % → 42 %). This session's context was at 77 %. If it compacts or ends, resume from this bullet, and do not relaunch run 9 while task `ww9s29wq4` runs.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
