@@ -46,6 +46,23 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
   - **Re-forecast (15:40), taking 2.7 an hour as the upper bound:**
     - The fixer should finish about 16:30–18:30, and the verdict is due about 19:00–21:30. The rest of cycle 21 costs about 8–16 points, which puts the meter at about 28–36 %.
     - Each further cycle (7–12 h) costs up to 19–32 points. Two more cycles plus the merge and Stage 5 (10–20 points) fit before the 12 Nov reset. A third cycle at this rate would likely reach the limit first.
+  - **Cycle 21's fixer returned at 17:54** (8 h 58 min into run 8; 73 commits in cycle 21, 24 of them since `7876a28`). `wp/s3f` is at `d5b2ab9`, and its last code commit is `e599ae1`. Step 8 found a test race and fixed it red-first (`a380c78`, then `e599ae1`).
+    - **Gates on `e599ae1`** (logs in `.worktrees/s3f/.build-s3f/c21/gates-b/`): `--quick` PASS; the release build with `-warnings-as-errors`; UNSAFE 0 of 3; DOCS 1281/1281; Sync 681/681 three times, and once under TSan; the iOS generic build; coverage, Sync 94.86 %; the simulator, 1635/1635 on 897F… plus 420 repeated runs.
+    - The release benchmarks failed with 3 issues: P-13 (WP-B's), `waitersStalledSubscriber` at 11.09 ms and `purgeWhileOwedTurns` at 10.04 ms.
+    - **Blocking and reported** (the draft's "Open at the close (cycle 21)"):
+      1. `commitTurns(.waitersStalledSubscriber)`: 10.45 and 11.09 ms best in the two gate runs. A stalled subscriber costs about 0.3 µs an event, and Phase 2 cannot cut it.
+      2. `purgeWhileOwedTurns`: 10.04 ms in the second gate run; 9.57 in the first, and 9.62 and 9.75 run alone. A route is recorded: read the purge's request before the copy lookup, which saves about 1 ms.
+      3. 12 mutant survivors with no killing test.
+      4. 4 places (12 lines) of changed code that no test reaches; two of them are survivors.
+      5. PROBE-C21-APM: `answerPresentMembers`' answer turn at 10,000 present ids takes 10.79, 12.76 and 14.17 ms (one group, 10,000 groups, 10,000 user waiters). No route found.
+      6. PROBE-C21-HOLDERS: one id held by 10,000 interests moves in one turn, 39.01 and 40.98 ms. No route found within "an id taken whole".
+    - **Put to the orchestrator:**
+      - the held-turn readers that loop `while followOwed` were not audited for the reservation-edge race;
+      - `releaseRerouteHolds` (R12) has no C2 figure;
+      - the two-subscriber figure, 13.68 ms, is for the owner (S3-R26 answer 4).
+    - Not run: `verify.sh --full` and `--gates-only`; their steps ran on their own.
+    - The verifiers `verify:s3f:reqs:c21` (`a0dbaa44…`) and `verify:s3f:correct:c21` (`a06aaa2f…`) started at 17:54. The host's 1-minute load was 3.81 at 17:55.
+  - **Usage at 17:55:** weekly all models **24 %**, Fable 21 %. That is 4 points in 2 h 15 min since 15:40, or 1.8 an hour.
   - **Next:** as in the 4 Nov bullet's "Next" list. At each wake-up, record the result here and commit. Rule put-backs between cycles by appending to `s3-rulings-s3f.md`. Check `get_usage`.
   - **If this session ends before convergence:** follow the 4 Nov bullet's steps 1 to 4 with run 8's journal, writing `s3-fix-args-run9.json` from run 8's. A run resumes only in its own session.
 - **Earlier (4 Nov 12:55 CET): resumed two days early, at the owner's request ("Run the next fix cycle. Be aware that we're close to usage limits, so save often so I will resume on next reset"). Session `993d93ff-5346-4c12-8776-2873c1660fc2`. The 2 Nov bullet below it is history, and its "Restart" steps are superseded by this one.**
