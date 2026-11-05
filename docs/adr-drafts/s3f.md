@@ -623,6 +623,61 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
 
   Applied in cycle 21: see "Cycle 21" below, whose "Status" list says which step is committed.
 
+- **Orchestrator ruling (close-out) S3-R27 — added 2026-11-05 20:00, its item 12 after the owner's ruling of 5 Nov,
+  21:15 (the cycle-21 fixer's put-backs and cycle 21's verification; written before the cycle-22 fixer starts).** Cycle 21 implemented S3-R26 (`8e1fb24..d5b2ab9`). The cycle-21 verifiers' findings are in
+  `.build-orchestrator/s3f-c21-issues.json` ("correct #n", "reqs #n"); the read-only analyses d1 to d5, e1 and e2 and
+  their reviews are in `.build-orchestrator/s3f-c21-analysis/`. From cycle 22 on S3-R27 is the cycle's ruling, and S3-R16
+  to S3-R26 apply where it does not change them. A C2 figure is the case's heartbeat, best of 3 (an in-actor pin's own
+  turn), with the 1-minute load read before its first timed run and after its last; the bar is `c2Budget`, 10 ms; a miss
+  is a best of 3 above it at a load of 10 or less in any run on the HEAD judged; 8.5 ms decides only the routes made
+  conditional on it, and the margin list; no work is hidden from a measurement.
+  1. *`commitTurns(.waitersStalledSubscriber)`* (correct #3, reqs #2; blocking): d1's route (a) with c3 in one step (a1
+     one hash per terminal publish; a2 one reservation per subscriber per batch, guarded by `slots.count + n >
+     2 × slots.capacity`; a3 one publish path, `publishAll` and `broadcastAll`; c3 `allBound` in `publishTerminal`), with
+     the exclusivity rules and the kills table (T-A-1 to T-A-3, T-ORDER for c3); c1 only if the case is still above
+     8.5 ms after the step; c6 only if `commitTurns(.manyGroups)` is; a scratch probe of four publish variants first; two
+     new gated cases, the re-announcement shape and the `.failed` arm; the decision rule (≤ 8.5 ms closes, 8.5–10 ms is
+     "at the edge", a miss is blocking); route (b) is not authorised; the two-subscriber figure is re-measured and
+     recorded; the c3 records.
+  2. *`purgeWhileOwedTurns`* (reqs #4; blocking): the fixer's route, the request read before the copy lookup, then the
+     owed batch in place, as item 12.3 amends it.
+  3. *`answerPresentMembers`' answer turn* (correct #4, reqs #5; blocking): d2's route (a) and B1 in d2 review's
+     sub-steps; the behaviour-free factoring first, then PIN-APM and PIN-APM-SPARE red; the mid-turn predicate audit; A7
+     and the group walks under their own rules.
+  4. *One id held by 10,000 interests* (correct #5, reqs #6): the per-id dimension is sized at up to 4 interests on one
+     id; A1 and A2 if taken, then the deciding figures at k = 2 and k = 4, then pair counting only if they trigger it.
+  5. *The twelve survivors* (correct #6, reqs #7; blocking): each disposed of as d4 says, corrected by its review: r7's
+     removal with the mutant texts rewritten, the cheap kills, then the remaining kills and the default-tuning probe.
+  6. *The four unreached places* (reqs #8; blocking): b22's under item 5; `settle`'s slice by T-A3 at count [10, 600];
+     `replayVerdict`'s second guard removed, with an epoch clause and its test.
+  7. *The held-turn readers* (reqs #14): d5's classification replaces the draft's put-back, with d5's pin and its
+     `#require`.
+  8. *`releaseRerouteHolds`' inventory row* (reqs #11): a bound on P cited from the code, or a figure.
+  9. *The fixer's own check*: S3-R26 item 9 on the final HEAD (S3-R25 item 10 for `d5b2ab9..HEAD`, the inventory, the
+     re-measure of every case the cycle's code passes through, the margin list).
+  10. *Order of work*: step 0 the baseline and the 'before' figures on a scratch copy of `d5b2ab9`; step 1 the unnamed
+      blocking findings; step 2 item 6 and item 5's removal and cheap kills; steps 3 to 6 items 1 to 4; step 7 item 5's
+      remaining kills; step 8 items 7 and 8, the records, item 9 and every gate. Red first against `d5b2ab9`; a deciding
+      figure without a quiet load is decided at the lowest load and recorded "not measured at a quiet load"; each step
+      is committed on its own.
+  11. *Amendments*: a k ≤ 4 miss that pair counting cannot cut is blocking with no route; "measured once" is a
+      recording rule; the six `BenchSync*.swift` files and any new one this cycle adds are WP-F's, each holding only
+      `SyncBenchmarks` and `SyncBench` extensions (reqs #1); `commitTurns(.manyGroups)` is blocking (reqs #3), with c3, c1,
+      c6 and item 3's group-walk cut in that order; PIN-APM's span includes `taskEnded`; B1's test names its hold.
+  12. *The owner's ruling, and correct #1 and #2*: (12.1) the bar covers only the reference set, 10,000 ids with at most
+      4 interests on one id and one subscriber, which may be stalled; other shapes are recorded as residual risks, not
+      gated (correct #5, reqs #6, reqs #12); (12.2) correct #1: e1-R1, an ENOENT re-queue that keeps (X, epoch) with
+      `copySerial` in `reroutePinCommits`' value, flagged as a re-queue, so that the pin holds until the first copy adopted
+      after it; T-E1 to T-E5; rr21-T8b's and the PIN-END invariants test's one-to-one changes; the kills; the probes
+      e1-PS, e1-P1, e1-P2, e1-P3 and e1-PR; the amendments to S3-R26 answer 6.3, item 1 and answer 8; (12.3) correct #2
+      with reqs #4: the purge's first turn, eleven gated purge cases, e2-A1.1 to e2-A1.7, e2-A2 only if a case stays
+      above 8.5 ms, e2-B not authorised; (12.4) the amended order and the findings' mapping; (12.5) the settled points,
+      among them the ensures variant of the user-waiter case, the red purge cases in one commit before e2-A1.1, e1-R1's
+      write inside the re-queue's `if`, the cycle-21 mutants that e1-R1 changes rewritten under `.build-s3f/c22/tools/`,
+      and the regression controls.
+
+  Applied in cycle 22: see "Cycle 22" below, whose "Status" list says which step is committed.
+
 ## Cycle 2: the cycle-1 verification findings
 
 Every finding of the two cycle-1 lenses, with its disposition. Blocking ones first; each fix is detailed under its item.
@@ -6843,6 +6898,144 @@ of 341. `EngineConditions.swift` (1), `EngineEvents.swift` (8), `EngineMoves.swi
 Put to the orchestrator with them: the held-turn readers whose loops end with the follow, not audited one by one
 for the reservation-edge race ("Step 8"); `releaseRerouteHolds`' inventory row, which has no figure; and the
 two-subscriber figure, for the owner (S3-R26 item 12's answer 4).
+
+## Cycle 22: the cycle-21 verifiers' findings, and S3-R27
+
+Cycle 22 applies S3-R27 (recorded under "Orchestrator rulings (close-out)") to the findings of the cycle-21 verifiers
+(`.build-orchestrator/s3f-c21-issues.json`, on `d5b2ab9`; "correct #n" and "reqs #n" are the lenses' numbers). The
+analyses are d1 to d5, e1 and e2, with their reviews, under `.build-orchestrator/s3f-c21-analysis/`. The work follows
+S3-R27 item 10's order, as items 11 and 12 amend it. Scratch files are under `.build-s3f/c22/`; `.build-s3f/c21/` is
+left as cycle 21 left it.
+
+### Status (resume here)
+
+A fixer resumed after an interruption continues from the worktree's HEAD with the first step that is not
+"committed". Each step's results are under its own heading below.
+
+0. Baseline, T-E1 to T-E5 and the 'before' figures on `d5b2ab9`: **committed** (these records). The scratch copy
+   `.build-s3f/c22/snap0` (`git archive d5b2ab9`, its seams applied by `.build-s3f/c22/tools/snap-seams.py`, its cases in
+   `snap0/Tests/ZTronAssetKitBenchmarks/BenchSyncCycle22.swift`) is kept for the later steps' comparisons. Item 3's and
+   item 4's 'before' figures are taken at the start of steps 5 and 6 (the deviation below).
+1. Item 12.2 (correct #1), then the unnamed blocking findings of class S3-R16 1(a) to 1(d): **in progress**. Committed:
+   `b603475` (T-E1, T-E3 and T-E4, red). Next: e1-R1 with rr21-T8b's and the PIN-END invariants test's changes, T-E2
+   and T-E5; the regression controls in both orders; the probes e1-PS, e1-P1, e1-P2, e1-P3 and e1-PR. No unnamed 1(a)
+   to 1(d) finding exists: every blocking finding of the file is named by S3-R27 (the mapping below).
+2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
+3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
+4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
+5. Item 3, in its sub-steps: not started.
+6. Item 4: not started.
+7. Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's and e2's kills: not started.
+8. Items 7 and 8, the records (item 1's, 5's `followedLane`, 12.2's, 12.3's, 11.6's), item 9, and every gate on the
+   final HEAD: not started.
+
+### The named findings (S3-R27 item 12.4)
+
+| Finding | Goes to | Where it stands |
+|---|---|---|
+| correct #1 (blocking): the pin after an ENOENT re-queue | item 12.2 | step 1 |
+| correct #2 and reqs #4 (blocking): the purge's first turn; `purgeWhileOwedTurns` | item 12.3 with item 2 | step 4 |
+| correct #3 and reqs #2 (blocking): `commitTurns(.waitersStalledSubscriber)` | item 1 | step 3 |
+| correct #4 and reqs #5 (blocking): `answerPresentMembers`' answer turn | item 3 | step 5 |
+| correct #5, reqs #6 and reqs #12: PROBE-C21-HOLDERS; two stalled subscribers | item 12.1 (outside the bar, by the owner's ruling of 5 Nov; recorded); k ≤ 4 stays with item 4 | steps 6 and 8 |
+| correct #6, reqs #7 and reqs #8 (blocking): the survivors; the unreached lines | items 5 and 6 | steps 2 and 7 |
+| reqs #1 (blocking): ownership of the bench files | item 11.6 | recorded under "Authorised edits outside WP-F" |
+| reqs #3 (blocking): `commitTurns(.manyGroups)` | item 11.7 | steps 3 and 5 |
+| reqs #9: no cycle-21 "Proposed document changes" | records | step 8 |
+| reqs #10: item 5's reaching test (`s3f.md:5072`) | item 12.5.9's records | step 8 |
+| reqs #11: `releaseRerouteHolds`' row | item 8 | step 8 |
+| reqs #13: two red commits before one fix | noted: one red commit per fix in this cycle | this cycle |
+| reqs #14: the held-turn readers | item 7 | step 8 |
+| reqs #15 and correct #7: P-13 | WP-B's (S3-R26 item 10) | not WP-F's |
+
+### Step 0: the baseline and the 'before' figures on `d5b2ab9`
+
+**The baseline.** `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick` on `d5b2ab9` (the worktree's HEAD, clean)
+ended `VERIFY: PASS` (`.build-s3f/c22/quick0.log`, 23:22:30 to 23:30:37 on 5 Nov; the Sync bundle 681 tests in 56
+suites; 1-minute load 3.00 before and 6.70 after).
+
+**T-E1 to T-E5 on `d5b2ab9`** (S3-R27 items 12.4 and 12.5.3; `.build-s3f/c22/te-d5b.log`; 1-minute loads 20.03 to
+14.90 during the run, above 10, which does not decide an answer). The tests are rr21-T8b's fixture
+(`EngineFollowBarrierRerouteRequeueTests.swift`, `requeuePin`): each content a mutant can request is served only if its
+job exists, and each test asserts which contents were requested.
+
+| Test | On `d5b2ab9` | What failed |
+|---|---|---|
+| T-E1 (order × owe) | red in 3 of 4 cases; green in (`followVisitedFirst`, not owing) | W1…W3 got W's 20 bytes, X held only zz-x after the replay, W was requested |
+| T-E2 | green in both orders | |
+| T-E3 | red in both orders | W1…W3 got U's 22 bytes, U was requested |
+| T-E4 | red in both orders | W1…W3 got U's bytes; X had no job, the jobs were U's and Y's |
+| T-E5 | green in both orders | |
+| rr21-T8b (unchanged) | green in both orders | |
+
+These match the ruling's table (T-E1 red in 3 of 4; T-E2 and T-E5 green; T-E3 and T-E4 red).
+
+**The 'before' figures** were taken in the scratch copy `.build-s3f/c22/snap0` (`git archive d5b2ab9`), built with
+`swift build -c release -Xswiftc -enable-testing --build-tests` into `.build-s3f/c22/snap0-build`, each case run alone by
+`.build-s3f/c22/tools/snap-bench.sh`, which waits for a 1-minute load of 10 or less before each case (logs
+`.build-s3f/c22/each/before-*.log`). The copy's seams, never committed as such (`.build-s3f/c22/tools/snap-seams.py`):
+`EngineState.commitTurnMarksForTests` called around the 404 resolution's turn (`EngineFailures.swift`, after
+`recordFailure`'s await to after `resolveAll`) and around the purge's first turn (`performPurge`, after `ensureStarted`'s
+await to after `withdrawPurged`); PROBE-C22-PUBLISH's `SubscriberQueue` variants; PROBE-C21-PURGE-PARTS' walk timer and
+`withdrawPurgedJoins` made internal, as in `.build-s3f/c21/purge`. The marks leave out the rest of each turn after the
+end mark (the purge's `joinEntry` registration; the resolution's `refreshStoreDeadline` prefix); the heartbeat, which
+gates, covers everything.
+
+| Case (S3-R27 item) | Heartbeat, three runs, ms | Best | In-actor turn, best | 1-minute loads | On `d5b2ab9` |
+|---|---|---|---|---|---|
+| `commitTurns(.waiters)` (1) | 12.97, 7.53, 8.13 | 7.53 | 7.52 | 9.00 to 8.68 | met |
+| `commitTurns(.waitersStalledSubscriber)` (1) | 10.78, 10.85, 12.77 | 10.78 | 10.77 | 8.68 to 8.68 | **miss** (in the tree, red since cycle 21) |
+| `commitTurns(.groupStalledSubscriber)` (1) | 8.81, 8.85, 9.62 | 8.81 | 8.80 | 8.68 to 8.79 | met, at the edge |
+| `commitTurns(.manyGroups)` (1, 11.7) | 9.75, 9.58, 9.58 | 9.58 | 9.57 | 8.79 to 8.21 | met, at the edge |
+| `commitTwoStalledSubscribersTurns` (1, 12.1) | 14.00, 14.25, 13.78 | 13.78 | 13.77 | 7.63 to 7.66 | outside the bar (12.1), recorded |
+| `commitReannounceTurns`, new (1) | 10.70, 10.90, 10.77 | 10.70 | 10.70 | 3.36 to 3.33 | **miss**: committed red before item 1's step |
+| `commitFailedArmTurns`, new (1) | 9.78, 9.10, 9.13 | 9.10 | 9.09 | 6.88 to 6.88 | met, at the edge: lands with item 1's step |
+| `purgeWhileOwedTurns` (2, 12.3; in the tree) | 9.67, 9.70, 9.66 | 9.66 | (no mark in this case) | 6.49 to 6.13 | met, at the edge (cycle 21's 10.04 ms miss stands) |
+| `purgeTurns(.oneGroup)`, new: (i) | 51.77, 47.56, 49.10 | 47.56 | 47.56 | 6.44 to 6.44 | **miss** |
+| `purgeTurns(.oneMemberGroups)`, new: (ii) | 51.32, 47.77, 46.93 | 46.93 | 46.92 | 6.44 to 4.38 | **miss** |
+| `purgeTurns(.oneGroupScope)`, new: (i) under `.scope` | 47.35, 46.45, 46.47 | 46.45 | 46.45 | 4.38 to 4.19 | **miss** |
+| `purgeTurns(.sharedJob)`, new: k = 1 | 10.89, 10.80, 10.84 | 10.80 | 10.80 | 4.19 to 4.19 | **miss** |
+| `purgeTurns(.sharedJobFourGroups)`, new: k = 4 | 39.49, 39.30, 38.99 | 38.99 | 38.99 | 3.33 to 3.14 | **miss** |
+| `purgeTurns(.fourGroups)`, new: k = 4 over 10,000 jobs | 121.67, 117.64, 117.93 | 117.64 | 117.62 | 3.14 to 2.97 | **miss** |
+| `purgeTurns(.retryJobs)`, new | 644.58, 594.09, 585.40 | 585.40 | 585.39 | 2.97 to 4.15 | **miss** |
+| `purgeTurns(.userWaiters)`, new (12.5.11) | 7.72, 7.72, 7.66 | 7.66 | 7.65 | 4.15 to 4.15 | met |
+| `purgeTurns(.ensures)`, new (12.5.11) | 8.07, 8.96, 8.77 | 8.07 | 8.08 | 4.15 to 19.66 (the host's load rose during the last two runs) | met |
+| `purgeJoinsTurns(.bucket)`, new: 9,216 joins behind the verdict | 10.08, 10.02, 9.94 | 9.94 | 9.94 | 9.03 to 9.03 | met, at the edge |
+| `purgeJoinsTurns(.queue)`, new: 9,489 joins in the queue | 9.10, 9.34, 9.50 | 9.10 | 9.10 | 9.03 to 9.03 | met, at the edge |
+
+The cases that miss on `d5b2ab9` are committed red under item 10's and item 12.5.12's rules: the re-announcement case on
+its own, right before item 1's step; the seven purge cases in one commit, right before e2-A1.1. The cases that meet land
+with the step that adds them. `purgeWhileOwedTurns`' PROBE-C21-PURGE-PARTS on `d5b2ab9` (`PROBE_C21_PURGE_PARTS=1`, a
+separate run whose heartbeat is not a figure: the probe performs the parts before the purge): owed items 10,000, jobs 0;
+`dropBindings` 0.000 ms, `settleRun` 0.000 ms, the walk of the events 9.25, 9.35 and 9.40 ms, the jobs 0.001 ms (load
+6.13). The purge cases' figure is the heartbeat from the purge's call until every job is gone (until the purge returned
+and 200 yields ran, for the user waiters and the ensures, whose jobs stay); each id has its own 400-byte content
+(`scaleBench`), or one content for the shared job; the setup waits for every (interest, id) pair, since a group's
+registration joins its members over several turns.
+
+**PROBE-C22-PUBLISH** (item 1's scratch probe; `.build-s3f/c22/each/before-publish.log`, 1-minute load 6.49): 10,000
+distinct terminal publishes into one `SubscriberQueue`, best (median) of 9, in ms. "a1" is one hash per terminal publish,
+"a1+a2" adds the guarded reservation, "publishAll" is a3's path; the probe calls `publishAll` across modules, so its
+generic `Collection` parameter is not specialized there, which the engine's own call inside the module would be: its
+figure is pessimistic.
+
+| Ids, queue | `publish` (today) | a1 | a1+a2 | `publishAll` |
+|---|---|---|---|---|
+| 6 bytes, fresh queue | 1.257 (1.282) | 0.963 (0.970) | 0.568 (0.572) | 1.118 (1.125) |
+| 6 bytes, re-announcement (the queue already holds the ids) | 1.270 (1.344) | 0.749 (0.792) | 0.753 (0.792) | 1.316 (1.391) |
+| 22 bytes, fresh queue | 3.456 (3.474) | 2.085 (2.160) | 1.071 (1.103) | 1.905 (1.932) |
+| 22 bytes, re-announcement | 9.378 (9.465) | 4.782 (4.798) | 4.794 (4.801) | 5.621 (5.634) |
+
+Ids over 15 bytes are heap strings, which every `EventSlot` and `Live` copy retains: at 22 bytes today's re-announcement
+costs 9.4 ms in the queue alone, against 1.3 ms at 6 bytes (evidence, not a gate; d1 review should-fix 7). The cases
+measured here use ids of at most 6 bytes.
+
+**A sequencing deviation, recorded.** Item 10's step 0 asks for the 'before' figure of every case items 1 to 4 add.
+Item 1's and item 12.3's cases (items 1 and 2) are measured here. Item 3's PIN-APM and PIN-APM-SPARE need d2's
+behaviour-free factoring as their seam, and item 4's cases are built only if item 4's deciding figures trigger them; their
+'before' figures are taken at the start of steps 5 and 6, on a scratch copy of `d5b2ab9` with the same seams, so that
+the figures are the same `d5b2ab9` figures the ruling asks for. This keeps step 0 short before a likely cut-off by the
+weekly limit (item 10, "Expect the weekly limit").
 
 ## Items
 
