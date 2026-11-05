@@ -122,7 +122,7 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         let commits = runs.map(\.commitTurn)
         let during = runs.map(\.during)
         let lanes = runs.compactMap(\.lane)
-        print("R-SYN-11 \(shape.rawValue), \(label), at 10,000: heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; the commit's own turn \(commits) ms; while owed \(during) ms; followedLane \(lanes) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
+        print("R-SYN-11 \(shape.rawValue), \(label), at 10,000: heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms; longest held turn \(turns) ms, best \(turns.min() ?? .infinity) ms; the commit's own turn \(shape.superseded ? "not timed inside the actor (an exit, no commit: the heartbeat covers it)" : "\(commits) ms"); while owed \(during) ms; followedLane \(lanes) ms (budget \(Self.c2Budget) ms best); runs \(runs)")
         #expect((waits.min() ?? .infinity) <= Self.c2Budget, "the heartbeat: \(waits)")
         #expect((turns.min() ?? .infinity) <= Self.c2Budget, "the held turns: \(turns)")
     }
@@ -164,20 +164,45 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
     /// Every moved id to D's content, one prefetch group; while the batch is owed, everything is purged, the manual clock
     /// moved past the deletion grace the store's purge waits out (`purgeWhileOwedTurns`).
     case purgeWhileOwed
+    /// Every moved id to D's content (its download held), a user waiter per id, and K to a content of its own (E, its
+    /// download held): no record wants H's bytes, so the store refuses H's publication (`.superseded`), and its exit
+    /// owes every re-route, K's with the members' (site 3, `supersede`; `supersededUserTurns`).
+    case supersededWaiters
+    /// Every moved id to D's content (its download held), each a claim of a forced sync's run, which stays in flight:
+    /// the commit owes the run's items (`runSuperseded`).
+    case runMovedAway
+    /// As `runMovedAway`, and K to a content of its own (E, its download held): the store refuses H's publication, and
+    /// its exit owes every re-route (`runSuperseded`).
+    case runSuperseded
+    /// As `runMovedAway`, onto D's content, which the store holds (D's own id was fetched): each owed run item is
+    /// answered present at the drain, its claim released and the asset counted fetched, the run's progress offered
+    /// (`answerPresent`, `countRunFetched`, `offerRunProgress`; `runSuperseded`).
+    case runToBound
 
-    /// Whether every moved id has a user waiter; the other shapes want them by prefetch groups.
+    /// Whether every moved id has a user waiter; the run's shapes claim them for a run, the other shapes want them by
+    /// prefetch groups.
     var waiters: Bool {
-        self == .waiters || self == .waitersBound || self == .userToBound || self == .delistedWaiters
+        self == .waiters || self == .waitersBound || self == .userToBound || self == .delistedWaiters || self == .supersededWaiters
+    }
+
+    /// Whether the moved ids are a forced sync's run's claims, on entries the run fetches.
+    var run: Bool {
+        self == .runMovedAway || self == .runSuperseded || self == .runToBound
+    }
+
+    /// Whether v4 maps K off H's content too, so that the store refuses H's publication (site 3).
+    var superseded: Bool {
+        self == .supersededWaiters || self == .runSuperseded
     }
 
     /// The prefetch groups of every id.
     var groups: Int {
-        self.waiters ? 0 : (self == .twoTokens ? 2 : 1)
+        self.waiters || self.run ? 0 : (self == .twoTokens ? 2 : 1)
     }
 
     /// Whether the store holds D's content before H's commit.
     var present: Bool {
-        self == .userToBound || self == .groupToBound
+        self == .userToBound || self == .groupToBound || self == .runToBound
     }
 
     /// Whether the manifest lists D's own id.
@@ -198,7 +223,11 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
                 issues.append(what)
             }
         }
-        need(run.committed && run.served, "the commit bound K and answered its waiter")
+        if self.superseded {
+            need(run.committed, "the store refused H's publication, and its exit ended H's job")
+        } else {
+            need(run.committed && run.served, "the commit bound K and answered its waiter")
+        }
         need(run.violations.isEmpty, "no invariant violation")
         if self == .delistedGroupFit {
             need(run.batchesAtCommit == 0 && run.owedAtCommit == 0, "the commit owes nothing: K and the 255 re-routes fit its turn")
@@ -210,11 +239,16 @@ enum CommitRerouteShape: String, Sendable, CaseIterable {
             need(run.answered == count, "the commit answers every waiter")
             return issues
         }
-        need(run.madeAtCommit == 0 && run.batchesAtCommit == 1 && run.owedAtCommit == count, "the commit makes no re-route and owes the \(count) ids as one batch")
+        let owed = count + (self.superseded ? 1 : 0)
+        need(run.madeAtCommit == 0 && run.batchesAtCommit == 1 && run.owedAtCommit == owed, "the commit (or the exit) makes no re-route and owes the \(owed) ids as one batch")
         need(run.made.allSatisfy { $0 <= SyncEngine.followIDsPerTurn } && run.made.reduce(0, +) == run.owedBeforeDrain, "the drain makes the batch at most a drain turn's ids a turn")
         switch self {
-        case .divergent, .waiters, .twoTokens, .appliesWhileOwed, .rateLimitWhileOwed:
+        case .divergent, .waiters, .twoTokens, .appliesWhileOwed, .rateLimitWhileOwed, .supersededWaiters:
             need(run.rerouted == count, "every moved id ends on its v4 content's job")
+        case .runMovedAway, .runSuperseded:
+            need(run.rerouted == count && run.runOnHolder == nil && run.runOnTarget == count, "the run claims nothing on H and every moved id on D's job")
+        case .runToBound:
+            need(run.runFetched == count && run.runOnHolder == nil && run.runOnTarget == 0 && !run.targetJob, "the run counts every moved id fetched from the store, claims nothing on H or D, and D's content gets no job")
         case .userToBound:
             need(run.answered == count && !run.targetJob, "the store answers every waiter, and D's content gets no job")
         case .groupToBound:
@@ -278,8 +312,13 @@ struct CommitRerouteBenchRun: CustomStringConvertible {
     var groupsAnswered = false
     /// The members the groups still waited for after the commit (`.delistedGroupFit`).
     var pendingAtCommit = 0
-    /// Whether D's content had a job after a held turn (`.userToBound`, `.groupToBound`).
+    /// Whether D's content had a job after a held turn (`.userToBound`, `.groupToBound`, `.runToBound`).
     var targetJob = false
+    /// The run's claims on H's job at the end (`nil`: none) and on D's, and the ids it counted fetched over the drain
+    /// (the run's shapes).
+    var runOnHolder: Int?
+    var runOnTarget = 0
+    var runFetched = 0
     /// The joins waiting behind the batch (`.waiters`).
     var joinsBehind = 0
     /// Each owed batch's layers before the replay, and whether P's job was in the layers' jobs at an attempt's end.
@@ -306,7 +345,7 @@ struct CommitRerouteBenchRun: CustomStringConvertible {
 
     var description: String {
         let ms = { (value: Double) in String(format: "%.2f", value) }
-        return "heartbeat commit \(ms(self.commit)) ms, while owed \(ms(self.during)) ms, drain \(ms(self.drain)) ms; commit turn \(ms(self.commitTurn)) ms; \(self.turns.count) held turns, longest \(ms(self.longestTurn)) ms; made at the commit \(self.madeAtCommit), owed \(self.owedAtCommit) ids, \(self.pairsAtCommit) pairs in \(self.batchesAtCommit) batches, \(self.owedBeforeDrain) at the drain; made per turn \(self.made); re-routed \(self.rerouted); committed \(self.committed), served \(self.served), answered \(self.answered), notFound \(self.notFound), groups answered \(self.groupsAnswered), D's job \(self.targetJob), joins behind \(self.joinsBehind), layers \(self.layers), publishing \(self.publishing), followedLane \(self.lane.map(ms) ?? "-") ms, throttled \(self.throttled); violations \(self.violations.prefix(3)); load \(self.load)"
+        return "heartbeat commit \(ms(self.commit)) ms, while owed \(ms(self.during)) ms, drain \(ms(self.drain)) ms; commit turn \(ms(self.commitTurn)) ms; \(self.turns.count) held turns, longest \(ms(self.longestTurn)) ms; made at the commit \(self.madeAtCommit), owed \(self.owedAtCommit) ids, \(self.pairsAtCommit) pairs in \(self.batchesAtCommit) batches, \(self.owedBeforeDrain) at the drain; made per turn \(self.made); re-routed \(self.rerouted); committed \(self.committed), served \(self.served), answered \(self.answered), notFound \(self.notFound), groups answered \(self.groupsAnswered), D's job \(self.targetJob), joins behind \(self.joinsBehind), run claims on H \(self.runOnHolder.map(String.init) ?? "none"), on D \(self.runOnTarget), fetched \(self.runFetched), layers \(self.layers), publishing \(self.publishing), followedLane \(self.lane.map(ms) ?? "-") ms, throttled \(self.throttled); violations \(self.violations.prefix(3)); load \(self.load)"
     }
 }
 
@@ -338,15 +377,33 @@ extension SyncBench {
         let kept = SyncBench.entry("k", hBytes, policy: .onDemand)
         // At the fit edge, K and H's members are `inboundIDsNow`; the group's other members share G's content.
         let onH = shape == .delistedGroupFit ? SyncEngine.followIDsPerTurn / 2 - 1 : count
-        let members = SyncBench.sharing(onH, hBytes)
+        let members = SyncBench.sharing(onH, hBytes, policy: shape.run ? .standard : .onDemand)
         let gBytes = Data(repeating: 0x67, count: 16)
         let elsewhere = shape == .delistedGroupFit ? (0..<(count - 1 - onH)).map { SyncBench.entry(String(format: "g%05d", $0), gBytes, policy: .onDemand) } : []
         let d = SyncBench.entry("d", dBytes, policy: .onDemand)
         let p = SyncBench.entry("p", pBytes, policy: .onDemand)
         let extra = (shape.listsD ? [d] : []) + (shape == .appliesWhileOwed ? [p] : [])
+        // K's own content where v4 maps K off H's (site 3).
+        let own = SyncBench.entry("k", Data(repeating: 0x65, count: 17), policy: .onDemand)
+        let holder = kept.transferID
         await source.scriptManifest([.fetched(SyncBench.manifestData([kept] + members + extra + elsewhere), etag: ETag(rawValue: "\"v2\""))])
-        guard await engine.sync(.force).isComplete else {
-            throw SyncBenchError.incomplete("the second sync did not complete")
+        var runSync: Task<SyncOutcome, Never>?
+        var spins = 0
+        if shape.run {
+            // The members are the claims of a forced sync's run, which stays in flight while H's download is held.
+            await source.script(holder, [.hold, .stage(hBytes)])
+            runSync = Task { await engine.sync(.force) }
+            while !Task.isCancelled, (await SyncBench.runClaims(engine, on: holder) ?? 0) < onH {
+                spins += 1
+                if spins > 50_000_000 {
+                    throw SyncBenchError.incomplete("setup: the run never claimed the members on H: \(String(describing: await SyncBench.runClaims(engine, on: holder)))")
+                }
+                await Task.yield()
+            }
+        } else {
+            guard await engine.sync(.force).isComplete else {
+                throw SyncBenchError.incomplete("the second sync did not complete")
+            }
         }
         try await store.flush(.ordered)
         if shape.present {
@@ -356,21 +413,25 @@ extension SyncBench {
             }
             try await store.flush(.ordered)
         }
-        let holder = kept.transferID
-        await source.script(holder, [.hold, .stage(hBytes)])
+        if !shape.run {
+            await source.script(holder, [.hold, .stage(hBytes)])
+        }
         switch shape {
         case .rateLimitWhileOwed:
             await source.script(d.transferID, [.hold, .fail(.transient(.throttled, retryAfter: nil))])
         case .appliesWhileOwed:
             await source.script(p.transferID, [.hold, .stage(pBytes)])
             await source.script(d.transferID, [.hold])
-        case .waiters, .twoTokens, .purgeWhileOwed:
+        case .waiters, .twoTokens, .purgeWhileOwed, .runMovedAway:
             await source.script(d.transferID, [.hold])
+        case .supersededWaiters, .runSuperseded:
+            await source.script(d.transferID, [.hold])
+            await source.script(own.transferID, [.hold])
         case .delistedGroupFit:
             if let away = elsewhere.first {
                 await source.script(away.transferID, [.hold])
             }
-        case .divergent, .waitersBound, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters:
+        case .divergent, .waitersBound, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters, .runToBound:
             break
         }
         let waiter = Task { await engine.awaitAsset(kept.identifier, lane: .userInitiated) }
@@ -403,8 +464,8 @@ extension SyncBench {
             pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .userInitiated) }
             others.append(p.transferID)
         }
-        let interests = shape.waiters ? count + 1 : 1 + shape.groups
-        var spins = 0
+        let interests = shape.waiters ? count + 1 : 1 + shape.groups + (shape.run ? 1 : 0)
+        spins = 0
         while !Task.isCancelled {
             let now = await SyncBench.userHolding(engine, holder)
             if now.ids == onH + 1, now.interests == interests, await SyncBench.isRunning(engine, holder), await SyncBench.allRunning(engine, others) {
@@ -444,12 +505,30 @@ extension SyncBench {
         case .waiters, .twoTokens, .userToBound, .groupToBound, .appliesWhileOwed, .rateLimitWhileOwed, .purgeWhileOwed:
             moved = SyncBench.sharing(count, dBytes)
             v4 = [kept] + moved + extra
+        case .supersededWaiters:
+            moved = SyncBench.sharing(count, dBytes)
+            v4 = [own] + moved + extra
+        case .runMovedAway, .runToBound:
+            moved = SyncBench.sharing(count, dBytes, policy: .standard)
+            v4 = [kept] + moved + extra
+        case .runSuperseded:
+            moved = SyncBench.sharing(count, dBytes, policy: .standard)
+            v4 = [own] + moved + extra
         }
-        await source.scriptManifest([.fetched(SyncBench.manifestData(v4), etag: ETag(rawValue: "\"v4\""))])
-        // The sync ends with the engine (its run may wait for the re-routed downloads); only its apply matters here.
-        _ = Task { await engine.sync(.force) }
+        if shape.run {
+            // A forced sync would join the run in flight: v4 goes through the engine's apply path.
+            let manifest = try ValidatedManifest(entries: v4, digest: ContentHash.sha256(of: Data("v4-\(shape.rawValue)-\(count)".utf8)))
+            let applied = await engine.applyAndFollow(manifest, etag: nil, eviction: nil)
+            guard case .success = applied else {
+                throw SyncBenchError.incomplete("setup: v4 was not applied: \(applied)")
+            }
+        } else {
+            await source.scriptManifest([.fetched(SyncBench.manifestData(v4), etag: ETag(rawValue: "\"v4\""))])
+            // The sync ends with the engine (its run may wait for the re-routed downloads); only its apply matters here.
+            _ = Task { await engine.sync(.force) }
+        }
         spins = 0
-        while !Task.isCancelled, !(await SyncBench.appliedAndFollowed(engine, etag: "\"v4\"")) {
+        while !Task.isCancelled, !(shape.run ? await SyncBench.followAndDrainOver(engine) : await SyncBench.appliedAndFollowed(engine, etag: "\"v4\"")) {
             spins += 1
             if spins > 50_000_000 {
                 throw SyncBenchError.incomplete("setup: v4 was never applied and followed: \(await SyncBench.followShape(engine))")
@@ -544,11 +623,12 @@ extension SyncBench {
                 ticker.cancel()
                 _ = await ticker.value
             }
-        case .divergent, .waitersBound, .twoTokens, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters, .delistedGroupFit:
+        case .divergent, .waitersBound, .twoTokens, .userToBound, .groupToBound, .delistedGroup, .delistedWaiters, .delistedGroupFit, .supersededWaiters, .runMovedAway, .runSuperseded, .runToBound:
             break
         }
         var owed = await SyncBench.owedReroutes(engine)
         run.owedBeforeDrain = owed
+        let fetchedBefore = await SyncBench.runFetched(engine)
         var made: [Int] = []
         var targetJob = false
         run.drain = try await SyncBench.longestWait(on: engine) {
@@ -576,6 +656,11 @@ extension SyncBench {
         }
         run.made = made
         run.targetJob = targetJob
+        if shape.run {
+            run.runOnHolder = await SyncBench.runClaims(engine, on: holder)
+            run.runOnTarget = await SyncBench.runClaims(engine, on: d.transferID) ?? 0
+            run.runFetched = await SyncBench.runFetched(engine) - fetchedBefore
+        }
         let end = await SyncBench.rerouteState(engine, moved)
         run.rerouted = end.made
         run.violations += end.violations
@@ -598,6 +683,7 @@ extension SyncBench {
             _ = await caller.value
         }
         _ = await pWaiter?.value
+        _ = await runSync?.value
         run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
         return run
     }
@@ -698,6 +784,21 @@ extension SyncBench {
     /// The engine's waiters still waiting.
     static func waitersLeft(_ engine: isolated SyncEngine) -> Int {
         engine.state.waiters.count
+    }
+
+    /// The run's claims on `transfer`'s job, `nil` when it claims none there (or no run is in flight).
+    static func runClaims(_ engine: isolated SyncEngine, on transfer: TransferID) -> Int? {
+        engine.state.run?.outstanding[transfer]?.count
+    }
+
+    /// The ids the run in flight counted fetched; 0 with none.
+    static func runFetched(_ engine: isolated SyncEngine) -> Int {
+        engine.state.run?.fetched ?? 0
+    }
+
+    /// Whether no follow is owed, no drain turn is scheduled and no apply is in flight.
+    static func followAndDrainOver(_ engine: isolated SyncEngine) -> Bool {
+        !engine.followBarrier && !engine.state.drainFollowUpScheduled && engine.state.appliesInFlight == 0
     }
 
     /// The `moved` entries whose content's job holds their id, the distinct ids owed, the waiting batches of re-routes,

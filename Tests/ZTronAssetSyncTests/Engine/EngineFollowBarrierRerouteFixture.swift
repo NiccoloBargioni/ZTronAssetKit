@@ -9,7 +9,9 @@ import ZTronAssetTestSupport
 /// tests_and_mutants): O's content (16 bytes) holds zz-o, which O keeps, with a user waiter K, and zz-a1…zz-a<n>, which
 /// the test's apply moves away, each wanted as `OwedWanters` says. O downloads; the test holds its publication at its
 /// first store unit, applies its manifests, and releases the unit with the drain's turns held: the commit's answer and
-/// re-routes (1 + n) pass `inboundIDsNow` (2 at `followIDsPerTurn = 4`), so it owes them as one batch. The test acts
+/// re-routes (1 + n) pass `inboundIDsNow` (2 at `followIDsPerTurn = 4`), so it owes them as one batch. With `away` the
+/// test's applies map zz-o off O's content too: no id wants O's bytes, the store refuses the publication
+/// (`.superseded`), and the exit owes K's re-route with the moved ids' (1 + n pairs; site 3, `supersede`). The test acts
 /// between the owing instant and the replay, then releases the follow's and the drain's turns one at a time, reading
 /// the invariants after each.
 extension EngineFollowBarrierTests {
@@ -42,6 +44,9 @@ extension EngineFollowBarrierTests {
         /// The prefetch group of zz-o and the moved ids (`.group`, `.waitersAndGroup`): its interest holds an id O binds
         /// and the ids it does not.
         let group: InterestToken?
+        /// zz-o on the content the test's applies map it to (site 3: O's publication is superseded, and its exit owes
+        /// K's re-route there with the moved ids'); `nil` when they keep zz-o on O's content (site 1: O's commit binds it).
+        let away: ManifestEntry?
 
         var engine: SyncEngine {
             self.s.engine
@@ -57,9 +62,15 @@ extension EngineFollowBarrierTests {
             self.moved.map(\.identifier)
         }
 
-        /// The manifest the test applies: `q`, fillers that change with `tag`, zz-o, `entries` and later fillers.
-        func manifest(_ entries: [ManifestEntry], round: UInt64) -> [ManifestEntry] {
-            [self.s.q] + FollowBarrier.fillers(self.seed + 100 + 100 * round) + [self.o] + entries + EngineFollowBarrierTests.laterFillers(self.seed + 3_000 * (round + 1))
+        /// The pairs O's publication's end owes with `.waiters`: the moved ids', and K's at site 3.
+        var owedPairs: Int {
+            self.moved.count + (self.away == nil ? 0 : 1)
+        }
+
+        /// The manifest the test applies: `q`, fillers that change with `round`, zz-o (`o`, else `away`, else on O's
+        /// content), `entries` and later fillers.
+        func manifest(_ entries: [ManifestEntry], round: UInt64, o: ManifestEntry? = nil) -> [ManifestEntry] {
+            [self.s.q] + FollowBarrier.fillers(self.seed + 100 + 100 * round) + [o ?? self.away ?? self.o] + entries + EngineFollowBarrierTests.laterFillers(self.seed + 3_000 * (round + 1))
         }
     }
 
@@ -70,9 +81,10 @@ extension EngineFollowBarrierTests {
 
     /// The engine of an owed commit, before the test holds O's publication: v2 lists zz-o, zz-a1…zz-a<count> (on O's
     /// content) and `extra`; O downloads (held), with K and the moved ids' wanters on its job (the waiters on `lane`, the
-    /// group on `groupLane`), under `network`.
+    /// group on `groupLane`), under `network`. With `away`, the test's applies list zz-o on that content (site 3); the
+    /// test scripts its download where one is made.
     @available(macOS 15.0, iOS 18.0, *)
-    static func stageOwedCommit(seed: UInt64, moved count: Int = 3, extra: [ManifestEntry] = [], wanters: OwedWanters = .waiters, lane: AssetPriority = .userInitiated, groupLane: AssetPriority = .prefetch, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy()) async throws -> OwedCommit {
+    static func stageOwedCommit(seed: UInt64, moved count: Int = 3, extra: [ManifestEntry] = [], wanters: OwedWanters = .waiters, lane: AssetPriority = .userInitiated, groupLane: AssetPriority = .prefetch, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy(), away: Data? = nil) async throws -> OwedCommit {
         let (s, bulk) = try await Self.setUpHeldPublications(seed: seed, tuning: tuning, network: network)
         let engine = s.engine
         await engine.readForTests { $0.state.followIDsPerTurn = Self.owedIDsPerTurn }
@@ -103,7 +115,7 @@ extension EngineFollowBarrierTests {
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { $0.state.jobs[transfer]?.state == .downloading && $0.state.jobs[transfer]?.interests.count == interests }
         }
-        return OwedCommit(s: s, bulk: bulk, seed: seed, o: o, k: k, moved: moved, w: w, group: group)
+        return OwedCommit(s: s, bulk: bulk, seed: seed, o: o, k: k, moved: moved, w: w, group: group, away: away.map { EngineHarness.onDemand("zz-o", $0) })
     }
 
     /// The store units a test keeps held (`holdPublications`), and the task that releases every other one: a release of a

@@ -5156,8 +5156,15 @@ fix (S3-R26 item 11, "Red first").
    with the shapes R18 covers (`2e9d23f`), then R18 with RR21-HOP's join variant, **committed** right after it
    (`2c62e85`), and its C2 pin `joinChainTurns` with these records (under "Step 5"). PIN-END's and R18's mutants
    (`tools/mut-c4fix.py`, `mut21-c4fix.txt`) run on a snapshot of `2c62e85` after rr21-C3's and its fix's
-   (`tools/chain-c4fix.sh`). **Next action:** rr21-C5 (site 3: `supersededRerouteTurns`, `supersededUserTurns`,
-   `runSuperseded`; PROBE-RR21-PIN-END again after it), then rr21-C6, then the mutant runs' results and survivors.
+   (`tools/chain-c4fix.sh`). The fixer cut off at `7876a28` (5 Nov, 03:55) was resumed at 08:57: its uncommitted
+   rr21-C5 red step (`.build-orchestrator/s3f-c21-interrupted.patch`) was re-applied unchanged and run, and the
+   mutant chain resumed (`tools/chain-c21b.sh`: the commit fix's f7 to f11 again on `snap-c3fix`, then
+   `tools/mut-c4fix.py` on `snap-c4fix`, both snapshots checked against their REV; `mut21-c3fix2.txt`,
+   `mut21-c4fix.txt`; a whole-suite run now has 900 s, since the suite takes 200 to 360 s under load and the 300 s
+   limit counted a slow run as a hang). rr21-C5's red step: **committed** (rr21-T2, rr21-T2-two, rr21-T2-captured
+   and the three site-3 pins, failing before the fix; evidence under "Step 5"). **Next action:** rr21-C5's fix (R5),
+   with RR21-HOP, RR21-WINDOW-GATE and RR21-PRESENT-PRUNE at site 3 (red copies), PROBE-RR21-PIN-END again, and the
+   site-3 figures; then rr21-C6, then the mutant runs' results and survivors.
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.

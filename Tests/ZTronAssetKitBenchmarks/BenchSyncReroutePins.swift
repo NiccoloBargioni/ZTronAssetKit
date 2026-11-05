@@ -14,6 +14,30 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         try await Self.commitRerouteTurns(.waiters, label: "10,000 user waiters moved onto one content, 511 joins behind the batch")
     }
 
+    /// C2 of a superseded exit whose 10,000 moved-away ids each have a user waiter and converge on D's content
+    /// (`design-minimal.md`'s supersededUserTurns; ruling S3-R26 item 9's inventory, site 3): v4 maps K, H's own id, to a
+    /// content of its own as well, so the store refuses H's publication, and the exit owes the 10,001 pairs as one batch,
+    /// which the drain makes 512 ids a turn. The exit's own turn has no seam of its own: the heartbeat covers it.
+    @Test("R-SYN-11: a superseded exit that owes 10,000 user waiters' re-routes onto one content holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(10)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func supersededUserTurns() async throws {
+        try await Self.commitRerouteTurns(.supersededWaiters, label: "10,000 user waiters of a superseded publication moved onto one content")
+    }
+
+    /// C2 of a run's 10,000 claims that converge on one content and move away (`integrate-rr21.md`'s runSuperseded): at a
+    /// commit that binds K alone (site 1), at the exit of a publication the store refuses (site 3), and at a commit whose
+    /// moved claims land on a content the store holds, so that the drain answers each owed run item present, its claim
+    /// released and the asset counted fetched, with the run's progress offered (`countRunFetched`, `offerRunProgress`),
+    /// at most 512 a drain turn. Once the drain is over, the run claims nothing on H and, but where the store holds D's
+    /// content, the 10,000 ids on D's job.
+    @Test("R-SYN-11: a run's 10,000 claims moved away at a commit, at a superseded exit and onto a present content hold the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(20)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func runSuperseded() async throws {
+        try await Self.commitRerouteTurns(.runMovedAway, label: "a run's 10,000 claims moved away at a commit")
+        try await Self.commitRerouteTurns(.runSuperseded, label: "a run's 10,000 claims at a superseded exit")
+        try await Self.commitRerouteTurns(.runToBound, label: "a run's 10,000 claims moved onto a present content")
+    }
+
     /// C2 of a commit whose 10,000 moved-away ids are each wanted by two prefetch groups: the drain makes every id whole
     /// with both its tokens in one turn (T-two-tokens), so a turn re-routes 1,024 interests of 512 ids.
     @Test("R-SYN-11: a commit that owes 10,000 ids with two tokens each holds the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(10)))

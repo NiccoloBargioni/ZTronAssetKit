@@ -659,6 +659,18 @@ extension ZTronAssetKitBenchmarks {
             try await Self.concentrationTurns(.publication, commit: .movedAway, label: "a commit that re-routes the ids moved away")
         }
 
+        /// As `concentrationCommitRerouteTurns`, when v4 also maps O's own id to a content of its own (E, its download
+        /// held): no id wants O's content, so the store refuses the publication (`.superseded`), and the exit owes the
+        /// 10,001 interests' re-routes as one batch (`supersede`; Stage 3 close-out cycle 21, ruling S3-R26 item 1,
+        /// `integrate-rr21.md` R5, site 3), which the drain makes at most 512 ids a turn. Made in the exit's turn, they
+        /// held the actor 41.09 ms (the cycle-20 verifiers' PROBE-C20C-SUPERSEDE-C2). The heartbeat's longest wait over
+        /// the exit and over the drain's held turns, up to the last re-route, the best of three against C2.
+        @Test("R-SYN-11: the superseded exit of a publication whose 10,000 converged ids an apply moved away re-routes them holding the engine's actor at most C2's 10 ms per turn", .timeLimit(.minutes(5)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func supersededRerouteTurns() async throws {
+            try await Self.concentrationTurns(.publication, commit: .superseded, label: "a superseded exit that re-routes every id")
+        }
+
         /// As `concentrationNotFoundTurns`, while the content keeps downloading: the follow's own visits move the 10,000
         /// ids, each join onto the one job that grows to hold them (S3-R21 item 1, the cycle-17 verifiers'
         /// VERIFY-C17R-CONC-FOLLOW). Each held turn is also timed inside the actor.
@@ -716,6 +728,9 @@ extension ZTronAssetKitBenchmarks {
                 case .movedAway:
                     #expect(run.served && run.committed && run.madeAtCommit == 0 && run.batchesAtCommit == 1 && run.owedAtCommit == 10_000, "setup: the commit answered O's waiter, re-routed none of the 10,000 members and owed them as one batch: \(run)")
                     #expect(!run.drainMade.isEmpty && run.drainMade.allSatisfy { $0 <= SyncEngine.followIDsPerTurn } && run.rerouted == 10_000, "setup: the drain re-routed the 10,000 members' interests to v4's content, at most 512 ids a turn: \(run)")
+                case .superseded:
+                    #expect(run.committed && run.madeAtCommit == 0 && run.batchesAtCommit == 1 && run.owedAtCommit == 10_001, "setup: the exit ended O's job, re-routed none of the 10,001 ids and owed them as one batch: \(run)")
+                    #expect(!run.drainMade.isEmpty && run.drainMade.allSatisfy { $0 <= SyncEngine.followIDsPerTurn } && run.rerouted == 10_000 && run.onOwn == 1, "setup: the drain re-routed the 10,000 members' interests to v4's content and O's waiter to its id's own, at most 512 ids a turn: \(run)")
                 }
             }
             let waits = runs.map(\.wait)
@@ -725,7 +740,7 @@ extension ZTronAssetKitBenchmarks {
             let drains = runs.map { $0.drainTurns.max() ?? 0 }
             print("R-SYN-11 10,000 ids converging on one content during an owed follow, \(label): longest actor wait \(waits) ms, best \(waits.min() ?? .infinity) ms; the commit window \(commits) ms; longest held turn \(turns) ms; the drain's window \(runs.map(\.drain)) ms, its longest held turn \(drains) ms; followedLane with the moves owed \(lanes) ms (budget \(Self.c2Budget) ms best); load \(SyncBench.loadAverages()); runs \(runs)")
             #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(label): \(waits)")
-            if commit == .movedAway {
+            if commit == .movedAway || commit == .superseded {
                 #expect((drains.min() ?? .infinity) <= Self.c2Budget, "\(label), the drain's held turns: \(drains)")
             }
             if ending == .notFound {
@@ -3013,6 +3028,9 @@ enum ConcentrationCommit: Sendable, Equatable {
     /// v4 first maps every member to another content (one job, its download held): the store binds only O's own id,
     /// and the commit re-routes the other interests to that content.
     case movedAway
+    /// As `movedAway`, and v4 maps O's own id to a content of its own (its download held): the store binds nothing and
+    /// refuses the publication (`.superseded`), and its exit re-routes every interest (`supersede`).
+    case superseded
 }
 
 /// One run of `SyncBench.concentration`.
@@ -3027,11 +3045,14 @@ struct ConcentrationRun: CustomStringConvertible {
     var committed = false
     /// Whether O's user waiter was answered with a location.
     var served = false
-    /// The ids the job of v4's content held after the drain (`ConcentrationCommit.movedAway`).
+    /// The ids the job of v4's content held after the drain (`ConcentrationCommit.movedAway`, `.superseded`).
     var rerouted = 0
-    /// For `.movedAway`: the ids the job of v4's content held right after the commit, the distinct ids the commit owed
-    /// and its batches; then the heartbeat's longest wait over the drain's held turns, in milliseconds, each of those
-    /// turns timed inside the actor, and the distinct ids each turn re-routed, for the turns that re-routed any.
+    /// The ids the job of O's id's own content held after the drain (`ConcentrationCommit.superseded`).
+    var onOwn = 0
+    /// For `.movedAway` and `.superseded`: the ids the job of v4's content held right after the commit (or the exit), the
+    /// distinct ids it owed and its batches; then the heartbeat's longest wait over the drain's held turns, in
+    /// milliseconds, each of those turns timed inside the actor, and the distinct ids each turn re-routed, for the turns
+    /// that re-routed any.
     var madeAtCommit = 0
     var owedAtCommit = 0
     var batchesAtCommit = 0
@@ -3059,7 +3080,7 @@ struct ConcentrationRun: CustomStringConvertible {
     var description: String {
         let sorted = self.turns.sorted()
         let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
-        return "wait \(self.wait) ms, ending \(self.ending) ms, commit \(self.commit) ms (committed \(self.committed), served \(self.served), made at the commit \(self.madeAtCommit), owed \(self.owedAtCommit) in \(self.batchesAtCommit) batches; drain \(self.drain) ms, \(self.drainTurns.count) held turns, longest \(self.drainTurns.max() ?? 0) ms, made \(self.drainMade); re-routed \(self.rerouted)); \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), \(self.left) jobs left, verdict waits \(self.verdictWaits), followedLane \(String(describing: self.lane)) ms; \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
+        return "wait \(self.wait) ms, ending \(self.ending) ms, commit \(self.commit) ms (committed \(self.committed), served \(self.served), made at the commit \(self.madeAtCommit), owed \(self.owedAtCommit) in \(self.batchesAtCommit) batches; drain \(self.drain) ms, \(self.drainTurns.count) held turns, longest \(self.drainTurns.max() ?? 0) ms, made \(self.drainMade); re-routed \(self.rerouted), on O's id's own content \(self.onOwn)); \(self.jobs) jobs, follow owed \(self.owed), O ids \(self.ids), \(self.left) jobs left, verdict waits \(self.verdictWaits), followedLane \(String(describing: self.lane)) ms; \(self.turns.count) held turns, longest \(sorted.last ?? 0) ms, median \(median) ms"
     }
 }
 
@@ -3266,17 +3287,19 @@ extension SyncBench {
     /// The commit window of `concentration` (`ConcentrationCommit`): the follow's remaining turns run first, outside
     /// it; for `.movedAway`, v4 maps every member to D (16 bytes, one job, its download held) and is applied while O's
     /// publication stays at its first store unit (every later unit runs), and the follow's and the drain's turns are
-    /// held. Then the publication's unit is released, and the heartbeat times the turns until O's job is gone; for
-    /// `.movedAway` the commit owes the members' re-routes, and the held turns are then released one at a time, each
-    /// timed inside the actor, under the heartbeat, until the drain made them (Stage 3 close-out cycle 21, ruling S3-R26
-    /// item 1).
+    /// held; for `.superseded`, v4 also maps O's own id to E (17 bytes, its download held). Then the publication's unit
+    /// is released, and the heartbeat times the turns until O's job is gone; for `.movedAway` the commit owes the
+    /// members' re-routes, for `.superseded` the store refuses the publication and its exit owes every re-route, and
+    /// the held turns are then released one at a time, each timed inside the actor, under the heartbeat, until the
+    /// drain made them (Stage 3 close-out cycle 21, ruling S3-R26 item 1).
     static func timeCommit(of o: ManifestEntry, members count: Int, commit: ConcentrationCommit, engine: SyncEngine, source: FakeRemoteSource, bulk: SteppedBlockingExecutor, waiter: Task<Result<AssetLocation, AssetError>, Never>, into run: inout ConcentrationRun) async throws {
         await engine.releaseFollowFollowUps()
         while !Task.isCancelled, await SyncBench.barrierUp(engine) {
             await Task.yield()
         }
         var away: ManifestEntry?
-        if commit == .movedAway {
+        var own: ManifestEntry?
+        if commit == .movedAway || commit == .superseded {
             await bulk.waitForHeldUnits(atLeast: 1)
             guard let unit = await bulk.heldUnits.first else {
                 throw SyncBenchError.incomplete("O's publication is not held at the store")
@@ -3296,7 +3319,14 @@ extension SyncBench {
             let d = v4[0]
             away = d
             await source.script(d.transferID, [.hold])
-            await source.scriptManifest([.fetched(SyncBench.manifestData(v4 + [o]), etag: ETag(rawValue: "\"v4\""))])
+            var listedO = o
+            if commit == .superseded {
+                // O's own id leaves O's content too: no record wants O's bytes.
+                listedO = SyncBench.entry("o", Data(repeating: 0x65, count: 17), policy: .onDemand)
+                own = listedO
+                await source.script(listedO.transferID, [.hold])
+            }
+            await source.scriptManifest([.fetched(SyncBench.manifestData(v4 + [listedO]), etag: ETag(rawValue: "\"v4\""))])
             // The sync ends with the engine (its run may wait for the held download); only its apply matters here.
             _ = Task { await engine.sync(.force) }
             while !Task.isCancelled, !(await SyncBench.appliedAndFollowed(engine, etag: "\"v4\"")) {
@@ -3316,7 +3346,8 @@ extension SyncBench {
             }
         }
         run.committed = !(await SyncBench.jobExists(engine, o.transferID))
-        if case .success = await waiter.value {
+        // A superseded exit re-routes O's waiter to its id's own content, whose download stays held.
+        if commit != .superseded, case .success = await waiter.value {
             run.served = true
         }
         if let away {
@@ -3337,6 +3368,9 @@ extension SyncBench {
             run.drainMade = made
             await SyncBench.releaseHeldTurns(engine)
             run.rerouted = await SyncBench.inbound(engine, away.transferID).ids
+            if let own {
+                run.onOwn = await SyncBench.inbound(engine, own.transferID).ids
+            }
         }
     }
 
@@ -3824,10 +3858,10 @@ extension SyncBench {
         }
     }
 
-    /// `count` on-demand members, `s` and a five-digit index each, all of `bytes`.
-    static func sharing(_ count: Int, _ bytes: Data) -> [ManifestEntry] {
+    /// `count` members under `policy` (on-demand by default), `s` and a five-digit index each, all of `bytes`.
+    static func sharing(_ count: Int, _ bytes: Data, policy: AssetPolicy = .onDemand) -> [ManifestEntry] {
         (0..<count).map { index in
-            SyncBench.entry(String(format: "s%05d", index), bytes, policy: .onDemand)
+            SyncBench.entry(String(format: "s%05d", index), bytes, policy: policy)
         }
     }
 

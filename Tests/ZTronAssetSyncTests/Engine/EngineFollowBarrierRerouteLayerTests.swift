@@ -34,8 +34,8 @@ extension EngineFollowBarrierTests {
     }
 
     /// Holds the publications of O and of `publishing` at their first store units, applies K0 (swept or visited first),
-    /// and commits O with the drain's turns held; requires one batch of `items` re-routes. Returns the units still held:
-    /// `publishing`'s.
+    /// and commits O (with `away`, the store refuses it) with the drain's turns held; requires one batch of `items`
+    /// re-routes (`OwedCommit.owedPairs` by default). Returns the units still held: `publishing`'s.
     @available(macOS 15.0, iOS 18.0, *)
     static func oweThroughK0(_ c: OwedCommit, k0: [ManifestEntry], publishing: [TransferID] = [], items: Int? = nil, visit: LaneDropVisit) async throws -> HeldUnits {
         let engine = c.engine
@@ -47,8 +47,8 @@ extension EngineFollowBarrierTests {
         await held.release(units[0])
         await engine.awaitCondition { $0.state.jobs[transfer] == nil }
         let batches = await engine.readForTests { e in Self.owedBatches(e) }
-        let expected = items ?? c.moved.count
-        try #require(batches.count == 1 && batches.first?.items.count == expected, "setup: O's commit owes its \(expected) re-routes as one batch: \(batches.map(\.items.count))")
+        let expected = items ?? c.owedPairs
+        try #require(batches.count == 1 && batches.first?.items.count == expected, "setup: O's \(c.away == nil ? "commit" : "superseded exit") owes its \(expected) re-routes as one batch: \(batches.map(\.items.count))")
         return held
     }
 
