@@ -57,6 +57,17 @@ extension EngineFollowBarrierTests {
         var bucket = 0
         /// The ids a turn moves (`EngineState.followIDsPerTurn`).
         var idsPerTurn = EngineFollowBarrierTests.takeOffIDsPerTurn
+        /// The ids zz-y00… of a content Y (14 bytes), with zz-yk, which v4 maps to W's content (26 bytes) while Y
+        /// publishes, held (`takeOffHoldY`): Y's commit then owes their re-routes as one batch (site 1) behind O0's
+        /// verdict (`takeOffCommitY`).
+        var commit = 0
+        /// A present content D (zz-d, 4,000 bytes, made present after v2), onto which v5 maps O0's moved ids
+        /// (`TakeOff.v5`), so that its apply binds them to D's blob (`ApplyReport.reused`), with the gate that keeps a job
+        /// of D's content, had one been made, from serving them (RR21-PRESENT-PRUNE at site 2).
+        var present: PresentGate?
+        /// With `.timeout`: O0's retry times out too, at the interactive cap (`maxAttemptsPerRun` 2), so its verdict
+        /// answers every id O0 then holds with the timeout.
+        var capped = false
     }
 
     /// The ids and transfers a take-off scenario's readings need (`takeOffTurn`).
@@ -70,6 +81,10 @@ extension EngineFollowBarrierTests {
         let p: TransferID
         /// The cancelled waiter's id (`TakeOffShape.removal`).
         let removal: AssetID?
+        /// Y's moved ids and W's transfer (`TakeOffShape.commit`), and D's transfer (`TakeOffShape.present`).
+        let yMoved: Set<AssetID>
+        let w: TransferID
+        let d: TransferID
     }
 
     /// A take-off scenario's engine, entries and callers (`takeOffSetUp`).
@@ -104,14 +119,39 @@ extension EngineFollowBarrierTests {
         let group: InterestToken?
         /// The recorded group whose pending claim keeps O0 (`keptWaiters == false`).
         let claim: InterestToken?
+        /// The store units' executor (`setUpHeldPublications`), where Y's publication is held (`takeOffHoldY`).
+        let bulk: SteppedBlockingExecutor
+        /// zz-yk and zz-y… on Y's content, zz-y… on W's (`commit`), and their waiters, zz-yk's first.
+        let yKept: [ManifestEntry]
+        let yMoved: [ManifestEntry]
+        let yMovedOnW: [ManifestEntry]
+        let yCallers: [Task<Result<AssetLocation, AssetError>, Never>]
+        /// zz-d and zz-e (`present`), listed in every manifest, and O0's moved ids on D's content.
+        let presentEntries: [ManifestEntry]
+        let movedOnD: [ManifestEntry]
+        /// zz-e's waiter (`present == .breakerOpen`): its job downloads, held, until `takeOffOpenBreaker`.
+        let eCaller: Task<Result<AssetLocation, AssetError>, Never>?
 
         var engine: SyncEngine {
             self.s.engine
         }
 
-        /// v4: every content's ids on their own content, the `after` ids on P.
+        /// v4: every content's ids on their own content, the `after` ids on P; with `commit`, zz-y… on W's.
         var v4: [ManifestEntry] {
-            [self.s.q] + FollowBarrier.fillers(self.seed + 300) + EngineFollowBarrierTests.takeOffFillers(self.seed + 20_000) + self.kept + self.moved.flatMap { $0 } + self.afterOnP + self.membersOnO + [self.x] + EngineFollowBarrierTests.laterFillers(self.seed + 9_000)
+            self.manifest(moved: self.moved.flatMap { $0 })
+        }
+
+        /// v5 (`present`): v4 with O0's moved ids on D's content. Swept first it lands once the follow's visit of O0 under
+        /// v4, which found O0 by its `after` ids and the moved ids back on O0's content, spent the set it re-routes
+        /// (`Job.rerouteOnPass`), so its own visit passes O0 and leaves them to the verdict, whose take-off re-routes them
+        /// onto D (`takeOffFollowUntilVisited`).
+        var v5: [ManifestEntry] {
+            self.manifest(moved: self.movedOnD + self.moved.dropFirst().flatMap { $0 })
+        }
+
+        /// v4's entries with `moved` as the contents' moved ids.
+        private func manifest(moved: [ManifestEntry]) -> [ManifestEntry] {
+            [self.s.q] + FollowBarrier.fillers(self.seed + 300) + EngineFollowBarrierTests.takeOffFillers(self.seed + 20_000) + self.kept + moved + self.afterOnP + self.membersOnO + [self.x] + self.yKept + self.yMovedOnW + self.presentEntries + EngineFollowBarrierTests.laterFillers(self.seed + 9_000)
         }
     }
 
@@ -128,7 +168,8 @@ extension EngineFollowBarrierTests {
     /// first, it requires each verdict to wait with exactly its content's moved ids moved before it.
     @available(macOS 15.0, iOS 18.0, *)
     func takeOffSetUp(_ visit: LaneDropVisit, seed: UInt64, shape: TakeOffShape) async throws -> TakeOff {
-        let (s, _) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let breaker = shape.present == .breakerOpen ? CircuitBreakerPolicy(authDistinctAssets: 1) : CircuitBreakerPolicy()
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry, breaker: breaker))
         let engine = s.engine
         let idsPerTurn = shape.idsPerTurn
         await engine.readForTests { $0.state.followIDsPerTurn = idsPerTurn }
@@ -149,12 +190,27 @@ extension EngineFollowBarrierTests {
         let membersOnO = memberNames.map { EngineHarness.onDemand($0, oBytes[0]) }
         let x = EngineHarness.onDemand("zz-x", xBytes)
         let h = EngineHarness.onDemand("zz-h", hBytes).transferID
+        let yBytes = EngineFixture.bytes(seed + 40, count: 14)
+        let wBytes = EngineFixture.bytes(seed + 41, count: 26)
+        let dBytes = EngineFixture.bytes(seed + 42, count: 4_000)
+        let eBytes = EngineFixture.bytes(seed + 43, count: 12)
+        let yKept = shape.commit > 0 ? [EngineHarness.onDemand("zz-yk", yBytes)] : []
+        let yNames = (0..<shape.commit).map { String(format: "zz-y%02d", $0) }
+        let yMoved = yNames.map { EngineHarness.onDemand($0, yBytes) }
+        let yMovedOnW = yNames.map { EngineHarness.onDemand($0, wBytes) }
+        let zzD = EngineHarness.onDemand("zz-d", dBytes)
+        let zzE = EngineHarness.onDemand("zz-e", eBytes)
+        let presentEntries = shape.present == nil ? [] : [zzD, zzE]
+        let movedOnD = shape.present == nil ? [] : movedNames[0].map { EngineHarness.onDemand($0, dBytes) }
+        let y = EngineHarness.onDemand("zz-yk", yBytes).transferID
+        let w = EngineHarness.onDemand("zz-w", wBytes).transferID
         let contents = kept.map(\.transferID)
-        let n = try #require(movedOnN.first?.first).transferID
+        let n = EngineHarness.onDemand("zz-n", nBytes).transferID
         let p = EngineHarness.onDemand("zz-p", pBytes).transferID
-        try #require(Set(contents + [n, p, h, x.transferID]).count == shape.contents + 4, "setup: O0…, N, P, H and X are distinct contents")
+        let others = [n, p, h, x.transferID] + (shape.commit > 0 ? [y, w] : []) + (shape.present == nil ? [] : [zzD.transferID, zzE.transferID])
+        try #require(Set(contents + others).count == shape.contents + others.count, "setup: O0…, N, P, H, X (and Y, W, D, E) are distinct contents")
         try #require((0..<shape.contents).allSatisfy { c in moved[c].allSatisfy { $0.transferID == contents[c] } } && after.allSatisfy { $0.transferID == contents[0] }, "setup: each content's ids share it")
-        let all = kept + moved.flatMap { $0 } + after + members + [x]
+        let all = kept + moved.flatMap { $0 } + after + members + [x] + yKept + yMoved + presentEntries
         await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + Self.takeOffFillers(seed + 20_000) + all + Self.laterFillers(seed + 3_000), etag: "v2")
         _ = try #require(await engine.sync(.force).completeReport)
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
@@ -162,8 +218,13 @@ extension EngineFollowBarrierTests {
         await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
         for c in 0..<shape.contents {
             switch shape.ending {
+            case .notFound where shape.present != nil:
+                // Visited first, v4's visit makes a fresh job of O0's content for the moved ids, held, which v5's supersedes.
+                await s.harness.source.script(contents[c], [.hold, .fail(.permanentMissing(httpStatus: 404)), .hold, .stage(oBytes[c])])
             case .notFound:
                 await s.harness.source.script(contents[c], [.hold, .fail(.permanentMissing(httpStatus: 404)), .stage(oBytes[c])])
+            case .timeout where shape.capped:
+                await s.harness.source.script(contents[c], [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .fail(.transient(.timedOut, retryAfter: nil))])
             case .timeout:
                 await s.harness.source.script(contents[c], [.hold, .fail(.transient(.timedOut, retryAfter: nil)), .stage(oBytes[c])])
             case .spaceRetry:
@@ -174,6 +235,23 @@ extension EngineFollowBarrierTests {
         await s.harness.source.script(p, [.stage(pBytes)])
         await s.harness.source.script(h, [.hold, .stage(hBytes)])
         await s.harness.source.script(x.transferID, [.stage(xBytes)])
+        if shape.commit > 0 {
+            await s.harness.source.script(y, [.hold, .stage(yBytes)])
+            await s.harness.source.script(w, [.stage(wBytes)])
+        }
+        if shape.present == .breakerOpen {
+            // zz-e downloads, held, until `takeOffOpenBreaker` lets its 403 arrive.
+            await s.harness.source.script(zzE.transferID, [.hold, .fail(EngineRegressionCycle20Tests.forbidden)])
+        }
+        if shape.present != nil {
+            // D is present before the waiters register: zz-d's request fetches it, and its job ends.
+            let dT = zzD.transferID
+            await s.harness.source.script(dT, [.stage(dBytes)])
+            let dID = zzD.identifier
+            let served = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await engine.awaitAsset(dID, lane: .userInitiated) }
+            try #require((try? served.get())?.byteSize == 4_000, "setup: zz-d is present: \(served)")
+            await engine.awaitCondition { $0.state.jobs[dT] == nil && !$0.state.storeWorkInFlight }
+        }
         // The waiters register one at a time, in order, so that their tokens ascend with the ids (`lanes`).
         func register(_ id: AssetID, lane: AssetPriority) async -> Task<Result<AssetLocation, AssetError>, Never> {
             let task = Task { await engine.awaitAsset(id, lane: lane) }
@@ -199,6 +277,11 @@ extension EngineFollowBarrierTests {
         for entry in after {
             afterCallers.append(await register(entry.identifier, lane: .userInitiated))
         }
+        var yCallers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in yKept + yMoved {
+            yCallers.append(await register(entry.identifier, lane: .userInitiated))
+        }
+        let eCaller = shape.present == .breakerOpen ? await register(zzE.identifier, lane: .userInitiated) : nil
         var group: InterestToken?
         if shape.partial, let first = moved.first?.first {
             group = try await engine.registerGroup([kept[0].identifier, first.identifier], lane: .prefetch).get()
@@ -217,13 +300,17 @@ extension EngineFollowBarrierTests {
             claim = await engine.readForTests { $0.recordGroup([id], lane: .prefetch).token }
         }
         let interests = (0..<shape.contents).map { c in shape.moved + (shape.keptWaiters ? 1 : 0) + (c == 0 ? shape.after + (shape.partial ? 1 : 0) : 0) }
+        let yInterests = yCallers.count
+        let eT = eCaller == nil ? nil : zzE.transferID
         await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
             await engine.awaitCondition { e in
                 e.state.conditions != nil && (0..<contents.count).allSatisfy { e.state.jobs[contents[$0]]?.state == .downloading && e.state.jobs[contents[$0]]?.interests.count == interests[$0] }
+                    && (yInterests == 0 || (e.state.jobs[y]?.state == .downloading && e.state.jobs[y]?.interests.count == yInterests))
+                    && eT.map { e.state.jobs[$0]?.state == .downloading } ?? true
             }
         }
-        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + Self.takeOffFillers(seed + 30_000) + kept + movedOnN.flatMap { $0 } + after + members + [x] + Self.laterFillers(seed + 6_000), tag: "v3-take-off-\(seed)", s, visit: visit)
-        if visit == .followVisitedFirst {
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + Self.takeOffFillers(seed + 30_000) + kept + movedOnN.flatMap { $0 } + after + members + [x] + yKept + yMoved + presentEntries + Self.laterFillers(seed + 6_000), tag: "v3-take-off-\(seed)", s, visit: visit)
+        if visit == .followVisitedFirst, shape.moved > 0 {
             // Visited first, v3's visit moved the moved ids onto N, held, at the apply.
             await engine.awaitCondition { $0.state.jobs[n]?.state == .downloading }
         }
@@ -273,14 +360,75 @@ extension EngineFollowBarrierTests {
                 await engine.awaitCondition { e in !e.state.waiters.values.contains { $0.asset == id } }
             }
         }
-        let ids = TakeOffIDs(contents: contents, moved: Set(moved.flatMap { $0 }.map(\.identifier)), after: Set(after.map(\.identifier)), p: p, removal: removal)
-        return TakeOff(s: s, shape: shape, seed: seed, ids: ids, kept: kept, moved: moved, movedOnN: movedOnN, after: after, afterOnP: afterOnP, members: members, membersOnO: membersOnO, bucketGroup: bucketGroup, x: x, keptCallers: keptCallers, movedCallers: movedCallers, afterCallers: afterCallers, group: group, claim: claim)
+        let ids = TakeOffIDs(contents: contents, moved: Set(moved.flatMap { $0 }.map(\.identifier)), after: Set(after.map(\.identifier)), p: p, removal: removal, yMoved: Set(yMoved.map(\.identifier)), w: w, d: zzD.transferID)
+        return TakeOff(s: s, shape: shape, seed: seed, ids: ids, kept: kept, moved: moved, movedOnN: movedOnN, after: after, afterOnP: afterOnP, members: members, membersOnO: membersOnO, bucketGroup: bucketGroup, x: x, keptCallers: keptCallers, movedCallers: movedCallers, afterCallers: afterCallers, group: group, claim: claim, bulk: bulk, yKept: yKept, yMoved: yMoved, yMovedOnW: yMovedOnW, yCallers: yCallers, presentEntries: presentEntries, movedOnD: movedOnD, eCaller: eCaller)
     }
 
     /// Applies v4 (`TakeOff.v4`): visited first its follow ends at the apply; swept first it stays owed, its turns held.
     @available(macOS 15.0, iOS 18.0, *)
     func takeOffApplyV4(_ t: TakeOff, _ visit: LaneDropVisit) async throws {
         try await Self.applyHeld(t.v4, tag: "v4-take-off-\(t.seed)", t.s, visit: visit)
+    }
+
+    /// Swept first: holds the drain's turns and runs the follow's held turns one at a time until its visit of O0 spent
+    /// O0's re-routed set (`Job.rerouteOnPass`), with the follow still owed and O0's verdict waiting, so that an apply
+    /// lands after that visit and before the verdict (`TakeOff.v5`). A pass finds O0 only by an id whose content differs
+    /// between its copy and the engine's (`continueFollowScans`): its `after` ids, which v4 maps to P; the moved ids are
+    /// on O0's content in v2's copy and in v4's, and on N's, which has no job, in v3's. It fails, rather than waiting for
+    /// a held turn that never comes, once the follow ended or O0's verdict was given first.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func takeOffFollowUntilVisited(_ t: TakeOff) async throws {
+        let engine = t.engine
+        let o0 = try #require(t.ids.contents.first)
+        await engine.readForTests { $0.holdDrainFollowUps() }
+        var turns = 0
+        while true {
+            let state = await engine.readForTests { e in (spent: e.state.jobs[o0]?.rerouteOnPass?.isEmpty == true, owed: e.followOwed, waits: e.state.jobs[o0]?.attemptEnd?.deferredAfter != nil) }
+            try #require(state.owed && state.waits, "setup: the follow visits O0 with more of it owed, before O0's verdict: \(state) after \(turns) turns")
+            if state.spent {
+                return
+            }
+            try #require(turns < 40, "setup: the follow visits O0 within 40 turns")
+            _ = await Self.runOneHeldTurn(engine)
+            turns += 1
+        }
+    }
+
+    /// Lets zz-e's held attempt end in its 403, which opens the breaker at its arrival (`authDistinctAssets` 1,
+    /// `recordBreaker`), behind the barrier too, where its verdict waits (zz-e's waiter, `TakeOff.eCaller`, gets it).
+    @available(macOS 15.0, iOS 18.0, *)
+    func takeOffOpenBreaker(_ t: TakeOff) async throws {
+        let engine = t.engine
+        let e = try #require(t.presentEntries.last, "setup: a present shape").transferID
+        let origin = t.s.harness.source.originID
+        await t.s.harness.source.release(e, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { e in
+            if case .open? = e.state.breakers[origin]?.state {
+                return true
+            }
+            return false
+        }
+    }
+
+    /// Holds Y's publication at its first store unit (`holdPublications`), before v4 maps zz-y… to W's content: v4's
+    /// visit then passes Y publishing (RR-14), and Y's commit re-routes them (`takeOffCommitY`).
+    @available(macOS 15.0, iOS 18.0, *)
+    func takeOffHoldY(_ t: TakeOff) async throws -> HeldUnits {
+        let y = try #require(t.yKept.first, "setup: a commit shape").transferID
+        let (units, releaser) = try await Self.holdPublications(of: [y], t.s, bulk: t.bulk)
+        return HeldUnits(bulk: t.bulk, kept: units, releaser: releaser)
+    }
+
+    /// Releases Y's held publication with the drain's turns held: Y commits, binds zz-yk, and owes zz-y…'s re-routes as
+    /// one batch, since its answer and re-routes pass `inboundIDsNow`.
+    @available(macOS 15.0, iOS 18.0, *)
+    func takeOffCommitY(_ t: TakeOff, _ held: inout HeldUnits) async throws {
+        let engine = t.engine
+        let y = try #require(t.yKept.first, "setup: a commit shape").transferID
+        let unit = try #require(held.kept.first, "setup: Y's publication is held")
+        await engine.readForTests { $0.holdDrainFollowUps() }
+        await held.release(unit)
+        await engine.awaitCondition { $0.state.jobs[y] == nil }
     }
 
     /// What one sweep-first held turn of a take-off scenario left.
@@ -307,11 +455,18 @@ extension EngineFollowBarrierTests {
         /// O0's job's held lane (`Job.heldLane`) and its interests.
         let heldLane: AssetPriority?
         let o0Interests: Int
+        /// The ids zz-y… W's job holds (`TakeOffShape.commit`).
+        let yOnW: Int
+        /// The moved ids bound to D's content, and whether a job of D's content exists (`TakeOffShape.present`).
+        let boundOnD: Int
+        let dJob: Bool
+        /// The jobs.
+        let jobs: Int
         /// The invariants.
         let violations: [String]
 
         var description: String {
-            "\(self.kind.rawValue) owed=\(self.owed) moving=\(self.moving) verdicts=\(self.verdicts) settled=\(self.settled) batches=\(self.batches)/\(self.owedIDs) queue=\(self.queue.prefix(4))(\(self.queue.count)) onP=\(self.onP) removalOnJob=\(self.removalOnJob) heldLane=\(String(describing: self.heldLane)) o0=\(self.o0Interests) violations=\(self.violations.prefix(2))"
+            "\(self.kind.rawValue) owed=\(self.owed) moving=\(self.moving) verdicts=\(self.verdicts) settled=\(self.settled) batches=\(self.batches)/\(self.owedIDs) queue=\(self.queue.prefix(4))(\(self.queue.count)) onP=\(self.onP) removalOnJob=\(self.removalOnJob) heldLane=\(String(describing: self.heldLane)) o0=\(self.o0Interests) yOnW=\(self.yOnW) boundOnD=\(self.boundOnD) dJob=\(self.dJob) jobs=\(self.jobs) violations=\(self.violations.prefix(2))"
         }
     }
 
@@ -357,6 +512,10 @@ extension EngineFollowBarrierTests {
             removalOnJob: removalOnJob,
             heldLane: o0?.heldLane,
             o0Interests: o0?.interests.count ?? 0,
+            yOnW: e.state.jobs[ids.w]?.assets.intersection(ids.yMoved).count ?? 0,
+            boundOnD: ids.moved.filter { e.state.boundContent[$0] == ids.d }.count,
+            dJob: e.state.jobs[ids.d] != nil,
+            jobs: e.state.jobs.count,
             violations: e.invariantViolations()
         )
     }
@@ -403,6 +562,8 @@ extension EngineFollowBarrierTests {
         let jobs: Int
         /// The bucket's group's members still pending then.
         let bucketPending: Int
+        /// zz-yk's and zz-y…'s bytes (`TakeOffShape.commit`).
+        let y: [Int64]
     }
 
     /// Lets the follow and its drain end, reads every answer, driving the clock, then checks the invariants and shuts the
@@ -436,6 +597,10 @@ extension EngineFollowBarrierTests {
         for caller in t.afterCallers {
             after.append(bytes(await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: caller) }))
         }
+        var y: [Int64] = []
+        for caller in t.yCallers {
+            y.append(bytes(await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) { await EngineHarness.value(of: caller) }))
+        }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled && !$0.state.storeWorkInFlight }
         if let bucketGroup = t.bucketGroup {
             await EngineRegressionCycle6Tests.driving([t.s.time], fence: engine) {
@@ -451,6 +616,6 @@ extension EngineFollowBarrierTests {
             await engine.releaseGroup(token)
         }
         await Self.finishHeld(t.s)
-        return TakeOffOutcome(kept: kept, moved: moved, after: after, groupPending: left.pending, jobs: left.jobs, bucketPending: left.bucket)
+        return TakeOffOutcome(kept: kept, moved: moved, after: after, groupPending: left.pending, jobs: left.jobs, bucketPending: left.bucket, y: y)
     }
 }

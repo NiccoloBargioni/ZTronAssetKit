@@ -5172,9 +5172,10 @@ fix (S3-R26 item 11, "Red first").
    under "Step 5"). rr21-C6's fix: **committed** right after it (R6 and R7; the five site-2 tests pass in both orders and
    the whole Sync suite passes). Its pins missed C2 on `e437c28` (27.66 ms all held, 17.48 ms half held); the take-off
    in one access (`Job.takeOff(_:)`, `settleRemoval`): **committed** next (7.26 ms and 6.17 ms at a 1-minute load of
-   5.27; under "Step 5"). **Next action:** T-shared, PRESENT-PRUNE at site 2 and `PROBE-RR21-RESERVE-REJOIN`
-   (`c6/fixture-y-d.py`, `c6/EngineFollowBarrierRerouteTakeOffShareTests.swift`), site 2's mutants, the timing window
-   (the site-3 figures with step 8's), then the mutant runs' results and survivors.
+   5.27; under "Step 5"). T-shared, PRESENT-PRUNE at site 2 (with its red copy) and `PROBE-RR21-RESERVE-REJOIN`:
+   **committed** next (16 cases pass in both orders; under "Step 5"). **Next action:** site 2's mutants
+   (`tools/mut-c6.py` on `snap-c6`), the timing window (the site-3 figures with step 8's), then the mutant runs'
+   results and survivors (rr21-C7).
 6. Item C, Phase 2, if a trigger fires: pending.
 7. Item 5 (`waitingTarget`) and its two probes: pending.
 8. Close (benchmarks, covdiff, mutants, simulator, coverage, `--full`): pending.
@@ -5999,6 +6000,62 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   `movedBeforeDrainTurns` 5.12 ms (5.15, 5.21, 5.12; J's 500 deferring 3.00): every site-2 case within C2, with its
   setup. The take-off's 11 tests pass in both orders (`each/c6-one-1.log`), and the whole Sync suite passes (661 tests
   in 56 suites, `each/c6-one-sync1.log`, 298.3 s, 1-minute loads 3.76 to 4.41).
+- **rr21-C6: T-shared, RR21-PRESENT-PRUNE at site 2 and PROBE-RR21-RESERVE-REJOIN** (the commit after `8647760`;
+  `EngineFollowBarrierRerouteTakeOffShareTests.swift`, with the setup's additions in
+  `EngineFollowBarrierRerouteTakeOffFixture.swift`: Y and W for a site-1 batch behind the verdict (`commit`,
+  `takeOffHoldY`, `takeOffCommitY`), the present content D and zz-e for the gates (`present`, `TakeOff.v5`,
+  `takeOffOpenBreaker`), a capped retry (`capped`), and the readings `yOnW`, `boundOnD`, `dJob` and `jobs`).
+  - T-shared (`verdictsVisitAndTheOwedBatchBehindItShareTheDrainTurnsIDs`): O0 times out with three ids zz-c0p00…p02
+    that v4 maps to P, and Y (zz-yk, zz-y00…y02) publishes, held, while v4 maps zz-y00…y02 to W, so Y's commit owes
+    their three re-routes as one batch behind O0's verdict (site 1; the queue `[verdict, reroutes]`, required).
+    Swept first the verdict's turn moves the visit's three p-ids and makes one of the batch's re-routes, its four ids;
+    the next turn makes the other two (re-routes `[1, 2]`), and no turn moves and re-routes more than four. A turn's
+    re-routes are read from the batch's `owedIDs`, not from W's job, whose publication can land between two readings.
+    Both orders: P serves the p-ids, Y zz-yk and W the moved zz-y…, O0's retry zz-c0k, and no job is left.
+  - RR21-PRESENT-PRUNE at site 2 (`owedTakeOffOntoAPresentContentIsServedFromTheStore`, rr21-B24; three gates):
+    D (zz-d, 4,000 bytes) is made present after v2; O0 holds zz-c0k, six moved-before ids and zz-c0p00, and ends in
+    a 404 whose second attempt is held; v4 maps the six back to O0's content and zz-c0p00 to P, v5 maps the six to D,
+    so its apply binds them to D's blob. Swept first the drain's 404 ends O0 and its take-off re-routes the six under
+    v5 and owes them (six past four a turn): no job holds them, so the idle pass after the verdict's turn would drop
+    their bindings were the batch not waiting (`pruneBoundContent`'s `eventsAfterFollow.isEmpty` guard), and the
+    replay answers them from the store. Visited first v3's visit moved them onto N, the 404 was given at its arrival,
+    v4's visit moved them to a fresh job of O0's content, held, and v5's to D, where the store served them. The
+    design's three lessons: (1) v4 cannot map them to D itself: the owed visit that meets O0 while its set serves the
+    follow re-routes the moved-before ids at once (`rerouteOnVisit`, `Job.rerouteFor`), so no take-off was left; v5
+    lands once that visit spent the set (`takeOffFollowUntilVisited`), and its own visit passes O0 and leaves the six to
+    the verdict. (2) A pass finds O0 only by an id whose content differs between its copy and the engine's
+    (`continueFollowScans`): the six are on O0's content in v2's and v4's copies and on N's, which has no job swept
+    first, in v3's, so without zz-c0p00 no pass of v4's follow visited O0, its set was never spent and its verdict was
+    given in the follow's last turn (`each/c6-present-diag.log`: four follow turns, O0 never in the follow's order, its
+    set of six unspent); zz-c0p00 makes v2's pass find O0 at v4's apply, whose visit passes it to the verdict, which
+    answers it with the 404 in both orders. (3) The gates close after v5 in both orders: closed before v3 the breaker
+    failed visit-first's N job fast, and with the timeout ending T20 re-queued O0 at v4 and its retry served 16 bytes
+    before v5, hence the 404 with a held second attempt. zz-e's held 403 opens the breaker at its arrival
+    (`recordBreaker`, `authDistinctAssets` 1; zz-e's waiter gets it); offline is awaited swept first only, since
+    visited first the engine is idle after v5 and its watcher gone (`reconcileIdle`); `insufficientSpace` leaves
+    1,000 bytes. Swept first the test requires that the verdict's turn ends O0 and owes the six as one batch with all
+    six bound to D after it, the batch answers four ids a turn then two, no job is made after v5 (`jobsCreated`) and
+    none of D's content, and the invariants hold; both orders expect D's bytes for the six, the 404 for zz-c0k and
+    zz-c0p00, zz-e's 403, and no job left. Red copy (`tools/hole-red-c6.py`: the guard dropped, the working tree
+    otherwise; `red-holes-c6/summary.txt`, 1-minute loads 4.15 to 9.27): the three sweep-first cases fail at
+    `ShareTests.swift:98` (no binding left after the verdict's turn: `boundOnD=0`) and `:105` (a job of D's content
+    made), 6 issues; the visited-first cases pass.
+  - PROBE-RR21-RESERVE-REJOIN (`takeOffAtTheReservationsEdgeRejoinsItsJobWithItsRetryState`; the order class of
+    the reservation, `integrate-rr21.md`'s probes): O0 holds zz-c0k and four or five moved-before ids, at four a turn,
+    and times out; capped, its retry times out too (`maxAttemptsPerRun` 2). All eight cases pass: at the edge (four)
+    the take-off is charged to the verdict's turn and made in it, no batch; past it (five) it is owed as one batch;
+    either way the ids rejoin O0 backed off with its retry state, as v4's visit rejoined them visited first, and O0's
+    retry serves them all, or, capped, answers them all with its failure. The probe finds no defect.
+  - A site-2 observation, in RR-16's family (S3-R24 item 5; UNCONFIRMED, no probe run, none required): were a gate to
+    close after the verdict defers and before v4, a visit-first engine's v4 visit would place the six on a fresh job of
+    O0's content that parks and fails its waiters fast (`failFastError`), before v5; swept first the take-off
+    re-routes them at the drain, after v5, onto D's content, present, which serves them. The answers differ only
+    because v5 lands between the two engines' answers; landing after both, the take-off re-routes them under v4's copy
+    onto O0's content, as that engine placed them, and they fail fast too. So it is the timing difference S3-R24
+    item 5 places with RR-16, and not blocking.
+  - Results: the three tests pass in both orders (16 cases) with the site-2 tests (8 tests, `each/c6-site2-all.log`,
+    30.6 s, a 1-minute load of 8.77 at the end), and PRESENT-PRUNE's six cases on their own (`each/c6-present-pty3.log`,
+    6.2 s, load 4.09).
 
 ## Items
 
