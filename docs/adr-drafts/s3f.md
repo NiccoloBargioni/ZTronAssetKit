@@ -6930,7 +6930,10 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    404 resolution's turn marks, behaviour-free); `06c9ddf` (`commitReannounceTurns`, red); `5f7db46` (a1, a2, a3 and c3,
    with T-A-1, T-A-2, T-A-3 and `commitFailedArmTurns`). `waitersStalledSubscriber` is 6.38 ms after the step, so c1 is
    not taken; `manyGroups` is 7.80 ms, so c6 is not taken. The figures and the kills are under step 3 below.
-4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
+4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): **in progress**. Committed:
+   `1ccf796` (the purge's turn marks, behaviour-free); `e174f81` (the purge cases, red); `170c376` (e2-A1.1);
+   `4c572fb` (e2-A1.2); `0500e6c` (e2-A1.3). The audit before e2-A1.4 is recorded. Next: e2-A1.4. The figures are
+   under step 4 below.
 5. Item 3, in its sub-steps: not started.
 6. Item 4: not started.
 7. Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's and e2's kills: not started.
@@ -7402,6 +7405,89 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
     It costs one hash per id.
 - **Records.** The ARCHITECTURE §4.3 proposal for c3's dependency is under "Proposed document changes", "Cycle 22 adds"
   (S3-R6). `publishTerminal`'s doc comment names it.
+
+### Step 4: item 2 with item 12.3, e2-A1
+
+- **The seam** (`1ccf796`, behaviour-free). `commitTurnMarksForTests` also marks a purge's first turn, from
+  `ensureStarted`'s await to the end of `withdrawPurged` (`performPurge`), as step 0's copy marked it.
+- **The red cases** (`e174f81`, one commit, right before e2-A1.1; item 12.5.12). `BenchSyncCycle22Purge.swift` holds
+  `purgeTurns(_:)` over the nine shapes of 12.3 (`PurgeShape`) and `purgeJoinsTurns(_:)` at the bucket and the queue:
+  step 0's case code (`snap0`), without its scratch test. On `e174f81` (release with `-enable-testing`;
+  `.build-s3f/c22/each/red4-*.log`) the same seven shapes miss as on `d5b2ab9`:
+
+| Case | Heartbeat, three runs, ms | Best | The purge's turn, best | 1-minute loads | `d5b2ab9` (step 0), best |
+|---|---|---|---|---|---|
+| `purgeWhileOwedTurns` | 9.48, 9.58, 9.59 | 9.48 | (no mark) | 4.54 to 4.54 | 9.66 |
+| `purgeTurns(.oneGroup)` | 46.00, 45.65, 45.57 | 45.57 | 45.56 | 4.54 to 4.26 | 47.56, **miss** |
+| `purgeTurns(.oneMemberGroups)` | 49.71, 47.07, 49.07 | 47.07 | 47.07 | 4.26 to 3.56 | 46.93, **miss** |
+| `purgeTurns(.oneGroupScope)` | 48.38, 49.85, 51.40 | 48.38 | 48.38 | 3.56 to 3.56 | 46.45, **miss** |
+| `purgeTurns(.sharedJob)` | 10.85, 10.98, 12.39 | 10.85 | 10.85 | 3.56 to 3.35 | 10.80, **miss** |
+| `purgeTurns(.sharedJobFourGroups)` | 39.41, 39.12, 39.39 | 39.12 | 39.11 | 3.35 to 3.35 | 38.99, **miss** |
+| `purgeTurns(.fourGroups)` | 119.02, 119.00, 120.62 | 119.00 | 118.99 | 3.35 to 3.21 | 117.64, **miss** |
+| `purgeTurns(.retryJobs)` | 629.08, 589.83, 627.05 | 589.83 | 589.82 | 3.21 to 2.54 | 585.40, **miss** |
+| `purgeTurns(.userWaiters)` | 9.26, 8.62, 8.92 | 8.62 | 8.60 | 2.54 to 2.66 | 7.66 |
+| `purgeTurns(.ensures)` | 11.18, 8.17, 8.79 | 8.17 | 8.15 | 2.66 to 19.04 (the host's load rose in the last run) | 8.07 |
+| `purgeJoinsTurns(.bucket)` | 9.99, 9.96, 9.88 | 9.88 | 9.87 | 9.17 to 9.17 | 9.94 |
+| `purgeJoinsTurns(.queue)` | 8.88, 8.89, 8.72 | 8.72 | 8.72 | 9.17 to 9.17 | 9.10 |
+
+- **e2-A1.1** (`170c376`). `isPurged` switches on the request first: `.all` answers with no lookup, and only `.evictable`
+  and `.scope` look the id up in the copy, which the predicate reads from a local (`let applied = self.state.applied`),
+  so no predicate of the walk reads the state through `self` (the exclusivity rule's precondition for e2-A1.2 and
+  e2-A1.4). One closure serves the three callers (the walk, the joins and the owed arm). The early read's drop-mutant is
+  Equivalent (item 2's part (1)): `.all` then looks the id up and answers `true` either way.
+- **e2-A1.2** (`4c572fb`). `EventAfterFollow.withdrawPurged(joins:reroutes:)` consumes the event and makes it again, as
+  `appendLayer` does: a join the predicate names is marked withdrawn, and a batch of owed re-routes loses its items in
+  place; it returns what the walk withdraws after the access (`PurgedFromEvent`: nothing, a `WithdrawnJoin`, the removed
+  items with the batch's `from`, or an exit verdict's key). A bucket is marked in one `joinsBehindVerdicts[key]` access,
+  newest first (`Array.markWithdrawn(where:)`). The writes the marks imply (`joinsAfterFollow`, the group's member, the
+  heal; `withdrawJoinInterest`) follow the access, in the same order: the predicates read nothing those writes change,
+  so marking first and writing after leaves the state the interleaved walk left. The predicates are local functions
+  (they capture `isPurged`, a non-escaping parameter). The batch arm returns its removed items even when there are none
+  (an empty loop), so the arm has no branch; the old `guard !removed.isEmpty`, whose drop was Equivalent, is gone.
+- **e2-A1.3** (`0500e6c`). The walk drops a job's withdrawn ids in their set's order, and the owed arm its removed items
+  in the heap's order. No drop resumes anything: an `.ensure` group and its interests are user-initiated
+  (`EngineCommands.swift:737`, `EngineDispatch.swift:260`), so the lane filter never withdraws one, and `.system` only
+  forgets a heal. The order is unobservable; the walk's doc no longer says "(id, token) order" (item 12.5.18). This
+  reverses `integrate-rr21.md` R15's sort (`s3f-c20-analysis/integrate-rr21.md:239`) and S3-R26 answer 7's "the purge
+  arm that removes items and sorts the removed subset" (item 12.3's reversals). Restoring a sort is Equivalent (cost
+  only).
+- **Figures after each part** (item 12.5.13; release with `-enable-testing`, best of 3; `purgeWhileOwedTurns` and
+  `purgeJoinsTurns` through `.build-s3f/c22/tools/part-measure.sh`, which builds, runs `wt-bench.sh` and then
+  `probe-parts.sh`; PROBE-C21-PURGE-PARTS on a copy of the commit with the probe's seams, `.build-s3f/c22/probe/<tag>.log`,
+  whose heartbeat is not a figure):
+
+| After | `purgeWhileOwedTurns`, heartbeat, ms | Best | Loads | The probe's walk of the events, ms | Load | `purgeJoinsTurns` bucket, queue, best | Loads |
+|---|---|---|---|---|---|---|---|
+| `e174f81` (red) | 9.48, 9.58, 9.59 | 9.48 | 4.54 | 9.19, 9.63, 9.09 | 8.92 | 9.88, 8.72 | 9.17 |
+| `170c376` e2-A1.1 | 8.38, 8.30, 8.26 | 8.26 | 3.72 | 7.88, 7.96, 7.93 | 3.09 to 2.92 | (not run) | |
+| `4c572fb` e2-A1.2 | 8.38, 8.16, 8.18 | 8.16 | 2.34 to 2.23 | 8.05, 8.56, 8.10 | 3.48 to 3.36 | 6.56, 6.75 | 2.23 |
+| `0500e6c` e2-A1.3 | 5.02, 4.94, 4.97 | 4.94 | 3.94 | 4.19, 4.21, 4.15 | 3.43 | 6.28, 6.49 | 3.70 |
+
+  e2-A1.2 left the probe's walk where e2-A1.1 left it: with every item removed, the copied batch kept none, so its copy
+  was cheap; the sort of 10,000 removed items was the walk's largest share, and e2-A1.3 halved the walk. Each part
+  passed `verify.sh --quick` (`VERIFY: PASS`; the Sync bundle's 700 tests), the release build with warnings as errors,
+  and the unsafe and docs gates (0 escapes; 1281 of 1281) before its commit.
+- **The audit before e2-A1.4** (item 12.5.15). e2-A1.4 leaves one `settleRemoval`, so one `notifyObservers`, per job
+  where today each interest the walk removes whole notifies. The states it no longer shows are inside one job's
+  removals: some of its withdrawn interests removed, the rest not yet. Every `.purge(` of the Sync suites (sixteen calls
+  in eleven files), of the Kit suites (`EventContinuityModelTests`, `FacadeReopenTests`, `FacadeRaceTests`,
+  `FacadeLifecycleTests`) and of the benchmarks was read with the waits around it. A wait registered before the purge's
+  first turn and still pending in it is one of three kinds:
+  - the clock drivers' fence (`EngineHarness.withClock`, `EngineRegressionCycle6Tests.driving(fence:)`,
+    `KitHarness.withClock`): `clockFence() != fence` reads the manifest fetch's deadline and the breakers' half-open
+    watchdogs, which a job's removals change only through its retirement (`abandon`, `recordBreaker`), at its last
+    removal in both shapes, before the notification both shapes make;
+  - `EngineHarness.drive`'s wake-up (`now != state || predicate(now) || clockFence() != fence`): the walk only lowers
+    the interest counts, so a job's end differs from the state the wait recorded whenever a state inside its removals
+    did, and the wake-up re-reads in its own turn;
+  - waits on what the walk does not change (`run?.settlement` in `EngineRegressionRound2Tests.swift:169`,
+    `manifestCatchUps` and `storeWorkInFlight` in `EngineRegressionCycle6Tests.swift:298`), or around a purge that
+    withdraws nothing (`["nothing-here"]` at `EngineRegressionRound2Tests.swift:168` and
+    `EngineFollowBarrierReplayTests.swift:369`).
+
+  Every other wait is registered after the purge returned (the call is awaited first), and `EngineModelTests` reads its
+  invariants in turns of their own (`idleViolations`). No predicate depends on a state inside one job's removals, so no
+  `notifyObservers` call is kept for one. The benchmarks' waits (`jobs.isEmpty` and the like) are monotone in the walk.
 
 ## Items
 
