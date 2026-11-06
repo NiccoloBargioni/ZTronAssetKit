@@ -200,6 +200,23 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - `EngineCommands.swift:1004` and `:1009` are reached by no test (1(e)).
     - **Usage at 08:46: weekly 49 %** (0.74 points an hour since 02:00).
     - The watcher for both cycle-22 verifiers (`watch_journal.py <run 9's journal> 1 3`) runs as task `bb79dr0hq`.
+  - **Cycle 22's verifiers returned at about 10:03. Run 9 was stopped at 10:04**, just after its cycle-23 fixer started and before it changed anything. The worktree is clean at `9aa337c`, there is no `sim.lock`, set 1 is shut down, and no build is running.
+    - `s3f-c22-issues.json` is written (cycle 22, head `9aa337c`). Reqs: 11 issues, 7 blocking. Correct: 10 issues, 7 blocking.
+    - **Fixed and confirmed:** cycle 21's correct #1 (the pin after an ENOENT, probed 8/8, and its defects re-applied as mutants fail 2/2), and `waitersStalledSubscriber` (correct #3, reqs #2).
+    - **New and blocking:**
+      - correct #1, PROBE-C22C-TS-DRAIN-JOIN (1(a)): a user request made before a transfer's ENOSPC is replayed by the swept-first drain as if it came after the end, so it re-queues the job (`EngineJobs.swift:289-297`, `metInItsAttempt`'s replay branch);
+      - correct #2, PROBE-C22C-APPLY-IN-READ (1(a)): an apply made inside a failed publication's free-space read dates an older visit as one made after the end (`EngineJobs.swift:290-291`). Both are siblings of e1-P1 and e1-P2;
+      - correct #3 (1(d)): `shutdownClearsTheJoinsBehindAVerdict(.followVisitedFirst)` failed in 1 of 3 Sync runs (`EngineFollowBarrierDeferBucketTests.swift:755-788`);
+      - reqs #6: 11.6's record was never written, although the draft says it was.
+    - **Carried over and blocking:** the six purge misses (12.3), APM (item 3), item 4's k ≤ 4 shapes (reqs; correct calls them unproven and so non-blocking), the survivors and unreached lines, the changed lines no test reaches, and step 8's records.
+    - **The reqs verifier is incomplete** (reqs #7): "the harness forced a return" before Sync ×3, TSan, the iOS build and Simulator suite, the full benchmarks and the mutants. The fixer also stopped short, citing "budget". So each agent seems to have a working budget, probably its context, of a few hours of heavy tool output. Plan cycle 23 to fit it: the fixer resumes over several runs, as in cycle 21; every agent keeps command output short (logs to files, summaries read back); and the cycle-23 verifiers run lens 3 first.
+    - **Usage at 10:05: weekly 51 %.**
+    - **Next: S3-R28's analysis** (read-only, one workflow, each topic with an independent review):
+      - A: correct #1 and #2, with e1-P1's and e1-P2's fixes. Find the root cause in `metInItsAttempt`'s branches and give one route for the ENOSPC windows.
+      - B: correct #3's flake.
+      - C: the purge's six misses. Cover e2-A2.1 to A2.4, e2-B re-specified with its review's corrections, and a route in one turn for the k = 4 shapes.
+
+      Then write S3-R28, and launch run 10 for cycle 23.
     - **Plan:** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
