@@ -29,10 +29,14 @@ struct EngineRegressionCycle5Tests {
     /// held by a test seam until no other `apply` is at the store or waiting to be followed). Following the run's older
     /// report last took the engine's copy back to `v2` while the store held `v3`, announced `z` pruned a second time and
     /// announced `b` pruned although the store lists and serves it.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 36.0 to 36.7 s beside a second TSan process at a
+    /// load of 20 to 35 (61 % of 60 s) and 16.0 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: SecondManifest.allCases
     )
     func appliesFollowedInStoreOrder(_ second: SecondManifest) async throws {
@@ -70,7 +74,7 @@ struct EngineRegressionCycle5Tests {
         await bulk.release()
         await engine.awaitCondition { $0.applyFollowHeld && $0.state.appliesInFlight == 1 }
         await engine.releaseApplyFollow()
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let ensured = await ensure.value
         await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply && $0.state.appliesInFlight == 0 }
         #expect(outcome.completeReport != nil, "setup: the run completes: \(outcome)")

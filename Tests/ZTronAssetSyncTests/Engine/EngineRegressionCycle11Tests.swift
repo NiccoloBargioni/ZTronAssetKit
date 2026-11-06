@@ -67,10 +67,14 @@ struct EngineRegressionCycle11Tests {
     /// members waited queued behind busy slots left every one of their entries stored, so the queues held far more than
     /// twice the jobs left until the next enqueue, which the engine's own invariant check reports (sync.md §7.2: the
     /// queues stay within twice their live entries). Both a release in one turn and one over several turns.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 42.1 to 42.2 s beside a second TSan process at a
+    /// load of 20 to 35 (70 % of 60 s) and 17.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: [200, SyncEngine.releasesPerTurn + 64]
     )
     func releasedQueuedMembersLeaveNoStaleEntries(count: Int) async throws {
@@ -119,10 +123,14 @@ struct EngineRegressionCycle11Tests {
     /// released and, in the same actor turn, three of the 64 still waiting gain an interest (system interests, the
     /// synchronous stand-in for a second handle's join); the dispatch order is the engine's own (`startSequence`), not
     /// the order the attempts reach the fake.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 44.2 to 45.5 s beside a second TSan process at a
+    /// load of 20 to 35 (76 % of 60 s) and 18.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: Place.allCases
     )
     func rejoinedMembersKeepTheirPlaces(place: Place) async throws {

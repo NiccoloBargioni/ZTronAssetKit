@@ -36,11 +36,212 @@ struct EngineState {
     var ownedTaskPriorityFloor: TaskPriority?
     /// The start task, while it runs.
     var startTask: UInt64?
+    /// Set when shutdown begins closing the store, after it joined every owned task (R-SYN-15, ADR-039): what a condition
+    /// observer reads to check that order (Stage 3, S3-B-070).
+    var closingStore = false
+    /// Introspection: the steps each turn of a shutdown's `settle(_:with:)` took, in order (each at most
+    /// `SyncEngine.shutdownStepsPerTurn`, C2; Stage 3, S3-PERF-01).
+    var shutdownSlices: [Int] = []
 
     // MARK: Jobs, interests and continuations (H-3)
 
     /// One job per transfer (ADR-020).
     var jobs: [TransferID: Job] = [:]
+    /// The jobs that may hold an id the engine's copy maps to another transfer, or does not list: one joined for an
+    /// entry the copy did not name then (`addInterest`), one a follow skipped while it verified or committed, and every
+    /// job when the copy changed without a follow (launch). Every other job follows the copy, so a follow visits these
+    /// and the jobs of the ids the copy's change moved, not the whole table (`followApplied(from:)`; C2, Stage 3,
+    /// S3-PERF-02). A stale member is harmless: the follow finds nothing to move.
+    var unfollowed: Set<TransferID> = []
+    /// The follow in progress, in visiting order: `followOrder[followNext...]` are the jobs it still owes a visit, each in
+    /// `unfollowed` until visited; empty when no follow is owed (`SyncEngine.followsPerTurn`, C2).
+    var followOrder: [TransferID] = []
+    /// The replaced copies whose comparison with the copy a follow still owes, oldest first (`followScansPerTurn`).
+    var followScans: [FollowScan] = []
+    /// The next index of `followOrder` to visit.
+    var followNext = 0
+    /// The applies the engine's copy has been followed for (`SyncEngine.followApplied(from:)`), counted: an attempt's end
+    /// and its deferred verdict record the count at their instant (`Job.attemptEnd`), so a later visit tells an apply a
+    /// visit-first engine visited the job at before them from one after (Stage 3 close-out cycle 16, ruling S3-R19 item 1).
+    var appliesFollowed: UInt64 = 0
+    /// The decision instants `SyncEngine.worldStamp()` minted, counted over the engine's life: a stamp carries its place
+    /// (`WorldStamp.serial`) and a publication's end the count at its instant (`AttemptEnd.stamped`), so the drain tells an
+    /// event that arrived before that end from one that arrived after, which the clock cannot (Stage 3 close-out cycle 22,
+    /// ruling S3-R27 item 12.2's e1-P1). Never reset: an end recorded under one barrier is read under a later one.
+    var stampsMinted: UInt64 = 0
+    /// The follows that ended (`SyncEngine.continueFollow`), counted: a job's re-route set belongs to the follow owed when
+    /// it was recorded (`Job.rerouteFor`) and is spent once that follow has ended (cycle 16, PROBE-C15C-STALE-REROUTE).
+    var followsEnded: UInt64 = 0
+    /// A later turn is scheduled to continue the follow.
+    var followFollowUpScheduled = false
+    /// Test seam: while set, the scheduled follow-up keeps its visits owed and stays scheduled instead of running
+    /// (`holdFollowFollowUps()`, `releaseFollowFollowUps()`). No production path sets it.
+    var followFollowUpsHeld = false
+    /// Test seam: a follow-up turn reached the hold and waits for its release.
+    var followFollowUpWaiting = false
+    /// Test seam: while set, every attempt's start appends its admission here, in the order the engine admits them
+    /// (`SyncEngine.start`). The fake transport records a request when the attempt's driver reaches it, after the
+    /// driver's own store read (`answeredFromStore`), so attempts in flight together may reach it in either order: a
+    /// test of the order of admissions reads it here (Stage 3 close-out cycle 20, ruling S3-R25 item 4). No production
+    /// path sets it.
+    var admissionsForTests: [AttemptAdmission]?
+    /// Test seam: told when a commit's turn begins (`false`, once the store's publication returned) and when its
+    /// delivery ends (`true`), so a benchmark times that one turn inside the actor, apart from the turns of the callers
+    /// it resumes (Stage 3 close-out cycle 21, ruling S3-R26 item 4; `BenchSync.commitTurns`); likewise a 404's
+    /// resolution, from its `recordFailure` await to the end of `resolveAll` (cycle 22, S3-R27 item 1's `.failed` arm),
+    /// and a purge's first turn, from `ensureStarted`'s await to the end of `withdrawPurged` (cycle 22, S3-R27 item
+    /// 12.3). No production path sets it.
+    var commitTurnMarksForTests: (@Sendable (_ ended: Bool) -> Void)?
+    /// A pump found the follow barrier up (`SyncEngine.followBarrier`, F-28) and admitted nothing: every follow turn
+    /// pumps again, and the drain's last batch pumps once the barrier is down (Stage 3, close-out cycles 3 and 9).
+    var pumpWaitsForFollow = false
+    /// Set while the follow moves one job (`SyncEngine.follow`): a join it makes (a moved id's interest re-routed to its
+    /// new content) is the follow's own, whose space verdict is given at once; any other join's verdict on a job parked
+    /// `insufficientSpace`, and any other place in a queue, waits for the follow's end while one is owed
+    /// (`eventsAfterFollow`, F-28).
+    var inFollowVisit = false
+    /// Set while an attempt's end brings onto its job the interests an owed visit moves there (`SyncEngine.bringInbound`):
+    /// their joins are made at once, on the job as the attempt left it, never behind its verdict (`addInterest`).
+    var bringingInbound = false
+    /// Set while the drain's visit after a verdict (`SyncEngine.followAfterVerdict`), or the rest of one
+    /// (`followMoving`), moves a job's ids: a join it makes onto a job whose own exit verdict waits waits behind that
+    /// verdict unless the copy the verdict deferred under already mapped the id there (`SyncEngine.joinWaitsForVerdict`;
+    /// Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 5, candidate 4).
+    var visitingAfterVerdict = false
+    /// The moves an attempt's end or an apply owes onto a job (`SyncEngine.bringInbound`), in the order they were found:
+    /// `inboundMoves[inboundNext...]` are still owed. The follow makes them a bounded number per turn, before any visit
+    /// (`SyncEngine.continueInbound`; Stage 3 close-out cycle 18, ruling S3-R20 item 3), so a follow is owed while one is.
+    var inboundMoves: [InboundMove] = []
+    /// The next index of `inboundMoves` to make. A move that carries more ids than a turn moves stays there, its moves
+    /// left in `InboundMove.progress`, until its last turn (Stage 3 close-out cycle 19, ruling S3-R22 item 1).
+    var inboundNext = 0
+    /// The rest of a visit that moves more ids than a turn moves (`SyncEngine.followIDsPerTurn`): the follow is owed until
+    /// its last id moved, its turns make it before any other visit, and its holder's publication waits for it (Stage 3
+    /// close-out cycle 19, ruling S3-R22 item 1).
+    var followMoving: VisitRemainder?
+    /// The ids a follow turn moves at most, visits, owed moves and a visit's rest together, half of them in an attempt's
+    /// end or an apply's turn (`SyncEngine.followIDsPerTurn`). A seam: a test sets it small to pin the bound (S3-R23
+    /// item 3); no production path writes it.
+    var followIDsPerTurn = SyncEngine.followIDsPerTurn
+    /// The answers a resolution of more than `answersPerTurn` interests owes its callers (`SyncEngine.resolveAll`; Stage
+    /// 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12): each is computed in the resolution's
+    /// turn from that turn's state, its waiter or its ensure group's continuation taken out of the state there as before,
+    /// and only the resume is left to the answer follow-ups (`SyncEngine.answerFollowUp`), oldest first.
+    /// `owedAnswers[owedAnswersHead...]` are still owed; the array is emptied once its last answer is resumed, and the
+    /// shutdown drain resumes the rest (`SyncEngine.drainEverything`).
+    var owedAnswers: [OwedAnswer] = []
+    /// The first owed answer not resumed yet.
+    var owedAnswersHead = 0
+    /// The owned task of the answer follow-up scheduled for the owed answers (`SyncEngine.scheduleAnswerFollowUp`).
+    var answerFollowUp: UInt64?
+    /// The interests a resolution answers in its own turn, and the answers an answer follow-up resumes, at most
+    /// (`SyncEngine.answersPerTurn`). A seam: a test sets it small to pin the bound (S3-R23 item 3); no production path
+    /// writes it.
+    var answersPerTurn = SyncEngine.answersPerTurn
+    /// Test seam: while set, the answer follow-up keeps its answers owed and stays scheduled instead of resuming them
+    /// (`holdAnswerFollowUps()`, `releaseAnswerFollowUps()`). No production path sets it.
+    var answerFollowUpsHeld = false
+    /// Test seam: an answer follow-up reached the hold and waits for its release.
+    var answerFollowUpWaiting = false
+    /// The owed moves onto each job, counted once per walk: the job's publication binds its ids only once none is owed
+    /// onto it or off it (`SyncEngine.inboundBlocks`). The moves off a job are found among the owed moves when its
+    /// publication asks, so a walk that finds thousands of holders records no holder twice (C2).
+    var inboundOnto: [TransferID: Int] = [:]
+    /// The publications that wait for their job's owed moves (`SyncEngine.awaitInboundMoves`), resumed once none is owed,
+    /// or by shutdown.
+    var inboundWaits: [TransferID: CheckedContinuation<Void, Never>] = [:]
+    /// Whether the apply of this turn walked the jobs for the publications in flight
+    /// (`SyncEngine.bringInboundOntoPublications`): its follow's first turn is then the follow-up turn the walk
+    /// scheduled, so the apply's turn holds the walk without the follow's first passes, moves and visits (C2). Set and
+    /// cleared within the apply's turn (`SyncEngine.followApplied(from:)`).
+    var applyWalked = false
+    /// The inputs that arrived behind the follow barrier and are not real-world ledger inputs, in arrival order (F-28;
+    /// Stage 3 close-out cycle 9, S3-R11 design D3, and cycle 11, S3-R14): every attempt's exit verdict, every request's
+    /// join and withdrawal, a group's release and a purge's withdrawals, an ENOSPC's verdict, a conditions element's and
+    /// a re-admission's decisions about jobs, a due retry and a throttle's fail-fast turn. The engine's handling of each
+    /// waits, and is applied when the follow ends, after its own last turn and pump, as a visit-first engine met them
+    /// (`SyncEngine.drainEventsAfterFollow`); the real-world facts each read (the path, the clock, a `Retry-After`) are
+    /// captured when it arrives. They wait only while a follow is owed, a drain turn is scheduled or a drain is in
+    /// progress (`invariantViolations()`).
+    var eventsAfterFollow: [EventAfterFollow] = []
+    /// The decision instant of each event of `eventsAfterFollow`, in step with it (`SyncEngine.deferToFollow`): its
+    /// arrival and the view of the world then (`worldHistory`). The drain applies an event under it (`reading`), so a
+    /// place keeps the time it was asked for (bulk aging reads it, the cycle-9 amendment (a)), a backoff and a fail-fast
+    /// answer count from the event's arrival, and the throttle, the breaker and the conditions are read as they stood
+    /// then (Stage 3 close-out cycle 12, S3-R15 item 1).
+    var eventStamps: [WorldStamp] = []
+    /// The views of the non-ledger real-world inputs (the origin's throttle and breaker, the conditions, the network
+    /// edge) at the decision instants of the follow barrier, oldest first: one is appended when a deferred event or an
+    /// apply reads a view that differs from the last (`SyncEngine.worldStamp()`), so it grows with the inputs' changes,
+    /// not with the events. Empty while the barrier is down (`invariantViolations()`): after the drain's last batch the
+    /// live state is what applying every input on arrival gave, and no decision reads an older view.
+    var worldHistory: [WorldView] = []
+    /// The decision instant the engine decides at now (`SyncEngine.decisionNow`, `SyncEngine.withReading`): the event
+    /// the drain applies, or the apply a follow's visit belongs to; `nil` otherwise, when every read is live.
+    var reading: WorldStamp?
+    /// The decision instant of each job a follow's visit is owed to: the apply whose pass found it (or whose follow
+    /// carried it), whose instant a visit-first engine visited it at (S3-R15 item 1). Set when the job joins
+    /// `followOrder`, taken by its visit; cleared with `worldHistory`.
+    var followStamps: [TransferID: WorldStamp] = [:]
+    /// The jobs whose exit verdict waits in `eventsAfterFollow` (`.attemptFailed`, `SyncEngine.defersFailure`): each is
+    /// `failed` until the drain gives the verdict, and a re-lane of it is the follow's own visit's (any other waits as the
+    /// event that asks for it); `removeJob` forgets it.
+    var verdictsAfterFollow: [TransferID: VerdictAfterFollow] = [:]
+    /// The joins that wait in `eventsAfterFollow` (`.join`) or behind a waiting exit verdict (`joinsBehindVerdicts`), by
+    /// interest and asset, with the transfer each joins: the waiter, group member or run fetch they stand for holds no
+    /// interest until the drain joins it (`invariantViolations()`).
+    var joinsAfterFollow: [InterestToken: [AssetID: TransferID]] = [:]
+    /// The joins a follow's visit waits behind a waiting exit verdict (`SyncEngine.deferBehindVerdict`), by the verdict's
+    /// attempt, oldest first, each with its decision instant. The drain places a bucket right behind its verdict, newest
+    /// first, when it forms that verdict's batch (`SyncEngine.drainEventsAfterFollow`), where an insert into the queue
+    /// right behind the verdict had put each, at a cost that grew with the joins already behind it (Stage 3 close-out
+    /// cycle 21, ruling S3-R26 item 2). They are registered in `joinsAfterFollow` like any waiting join, and a bucket
+    /// exists only while its verdict waits in `eventsAfterFollow` (`invariantViolations()`).
+    var joinsBehindVerdicts: [VerdictKey: [JoinBehindVerdict]] = [:]
+    /// The jobs an older follow left in `unfollowed` that a later apply found owed no visit while an older pass was
+    /// still owed: they join `followOrder` once the older passes end, where a visit-first engine, whose older passes had
+    /// ended at that apply, placed them (`FollowScan.carried`; amendment (e) of S3-R11, cycle 11).
+    var followCarried: Set<TransferID> = []
+    /// Set while `drainEventsAfterFollow` applies a batch: the events it applies are not deferred again, and no pump runs.
+    var drainingAfterFollow = false
+    /// Set while the drain gives a waiting verdict whose job it took a run's claim off first (`takeOffMovedBefore`), until
+    /// `rerouteMovedBefore` lands the claim or the batch that owes it takes the run check over (`landTakeOff`,
+    /// `reroutesWaiting`): until then it is on no job's interest, so the run check waits (`checkRunSettled`), and the
+    /// drain's end checks the run again (Stage 3 close-out cycle 21, found while fixing S3-R26 item 12's answer 5,
+    /// candidate 2: a check the verdict made between the two settled the run without the claim).
+    var runClaimTakenOff = false
+    /// The ids the drain's visits after verdicts may still move in this turn (`SyncEngine.followAfterVerdict`), its
+    /// owed re-routes re-route (`SyncEngine.continueReroutes`) and its verdicts' take-offs re-route at once
+    /// (`SyncEngine.chargeTakeOff`, which spends them all on one that does not fit), set at each batch to what the turn
+    /// has left: one turn's ids cover the whole batch, the follow's last turn included (Stage 3 close-out cycle 20,
+    /// ruling S3-R25 item 1; each visit had a whole turn's ids, so a batch of verdicts moved that many times more in one
+    /// turn).
+    var drainIDsLeft = 0
+    /// The batches of owed re-routes (`EventAfterFollow.reroutes`) not yet replayed whole, whether they wait in
+    /// `eventsAfterFollow` or in a drain turn's batch: a batch's last item counts it down (`SyncEngine.continueReroutes`;
+    /// Stage 3 close-out cycle 21, ruling S3-R26 item 1).
+    var reroutesWaiting = 0
+    /// The attempts that committed, whose publication the store refused as superseded, or that an ENOENT re-queued at
+    /// their epoch, while events waited for the follow, keyed as an attempt's verdict is, each with `copySerial` then and
+    /// whether the job kept the pinned ids (`PinEnd`), until the barrier is down (`SyncEngine.endWorldHistory`) or
+    /// shutdown. An owed re-route or a waiting join a layer pinned to one of them (`RerouteLayer.ends`) follows the copy in
+    /// force at that commit or supersede, as a visit-first engine's commit or supersede re-routed the interests that had
+    /// joined the job (`SyncEngine.rerouteListing`, `SyncEngine.joinListing`; Stage 3 close-out cycle 21,
+    /// PROBE-RR21-PIN-END, ruling S3-R26 item 12's answer 6.3; the supersede in cycle 22, ruling S3-R27 item 12.2's
+    /// e1-PS), or, after such a re-queue, rides the fresh attempt until the first copy adopted after it (Stage 3 close-out
+    /// cycle 22, ruling S3-R27 item 12.2's e1-R1).
+    var reroutePinCommits: [VerdictKey: PinEnd] = [:]
+    /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
+    var drainFollowUpScheduled = false
+    /// Test seam: while set, the drain's scheduled follow-up keeps its events waiting and stays scheduled instead of
+    /// running (`holdDrainFollowUps()`, `releaseDrainFollowUps()`). No production path sets it.
+    var drainFollowUpsHeld = false
+    /// Test seam: a drain follow-up turn reached the hold and waits for its release.
+    var drainFollowUpWaiting = false
+    /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
+    /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
+    /// by that visit; `removeJob` drops it.
+    var systemHeld: Set<TransferID> = []
     /// Attempts the engine cancelled whose driver still drains the stream to its terminal element.
     var draining: [TransferID: DrainingAttempt] = [:]
     /// Transfers whose interests wait for the engine's manifest copy to catch up with the store: the store superseded a
@@ -193,6 +394,12 @@ struct EngineState {
 
     /// Every deadline.
     var heap = DeadlineHeap()
+
+    /// The `.retry` deadlines of the jobs a purge's walk retires (`SyncEngine.withdrawPurged`), which the walk takes out
+    /// of the heap in one pass once it ends; `nil` outside the walk, where `removeJob` takes each job's out itself. One
+    /// pass per job was quadratic in the jobs waiting for a retry: 10,000 of them held the purge's turn 586 to 629 ms
+    /// (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A2.5).
+    var retiredRetries: Set<DeadlineReason>?
     /// The single alarm.
     var alarm: Alarm?
     /// The last alarm token.
@@ -279,6 +486,14 @@ struct EngineState {
     var alarmTurnsHeld = false
     /// Test seam: the alarm turns the hold keeps, by alarm token; a replaced alarm's is resumed by `rearm`.
     var heldAlarmTurns: [UInt64: CheckedContinuation<Void, Never>] = [:]
+    /// Test seam (Stage 3 close-out cycle 11): while set, an attempt's driver that received the terminal element waits
+    /// before it applies it (`heldAttemptTerminals`) until a test releases it (`holdAttemptTerminals()`,
+    /// `releaseAttemptTerminals()`), so the test can let other engine work, such as a follow's next turn, run between a
+    /// transfer's end and the engine's verdict on it, an order production leaves to the driver's hop onto the actor. No
+    /// production path sets it.
+    var attemptTerminalsHeld = false
+    /// Test seam: the drivers the hold keeps, in the order their terminal elements arrived.
+    var heldAttemptTerminals: [CheckedContinuation<Void, Never>] = []
     /// Test seam (close-out cycle 19): while set, a run's settlement waits before it reaches the run's task
     /// (`heldRunSettlements`) until a test releases it (`holdRunSettlementDelivery()`, `releaseRunSettlementDelivery()`),
     /// so the test can let other engine work, such as a transfer's 429, run between a run's settling turn and its answer,
@@ -296,6 +511,15 @@ struct EngineState {
     /// The jobs parked by their origin's breaker (`blocked(circuitOpen)`), kept and checked as `spaceParked` is: a
     /// closed breaker or a cooldown's end takes these as its owed re-queues in O(1), not a pass over every job (C2).
     var circuitParked: Set<TransferID> = []
+    /// `circuitParked` in the pump's order (`CircuitParkedOrder`, lazy deletion): a breaker that admits only a probe
+    /// re-admits its first job, not every parked job (S3-B-063).
+    var circuitOrder = CircuitParkedOrder()
+    /// The job last re-admitted for the probe a breaker that admits only a probe gives (`readmitForProbe()`): while it
+    /// waits in the queue, the next dispatch takes the probe, so the other parked jobs stay parked.
+    var probeCandidate: TransferID?
+    /// Introspection: the jobs re-queued from `blocked(circuitOpen)` since start, the work the breaker's re-admissions did
+    /// (a chain of probes ending without a verdict re-admits one parked job per exit, S3-B-063).
+    var circuitReadmissions = 0
     /// The jobs parked by their origin's throttle (`blocked(throttled)`), kept and checked as `circuitParked` is.
     var throttleParked: Set<TransferID> = []
     /// The failed jobs (any disposition), kept and checked as `spaceParked` is: a satisfied network edge re-queues
@@ -330,6 +554,11 @@ struct EngineState {
     var releasing: [InterestToken: Release] = [:]
     /// A later turn is scheduled to continue `releasing`.
     var releaseFollowUpScheduled = false
+    /// Test seam: while set, the scheduled release follow-up stays scheduled instead of running (`holdReleaseFollowUps()`,
+    /// `resumeReleaseFollowUps()`). No production path sets it.
+    var releaseFollowUpsHeld = false
+    /// Test seam: a release follow-up reached the hold and waits for its resumption.
+    var releaseFollowUpWaiting = false
 
     // MARK: Events (R-SYN-12)
 
@@ -456,6 +685,112 @@ struct DrainingAttempt: Hashable {
     let driver: UInt64
 }
 
+/// A replaced copy of the applied manifest whose comparison with the engine's copy a follow still owes, from `next` on
+/// (`SyncEngine.followApplied(from:)`).
+struct FollowScan {
+    /// The replaced copy.
+    let manifest: ValidatedManifest
+    /// The index of its next entry to compare.
+    var next = 0
+    /// The jobs the apply that queued this pass found in `unfollowed` and owed no visit while older passes were owed:
+    /// they join `followOrder`, sorted, when this pass begins (`SyncEngine.followCarried`).
+    var carried: [TransferID] = []
+    /// The decision instant of the apply that queued this pass: the jobs it finds or carries are visited under it
+    /// (`EngineState.followStamps`).
+    let stamp: WorldStamp
+}
+
+/// One owed move of `SyncEngine.bringInbound` (`EngineState.inboundMoves`): the ids `holder` holds that `copy` maps to
+/// `target`'s content, which a visit-first engine's visits had already moved onto `target`'s job at its epoch `epoch`.
+struct InboundMove {
+    /// The job the ids move onto.
+    let target: TransferID
+    /// Its epoch when the move was found: a job the epoch no longer names gets none (`SyncEngine.continueInbound`).
+    let epoch: UInt64
+    /// The job that holds them.
+    let holder: TransferID
+    /// The ids.
+    let ids: Set<AssetID>
+    /// The copy that mapped them to `target`'s content: the moves re-route under it (`SyncEngine.reroute`).
+    let copy: ValidatedManifest
+    /// The moves left of a move that carries more ids than a turn moves, once its first turn made some
+    /// (`SyncEngine.continueInbound`); `nil` before.
+    var progress: MoveProgress?
+}
+
+/// A job `SyncEngine.findInbound` brings ids onto: its transfer, its epoch and its entry, read before the walk, so no copy
+/// of the job is alive while its interests grow.
+struct InboundTarget {
+    /// The job's transfer.
+    let transfer: TransferID
+    /// Its epoch (`InboundMove.epoch`).
+    let epoch: UInt64
+    /// Its entry: an id the copy maps to the same transfer (`SyncEngine.sameTransfer`) moves onto it.
+    let entry: ManifestEntry
+}
+
+/// One attempt's admission, as `EngineState.admissionsForTests` records it.
+struct AttemptAdmission: Equatable, Sendable {
+    /// The job's transfer.
+    let transfer: TransferID
+    /// The ticket of the queue entry it was admitted from (`Job.ticket`).
+    let ticket: UInt64
+    /// That entry's place in its lane queue (`Job.queuePlace`).
+    let place: Int64
+    /// The attempt.
+    let attempt: TransferAttempt
+}
+
+/// The interests that hold one id of a job (`Job.tokensByID`): the holder that indexed the id first apart from the
+/// others, so the common id, held by one interest, costs no `Set` (the empty set allocates nothing). It has no `==`: the
+/// invariant check reads its holders from its fields, as a set, against a recount made from the interests directly
+/// (Stage 3 close-out cycle 21, ruling S3-R26 item 3; the design's `==` was not symmetric).
+struct IDTokens: Sendable {
+    /// The holder that indexed the id first, or the one promoted when it left (`remove`).
+    private(set) var first: InterestToken
+    /// The other holders; never `first`.
+    private(set) var others: Set<InterestToken> = []
+
+    /// One holder.
+    init(_ token: InterestToken) {
+        self.first = token
+    }
+
+    /// Adds `token` as a holder; `first` again changes nothing.
+    mutating func add(_ token: InterestToken) {
+        if token != self.first {
+            self.others.insert(token)
+        }
+    }
+
+    /// Removes `token` as a holder, and returns whether a holder is left: removing `first` promotes one of the others,
+    /// or leaves none when it held the id alone.
+    mutating func remove(_ token: InterestToken) -> Bool {
+        if token != self.first {
+            self.others.remove(token)
+            return true
+        }
+        guard let next = self.others.popFirst() else {
+            return false
+        }
+        self.first = next
+        return true
+    }
+
+    /// Every holder.
+    var tokens: Set<InterestToken> {
+        var all = self.others
+        all.insert(self.first)
+        return all
+    }
+
+    /// Calls `body` with each holder, `first` first.
+    func forEach(_ body: (InterestToken) -> Void) {
+        body(self.first)
+        self.others.forEach(body)
+    }
+}
+
 /// One transfer's outstanding work (ARCHITECTURE §7.1).
 struct Job {
     /// The content.
@@ -469,10 +804,25 @@ struct Job {
     var assets: Set<AssetID>
     /// The in-flight state.
     var state: JobState
-    /// Bumped on every (re)start, supersede and abandon; a stale continuation is dropped (ARCHITECTURE §10).
+    /// Taken from `EngineState.lastEpoch` when the job is created (`addInterest`) and at every attempt's start
+    /// (`start`), and at no other instant: a supersede removes the job, so a fresh job of its content takes a new
+    /// epoch, and an abandoned attempt's job keeps its own until its next start. A continuation that carries an older
+    /// epoch is dropped (ARCHITECTURE §10). A job queued again without a start (a publication's ENOENT re-queue, a user
+    /// request's backoff skip, a retry's timer) keeps its attempt's epoch, which owed moves and waiting verdicts name
+    /// (`waitingTarget`; Stage 3 close-out cycle 21, ruling S3-R26 item 5).
     var epoch: UInt64
-    /// Interests by token.
-    var interests: [InterestToken: JobInterest] = [:]
+    /// Interests by token. Changed only through `setInterest` and the other mutators below, which keep
+    /// `interestCounts` and the index of their ids (`tokensByID`) with it.
+    private(set) var interests: [InterestToken: JobInterest] = [:]
+    /// How many of `interests` ask for each lane (`InterestCounts`), kept by every change to them, so the job's lane is
+    /// read without a walk of its interests; the invariant check recounts them (`SyncEngine.invariantViolations`).
+    var interestCounts = InterestCounts()
+    /// The interests that hold each id (`IDTokens`), kept in step with `interests` by every mutator below, so a move
+    /// reads a moved id's holders in O(holders) (`holdings`, `moveItems`) where it walked and sorted every interest of
+    /// the job: 16 moves owed off one holder of 10,000 ids held the actor 79.55 ms (Stage 3 close-out cycle 21, ruling
+    /// S3-R26 item 3; the cycle-20 correctness verifier's PROBE-C20C-MANY-MOVES). The invariant check recounts it from
+    /// the interests (I1).
+    private(set) var tokensByID: [AssetID: IDTokens] = [:]
     /// The lane-queue ticket (lazy deletion).
     var ticket: UInt64 = 0
     /// Its entry's place in its lane queue (`LaneQueues.Entry.place`), where `reinstate` puts it back.
@@ -489,6 +839,32 @@ struct Job {
     var adopt: StagedFile?
     /// Whether the last failure was transient (re-queued early on a satisfied edge, T19).
     var transientFailure = false
+    /// The ids the next visit that passes the job re-routes at once (`SyncEngine.follow`, `SyncEngine.rerouteOnVisit`),
+    /// `nil` from the start of an attempt (`start`) until its publication or its deferred verdict sets it. Set when the
+    /// attempt reaches its publication (`publish`): the ids the engine's copy listed elsewhere then while a follow was owed,
+    /// which a visit-first engine, visiting the job at that follow's apply while it still downloaded, had moved (Stage 3
+    /// close-out cycle 15, ruling S3-R18 item 2); an id an apply moved while the job already published is not in it, since
+    /// that engine passed it (S3-R18a item 1). Set again when the attempt's exit verdict defers to the follow
+    /// (`recordDeferredVerdict`) unless the attempt ended in its publication with no apply since: the ids listed elsewhere
+    /// then while a follow was owed, which that engine had moved before the verdict arrived. The set serves the visit
+    /// the follow owed then makes, and only it: that visit empties it, found moved ids or not, and once that follow has
+    /// ended without visiting the job (an apply moved its ids back first) it is spent all the same (`rerouteFor`). A
+    /// later apply's visit meets ids an apply moved while the job published, which that engine passed; an id the set
+    /// kept was re-routed again once an apply had moved it back and away (cycle 16; PROBE-C15R-REROUTE-STALE,
+    /// PROBE-C15C-STALE-REROUTE).
+    var rerouteOnPass: Set<AssetID>?
+    /// The follows ended (`EngineState.followsEnded`) when `rerouteOnPass` was set: the set belongs to the follow owed
+    /// then, and is spent once that follow has ended (`SyncEngine.rerouteOnVisit`).
+    var rerouteFor: UInt64 = 0
+    /// The applies followed when the latest attempt ended in a failure, and when its exit verdict deferred to the follow
+    /// (`AttemptEnd`); `nil` from the start of an attempt (`start`) and once the drain gives the verdict.
+    var attemptEnd: AttemptEnd?
+    /// The applies followed when the latest attempt's transfer ended in ENOSPC (`failed`): the job is failed from that
+    /// instant, and its verdict waits for the resume point's read and the free-space read (`spaceFailed`). A follow's
+    /// visit inside them for an apply made before it stands for a visit-first engine's visit, which met the job
+    /// downloading, whose re-lane re-queues nothing (`relane`; Stage 3 close-out cycle 21, the transfer's side of ruling
+    /// S3-R26 item 5, probe (i)). A publication's end is `attemptEnd`'s. `nil` from the start of an attempt (`start`).
+    var transferSpaceEnd: UInt64?
     /// The error interests will receive if the job ends now.
     var lastError: AssetError?
 
@@ -497,14 +873,411 @@ struct Job {
     /// released interest were still there. Read only while the job has no interest.
     var heldLane: AssetPriority?
 
+    /// A job of `transfer`'s content, for `entry`, with no interest.
+    init(
+        transfer: TransferID,
+        entry: ManifestEntry,
+        identity: ContentIdentity,
+        assets: Set<AssetID>,
+        state: JobState,
+        epoch: UInt64,
+        queuedAt: MonotonicInstant
+    ) {
+        self.transfer = transfer
+        self.entry = entry
+        self.identity = identity
+        self.assets = assets
+        self.state = state
+        self.epoch = epoch
+        self.queuedAt = queuedAt
+    }
+
     /// The maximum over its interests (ADR-020); for a job only a pending claim keeps, the lane it had (`heldLane`).
+    /// Read from `interestCounts`: each id a follow moves reads the lanes of the jobs it leaves and joins (`addInterest`,
+    /// `relane`, `dropInterest`), and the walk of every interest it was made that O(interests) per id, so a bounded turn
+    /// of 512 ids off a job of 10,000 user waiters held the actor 33 to 71 ms (Stage 3 close-out cycle 20, ruling S3-R25
+    /// item 2; the cycle-19 correctness verifier's PROBE-C19C-USER-SHARED-C2, `BenchSync.userSharedApplyTurns`).
     var lane: AssetPriority {
-        self.interests.values.map(\.lane).max() ?? self.heldLane ?? .bulk
+        self.lane(counting: self.interestCounts)
+    }
+
+    /// The lane the job has with the interests `counts` counts: their highest, else the lane a claim keeps, else bulk
+    /// (`lane`). A commit that answered each interest only its bound ids reads its terminal events' lane here, from the
+    /// interests it answered (`SyncEngine.resolveAll`).
+    func lane(counting counts: InterestCounts) -> AssetPriority {
+        counts.highest ?? self.heldLane ?? .bulk
     }
 
     /// Whether a user-initiated interest is a single request (served before batches, sync.md §7.2).
     var isSingleUser: Bool {
-        self.interests.values.contains { $0.lane == .userInitiated && $0.kind != .ensure }
+        self.interestCounts.singleUser > 0
+    }
+
+    /// Sets `token`'s interest, or removes it with `nil`, and keeps `interestCounts`: an insertion counts the new
+    /// interest, a removal uncounts the old one, and a replacement moves its count from the old interest's lane and kind
+    /// to the new one's (a token's interests keep the lane they registered with, `invariantViolations`, so today's
+    /// replacements narrow an interest's ids and keep both).
+    mutating func setInterest(_ interest: JobInterest?, for token: InterestToken) {
+        switch (self.interests[token], interest) {
+        case (nil, let added?):
+            self.interestCounts.add(added)
+        case (let removed?, nil):
+            self.interestCounts.remove(removed)
+        case (let old?, let new?):
+            self.interestCounts.remove(old)
+            self.interestCounts.add(new)
+        case (nil, nil):
+            break
+        }
+        let old = self.interests[token]?.assets ?? []
+        let new = interest?.assets ?? []
+        for asset in old where !new.contains(asset) {
+            self.release(asset, token)
+        }
+        for asset in new where !old.contains(asset) {
+            self.index(asset, token)
+        }
+        self.interests[token] = interest
+    }
+
+    /// Adds `asset` to `token`'s interest, in place; nothing without one. Its lane and kind, and so the counts, stay.
+    mutating func insertAsset(_ asset: AssetID, for token: InterestToken) {
+        if self.interests[token]?.assets.insert(asset).inserted == true {
+            self.index(asset, token)
+        }
+    }
+
+    /// Removes `asset` from `token`'s interest, in place; whether the interest held it. The interest stays, with its lane
+    /// and kind, when it is left with no id: its caller removes it (`setInterest`).
+    mutating func removeAsset(_ asset: AssetID, for token: InterestToken) -> Bool {
+        guard self.interests[token]?.assets.remove(asset) != nil else {
+            return false
+        }
+        self.release(asset, token)
+        return true
+    }
+
+    /// Removes `assets` from `token`'s interest, in place, as `removeAsset` does each.
+    mutating func subtractAssets(_ assets: Set<AssetID>, for token: InterestToken) {
+        for asset in assets where self.interests[token]?.assets.remove(asset) != nil {
+            self.release(asset, token)
+        }
+    }
+
+    /// Replaces the ids of `token`'s interest, in place; nothing without one. Its lane and kind stay.
+    mutating func setAssets(_ assets: Set<AssetID>, for token: InterestToken) {
+        guard let old = self.interests[token]?.assets else {
+            return
+        }
+        for asset in old where !assets.contains(asset) {
+            self.release(asset, token)
+        }
+        for asset in assets where !old.contains(asset) {
+            self.index(asset, token)
+        }
+        self.interests[token]?.assets = assets
+    }
+
+    /// Removes every interest, their counts and their index.
+    mutating func removeAllInterests() {
+        self.interests.removeAll()
+        self.interestCounts = InterestCounts()
+        self.tokensByID.removeAll()
+    }
+
+    /// Keeps the interests `isIncluded` accepts, and recounts them (`SyncEngine.jobAtVerdict`'s copy of a job). The
+    /// predicate is evaluated once an interest; a dropped interest's ids leave the index, which is untouched, and so
+    /// not copied, when none is dropped.
+    mutating func keepInterests(where isIncluded: (InterestToken, JobInterest) -> Bool) {
+        let dropped = self.interests.filter { !isIncluded($0.key, $0.value) }
+        for (token, interest) in dropped {
+            for asset in interest.assets {
+                self.release(asset, token)
+            }
+            self.interests[token] = nil
+        }
+        self.interestCounts = InterestCounts(self.interests.values)
+    }
+
+    /// The holders of `moved`'s ids, one pair per id and interest that holds it, each with its interest's lane and kind
+    /// and no id (all `SyncEngine.reroute` reads, so no copy of the interest's ids is alive across the moves), by token
+    /// and then id: the order `SyncEngine.move` re-routes them in, where it walked every interest of the job, sorted, for
+    /// the same pairs. Read from the index, it costs O(moved + holders): 16 moves owed off one holder of 10,000 ids held
+    /// the actor 79.91 ms with the walk (`BenchSyncCycle21.manyMovesTurns`; Stage 3 close-out cycle 21, ruling S3-R26
+    /// item 3).
+    func holdings(of moved: Set<AssetID>) -> [(token: InterestToken, asset: AssetID, interest: JobInterest)] {
+        var pairs: [(token: InterestToken, asset: AssetID, interest: JobInterest)] = []
+        for asset in moved {
+            guard let holders = self.tokensByID[asset] else {
+                continue
+            }
+            holders.forEach { token in
+                if let interest = self.interests[token] {
+                    pairs.append((token, asset, JobInterest(lane: interest.lane, kind: interest.kind, assets: [])))
+                }
+            }
+        }
+        pairs.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+        return pairs
+    }
+
+    /// The interests in `moved`'s ids, one item per id and interest that holds it (`MoveProgress`), in no order (the
+    /// move's heap orders them), and the moved ids no interest holds, which a move takes off the job all the same
+    /// (`SyncEngine.startMove`), as `SyncEngine.move` subtracts every moved id. Read from the index, in O(moved +
+    /// holders).
+    func moveItems(of moved: Set<AssetID>) -> (items: [MoveItem], unheld: [AssetID]) {
+        var items: [MoveItem] = []
+        items.reserveCapacity(moved.count)
+        var unheld: [AssetID] = []
+        for asset in moved {
+            guard let holders = self.tokensByID[asset] else {
+                unheld.append(asset)
+                continue
+            }
+            holders.forEach { items.append(MoveItem(asset: asset, token: $0)) }
+        }
+        return (items, unheld)
+    }
+
+    /// Takes `held` off the job in place, as the drain gives its waiting exit verdict (`SyncEngine.takeOffMovedBefore`;
+    /// Stage 3 close-out cycle 21, `integrate-rr21.md` R6): the ids leave `assets`; each interest in them, read from the
+    /// index (`moveItems(of:)`), loses them (`subtractAssets`) or, when they are all it holds, is removed, in ascending
+    /// token order (`setInterest`), its lane read before each removal. One access to the job does it all: through the
+    /// engine, each removal looked the job up and copied it several times, 27.66 ms for 10,000 user waiters' interests
+    /// against 7.26 ms in one access (`movedBeforeDrainWaitersTurns`, the verdict's turn, best of 3, at 1-minute loads of
+    /// 6.26 and 5.27). Returns the re-routes, one item per held id and interest that held it, each with its interest's
+    /// lane and kind, in no order; the tokens removed, ascending; the job's lane before the first removal and before the
+    /// last; and how many held ids an interest held.
+    mutating func takeOff(_ held: Set<AssetID>) -> JobTakeOff {
+        let holders = self.moveItems(of: held)
+        self.assets.subtract(held)
+        var counts: [InterestToken: Int] = [:]
+        counts.reserveCapacity(holders.items.count)
+        for item in holders.items {
+            counts[item.token, default: 0] += 1
+        }
+        // Whole or partial, decided before any interest changes: a partial interest's count drops as it loses ids.
+        var off = JobTakeOff(ids: held.count - holders.unheld.count)
+        var partial: [InterestToken: Set<AssetID>] = [:]
+        for (token, taken) in counts {
+            guard let count = self.interests[token]?.assets.count else {
+                continue
+            }
+            if count == taken {
+                off.removed.append(token)
+            } else {
+                partial[token] = []
+            }
+        }
+        off.items.reserveCapacity(holders.items.count)
+        for item in holders.items {
+            guard let interest = self.interests[item.token] else {
+                continue
+            }
+            off.items.append(RerouteItem(asset: item.asset, token: item.token, lane: interest.lane, kind: interest.kind))
+            if partial[item.token] != nil {
+                partial[item.token]?.insert(item.asset)
+            }
+        }
+        for (token, assets) in partial {
+            self.subtractAssets(assets, for: token)
+        }
+        off.removed.sort()
+        for token in off.removed {
+            let before = self.lane
+            off.laneBeforeLast = before
+            off.laneBeforeFirst = off.laneBeforeFirst ?? before
+            self.setInterest(nil, for: token)
+        }
+        return off
+    }
+
+    /// Keeps `lane` as the job's lane (`heldLane`) once it has no interest left, in place, and returns the content a
+    /// claim that keeps it names (`ClaimKey`); `nil`, with nothing changed, while it has interests
+    /// (`SyncEngine.settleRemoval`).
+    mutating func holdIfUnwanted(_ lane: AssetPriority) -> ClaimKey? {
+        guard self.interests.isEmpty else {
+            return nil
+        }
+        self.heldLane = lane
+        return ClaimKey(job: self)
+    }
+
+    /// What `SyncEngine.retire` reads of a job with no interest left: its state and its running attempt; `nil` while it
+    /// has interests. Mutating only so that the engine reads it through the table's in-place access
+    /// (`Dictionary.subscript(_:)`'s `_modify`) rather than its getter, which copies the job: every reference the job
+    /// holds retained and released once per read (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.7).
+    mutating func retirement() -> (state: JobState, active: ActiveAttempt?)? {
+        guard self.interests.isEmpty else {
+            return nil
+        }
+        return (self.state, self.active)
+    }
+
+    /// Withdraws in place what a purge removes from the job (`SyncEngine.withdrawPurged`): from each non-user interest
+    /// other than a waiter's, in ascending token order, its ids `isPurged` names. An interest left with none is removed
+    /// (`setInterest`), the job's lane read before each removal; one left with some loses them (`subtractAssets`). One
+    /// access to the job does it all, as `takeOff` does, where the walk looked the job up and copied it once for each
+    /// interest it removed (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.4). The order is the walk's
+    /// before: a job a claim keeps holds the lane before the last removal (`heldLane`), so removing in another order
+    /// would change it (e2 review must-fix 6). `isPurged` runs inside the caller's access to the job, so it reads nothing
+    /// of the engine's state. A purge of everything (`all`) withdraws every id of such an interest, with no filter and no
+    /// intersection: an interest's ids are the job's (e2-A1.5, the one branch ruling S3-R27 item 12.3 authorises in
+    /// e2-A1). Returns the interests it withdrew ids from, ascending, with the ids, for the drops the walk makes after
+    /// the access; the tokens removed; the lanes before the first and before the last removal; and whether the job was
+    /// left with no interest.
+    mutating func withdrawPurged(_ isPurged: (AssetID) -> Bool, all: Bool) -> JobWithdrawal {
+        var off = JobWithdrawal()
+        let purged: Set<AssetID> = all ? [] : self.assets.filter(isPurged)
+        guard all || !purged.isEmpty else {
+            return off
+        }
+        for (token, interest) in self.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
+            let withdrawn = all ? interest.assets : interest.assets.intersection(purged)
+            guard !withdrawn.isEmpty else {
+                continue
+            }
+            off.withdrawn.append(WithdrawnInterest(token: token, kind: interest.kind, assets: withdrawn))
+            if withdrawn.count == interest.assets.count {
+                let before = self.lane
+                off.laneBeforeLast = before
+                off.laneBeforeFirst = off.laneBeforeFirst ?? before
+                off.removed.append(token)
+                self.setInterest(nil, for: token)
+            } else {
+                self.subtractAssets(withdrawn, for: token)
+            }
+        }
+        off.emptied = self.interests.isEmpty
+        return off
+    }
+
+    /// Test seam (the invariant oracle): forgets `asset`'s holders in the index, its interests unchanged, the state the
+    /// index's clause reports (I1).
+    mutating func forgetIndexForTests(_ asset: AssetID) {
+        self.tokensByID[asset] = nil
+    }
+
+    /// Indexes `token` as a holder of `asset`.
+    private mutating func index(_ asset: AssetID, _ token: InterestToken) {
+        self.tokensByID[asset, default: IDTokens(token)].add(token)
+    }
+
+    /// Removes `token` as a holder of `asset`, and the entry once it has none.
+    private mutating func release(_ asset: AssetID, _ token: InterestToken) {
+        if self.tokensByID[asset]?.remove(token) == false {
+            self.tokensByID[asset] = nil
+        }
+    }
+}
+
+/// What `Job.takeOff(_:)` took off a job.
+struct JobTakeOff {
+    /// The re-routes, one per held id and interest that held it, in no order.
+    var items: [RerouteItem] = []
+    /// The tokens whose interests it removed, ascending.
+    var removed: [InterestToken] = []
+    /// The job's lane before the first removal (`nil` without one): a job left with interests is re-laned from it.
+    var laneBeforeFirst: AssetPriority?
+    /// The job's lane before the last removal (`nil` without one): a job left with none that a claim keeps holds it
+    /// (`Job.heldLane`).
+    var laneBeforeLast: AssetPriority?
+    /// The held ids an interest held.
+    var ids = 0
+}
+
+/// What `Job.withdrawPurged(_:)` withdrew from a job.
+struct JobWithdrawal {
+    /// The interests it withdrew ids from, in ascending token order.
+    var withdrawn: [WithdrawnInterest] = []
+    /// The tokens whose interests it removed, ascending.
+    var removed: [InterestToken] = []
+    /// The job's lane before the first removal (`nil` without one): a job left with interests is re-laned from it.
+    var laneBeforeFirst: AssetPriority?
+    /// The job's lane before the last removal (`nil` without one): a job left with none that a claim keeps holds it
+    /// (`Job.heldLane`).
+    var laneBeforeLast: AssetPriority?
+    /// Whether the job was left with no interest.
+    var emptied = false
+}
+
+/// An interest a purge withdrew ids from (`Job.withdrawPurged(_:)`): what the walk needs, after the access, to drop
+/// its group's members or forget its heals.
+struct WithdrawnInterest {
+    /// Its token.
+    let token: InterestToken
+    /// Its kind.
+    let kind: InterestKind
+    /// The ids it lost.
+    let assets: Set<AssetID>
+}
+
+/// How many of a job's interests ask for each lane, and how many of its user-initiated ones are single requests (no
+/// `ensure` batch): the job's lane and its single-user rank (`Job.lane`, `Job.isSingleUser`) are read from them in O(1)
+/// (Stage 3 close-out cycle 20, ruling S3-R25 item 2).
+struct InterestCounts: Equatable {
+    /// The bulk interests.
+    var bulk = 0
+    /// The prefetch interests.
+    var prefetch = 0
+    /// The user-initiated interests.
+    var userInitiated = 0
+    /// The user-initiated interests that are single requests, no `ensure` batch (`Job.isSingleUser`).
+    var singleUser = 0
+
+    /// No interest.
+    init() {}
+
+    /// The counts of `interests`, recounted.
+    init<Interests: Sequence>(_ interests: Interests) where Interests.Element == JobInterest {
+        for interest in interests {
+            self.add(interest)
+        }
+    }
+
+    /// The highest lane an interest asks for; `nil` with none.
+    var highest: AssetPriority? {
+        self.highest { _ in true }
+    }
+
+    /// The highest lane an interest `admits` accepts asks for; `nil` with none. `verdictAnswers` reads the lane a retry
+    /// keeps (the lanes whose cap the attempt does not reach) here, where it walked the interests once for each it read.
+    func highest(where admits: (AssetPriority) -> Bool) -> AssetPriority? {
+        if self.userInitiated > 0, admits(.userInitiated) {
+            return .userInitiated
+        }
+        if self.prefetch > 0, admits(.prefetch) {
+            return .prefetch
+        }
+        if self.bulk > 0, admits(.bulk) {
+            return .bulk
+        }
+        return nil
+    }
+
+    /// Counts `interest`.
+    mutating func add(_ interest: JobInterest) {
+        self.count(interest, by: 1)
+    }
+
+    /// Uncounts `interest`.
+    mutating func remove(_ interest: JobInterest) {
+        self.count(interest, by: -1)
+    }
+
+    /// Moves `interest`'s lane's count, and the single requests' for a user-initiated one, by `delta`.
+    private mutating func count(_ interest: JobInterest, by delta: Int) {
+        switch interest.lane {
+        case .bulk:
+            self.bulk += delta
+        case .prefetch:
+            self.prefetch += delta
+        case .userInitiated:
+            self.userInitiated += delta
+            if interest.kind != .ensure {
+                self.singleUser += delta
+            }
+        }
     }
 }
 
@@ -514,11 +1287,40 @@ struct Waiter {
     let asset: AssetID
     /// The job it is an interest of.
     var transfer: TransferID
-    /// Its continuation.
-    let continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>
+    /// Its continuation; `nil` once the caller withdrew behind the follow barrier: the caller was answered `.cancelled`
+    /// at once, and the record follows the interest's re-routes until the drain removes both (`SyncEngine.withdraw`).
+    var continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>?
     /// Answered by a store read in an owned task instead of a job: the engine knows the asset is bound to `transfer`'s
     /// content (L4-R5). Such a waiter holds no interest; a read that finds nothing puts it on the job path.
     var fromStore = false
+}
+
+/// An answer a resolution owes its caller past its own turn (`EngineState.owedAnswers`): computed in that turn, from
+/// that turn's state, and resumed exactly once, by an answer follow-up or by the shutdown drain, with the value stored.
+enum OwedAnswer {
+    /// A `resolve` waiter's result; the waiter left `EngineState.waiters` in the owing turn, so a later withdrawal finds
+    /// nothing to cancel, as after an answer given in that turn.
+    case waiter(InterestToken, CheckedContinuation<Result<AssetLocation, AssetError>, Never>, Result<AssetLocation, AssetError>)
+    /// A settled `ensureAvailable` group's join; its continuation left the group in the owing turn.
+    case ensure(InterestToken, CheckedContinuation<Bool, Never>)
+
+    /// The caller's token.
+    var token: InterestToken {
+        switch self {
+        case .waiter(let token, _, _), .ensure(let token, _):
+            return token
+        }
+    }
+
+    /// Resumes the caller with the stored answer.
+    func resume() {
+        switch self {
+        case .waiter(_, let continuation, let result):
+            continuation.resume(returning: result)
+        case .ensure(_, let continuation):
+            continuation.resume(returning: true)
+        }
+    }
 }
 
 /// A `resolve` caller of an identifier the applied manifest does not list.
@@ -566,6 +1368,34 @@ struct Group {
     /// Whether the group waits for nothing more: no pending member and no fetch left to materialise.
     var isSettled: Bool {
         self.pending.isEmpty && self.cursor >= self.fetches.count
+    }
+
+    /// Drops `asset` if it still waits for `transfer`, in place (`SyncEngine.dropGroupMember`), and returns the
+    /// continuation of an `ensureAvailable` group that drop settled, taken out of the group so that it is resumed once;
+    /// `nil` otherwise: the member waits for other content or for nothing, or the group is a prefetch group, waits for
+    /// more, or was answered. The engine resumes the continuation after its access to the group ends. One hash finds the
+    /// member, compares its transfer and removes it (`Dictionary.index(forKey:)`, `Dictionary.Values.subscript(_:)`'s
+    /// `get` and `Dictionary.remove(at:)`, in the installed SDKs' `Swift.swiftinterface`, macOS 27.0 and iOS 27.0 alike,
+    /// lines 7807, 8050-8053 and 7908-7909). Stage 3 close-out cycle 22, ruling S3-R27 item 12.3's e2-A1.6, d2's A3 and
+    /// A3′: through the engine, a drop read the group out of the table twice, a copy of its arrays each time.
+    mutating func dropMember(_ asset: AssetID, waitingFor transfer: TransferID) -> CheckedContinuation<Bool, Never>? {
+        guard let index = self.pending.index(forKey: asset), self.pending.values[index] == transfer else {
+            return nil
+        }
+        self.pending.remove(at: index)
+        guard self.kind == .ensure, self.isSettled, let continuation = self.continuation else {
+            return nil
+        }
+        self.continuation = nil
+        return continuation
+    }
+
+    /// Drops the members of `assets` that still wait for `transfer`, in place (a delivery of `transfer`'s outcome; a
+    /// member that moved to other content meanwhile keeps waiting for it).
+    mutating func clearPending(_ assets: Set<AssetID>, on transfer: TransferID) {
+        for asset in assets where self.pending[asset] == transfer {
+            self.pending[asset] = nil
+        }
     }
 }
 
@@ -694,6 +1524,10 @@ struct RunState {
     var cursor = 0
     /// Materialised jobs it holds an interest in, with the assets it wants from each.
     var outstanding: [TransferID: Set<AssetID>] = [:]
+    /// Every job its interest was added to and has not left (`addInterest`, `removeInterest`, `removeJob`): the run's
+    /// end removes its interest from these, not from a walk of the whole table (C2, Stage 3, S3-PERF-02). A follow can
+    /// route the run's interest to a job outside `outstanding`.
+    var held: Set<TransferID> = []
     /// What it planned.
     var planned = PlanTotals()
     /// What `apply` did.

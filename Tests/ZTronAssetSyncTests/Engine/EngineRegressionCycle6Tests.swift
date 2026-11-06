@@ -144,10 +144,14 @@ struct EngineRegressionCycle6Tests {
     /// engine then learnt that nothing was left to reap or schedule and parked `y` `insufficientSpace` on its last
     /// free-space read (taken before either reclaim): the ensure failed `insufficientSpace(300, …)` while the volume held
     /// `y` above the reserve.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 31.2 to 31.3 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-11: ensureAvailable whose member waits for bytes a purge reclaimed before the engine's alarm ran fetches it instead of failing on older free-space figures",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func purgeReclaimsBeforeTheAlarm() async throws {
         let time = ManualTimeSource()
@@ -236,7 +240,7 @@ struct EngineRegressionCycle6Tests {
         #expect(await engine.readForTests { $0.state.storeDeadline != nil }, "setup: y waits with the store's deadline armed")
         // The volume gains room the engine has not read.
         try fileSystem.removeItem(at: ballast)
-        let ensured = await harness.withClock { await ensure.value }
+        let ensured = await harness.withClock { await EngineHarness.value(of: ensure) }
         #expect(try await harness.store.freeSpace().pendingReclaim == Int64(xBytes.count), "setup: x's bytes were never reclaimed")
         switch ensured {
         case .success(let report):
@@ -255,10 +259,14 @@ struct EngineRegressionCycle6Tests {
     /// later). The purge reclaims `q`'s bytes, enough for `y`, and the store's next deadline is then `x`'s. The engine
     /// left `y` waiting for that deadline although the volume already held it: only the alarm's own reclaim re-read the
     /// free space.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.1 to 33.9 s beside a second TSan process at a
+    /// load of 20 to 35 (57 % of 60 s) and 15.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-10: ensureAvailable whose member waits for space fetches it as soon as a purge reclaimed the bytes, not at the store's next deadline",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(3))
     )
     func purgeReclaimWakesSpaceWaits() async throws {
         let time = ManualTimeSource()

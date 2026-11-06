@@ -109,6 +109,10 @@ struct EngineRaceTests {
         let fresh = try #require(requests.last)
         #expect(fresh.resume == nil, "a fresh attempt")
         #expect(harness.time.pendingSleepers == 0, "no backoff")
+        // No event waits for a follow, so the re-queue keeps no end for a pin (`EngineState.reroutePinCommits`; Stage 3
+        // close-out cycle 22, ruling S3-R27 item 12.2's e1-R1): one kept would be reported with the barrier down.
+        let violations = await engine.invariantViolations()
+        #expect(violations.isEmpty, "\(violations.prefix(3))")
         let metrics = try await engine.metrics().get()
         #expect(metrics.failures == FailureCounts(), "ENOENT is the cancellation, not a failure")
         #expect(metrics.retries == FailureCounts())

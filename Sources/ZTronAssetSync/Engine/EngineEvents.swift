@@ -8,16 +8,32 @@ extension SyncEngine {
     /// Each queue is mutated in place through the dictionary (a copy taken out and written back would copy a stalled
     /// subscriber's slots on every publication: O(n) each, O(n²) for a mass prune announced in one turn).
     func broadcast(_ event: AssetEvent) {
-        self.state.lastEventSequence += 1
-        let sequence = self.state.lastEventSequence
-        var handOffs: [CheckedContinuation<AssetEvent?, Never>] = []
-        for key in self.state.subscribers.keys.sorted() {
-            guard let published = self.state.subscribers[key]?.publish(event, sequence: sequence) else {
+        self.broadcast(event, to: self.state.subscribers.keys.sorted())
+    }
+
+    /// `broadcast(_:)` to the subscribers `keys` names, in that order: a caller that publishes many events in one turn
+    /// sorts the keys once for all of them (`publishTerminal`; Stage 3 close-out cycle 21, step C8). No subscriber
+    /// registers within a turn, and a key whose subscriber finished meanwhile is skipped. One event takes the batch's
+    /// path (`broadcastAll`), so every publication has one path.
+    func broadcast(_ event: AssetEvent, to keys: [UInt64]) {
+        self.broadcastAll(CollectionOfOne(event), to: keys)
+    }
+
+    /// Publishes `events`, in order, to the subscribers `keys` names, with one access to each queue for all of them
+    /// (`SubscriberQueue.publishAll`; Stage 3 close-out cycle 22, ruling S3-R27 item 1, a3). Each queue ends as after one
+    /// `broadcast(_:to:)` per event: queues are independent, the events take the same sequences, and no other
+    /// publication runs inside the call. The pulls handed an event resume after every queue is published, which nothing
+    /// observes, because `pull` is engine-isolated; observers are evaluated once for the batch. `events` is iterated
+    /// inside each queue's access, so it must not read `self.state` (a lazy `map` over values the caller prepared).
+    func broadcastAll(_ events: some Collection<AssetEvent>, to keys: [UInt64]) {
+        let first = self.state.lastEventSequence + 1
+        self.state.lastEventSequence += UInt64(events.count)
+        var handOffs: [(continuation: CheckedContinuation<AssetEvent?, Never>, event: AssetEvent)] = []
+        for key in keys {
+            guard let published = self.state.subscribers[key]?.publishAll(events, from: first) else {
                 continue
             }
-            if published.coalesced {
-                self.state.metrics.eventsCoalesced += 1
-            }
+            self.state.metrics.eventsCoalesced += published.coalesced
             if let handOff = published.handOff {
                 handOffs.append(handOff)
                 self.state.metrics.eventsDelivered += 1
@@ -27,7 +43,7 @@ extension SyncEngine {
             }
         }
         for handOff in handOffs {
-            handOff.resume(returning: event)
+            handOff.continuation.resume(returning: handOff.event)
         }
         self.notifyObservers()
     }

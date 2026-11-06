@@ -69,8 +69,11 @@ enum EventSlot: Hashable, Sendable {
 
 /// One subscriber's bounded queue (sync.md §10.3, H-9): at most one live slot per progress key and per subject, and one
 /// for each of the two client lifecycle events (L5-R19), so a stalled subscriber costs memory bounded by keys and
-/// subjects, never by time or event volume. Delivery order is the publication order of each slot's latest occurrence;
-/// `clientShutDown` is always last (nothing is published after it).
+/// subjects, never by time or event volume. A terminal slot moves to the tail when published again; a progress slot is
+/// replaced in place and keeps the position of its first undelivered occurrence, except that one run's progress never
+/// replaces another's: the next run's first `syncProgress` takes a fresh slot at the tail, behind the previous run's
+/// `syncFinished` and its own `syncStarted`, and the previous run's undelivered progress, which that `syncFinished`
+/// superseded, is dropped (Stage 3, S3-CONC-03). `clientShutDown` is always last (nothing is published after it).
 struct SubscriberQueue {
     /// A live slot.
     private struct Live {
@@ -99,8 +102,16 @@ struct SubscriberQueue {
         self.slots.isEmpty
     }
 
+    /// The live slots, in no order (the progress gate's clause P3, `SyncEngine.invariantViolations`).
+    var liveSlots: [EventSlot] {
+        Array(self.slots.keys)
+    }
+
     /// Publishes `event`; returns the continuation to resume with it when a pull was waiting on an empty queue (the
-    /// caller resumes it outside the mutation), and whether it replaced or moved a live slot.
+    /// caller resumes it outside the mutation), and whether it replaced or moved a live slot. A terminal event costs one
+    /// hash of its slot (Stage 3 close-out cycle 22, ruling S3-R27 item 1, a1): `updateValue` both stores it at the tail
+    /// and reports whether a live slot was there. Raising `peakLiveCount` after a move changes nothing, since only an
+    /// insert raises the live count.
     mutating func publish(_ event: AssetEvent, sequence: UInt64) -> (handOff: CheckedContinuation<AssetEvent?, Never>?, coalesced: Bool) {
         guard !self.finished else {
             return (nil, false)
@@ -113,22 +124,44 @@ struct SubscriberQueue {
             return (pending, false)
         }
         let slot = EventSlot(event)
-        if var live = self.slots[slot] {
-            if slot.isProgress, !self.finished {
-                live.event = event
-                self.slots[slot] = live
-                return (nil, true)
-            }
-            self.slots[slot] = Live(sequence: sequence, event: event)
-            self.order.append((sequence, slot))
-            self.compactIfNeeded()
+        if slot.isProgress, var live = self.slots[slot], !self.finished, !SubscriberQueue.isAnotherRun(event, than: live.event) {
+            live.event = event
+            self.slots[slot] = live
             return (nil, true)
         }
-        self.slots[slot] = Live(sequence: sequence, event: event)
+        let replaced = self.slots.updateValue(Live(sequence: sequence, event: event), forKey: slot) != nil
         self.peakLiveCount = max(self.peakLiveCount, self.slots.count)
         self.order.append((sequence, slot))
         self.compactIfNeeded()
-        return (nil, false)
+        return (nil, replaced)
+    }
+
+    /// Publishes `events` in order with the sequences `first`, `first + 1`, …: the queue ends as after one `publish` per
+    /// event, and only the first event can be handed off, since a pull waits only on an empty queue and the hand-off
+    /// ends its wait (ruling S3-R27 item 1, a3). Returns that hand-off, for the caller to resume outside the mutation,
+    /// and how many events replaced or moved a live slot.
+    ///
+    /// The slot table grows at most once for the batch (a2), and only when the batch could need more than one doubling
+    /// (d1 review M1): a stalled queue that already holds the batch's subjects (a re-announcement) needs no room, and a
+    /// reservation of its count plus the batch's would grow a table whose live slots need none. `order` is never
+    /// reserved: `append` grows it geometrically, and an exact reservation per commit would reallocate it each time.
+    mutating func publishAll(_ events: some Collection<AssetEvent>, from first: UInt64) -> (handOff: (continuation: CheckedContinuation<AssetEvent?, Never>, event: AssetEvent)?, coalesced: Int) {
+        let count = events.count
+        if self.slots.count + count > 2 * self.slots.capacity {
+            self.slots.reserveCapacity(self.slots.count + count)
+        }
+        var handOff: (continuation: CheckedContinuation<AssetEvent?, Never>, event: AssetEvent)?
+        var coalesced = 0
+        var sequence = first
+        for event in events {
+            let published = self.publish(event, sequence: sequence)
+            sequence += 1
+            coalesced += published.coalesced ? 1 : 0
+            if let continuation = published.handOff {
+                handOff = (continuation, event)
+            }
+        }
+        return (handOff, coalesced)
     }
 
     /// Removes and returns the next event in order.
@@ -143,6 +176,15 @@ struct SubscriberQueue {
             }
         }
         return nil
+    }
+
+    /// Whether `event` is a run's progress and `live` another run's: then `event` is not a replacement in place (its
+    /// run started after `live`'s ended), so it takes a fresh slot at the tail.
+    private static func isAnotherRun(_ event: AssetEvent, than live: AssetEvent) -> Bool {
+        guard case .syncProgress(let run, _) = event, case .syncProgress(let previous, _) = live else {
+            return false
+        }
+        return run != previous
     }
 
     /// Drops an undelivered progress slot (a transfer's key retires with the transfer, ADR-023).

@@ -62,17 +62,21 @@ extension SyncEngine {
         guard self.state.ledgerForgets == serial else {
             return
         }
+        // One growth for a commit's whole binding, not one rehash per doubling as its ids are inserted (step C7).
+        self.state.boundContent.reserveCapacity(self.state.boundContent.count + ids.underestimatedCount)
         for id in ids {
             self.state.boundContent[id] = transfer
         }
     }
 
     /// Keeps only the bindings something could still consult: everything while a run exists (its plan is a snapshot),
-    /// while an `ensureAvailable` group has fetches left to materialise, or while a store read whose answer registers an
-    /// interest is in flight; otherwise only the ids of jobs (an interest that follows its asset's entry may meet them).
-    /// The ledger therefore scales with outstanding work and a plan in progress, never with the catalog.
+    /// while an `ensureAvailable` group has fetches left to materialise, while a store read whose answer registers an
+    /// interest is in flight, or while events wait for the follow: an owed re-route or a waiting join reads its binding at
+    /// its replay (`reroute`; Stage 3 close-out cycle 21, ruling S3-R26 item 12's answer 6.5, RR21-PRESENT-PRUNE);
+    /// otherwise only the ids of jobs (an interest that follows its asset's entry may meet them). The ledger therefore
+    /// scales with outstanding work and a plan in progress, never with the catalog.
     func pruneBoundContent() {
-        guard !self.state.boundContent.isEmpty, self.state.run == nil, self.state.presenceReaders == 0 else {
+        guard !self.state.boundContent.isEmpty, self.state.run == nil, self.state.presenceReaders == 0, self.state.eventsAfterFollow.isEmpty else {
             return
         }
         guard !self.state.groups.values.contains(where: { $0.cursor < $0.fetches.count }) else {
@@ -135,7 +139,7 @@ extension SyncEngine {
             await engine.readPresentLocation(token, asset: asset, lane: lane)
         }
         if spawned == nil {
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(self.isShuttingDown ? .shutDown : .cancelled))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(self.isShuttingDown ? .shutDown : .cancelled))
         }
     }
 
@@ -149,13 +153,13 @@ extension SyncEngine {
         }
         if let location {
             self.state.metrics.resolveHits += 1
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .success(location))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .success(location))
             self.reconcileIdle()
             return
         }
         self.forgetBound([asset])
         guard let entry = self.state.applied.entry(for: asset) else {
-            self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound))
+            self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(.notFound))
             self.reconcileIdle()
             return
         }
@@ -334,20 +338,31 @@ extension SyncEngine {
     }
 
     /// Takes the interests in `present` out of `transfer`'s job and answers them from the store, so that an outcome of
-    /// the job (a 404 of its content) never reaches an asset the store holds (R-NET-6, L4-R5).
+    /// the job (a 404 of its content) never reaches an asset the store holds (R-NET-6, L4-R5). The interests are read
+    /// first, by token, each as its lane, kind and ids in `present` (no copy of the job or its interests is alive across
+    /// the removals); an interest whose every id is present leaves, another loses those ids in place, so the index is
+    /// changed for the ids that leave only (Stage 3 close-out cycle 21, ruling S3-R26 item 3; critique A10).
     func answerPresentMembers(of transfer: TransferID, _ present: Set<AssetID>) {
-        guard !present.isEmpty, let job = self.state.jobs[transfer] else {
+        guard !present.isEmpty else {
             return
         }
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            let held = interest.assets.intersection(present)
-            guard !held.isEmpty else {
-                continue
+        let rows = self.state.jobs[transfer].map { job in
+            job.interests.compactMap { token, interest -> (token: InterestToken, kind: InterestKind, lane: AssetPriority, held: Set<AssetID>, whole: Bool)? in
+                let held = interest.assets.intersection(present)
+                return held.isEmpty ? nil : (token, interest.kind, interest.lane, held, held.count == interest.assets.count)
+            }.sorted { $0.token < $1.token }
+        }
+        guard let rows else {
+            return
+        }
+        for row in rows {
+            if row.whole {
+                self.state.jobs[transfer]?.setInterest(nil, for: row.token)
+            } else {
+                self.state.jobs[transfer]?.subtractAssets(row.held, for: row.token)
             }
-            let left = interest.assets.subtracting(held)
-            self.state.jobs[transfer]?.interests[token] = left.isEmpty ? nil : JobInterest(lane: interest.lane, kind: interest.kind, assets: left)
-            for asset in held.sorted() {
-                self.answerPresent(token, kind: interest.kind, lane: interest.lane, asset: asset, at: transfer, from: transfer)
+            for asset in row.held.sorted() {
+                self.answerPresent(row.token, kind: row.kind, lane: row.lane, asset: asset, at: transfer, from: transfer)
             }
         }
         self.state.jobs[transfer]?.assets.subtract(present)

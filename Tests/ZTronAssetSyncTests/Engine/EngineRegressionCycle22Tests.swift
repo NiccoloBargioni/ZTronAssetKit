@@ -33,6 +33,9 @@ struct EngineRegressionCycle22Tests {
             var registered = false
             var after: UInt64 = .max
             var sightings: [Sighting] = []
+            /// The engine invariants that failed at any observation once a watched run's identifier was taken, its
+            /// start turn included (L4-R24(1); Stage 3, S3-B-064).
+            var violations: [String] = []
         }
 
         let origin: String
@@ -65,7 +68,24 @@ struct EngineRegressionCycle22Tests {
             self.seen.withLock { $0.sightings }
         }
 
+        /// What `Seen.violations` collected.
+        var violations: [String] {
+            self.seen.withLock { $0.violations }
+        }
+
         func observe(_ engine: isolated SyncEngine) {
+            let started = engine.state.lastRunID
+            if started > self.seen.withLock({ $0.after }) {
+                // An observer can run inside the start turn (any notification there); it must never see a half-started
+                // run (L4-R24(1)): `invariantViolations()`'s rule that a probe held for a manifest fetch belongs to a
+                // fetch in flight or to a run in place. The other rules describe turn boundaries, and an observer inside
+                // a turn sees their transients (an alarm about to be re-armed, a job about to be queued), so only the
+                // start turn's rule is asserted here.
+                let halfStarted = engine.invariantViolations().filter { $0.hasPrefix("the breaker's probe is held for a manifest fetch") }
+                if !halfStarted.isEmpty {
+                    self.seen.withLock { $0.violations.append(contentsOf: halfStarted.map { "run \(started): \($0)" }) }
+                }
+            }
             guard let run = engine.state.run else {
                 return
             }
@@ -134,8 +154,13 @@ struct EngineRegressionCycle22Tests {
     /// settled blocked: 10 runs after the cooldown, the clock never moving. Now every exit without a verdict owes a pump, the
     /// pending run starts once no member is left to take the probe (F-41), and a run that starts holds the probe for its
     /// manifest fetch from its start turn (F-42).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 44.6 to 45.4 s beside a second TSan process at a
+    /// load of 20 to 35 (76 % of 60 s) and 18.7 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 33.6 to 33.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: prefetch members that wait for a slot and each end without a verdict start no run per probe while the clock does not move", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: prefetch members that wait for a slot and each end without a verdict start no run per probe while the clock does not move", .timeLimit(.minutes(3)))
     func slotWaitingMembersStartNoRunEach() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 2, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)
@@ -224,8 +249,12 @@ struct EngineRegressionCycle22Tests {
     /// pause's re-dispatch, a join's batch, a retry, a probe's exit) took the probe first and the run settled blocked by the
     /// manifest's rejection: the window behind cycles 20 to 22's runaway runs. The run now holds the probe for its manifest
     /// fetch from its start turn, so in that turn the breaker already rejects every other transfer.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.2 to 30.2 s beside a second TSan process at a
+    /// load of 20 to 35 (50 % of 60 s) and 13.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn", .timeLimit(.minutes(3)))
     func runHoldsTheProbeFromItsStartTurn() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)
@@ -269,6 +298,7 @@ struct EngineRegressionCycle22Tests {
         }
         let after = await engine.readForTests { $0.state.lastRunID }
         #expect(after - before.0 == 1, "one run follows the cooldown: \(after - before.0) runs")
+        #expect(watch.violations.isEmpty, "no observer saw a half-started run (L4-R24(1)): \(watch.violations)")
         let start = watch.sightings.first
         #expect(start?.trigger == .breakerClosed, "the pending run started for the breaker's gate: \(String(describing: start?.trigger))")
         guard case .reject? = start?.admission else {
@@ -390,8 +420,13 @@ struct EngineRegressionCycle22Tests {
     /// breaker's deadline. That turn owes a pump although nothing was parked: the pending run waits for it, the member
     /// probes (and answers 404), and the run starts after it, as F-41 orders (mutant NOBREAKERPUMP: the alarm's turn started
     /// the run with the member still queued).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 40.1 to 41.2 s beside a second TSan process at a
+    /// load of 20 to 35 (69 % of 60 s) and 16.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 30.7 to 30.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a retry that falls due in the alarm turn of the cooldown's end probes before the pending run starts", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a retry that falls due in the alarm turn of the cooldown's end probes before the pending run starts", .timeLimit(.minutes(3)))
     func retryDueWithTheCooldownProbesFirst() async throws {
         let tuning = SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0, breaker: CircuitBreakerPolicy(authDistinctAssets: 1))
         let harness = EngineHarness.make(tuning: tuning)

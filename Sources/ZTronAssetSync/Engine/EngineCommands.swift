@@ -168,11 +168,23 @@ extension SyncEngine {
     /// (`Waiter.transfer`, which every reroute moves with it; the model test checks both directions after every
     /// operation), so only that job is touched: a sorted pass over every job held the actor about 6 ms at 10,000 queued
     /// prefetch members (review of close-out cycle 9, PROBE-C9R-1, C2).
+    ///
+    /// Behind the follow barrier the caller is answered at once (R-SYN-4, R-SYN-10), and only the engine's removal of
+    /// the interest waits (`removeInterest`, S3-R14 item 3): the record stays, without its continuation, so it follows
+    /// the interest's re-routes and joins until the drain removes both (`replayRemoval`), and no later answer reaches the
+    /// caller twice.
     func withdraw(_ token: InterestToken) {
-        if let waiter = self.state.waiters.removeValue(forKey: token) {
-            waiter.continuation.resume(returning: .failure(.cancelled))
-            self.removeInterest(token, from: waiter.transfer)
-            self.pump()
+        if let waiter = self.state.waiters[token], waiter.continuation != nil {
+            waiter.continuation?.resume(returning: .failure(.cancelled))
+            if self.defersToFollow, !waiter.fromStore {
+                self.state.waiters[token]?.continuation = nil
+                self.deferToFollow(.removal(token, waiter.transfer))
+                self.notifyObservers()
+            } else {
+                self.state.waiters[token] = nil
+                self.removeInterest(token, from: waiter.transfer)
+                self.pump()
+            }
         } else if let waiter = self.state.unknownWaiters.removeValue(forKey: token) {
             waiter.continuation.resume(returning: .failure(.cancelled))
         }
@@ -303,6 +315,11 @@ extension SyncEngine {
     /// Joins one prefetch member unless it is gone from the manifest, present at its current content, bound to it since
     /// the view was read (L4-R5), or held back (T2). Its pending claim ends afterwards, once its interest, if any, is
     /// in place (L5-R1).
+    ///
+    /// Behind the follow barrier the join waits (`EventAfterFollow.join`) and the claim ends now. A job only the claim
+    /// kept is then retired before the join, and the drain's join creates it again: a transfer stopped and started
+    /// again where a visit-first engine kept it, an order difference with the same answers (the claim's own deferral was
+    /// removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3; recorded in the WP-F draft as a residual risk).
     private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
         defer {
             self.endClaim(token, member: id)
@@ -333,6 +350,11 @@ extension SyncEngine {
     /// (`continueReleases`); a job only released groups want never starts meanwhile (`gate`). Removing the 10,000
     /// interests of a prefetch handle in one turn, after sorting their transfers, held the engine's actor about 15 ms
     /// (review of close-out cycle 8, C2).
+    ///
+    /// Behind the follow barrier the release applies now, as before Stage 3 close-out cycle 11: the group's joins that
+    /// still wait for the drain then join nothing (`replayJoin`'s `stillWants`). Its deferral (S3-R14 item 3) made only the
+    /// order of the release's removals equal to a visit-first engine's, and was removed in cycle 13 under ruling S3-R16
+    /// item 3 (recorded in the WP-F draft as a residual risk).
     func performReleaseGroup(_ token: InterestToken) {
         guard let group = self.state.groups.removeValue(forKey: token) else {
             return
@@ -360,8 +382,10 @@ extension SyncEngine {
         self.reconcileIdle()
     }
 
-    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 1 µs in
-    /// release (the member's transfer, the job's retirement), so the turn stays near 1 ms at SPEC §6's 10,000 (C2).
+    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 8 to 9 µs in
+    /// release (the member's transfer, the job's retirement with its queue entry and indexes), so a turn of 512 stays
+    /// near 4 to 5 ms at SPEC §6's 10,000, under C2's 10 ms (re-measured in Stage 3, S3-B-084: `handleReleaseTurns`'s
+    /// longest actor wait 4.1 to 4.8 ms; WP-G's probe 4.3 to 4.6 ms per 512-member turn).
     static let releasesPerTurn = 512
 
     /// Removes released groups' pending claims and then their interests, in token order and each group's member and
@@ -416,18 +440,49 @@ extension SyncEngine {
     /// a group released before the engine runs leaves claims to drop (L5-R1), and a release left for later would stay
     /// for good.
     private func releaseFollowUp() {
+        if self.state.releaseFollowUpsHeld {
+            // Test seam: the remaining members keep their interests and the turn stays scheduled until it is resumed.
+            self.state.releaseFollowUpWaiting = true
+            self.notifyObservers()
+            return
+        }
         self.state.releaseFollowUpScheduled = false
-        guard !self.isShuttingDown, self.continueReleases() else {
+        guard !self.isShuttingDown else {
+            return
+        }
+        self.resumeReleases()
+    }
+
+    /// One release turn (`continueReleases`), then the pump and the idle check once the last member left.
+    func resumeReleases() {
+        guard self.continueReleases() else {
             return
         }
         self.pump()
         self.reconcileIdle()
     }
 
+    /// Test seam: the next release follow-up keeps the members it has not reached until `resumeReleaseFollowUps()`, so a
+    /// test reads the engine while a release is part-way across other turns (a follow's, a drain's), which no
+    /// production path can order (Stage 3 close-out cycle 10: the drain's `.reinstate` replay).
+    func holdReleaseFollowUps() {
+        self.state.releaseFollowUpsHeld = true
+    }
+
+    /// Test seam: lets a held release follow-up run in this turn, or disarms a hold nothing reached.
+    func resumeReleaseFollowUps() {
+        self.state.releaseFollowUpsHeld = false
+        guard self.state.releaseFollowUpWaiting else {
+            return
+        }
+        self.state.releaseFollowUpWaiting = false
+        self.releaseFollowUp()
+    }
+
     // MARK: Pending claims (L5-R1, CCR-G2)
 
     /// The group's join reached `id`, its next member in order, and joined or skipped it: the member's claim ends.
-    private func endClaim(_ token: InterestToken, member id: AssetID) {
+    func endClaim(_ token: InterestToken, member id: AssetID) {
         guard let group = self.state.groups[token], group.claimCursor < group.claimed.count, group.members[group.claimCursor] == id else {
             return
         }
@@ -616,7 +671,8 @@ extension SyncEngine {
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation; the measured read became the ledger's
-            // base in the turn it returned (L4-R7), and parked jobs are re-evaluated against it there.
+            // base in the turn it returned (L4-R7, also behind the follow barrier: S3-R11 R1), and parked jobs are
+            // re-evaluated against it there, or, behind the barrier, by the sweep's follow-up once the follow ends (F-28).
             measured = try await self.readFreeSpace()
             if self.isRunning {
                 self.reconsiderSpaceBlocked()
@@ -902,6 +958,11 @@ extension SyncEngine {
 
     // MARK: Purge (R-CLN-6, RE-S24)
 
+    /// C2's limit on one stretch of the cooperative pool, about 10 ms (CLAUDE.md C2): a purge's first turn that holds
+    /// the actor longer writes one line (`logLongPurgeTurn`), the field signal for the purge's known misses of the
+    /// limit (Stage 3 close-out cycle 23, the owner's close ruling S3-R28 point 5).
+    static let turnTimeLimit: TimeInterval = 0.010
+
     /// Bumps the purge epoch before any await of the purge, ends the active run with `failed(.cancelled)`, withdraws
     /// non-user interests on purged ids (user waiters keep theirs and re-queue), then purges in an owned task.
     func performPurge(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
@@ -909,56 +970,20 @@ extension SyncEngine {
         if let error = await self.ensureStarted() {
             return .failure(error)
         }
+        self.state.commitTurnMarksForTests?(false)
+        // The turn's counts as it begins, before the withdrawal removes jobs: both O(1) (C2).
+        let turnBegan = self.environment.time.monotonicNow()
+        let jobsBefore = self.state.jobs.count
+        let groupsBefore = self.state.groups.count
         self.state.purgeEpoch += 1
         // The store clears the stamp before its first await of the purge (R-CLN-6).
         self.state.lastStamp = nil
         // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
         self.dropBindings()
         self.settleRun(.cancelled)
-        for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer] else {
-                continue
-            }
-            let purged = job.assets.filter { asset in
-                guard let entry = self.state.applied.entry(for: asset) else {
-                    return true
-                }
-                switch request {
-                case .all:
-                    return true
-                case .evictable:
-                    return entry.policy != .essential
-                case .scope(let scope):
-                    return scope.contains(entry)
-                }
-            }
-            guard !purged.isEmpty else {
-                continue
-            }
-            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
-                let withdrawn = interest.assets.intersection(purged)
-                guard !withdrawn.isEmpty else {
-                    continue
-                }
-                // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of
-                // a purged id is forgotten.
-                for asset in withdrawn.sorted() {
-                    switch interest.kind {
-                    case .prefetch, .ensure:
-                        self.dropGroupMember(token, asset: asset, from: transfer)
-                    case .system:
-                        self.state.heals[asset] = nil
-                    case .run, .waiter:
-                        break
-                    }
-                }
-                if withdrawn.count == interest.assets.count {
-                    self.removeInterest(token, from: transfer)
-                } else {
-                    self.state.jobs[transfer]?.interests[token]?.assets.subtract(withdrawn)
-                }
-            }
-        }
+        self.withdrawPurged(request)
+        self.state.commitTurnMarksForTests?(true)
+        self.logLongPurgeTurn(since: turnBegan, jobs: jobsBefore, groups: groupsBefore)
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
@@ -971,6 +996,175 @@ extension SyncEngine {
             return .failure(error)
         }
         return .failure(.cancelled)
+    }
+
+    /// Writes one `.info` line on `.sync` when the purge's first turn, begun at `began` on the injected clock (C4),
+    /// held the actor longer than C2's limit (`turnTimeLimit`): its milliseconds, and the job and group counts as it
+    /// began, which tie a long turn to a shape. The line names no id, hash, URL, path or key (R-OBS-1, R-SEC-1); an app
+    /// that adopts the kit reads it through its own `LogSink` or `OSLogStore`, so its text is a soft contract (the
+    /// owner's close ruling S3-R28 point 5).
+    private func logLongPurgeTurn(since began: MonotonicInstant, jobs: Int, groups: Int) {
+        let elapsed = self.environment.time.monotonicNow().seconds(since: began)
+        guard elapsed > Self.turnTimeLimit else {
+            return
+        }
+        let milliseconds = String(format: "%.2f", elapsed * 1_000)
+        self.log.log(.sync, .info, "long purge turn: \(milliseconds) ms, \(jobs) jobs, \(groups) groups")
+    }
+
+    /// Withdraws the non-user interests a purge of `request` removes (user waiters keep theirs and re-queue): a group
+    /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten. Behind the
+    /// follow barrier the joins of such interests that wait for the follow are withdrawn too (`withdrawPurgedJoins`).
+    func withdrawPurged(_ request: PurgeRequest) {
+        // The request is read before the copy, so a purge of `.all` looks nothing up; an id the copy does not list is
+        // purged (S3-R27 item 12.3, e2-A1.1). The copy is a local: the predicate never reads the state through `self`.
+        let applied = self.state.applied
+        let isPurged: (AssetID) -> Bool = { asset in
+            switch request {
+            case .all:
+                return true
+            case .evictable:
+                guard let entry = applied.entry(for: asset) else {
+                    return true
+                }
+                return entry.policy != .essential
+            case .scope(let scope):
+                guard let entry = applied.entry(for: asset) else {
+                    return true
+                }
+                return scope.contains(entry)
+            }
+        }
+        // A purge of everything takes the jobs' fast path (`Job.withdrawPurged`'s `all`; e2-A1.5).
+        let all = request == .all
+        self.withdrawPurgedJoins(isPurged)
+        // The jobs the walk retires leave their `.retry` deadlines to one pass after it (`removeJob`; e2-A2.5).
+        self.state.retiredRetries = []
+        for transfer in self.state.jobs.keys.sorted() {
+            // One access to the job removes its purged interests, in ascending token order (`Job.withdrawPurged`); the
+            // writes they imply follow it (S3-R27 item 12.3, e2-A1.4, with item 1's exclusivity rule).
+            guard let off = self.state.jobs[transfer]?.withdrawPurged(isPurged, all: all) else {
+                continue
+            }
+            // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of a
+            // purged id is forgotten. In the set's order: the lane filter never withdraws an `.ensure` interest (always
+            // user-initiated), so no drop resumes anything, and the order is unobservable (e2-A1.3).
+            for interest in off.withdrawn {
+                for asset in interest.assets {
+                    switch interest.kind {
+                    case .prefetch, .ensure:
+                        self.dropGroupMember(interest.token, asset: asset, from: transfer)
+                    case .system:
+                        self.state.heals[asset] = nil
+                    case .run, .waiter:
+                        break
+                    }
+                }
+            }
+            guard let before = off.laneBeforeFirst, let last = off.laneBeforeLast else {
+                continue
+            }
+            // What `dropInterest` did after each removal, once for them all (`settleRemoval`), as `takeOffMovedBefore`
+            // does: only the last removal can leave the job empty, removals never raise a lane, and a non-user lane falls
+            // at most once (prefetch to bulk), so one re-lane from the lane before the first removal does what each
+            // removal's re-lane did (re-queue, re-prioritise, pause), and observers are notified once, at the job's end
+            // (the audit before e2-A1.4: no purge suite waits for a state inside one job's removals).
+            if let run = self.state.run?.token, off.removed.contains(run) {
+                self.state.run?.held.remove(transfer)
+            }
+            if off.emptied, before != last {
+                // The removals before the last left the job interests and lowered its lane, from `before` to `last`:
+                // their re-lane came before the last removal retired the job or a claim kept it at `last`, and one
+                // settle alone would skip it (`EnginePurgeWithdrawalTests`).
+                self.state.jobs[transfer]?.heldLane = last
+                self.relane(transfer, from: before)
+            }
+            self.settleRemoval(transfer, before: before, last: last)
+        }
+        // One pass over the heap takes the retired jobs' `.retry` deadlines out, and observers are notified once more:
+        // the walk's last notification still counted them (`EngineIntrospection.scheduledDeadlines`).
+        let retired = self.state.retiredRetries ?? []
+        self.state.retiredRetries = nil
+        self.state.heap.removeAll { retired.contains($0) }
+        self.notifyObservers()
+    }
+
+    /// Withdraws the waiting joins (`EventAfterFollow.join`) of the non-user interests a purge removes, as `withdrawPurged`
+    /// withdraws them from jobs: a visit-first engine had made those joins before the purge arrived, and its purge
+    /// withdrew them, so the group stopped waiting for the member, a heal was forgotten, and no job was left for the
+    /// purged id. Applied at once without them (Stage 3 close-out cycle 13, removal 7), the drain made the join after the
+    /// purge, and the purged id was downloaded and stored again (PROBE-C13-PURGE-JOIN; cycle 14). Each such join leaves
+    /// `joinsAfterFollow`, so its replay joins nothing (`replayJoin`), and stays in the queue, or behind its verdict,
+    /// marked withdrawn (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that
+    /// arrived. One pass over the waiting events, each verdict's joins (`EngineState.joinsBehindVerdicts`) at the
+    /// verdict's place, newest first, where the queue held them when each was inserted right behind the verdict, so the
+    /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2). An owed
+    /// re-route of such an interest leaves its batch (`EventAfterFollow.reroutes`), as that engine's purge withdrew the
+    /// interest from the job the re-route had joined: its group stops waiting for the member and its heal is forgotten,
+    /// in the order the batch's heap gave them up, unsorted, as `withdrawPurged` drops a job's ids in its set's order:
+    /// no drop resumes anything, an `.ensure` interest being user-initiated, so the order is unobservable (Stage 3
+    /// close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.3, which reverses `integrate-rr21.md` R15's sort and S3-R26
+    /// answer 7's sorted subset); a batch the purge empties stays queued, and its replay
+    /// counts it done (`continueReroutes`). The walk runs whether or not a join waits: an empty walk costs nothing
+    /// (ruling S3-R26 item 1; the early return on no waiting join was removed with it).
+    ///
+    /// Each event, and each bucket, is changed in place in one access (`EventAfterFollow.withdrawPurged`,
+    /// `Array.markWithdrawn(where:)`): a join is marked and a batch loses its items inside the access, and the writes
+    /// they imply (`joinsAfterFollow`, the groups, the heals) follow it, in the same order (Stage 3 close-out cycle 22,
+    /// ruling S3-R27 item 12.3, e2-A1.2). Made inside the access, those writes would overlap it, and the predicates read
+    /// only `isPurged`'s locals for the same reason (exclusivity, ruling S3-R27 item 1).
+    private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
+        // A waiting join is withdrawn when its interest is a non-user interest other than a waiter's in a purged id, and
+        // no purge withdrew it already; an owed re-route, when its interest is such an interest.
+        func withdraws(_ join: JoinAfterFollow) -> Bool {
+            !join.withdrawn && join.lane < .userInitiated && join.kind != .waiter && isPurged(join.asset)
+        }
+        func removes(_ item: RerouteItem) -> Bool {
+            item.lane < .userInitiated && item.kind != .waiter && isPurged(item.asset)
+        }
+        for index in self.state.eventsAfterFollow.indices {
+            switch self.state.eventsAfterFollow[index].withdrawPurged(joins: withdraws, reroutes: removes) {
+            case .nothing:
+                continue
+            case .join(let join):
+                self.withdrawJoinInterest(join)
+            case .reroutes(let from, let removed):
+                for item in removed {
+                    switch item.kind {
+                    case .prefetch, .ensure:
+                        self.dropGroupMember(item.token, asset: item.asset, from: from)
+                    case .system:
+                        self.state.heals[item.asset] = nil
+                    case .run, .waiter:
+                        break
+                    }
+                }
+            case .verdict(let key):
+                for join in self.state.joinsBehindVerdicts[key]?.markWithdrawn(where: withdraws) ?? [] {
+                    self.withdrawJoinInterest(join)
+                }
+            }
+        }
+    }
+
+    /// What follows a waiting join's withdrawal (`withdrawPurgedJoins`), once the access that marked it ended: the join
+    /// leaves `joinsAfterFollow`, and its group stops waiting for the member or its heal is forgotten. A join no longer
+    /// listed there is only marked.
+    private func withdrawJoinInterest(_ join: WithdrawnJoin) {
+        guard let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) else {
+            return
+        }
+        if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+            self.state.joinsAfterFollow[join.token] = nil
+        }
+        switch join.kind {
+        case .prefetch, .ensure:
+            self.dropGroupMember(join.token, asset: join.asset, from: transfer)
+        case .system:
+            self.state.heals[join.asset] = nil
+        case .run, .waiter:
+            break
+        }
     }
 
     private func purgeTask(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
@@ -1427,20 +1621,26 @@ extension SyncEngine {
         continuation.resume(returning: .done(.failure(.cancelled)))
         if stopWork {
             self.cancelTask(self.state.entryTasks[token])
-            if let group = self.state.groups.removeValue(forKey: token) {
-                group.continuation?.resume(returning: false)
-                // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
-                self.state.unlistedClaims -= group.unlistedClaims
-                for claim in group.claimed[group.claimCursor...] {
-                    self.dropClaim(claim)
-                }
-                for transfer in Set(group.pending.values).sorted() {
-                    self.removeInterest(token, from: transfer)
-                }
-                self.pump()
-            }
+            self.releaseEntryGroup(token)
         }
         self.reconcileIdle()
+    }
+
+    /// Removes a withdrawn entry's group (`withdrawEntry`): its claims end and its members' interests leave at once.
+    func releaseEntryGroup(_ token: InterestToken) {
+        guard let group = self.state.groups.removeValue(forKey: token) else {
+            return
+        }
+        group.continuation?.resume(returning: false)
+        // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
+        self.state.unlistedClaims -= group.unlistedClaims
+        for claim in group.claimed[group.claimCursor...] {
+            self.dropClaim(claim)
+        }
+        for transfer in Set(group.pending.values).sorted() {
+            self.removeInterest(token, from: transfer)
+        }
+        self.pump()
     }
 
     // MARK: Introspection (R-SYN-14, P-14)
@@ -1599,10 +1799,67 @@ extension SyncEngine {
         if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
             violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
         }
-        for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
-            violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
+        // The pairs owed a re-route (`EventAfterFollow.reroutes`), with the job each left: its owner names that job until
+        // the drain re-routes it (`continueReroutes`).
+        var owed: [MoveItem: TransferID] = [:]
+        for event in self.state.eventsAfterFollow {
+            if case .reroutes(let batch) = event {
+                for item in batch.items.elements {
+                    owed[MoveItem(asset: item.asset, token: item.token)] = batch.from
+                }
+            }
         }
+        // A waiter whose join waits for a failure verdict (`joinsAfterFollow`), or whose re-route is owed, holds no interest
+        // until the drain.
+        for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
+            if self.state.joinsAfterFollow[token]?[waiter.asset] != waiter.transfer, owed[MoveItem(asset: waiter.asset, token: token)] != waiter.transfer {
+                violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
+            }
+        }
+        // A job the owed passes of a follow have not reached follows the copy they replaced (`followScans`).
+        let unscanned = self.state.followScans.isEmpty ? [:] : self.unscannedFollowEntries()
+        // A token's interests carry the one lane it registered with: its group's (`Group.lane`), its waiter's, a run's
+        // bulk lane or a system interest's, which every join and re-route passes on, so a second join of a token's
+        // interest in a job never changes its lane (`addInterest`; Stage 3 close-out cycle 19, ruling S3-R19 item 3).
+        var tokenLanes: [InterestToken: AssetPriority] = [:]
         for (transfer, job) in self.state.jobs {
+            for (token, interest) in job.interests {
+                let lane = self.state.groups[token]?.lane ?? tokenLanes[token] ?? interest.lane
+                tokenLanes[token] = lane
+                if lane != interest.lane {
+                    violations.append("interest \(token.rawValue) in \(transfer) at \(interest.lane), its token's lane being \(lane)")
+                }
+            }
+            // The counts a job's lane is read from are its interests' (`Job.interestCounts`; Stage 3 close-out cycle 20,
+            // ruling S3-R25 item 2).
+            let recount = InterestCounts(job.interests.values)
+            if job.interestCounts != recount {
+                violations.append("job \(transfer) counts its interests \(job.interestCounts), which count \(recount)")
+            }
+            // The index a move reads its ids' holders from is its interests' (`Job.tokensByID`, I1; Stage 3 close-out
+            // cycle 21, ruling S3-R26 item 3), recounted from the interests directly, never through `IDTokens`.
+            var holders: [AssetID: Set<InterestToken>] = [:]
+            for (token, interest) in job.interests {
+                for asset in interest.assets {
+                    holders[asset, default: []].insert(token)
+                }
+            }
+            let indexed = job.tokensByID.mapValues { $0.others.union([$0.first]) }
+            let misindexed = Set(indexed.keys).union(holders.keys).filter { indexed[$0] != holders[$0] }.count
+            let doubled = job.tokensByID.values.filter { $0.others.contains($0.first) }.count
+            if misindexed > 0 || doubled > 0 {
+                violations.append("job \(transfer) indexes the holders of \(misindexed) ids unlike its interests, \(doubled) with its first holder among the others")
+            }
+            // Every interest's ids are the job's (I2): a rest that takes an id off its holder puts it back while an
+            // interest that joined meanwhile holds it (`continueMove`).
+            let outside = holders.keys.filter { !job.assets.contains($0) }.count
+            if outside > 0 {
+                violations.append("job \(transfer) has interests in \(outside) ids outside its ids")
+            }
+            // Every writer removes an interest its last id leaves (I3): a move's per-holder removal relies on it.
+            if let empty = job.interests.filter({ $0.value.assets.isEmpty }).keys.min() {
+                violations.append("job \(transfer) holds interest \(empty.rawValue) with no id")
+            }
             if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
                 let key = ClaimKey(job: job)
                 if self.state.claims[key] == nil {
@@ -1613,6 +1870,25 @@ extension SyncEngine {
             }
             if (job.state == .downloading) != (job.active != nil) {
                 violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
+            }
+            // An attempt carries nothing of the one before it (`start`): a visit reads the end and the re-route set as
+            // this attempt's (`rerouteOnVisit`, `recordDeferredVerdict`; Stage 3 close-out cycle 16, ruling S3-R19 item 3).
+            if job.state == .downloading, job.attemptEnd != nil || job.rerouteOnPass != nil {
+                violations.append("job \(transfer) downloads with an earlier attempt's end or re-route set")
+            }
+            // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
+            // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
+            // The holder of a visit's rest (`followMoving`) holds the ids it still moves, and is visited already.
+            if !self.state.unfollowed.contains(transfer), self.state.followMoving?.holder != transfer,
+                let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true })
+            {
+                violations.append("job \(transfer) holds \(asset), which the copy maps elsewhere, and is not in unfollowed")
+            }
+            if job.interests.values.contains(where: { $0.kind == .system }), !self.state.systemHeld.contains(transfer) {
+                violations.append("job \(transfer) holds a system interest and is not in systemHeld")
+            }
+            if let run = self.state.run, job.interests[run.token] != nil, !run.held.contains(transfer) {
+                violations.append("job \(transfer) holds the run's interest and is not in its held set")
             }
             for token in job.interests.keys where job.interests[token]?.kind == .waiter {
                 if let waiter = self.state.waiters[token] {
@@ -1630,7 +1906,9 @@ extension SyncEngine {
         }
         for (token, group) in self.state.groups {
             for (asset, transfer) in group.pending where self.state.jobs[transfer]?.interests[token] == nil {
-                violations.append("group \(token.rawValue) member \(asset) without an interest")
+                if self.state.joinsAfterFollow[token]?[asset] != transfer, owed[MoveItem(asset: asset, token: token)] != transfer {
+                    violations.append("group \(token.rawValue) member \(asset) without an interest")
+                }
             }
         }
         violations.append(contentsOf: self.claimViolations())
@@ -1643,11 +1921,19 @@ extension SyncEngine {
         for (key, queue) in self.state.subscribers where queue.storedOrderCount > 2 * queue.liveCount + 16 {
             violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
         }
+        violations.append(contentsOf: self.progressGateViolations())
+        violations.append(contentsOf: self.answerViolations())
         if let unfired = self.unfiredDeadline() {
             violations.append(unfired)
         }
         if let stranded = self.strandedPendingRun() {
             violations.append(stranded)
+        }
+        if let stranded = self.strandedBreakerParks() {
+            violations.append(stranded)
+        }
+        if let unwakeable = self.unwakeableBreakerParks() {
+            violations.append(unwakeable)
         }
         if let unwakeable = self.unwakeableThrottleParks() {
             violations.append(unwakeable)
@@ -1656,11 +1942,12 @@ extension SyncEngine {
             violations.append("\(transfer) drains an attempt whose driver ended")
         }
         if let run = self.state.run, run.transferring, run.settlement == nil {
-            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil {
+            let waitingJoins = Set(self.state.joinsAfterFollow[run.token].map { Array($0.values) } ?? [])
+            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil && !waitingJoins.contains(transfer) {
                 violations.append("the run claims \(transfer), whose job does not hold its interest")
             }
         }
-        if self.isRunning, self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+        if self.isRunning, self.state.manifestCatchUps == 0, !self.followOwed, !self.state.heldForManifest.isEmpty {
             violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
         }
         if self.isRunning, let origin = self.state.remote?.originID, self.state.breakers[origin]?.probe == .manifest,
@@ -1706,6 +1993,53 @@ extension SyncEngine {
         }
         let timers = Set([self.state.alarm?.task, self.state.watcher?.task, self.state.pressure.task].compactMap { $0 })
         return self.state.tasks.keys.allSatisfy { timers.contains($0) }
+    }
+
+    /// The progress gate's clauses (Stage 3 close-out cycle 21, step C9): every key with a trailing emission (P1), with
+    /// a trailing flush in the heap (P2), or with a live `.transfer` slot in a subscriber's queue (P3) has a
+    /// `lastEmitted` entry. `offerProgress` sets the entry before any of them and `retireProgress` removes them with
+    /// it, so `removeJob` retires only the keys that have one (step C4) and leaves nothing behind.
+    private func progressGateViolations() -> [String] {
+        var violations: [String] = []
+        let lastEmitted = self.state.progress.lastEmitted
+        for slot in self.state.progress.trailing.keys where lastEmitted[slot] == nil {
+            violations.append("progress trailing \(slot) without lastEmitted")
+        }
+        for deadline in self.state.heap.entries {
+            if case .progress(let slot) = deadline.reason, lastEmitted[slot] == nil {
+                violations.append("progress deadline \(slot) without lastEmitted")
+            }
+        }
+        for (key, queue) in self.state.subscribers {
+            for slot in queue.liveSlots where lastEmitted[slot] == nil {
+                if case .transfer = slot {
+                    violations.append("subscriber \(key) holds \(slot) without lastEmitted")
+                }
+            }
+        }
+        return violations
+    }
+
+    /// The owed answers' clause (Stage 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12): the
+    /// head lies within the table, a running engine with answers owed has an answer follow-up scheduled (`spawn` refuses
+    /// one only once shutdown began, whose drain resumes them), and no owed waiter is registered, so no withdrawal or
+    /// shutdown answers it a second time.
+    private func answerViolations() -> [String] {
+        var violations: [String] = []
+        let head = self.state.owedAnswersHead
+        let count = self.state.owedAnswers.count
+        if head > count {
+            violations.append("the owed answers' head \(head) is past their \(count)")
+        }
+        if self.isRunning, count > head, self.state.answerFollowUp == nil {
+            violations.append("\(count - head) answers are owed and no answer follow-up is scheduled")
+        }
+        for answer in self.state.owedAnswers[min(head, count)...] {
+            if case .waiter(let token, _, _) = answer, self.state.waiters[token] != nil {
+                violations.append("owed answer \(token.rawValue) has a registered waiter")
+            }
+        }
+        return violations
     }
 
     /// The claim counters against the groups' pending claims and the released groups' claims left to drop (L5-R1).
@@ -1769,6 +2103,17 @@ extension SyncEngine {
         if circuitParked != self.state.circuitParked || throttleParked != self.state.throttleParked {
             violations.append("the index's \(self.state.circuitParked.count) and \(self.state.throttleParked.count) jobs parked by the breaker and the throttle differ from the table's \(circuitParked.count) and \(throttleParked.count)")
         }
+        // Every job the breaker parked has its place in the breaker's order (S3-B-063).
+        if !circuitParked.isEmpty {
+            var placed: Set<TransferID> = []
+            for entry in self.state.circuitOrder.entries where self.state.jobs[entry.transfer]?.ticket == entry.ticket {
+                placed.insert(entry.transfer)
+            }
+            let unplaced = circuitParked.subtracting(placed).count
+            if unplaced > 0 {
+                violations.append("\(unplaced) jobs the breaker parked have no place in its order")
+            }
+        }
         if failed != self.state.failedJobs {
             violations.append("the index's \(self.state.failedJobs.count) failed jobs differ from the table's \(failed.count)")
         }
@@ -1779,13 +2124,30 @@ extension SyncEngine {
         if !self.state.originOwed.isSubset(of: originParked) {
             violations.append("\(self.state.originOwed.subtracting(originParked).count) jobs owed a re-queue by their origin are not parked by it")
         }
-        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled {
+        // A re-admission turn that waits for the follow (`EventAfterFollow.readmit`) is the turn the owed re-queues wait for.
+        let readmissionWaits = self.state.eventsAfterFollow.contains { if case .readmit = $0 { return true } else { return false } }
+        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled, !readmissionWaits {
             violations.append("re-queues are owed but no turn is scheduled for them")
+        }
+        if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
+            violations.append("a follow owes \(self.state.followScans.count) passes and \(self.state.followOrder.count - self.state.followNext) visits but no turn is scheduled for them")
+        }
+        if self.isRunning, self.state.pumpWaitsForFollow, !self.followBarrier {
+            violations.append("a pump waits for a follow that nothing owes")
+        }
+        violations.append(contentsOf: self.followBarrierViolations())
+        if self.followOwed {
+            let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
+            if unmarked > 0 {
+                violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
+            }
         }
         if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
             violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
         }
-        for token in self.state.releasing.keys where self.state.groups[token] != nil {
+        // A registered group's token is in `releasing` with claims only after a join's large give-up (L5-R15): that is
+        // the follow-up's work, not a release of a registered group, which holds members (L5-R22(4); Stage 3, S3-B-082).
+        for (token, release) in self.state.releasing where self.state.groups[token] != nil && !release.members.isEmpty {
             violations.append("group \(token.rawValue) is released and registered")
         }
         // A job set aside waits in no queue: it must be one only released groups want.
@@ -1800,10 +2162,193 @@ extension SyncEngine {
         }
         // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
         // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+        // Behind the follow barrier no place waits any more (Stage 3 close-out cycle 12: the `.enqueue` event is gone).
         let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
-        let stranded = self.state.jobs.values.filter { $0.state == .queued && !reachable.contains($0.transfer) }.count
+        let stranded = self.state.jobs.values.filter { job in
+            job.state == .queued && !reachable.contains(job.transfer)
+        }.count
         if stranded > 0 {
             violations.append("\(stranded) queued jobs wait in no queue")
+        }
+        return violations
+    }
+
+    /// What must hold of one owed re-route (`EventAfterFollow.reroutes`) from `transfer`'s job: its owner, if still
+    /// there, waits for it at that job (a waiter for its id, not from the store; a group's member pending there), the run
+    /// claims it nowhere (its claim was released when it was owed, `oweReroutes`), no job of that content holds it, and no
+    /// waiting join carries it too (Stage 3 close-out cycle 21, `integrate-rr21.md` R17, D3).
+    private func owedRerouteViolations(_ item: RerouteItem, from transfer: TransferID) -> [String] {
+        var violations: [String] = []
+        switch item.kind {
+        case .waiter:
+            if let waiter = self.state.waiters[item.token], waiter.fromStore || waiter.asset != item.asset || waiter.transfer != transfer {
+                violations.append("waiter \(item.token.rawValue) owed a re-route of \(item.asset) from \(transfer) waits for \(waiter.asset) in \(waiter.transfer)")
+            }
+        case .prefetch, .ensure:
+            if let group = self.state.groups[item.token], group.pending[item.asset] != transfer {
+                violations.append("group \(item.token.rawValue) member \(item.asset) owed a re-route from \(transfer) is pending at \(String(describing: group.pending[item.asset]))")
+            }
+        case .run:
+            if self.state.run?.token == item.token, self.state.run?.outstanding[transfer]?.contains(item.asset) == true {
+                violations.append("the run claims \(item.asset) on \(transfer), which a re-route owes")
+            }
+        case .system:
+            break
+        }
+        if self.state.jobs[transfer]?.interests[item.token]?.assets.contains(item.asset) == true {
+            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) is still held there")
+        }
+        if let join = self.state.joinsAfterFollow[item.token]?[item.asset] {
+            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) also waits to join \(join)")
+        }
+        return violations
+    }
+
+    /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
+    /// drain is in progress (none, between turns), so none waits for ever, and none once the engine stops running (cycle
+    /// 21, ruling S3-R26 item 6); every failure verdict that waits names a failed job with its event (Stage 3 close-out
+    /// cycle 9, amendment (c) of S3-R11); the joins registered in
+    /// `joinsAfterFollow` are exactly the waiting `.join` events and the joins behind waiting verdicts (cycle 10; cycle
+    /// 21, ruling S3-R26 item 2); the carried jobs are gone once the barrier is down (cycle 11); every waiting event has
+    /// its decision instant in the world history, and once the barrier is down the history and the visits' and the
+    /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
+    /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
+    /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
+    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); every
+    /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the ends a
+    /// pin follows (commits, superseded publications and ENOENT re-queues) are kept only while the barrier is up, each an
+    /// attempt no longer at its end, at a copy adopted by then (`EngineState.reroutePinCommits`; cycle 21,
+    /// PROBE-RR21-PIN-END; cycle 22, e1-R1 and e1-PS).
+    private func followBarrierViolations() -> [String] {
+        var violations: [String] = []
+        let events = self.state.eventsAfterFollow
+        if self.isRunning, !events.isEmpty, !self.followOwed, !self.state.drainFollowUpScheduled, !self.state.drainingAfterFollow {
+            violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
+        }
+        // Only a running engine follows, so a follow-up turn is never owed when `spawn` refuses its task
+        // (`scheduleFollowFollowUp`; Stage 3 close-out cycle 20, ruling S3-R25 item 7).
+        if !self.isRunning, self.followOwed {
+            violations.append("a follow is owed while the engine is \(self.state.lifecycle)")
+        }
+        // Only a running engine drains, so no event waits once `spawn` refuses a drain's follow-up turn
+        // (`scheduleDrainFollowUp`; Stage 3 close-out cycle 21, ruling S3-R26 item 6).
+        if !self.isRunning, !events.isEmpty {
+            violations.append("\(events.count) events wait for a follow while the engine is \(self.state.lifecycle)")
+        }
+        var verdicts: Set<TransferID> = []
+        var joins: [InterestToken: [AssetID: TransferID]] = [:]
+        var waitingVerdicts: [VerdictKey: Int] = [:]
+        var batches = 0
+        var owedCounts: [MoveItem: Int] = [:]
+        func register(_ join: JoinAfterFollow) {
+            // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
+            if !join.withdrawn {
+                joins[join.token, default: [:]][join.asset] = join.entry.transferID
+            }
+        }
+        for event in events {
+            switch event {
+            case .attemptFailed(let transfer, let epoch, _):
+                if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
+                    verdicts.insert(transfer)
+                }
+            case .join(let join):
+                register(join)
+                if let chain = join.chain, UInt64(chain.layers.count) != self.state.copySerial &- chain.serial {
+                    violations.append("a waiting join of interest \(join.token.rawValue) in \(join.asset) holds \(chain.layers.count) copies for \(self.state.copySerial &- chain.serial) adopted since it deferred")
+                }
+            case .reroutes(let batch):
+                batches += 1
+                if UInt64(batch.layers.count) != self.state.copySerial &- batch.serial {
+                    violations.append("a re-route batch from \(batch.from) holds \(batch.layers.count) copies for \(self.state.copySerial &- batch.serial) adopted since it was owed")
+                }
+                for item in batch.items.elements {
+                    owedCounts[MoveItem(asset: item.asset, token: item.token), default: 0] += 1
+                    violations.append(contentsOf: self.owedRerouteViolations(item, from: batch.from))
+                }
+            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
+                break
+            }
+            // A verdict's joins count at its place, newest first, where the queue held them (`joinsBehindVerdicts`).
+            if let key = event.verdictKey {
+                waitingVerdicts[key, default: 0] += 1
+                for entry in (self.state.joinsBehindVerdicts[key] ?? []).reversed() {
+                    register(entry.join)
+                }
+            }
+        }
+        if joins != self.state.joinsAfterFollow {
+            violations.append("\(self.state.joinsAfterFollow.count) interests' joins wait for the follow, \(joins.count) with their event")
+        }
+        // Each owed pair is owed once, and every batch not replayed whole is counted: between turns every batch waits in
+        // the queue (a drain turn puts back what it did not make, `drainEventsAfterFollow`).
+        for (pair, count) in owedCounts.sorted(by: { $0.key < $1.key }) where count > 1 {
+            violations.append("interest \(pair.token.rawValue) in \(pair.asset) is owed \(count) re-routes")
+        }
+        if self.state.reroutesWaiting != batches {
+            violations.append("\(self.state.reroutesWaiting) re-route batches counted, \(batches) waiting")
+        }
+        let pinCommits = self.state.reroutePinCommits
+        if !self.followBarrier, !pinCommits.isEmpty {
+            violations.append("the follow barrier is down with \(pinCommits.count) pin ends kept for owed re-routes")
+        }
+        let unended = pinCommits.keys.filter { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil }.count
+        if unended > 0 {
+            violations.append("\(unended) pin ends kept for owed re-routes name an attempt still at its end")
+        }
+        let ahead = pinCommits.values.filter { $0.serial > self.state.copySerial }.count
+        if ahead > 0 {
+            violations.append("\(ahead) pin ends kept for owed re-routes name a copy not yet adopted")
+        }
+        if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
+            violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")
+        }
+        // A bucket waits only behind its verdict's one waiting event (`deferBehindVerdict`, `drainEventsAfterFollow`), so
+        // the barrier holds, the history is kept and a drain is owed while it waits.
+        let unplaced = self.state.joinsBehindVerdicts.filter { key, behind in behind.isEmpty || waitingVerdicts[key] != 1 }.count
+        if unplaced > 0 {
+            violations.append("\(unplaced) verdicts hold joins behind them without exactly one waiting event")
+        }
+        let unstamped = self.state.joinsBehindVerdicts.values.reduce(0) { count, behind in
+            count + behind.filter { $0.stamp.view >= self.state.worldHistory.count }.count
+        }
+        if unstamped > 0 {
+            violations.append("\(unstamped) joins wait behind verdicts with decision instants over \(self.state.worldHistory.count) views")
+        }
+        if !self.followBarrier, !self.state.followCarried.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
+        }
+        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty {
+            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views and \(self.state.followStamps.count) visits' decision instants left")
+        }
+        if verdicts != Set(self.state.verdictsAfterFollow.keys) {
+            violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")
+        }
+        let unfailed = self.state.verdictsAfterFollow.keys.filter { transfer in
+            guard case .failed? = self.state.jobs[transfer]?.state else {
+                return true
+            }
+            return false
+        }
+        if !unfailed.isEmpty {
+            violations.append("\(unfailed.count) jobs whose failure verdict waits for a follow are not failed")
+        }
+        let elsewhere = self.state.verdictsAfterFollow.filter { self.state.jobs[$0.key]?.epoch != $0.value.epoch }
+        if !elsewhere.isEmpty {
+            violations.append("\(elsewhere.count) jobs whose failure verdict waits for a follow are at another epoch")
+        }
+        // The owed moves onto each job are counted once (`inboundOnto`), and a publication waits only while a move onto or
+        // off its job, or its visit's rest, is owed: one that nothing owes is never resumed (Stage 3 close-out cycle 19).
+        var onto: [TransferID: Int] = [:]
+        for move in self.state.inboundMoves[min(self.state.inboundNext, self.state.inboundMoves.count)...] {
+            onto[move.target, default: 0] += 1
+        }
+        if onto != self.state.inboundOnto {
+            violations.append("\(self.state.inboundOnto.count) jobs count owed moves onto them, \(onto.count) with moves owed")
+        }
+        let stranded = self.state.inboundWaits.keys.filter { self.state.jobs[$0]?.state != .verifying || !self.inboundBlocks($0) }
+        if self.isRunning, !stranded.isEmpty {
+            violations.append("\(stranded.count) publications wait for owed moves that nothing owes")
         }
         return violations
     }
@@ -1825,6 +2370,54 @@ extension SyncEngine {
             return "the alarm is armed after the earliest deadline (\(first.reason))"
         }
         return nil
+    }
+
+    /// Why the jobs the breaker parked may never be re-admitted, if so. A breaker that admits only a probe re-admits one
+    /// parked job for it (`readmitForProbe()`, S3-B-063); the others wait, legitimately, while a queued job will take the
+    /// probe. With the probe untaken, nothing queued, no re-queue or pump owed and no alarm turn due for the breaker (it
+    /// re-admits at a cooldown's end or a watchdog), nothing would re-admit them: a half-open breaker without a probe has no
+    /// deadline.
+    private func strandedBreakerParks() -> String? {
+        guard self.isRunning, let origin = self.state.remote?.originID, !self.state.circuitParked.isEmpty, self.breakerAdmitsOnlyProbe() else {
+            return nil
+        }
+        if let due = self.state.heap.deadline(for: .breaker(origin)), due <= self.environment.time.monotonicNow() {
+            return nil
+        }
+        if self.state.pumpFollowUpScheduled || !self.state.originOwed.isEmpty || self.state.jobs.values.contains(where: { $0.state == .queued }) {
+            return nil
+        }
+        return "nothing re-admits the \(self.state.circuitParked.count) jobs the breaker parked for the probe it admits"
+    }
+
+    /// Why the jobs the breaker parked may never be re-admitted while the live breaker is closed, if so. A breaker that
+    /// closes re-admits every job it parked (`unblockOrigin(.circuitOpen)`; behind the follow barrier at that event's
+    /// replay, `EventAfterFollow.unblock`; the jobs one turn cannot re-queue are owed a follow-up, `originOwed`), and with
+    /// no deadline left (`scheduleBreakerDeadline`) nothing else wakes them. A job parked `circuitOpen` behind a closed
+    /// breaker, neither owed a re-queue nor behind a waiting re-admission or the breaker's deadline, waits for ever: the
+    /// state a place refused on the breaker of its decision instant, after the close's re-admission had run in the drain,
+    /// left (PROBE-C13R-STAMP-BREAKER; Stage 3 close-out cycle 14).
+    private func unwakeableBreakerParks() -> String? {
+        guard self.isRunning, let origin = self.state.remote?.originID, self.state.heap.deadline(for: .breaker(origin)) == nil else {
+            return nil
+        }
+        if let breaker = self.state.breakers[origin], breaker.state != .closed {
+            return nil
+        }
+        let waiting = self.state.circuitParked.subtracting(self.state.originOwed)
+        guard !waiting.isEmpty else {
+            return nil
+        }
+        let readmissionWaits = self.state.eventsAfterFollow.contains { event in
+            if case .unblock(.circuitOpen) = event {
+                return true
+            }
+            return false
+        }
+        guard !readmissionWaits else {
+            return nil
+        }
+        return "nothing will re-admit the \(waiting.count) jobs the breaker parked while it is closed"
     }
 
     /// Why the jobs a throttle parked may never be re-admitted, if so. Only the origin's `.throttle` deadline re-admits

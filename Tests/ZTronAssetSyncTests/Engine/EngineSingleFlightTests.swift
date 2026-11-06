@@ -17,10 +17,13 @@ struct EngineSingleFlightTests {
         #expect(outcome.completeReport != nil, "the on-demand catalog applies without fetching: \(outcome)")
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.5 to 47.0 s beside a second TSan process at a
+    /// load of 20 to 35 (78 % of 60 s) and 20.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
     @Test(
         "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(3)),
         arguments: [UInt64(0xA1), 0xB2, 0xC3, 0xD4, 0xE5]
     )
     func hundredCallers(seed: UInt64) async throws {
@@ -61,8 +64,12 @@ struct EngineSingleFlightTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 50.7 to 55.1 s beside a second TSan process at a
+    /// load of 20 to 35 (92 % of 60 s) and 20.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 37.8 to 37.9 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels", .timeLimit(.minutes(1)))
+    @Test("R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels", .timeLimit(.minutes(3)))
     func cancelledOnlyAfterLastCaller() async throws {
         let harness = EngineHarness.make()
         let entry = EngineHarness.onDemand("shared", EngineFixture.bytes(6))

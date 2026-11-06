@@ -7,7 +7,7 @@ extension SyncEngine {
     /// Whether anything needs the conditions: a job, a run, a pending run, a manifest fetch or an unknown-id waiter.
     var hasWork: Bool {
         !self.state.jobs.isEmpty || self.state.run != nil || self.state.pendingRun != nil || self.state.manifestFetch != nil
-            || !self.state.unknownWaiters.isEmpty || !self.state.conditionWaiters.isEmpty
+            || !self.state.unknownWaiters.isEmpty || !self.state.conditionWaiters.isEmpty || !self.state.eventsAfterFollow.isEmpty
     }
 
     /// Stops the watcher when no work is left (its stream ends, so the source stops observing) and keeps the alarm
@@ -69,6 +69,14 @@ extension SyncEngine {
     /// re-queueing offline and transient failures on a satisfied edge (T19, R-SYN-13), pending runs, then `pump()`. The
     /// re-queues read the indexes of jobs parked by a lane-wide gate and of failed jobs, and at most
     /// `readmissionsPerTurn` happen in this turn (`readmit`; C2).
+    ///
+    /// Behind the follow barrier the element, its edge and the pending run's reading apply now (real-world inputs,
+    /// S3-R14), and the decisions it takes about jobs wait (`EventAfterFollow.conditions`): the pauses read each running
+    /// job's lane, the edge's re-queues read which jobs wait for an edge and in what order, the re-admissions read the
+    /// lanes and places, all of which the visits and the verdicts before the element change. Decided now, a Low Data
+    /// Mode element paused a transfer a visit raised to user work (PROBE-C10R-POLICY-PAUSE), a re-admission placed a job
+    /// the visit placed again (PROBE-C10-DOUBLE-PLACE), and an edge re-queued a job whose verdict waited ahead of the jobs
+    /// the edge owed first (the cycle-10 residual). The drain applies them under the element's own conditions.
     func apply(_ conditions: DeviceConditions) {
         let previous = self.state.conditions
         self.state.conditions = conditions
@@ -84,17 +92,39 @@ extension SyncEngine {
         for token in waiting.keys.sorted() {
             waiting[token]?.resume()
         }
-        // Only a downloading job can be paused (`pauseIfRefused`): the jobs in flight, not every job (C2).
-        for transfer in self.state.inFlight.sorted() {
-            self.pauseIfRefused(transfer)
-        }
-        var passes: Readmissions = [.conditions]
-        let edge = conditions.network.satisfied && (previous.map { !$0.network.satisfied || $0.network != conditions.network } ?? false)
+        // A satisfied first reading (none since the watcher started: at launch, or after an idle teardown set the
+        // conditions to `nil`) is an edge too. User work is dispatched before any reading exists, and an attempt that
+        // failed offline then, or that fails offline after this reading, waits for the edge this reading is: counting
+        // it re-queues such a job once (or `failed` retries it at once, `ActiveAttempt.edgeSerial`), where no further
+        // edge may ever come on a steady network (R-SYN-13; Stage 3, S3-CONC-04). With nothing failed it re-queues
+        // nothing; a pending run that waits for an edge keeps the watcher, so its first reading is never this one.
+        let edge = conditions.network.satisfied && (previous.map { !$0.network.satisfied || $0.network != conditions.network } ?? true)
         if edge {
             // The edge an offline-failed pending run waits for (R-SYN-13): its debounce may start now.
             self.state.pendingRun?.awaitsNetworkEdge = false
             self.state.offlineRunsWithoutEdge = 0
             self.state.networkEdgeSerial += 1
+        }
+        if self.defersToFollow {
+            self.deferToFollow(.conditions(edge: edge))
+        } else {
+            self.applyConditionsToJobs(edge: edge)
+        }
+        self.considerPendingRun()
+        self.pump()
+        self.rearm()
+        self.notifyObservers()
+    }
+
+    /// A conditions element's decisions about jobs (`apply`): pauses the running transfers whose lane the conditions
+    /// refuse (only a downloading job can be paused, `pauseIfRefused`: the jobs in flight, not every job, C2), owes a
+    /// satisfied `edge`'s re-queue to every job failed `whenOnline` or transiently (T19), and re-admits.
+    func applyConditionsToJobs(edge: Bool) {
+        for transfer in self.state.inFlight.sorted() {
+            self.pauseIfRefused(transfer)
+        }
+        var passes: Readmissions = [.conditions]
+        if edge {
             for transfer in self.state.failedJobs {
                 guard let job = self.state.jobs[transfer], job.state.owedOnEdge(transient: job.transientFailure) else {
                     continue
@@ -104,9 +134,5 @@ extension SyncEngine {
             passes.insert(.edge)
         }
         self.readmit(passes)
-        self.considerPendingRun()
-        self.pump()
-        self.rearm()
-        self.notifyObservers()
     }
 }

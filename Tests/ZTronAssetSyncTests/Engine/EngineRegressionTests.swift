@@ -243,8 +243,11 @@ struct EngineRegressionTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 28.6 to 30.2 s beside a second TSan process at a
+    /// load of 20 to 35 (50 % of 60 s) and 12.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-13: runs that keep failing offline while the path reads satisfied run again only after a network edge, never on a timer", .timeLimit(.minutes(1)))
+    @Test("R-SYN-13: runs that keep failing offline while the path reads satisfied run again only after a network edge, never on a timer", .timeLimit(.minutes(3)))
     func offlineRunWaitsForAnEdge() async throws {
         let harness = EngineHarness.make()
         let engine = harness.engine

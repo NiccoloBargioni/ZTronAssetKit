@@ -382,12 +382,17 @@ extension SyncEngine {
                 let serial = self.state.ledgerForgets
                 admitted = true
                 do {
-                    // REENTRANCY: RE-S37 — the waiter is re-checked as still registered right below.
+                    // REENTRANCY: RE-S37 — the waiter is re-checked as still registered below.
                     try await self.store.admit(entry)
-                    // REENTRANCY: RE-S37 — the lifecycle; the applied manifest is re-read as a snapshot and followed
-                    // unless the read may predate the copy (`followStoreView`), and an admitted record the store bound to
-                    // a live blob is answered from the store.
+                    // REENTRANCY: RE-S37 — the lifecycle, before the view is followed: a view read once shutdown began
+                    // is not, so no follow starts while the engine does not run, as after an apply's end or a catch-up
+                    // (Stage 3 close-out cycle 20, ruling S3-R25 item 7; `followBarrierViolations`). The applied manifest
+                    // is re-read as a snapshot and followed unless the read may predate the copy (`followStoreView`), and
+                    // an admitted record the store bound to a live blob is answered from the store.
                     let view = try await self.store.planningView()
+                    guard self.isRunning else {
+                        return
+                    }
                     self.followStoreView(view, readAt: mark)
                     self.noteBound(from: view, ids: [waiter.asset], since: serial)
                 } catch {
@@ -395,9 +400,6 @@ extension SyncEngine {
                         pending.continuation.resume(returning: .failure(error.assetError))
                     }
                     continue
-                }
-                guard self.isRunning else {
-                    return
                 }
             }
             guard let pending = self.state.unknownWaiters.removeValue(forKey: token) else {

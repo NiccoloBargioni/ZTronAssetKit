@@ -254,6 +254,47 @@ struct EngineRunPathTests {
         await engine.shutdown()
     }
 
+    /// A user request for an asset whose publication failed skips the backoff as one after a failed transfer does (T20):
+    /// the publication's end stays recorded on the job until its next start (`recordPublicationEnd`), and only the
+    /// follow's own visit for an apply made before the end leaves such a job failed (`relane`; Stage 3 close-out cycle 21,
+    /// ruling S3-R26 item 5, probe (i)). With no follow the request re-queues the job before the clock moves: re-lanes on
+    /// the recorded end alone left it failed until its backoff ran out.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: a user request for an asset whose publication failed skips the backoff", .timeLimit(.minutes(1)))
+    func userSkipsAFailedPublicationsBackoff() async throws {
+        let harness = EngineHarness.make()
+        let bytes = EngineFixture.bytes(414)
+        let entry = EngineHarness.onDemand("published-backoff", bytes)
+        let transfer = entry.transferID
+        await harness.serveManifest([entry])
+        await harness.source.script(transfer, [.stage(bytes), .stage(bytes)])
+        try await harness.start()
+        _ = await harness.engine.sync(.force)
+        harness.fileSystem.addFault(FaultRule(operation: .rename, matching: URLMatcher(lastComponentSuffix: ".part"), occurrence: .nth(1), error: .io))
+        let engine = harness.engine
+        let group = try await engine.registerGroup([entry.identifier], lane: .prefetch).get()
+        await engine.awaitCondition { e in
+            guard case .failed(.at(_))? = e.state.jobs[transfer]?.state else {
+                return false
+            }
+            return true
+        }
+        let setup = await engine.readForTests { e in (end: e.state.jobs[transfer]?.attemptEnd, applies: e.state.appliesFollowed, owed: e.followOwed) }
+        try #require(setup.end != nil && setup.end?.deferredAfter == nil && setup.end?.failedAfter == setup.applies && !setup.owed, "setup: the publication's end is recorded and its verdict, a backoff, given at once with no follow owed: \(setup)")
+        let before = harness.time.now()
+        let waiter = Task { await engine.awaitAsset(entry.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[transfer]?.interests.count == 2 }
+        // Gone is served: the re-queued attempt can end before this read.
+        let state = await engine.readForTests { $0.state.jobs[transfer]?.state }
+        #expect(state.map { $0.kind != .failed } != false, "the request re-queued the job at once, skipping its backoff (T20): \(String(describing: state))")
+        #expect(harness.time.now() == before, "the clock did not move")
+        let location = await harness.withClock { await EngineHarness.value(of: waiter) }
+        #expect((try? location.get())?.byteSize == Int64(bytes.count), "the asset arrives from the second attempt: \(location)")
+        #expect(await harness.source.starts.count == 2, "the failed publication cost one more attempt")
+        await engine.releaseGroup(group)
+        await engine.shutdown()
+    }
+
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-5: a user request waits for a short origin throttle and fails fast on a long one", .timeLimit(.minutes(1)))
     func userAndThrottle() async throws {
@@ -291,8 +332,13 @@ struct EngineRunPathTests {
     /// cycle 9: two attempts still running at the cooldown's end, the breaker reopened, then closed by a probe, and the
     /// run completed). Every 500 reaches the engine without the clock, and the open breaker starts nothing, so once no
     /// transfer runs only the clock moves the run. Then past the cooldown: the pending run's probe closes the breaker.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 46.5 to 48.1 s beside a second TSan process at a
+    /// load of 20 to 35 (80 % of 60 s) and 19.4 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 35.8 to 35.8 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it", .timeLimit(.minutes(3)))
     func serverBreakerBlocksRun() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let catalog = EngineSyncTests.catalog(6)
@@ -336,8 +382,11 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 35.5 to 35.8 s beside a second TSan process at a
+    /// load of 20 to 35 (60 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied", .timeLimit(.minutes(3)))
     func offlineRunResumes() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(2)
@@ -506,8 +555,11 @@ struct EngineRunPathTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.7 to 31.2 s beside a second TSan process at a
+    /// load of 20 to 35 (52 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-OBS-3: the diagnostics keep the last 32 errors", .timeLimit(.minutes(1)))
+    @Test("R-OBS-3: the diagnostics keep the last 32 errors", .timeLimit(.minutes(3)))
     func errorRingIsBounded() async throws {
         let harness = EngineHarness.make()
         let catalog = (0..<40).map { EngineHarness.onDemand("m\($0)", EngineFixture.bytes(UInt64(430 + $0))) }

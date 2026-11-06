@@ -94,11 +94,16 @@ extension SyncEngine {
         !self.state.heldAlarmTurns.isEmpty
     }
 
-    /// Drains due entries in `(deadline, seq)` order, re-validating each against epochs, then runs the store's due
-    /// work if its deadline was among them, and re-arms.
+    /// The due deadlines one alarm turn takes at most (C2): the rest stay due and the re-armed alarm fires again at once,
+    /// so retries of a 10,000-member group falling due together are re-queued over several turns, as `readmit` bounds its
+    /// re-queues (Stage 3, S3-B-077).
+    static let dueDeadlinesPerTurn = 512
+
+    /// Drains due entries in `(deadline, seq)` order, at most `dueDeadlinesPerTurn`, re-validating each against epochs,
+    /// then runs the store's due work if its deadline was among them, and re-arms.
     func fireDue() async {
         let now = self.environment.time.monotonicNow()
-        let due = self.state.heap.popDue(at: now)
+        let due = self.state.heap.popDue(at: now, limit: Self.dueDeadlinesPerTurn)
         var storeDue = false
         for deadline in due {
             switch deadline.reason {
@@ -106,11 +111,20 @@ extension SyncEngine {
                 guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed(.at) = job.state else {
                     continue
                 }
-                if self.transition(transfer, to: .queued) {
-                    self.enqueue(transfer)
+                if self.defersToFollow {
+                    // The backoff's end is the clock's; the re-queue and its place wait as the events before them do
+                    // (`EventAfterFollow.retryDue`, S3-R14).
+                    self.deferToFollow(.retryDue(transfer, epoch: epoch))
+                    continue
                 }
+                self.retryDue(transfer, epoch: epoch)
             case .throttle(let origin):
                 guard let until = self.state.throttles[origin] else {
+                    // A park read at an earlier decision instant (a 429's replayed park, `replayThrottle`, S3-R15 item
+                    // 2) waits for a throttle that ended since: its jobs are re-admitted as the throttle's end would have.
+                    if !self.state.throttleParked.isEmpty {
+                        self.unblockOrigin(.throttled)
+                    }
                     continue
                 }
                 guard until <= now else {
@@ -178,6 +192,17 @@ extension SyncEngine {
         self.pump()
         self.rearm()
         self.reconcileIdle()
+    }
+
+    /// A failed job's backoff ended (the alarm's `.retry`): it is re-queued unless it left that backoff meanwhile (a user
+    /// request skipped it, an edge re-queued it, it ended).
+    func retryDue(_ transfer: TransferID, epoch: UInt64) {
+        guard let job = self.state.jobs[transfer], job.epoch == epoch, case .failed(.at) = job.state else {
+            return
+        }
+        if self.transition(transfer, to: .queued) {
+            self.enqueue(transfer)
+        }
     }
 
     /// The pending run's deadline (its debounce or throttle end) fired: the run starts unless conditions refuse bulk work

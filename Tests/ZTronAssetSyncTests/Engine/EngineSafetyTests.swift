@@ -57,8 +57,12 @@ struct EngineSafetyTests {
         await engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 50.3 to 51.3 s beside a second TSan process at a
+    /// load of 20 to 35 (86 % of 60 s) and 20.4 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 38.3 to 38.4 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-3: lane queues stay within twice their live entries while queued jobs move between lanes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-3: lane queues stay within twice their live entries while queued jobs move between lanes", .timeLimit(.minutes(3)))
     func laneQueuesStayCompact() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 1, reservedInteractiveSlots: 0, preemptLowerLanes: false))
         let entries = (0..<12).map { EngineHarness.onDemand("q\($0)", EngineFixture.bytes(UInt64(1_800 + $0))) }
@@ -127,7 +131,7 @@ struct EngineSafetyTests {
         await engine.awaitCondition { !$0.state.syncJoiners.isEmpty }
         // No correct path drops a job the run claims without telling it; the safety net still lets the run settle.
         let settlement = await engine.settleRunAfter { state in
-            state.jobs[entry.transferID]?.interests.removeAll()
+            state.jobs[entry.transferID]?.removeAllInterests()
         }
         #expect(settlement == .finished)
         let outcome = await run.value

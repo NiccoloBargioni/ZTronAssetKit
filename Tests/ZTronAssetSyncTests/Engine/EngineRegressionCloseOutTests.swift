@@ -89,8 +89,12 @@ struct EngineRegressionCloseOutTests {
     /// Found while fixing PROBE-C1-N1: a run's `apply` that wrote its manifest in memory and then threw left the engine's
     /// copy behind the store's until some later publication was superseded, so the ids it pruned were never announced
     /// (a re-apply of the same manifest prunes nothing). The engine now re-reads the store once no `apply` is in flight.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.4 to 30.9 s beside a second TSan process at a
+    /// load of 20 to 35 (51 % of 60 s) and 13.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes", .timeLimit(.minutes(3)))
     func failedApplyIsFollowed() async throws {
         let harness = EngineHarness.make()
         let xBytes = EngineFixture.bytes(9_601)

@@ -17,8 +17,12 @@ struct EngineIdleTests {
         }
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 38.9 to 41.7 s beside a second TSan process at a
+    /// load of 20 to 35 (69 % of 60 s) and 17.3 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 30.1 to 30.5 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing", .timeLimit(.minutes(1)))
+    @Test("R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing", .timeLimit(.minutes(3)))
     func idleAfterSync() async throws {
         // The store's real coalescing and deletion grace leave deadlines the engine's alarm must drive.
         let harness = EngineHarness.make(commitInterval: 0.25, installInterval: 0.1)
@@ -198,8 +202,11 @@ struct EngineIdleTests {
         #expect(await engine.introspect().subscribers == 0)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 38.9 to 39.1 s beside a second TSan process at a
+    /// load of 20 to 35 (65 % of 60 s) and 16.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-15: no store mutation or commit happens after close returns", .timeLimit(.minutes(1)))
+    @Test("R-SYN-15: no store mutation or commit happens after close returns", .timeLimit(.minutes(3)))
     func noMutationAfterClose() async throws {
         let bulk = NextUnitGate()
         let harness = EngineHarness.make(bulk: bulk, commitInterval: 0.25)
@@ -227,7 +234,7 @@ struct EngineIdleTests {
         await bulk.release()
         // Shutdown joins the publication, whose commit window needs the clock, then closes the store.
         await harness.withClock {
-            await shutdown.value
+            await EngineHarness.value(of: shutdown)
         }
         _ = await run.value
         // The baseline is close's return: the store releases its lock last.

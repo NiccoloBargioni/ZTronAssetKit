@@ -187,7 +187,7 @@ struct EngineRegressionRound3Tests {
         let other = await engine.awaitAsset("e1", lane: .prefetch)
         #expect(other.map(\.byteSize) == .success(Int64(b1.count)))
         let created = await engine.readForTests { $0.state.jobsCreated }
-        let report = try await harness.withClock { try await ensure.value.get() }
+        let report = try await harness.withClock { try await EngineHarness.value(of: ensure).get() }
         #expect(report.isComplete && report.present == 2, "\(report)")
         #expect(await harness.source.starts.filter { $0.id == e1.transferID }.count == 1, "e1 was present when the ensure reached it")
         // Not only no second download: the binding the commit taught the engine keeps e1 from getting a job at all
@@ -224,7 +224,7 @@ struct EngineRegressionRound3Tests {
         let other = await engine.awaitAsset("r1", lane: .prefetch)
         #expect(other.map(\.byteSize) == .success(Int64(b1.count)))
         let created = await engine.readForTests { $0.state.jobsCreated }
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let report = try #require(outcome.completeReport, "\(outcome)")
         #expect(report.fetched == 2, "the run counts r1, present when it reached it, as fetched")
         #expect(await harness.source.starts.filter { $0.id == r1.transferID }.count == 1, "r1 was present when the run reached it")
@@ -322,7 +322,7 @@ struct EngineRegressionRound3Tests {
         _ = try sink.appendPartial(Data(repeating: 7, count: 120), to: first.partialName)
         // A 64 GiB volume holds the job: the engine retries (F-20).
         await harness.source.release(x.transferID, with: .failed(.insufficientSpace(requiredBytes: 300)))
-        let result = await harness.withClock { await waiter.value }
+        let result = await harness.withClock { await EngineHarness.value(of: waiter) }
         #expect(result.map(\.byteSize) == .success(Int64(bytes.count)), "\(result)")
         await engine.waitUntil { $0.jobsByState.isEmpty }
         let inventory = try await harness.store.stagingInventory()

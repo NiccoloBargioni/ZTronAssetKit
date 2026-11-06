@@ -97,7 +97,7 @@ struct EngineRegressionCycle3Tests {
         let before = try #require(try await harness.view().records["x"])
         #expect(SyncEngine.isPresent(before, at: x.transferID), "setup: the store holds x present: \(before.residency)")
         await harness.source.release(h1.transferID, with: .progress(received: 0, expected: nil))
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let starts = await harness.source.starts.filter { $0.id == x.transferID }.count
         #expect(starts == 1, "\(drop): only the user ensure downloaded x; the run found it present (\(outcome))")
         if case .completeWithFailures(let report) = outcome {
@@ -110,8 +110,11 @@ struct EngineRegressionCycle3Tests {
     }
 
     /// PROBE-C2-6: the same with the default tuning and policy, and a 40-asset catalog whose first three transfers hold.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 20.7 s alone and 30.5 to 30.9 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger", .timeLimit(.minutes(3)))
     func runAfterLedgerDropDefaultTuning() async throws {
         let harness = EngineHarness.make()
         let engine = harness.engine
@@ -150,7 +153,7 @@ struct EngineRegressionCycle3Tests {
         for entry in held {
             await harness.source.release(entry.transferID, with: .progress(received: 0, expected: nil))
         }
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let starts = await harness.source.starts.filter { $0.id == x.transferID }.count
         #expect(starts == 1, "only the user ensure downloaded x; the run found it present (\(String(describing: outcome).prefix(120)))")
         #expect(await engine.invariantViolations().isEmpty)
@@ -178,7 +181,7 @@ struct EngineRegressionCycle3Tests {
         let h2b = EngineFixture.entry("h2", EngineFixture.bytes(9_312, count: 10))
         try await EngineRegressionCycle3Tests.failApply(harness, keeping: [h1b, h2b, x], seed: 9_399)
         await harness.source.release(h1.transferID, with: .progress(received: 0, expected: nil))
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let record = try #require(try await harness.view().records["x"])
         #expect(record.integrity.attempts == 0, "cap \(cap): no integrity failure is counted against present x: \(record.integrity)")
         #expect(SyncEngine.isPresent(record, at: x.transferID), "cap \(cap): x stays present: \(record.residency)")
@@ -240,7 +243,7 @@ struct EngineRegressionCycle3Tests {
             let file = StagedFile(name: corruptName, byteCount: Int64(corrupt.count), resumed: false, httpStatus: 200, etag: nil)
             await harness.source.release(x.transferID, with: .staged(file))
         }
-        let result = await harness.withClock { await waiter.value }
+        let result = await harness.withClock { await EngineHarness.value(of: waiter) }
         #expect(result.map(\.byteSize) == .success(Int64(bytes.count)), "\(source), cap \(cap): x is present: never integrityFailure, got \(result)")
         let record = try #require(try await harness.view().records["x"])
         #expect(record.integrity.attempts == 0, "\(source), cap \(cap): nothing counted against present x: \(record.integrity)")
@@ -254,8 +257,12 @@ struct EngineRegressionCycle3Tests {
     /// PROBE-C2-7: `x` and `y` share one blob. `reportUnreadable("x")` made the store quarantine both, but the engine
     /// forgot, announced and healed only `x`: the run, reaching `y`, counted it fetched from the stale binding and ended
     /// `.complete` (stamp written) while `y` stayed quarantined and unserved.
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.8 to 35.2 s beside a second TSan process at a
+    /// load of 20 to 35 (59 % of 60 s) and 15.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again", .timeLimit(.minutes(1)))
+    @Test("R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again", .timeLimit(.minutes(3)))
     func siblingQuarantine() async throws {
         let time = ManualTimeSource()
         let tuning = SyncTuning(maxConcurrentTransfers: 2, reservedInteractiveSlots: 1, pipelineDepth: 1, runLookahead: 0)
@@ -300,7 +307,7 @@ struct EngineRegressionCycle3Tests {
         #expect(await engine.readForTests { $0.state.boundContent["y"] } == nil, "the engine no longer binds y")
         #expect(await engine.readForTests { $0.state.heals["y"] != nil }, "y's re-download is scheduled at the end of its quarantine")
         await harness.source.release(h1.transferID, with: .progress(received: 0, expected: nil))
-        let outcome = await harness.withClock { await run.value }
+        let outcome = await harness.withClock { await EngineHarness.value(of: run) }
         let finished = await probe.next { event in
             if case .syncFinished = event {
                 return true

@@ -123,8 +123,11 @@ struct EngineOutcomeTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 38.2 to 39.0 s beside a second TSan process at a
+    /// load of 20 to 35 (65 % of 60 s) and 16.6 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest", .timeLimit(.minutes(3)))
     func runWhileBreakerOpen() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let catalog = EngineSyncTests.catalog(6)
@@ -157,8 +160,11 @@ struct EngineOutcomeTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 30.9 to 32.2 s beside a second TSan process at a
+    /// load of 20 to 35 (54 % of 60 s) and 13.9 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes", .timeLimit(.minutes(3)))
     func transferProbePublishesHalfOpen() async throws {
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 5, reservedInteractiveSlots: 0))
         let failing = (0..<5).map { EngineHarness.onDemand("f\($0)", EngineFixture.bytes(UInt64(495 + $0))) }
@@ -422,7 +428,7 @@ struct EngineOutcomeTests {
         await bulk.setHolding(false)
         await bulk.releaseAll()
         await maintenance.value
-        let location = try await harness.withClock { try await waiter.value.get() }
+        let location = try await harness.withClock { try await EngineHarness.value(of: waiter).get() }
         #expect(location.byteSize == Int64(bytes.count))
         #expect(await harness.source.starts.count == 1, "the publication completed from the file staging GC kept")
         await engine.shutdown()
@@ -443,9 +449,12 @@ struct EngineOutcomeTests {
         await engine.waitUntil { $0.running == 1 }
         #expect(await engine.invariantViolations().isEmpty, "a healthy engine")
         let transfer = entry.transferID
-        let orphaned = await engine.violations { $0.jobs[transfer]?.interests.removeAll() }
+        let orphaned = await engine.violations { $0.jobs[transfer]?.removeAllInterests() }
         #expect(orphaned.contains { $0.hasPrefix("job ") && $0.contains("has no interest") })
         #expect(orphaned.contains { $0.hasPrefix("group ") && $0.contains("without an interest") })
+        // The counts a job's lane is read from are its interests' (`Job.interestCounts`; Stage 3 close-out cycle 20).
+        let miscounted = await engine.violations { $0.jobs[transfer]?.interestCounts.userInitiated += 1 }
+        #expect(miscounted == ["job \(transfer) counts its interests InterestCounts(bulk: 0, prefetch: 1, userInitiated: 1, singleUser: 0), which count InterestCounts(bulk: 0, prefetch: 1, userInitiated: 0, singleUser: 0)"])
         let inactive = await engine.violations { $0.jobs[transfer]?.active = nil }
         #expect(inactive.contains { $0.contains("in downloading with active false") })
         let illegal = await engine.violations { $0.metrics.illegalTransitions = 2 }

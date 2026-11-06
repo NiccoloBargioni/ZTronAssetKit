@@ -84,10 +84,12 @@ extension SyncEngine {
             startedAt: self.environment.time.now(),
             purgeEpoch: self.state.purgeEpoch
         )
-        // A breaker that admits only a probe gives it to this run's manifest fetch in this turn, before the run is in place
-        // and before any later turn can dispatch a job (F-42); its `circuitChanged` follows `syncStarted`.
-        let held = self.reserveManifestProbe()
         self.state.run = run
+        // A breaker that admits only a probe gives it to this run's manifest fetch in this turn, before any later turn can
+        // dispatch a job (F-42); its `circuitChanged` follows `syncStarted`. The run is in place first: the reservation
+        // notifies the condition observers, which must not see a probe held for a run that does not exist yet (L4-R24(1);
+        // Stage 3, S3-B-064).
+        let held = self.reserveManifestProbe()
         // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
         guard self.spawn(.run, { engine in await engine.performRun(token) }) != nil else {
             self.state.run = nil
@@ -171,7 +173,8 @@ extension SyncEngine {
         let view: StorePlanningView
         do {
             // REENTRANCY: RE-S06 — the lifecycle and the run token; the read became the ledger's base in the turn it
-            // returned (L4-R7), and parked jobs are re-evaluated against it there.
+            // returned (L4-R7, also behind the follow barrier: S3-R11 R1), and parked jobs are re-evaluated against it
+            // there, or, behind the barrier, by the sweep's follow-up once the follow ends (F-28).
             space = try await self.readFreeSpace()
             if self.isRunning {
                 self.reconsiderSpaceBlocked()
@@ -359,6 +362,10 @@ extension SyncEngine {
     /// engine announces never depends on which manifest the store diffed against (L4-R7, L4-R10).
     func applied(_ manifest: ValidatedManifest, etag: ETag?, report: ApplyReport, since serial: UInt64) {
         let unreported = self.prunesUnreported(by: report, in: manifest)
+        let previous = self.state.applied
+        // The interests the outgoing copy's owed visits move onto a running publication are its own before the copy
+        // changes (`bringInboundOntoPublications`; Stage 3 close-out cycle 18, RR-14).
+        self.bringInboundOntoPublications()
         self.adoptApplied(manifest, etag: etag)
         self.state.generation = max(self.state.generation, report.generation)
         // What the apply bound and unbound (L4-R5): a reused id is present at its new entry's content, so an interest
@@ -383,7 +390,7 @@ extension SyncEngine {
             self.broadcast(.assetRemoved(id, .pruned))
         }
         self.broadcast(.snapshotChanged(generation: self.state.generation))
-        self.followApplied()
+        self.followApplied(from: previous)
     }
 
     /// The ids the engine's copy lists and `manifest` does not that the store's report leaves out, in the copy's order;
@@ -414,48 +421,6 @@ extension SyncEngine {
         return unreported
     }
 
-    /// Moves every job to the engine's copy of the applied manifest: a job none of whose ids still want its content is
-    /// superseded (its interests follow their entries, T22, or end, T21), one some of whose ids moved lets them go.
-    func followApplied() {
-        for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer] else {
-                continue
-            }
-            switch job.state {
-            case .verifying, .committing:
-                continue
-            default:
-                break
-            }
-            let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
-            guard !moved.isEmpty else {
-                continue
-            }
-            if moved.count == job.assets.count {
-                if job.state == .downloading {
-                    if let active = job.active {
-                        self.abandon(transfer, active)
-                    }
-                    // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
-                    self.recordBreaker(.abandoned(transfer))
-                }
-                self.supersede(transfer)
-            } else {
-                self.state.jobs[transfer]?.assets.subtract(moved)
-                for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-                    for asset in interest.assets.sorted() where moved.contains(asset) {
-                        self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
-                        self.reroute(token, interest: interest, asset: asset, from: transfer)
-                    }
-                    if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
-                        self.removeInterest(token, from: transfer)
-                    }
-                }
-            }
-        }
-        self.checkRunSettled()
-    }
-
     /// Skipped entries whose records failed until their entry changes count as the run's failures (a run with them
     /// never ends `.complete`, so the sync stays due).
     private func recordSkippedFailures(_ plan: SyncPlan, view: StorePlanningView) {
@@ -484,17 +449,25 @@ extension SyncEngine {
     /// Releases the system interests launch re-attachment created for transfers the run does not plan (sync.md §7.1).
     /// A re-attached transfer the run plans keeps its interest until the run's own joins it (materialisation is bounded
     /// by the pipeline, S1-15): releasing it first would retire the job, cancel the live OS task and start the same
-    /// transfer again (R-NET-3: joined once, never duplicated).
+    /// transfer again (R-NET-3: joined once, never duplicated). Only the jobs a system interest joined are visited
+    /// (`systemHeld`), in transfer order, not the whole table (C2; Stage 3, S3-PERF-02); one left with no system interest
+    /// leaves the index.
     private func releaseSystemReattachments(keeping planned: Set<TransferID>) {
-        for transfer in self.state.jobs.keys.sorted() where !planned.contains(transfer) {
+        for transfer in self.state.systemHeld.sorted() {
             guard let job = self.state.jobs[transfer] else {
+                self.state.systemHeld.remove(transfer)
                 continue
             }
-            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.kind == .system {
-                let healing = interest.assets.contains { self.state.heals[$0] != nil }
-                if !healing {
-                    self.removeInterest(token, from: transfer)
+            if !planned.contains(transfer) {
+                for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.kind == .system {
+                    let healing = interest.assets.contains { self.state.heals[$0] != nil }
+                    if !healing {
+                        self.removeInterest(token, from: transfer)
+                    }
                 }
+            }
+            if self.state.jobs[transfer]?.interests.values.contains(where: { $0.kind == .system }) != true {
+                self.state.systemHeld.remove(transfer)
             }
         }
     }
@@ -530,33 +503,45 @@ extension SyncEngine {
     /// Drops the run's claim on `asset` in `transfer` (the asset follows other content now, or left the manifest): a
     /// claim left on a job that will never report to the run would keep the run from settling.
     func releaseRunClaim(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
-        guard var run = self.state.run, run.token == token, var claimed = run.outstanding[transfer] else {
+        // In place through the run: a copy written back would copy `outstanding` per released claim (step C11).
+        guard self.state.run?.token == token, self.state.run?.outstanding[transfer] != nil else {
             return
         }
-        claimed.remove(asset)
-        run.outstanding[transfer] = claimed.isEmpty ? nil : claimed
-        self.state.run = run
+        self.state.run?.outstanding[transfer]?.remove(asset)
+        if self.state.run?.outstanding[transfer]?.isEmpty == true {
+            self.state.run?.outstanding[transfer] = nil
+        }
     }
 
     /// Records a job's outcome for the run.
+    ///
+    /// Written in place through the run: a copy written back would copy `outstanding` and `failures` per outcome; the
+    /// failures are dictionary entries, so no order is needed (step C6). A committed id the store did not bind is never
+    /// delivered here (`committed` moves its interest first); the loop that fails one is kept, pre-existing (S3-R19
+    /// item 3). Only the ids answered leave the transfer's claims: a claim a visit re-routed onto this job while its
+    /// verdict waited keeps its place, and its join's replay, after the verdict, lands it as a visit-first engine's
+    /// later visit had. Emptying the transfer's claims wiped it, and the join then found none (`stillWants`; Stage 3
+    /// close-out cycle 21, S3-R26 item 12's answer 5, candidate 2).
     func recordRunOutcome(_ outcome: InterestOutcome, transfer: TransferID, assets: Set<AssetID>) {
-        guard var run = self.state.run else {
+        guard self.state.run != nil else {
             return
         }
-        run.outstanding[transfer] = nil
+        self.state.run?.outstanding[transfer]?.subtract(assets)
+        if self.state.run?.outstanding[transfer]?.isEmpty == true {
+            self.state.run?.outstanding[transfer] = nil
+        }
         switch outcome {
-        case .committed(let locations):
-            run.fetched += assets.filter { locations[$0] != nil }.count
-            for asset in assets.sorted() where locations[asset] == nil {
-                run.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound)
+        case .committed(let locations, _):
+            self.state.run?.fetched += assets.lazy.filter { locations[$0] != nil }.count
+            for asset in assets where locations[asset] == nil {
+                self.state.run?.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound)
             }
         case .failed(let error):
             let failureClass = SyncEngine.failureClass(of: error)
-            for asset in assets.sorted() {
-                run.failures[asset] = AssetFailure(id: asset, error: error, failureClass: failureClass)
+            for asset in assets {
+                self.state.run?.failures[asset] = AssetFailure(id: asset, error: error, failureClass: failureClass)
             }
         }
-        self.state.run = run
         self.offerRunProgress()
     }
 
@@ -599,11 +584,26 @@ extension SyncEngine {
 
     /// `checkRunSettled()`; `spaceSwept` once this check has re-checked the space-parked jobs against the ledger.
     private func checkRunSettled(spaceSwept: Bool) {
-        guard let run = self.state.run, run.transferring, run.settlement == nil else {
+        // While a follow owes visits a claim may still move (T21/T22): the follow's last turn checks again. While the
+        // drain gives a verdict whose job it took a run's claim off first, the claim is on no job's interest until its
+        // re-route lands it (`runClaimTakenOff`): the drain's end checks again. While re-routes are owed, their run items
+        // hold no claim (`oweReroutes`), queued or in a drain turn's batch, where the barrier reads down mid-drain: the
+        // drain's end checks again once the last is made (Stage 3 close-out cycle 21, RR21-RUN-MIDDRAIN).
+        guard let run = self.state.run, run.transferring, run.settlement == nil, !self.followBarrier, !self.state.runClaimTakenOff, self.state.reroutesWaiting == 0 else {
             return
         }
         self.materializeRun()
         guard var current = self.state.run else {
+            return
+        }
+        // A claim whose join waits in the drain counts as working: a visit re-routed it onto a job whose verdict replays
+        // first, and the drain's batch is off the queue while it replays, so the barrier reads down here. The join's
+        // replay, later in the batch, lands the claim (`replayJoin`), as a visit-first engine's join had, and the drain's
+        // end checks the run again. Without this the orphan pass below failed the claim, whose job does not hold the
+        // run's interest while its join waits (Stage 3 close-out cycle 21, S3-R26 item 12's answer 5, candidate 1).
+        if let waiting = self.state.joinsAfterFollow[current.token],
+            waiting.contains(where: { current.outstanding[$0.value]?.contains($0.key) == true })
+        {
             return
         }
         // One read of the job table: a closure over `self.state` would copy the whole engine state per claim.
@@ -820,7 +820,9 @@ extension SyncEngine {
         for transfer in run.outstanding.keys.sorted() {
             self.removeInterest(run.token, from: transfer)
         }
-        for transfer in self.state.jobs.keys.sorted() where self.state.jobs[transfer]?.interests[run.token] != nil {
+        // The jobs the run's interest still holds outside `outstanding` (a follow routed it there): those its joins
+        // reached and it has not left, not a walk of the whole table (C2; Stage 3, S3-PERF-02).
+        for transfer in (self.state.run?.held ?? []).sorted() where self.state.jobs[transfer]?.interests[run.token] != nil {
             self.removeInterest(run.token, from: transfer)
         }
         self.state.run = nil
@@ -967,11 +969,12 @@ extension SyncEngine {
     }
 
     /// Whether a later turn owes a pump that may dispatch queued or re-admitted jobs: a pump follow-up, a re-admission
-    /// follow-up (it pumps after its re-queues), re-queues still owed to an origin's jobs, or an `ensureAvailable` refill.
-    /// Each of those turns ends in `pump()`, which reconsiders a pending run that waits for the breaker (F-41).
+    /// follow-up (it pumps after its re-queues), re-queues still owed to an origin's jobs, an `ensureAvailable` refill, or
+    /// a queue whose head waits for an owed follow (each follow turn pumps; `pumpWaitsForFollow`). Each of those turns
+    /// ends in `pump()`, which reconsiders a pending run that waits for the breaker (F-41).
     var dispatchOwed: Bool {
         self.state.pumpFollowUpScheduled || self.state.readmissionFollowUpScheduled || self.state.ensureRefillScheduled
-            || !self.state.originOwed.isEmpty
+            || !self.state.originOwed.isEmpty || self.state.pumpWaitsForFollow
     }
 
     /// Starts the pending run when its gate is already open, and arms whatever opens a closed one.

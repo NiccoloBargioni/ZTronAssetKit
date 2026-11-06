@@ -41,8 +41,11 @@ struct EngineSyncTests {
         await harness.engine.shutdown()
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 29.2 to 30.2 s beside a second TSan process at a
+    /// load of 20 to 35 (50 % of 60 s) and 13.1 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7), over half
+    /// its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-8: reconcile is committed before the first transfer starts", .timeLimit(.minutes(1)))
+    @Test("R-SYN-8: reconcile is committed before the first transfer starts", .timeLimit(.minutes(3)))
     func reconcileBeforeTransfer() async throws {
         let time = ManualTimeSource()
         let fileSystem = FakeFileSystem(
@@ -157,8 +160,11 @@ struct EngineSyncTests {
         await relaunched.engine.shutdown()
     }
 
+    /// One asset of 100 fails; the run completes and lists it. Hang guard (S3-R4): under TSan in the whole Sync bundle it
+    /// took 24.6 s alone and 35.7 to 37.5 s beside a second TSan process at a load of 16 to 26 (Stage 3 close-out cycle
+    /// 4), over half its 60 s, so the guard is `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report", .timeLimit(.minutes(1)))
+    @Test("R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report", .timeLimit(.minutes(3)))
     func oneFailureNeverAbortsTheRun() async throws {
         let harness = EngineHarness.make()
         let catalog = EngineSyncTests.catalog(100)

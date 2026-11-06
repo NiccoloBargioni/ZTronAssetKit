@@ -92,6 +92,21 @@ extension SyncEngine {
         }
         self.materializeRun()
         self.materializeEnsures()
+        if self.followBarrier || self.state.drainingAfterFollow {
+            // No admission behind the follow barrier (F-28): every start, park and fail-fast answer reads lanes, ranks,
+            // interests and the bytes in flight, which the owed visits change (a visit lowers or supersedes the job it
+            // moves, raises or creates the job of the moved id's new content, abandons a superseded download). Decided
+            // now, a job is judged on a half-followed state, so its answer depended on whether a visit ran first (the
+            // close-out cycles 2 to 8). Nor while the events that waited for the follow are drained, during a batch or
+            // between two: the places a later batch gives come before work a pump would start meanwhile (the cycle-9
+            // amendment (d)). The queues wait; each follow turn pumps again (`pumpWaitsForFollow`), and the drain's last
+            // batch pumps on the state every visit and event left.
+            self.state.pumpWaitsForFollow = true
+            self.scheduleEnsureRefill()
+            self.notifyObservers()
+            return
+        }
+        self.state.pumpWaitsForFollow = false
         let maximum = self.tuning.maxConcurrentTransfers
         let userCap = self.userCap
         var guardCount = 0
@@ -156,6 +171,7 @@ extension SyncEngine {
             // A lane-wide park stopped at the bound: a later turn continues it whether or not a slot frees.
             self.schedulePumpFollowUp()
         }
+        self.ensureProbeCandidate()
         self.checkRunSettled()
         self.scheduleEnsureRefill()
         if self.state.pendingRun?.gate == .breaker {
@@ -203,9 +219,17 @@ extension SyncEngine {
 
     /// Turns `ensureAvailable` groups' planned fetches into members and jobs while fewer than the limit are pending. A
     /// fetch follows its asset's current entry (T22) and is dropped when the asset left the manifest (T21).
+    ///
+    /// Every pump runs this, so it sorts only the tokens of the ensure groups with fetches left, in the order it visited
+    /// them when it sorted every group's: a group's kind never changes, its fetches are only consumed, and nothing here
+    /// registers a group, so no other group can become one during the loop. Sorting 10,000 prefetch groups' tokens at a
+    /// commit's pump held its turn (`.manyGroups`, C2; Stage 3 close-out cycle 21, step 6).
     func materializeEnsures() {
         let limit = self.materializationLimit
-        for token in self.state.groups.keys.sorted() {
+        let candidates = self.state.groups.compactMap { token, group in
+            group.kind == .ensure && group.cursor < group.fetches.count ? token : nil
+        }
+        for token in candidates.sorted() {
             guard var group = self.state.groups[token], group.kind == .ensure, group.cursor < group.fetches.count, group.pending.count < limit else {
                 continue
             }
@@ -285,7 +309,8 @@ extension SyncEngine {
     }
 
     /// Whether a valid user-initiated entry waits that is not draining, held for a manifest catch-up or wanted only by
-    /// released groups (those are set aside on the way, so each is stepped over once, C2).
+    /// released groups (those are set aside on the way, so each is stepped over once, C2). The pump reads it only behind
+    /// no follow barrier (F-28), so no entry it finds waits for a follow's visit.
     private func hasQueuedUser() -> Bool {
         // The queues are taken out of the state while the closures read it (no overlapping access).
         var queues = self.state.queues
@@ -343,7 +368,9 @@ extension SyncEngine {
     }
 
     /// Starts `transfer` or parks it; a lane-wide block also parks the lane's other queued jobs, at most `parkLimit`
-    /// in all (`parkLane`).
+    /// in all (`parkLane`). Reached only behind no follow barrier (`pump`, F-28): a job whose ids the copy maps
+    /// elsewhere has been visited, so none of the replaced content of the close-out cycle-2 finding (PROBE-W1) is left
+    /// to start.
     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {
         switch self.gate(transfer) {
         case .wait:
@@ -442,13 +469,17 @@ extension SyncEngine {
         return nil
     }
 
-    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4).
+    /// Moves a job to `blocked(reason)` and applies the fail-fast policy (T4). A throttle's park keeps the origin's alarm
+    /// at the origin's end, never earlier: a park whose 429 waited for the follow carries its own, earlier end while a
+    /// later 429 extended the origin's, and moving the alarm back to the park's end re-admitted the throttle's jobs before
+    /// the origin's end (PROBE-C10-THROTTLE-EXTENDED).
     func park(_ transfer: TransferID, reason: BlockReason) {
         guard self.transition(transfer, to: .blocked(reason)) else {
             return
         }
         if case .throttled(let until) = reason, let origin = self.state.remote?.originID {
-            self.state.heap.schedule(.throttle(origin), at: until)
+            // The live origin's end, whatever decision instant the park reads its answers at (S3-R15 item 1).
+            self.state.heap.schedule(.throttle(origin), at: max(self.state.throttles[origin] ?? .zero, until))
             self.rearm()
         }
         if case .circuitOpen = reason {
@@ -482,6 +513,12 @@ extension SyncEngine {
             return .block(reason)
         }
         let now = self.environment.time.monotonicNow()
+        // Every place, a follow's visit's and a drain replay's included, is admitted on the live throttle, breaker, slots
+        // and space alone: a start is a request, and a request reads the live origin gates (R-SYN-5; Stage 3 close-out
+        // cycle 15, ruling S3-R18 item 1). The cycle-12 to cycle-14 place stamps, which refused a place on the throttle of
+        // its decision instant's view, were a past view: refused there after a place ahead of it, which a visit-first
+        // pump started, had taken the slot, a place was answered `serverUnavailable` although the live throttle had
+        // ended (PROBE-C14C-STAMP-AHEAD).
         // The origin's gates through the pure functions every other decision reads too (`OriginGate`, F-40), each read
         // once per job: this runs for every job a pump dispatches or parks.
         if let until = OriginGate.inForce(self.state.throttles[remote.originID], at: now) {
@@ -698,6 +735,14 @@ extension SyncEngine {
             return
         }
         job.active = ActiveAttempt(attempt: attempt, request: request, driver: driver, startSequence: self.state.lastStart, probe: probe)
+        self.state.admissionsForTests?.append(AttemptAdmission(transfer: transfer, ticket: job.ticket, place: job.queuePlace, attempt: attempt))
+        // A new attempt: the last publication's ids, its end and its verdict, and a transfer's ENOSPC end, are behind it
+        // (`Job.rerouteOnPass`, `Job.attemptEnd`, `Job.transferSpaceEnd`).
+        job.rerouteOnPass = nil
+        job.attemptEnd = nil
+        job.transferSpaceEnd = nil
+        // The edge in force when the attempt starts, also for a place given behind the barrier: it starts on the live
+        // gates (Stage 3 close-out cycle 15, ruling S3-R18 item 1), so an edge before this start is no edge it missed.
         job.active?.edgeSerial = self.state.networkEdgeSerial
         // A publication of a file an earlier attempt staged has no stream: nothing is left to drain if its job is
         // retired before its driver runs (`publish` then discards the file).
@@ -741,7 +786,8 @@ extension SyncEngine {
             return
         }
         // REENTRANCY: f-11 (proposed) — the callee re-validates the lifecycle, the job epoch and the attempt after its
-        // reads; an attempt it did not end goes on below, which re-validates them after `remote.transfer`.
+        // reads; an attempt it did not end goes on below, which re-checks the lifecycle, the job epoch and the attempt
+        // before `remote.transfer` (L5K-R25: no request for an attempt retired during the reads) and again after it.
         if await self.answeredFromStore(transfer, epoch: epoch, attempt: request.attempt) {
             return
         }
@@ -806,10 +852,55 @@ extension SyncEngine {
         guard !Task.isCancelled, self.isRunning else {
             return
         }
+        if self.state.attemptTerminalsHeld {
+            // REENTRANCY: RE-S47 (proposed) — the lifecycle, re-checked right below; `finishAttempt` re-validates the job
+            // epoch and the attempt.
+            await self.awaitAttemptTerminalRelease()
+            guard self.isRunning else {
+                return
+            }
+        }
         // A stream that ends without a terminal element fails the job (sync-1 S1-11).
         let update = terminal ?? .failed(.transient(.incompleteCallbackSequence, retryAfter: nil))
         // REENTRANCY: RE-S13 — nothing here: the callee re-validates the lifecycle and the job epoch after each of its awaits.
         await self.finishAttempt(transfer, epoch: epoch, request: request, update: update)
+    }
+
+    /// Test seam: the driver waits for `releaseAttemptTerminals()` or for shutdown; it registers synchronously, so a hold
+    /// released before it registered lets it pass at once.
+    private func awaitAttemptTerminalRelease() async {
+        // REENTRANCY: RE-S47 (proposed) — nothing: the body registers synchronously; the caller re-validates the
+        // lifecycle, and `finishAttempt` the job epoch and the attempt.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if self.state.attemptTerminalsHeld, self.isRunning {
+                self.state.heldAttemptTerminals.append(continuation)
+                self.notifyObservers()
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Test seam: from now on, a driver that received its attempt's terminal element waits before it applies it, until
+    /// `releaseAttemptTerminals()` (Stage 3 close-out cycle 11). A test uses it to let a follow's next turn run between a
+    /// transfer's end and the engine's verdict on it, an order production leaves to the scheduler.
+    func holdAttemptTerminals() {
+        self.state.attemptTerminalsHeld = true
+    }
+
+    /// Test seam: disarms the hold and lets every held driver go on, in arrival order; shutdown calls it too.
+    func releaseAttemptTerminals() {
+        self.state.attemptTerminalsHeld = false
+        let held = self.state.heldAttemptTerminals
+        self.state.heldAttemptTerminals.removeAll()
+        for continuation in held {
+            continuation.resume()
+        }
+    }
+
+    /// Test seam: how many drivers wait for `releaseAttemptTerminals()`.
+    var heldAttemptTerminalCount: Int {
+        self.state.heldAttemptTerminals.count
     }
 
     /// Records transfer progress: counters, run bytes, and a rate-limited `transferProgress` for non-bulk lanes.
@@ -918,7 +1009,7 @@ extension SyncEngine {
     /// `downloading → verifying`, publish, then `committing →` present: every interest present **now** receives the
     /// locations (RE-S14).
     func publish(_ transfer: TransferID, epoch: UInt64, file: StagedFile, cancelledAttempt: Bool) async {
-        guard var job = self.state.jobs[transfer], job.epoch == epoch else {
+        guard self.state.jobs[transfer]?.epoch == epoch else {
             // The job was retired (or replaced) before this publication began: nobody else will publish the file. The
             // transfer ended without a verdict (a half-open probe's exit, §7.7) unless a new job of it runs.
             if self.state.jobs[transfer] == nil {
@@ -931,13 +1022,43 @@ extension SyncEngine {
         guard self.transition(transfer, to: .verifying) else {
             return
         }
-        job = self.state.jobs[transfer] ?? job
-        job.active = nil
-        self.state.jobs[transfer] = job
-        self.pump()
+        // The interests a visit-first engine's visits had moved onto this content are the job's before its publication
+        // binds its ids (`bringInbound`; Stage 3 close-out cycle 17, PROBE-C16C-INTERMEDIATE-HOP-SERVED).
+        self.bringInbound(transfer)
+        self.state.jobs[transfer]?.active = nil
+        // The ids a visit-first engine moved before this publication began: an owed follow's visit, which meets the job
+        // publishing, re-routes them at once (`Job.rerouteOnPass`, `follow`). None while no follow is owed: every
+        // visit has run, and an id the copy maps elsewhere is one a visit passed, which the next follow visits. Read at
+        // the attempt's end: the moves it owes (`bringInbound`) bring ids the copy maps here, which none of this holds.
+        var away: Set<AssetID> = []
+        if self.followOwed, let job = self.state.jobs[transfer] {
+            away = job.assets.filter { asset in self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? true }
+        }
+        // Read before the job is written: an optional-chained assignment holds the state across its right side.
+        let follow = self.state.followsEnded
+        self.state.jobs[transfer]?.rerouteOnPass = away
+        self.state.jobs[transfer]?.rerouteFor = follow
+        if self.inboundBlocks(transfer) {
+            // The binding waits for the moves owed onto or off this job, and for the rest of its visit (ruling S3-R20
+            // item 3: the job's end waits while they are made over the follow's turns, `bringInbound`; cycle 19).
+            // REENTRANCY: RE-S48 (proposed) — the lifecycle (shutdown resumes the wait, `releaseInboundWaits`). The job is
+            // still verifying at this epoch, as an invariant checks while it waits (`followBarrierViolations`): a
+            // verifying job is never retired (`retire`), superseded (`move`, `startMove`) or given an attempt, and its
+            // interests' withdrawals wait behind the barrier. The cycle-18 re-check of the job's epoch and state, which no
+            // path reached, was removed under ruling S3-R19 item 3 (cycle 19; the cycle-18 requirements verifier's G4
+            // finding on RE-S48).
+            await self.awaitInboundMoves(transfer)
+            guard self.isRunning else {
+                return
+            }
+        }
+        guard let job = self.state.jobs[transfer] else {
+            return
+        }
         let ids = job.assets.sorted()
         let identity = job.identity
         let lane = job.lane
+        self.pump()
         let serial = self.state.ledgerForgets
         let locations: [AssetID: AssetLocation]
         do {
@@ -957,6 +1078,7 @@ extension SyncEngine {
         guard self.isRunning else {
             return
         }
+        self.state.commitTurnMarksForTests?(false)
         self.recordBreaker(.objectSuccess(transfer))
         guard let current = self.state.jobs[transfer], current.epoch == epoch else {
             // The job ended while its content was published (its asset pruned, its content superseded): the publication's
@@ -968,7 +1090,14 @@ extension SyncEngine {
         self.transition(transfer, to: .committing)
         self.state.committedSinceRead = PlanBuilder.adding(self.state.committedSinceRead, file.byteCount)
         self.state.committedTotal = PlanBuilder.adding(self.state.committedTotal, file.byteCount)
+        // A commit applies on arrival, also behind the follow barrier: the ids the store did not bind follow their
+        // content now, and their joins wait for the drain (`committed`, `addInterest`). The cycle-12 deferral of a commit
+        // until the follow's visit of its job (`EventAfterFollow.committed`, `publishedOwingVisit`; residual R-A) made only
+        // the re-routed joins' places equal to a visit-first engine's, and its visit removed a verifying or committing job
+        // while the store still published its bytes. It was removed in Stage 3 close-out cycle 13 under ruling S3-R16
+        // item 3 (recorded in the WP-F draft as a residual risk).
         self.committed(transfer, binding: ids, locations: locations, since: serial)
+        self.state.commitTurnMarksForTests?(true)
         // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline.
         await self.refreshStoreDeadlineAfterPublish()
     }
@@ -979,41 +1108,86 @@ extension SyncEngine {
     /// copy still maps to this content moves to a fresh job of it once this one is gone, because it joined after the
     /// publication's binding was captured (the next publication binds it; the store deduplicates the bytes, ADR-020),
     /// or because the store refused it while holding a newer manifest than the copy (held until the copy catches up).
+    ///
+    /// The re-routes share the commit's turn with its answers (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 1): a
+    /// commit whose answers and re-routes fit `inboundIDsNow` together makes the re-routes in this turn, the calls and
+    /// their order unchanged (each list by token, then id; the moved ones at once, the others once the job is gone); one
+    /// whose do not owes every re-route as one batch, which the drain makes at its place, a drain turn's ids a turn
+    /// (`deferReroutes`). The interests are read once, unsorted, and each id is classified by its entry in the copy
+    /// against the job's (`sameTransfer`; a job's entry is its transfer's, `addInterest`), no transfer formatted: a
+    /// format an id held a 10,000-id commit's turn 4.5 to 5.0 ms (`BenchSync.commitRerouteWaitersTurns`). A commit that
+    /// re-routes in this turn trims the interests in place afterwards, no copy of the job alive across a change (D11),
+    /// before the moved ones' re-routes, which interleaved with them: a re-route reads only the item's lane and kind,
+    /// and writes the run, a waiter, a group, a heal and the job of the id's new content, never this one (a moved id's
+    /// entry names another content), so the two touch disjoint state. One that owes them answers each interest its
+    /// bound ids only and retires the job untrimmed (`resolveAll`'s `boundOnly`): the trims released the index an id
+    /// for a job removed whole in the same turn, 3.2 to 4.8 ms of that turn. A commit while events wait for the follow
+    /// is kept with the copy's serial (`EngineState.reroutePinCommits`), for the ids of owed re-routes and waiting joins
+    /// a layer pinned here.
     private func committed(_ transfer: TransferID, binding ids: [AssetID], locations: [AssetID: AssetLocation], since serial: UInt64) {
-        guard let job = self.state.jobs[transfer] else {
+        guard let jobEntry = self.state.jobs[transfer]?.entry else {
             return
         }
-        let captured = Set(ids)
+        // An owed re-route or a waiting join a layer pinned to this attempt follows the copy now (`followLayers`).
+        if !self.state.eventsAfterFollow.isEmpty, let epoch = self.state.jobs[transfer]?.epoch {
+            self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: false)
+        }
         // Remembered unless a binding was forgotten while the publication ran (an eviction the engine processed first).
         self.bind(locations.keys, to: transfer, since: serial)
-        var deferred: [(token: InterestToken, interest: JobInterest, asset: AssetID)] = []
+        var trims: [(token: InterestToken, whole: Bool, unbound: Set<AssetID>)] = []
+        var moved: [RerouteItem] = []
+        var deferred: [RerouteItem] = []
         var refused = false
-        for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
-            let unbound = interest.assets.filter { locations[$0] == nil }
-            guard !unbound.isEmpty else {
-                continue
-            }
-            let bound = interest.assets.subtracting(unbound)
-            if bound.isEmpty {
-                self.state.jobs[transfer]?.interests[token] = nil
-            } else {
-                self.state.jobs[transfer]?.interests[token]?.assets = bound
-            }
-            for asset in unbound.sorted() {
-                guard self.state.applied.entry(for: asset)?.transferID == transfer else {
-                    self.reroute(token, interest: interest, asset: asset, from: transfer)
+        // The publication's binding, built only for an id the copy still maps here (C1).
+        lazy var captured = Set(ids)
+        if let interests = self.state.jobs[transfer]?.interests {
+            for (token, interest) in interests {
+                let unbound = interest.assets.filter { locations[$0] == nil }
+                guard !unbound.isEmpty else {
                     continue
                 }
-                refused = refused || captured.contains(asset)
-                deferred.append((token, interest, asset))
+                trims.append((token, unbound.count == interest.assets.count, unbound))
+                for asset in unbound {
+                    let item = RerouteItem(asset: asset, token: token, lane: interest.lane, kind: interest.kind)
+                    if !(self.state.applied.entry(for: asset).map({ SyncEngine.sameTransfer($0, jobEntry) }) ?? false) {
+                        moved.append(item)
+                        continue
+                    }
+                    if !refused, captured.contains(asset) {
+                        refused = true
+                    }
+                    deferred.append(item)
+                }
             }
         }
-        self.resolveAll(transfer, with: .committed(locations)) {
-            if refused {
-                self.holdForManifest(transfer)
+        let rerouted = moved.count + deferred.count
+        if rerouted > 0, locations.count + rerouted > self.inboundIDsNow {
+            self.resolveAll(transfer, with: .committed(locations, ascending: ids), boundOnly: true) {
+                if refused {
+                    self.holdForManifest(transfer)
+                }
+                self.deferReroutes(moved + deferred, from: transfer)
             }
-            for item in deferred {
-                self.reroute(item.token, interest: item.interest, asset: item.asset, from: transfer)
+        } else {
+            for trim in trims {
+                if trim.whole {
+                    self.state.jobs[transfer]?.setInterest(nil, for: trim.token)
+                } else {
+                    self.state.jobs[transfer]?.subtractAssets(trim.unbound, for: trim.token)
+                }
+            }
+            moved.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+            deferred.sort { ($0.token, $0.asset) < ($1.token, $1.asset) }
+            for item in moved {
+                self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: transfer)
+            }
+            self.resolveAll(transfer, with: .committed(locations, ascending: ids)) {
+                if refused {
+                    self.holdForManifest(transfer)
+                }
+                for item in deferred {
+                    self.reroute(item.token, interest: JobInterest(lane: item.lane, kind: item.kind, assets: []), asset: item.asset, from: transfer)
+                }
             }
         }
         self.pump()
@@ -1024,15 +1198,16 @@ extension SyncEngine {
     /// it when the asset left the manifest (T21): a waiter gets `.notFound`, a group drops the member, a heal is
     /// forgotten. The run's claim leaves `old` either way, so the run never waits for a job that will not report to it.
     /// An asset the store holds at its current entry's content (an apply reused a blob for it) joins no job: it is
-    /// answered from the store (L4-R5).
-    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID) {
+    /// answered from the store (L4-R5). `listing` is the copy whose entry the interest follows, the engine's copy when
+    /// `nil` (`SyncEngine.continueInbound`'s moves, found under a copy an apply may have replaced since).
+    func reroute(_ token: InterestToken, interest: JobInterest, asset: AssetID, from old: TransferID, listing: ValidatedManifest? = nil) {
         if interest.kind == .run {
             self.releaseRunClaim(token, asset: asset, from: old)
         }
-        guard let entry = self.state.applied.entry(for: asset) else {
+        guard let entry = (listing ?? self.state.applied).entry(for: asset) else {
             switch interest.kind {
             case .waiter:
-                self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound))
+                self.state.waiters.removeValue(forKey: token)?.continuation?.resume(returning: .failure(.notFound))
             case .prefetch, .ensure:
                 self.dropGroupMember(token, asset: asset, from: old)
             case .system:
@@ -1080,11 +1255,24 @@ extension SyncEngine {
         // The origin served the bytes; the store's verdict is no breaker input, but it ends a half-open probe without
         // one (§7.7: any other exit returns to `halfOpen(probe: nil)`).
         self.recordBreaker(SyncEngine.publicationBreakerOutcome(error, transfer: transfer))
+        // The publication ended, in this turn, before any bookkeeping below awaits the store (`recordPublicationEnd`).
+        self.recordPublicationEnd(transfer)
         switch error {
         case .superseded:
-            // The ids no longer want this content (T22/T11): their interests follow their current entries.
+            // The ids no longer want this content (T22/T11): their interests follow their current entries. Behind the
+            // follow barrier too, as before Stage 3 close-out cycle 12: the re-routed joins wait for the drain
+            // (`addInterest`). The cycle-12 deferral of this exit (`AttemptVerdict.supersede`) made only their places equal
+            // to a visit-first engine's and was removed in cycle 13 under ruling S3-R16 item 3. Re-routes that do not fit
+            // this turn are owed (`supersede`'s `bound`; Stage 3 close-out cycle 21, ruling S3-R26 item 1, site 3).
+            // While events wait, the exit is kept as a commit is (`EngineState.reroutePinCommits`): an owed re-route or a
+            // waiting join a layer pinned to this attempt follows the copy now, as a visit-first engine's supersede
+            // re-routed the interests that had joined the job (`followLayers`; Stage 3 close-out cycle 22, ruling S3-R27
+            // item 12.2's e1-PS).
+            if !self.state.eventsAfterFollow.isEmpty {
+                self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: false)
+            }
             self.transition(transfer, to: .queued)
-            self.supersede(transfer)
+            self.supersede(transfer, bound: self.inboundIDsNow)
         case .integrity:
             // The store counts publication integrity failures itself (`StoreMetrics.integrityFailures`).
             self.state.metrics.failures[.integrity] += 1
@@ -1092,9 +1280,18 @@ extension SyncEngine {
             await self.integrityFailed(transfer, epoch: epoch, ids: job.assets.sorted(), identity: job.identity)
         case .fileSystem(.notFound) where cancelledAttempt:
             // ENOENT for an attempt the engine cancelled is that cancellation (ARCHITECTURE §7.6, D-13): a fresh
-            // attempt, no failure, no backoff.
+            // attempt, no failure, no backoff. Behind the follow barrier too: the place it takes ahead of the visits'
+            // places is an order difference only, and the pump admits it on the live gates once the barrier is down. The
+            // cycle-12 deferral of this exit was removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3. While
+            // events wait, the re-queue is kept with the copy's serial (`EngineState.reroutePinCommits`): an owed
+            // re-route or a waiting join a layer pinned to this attempt rides the fresh attempt until the first copy
+            // adopted after the re-queue, as a visit-first engine's re-routed nothing here (`followLayers`; Stage 3
+            // close-out cycle 22, ruling S3-R27 item 12.2's e1-R1).
+            self.state.jobs[transfer]?.resume = nil
             if self.transition(transfer, to: .queued) {
-                self.state.jobs[transfer]?.resume = nil
+                if !self.state.eventsAfterFollow.isEmpty, let epoch = self.state.jobs[transfer]?.epoch {
+                    self.state.reroutePinCommits[VerdictKey(transfer: transfer, epoch: epoch)] = PinEnd(serial: self.state.copySerial, keepsEntry: true)
+                }
                 self.enqueue(transfer)
             }
             self.pump()
@@ -1125,23 +1322,47 @@ extension SyncEngine {
     /// Re-routes every interest of a job whose content its ids no longer want, and removes the job. An asset the
     /// engine's copy of the manifest still maps to this content was superseded by a manifest the store holds and the
     /// copy does not show yet: it waits on a fresh, held job of the content until the copy catches up (F-20), never
-    /// `.notFound` while the asset is listed.
-    func supersede(_ transfer: TransferID) {
+    /// `.notFound` while the asset is listed. A follow passes `settling: false` and checks the run and pumps once per
+    /// turn instead (C2). `listing` is the copy the interests follow, the engine's copy when `nil` (`reroute`).
+    ///
+    /// `bound` is the pairs (an interest's ids, over the job's interests) the exit re-routes in its own turn (C2; Stage 3
+    /// close-out cycle 21, ruling S3-R26 item 1, `integrate-rr21.md` R5, site 3). A publication's superseded exit passes
+    /// `inboundIDsNow`: when its pairs pass it, the exit makes none of the re-routes and owes them all as one batch
+    /// under the engine's copy, which the drain makes at its place, a drain turn's ids a turn, each id with all its
+    /// tokens (`deferReroutes`); made here, the 10,000 interests of one content held the actor 41 ms (the cycle-20
+    /// verifiers' PROBE-C20C-SUPERSEDE-C2). The job's removal and the F-20 hold come first on both paths, so a re-route
+    /// made at the replay finds the hold as one made here does. A visit's supersede passes none: the follow's turns
+    /// bound its moves already (`startMove`), and its re-routes follow its visit's copy.
+    func supersede(_ transfer: TransferID, settling: Bool = true, listing: ValidatedManifest? = nil, bound: Int? = nil) {
         guard let job = self.state.jobs[transfer] else {
             return
         }
-        self.state.jobs[transfer]?.interests.removeAll()
+        let copy = listing ?? self.state.applied
+        self.state.jobs[transfer]?.removeAllInterests()
         self.removeJob(transfer)
-        if job.interests.values.contains(where: { interest in interest.assets.contains { self.state.applied.entry(for: $0)?.transferID == transfer } }) {
+        if job.interests.values.contains(where: { interest in interest.assets.contains { copy.entry(for: $0).map { SyncEngine.sameTransfer($0, job.entry) } ?? false } }) {
             self.holdForManifest(transfer)
         }
-        for token in job.interests.keys.sorted() {
-            guard let interest = job.interests[token] else {
-                continue
+        if let bound, job.interests.values.reduce(0, { $0 + $1.assets.count }) > bound {
+            var items: [RerouteItem] = []
+            for (token, interest) in job.interests {
+                for asset in interest.assets {
+                    items.append(RerouteItem(asset: asset, token: token, lane: interest.lane, kind: interest.kind))
+                }
             }
-            for asset in interest.assets.sorted() {
-                self.reroute(token, interest: interest, asset: asset, from: transfer)
+            self.deferReroutes(items, from: transfer)
+        } else {
+            for token in job.interests.keys.sorted() {
+                guard let interest = job.interests[token] else {
+                    continue
+                }
+                for asset in interest.assets.sorted() {
+                    self.reroute(token, interest: interest, asset: asset, from: transfer, listing: listing)
+                }
             }
+        }
+        guard settling else {
+            return
         }
         self.checkRunSettled()
         self.pump()

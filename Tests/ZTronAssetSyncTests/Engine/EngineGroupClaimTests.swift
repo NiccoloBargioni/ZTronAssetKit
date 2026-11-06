@@ -384,7 +384,15 @@ extension EngineGroupClaimTests {
     /// after its read does: no running engine reaches that exit today, the next test's missing source aside, where no job
     /// exists). Before the change the turn retired every job at once.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerTurn jobs a turn", .timeLimit(.minutes(1)))
+    /// The join's wait reads the job count before it checks each member, so it costs O(1) per engine mutation until the
+    /// last member joined, not O(members): under TSan 7.4 s beside the Sync suite (was 14.8 s) and 17 s with a second TSan
+    /// process of the suite (was 32 s; load 27 to 43), under half its 1-minute guard (Stage 3, S3-STAB-03; ruling S3-R4).
+    ///
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 43.6 to 44.6 s beside a second TSan process at a
+    /// load of 20 to 35 (74 % of 60 s) and 18.5 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 32.9 to 33.0 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
+    @Test("R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerTurn jobs a turn", .timeLimit(.minutes(3)))
     func largeGiveUpRetiresJobsOverSeveralTurns() async throws {
         let count = SyncEngine.releasesPerTurn + 88
         let entries = (0..<count).map { EngineHarness.onDemand(String(format: "q%04d", $0), EngineFixture.bytes(UInt64(5_700 + $0), count: 32)) }
@@ -394,7 +402,7 @@ extension EngineGroupClaimTests {
         let ids = entries.map(\.identifier)
         let predecessor = try await engine.registerGroup(ids, lane: .prefetch).get()
         await engine.awaitCondition { engine in
-            entries.allSatisfy { engine.state.jobs[$0.transferID]?.interests[predecessor] != nil }
+            engine.state.jobs.count >= count && entries.allSatisfy { engine.state.jobs[$0.transferID]?.interests[predecessor] != nil }
         }
         let successor = await engine.inOneTurn { engine -> InterestToken in
             let successor = engine.recordGroup(ids, lane: .prefetch).token

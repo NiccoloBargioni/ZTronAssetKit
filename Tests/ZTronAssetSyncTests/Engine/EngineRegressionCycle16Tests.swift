@@ -28,7 +28,11 @@ struct EngineRegressionCycle16Tests {
     /// open and started a second run and a second manifest request without the clock moving (the cycle-15 correctness
     /// verifier's PROBE-OWEDSETTLE). The follow-up is held here (`holdReadmissionFollowUps()`), so the order is fixed.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle", .timeLimit(.minutes(1)))
+    /// Hang guard `.minutes(5)` (Stage 3, S3-STAB-03; rulings S3-R4 and S3-R12): 16.4 s beside the Sync suite under
+    /// TSan, 36.6 to 38.5 s with a second TSan process of the suite (load 27 to 43); 88.9 to 91.0 s in the close-out
+    /// cycle-8 verifier's paired TSan runs at 40ecd95 (load means 30.7 and 34.7), half of the earlier `.minutes(3)`, so
+    /// S3-R12 item 3 raised it one step in cycle 9. Nothing was cut (G3).
+    @Test("R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle", .timeLimit(.minutes(5)))
     func runWaitsForOwedClaims() async throws {
         let prefetchCount = SyncEngine.readmissionsPerTurn + 8
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4, reservedInteractiveSlots: 0))
@@ -390,8 +394,11 @@ struct EngineRegressionCycle16Tests {
     /// The answers to an extension come in turns of their own, at most `parksPerPump` jobs a turn (each answer costs about
     /// what a park does, C2); a later turn takes the rest. More user-initiated waiters than one turn answers wait for a
     /// 1 s throttle when a 60 s 429 extends it: every one of them gets the fail-fast answer, none is left waiting.
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 26.5 s alone and 41.2 to 41.7 s beside a second
+    /// TSan process at a load of 16 to 26 (Stage 3 close-out cycle 4), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast", .timeLimit(.minutes(1)))
+    @Test("R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast", .timeLimit(.minutes(3)))
     func everyUserWaiterFailsFastOnExtension() async throws {
         let count = SyncEngine.parksPerPump + 8
         let harness = EngineHarness.make(tuning: SyncTuning(maxConcurrentTransfers: 4))
@@ -462,7 +469,7 @@ struct EngineRegressionCycle16Tests {
                 epoch: 1,
                 queuedAt: MonotonicInstant(nanoseconds: 0)
             )
-            job.interests[InterestToken(rawValue: 1)] = JobInterest(lane: lane, kind: .run, assets: [entry.identifier])
+            job.setInterest(JobInterest(lane: lane, kind: .run, assets: [entry.identifier]), for: InterestToken(rawValue: 1))
             return job
         }
         let transfer = entry.transferID

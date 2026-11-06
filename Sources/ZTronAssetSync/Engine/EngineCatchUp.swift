@@ -217,13 +217,16 @@ extension SyncEngine {
         }
         self.forgetBound(self.state.boundContent.filter { !SyncEngine.isPresent(view.records[$0.key], at: $0.value) }.keys)
         let pruned = self.state.applied.entries.map(\.identifier).filter { !view.appliedManifest.contains($0) }
+        let previous = self.state.applied
+        // As `applied`: the outgoing copy's moves onto a running publication come first (RR-14).
+        self.bringInboundOntoPublications()
         self.adoptApplied(view.appliedManifest, etag: self.state.appliedETag)
         self.state.generation = max(self.state.generation, view.generation)
         for id in pruned {
             self.broadcast(.assetRemoved(id, .pruned))
         }
         self.broadcast(.snapshotChanged(generation: self.state.generation))
-        self.followApplied()
+        self.followApplied(from: previous)
         return true
     }
 
@@ -255,7 +258,8 @@ extension SyncEngine {
                 return
             }
         }
-        guard !self.state.heldForManifest.isEmpty else {
+        // While a follow owes visits a held job may be one it moves: its last turn releases them (`continueFollow`).
+        guard !self.state.heldForManifest.isEmpty, !self.followOwed else {
             return
         }
         self.state.heldForManifest.removeAll()

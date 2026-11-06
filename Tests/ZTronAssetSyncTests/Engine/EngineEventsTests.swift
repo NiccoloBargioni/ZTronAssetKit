@@ -14,9 +14,11 @@ struct EngineEventsTests {
     // assertion depends on the limit. `harness.start()` raises the engine's utility-priority tasks (the run and its bulk
     // drivers) to the default priority: beside 16 default-QoS busy loops on 8 cores the test overran its limit at
     // 258 s, every transfer's actor hand-offs waiting for the scheduler's share of a starved priority class, and took
-    // 45 s once raised (close-out cycle 13, F-17).
+    // 45 s once raised (close-out cycle 13, F-17). Six minutes since Stage 3's close-out cycle 9 (ruling S3-R12 item 3):
+    // the cycle-8 verifier's two paired TSan runs at 40ecd95 (two bundles at once, load means 30.7 and 34.7) took 133.0 to
+    // 133.8 s, 55.7 % of four minutes; nothing in the test was cut (G3).
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(4)))
+    @Test("R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync", .timeLimit(.minutes(6)))
     func stalledSubscriberIsBounded() async throws {
         let concurrency = 8
         // Index commits of 10,000 records are coalesced to one per hour of manual time (the run needs very few), and
@@ -61,8 +63,12 @@ struct EngineEventsTests {
         #expect(slots.last == .clientEnd)
     }
 
+    /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 42.4 to 45.6 s beside a second TSan process at a
+    /// load of 20 to 35 (76 % of 60 s) and 18.8 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+    /// verifier measured 33.0 to 33.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+    /// `.minutes(3)`.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource", .timeLimit(.minutes(1)))
+    @Test("R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource", .timeLimit(.minutes(3)))
     func progressIsRateLimited() async throws {
         let harness = EngineHarness.make()
         let bytes = EngineFixture.bytes(160)
