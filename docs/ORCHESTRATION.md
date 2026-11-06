@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 12:40 CET): run 9 (cycle 22) is stopped. S3-R28's final text is being written, and items 1b (the join rule) and 3b (the purge cases route C cannot reach) are being analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 13:35 CET): run 9 (cycle 22) is stopped. S3-R28's final text is being written with N20 and N21, and items 1b (f1c: the ENOSPC windows, under the owner's strict ruling) and 3b (f3b: the purge cases route C cannot reach) are being analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -281,6 +281,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Relaunched at 13:08:** `wf_b2663c1b-767` (task `wwuvza6v2`), from `/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad/s3r28-final2.js`.
     - It runs an editor that applies N20 (the copy before is `s3-r28-final-pre-n20.md`), then both checks against N1–N20, then a final editor.
   - **For the owner (asked at 13:06):** should the dating of a join or request made during an ENOSPC end's free-space read count as timing (S3-R16 item 2) rather than as an answer, as long as SF's answer is one visit-first gives for some arrival order of the same inputs, and the MUSTs and space safety hold? Until the owner rules, the strict bar stands.
+  - **The owner answered at about 13:30: "Keep it blocking"**, to the question whether a join's before/after dating inside an ENOSPC read should count as timing.
+    - So the strict bar stands for the ENOSPC windows: an answer that differs from visit-first's there is blocking (S3-R16 1(a)).
+    - Recorded as N21 in the orchestrator's rulings. N21 also adds the orchestrator's reading for shapes where visit-first's own answer depends on its internal timing (the multi-change lazy shape and W-BACK-PUB): SF matches when it gives one of visit-first's answers for the same inputs in the same order.
+  - **f1c launched at 13:33:** `wf_8dc737d5-cbc` (task `wfgcn6rf4`). Two analysts work in parallel:
+    - A completes f1b's dating approach with its review's fixes (`f1c-route-a.md`);
+    - B looks for a structural route that removes the window (`f1c-route-b.md`).
+
+    An adversarial comparative review follows (`f1c-review.md`). Every shape is traced in both orders and both drain timings.
+    - Item 1b is written from that review, and checked against step 0's measured table.
+    - **At the append,** S3-R28's text takes N21: the owner's ruling, and "f1c runs now".
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
