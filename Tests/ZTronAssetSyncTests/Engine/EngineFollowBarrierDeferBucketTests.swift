@@ -92,7 +92,9 @@ extension EngineFollowBarrierTests {
     /// Visited first, the follow ended at v3's apply and the verdict was given at its arrival. `extra` is listed after
     /// zz-o in every manifest, unchanged. With `passV3Members`, one more of v3's follow turns runs swept first before O's
     /// attempt ends, so v3's pass is past the members when v4 is applied and v4's pass alone finds H. With `holdRetry`,
-    /// O's next attempt holds too (visited first it starts at the verdict's arrival), until the test releases it.
+    /// O's next attempt holds too, until the test releases it: with `.timeout`, visited first, that attempt starts at
+    /// v4's barrier end when v4's joins leave O user-initiated (T20, `relane`'s `.failed` arm), and otherwise at its
+    /// backoff alarm, when the test drives the clock.
     @available(macOS 15.0, iOS 18.0, *)
     func deferBucketSetUp(_ visit: LaneDropVisit, seed: UInt64, ending: DeferBucketEnding, wanters: DeferBucketWanters, members count: Int, oByGroup: Bool = false, extra: [ManifestEntry] = [], passV3Members: Bool = false, holdRetry: Bool = false) async throws -> DeferBucket {
         let (s, _) = try await FollowBarrier.setUp(seed: seed)
@@ -531,8 +533,9 @@ extension EngineFollowBarrierTests {
     /// A purge of the members, while their joins wait in O's bucket, withdraws them there, as it withdraws the waiting
     /// joins of the queue (`withdrawPurgedJoins`): the group stops waiting for them, and the drain joins nothing for
     /// them. A prefetch group wants the members; O times out, and its retry, held until the drain is over, serves zz-o's
-    /// waiter. Visited first, the retry had started at the verdict's arrival, v4's visit had joined the members to it at
-    /// once, and the purge withdrew the group's interest there. The purge leaves the members in the retry's bound ids
+    /// waiter. Visited first, v4's visit had joined the members to O's job at once and re-queued it (T20: zz-o's user
+    /// waiter keeps its lane user), so the retry had started at v4's barrier end, and the purge withdrew the group's
+    /// interest there. The purge leaves the members in the retry's bound ids
     /// (`Job.assets`; `withdrawPurged` withdraws interests only, as `s3-base`'s `performPurge` did), so a visit-first
     /// engine binds them at the retry's publication, and a swept-first one, whose withdrawn joins join nothing, does
     /// not: that difference is the cycle-21 fixer's observation for the orchestrator (the WP-F draft's cycle 21), not
@@ -608,9 +611,10 @@ extension EngineFollowBarrierTests {
     /// A 429 of C during an owed follow is decided on the lane the joins behind a waiting verdict give C: those that join
     /// C at the drain count, the others do not (`followedLane`). C (1 MB, zz-b) downloads for P, a prefetch waiter; O
     /// (zz-o, 20 bytes) for zz-o's user waiter, timing out while v3's follow is owed, so its verdict waits, its retry held
-    /// (visited first it started at the verdict's arrival); H (zz-u's 16 bytes) for U, a user waiter. v4 maps zz-u to O's
-    /// content: H's visit's join for U waits in O's bucket. With `.toC`, v5 maps zz-u to C's content: the drain re-routes
-    /// U's join there (`replayJoin`). Then C gets a 429 with Retry-After 60 s, above the user lane's 30 s cap. Visited
+    /// (visited first it started at v4's barrier end: v4's visit joined U to O's job and re-queued it, T20); H (zz-u's
+    /// 16 bytes) for U, a user waiter. v4 maps zz-u to O's content: H's visit's join for U waits in O's bucket. With
+    /// `.toC`, v5 maps zz-u to C's content: the drain re-routes U's join there (`replayJoin`). Then C gets a 429 with
+    /// Retry-After 60 s, above the user lane's 30 s cap. Visited
     /// first, U's interest was on C's job at the 429 with `.toC` (v5's visit moved it from O's retry), so C was user work:
     /// nothing was throttled, C failed, and P and U were answered `serverUnavailable`; with `.stays` it was on O's retry,
     /// C was prefetch work, the origin was throttled, C's retry served P, and O's retry, started before the 429, served U
@@ -678,7 +682,7 @@ extension EngineFollowBarrierTests {
         }
         await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
         let pResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: pWaiter) }
-        // O's retry, held at its start, starts unthrottled: at the verdict's arrival visited first, at the drain swept
+        // O's retry, held at its start, starts unthrottled: at v4's barrier end visited first (T20), at the drain swept
         // first with `.toC`. Swept first with `.stays` the live throttle answers its waiters at the drain instead.
         if move == .toC || visit == .followVisitedFirst {
             await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
@@ -755,14 +759,21 @@ extension EngineFollowBarrierTests {
 
     /// Shutdown while joins wait behind O's verdict clears every follow table, the buckets included
     /// (`drainEverything`), and answers zz-o's waiter and every member's `shutDown`. O times out; the members are user
-    /// waiters. Visited first, the follow had ended and the members waited on O's job for its retry.
+    /// waiters; O's retry holds at the source (`holdRetry`). Visited first, the follow had ended, and v4's visit had moved
+    /// the members onto O's job and re-queued it (T20), so its retry, started at v4's barrier end, waits held with zz-o's
+    /// waiter and every member until the shutdown (the set-up check). Unheld, that retry could serve them before the
+    /// shutdown's first turn, an interleaving the test does not order (cycle 22's flake, ruling S3-R28 item 2).
     @available(macOS 15.0, iOS 18.0, *)
     @Test("R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
     func shutdownClearsTheJoinsBehindAVerdict(_ visit: LaneDropVisit) async throws {
         let count = 10
-        let b = try await self.deferBucketSetUp(visit, seed: 2_022_781, ending: .timeout, wanters: .users, members: count)
+        let b = try await self.deferBucketSetUp(visit, seed: 2_022_781, ending: .timeout, wanters: .users, members: count, holdRetry: true)
         let engine = b.s.engine
         try await self.deferBucketApplyV4(b, visit)
+        if visit == .followVisitedFirst {
+            let o = await engine.readForTests { e in e.state.jobs[b.o.transferID].map { (state: $0.state, interests: $0.interests.count) } }
+            try #require(o?.state == .downloading && o?.interests == count + 1, "setup: visited first, v4's visit re-queued O (T20), and its held retry holds zz-o's waiter and every member: \(String(describing: o))")
+        }
         if visit == .sweepFollowsFirst {
             let behind = await engine.readForTests { e in e.state.joinsBehindVerdicts.values.reduce(0) { $0 + $1.count } }
             try #require(behind > 0, "setup: v4's apply's own turn deferred joins behind O's verdict")

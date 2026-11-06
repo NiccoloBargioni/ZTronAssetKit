@@ -5524,7 +5524,9 @@ bundle passed after each fix: 582 tests on `96ca019` (`sync-k4.log`), 583 on `68
     - **T-PURGE**: "none of the purged members is stored" holds swept first only. Visited first, O's retry binds the
       purged members its job still holds, so the test pins each order's stored set (observation 1 below).
     - **T-FL**: O's retry is held (`holdRetry`), so that the shape holds in both orders: visited first the retry
-      started at the verdict's arrival and consumed O's next script step.
+      started at v4's barrier end, re-queued by T20 when v4's visit joined U to O's job (`EngineJobs.swift:360-363`),
+      and consumed O's next script step. (Corrected in cycle 23, ruling S3-R28 item 2: this line said the retry started
+      at the verdict's arrival, which only schedules it.)
     - **A7**: the bucket walk keeps an early return at `.userInitiated`, the lane's maximum, as the queue loop's
       `return .userInitiated` does: the result does not depend on the walk's order or on where it stops (the mutant
       that drops it is E2, Equivalent, below).
