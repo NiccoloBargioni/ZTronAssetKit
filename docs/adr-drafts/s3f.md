@@ -678,6 +678,51 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
 
   Applied in cycle 22: see "Cycle 22" below, whose "Status" list says which step is committed.
 
+- **Orchestrator ruling (close-out) S3-R28 — added 2026-11-06 (cycle 22's verification; written before the cycle-23
+  fixer starts), with item 1c appended 2026-11-06 15:33, before run 11 (the owner's ruling).** Cycle 22 implemented
+  S3-R27 in part (`d5b2ab9..9aa337c`). The cycle-22 verifiers' findings are in `.build-orchestrator/s3f-c22-issues.json`
+  ("correct #n", "reqs #n", on `9aa337c`); the read-only analyses f1, f1b, f2 and f3 and their reviews are in
+  `.build-orchestrator/s3f-c22-analysis/`, and bind only as S3-R28 carries them (a review corrects its report; must-fix
+  items bind, should-fix items only where named). From cycle 23 on S3-R28 is the cycle's ruling, and S3-R16 to S3-R27
+  apply where it does not change them; an appended item decides where it differs from items 1 to 8. A C2 figure is read
+  as S3-R27 says; the bar is `c2Budget`, 10 ms, over 10,000 ids with at most 4 interests on one id and one subscriber.
+  1. *Correct #1 and #2, the ENOSPC windows*: no code change for them; step 0's shapes on `9aa337c` and item 1b's route
+     (both withdrawn by item 1c).
+  2. *Correct #3, the flake in `shutdownClearsTheJoinsBehindAVerdict(.followVisitedFirst)`* (S3-R16 1(d)): f2's route
+     as its review corrects it: f2-R1 red first (a probe, not committed), then `holdRetry: true`, a visited-first set-up
+     check that is an assertion, the doc fixes, the one-to-one record, and the residual of a shutdown inside the
+     barrier; 30 iterations per argument on the host and the simulator as a regression check only.
+  3. *Correct #4 and reqs #1, the purge's six misses* (S3-R16 1(f)): route C in stages A to C (C-1 to C-5, option (i) as
+     C-2′, the freeing in slices of 512), five new gated in-letter cases, N9's skipped re-lane only under a probe, the
+     stage trigger and the decision rule (≤ 8.5 ms closes, 8.5-10 ms at the edge, a miss blocks); item 3b, for the cases
+     route C does not reach, is appended later, and step 2 waits for it (steps 4 and 5 may come first); e2-B′ is not
+     authorised. By the owner's ruling of 6 Nov (N25), three purge shapes are known misses of the 10 ms limit, out of
+     cycle 23 and recorded.
+  4. *S3-R27's unfinished work* (correct #5 to #7, reqs #2 to #6): the APM answer turn, the k = 2 and k = 4 shapes, the
+     kills (item 5's remaining ones, the 429 probe, e1-R1's rewritten mutants, the kills of e1-PS's, e1-P1's and e1-P2's
+     fixes, route C's), the three unreached lines (`EngineCommands.swift:1001`, `:1004`, `:1009`), reqs #8's guard, 11.6's
+     ownership rule as amended, and every missing record; item 9 on the final HEAD with `9aa337c` for `d5b2ab9`.
+  5. *Order of work*: step 0 measures first; step 1 item 2; steps 2 and 3 item 3's stages; steps 4 to 6 S3-R27's steps
+     5 to 7; step 7 the records and the close (`verify.sh --full`). Red first against `9aa337c`; every commit names the
+     cases red at it.
+  6. *The budget*: a run may end at its budget or when item 8 leaves it no work; the rulings file is re-read at every
+     step, and an appended item is taken at the first step that starts after it.
+  7. *The named findings' mapping*, kept under "Cycle 23".
+  8. *Fail fast*: measure first, riskiest first; stop conditions (a) to (e) checked at the end of every part and
+     measurement; a stop commits its evidence, then a status commit whose subject starts `PUT-BACK: item <n>: `; the
+     verifiers run only when every blocking item is closed by the fixer's own measurements and gates.
+
+  *Item 1c (N28): the ENOSPC windows are known residual correctness risks.* Correct #1 and #2 are not blocking in cycle
+  23; step 0's shapes and item 1b are withdrawn, and route Q is not ruled; no code, test or early probe for them. The
+  class (an answer that differs between the visit orders only because an event inside the window, from a transfer's or
+  a publication's ENOSPC end to the return of `spaceFailed`'s free-space read, is dated against the window's end) is
+  recorded, not reported as blocking, also for a shape newly found in it; a broken MUST or invariant, a hang or a flaky
+  test inside the window still blocks. The record goes under "Known residual correctness risks (owner ruling
+  2026-11-06)". Step 0 keeps `verify.sh --quick` and the 'before' figures; run 11 takes step 1 first, then re-reads the
+  rulings (the owner is deciding whether the remaining C2 work stays).
+
+  Applied in cycle 23: see "Cycle 23" below, whose "Status" list says which step is committed.
+
 ## Cycle 2: the cycle-1 verification findings
 
 Every finding of the two cycle-1 lenses, with its disposition. Blocking ones first; each fix is detailed under its item.
@@ -7809,6 +7854,255 @@ the same six lines): `EngineCommands.swift` 4 of 106 and `EngineState.swift` 2 o
    stay open.
 
 At the edge, not blocking: `commitTwoTokensTurns`, 9.02 ms best at a 1-minute load of 5.88 to 5.57.
+
+## Cycle 23: the cycle-22 verifiers' findings, and S3-R28
+
+Cycle 23 applies S3-R28 and its item 1c (recorded under "Orchestrator rulings (close-out)") to the findings of the
+cycle-22 verifiers (`.build-orchestrator/s3f-c22-issues.json`, on `9aa337c`; "correct #n" and "reqs #n" are the
+lenses' numbers). The work follows S3-R28 item 5's order as item 1c amends it, under item 8 ("Fail fast"). Scratch files
+are under `.build-s3f/c23/`; `.build-s3f/c21/` and `.build-s3f/c22/` stay as the earlier cycles left them. Run 10 was
+stopped at 15:32 after 10 minutes of step 0, with nothing committed; run 11 started at 15:36 on `9aa337c`.
+
+### Status (resume here)
+
+A fixer resumed after an interruption first re-reads the end of the rulings file (item 6), then continues from the
+worktree's HEAD with the first step that is not "committed". Each step's results are under its own heading below.
+
+0. Step 0 (item 5 as item 1c amends it: no ENOSPC shapes; `verify.sh --quick` on `9aa337c`, then item 3's five new
+   cases' 'before' figures on a scratch copy of `9aa337c`, then S3-R27 items 3's and 4's): **not started in run 11**.
+   Run 10's `quick0.log` stops inside the tests stage. Item 1c's order put step 1 first.
+1. Step 1 (item 2, correct #3): **committed**. `03c4e59` (A-T-SD's held retry, its set-up check and the doc fixes),
+   then these records. Started 15:36, `03c4e59` at 15:44; the simulator's 30 iterations and the bundle runs are taken
+   with the run's gate runs ("Gate evidence (cycle 23)"). Item 8 2(e): within item 2's estimate (1-1.5 h with shared
+   close runs), no stop.
+2. Step 2 (item 3, stage A): **not started**. Item 3 waits for item 3b, which is not appended, and the owner is
+   deciding whether the remaining C2 work stays (item 1c).
+3. Step 3 (item 3, stages B and C, each if triggered): not started.
+4. Step 4 (S3-R27's step 5, the APM answer turn; item 4): not started.
+5. Step 5 (S3-R27's step 6, the k = 2 and k = 4 shapes; item 4): not started.
+6. Step 6 (S3-R27's step 7: the kills, the three unreached lines, reqs #8's guard; item 4): not started.
+7. Step 7 (the records, item 9, the close): item 1c's record, N25's record and the S3-R28 record are **committed**
+   with step 1's records (below); the rest not started.
+
+### Appended items (S3-R28 item 6)
+
+- Item 1c (appended 15:33, before run 11): taken at step 1, run 11's first step (15:36). Step 0's ENOSPC shapes and
+  item 1b are withdrawn; correct #1 and #2 are recorded under "Known residual correctness risks (owner ruling
+  2026-11-06)".
+- Re-read at 15:44, after `03c4e59`: nothing appended after item 1c (the file ends at item 1c's run-11 order).
+
+### The named findings (S3-R28 item 7, as item 1c amends it)
+
+| Finding | Goes to | Where it stands |
+|---|---|---|
+| correct #1 and #2 (blocking at `9aa337c`): the ENOSPC windows, PROBE-C22C-TS-DRAIN-JOIN and PROBE-C22C-APPLY-IN-READ | item 1c | known residual correctness risks by the owner's ruling, not blocking in cycle 23; recorded below, no code change |
+| correct #3 (blocking): the flake in `shutdownClearsTheJoinsBehindAVerdict(.followVisitedFirst)` | item 2 | step 1: **fixed** (`03c4e59`) |
+| correct #4 and reqs #1 (blocking): the purge's six misses | item 3 | step 2: open (waits for item 3b and the owner's decision on the C2 work) |
+| correct #5 and reqs #2 (blocking): `answerPresentMembers`' answer turn; the k = 2 and k = 4 shapes | item 4 (S3-R27's steps 5 and 6) | steps 4 and 5: open |
+| correct #6 and #7, reqs #3 and #4 (blocking): the survivors, the kills, the three unreached lines | item 4 (S3-R27's step 7) | step 6: open |
+| reqs #5 and #6 (blocking): the records; 11.6's record | item 4 (the records) | step 7: open |
+| reqs #7 (blocking): the verification gap | item 6 | the verifiers' order (lens 3's heavy checks first) |
+| reqs #8, #9 and #10 (not blocking): the hang guard, the ownership wording, stale records | item 4 | steps 6 and 7: open |
+| correct #8 (not blocking): P-13 | item 5's close | WP-B's (S3-R26 item 10); WP-F edits nothing for it |
+| correct #9 (not blocking): the in-letter shapes unmeasured | item 4 (S3-R27's step 6) | step 5: open |
+| correct #10 (not blocking): the fixer's residuals, not probed | no action | as the draft records them |
+| reqs #11 (not blocking): C2 margins and load-only figures | item 6 | the quiet-load runs; `commitTwoTokensTurns` stays on the margin list |
+
+### Step 1: item 2, the flake in A-T-SD (correct #3)
+
+- **The class.** S3-R16 1(d), "any test that fails in any run"; its cause is a test that races its own set-up (f2 §1,
+  review should-fix 1). It is not 1(a). Visited first, v4's visit moves the ten user waiters onto O, failed with a
+  timeout backoff (`failed(.at)`), and `relane`'s `.failed` arm re-queues O at once (T20, `EngineJobs.swift:360-363`).
+  With the default `holdRetry: false` that retry runs unheld, and its `resolveAll` turn can come before the shutdown's
+  first turn, which takes every waiter (`EngineLifecycle.swift:490`, `EngineShutdown.swift:61-62`): the success is the
+  engine's true answer at that instant.
+- **f2-R1, red 2/2.** The probe is `.build-s3f/c23/probes/ProbeC23F2R1.swift`, copied into the Sync test target for
+  the run and removed afterwards; it is not committed. Log `.build-s3f/c23/f2r1.log`, 15:38:36 to 15:39:59, 1-minute
+  load 4.64 at the start and 53.86 at the end (the probe's own build).
+  - The shape, on `9aa337c`: visited first, seed 2_022_781, `.timeout`, `.users`, 10 members, `holdRetry: false`. After
+    `deferBucketApplyV4` the serve is forced first (`driving([b.s.time], fence: engine) { awaitCondition {
+    $0.state.jobs[b.o.transferID] == nil } }`), then the shutdown, then DBT:781 and :786 are asserted unchanged.
+  - Both rounds: after the set-up, O `failed(.at(1023044292ns))` with 1 interest and 1 request; after v4, O
+    `downloading` with 11 interests; zz-o and all 10 members `ok(20 B)`. Both expectations fail in both rounds (4
+    issues).
+  - The request count after v4 read 2 in round 1 and 1 in round 2, and 2 at the end of both: the driver's call to the
+    source is a separate hop after the engine's start, which is why the set-up check reads the engine (f2 §2).
+  - Its red does not depend on load, by construction.
+- **The fix** (`03c4e59`, test only), one to one (review should-fix 9):
+  - The set-up call (DBT:770, `:763` at `9aa337c`): the old value is `holdRetry: false` (the default), the new is
+    `holdRetry: true`. O's script becomes `[.hold, .fail(.timedOut), .hold, .stage]`. Its retry parks at the second
+    hold, and the shutdown ends it (`cancelRunningHandles`, `EngineShutdown.swift:158-162`). The cause is T20
+    (`EngineJobs.swift:360-363`).
+  - New, visited first only, right after `deferBucketApplyV4` (DBT:773-776): one `readForTests` of O's state and
+    `interests.count`, and a `try #require` that they are `.downloading` and `count + 1`. It is an assertion, not an
+    `awaitCondition`, and it sits in A-T-SD, not in `deferBucketApplyV4`, where A-T1's unheld retry would race it
+    (review must-fix 2).
+  - Unchanged (G3): the assertions (DBT:788-797, `:777-786` at `9aa337c`), the seed, the ending, the wanters, the count
+    and both arguments.
+  - No scenario is lost. The visited-first case is now the one its doc describes: the members wait on O's job for its
+    retry at the shutdown. The serve-first side is asserted by A-T1's `timeoutUsers`
+    (`barrierWaitsTheJoinsBehindAVerdictOutsideTheQueue`, DBT:313-341), which serves every member and zz-o 20 B (:332,
+    :338). The "O verifying at the shutdown" interleaving (the verifier's round 1) was asserted only at random, each
+    time it occurred, not never (review should-fix 4). A shutdown during a publication is asserted deterministically by
+    `barrierShutsDownWhileAPublicationWaitsForOwedMoves` (`EngineFollowBarrierSharedMoveTests.swift:354`), whose
+    swept-first arm requires `shutDown` (:357-361).
+- **The doc fixes** (review "must add" 3):
+  - the set-up's `holdRetry` line (DBT:94-97, `:94-95` at `9aa337c`), worded conditionally (review should-fix 3);
+  - T-PURGE's doc (DBT:536-538, `:533-535`);
+  - T-FL's doc (DBT:613-617, `:611`) and its comment (DBT:685-686, `:681-682`);
+  - A-T-SD's doc (DBT:760-765, `:756-758`);
+  - the draft's T-FL line under "Cycle 21" (`s3f.md:5526-5527` at `9aa337c`), corrected in place with a note.
+
+  Afterwards `grep -rn "verdict's arrival" Tests/ZTronAssetSyncTests` finds nothing. The remaining "the verdict was
+  given at its arrival" lines (DBT:92, :163, :310, :442, :485) date the verdict, not a retry.
+- **The sweep** (f2 §3, as the review confirms it). Only A-T-SD's set-up changes.
+  - A-T1 (DBT:313-341) stays: it waits for every answer and asserts only the served ones.
+  - The invariants test (`invariantsReportTheJoinsBehindAVerdictOutOfPlace`, DBT:716-756) stays: swept first only, the
+    follow held through every read.
+  - T-PURGE (`holdRetry: true`, DBT:547) and T-FL (an explicit held retry) already hold the retry, so only their doc
+    lines change.
+  - `EngineFollowBarrierSharedMoveTests.swift:354-372` and `EngineFollowBarrierTests.swift:1318` stay (G3), because
+    neither races a retry that has been served. The second runs swept first only, with the follow held (its doc,
+    :1312-1315); the first's visited-first arm tolerates the race by design (review should-fix 6).
+- **Evidence** (review "must add" 5):
+  - f2-R1 red, above.
+  - A-T-SD green in both orders on `03c4e59`'s tree, with DBT:788-797 passing and the set-up check holding:
+    `atsd-host.log` (15:42:24) and `atsd-host2.log` (15:44:20, after a comment-only re-wrap).
+  - 30 iterations per argument on the host: `swift test --skip-build --filter shutdownClearsTheJoinsBehindAVerdict
+    --maximum-repetitions 30` (`atsd-host-rep30.log`, 15:42:50 to 15:43:24, 1-minute load 20.98 to 13.78): repetitions
+    1 to 30 of each argument, 0 issues.
+  - These 30 iterations are a regression check only. The unfixed test passed 8/8 alone, so 30 green iterations cannot
+    tell the two apart (review should-fix 8). The evidence is f2-R1, the construction and the bundle runs.
+  - The simulator's 30 iterations (under `sim.lock`) and the Sync bundle runs with their load samples are under "Gate
+    evidence (cycle 23)".
+- **T20 is re-checked at every later commit** (item 2, "The order"). A-T-SD's set-up check runs in every Sync bundle, so
+  a failure of it at a later commit is a T20 regression: fix the code, not the test (f2 review "must add" 1).
+
+### Residual risks (S3-R16; cycle 23)
+
+- **RR-24. A shutdown inside the barrier answers `shutDown` to every answer that waits for the drain** (S3-R28 item 2,
+  f2 review must-fix 3; non-blocking, S3-R16 item 2).
+  - Visited first, a T20 retry started at a follow's end can serve its joins before a shutdown. Swept first, with the
+    follow still owed, the same joins wait behind the verdict for the drain, and the shutdown answers them `shutDown`.
+    The difference is when an answer arrives within the barrier and its drain.
+  - Its probe is f2-R1 (visited first, serve forced first: `ok(20 B)` ×11, 2/2 on `9aa337c`; under "Step 1"; not
+    committed) beside A-T-SD's swept-first arm (`shutDown` ×11 with 4 joins behind O's verdict: 3/3 in the cycle-22
+    verifier's PROBE-C22C-SHUTDOWN-HELD-RETRY, `.build-orchestrator/s3f-probes-c22/correct-probeC22ShutdownHeldRetry.summary.log`,
+    and pinned by A-T-SD since `03c4e59`).
+  - It qualifies `EngineFollowBarrierTests.swift:1315` ("Shutdown has no visit-first counterpart"): the answers decided
+    before a shutdown's first turn do have one, and they may differ in this way.
+
+### Known residual correctness risks (owner ruling 2026-11-06)
+
+By the owner's ruling (S3-R28 item 1c, N28: "Agreed let's document it as known risk"), the ENOSPC windows are known
+residual correctness risks, not blocking in cycle 23. Nothing changes in the code for them. `metInItsAttempt`
+(`EngineJobs.swift:289-297`), `Job.transferSpaceEnd`, `AttemptEnd.stamped`, and how any join, visit or replay is
+dated, stay as they are on `9aa337c`. No failing test is committed for them, and item 8's early probe does not run.
+
+- **The class.** The window runs from a transfer's or a publication's ENOSPC end to the return of `spaceFailed`'s
+  free-space read (`EngineFailures.swift:196-212`, `:564-596`). The class is an answer that differs between the two
+  visit orders (`.followVisitedFirst` and `.sweepFollowsFirst`) only because an event inside that window is dated
+  against the window's end.
+  - Its known members are correct #1, correct #2, and the shapes of S3-R28 item 1's step-0 list, which were withdrawn
+    before they ran.
+  - Such an answer (S3-R16 1(a)) is recorded here and not reported as blocking, including one that a verifier newly
+    finds in the class.
+  - Not covered: a broken MUST or invariant, a hang, or a flaky test inside the window (S3-R16 1(b) to 1(d) still
+    block there). A start count or metric that differs stays non-blocking (S3-R16 item 2).
+- **Correct #1 (PROBE-C22C-TS-DRAIN-JOIN, seed 2_029_101): a user request made before a transfer's ENOSPC, replayed
+  inside the free-space read, re-queues the job.** Deterministic, 2/2 on `9aa337c`. Sources: the findings file
+  `.build-orchestrator/s3f-c22-issues.json` (correct #1); the probe in
+  `.build-orchestrator/s3f-probes-c22/VerifyC22CorrectProbes.swift`; its log
+  `correct-probeC22TransferSpaceDrainJoin.summary.log` in the same directory.
+  1. T is zz-a's job (100 kB), scripted `[.hold, .fail(.insufficientSpace), .stage]`. v3 maps zz-x (H, 16 B, held) onto
+     T through an owed follow.
+  2. V, a user request for zz-a, is made while T's attempt is held. Swept first, it waits in `eventsAfterFollow`.
+  3. T's transfer fails with ENOSPC: `failed(.nextRun)`, epoch 4, `transferSpaceEnd` 3, `attemptEnd` nil. No stamp is
+     minted (`EngineFailures.swift:196-212`).
+  4. While `spaceFailed`'s free-space read is held, the drain replays V under `withReading(stamp)`. `metInItsAttempt`'s
+     replay branch finds no `attemptEnd.stamped` and returns false (`EngineJobs.swift:293-294`), so V counts as a
+     request after the end.
+  5. T20 re-queues T (`EngineJobs.swift:360-364`): `downloading`, epoch 7, holding zz-a and zz-x.
+  6. The read returns, and `decideSpaceFailure` finds the job no longer failed, so it gives no verdict
+     (`EngineFailures.swift:592-596`). The second attempt succeeds.
+
+  Visited first (the reference), A, X and V get `failed(insufficientSpace(required: 100000, available: 31318659))`,
+  and T starts once. Swept first, A, X and V get `ok(100000 B)`, and T starts twice. The control, with V made inside
+  the held read (seed 2_029_201), gives `ok(100000 B)` and two starts in both orders.
+- **Correct #2 (PROBE-C22C-APPLY-IN-READ, seed 2_029_301): an apply made inside a failed publication's free-space read
+  dates an older visit after the end.** 2/2 on `9aa337c`. Sources: the findings file (correct #2); the same probe file;
+  its log `correct-probeC22ApplyInRead.summary.log`.
+  1. T's publication is held (`holdPublication(of:)`). v3 maps zz-x onto T through an owed follow.
+  2. The publication's rename to `*.verifying` fails with `noSpace` (a `.rename` fault rule, `.nth(1)`).
+     `recordPublicationEnd` sets `attemptEnd(failedAfter: 3, stamped: stampsMinted)`.
+  3. While the free-space read is held, v4 is applied. It changes only the leading fillers, so `appliesFollowed`
+     becomes 4.
+  4. Swept first, the owed follow then visits T and moves zz-x's user interest onto it. The visit branch
+     (`EngineJobs.swift:290-291`) compares 4 with `failedAfter` 3, so a move that stands for v3's apply, made before the
+     end, is dated after it.
+  5. T20 re-queues T: `downloading`, epoch 7. The read finds the job not failed, so it gives no verdict, and the second
+     attempt succeeds.
+
+  Visited first, A and X get `failed(insufficientSpace(required: 100000, available: 31318658))`, and T starts once.
+  Swept first, A and X get `ok(100000 B)`, and T starts twice.
+- **The user-visible effect.** A download's or a publication's ENOSPC end can overlap a user request or a map apply that
+  arrives during the free-space read. Then the swept-first order re-queues the job (T20) where visit-first gives the
+  `.insufficientSpace` verdict. In both probes the second attempt succeeds, so the app sees an extra attempt instead of
+  the error. The causes are two (f1 §1, as f1 review must-fix 2 corrects it): a re-lane dated by the wrong clock, and a
+  re-queue that visit-first makes and the swept-first engine never makes before the verdict.
+- **Why it is not fixed.** Independent reviews found the class's analyses UNSOUND four times: f1
+  (`f1-enospc-windows-review.md`), f1b (`f1b-join-rule-review.md`), and f1c's routes A and B (`f1c-review.md` §0), all
+  under `.build-orchestrator/s3f-c22-analysis/`.
+- **What would close it.** Route Q (`f1c-review.md` §3), after an independent check of 3-5 h, at 44-67 h (estimates,
+  its §9). In outline: a per-job record of the ENOSPC window, and T20 of a job in its window decided on visit-first's
+  (token, id, lane) set at queue markers in serial order, with `metInItsAttempt`, `transferSpaceEnd` and
+  `AttemptEnd.stamped` retired. Q leaves shapes open (its §6): W-OBO, W-PEND-LATE's tail, the holder-state
+  approximation (W-BACK-PUB and W-NEST are its timing instances), W-SUPER, `lastError`'s figures, and the out-of-class
+  backlog (W-HOP-DEFERRED, W-PROMO, W-PEND-LATE's non-ENOSPC twin).
+- **The owner's re-open criterion:** how often it happens in the field.
+
+This section feeds ADR-057, and Stage 5's `RESIDUAL-RISKS.md` and `VERIFICATION.md`. The analyses are kept on the
+pushed branch `archive/build-orchestrator`.
+
+### Known misses of C2's 10 ms limit (owner ruling 2026-11-06)
+
+By the owner's ruling of 6 Nov (S3-R28 item 3, N25: "leave these three cases out of cycle 23 and record them as known
+misses of the 10 ms limit"), the first three rows of `f3b-review.md` §7 are out of cycle 23. They are not blocking and
+not gated, and no code, test or bench is added for them. §7's rows 4 and 5 stay measured, as variants of item 3b's
+cases, and every other C2 shape stays under S3-R27 12.1's bar. Each shape is at 10,000 ids, with at most 4 interests on
+an id. The figures are "after route C and item 3b's merge" (`f3b-review.md` §7), none measured.
+
+1. **Failed user jobs with `.retry` deadlines, under one to three prefetch groups** (f3c's failedUserRetries and
+   failedUserRefused, `f3c-open-shapes.md` §1). Each job is `.failed(.at)` at the user lane (a user waiter), with a
+   `.retry` entry on the heap. When the purge's withdrawal re-lanes it and the origin admits a user request, T20
+   re-admits it (`EngineJobs.swift:360-363`), and its `heap.remove` scans the whole heap.
+   - *Figure:* about 500 ms if the origin admits a user request (derived), 9-18 ms otherwise (estimate, on the sorted
+     path). The derivation: (571.12 − 36.24) ms / 10,000 ≈ 53 µs per heap scan, from `purgeTurns(.retryJobs)`' best
+     after e2-A1 (571.12 ms) and after e2-A2.5 (36.24 ms), under "Cycle 22", step 4 (`s3f.md:7584` and `:7617` at
+     `9aa337c`). Whether the origin admits depends on the breaker; the timeouts in `retryJobs`
+     (`BenchSyncCycle22Purge.swift:201-204`) leave its jobs `.failed(.at)`. The scan is today's cost too.
+   - *What would close it:* A-6 (C-1's pass also takes a `.retry` whose job is not `.failed(.at)`, which its firing
+     ignores, `EngineTimers.swift:111`) brings it to 11.5-18 ms; an in-place re-admission to 7-12 ms; going lower needs
+     table order, which needs a ruling (`f3b-review.md` §7). f3c estimates its route (OS-1 to OS-3 after item 3b's M-5)
+     at 10.4-21.2 ms, and at stage C with OS-4 to OS-6 at 5.2-10.8 ms for failedUserRetries (its top misses 8.5 ms) and
+     4.1-9.0 ms for failedUserRefused (`f3c-open-shapes.md` §0, §3).
+2. **A bulk waiter under three prefetch groups** (f3c's bulkWaiterFalls). A `.queued` job with a bulk waiter and three
+   prefetch groups: the purge withdraws the groups, its lane falls to `.bulk`, and `relane` re-queues it
+   (`EngineJobs.swift:311-314`, `:563-578`).
+   - *Figure (estimate):* 9-17 ms (route A: 9-14.5 ms; `f3b-review.md` §7).
+   - *What would close it:* an in-place re-queue, 7-11.5 ms; table-order re-queues after an A7-type audit, 4.5-8 ms
+     (`f3b-review.md` §7). f3c: 7.9-16.9 ms after OS-1 to OS-3 (2-3 ms more with a compaction), 3.5-8.4 ms at stage C
+     with OS-4 to OS-6 (4.4-10.4 ms when the purge compacts the queues).
+3. **A prefetch group and a bulk group, under a third group's pending claim** (f3c's claimHeldFalls). A `.queued` job
+   that the purge empties, with `before` (prefetch) ≠ `last` (bulk): `heldLane = last`, then a re-lane, then
+   `claimHeld` (`EngineCommands.swift:1051-1058`, `EngineJobs.swift:424-431`).
+   - *Figure (estimate):* 10-20 ms (`f3b-review.md` §7).
+   - *What would close it:* as in row 2; skipping that re-queue breaks R-SYN-3 (`f3b-review.md` must-fix 2). f3c:
+     7.4-16.7 ms after OS-1 to OS-3, 3.0-8.2 ms at stage C with OS-4 to OS-6.
+
+- f3c's review (`f3c-open-shapes-review.md`, which item 3 names) was not in `.build-orchestrator/s3f-c22-analysis/`
+  when this record was written, so f3c's figures above are its own estimates, unreviewed.
+- **The owner's re-open criterion:** how often each miss happens in the field.
 
 ## Items
 
