@@ -312,12 +312,14 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - f1c's review, at about 16:00: is there a sound route for item 1?
 
     If either says no, tell the owner then, with the options. For the purge, the options are to authorise e2-B′, or to put those shapes outside the bar. For the ENOSPC windows, they are a structural redesign, or another round of analysis. Run 10 meanwhile does only work that is needed whatever those reviews say.
-  - **Pushed to GitHub at the owner's request (about 14:25):** "push to this remote: https://github.com/NiccoloBargioni/ZTronAssetKit".
+  - **Pushed to GitHub at the owner's request (14:19):** "push to this remote: https://github.com/NiccoloBargioni/ZTronAssetKit".
     - `origin` was added, and `feature/asset-kit` pushed at `46b2eb1` with upstream tracking. It is the remote's only branch and its default.
     - **Checked before the push:**
       - every branch's history was scanned for secret patterns: no hits (a header name and the tests' fake canary key only);
       - no blob is over 20 MB, and the pack is 6.7 MiB.
-    - **Not pushed:** the `wp/*` and `wip/*` branches (including `wp/s3f`'s unmerged cycle-22 work) and the tags. There is no `main` branch locally.
+    - **At the owner's "Push them too" (about 14:27):** `wp/s3f`, `wp/s3ah`, `wp/s3b`, `wp/s3c`, `wp/s3d`, `wp/s3g` and `wip/s3f-c15a` were pushed as new branches, and `feature/asset-kit` was brought to `a4c59b7`. All 12 tags were pushed too, `harness-frozen` and `s3-base` among them.
+      - The secret scan covered every ref, tags included. No blob in any ref is over 20 MB.
+      - There is no `main` branch locally.
     - CLAUDE.md's "never push" holds for everything else: push again only when the owner asks.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
