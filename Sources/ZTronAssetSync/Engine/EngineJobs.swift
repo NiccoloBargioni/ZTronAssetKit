@@ -684,16 +684,12 @@ extension SyncEngine {
     /// Drops `asset` from group `token` while it still waits for `transfer` (the asset left the manifest, T21); an
     /// `ensureAvailable` group whose last member went completes.
     /// In place through the table, as `deliver` changes a group: a copy written back would copy `pending` per dropped
-    /// member (step C10).
+    /// member (step C10). One access to the group checks, drops and takes the completion (`Group.dropMember`; Stage 3
+    /// close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.6), which is resumed after the access.
     func dropGroupMember(_ token: InterestToken, asset: AssetID, from transfer: TransferID) {
-        guard self.state.groups[token]?.pending[asset] == transfer else {
+        guard let continuation = self.state.groups[token]?.dropMember(asset, waitingFor: transfer) else {
             return
         }
-        self.state.groups[token]?.pending[asset] = nil
-        guard let group = self.state.groups[token], group.kind == .ensure, group.isSettled, let continuation = group.continuation else {
-            return
-        }
-        self.state.groups[token]?.continuation = nil
         continuation.resume(returning: true)
     }
 

@@ -1342,6 +1342,26 @@ struct Group {
         self.pending.isEmpty && self.cursor >= self.fetches.count
     }
 
+    /// Drops `asset` if it still waits for `transfer`, in place (`SyncEngine.dropGroupMember`), and returns the
+    /// continuation of an `ensureAvailable` group that drop settled, taken out of the group so that it is resumed once;
+    /// `nil` otherwise: the member waits for other content or for nothing, or the group is a prefetch group, waits for
+    /// more, or was answered. The engine resumes the continuation after its access to the group ends. One hash finds the
+    /// member, compares its transfer and removes it (`Dictionary.index(forKey:)`, `Dictionary.Values.subscript(_:)`'s
+    /// `get` and `Dictionary.remove(at:)`, in the installed SDKs' `Swift.swiftinterface`, macOS 27.0 and iOS 27.0 alike,
+    /// lines 7807, 8050-8053 and 7908-7909). Stage 3 close-out cycle 22, ruling S3-R27 item 12.3's e2-A1.6, d2's A3 and
+    /// A3′: through the engine, a drop read the group out of the table twice, a copy of its arrays each time.
+    mutating func dropMember(_ asset: AssetID, waitingFor transfer: TransferID) -> CheckedContinuation<Bool, Never>? {
+        guard let index = self.pending.index(forKey: asset), self.pending.values[index] == transfer else {
+            return nil
+        }
+        self.pending.remove(at: index)
+        guard self.kind == .ensure, self.isSettled, let continuation = self.continuation else {
+            return nil
+        }
+        self.continuation = nil
+        return continuation
+    }
+
     /// Drops the members of `assets` that still wait for `transfer`, in place (a delivery of `transfer`'s outcome; a
     /// member that moved to other content meanwhile keeps waiting for it).
     mutating func clearPending(_ assets: Set<AssetID>, on transfer: TransferID) {
