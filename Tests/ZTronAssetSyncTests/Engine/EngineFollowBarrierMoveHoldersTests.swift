@@ -290,3 +290,101 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(s)
     }
 }
+
+// MARK: d4 §3.9 (T7): an owed move continued inside its holder's publication (vy)
+
+/// d4 §3.9 (Stage 3 close-out cycle 23, ruling S3-R28 item 4; S3-R27 item 5, with d4 review's should-fix 3): the
+/// visit-rest passing rule (`continueMove`'s `rerouting`) applies only to a visit's rest, never to an owed inbound move
+/// (`continueInbound` passes its copy as `listing`). The two differ only for a holder found downloading and continued
+/// verifying: inside its own `publish`, `bringInbound` continues the move before the publication writes its
+/// `rerouteOnPass`, so the rule would pass every id left.
+extension EngineFollowBarrierTests {
+    /// H (16 bytes) holds zz-h0…zz-h3 for the user waiters W0…W3, and T (20 bytes) zz-t for WT; both download (held). v3
+    /// moves zz-h1…zz-h3 to T's content and keeps zz-h0 on H's, so H is not superseded. T then gets a 429 with
+    /// Retry-After 7,200 s, above both lanes' caps (`.exhausted`). Swept first its verdict waits, and `bringInbound(T)`
+    /// finds the move off H and makes `inboundIDsNow` (two) of its ids, owing zz-h3; the follow's follow-up turns stay
+    /// held from the 429 until H's release, since a follow turn would make that move while H still downloads. H's
+    /// publication then continues the owed move, and zz-h3 joins T, failed with its verdict to come. Visited first, v3's
+    /// visit moved zz-h1…zz-h3 onto T downloading before its 429 (the owed move is swept first only: S3-R26 answer 1's
+    /// citation, `bringInbound` returns unless the follow is owed): T's 429 answered WT, W1, W2 and W3
+    /// `serverUnavailable`, T started once, and H's bytes served W0.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func barrierContinuesAnOwedMoveInsideItsHoldersPublication(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_331
+        let (s, _) = try await FollowBarrier.setUp(seed: seed)
+        let engine = s.engine
+        await engine.readForTests { $0.state.followIDsPerTurn = 4 }
+        let hBytes = EngineFixture.bytes(seed + 4, count: 16)
+        let tBytes = EngineFixture.bytes(seed + 5, count: 20)
+        let names = (0..<4).map { "zz-h\($0)" }
+        let onH = names.map { EngineHarness.onDemand($0, hBytes) }
+        let t = EngineHarness.onDemand("zz-t", tBytes)
+        let movedH = names.indices.map { $0 == 0 ? onH[0] : EngineHarness.onDemand(names[$0], tBytes) }
+        let holder = onH[0].transferID
+        let tT = t.transferID
+        try #require(onH.allSatisfy { $0.transferID == holder } && movedH.dropFirst().allSatisfy { $0.transferID == tT } && holder != tT, "setup: v3 moves zz-h1…zz-h3 from H's content to T's")
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + onH + [t] + Self.laterFillers(seed + 3_000), etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(holder, [.hold, .stage(hBytes)])
+        await s.harness.source.script(tT, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(7_200))), .stage(tBytes)])
+        var waiters: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in onH {
+            let id = entry.identifier
+            waiters.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+        }
+        let tID = t.identifier
+        let tWaiter = Task { await engine.awaitAsset(tID, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { e in
+                e.state.conditions != nil && e.state.jobs[holder]?.state == .downloading && e.state.jobs[holder]?.interests.count == 4
+                    && e.state.jobs[tT]?.state == .downloading && e.state.jobs[tT]?.interests.count == 1
+            }
+        }
+        try await Self.applyHeld([s.q] + FollowBarrier.fillers(seed + 200) + movedH + [t] + Self.laterFillers(seed + 6_000), tag: "v3-owed-move-publish-\(seed)", s, visit: visit)
+        await s.harness.source.release(tT, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[tT].map { $0.state != .downloading } ?? true }
+        let h3 = AssetID(names[3])
+        if visit == .sweepFollowsFirst {
+            let owed = await engine.readForTests { e in
+                (
+                    moves: e.state.inboundMoves[e.state.inboundNext...].filter { $0.holder == holder && $0.target == tT }.count,
+                    onT: e.state.jobs[tT]?.assets.sorted() ?? [], onH: e.state.jobs[holder]?.assets.sorted() ?? [],
+                    verdict: e.state.verdictsAfterFollow[tT] != nil, owedFollow: e.followOwed
+                )
+            }
+            try #require(
+                owed.moves == 1 && owed.onT == [AssetID(names[1]), AssetID(names[2]), tID] && owed.onH == [AssetID(names[0]), h3] && owed.verdict && owed.owedFollow,
+                "setup: T's verdict waits, and its end made two of the move's ids onto it and owes zz-h3's off H: \(owed)"
+            )
+        } else {
+            let gone = await engine.readForTests { $0.state.jobs[tT] == nil }
+            try #require(gone, "setup: visited first, T's 429 answered its interests at once")
+        }
+        await s.harness.source.release(holder, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[holder] == nil }
+        if visit == .sweepFollowsFirst {
+            let onT = await engine.readForTests { $0.state.jobs[tT]?.assets.contains(h3) == true }
+            #expect(onT, "H's publication made the owed move: zz-h3 joined T, whose verdict waits (visit-first: v3's visit moved it there)")
+        }
+        await engine.readForTests { $0.releaseFollowFollowUps() }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        var results: [Result<AssetLocation, AssetError>] = []
+        for waiter in waiters + [tWaiter] {
+            results.append(await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await EngineHarness.value(of: waiter) })
+        }
+        let starts = await s.harness.source.starts.filter { $0.id == tT }.count
+        #expect((try? results[0].get())?.byteSize == 16, "H's bytes serve W0 (visit-first): \(results)")
+        for (index, answer) in results.enumerated().dropFirst() {
+            if case .failure(.serverUnavailable) = answer {
+            } else {
+                Issue.record("\(index == 4 ? "WT" : "W\(index)") gets T's 429's answer (visit-first): \(answer); \(results)")
+            }
+        }
+        #expect(starts == 1, "T starts once (visit-first): \(starts)")
+        await Self.finishHeld(s)
+    }
+}
