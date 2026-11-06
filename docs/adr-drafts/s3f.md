@@ -5082,7 +5082,7 @@ median of 3.3 %, and the one status they change, `purgeWhileOwedTurns`', is note
 | A purge while re-routes are owed (`withdrawPurgedJoins`' `.reroutes` arm, R15) | O(items) once a purge: each batch's items filtered, and the removed ones sorted | `purgeWhileOwedTurns` (a purge of everything while 10,000 are owed): 9.57 ms best (cycle 21's gate run); 10.04 ms in the second gate run, at a 1-minute load of mean 5.23; alone, 9.62 and 9.75 ms best (at 5.35 to 5.60). The walk of the owed batch is the turn's synchronous work: 9.14 to 9.22 ms of its own (PROBE-C21-PURGE-PARTS, "Step 8") | **miss** in the second gate run: blocking by S3-R24 item 2, reported ("Step 8"); at the edge in every other run |
 | The owed answers' resumes (`answerFollowUp`, Phase 2) | `answersPerTurn` (512) resumes a turn | inside `commitTurns` and `commitWaitersBoundTurns` above, whose windows end at the last resume | met |
 | `deliver`, `dropGroupMember`, `releaseRunClaim` | O(1) amortised an interest since `a78f913` (steps C10 and C11: the group's `pending` and the run's `outstanding` changed in place, not copied) | inside every commit case above | met (no figure of their own) |
-| `releaseRerouteHolds` (R12) | once, when the last batch is made: the waiting publications' transfers sorted and each resumed, O(P log P) for P publications, at most one a job | no figure | no figure: put to the orchestrator |
+| `releaseRerouteHolds` (R12) | once, when the last batch is made: the waiting publications' transfers sorted and each resumed, O(P log P) for P publications, at most one a job | no figure | no figure: open (S3-R27 item 8; no bound on P cited for every lane, and no bench; under "Cycle 23", "Point 6: the records") |
 
 ### A holder re-created between turns (correct #4; S3-R25 item 9)
 
@@ -5194,6 +5194,13 @@ The counts are from the gate run's coverage (`.build-s3f/c20/gates/cov.profdata`
    in cycle 21). The `downloading` claim stands: only a start makes a job download again, and a start takes a new
    epoch (`Job.epoch`, whose doc said a supersede and an abandon bump it too, which they do not). The arm is Reached in
    cycle 21 (Shape A, under "Step 7").
+   (Corrected in cycle 23, S3-R27 items 12.2 and 12.5.9, after cycle 21's reqs #10: since `58b278e`,
+   `waitingTarget(_ move:)` returns a job queued at the move's epoch before it calls `waitingTarget(_:epoch:)`, so Shape
+   A covers that queued branch, not this arm; in cycle 21 rr21-T8b reached the arm and killed `i5-pin-fold`, at
+   `RerouteRequeue:124` and `:130` (S3-R26 answer 8). Since e1-R1 (`5ad245d`) an ENOENT re-queue keeps the pin by its
+   record, and the fold's re-run, T-E2, was not made: open, under "Cycle 23". Cycle 22's e1-P3 (`a83f54e`) found no
+   park at the same epoch while the barrier holds: only the pump parks a queued job, and no pump runs behind the
+   barrier. The window in which the barrier drops during the read stays UNCONFIRMED.)
 
 ### Residual risks (cycle 20)
 
@@ -5824,6 +5831,11 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   where cancelledAttempt`). The owed re-routes of zz-a1…zz-a3, pinned to X's publishing job by K1's layer
   (`pins == [epoch]`), then follow the copy to W: `waitingTarget` reads a `.queued` job as no target (rr21-B30's pin
   caller), in both orders. X holds only zz-x, W holds zz-a1…zz-a3, and K, V2 and W1…W3 get their bytes.
+  (Changed in cycle 22 by e1-R1, `5ad245d`, S3-R27 item 12.2; this note added in cycle 23, after cycle 22's reqs #10:
+  the test is now `owedReroutePinnedToARequeuedJobKeepsThePin`, with e1-P3's `edge` argument. The ENOENT re-queue
+  keeps the pin (a `PinEnd` record with `keepsEntry: true`, `EngineState.reroutePinCommits`), so the replay keeps
+  W1…W3 on X's fresh attempt: X holds zz-a1…zz-a3 and zz-x, W has no job, and X's commit re-routes them to W's
+  content. K gets 16 bytes, V2 18 and W1…W3 20, in both orders.)
 - **`PROBE-RR21-HEAL-T21`** (`healOfAnOwedT21SystemInterest`, `EngineFollowBarrierRerouteHealTests.swift`, seeds
   2,027,461, 471 and 481): K0 drops zz-a1…zz-a3, whose re-routes O's commit owes (`followIDsPerTurn` 4) or makes at
   once (512); the T21 re-route of zz-a1's heal interest forgets the heal. A second heal scheduled before the site is
@@ -5947,8 +5959,10 @@ REENTRANCY rows are unchanged. Logs are under `.build-s3f/c21/`.
   the engine's copy, and walks on from that layer; without a kept commit (a job requeued or superseded behind its
   verdict) it follows the engine's copy as before, rr21-T8b's class, exact unless the requeued job publishes again
   across a later apply (the judge's approximation; **residual risk**). The records go when the last batch is replayed
-  whole (`continueReroutes`) and at shutdown. Clauses (`followBarrierViolations`): no kept commit while no batch waits,
-  none for an attempt still at its end, none at a copy not yet adopted. Tests with the fix:
+  whole (`continueReroutes`) and at shutdown (since R18, `2c62e85`, below, they are kept until the barrier is down,
+  `endWorldHistory`, or shutdown: "The kept commits (`reroutePinCommits`) are now recorded while any event waits";
+  cross-reference added in cycle 23, S3-R27 items 12.2 and 12.5.9). Clauses (`followBarrierViolations`): no kept
+  commit while no batch waits, none for an attempt still at its end, none at a copy not yet adopted. Tests with the fix:
   `owedRerouteWhosePinCommittedFollowsTheAppliesAfterThatCommit` (K2 while W downloads: the walk goes on from the
   commit's copy and K2 moves W1…W3 to Z, 24 bytes each, Z requested once; it passes without the fix too, which follows
   the engine's copy there), `invariantsReportCommitsKeptForOwedReroutes` (each clause broken alone; X's commit kept
@@ -6679,7 +6693,8 @@ claimed). Each names the state where it would change an answer; no test this cyc
   ensures' resumes (S3-R26 item 4), and terminal events stay ascending in the commit's turn (S3-R26 answer 2), so no
   change within the rulings cuts it. The routes, which are the owner's to rule on: owe the events past the commit's
   turn in their order, as the answers are owed, or carry many ids in one event (an event-shape change). The
-  two-subscriber figure is "open, for the owner" (answer 4).
+  two-subscriber figure is "open, for the owner" (answer 4). (Corrected in cycle 23, after cycle 22's reqs #10: by the
+  owner's ruling of 5 Nov, S3-R27 item 12.1, a second subscriber is outside the bar; the figure is recorded.)
 
 ### Step 7: item 5 (`waitingTarget`'s queued arm) and its two probes
 
@@ -6689,7 +6704,11 @@ claimed). Each names the state where it would change an answer; no test this cyc
   arm. It is Reached under S3-R26 item 12's answer 1: the test runs in both orders, asserts the visit-first answers in
   both, and requires per order the state (swept first the owed move, visited first none, since v3's visit moved zz-x
   onto T while it published); the fold mutant (`i5-pin-fold`) fails the one-turn state assertion 2/2, and rr21-T8b
-  (`RerouteRequeue:124`, `:130`) kills it in both orders.
+  (`RerouteRequeue:124`, `:130`) kills it in both orders. (Corrected in cycle 23, S3-R27 item 12.2, after cycle 21's
+  reqs #10: the cycle-21 verifier found Shape A passing 2/2 under the fold, since `58b278e` answers the queued move
+  before this arm, and rr21-T8b killing it. Since e1-R1 (`5ad245d`) rr21-T8b keeps the pin by its record, so the pin
+  caller's kill of the fold is T-E2's, with the tests its run shows (12.2's kill table); that run was not made: open,
+  under "Cycle 23".)
 - **Probe (ii)**, the later apply (`3412ec3`, then `d85eb02` with the re-queued job in the turn's follow order; both red
   swept first): v4 maps zz-x to a third content U while T's drained publication runs; the ENOENT re-queues T and its
   fresh attempt gets a 404. Visited first, v4's visit passed T with zz-x on it and the 404 answered X; swept first the
@@ -6730,7 +6749,12 @@ claimed). Each names the state where it would change an answer; no test this cyc
 - **UNCONFIRMED siblings** (from the code; not probed this cycle): the pin's caller with a terminal failure of the
   fresh attempt; the drain's replay of a user join during the read; `followAfterVerdict`'s joins during the read;
   `analyse-g4-reach.md` (b)'s park at the same epoch while the barrier stays up; and `metrics.promotions`, not counted
-  for a join in the transfer's window (a metric only).
+  for a join in the transfer's window (a metric only). (Cycle 22 settled the first four, S3-R27 item 12.2; noted in
+  cycle 23: the pin's caller with a terminal failure of the fresh attempt was confirmed and fixed by e1-R1, `5ad245d`;
+  the drain's replay of a user join during the read is e1-P1, `94aa4b5` and `9005651` red, `b83112c` the seam,
+  `58e2c1c` the fix; `followAfterVerdict`'s joins during the read are e1-P2, `f7c993f` red, `75b9e45` the fix; the
+  park at the same epoch is e1-P3, which holds, `a83f54e`. All under "Cycle 22", step 1. `metrics.promotions` is as
+  it was.)
 - **Residual risk** (S3-R26 item 5): item 5's order, place and ticket difference (S3-R16 item 2).
 
 ### Step 8: the close
@@ -6777,8 +6801,35 @@ claimed). Each names the state where it would change an answer; no test this cyc
     - `RerouteHold`, `RerouteRun`, `RerouteAnnounce` and `releaseOwedTurns`: they read invariants, events and flags.
 
     The readers whose loops end with the follow (`while followOwed`, in the MoveHolders, Convergence,
-    MoveRevalidation, MoveIndex, SharedMove, TurnTotal and DeferBucket tests) were not audited one by one. RestOrder
-    stops before its reading once H's move is made. Put to the orchestrator.
+    MoveRevalidation, MoveIndex, SharedMove, TurnTotal and DeferBucket tests) were audited by d5, a read-only analysis
+    made for S3-R27 (`.build-orchestrator/s3f-c21-analysis/d5-held-readers.md`, at `d5b2ab9`); this replaces "not
+    audited one by one … Put to the orchestrator" (S3-R27 item 7, cycle 23). A reading is racy only when it follows a
+    held turn that leaves the barrier down, reads a job, an id, an interest or a count, and an attempt that changes that
+    value can start in that turn and end at once (d5, "The race, as the code makes it"). D5 found none, suite by suite:
+    - MoveHolders: T2 `barrierReroutesAMovesInterestsByToken`, T3 `barrierReroutesEveryHolderOfAMovedID` and T6
+      `barrierBoundsOneIDMovesOffAHolderPerTurn`: SAFE (the loops read `followOwed` only; the readings are held at the
+      source, or the targets' publications are held).
+    - Convergence (`barrierMovesConvergingIDsOverTheFollowsTurns`): SAFE (after the barrier drops it reads logs and
+      answers only).
+    - MoveRevalidation (`barrierRereadsWhatLandsBetweenABoundedMovesTurns`): SAFE (a rest is still owed, so the
+      barrier is up, or the engine's one slot leaves nothing queued to start).
+    - MoveIndex: B-T4 `barrierTakesABoundedMovesUnheldIDsOffTheHolder` and `restRejoin`: SAFE (H is held at the
+      source; the barrier is up while a rest is owed; H's publication is held).
+    - SharedMove: `barrierMovesASharedContentsIDsOverBoundedTurns`, `…ShutsDownWhileAPublicationWaits…` and
+      `barrierDrainsTheEventsAfterAVisitsRest`: SAFE (the holders are held at the source; C's retry waits for the
+      clock, which no loop advances).
+    - TurnTotal: `barrierBoundsAnOwedMovesTurnAcrossHolders` and `barrierBoundsARestsTurnAcrossHolders`: SAFE (the
+      holders are held at the source; no reading names O's job).
+    - DeferBucket: `deferBucketTurns` (used by A-T1, A-T1-place, A-T-PURGE and the invariants test), A-T1-place,
+      A-T1-skip, A-T1-space, A-T-PURGE, the 429 test and the shutdown test (A-T-SD): SAFE (the drain's follow-ups are
+      held, the barrier is up, or the retry is held at the source). A-T-SD's visited-first set-up check, added in cycle
+      23 (`03c4e59`), reads O while its retry is held at the source (`[.hold, .fail(.timedOut), .hold, .stage]`); it is
+      safe by the same argument, which d5 did not see.
+    - The rest of the Sync tests: no racy reader. `EngineFollowBarrierWaitingTargetTests.swift:191` was safe on a
+      premise it did not assert (that its one turn is not the follow's last); cycle 23 pins it (d5's pin, under "Cycle
+      23", "Point 6"). `EngineFollowBarrierSpaceReadTests.swift:236` tolerates the race by design.
+    - The limit: d5 spot-checked this cycle's own list above (`EngineFollowBarrierDrainBoundTests.swift:151-158` and
+      `EngineFollowBarrierRestOrderTests.swift:121-128` agree with it) and did not re-derive it line by line.
 - **reqs #7** (S3-R26 item 10). The line that replaced `8e1fb24`'s `EngineDispatch.swift:1118` is `:1176`,
   `subtractAssets(trim.unbound, for: trim.token)`: the commit's partial trim, made at once.
   - `runJoinsSharedJobWhileItVerifies` (`EngineRegressionRound2Tests.swift:461`) reaches it deterministically, in the
@@ -6936,14 +6987,19 @@ of 341. `EngineConditions.swift` (1), `EngineEvents.swift` (8), `EngineMoves.swi
   land sort (`c6-land-desc`, `c6-land-unsorted`) is of the same class.
 - **RR-21's residuals** (`integrate-rr21.md`'s residual_risks, each a timing class only while the event lands between
   the two engines' answers, S3-R24 item 5): a cancel or a release between the owing instant and a T21 or present pair's
-  replay gives `.cancelled` (ruling 1); the global hold delays unrelated publications, and an apply during it can drop
-  a held job's ids (ruling 2); a pin whose job committed, was superseded or was re-queued by ENOENT between the apply
-  and the replay follows the copy at the replay, exact unless another apply landed between (ruling 3, rr21-T8b's
-  class); a purge's dropped bindings, an eviction or a quarantine between the owing instant and the replay turn a
-  present answer into a join (ruling 5); a heal of a T21 system item's asset in that window is forgotten at the replay
-  (ruling 1's class; `PROBE-RR21-HEAL-T21` breaks nothing, under "Step 5"); the broad idle guards keep every binding
-  and the watcher while any event waits; admissions and run settlement wait for every owed batch (about 20 drain turns
-  at 10,000 ids); each owed batch keeps its copy and its layers' outgoing copies alive (memory only).
+  replay gives `.cancelled` (ruling 1); the global hold delays unrelated publications, and an apply during it can drop a
+  held job's ids (ruling 2); a pin whose job committed, was superseded or was re-queued by ENOENT between the apply and
+  the replay follows the copy at the replay, exact unless another apply landed between (ruling 3, rr21-T8b's class;
+  narrowed in cycle 22, S3-R27 item 12.2, noted in cycle 23: a commit, or a publication the store refused as superseded,
+  now leaves a `PinEnd` record with `keepsEntry: false`, and such a pin follows the copy in force at that commit or
+  supersede; an ENOENT re-queue leaves one with `keepsEntry: true`, and the pin rides the fresh attempt until the first
+  copy adopted after it (e1-R1, `5ad245d`; e1-PS, `b4eebb1`; `EngineState.swift:224-232`). A job that leaves its end
+  with no record still follows the copy at the replay); a purge's dropped bindings, an eviction or a quarantine between
+  the owing instant and the replay turn a present answer into a join (ruling 5); a heal of a T21 system item's asset in
+  that window is forgotten at the replay (ruling 1's class; `PROBE-RR21-HEAL-T21` breaks nothing, under "Step 5"); the
+  broad idle guards keep every binding and the watcher while any event waits; admissions and run settlement wait for
+  every owed batch (about 20 drain turns at 10,000 ids); each owed batch keeps its copy and its layers' outgoing copies
+  alive (memory only).
 - **Items 2 to 4**: item A's bucket order is an accepted order (above; under "Step 3"); item B's residual risks are
   listed with their class, condition and test under "Step 4"; item C's are the table's order of resumes (above),
   `waitersStalledSubscriber`'s miss (blocking, under "Step 6") and the two-subscriber figure (for the owner).
@@ -6968,7 +7024,10 @@ of 341. `EngineConditions.swift` (1), `EngineEvents.swift` (8), `EngineMoves.swi
 
 Put to the orchestrator with them: the held-turn readers whose loops end with the follow, not audited one by one
 for the reservation-edge race ("Step 8"); `releaseRerouteHolds`' inventory row, which has no figure; and the
-two-subscriber figure, for the owner (S3-R26 item 12's answer 4).
+two-subscriber figure, for the owner (S3-R26 item 12's answer 4). (Settled since, noted in cycle 23: d5 audited the
+readers and found no racy reader, under "Step 8" above (S3-R27 item 7); `releaseRerouteHolds`' row is recorded open,
+under "Cycle 23", "Point 6: the records" (S3-R27 item 8); and a second subscriber is outside the bar by the owner's
+ruling of 5 Nov (S3-R27 item 12.1), so its figure is recorded.)
 
 ## Cycle 22: the cycle-21 verifiers' findings, and S3-R27
 
@@ -7435,7 +7494,7 @@ Item 10's step 3, with item 11.7's conditional parts (c1, and c6 for `commitTurn
 | `commitTurns(.waitersStalledSubscriber)` | 7.07, 7.26, 6.38 | 6.38 | 6.37 | 9.77 to 7.72 | 10.78, a miss | met, at or below 8.5 ms |
 | `commitTurns(.groupStalledSubscriber)` | 5.11, 5.14, 4.80 | 4.80 | 4.79 | 9.77 to 7.72 | 8.81 | met |
 | `commitTurns(.manyGroups)` | 7.91, 7.80, 7.83 | 7.80 | 7.80 | 9.77 to 7.72 | 9.58 | met, at or below 8.5 ms |
-| `commitTwoStalledSubscribersTurns` | 7.01, 7.24, 6.90 | 6.90 | 6.90 | 7.72 to 7.26 | 13.78 | recorded (open, for the owner) |
+| `commitTwoStalledSubscribersTurns` | 7.01, 7.24, 6.90 | 6.90 | 6.90 | 7.72 to 7.26 | 13.78 | recorded: outside the bar (S3-R27 item 12.1; this cell said "open, for the owner" until cycle 23) |
 | `commitReannounceTurns` (gated) | 7.15, 6.93, 6.90 | 6.90 | 6.89 | 7.26 to 6.84 | 10.70, a miss | met |
 | `commitFailedArmTurns` (gated) | 5.92, 6.09, 6.01 | 5.92 | 5.92 | 6.84 to 6.53 | 9.10 | met |
 
@@ -7444,6 +7503,8 @@ Item 10's step 3, with item 11.7's conditional parts (c1, and c6 for `commitTurn
   7.80 ms, at or below 8.5 ms: c6 is not taken. Both new cases are met. No figure of the item is between 8.5 and 10 ms,
   so none goes to item 9's margin list. The two-subscriber figure, 6.90 ms, is recorded with its loads and stays "open,
   for the owner" (S3-R26 answer 4): this measurement neither accepts nor closes it. Route (b) is not started.
+  (Corrected in cycle 23, after cycle 22's reqs #10: by the owner's ruling of 5 Nov, S3-R27 item 12.1, a second
+  subscriber is outside the bar; the figure is recorded, not open.)
 - **The fall is larger than d1's model.** d1's central figure left 1.36 to 1.72 ms per stalled subscriber; the
   measured difference between the stalled and the plain shape is now 0.36 ms, and the plain shape itself fell 1.51 ms.
   One evaluation of the observers per batch instead of one per event (10,000 per commit) is a likely share of it; no
@@ -7903,10 +7964,12 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
   2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: **done** (17:26 to
      17:29, on a snapshot of `f38dd8c`): each of the seven fails 2/2 in each order that reaches it, by assertions only.
      Recorded with run 12's seven commits and its e1 runs under "Point 6" below. Within point 6's 0.5-1 h.
-  3. Point 6, the records: **in progress** (from 17:30). Committed with the mutant-run record: d5's pin (S3-R27 item 7;
-     green 2/2 in both orders, 17:42) and 12.5.18's 12.1 doc at `BenchSyncCycle21.swift:156-159`. Next: the findings'
-     states, the ownership record, the stale records, items 8 and 9, the sections for points 2 and 4, N25's update, the
-     "Proposed document changes" of cycles 21 to 23, and "Not verified".
+  3. Point 6, the records: **in progress** (from 17:30). Committed: d5's pin (S3-R27 item 7; green 2/2 in both orders,
+     17:42) and 12.5.18's 12.1 doc at `BenchSyncCycle21.swift:156-159`, with the mutant-run record (`3a551f4`); the
+     ownership record (`79e1e0b`); reqs #10's stale records, the 12.x records, item 7's classification, item 5's
+     `followedLane` record, item 8 and item 9's rows (the commit after `79e1e0b`; under "Point 6: the records"). Next:
+     the findings' states, the sections for points 2 and 4 with N25's update, the "Proposed document changes" of
+     cycles 21 to 23, and "Not verified".
   4. Point 7, the close: not started.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
@@ -8174,6 +8237,92 @@ and the specifications `.build-s3f/c23/tools/mut-e1.py` and `mut-k23.py`, which 
   `:156-158`) on `commitTwoStalledSubscribersTurns` now says that a second stalled subscriber is "outside the bar, by
   the owner's ruling of 5 Nov; recorded" (S3-R27 item 12.1), in place of "a miss of C2 at a load of 10 or less is
   reported "open, for the owner"". It is a comment-only test edit, as point 6 allows.
+
+### Point 6: the records (the close ruling)
+
+Each record that point 6 lists (S3-R28 item 4's "S3-R27's step 8 (step 7)", rulings:1488-1493, and run 12's order,
+point 2, :1674-1678), with where it now is. A record corrected in place keeps its old text and gains a note that says
+what changed and in which cycle.
+
+- **Reqs #6 and #9, the ownership record** (S3-R27 item 11.6, as S3-R28 item 4 amends its first condition): under
+  "Authorised edits outside WP-F" (`79e1e0b`), with the eight files, their first commits, their helper types and the
+  check; that section's "None, in any cycle" and "Every changed file is WP-F's" are corrected; cycle 22's row under
+  "The named findings (S3-R27 item 12.4)" now says where the record is; the ARCHITECTURE §1.2 addition is under
+  "Proposed document changes", cycle 23. Reqs #9's point is met by the amended wording: each helper type is declared at
+  file scope in one file, and no name collides.
+- **Reqs #10's stale records**, corrected in place: the two-subscriber figure under "Cycle 21" (step on item 1, "The
+  routes, which are the owner's to rule on"), cycle 22's row and decision-rule sentence under "Step 3" (`s3f.md:7367`
+  at `9aa337c`) and cycle 21's put-back paragraph, each now citing 12.1 (outside the bar, recorded); the doc comment at
+  `BenchSyncCycle21.swift:156-159` (`3a551f4`); and rr21-T8b's record (`s3f.md:5750-5755` at `9aa337c`), now e1-R1's.
+- **The 12.x records:**
+  - 12.2's: the source doc comments were corrected in cycle 22 (`EngineFollow.swift:1576-1578`,
+    `EngineState.swift:224-232`, `EngineDispatch.swift:1289`). The draft's are corrected in place now: rr21-T8b
+    (above); the records' lifetime, by a cross-reference to R18's text, not a rewrite (12.5.9); the fold's kill and the
+    first UNCONFIRMED sibling, now confirmed and fixed (under "Cycle 21", "Step 7"); and RR-21's ruling-3 residual
+    (under "Cycle 21", "Step 8").
+  - 12.3's: written in cycle 22 (the walk's doc no longer says "(id, token) order"; under "Cycle 22", step 4).
+  - 12.5.9's: the arm's reach (`s3f.md:5072` at `d5b2ab9`, cycle 21's reqs #10), corrected in place under "Cycle 20"
+    ("The arm is Reached in cycle 21"), with e1-P3's result; and the cross-reference above.
+  - 12.5.18's: the 12.1 doc (`3a551f4`) and the 12.3 doc (cycle 22).
+- **Item 7 (d5).** Its classification, suite by suite, replaces "not audited one by one … Put to the orchestrator"
+  under "Cycle 21", "Step 8", and the matching clause in "Not verified here"; cycle 21's put-back paragraph notes it.
+  The pin is under "Point 6: run 12's work and the mutant runs".
+- **Item 5's `followedLane` record** (S3-R27 item 5; d4 §1, confirmed by its review):
+  - Its one production caller is `throttled` (`EngineFailures.swift:352`), inside `if self.defersToFollow,
+    self.exitDefers(job)` (`:349`), so only a 429 whose verdict defers behind the follow reads it. The lane it returns
+    picks the retry policy and nothing else (`retryPolicy(for:)`, `:639-641`: `interactiveRetry` for `.userInitiated`,
+    `retry` otherwise). `Backoff.delay` (`EngineSupport.swift:201-215`) reads that policy: `nil`, so `.exhausted` (the
+    retry deferred to the next run), when the Retry-After exceeds `maxRetryAfter`; otherwise a jittered delay under the
+    ceiling that `baseDelay` and `maxDelay` set, with the Retry-After as its floor.
+  - Under the default tuning both policies' `maxRetryAfter` is 3,600 s (`SyncTuning.swift:36`, `:45`), so `.exhausted`
+    does not depend on the lane, and a wrong lane changes only the throttle's length, through the jitter's ceiling
+    (background 1 s doubling to 300 s, interactive 0.25 s doubling to 2 s).
+  - **The tuning under which a wrong lane changes an answer:** `shortInteractiveRetry`
+    (`EngineFollowBarrierAnswerTests.swift:440`: `maxRetryAfter` 30 s), with a Retry-After of 60 s. A user lane gives
+    `.exhausted` (nothing is throttled, and the waiters are answered `serverUnavailable`); a prefetch lane gives
+    `.until` (the origin is throttled, and the retry serves the prefetch waiter). The survivor tests use it
+    (`1b911a1`, `486ee2a`, `8b252f2`: Retry-After 60 s against the user lane's 30 s cap).
+  - **The default-tuning case** (d4 §1 and §5 item 6, UNCONFIRMED): from the third attempt, a seeded background ceiling
+    above `interactiveMaxWait` can make another user's request fail fast where the interactive end lets it wait. It is
+    ruled S3-R16 item 2 under S3-R26 answer 6's condition. Its probe was not run (point 1 does not take it): open.
+- **Item 8, `releaseRerouteHolds`' row** (S3-R27 item 8). Neither of its two forms is given, so the row reads "no
+  figure: open" (under "Cycle 20", "The C2 inventory").
+  - *The argument, not finished:* while a re-route is owed the pump admits nothing. The batch waits in
+    `eventsAfterFollow`, so `followBarrier` holds (`EngineFollow.swift:97-99`), or a drain turn replays it with
+    `drainingAfterFollow` set (`:223-249`), and `pump()` returns under either (`EngineDispatch.swift:95`). Every
+    publication waits while a re-route is owed (`inboundBlocks`, `EngineFollow.swift:1474-1476`), at most one a job. So
+    only a job whose transfer was in flight when the batch was owed could start to wait, which would bound P by the
+    jobs then downloading: at most `maxConcurrentTransfers` running (`EngineDispatch.swift:148`), plus any paused for
+    preemption. Whether a paused job's transfer can end then, and whether any other path starts a transfer, was not
+    checked in cycle 23, so no bound is cited (from the code, UNCONFIRMED).
+  - *A figure* needs a new BenchSync case (the largest P behind owed re-routes at 10,000 ids, best of 3), which the
+    close ruling's point 1 does not take.
+- **Item 9's inventory rows** (S3-R27 item 9 with 12.5.17, on code that items 3 and 3b do not touch; S3-R28 item 4).
+  Every new per-id, per-pair, per-event or per-row operation that cycles 22 and 23 landed, with its cost and its
+  figure (release with `-enable-testing`, best of 3, in ms, as cycle 22 measured them; the loads are under "Cycle 22",
+  steps 3 and 4). S3-R27's items 3 and 4 (APM's answer turn, the k = 2 and k = 4 shapes) landed no code, and of
+  12.5.17's three only e2-A2.5's heap pass landed (e2-A2.2's counter and compaction and e2-A2.3's freeing turn did
+  not). The re-measure of every C2 case the cycle's code passes through, and the margin list, are point 7's (the
+  close's benchmarks).
+
+  | Operation | Cost | Figure | Status |
+  |---|---|---|---|
+  | a1 (`5f7db46`): `SubscriberQueue.publish` hashes a terminal slot once | one hash a terminal event (was two) | `commitTurns(.waitersStalledSubscriber)` 6.38 (loads 9.77 to 7.72) | met |
+  | a2 (`5f7db46`): `publishAll` reserves only when `slots.count + n > 2 × slots.capacity` | O(1) a batch, amortised O(1) an event | as a1 | met |
+  | a3 (`5f7db46`): one publication path (`publishAll(_:from:)`, `broadcastAll`); the observers once a batch | O(n) a batch of n events; the observers O(1) a batch (was one evaluation an event) | `commitTurns` `.waiters` 6.02, `.groupStalledSubscriber` 4.80, `.manyGroups` 7.80; `commitReannounceTurns` 6.90; `commitFailedArmTurns` 5.92 (loads 9.77 to 6.53) | met |
+  | c3 (`5f7db46`): `publishTerminal`'s one `announced` filter an id | O(N) a commit, one lookup an id | as a3 | met |
+  | e2-A1.1 (`170c376`): `isPurged` reads the request first | O(1) a call; `.all` with no lookup | `purgeWhileOwedTurns` 8.26 after the part (loads 3.09 to 2.92); the events' walk 7.88 (PROBE-C21-PURGE-PARTS) | met |
+  | e2-A1.2 (`4c572fb`): `EventAfterFollow.withdrawPurged(joins:reroutes:)`, the event withdrawn in place | O(items) an event, no copy | `purgeWhileOwedTurns` 8.16; the walk 8.05; `purgeJoinsTurns` bucket 6.56, queue 6.75 | met |
+  | e2-A1.3 (`0500e6c`): the withdrawn ids dropped in their set's order, the sort removed | O(k) a job's k ids (was O(k log k)) | `purgeWhileOwedTurns` 4.94; the walk 4.15; bucket 6.28, queue 6.49 | met |
+  | e2-A1.4 (`1c684cf`): `Job.withdrawPurged`, one access and one settle a job | O(interests) a job, one `settleRemoval` | `purgeWhileOwedTurns` 5.09; the walk 4.18 | met |
+  | e2-A1.5 (`6ae763d`): the `.all` fast path | O(1) a job under `.all` | `purgeWhileOwedTurns` 4.81; the walk 4.19 | met |
+  | e2-A1.6 (`332b6cc`): `Group.dropMember(_:waitingFor:)`, one hash a member | O(1) a member | `purgeWhileOwedTurns` 4.84; the walk 2.94 | met |
+  | e2-A1.7 (`03c3504`): `settleRemoval` keeps the lane and names the claim's content in one access | O(1) a job | `purgeWhileOwedTurns` 4.87; the walk 2.87; bucket 4.99, queue 5.20 | met |
+  | e2-A2.5 (`2abddd1`): the walk's retired `.retry` deadlines out in one `removeAll(where:)` pass, and one more notification | O(H) a purge for H heap entries (was O(H) a retired job) | `purgeTurns(.retryJobs)` 571.12 → 36.24 (loads 4.38 to 3.33) | the six purge cases: known misses (point 2) |
+  | S1 (`f38dd8c`): two clock reads, two counts and one comparison in the purge's first turn; the line formatted only above 10 ms | O(1) a purge | none: O(1), and no ruling names a case for it (S3-R27 item 9); the benches' clock does not move in the turn, so they never write the line, and the close's purge figures include the reads | — |
+
+  The six purge cases after e2-A2.5 (36.14, 37.17, 39.59, 17.85, 61.09 and 36.24 ms) are the owner's known misses
+  (point 2), under "Known misses of C2's 10 ms limit (owner ruling 2026-11-06)".
 
 ### Residual risks (S3-R16; cycle 23)
 
@@ -11486,7 +11635,8 @@ again: `eca67b8` changes no `Sources` or benchmark file.
   and the many-holders move's come from scratch probes (PROBE-C21-APM and PROBE-C21-HOLDERS in `.build-s3f/c21/apm`,
   not committed), not from a committed benchmark, and the purge's parts from another (`.build-s3f/c21/purge`). On the
   simulator four tests ran 30 times (`sim-rep30`), the rest once. The held-turn readers whose loops end with the
-  follow (`while followOwed`) were not audited one by one for the reservation-edge race ("Step 8"). The cycle-20
+  follow (`while followOwed`) were audited for the reservation-edge race by d5 only, a read-only analysis, which found
+  no racy reader (S3-R27 item 7; under "Cycle 21", "Step 8"; corrected in cycle 23). The cycle-20
   verifiers' probes were not re-run as probes; those this cycle used were adapted into tests and benchmarks (their
   shapes kept, as PROBE-C20C-MANY-MOVES and PROBE-C20R-PARTIAL-MOVE-C2). The R1 boundary probes were not re-run. The
   C2 figures are this host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
