@@ -291,7 +291,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     An adversarial comparative review follows (`f1c-review.md`). Every shape is traced in both orders and both drain timings.
     - Item 1b is written from that review, and checked against step 0's measured table.
     - **At the append,** S3-R28's text takes N21: the owner's ruling, and "f1c runs now".
-  - **Fail fast, adopted at 14:12.** The owner asked at about 14:05: "can we adopt a fail-fast policy? If the cycle is bound to fail let's not wait the 100h". It is ruled as N22, and goes into S3-R28 as item 8. In short:
+  - **Fail fast, adopted at about 14:10.** The owner asked at about 14:00: "can we adopt a fail-fast policy? If the cycle is bound to fail let's not wait the 100h". It is ruled as N22, and goes into S3-R28 as item 8. In short:
     - step 0 measures the riskiest things first (item 1's shapes, then item 3's new cases) and commits each table as it lands;
     - the fixer has stop conditions:
       - a route exhausted with its case still red;
@@ -322,7 +322,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - There is no `main` branch locally.
     - CLAUDE.md's "never push" holds for everything else: push again only when the owner asks.
   - **S3-R28's final text with N20 landed at about 14:20:** `wf_b2663c1b-767`, 4 agents, 75 min. Fidelity READY, consistency CORRECTED (5 must-fix, all applied). `s3-r28-final.md` is 227 lines.
-    - **N23 (14:30) rules its open items:**
+    - **N23 (14:22) rules its open items:**
       - N21's replacements;
       - start-count-only differences are recorded, not blocking;
       - the e1 kills run at step 6 on the code as it stands;
@@ -335,7 +335,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - f3b-route-a's three ungated shapes go to item 3b;
       - item 8 is fail fast.
     - **One go/no-go signal has already arrived:** f3b's review, partly written at 14:11, says option (i)'s C-2′ breaks R-SYN-3 for a kept claim-held job, and that N9's skip also leaves `queuedAt` and `lastTicket` unchanged. So item 3 now waits for item 3b's check. If item 3b is late, the fixer does steps 4 and 5 before step 2.
-    - **`wf_59564fea-9b2` (task `wjd3whg19`) from 14:31:** an editor applies N21–N23 into `s3-r28-append.md`, then one check (`s3-r28-append-review.md`), then a final editor. That file is what gets appended.
+    - **`wf_59564fea-9b2` (task `wjd3whg19`) from 14:23:** an editor applies N21–N23 into `s3-r28-append.md`, then one check (`s3-r28-append-review.md`), then a final editor. That file is what gets appended.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
