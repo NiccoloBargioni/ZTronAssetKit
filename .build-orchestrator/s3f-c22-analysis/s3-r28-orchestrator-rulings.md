@@ -237,3 +237,69 @@ These rule the points that the final editor and the two checks (`s3-r28-final-re
   - Nothing under `.build-orchestrator/` is deleted, now or at the package's close. The folder matches `.gitignore`'s `.build*` and CLAUDE.md's `rm -rf` allowance, so a clean-up could remove it.
   - So the orchestrator snapshots it into the local branch `archive/build-orchestrator`, now and at the close, and writes a re-open dossier, tracked on `feature/asset-kit`.
   - The post-convergence clean-up removes the s3 worktrees only after their branches are pushed or archived, and never removes `.build-orchestrator/`.
+- **Pushed (14:46, the owner's "Yes, push it"):** `archive/build-orchestrator` is on `origin` at `765102c`. Later snapshots need the owner's word before they are pushed.
+
+## N26 (15:21): the append text's open items (`s3-r28-append.md`, from `wf_59564fea-9b2`)
+
+The append review (`s3-r28-append-review.md`, CORRECTED) and its editor left O1 to O6. The orchestrator rules them, and applied each one to `s3-r28-append.md`; the copy from before these edits is `s3-r28-append-pre-n26.md`.
+- **O1, item 8's stop conditions.** The review's proposed texts are taken:
+  - (a) is "still red in a way that blocks", so a start-count-only red is not a stop (N23 point 2);
+  - (b) reads the upper end of what the later stages and parts save on that case (f3 §3.2, and item 3b's estimates), so a stop means even the best estimate cannot close it. That is item 8's "cannot";
+  - (c) for a step-0 'before' figure, the fixer commits the table and goes on, and the orchestrator's check decides whether it is a stop. The orchestrator rules a stop found by its check or by the early prober, and says what the fixer commits;
+  - (e) covers a part, stage or step that items 2, 3, 3b or 6 estimate, and the status list times each one;
+  - a figure above 10 ms seen only at a load above 10 stops nothing until rulings :763 decides it.
+- **O2, the lines N24 and N25 left stale:**
+  - item 3b names "C-3, and the sort at `:1019`";
+  - item 3b says what cycle 23 does with route A §9's three shapes. Two of them are N25's known misses, and M-4 routes the third;
+  - "a known miss" in item 8's point 5 becomes "a blocking miss".
+
+  N25 itself goes into item 3 as its own bullet, so the verifiers read it in the rulings file before item 3b is appended.
+- **O3:** the header says "An appended item decides where it differs from items 1 to 8". A later ruling wins, as everywhere.
+- **O4:** N12's option is struck. S3-R27 items 3's and 4's 'before' figures are taken in step 0, as "the rest" (N22 point 1). The owner's "end this package as soon as possible" favours surfacing an unroutable miss early.
+- **O5:** the lenient reading. While item 8's early prober runs, the fixer goes on only as point 3 allows after a stop. So no work that depends on item 1b's route goes on, and the fixer is not idle. The run may end when item 8 leaves it no work.
+- **O6:** each visit-first answer is recorded with its inputs' order. Swept first matches only an answer for the same inputs in the same order, so the timing class cannot accept the other order's answer. "Keep it blocking" is not narrowed.
+- **The editor's gap:** step 0's hours gain about 2-8 h for W-JOIN-HOP's variants (N23 point 4), so 13-26 h in all (derived). Item 3b's 17-26.5 h is added to item 6's list.
+- **The time:** item 8 drops "at about 14:05", because the sources disagree on when the owner asked (N22 says about 14:05, ORCHESTRATION.md about 14:00).
+
+## N27 (15:28): f1c's review, a no-go until the owner rules
+
+- **f1c returned at 15:26** (`wf_8dc737d5-cbc`). The review (`f1c-review.md`) finds route A (`f1c-route-a.md`) and route B (`f1c-route-b.md`) both UNSOUND. It proposes a merged route Q (its §3), with 12 ruling points.
+- **Q is not a route that an independent review calls sound:**
+  - Q is the reviewer's own merge, and its point 9 says it binds only after an independent check (P4) by an agent that wrote none of A, B or the review. That check costs about 3-5 h (estimate).
+  - Every red or green in the review is by code reading and UNCONFIRMED.
+  - Q leaves four shapes open that block with no route if they are red (its point 11): W-OBO, W-PEND-LATE's tail, W-SUPER (new, not traced) and the holder-state approximation.
+  - Q's hours are 44-67 h, step 0's 8-12 h included, plus the check (estimates).
+- **The class's record:** f1 was UNSOUND, f1b UNSOUND, and f1c's A and B both UNSOUND. That is item 8's point 6 class.
+- **Item 8's point 4 applies:** a blocking item (correct #1 and #2) has no route that an independent review calls sound. So the orchestrator tells the owner at once, with the evidence and the options:
+  - (1) record correct #1 and #2 as known residual correctness risks, and drop item 1 and item 1b;
+  - (2) run Q's independent check first, then rule item 1b on its result.
+
+  Item 1b is not appended until the owner rules.
+- **Meanwhile:** run 10's fixer is in step 0 (`verify.sh --quick`, then item 1's step-0 shapes). Its shapes are useful either way, as Q's measured reference or as the residual risk's evidence. So the run is not stopped. If the owner chooses (1), the orchestrator stops the run and relaunches it without item 1's work.
+
+## N28 (15:33): the owner's ruling, the ENOSPC windows become known residual correctness risks
+
+- **The owner's words** (after N27's report at 15:28): "Agreed let's document it as known risk". This answered the option "record correct #1 and #2 as known correctness risks, the same way as the three 10 ms misses".
+- **Carried out as S3-R28 item 1c** (`s3-r28-item1c.md`, appended to the rulings file):
+  - item 1's step-0 shapes and item 1b are withdrawn, and Q is not ruled;
+  - correct #1 and #2, and any answer in the class "the ENOSPC windows", are known residual correctness risks, not blocking;
+  - S3-R16 1(b) to 1(d) inside the window still block;
+  - no code, test or early probe is added for them;
+  - the fixer records them in the draft under "Known residual correctness risks (owner ruling 2026-11-06)".
+- **Run 10 was stopped at 15:32** (`wf_bf008c3c-24c`). It was 10 minutes into step 0's `verify.sh --quick`, with no commit and a clean worktree. Run 11 relaunches cycle 23 with item 2 first, then a re-read, because the owner's decision on the remaining C2 work is still pending.
+- **Records:** `docs/REOPEN-WP-F.md` lists the known risks next to N25's known misses. The archive branch gets them at the final snapshot.
+
+## N29 (15:55): item 1c's independent check, and N28's scope corrected
+
+- **The check** (`s3-r28-item1c-review.md`, `wf_76e8f9f2-6c4`, CORRECTED) found 7 must-fix items. The orchestrator accepts all 7 and appended them at 15:55 as "S3-R28 item 1c, amended" (rulings file line 1618; `s3-r28-item1c-amend.md`).
+- **N28's scope is corrected:**
+  - The owner ruled on correct #1 and #2: "record correct #1 and #2 as known correctness risks, the same way as the three 10 ms misses". N25 carried those three "for these three cases only".
+  - N28's "and any answer in the class" went beyond that, so only correct #1 and #2 are exempt, defined by their deciding line.
+  - Any other ENOSPC-window answer difference is blocking under S3-R16 1(a), with N21's reading, and goes to the owner at once (item 8's point 4).
+- **The owner is asked in one line** whether every such difference that a verifier finds should also be a known risk. If the owner says yes, the class is defined by T20, as the check proposes: "an answer that differs only because T20 (EngineJobs.swift:360-364) re-queues a job failed at an ENOSPC end in one order and not the other, before that job's space verdict, given at once or at the follow's end after spaceFailed's deferral (EngineFailures.swift:573-582)". That definition covers both causes and the late drain.
+- **Corrected in the record:**
+  - S3-R16 1(e) and 1(f) still block, including the e1-PS, e1-P1 and e1-P2 kills.
+  - The user-visible effect: in correct #1 the request was made before the end and replayed in the read. The probes cap retries at 1 and script the second attempt to succeed.
+  - The archive's copy predated S3-R28 and f1c's review. Snapshot 2 follows now, locally.
+- **Run 11's order** is now `verify.sh --quick` on HEAD, then the record amended on its own commit, then the re-read for the C2 ruling, then step 2.
+- **The orchestrator's own report to the owner at 15:28 was also imprecise** on correct #1 ("arrives while the engine is checking free space"). The owner is told the corrected effect.

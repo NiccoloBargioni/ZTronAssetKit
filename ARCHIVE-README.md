@@ -1,4 +1,4 @@
-# Archive of `.build-orchestrator/` (snapshot 1, 2026-11-06 14:39 CET)
+# Archive of `.build-orchestrator/` (snapshot 2, 2026-11-06 15:55 CET)
 
 This branch keeps the orchestrator's working files for ZTronAssetKit's Stage 3, so that a later re-open of WP-F (the `ZTronAssetSync` engine) can resume. The owner asked for it on 2026-11-06: "keep all your analysis results and persist what's needed for a later resume".
 
