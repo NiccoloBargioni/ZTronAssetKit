@@ -394,12 +394,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - every call in the review is by code reading and UNCONFIRMED.
 
       This is the class's fourth unsound analysis, after f1, f1b and f1c's two routes. **N27 rules a no-go for item 1b until the owner rules.** Under item 8's point 4 the owner is told at once, with two options: record correct #1 and #2 as known residual correctness risks, or check Q first. Run 10 is not stopped, because its step-0 shapes serve either option.
-    - **The owner ruled at about 15:31: "Agreed let's document it as known risk"**, choosing option (1) for the ENOSPC windows. It is recorded as **N28 (15:33)** and carried out as **S3-R28 item 1c**. Item 1c was appended at 15:33 to the rulings file, which grew from 1,580 to 1,616 lines, starting at line 1582 and byte-identical to `s3-r28-item1c.md`; the file from before is `.before-item1c`.
+    - **The owner ruled after 15:28: "Agreed let's document it as known risk"**, choosing option (1) for the ENOSPC windows. It is recorded as **N28 (15:33)** and carried out as **S3-R28 item 1c**. Item 1c was appended at 15:33 to the rulings file, which grew from 1,580 to 1,616 lines, starting at line 1582 and byte-identical to `s3-r28-item1c.md`; the file from before is `.before-item1c`.
       - Item 1's step-0 shapes and item 1b are withdrawn, and Q is not ruled.
       - Correct #1 and #2, and any answer in the class "the ENOSPC windows", are known residual correctness risks, not blocking. A broken MUST or invariant, a hang or a flake inside the window still blocks.
       - No code, test or early probe is added for them. The fixer records each one in the draft under "Known residual correctness risks (owner ruling 2026-11-06)", for ADR-057 and Stage 5.
     - **Run 10 was stopped at 15:32,** 10 minutes into step 0's `verify.sh --quick`. It had made no commit, the worktree was clean, there was no `sim.lock`, and simulator set 1 was shut down. Watcher `bi92qw5f9` was stopped with it.
-    - **Run 11 (cycle 23) launched at 15:34:** `wf_e1cbc5ed-f72` (task `w1avgdalh`), with `.build-orchestrator/s3f-fix-args-run11.json`, which is run 10's args with the focus rewritten for item 1c.
+    - **Run 11 (cycle 23) launched at 15:34:** `wf_e1cbc5ed-f72` (task `w1avgdalh`), with `.build-orchestrator/s3-fix-args-run11.json`, which is run 10's args with the focus rewritten for item 1c.
       - Its order: step 1 (item 2) first, then a re-read, because the owner's decision on the remaining C2 work (items 3 and 3b, and S3-R27's items 3 and 4) is pending.
       - **Watcher `beit4jpfl`:** `watch_putback.py .worktrees/s3f 9aa337c <run 11's journal> 0`.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
