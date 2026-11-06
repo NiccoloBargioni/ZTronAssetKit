@@ -725,6 +725,26 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
   second cause, the late drain and every other answer difference in or after a window are judged under S3-R16 1(a)
   as usual; 1(b) to 1(f) still block; the record gives point 3's effect; run 11 runs `verify.sh --quick` on HEAD.
 
+  *Order for run 12 (appended 16:15, N30)*: the work every option needs comes first, while the owner's ruling on the
+  remaining C2 work is pending: S3-R27 step 7's work outside the purge code (e1-PS's, e1-P1's and e1-P2's kills, e1-R1's
+  kill table, the d4 review's survivors with the default-tuning probe, reqs #8's guard), then the records no C2 route
+  changes; the three unreached purge lines wait for the C2 ruling.
+
+  *The owner's close ruling (appended 17:12, N31; N32 records its two independent checks)*: WP-F ends with option (e),
+  a short close, and the note decides wherever it differs from S3-R16 to S3-R28 (item 1c, its amendment and run 12's
+  order included). (1) No more fix work except point 5's log line, point 6's mutant runs and point 8's corrections; item
+  1c's freeze stays; no new test but S1's; run 12's seven commits stay. (2) The six gated purge misses, N7's five, f3b
+  review §7's two variants, route A §9's third shape, APM's answer turn and item 4's shapes are known misses of the
+  10 ms limit (item 4's as unproven), each with its figure, route and re-open criterion; f3c's two open shapes are
+  recorded as open, not as known misses. (3) The FAIL is accepted: the six stay as written and red, and `verify.sh
+  --full` on the final HEAD is expected to end `VERIFY: FAIL (1 failed: benchmarks)`, with only the six and P-13 red;
+  every commit names the cases red at it. (4) The whole ENOSPC class (an answer that differs between the visit orders,
+  caused by an event inside an ENOSPC window) is a known residual risk; a broken MUST, a hang or a flaky test there
+  still blocks. (5) S1: one `.info` line on `.sync` when a purge's first turn passes C2's 10 ms, with its milliseconds
+  and the job and group counts, red first. (6) The records and the mutant runs for run 12's five kill tests. (7) The
+  close: `--quick`, `--gates-only`, `--full` on the final HEAD. (8) Two verifiers run once; what happens to their
+  findings. (9) Run 13's order: point 5, point 6, point 7. (10) The orchestrator's steps after the verification.
+
   Applied in cycle 23: see "Cycle 23" below, whose "Status" list says which step is committed.
 
 ## Cycle 2: the cycle-1 verification findings
@@ -7870,47 +7890,39 @@ stopped at 15:32 after 10 minutes of step 0, with nothing committed; run 11 star
 ### Status (resume here)
 
 A fixer resumed after an interruption first re-reads the end of the rulings file (item 6), then continues from the
-worktree's HEAD with the first step that is not "committed". Each step's results are under its own heading below.
+worktree's HEAD with the first step that is not "committed". Since 17:12 the owner's close ruling decides (S3-R28's last
+note, N31: option (e), a short close; recorded under "Orchestrator rulings (close-out)"). Its point 9 sets the order:
+point 5 (S1, the long-purge log line), then point 6 (the mutant runs for run 12's kill tests, then the records), then
+point 7 (the close); then the two verifiers run once (point 8). Each step's results are under its own heading below.
 
-0. Step 0 (item 5 as item 1c amends it: no ENOSPC shapes; `verify.sh --quick` on `9aa337c`, then item 3's five new
-   cases' 'before' figures on a scratch copy of `9aa337c`, then S3-R27 items 3's and 4's): **in progress**.
-   - `verify.sh --quick` on `9aa337c`, run 11 (the scratch copy `.build-s3f/c23/snap0`, `git archive 9aa337c`; pre-built
-     outside the lock, the coverage test run under `sim.lock`; `tools/step0-quick.sh`, `step0-quick.log`, `.meta`):
-     `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines (15:51:23 to 16:01:15; lock taken
-     15:52:39 and released at the end; 1-minute load 2.35 at the start, 40.91 after the pre-build, 6.32 at the end).
-     Tests passed: Transport 151, Sync 706 (`passed after 364.515 seconds`), Storage 459, Model 84, Kit 85,
-     Compatibility 71, AppleHosted 104.
-   - `verify.sh --quick` on HEAD (item 1c amended, point 5.1; `be8804a`, whose code and tests are HEAD's; the coverage
-     run under `sim.lock`, taken 16:03:17, released 16:11:52; `tools/quick-head.sh`, `quick-head.log`, `.meta`; 1-minute
-     load 4.10 at the start, 36.49 after the pre-build, 6.67 at the end): `VERIFY: PASS`, `::: SUMMARY mode=--quick
-     steps-failed=0`, 0 `warning:` lines; Transport 151, Sync 706 (`passed after 362.068 seconds`), Storage 459,
-     Model 84, Kit 85, Compatibility 71, AppleHosted 104. It replaces the run on `9aa337c` above.
-   - Re-read at 16:12: no ruling on the remaining C2 work yet, so the 'before' figures below come next (point 5.3).
-   - Item 3's five new cases are written (`.build-s3f/c23/probes/BenchSyncCycle23Purge.swift`: `purgeInLetterTurns`
-     over `keptUnderThreeGroups`, `fourGroupJoins`, `mixedLaneGroups`, `pendingClaimGroups` and
-     `oneMemberGroupsFourPerID`), not yet built or run. They are copied, with PROBE-C21-APM (the cycle-22 verifier's
-     `ProbeC21APM-as-run-c22-correct.swift`, for S3-R27 item 3's 'before' figure), into `.build-s3f/c23/bench0`, a
-     benchmarks-only scratch copy of `9aa337c` (its own `Package.swift`, never committed).
-   - **Next action:** in `bench0`, `swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing
-     --filter 'purgeInLetterTurns|ProbeC21APM'` under `sim.lock` at a 1-minute load of 10 or less; commit the five
-     cases' table with loads; then write and measure S3-R27 item 4's k = 2 and k = 4 cases (four figures each, d3's
-     shapes; not written).
-   - Run 10's `quick0.log` stops inside the tests stage; item 1c's order put step 1 first.
-1. Step 1 (item 2, correct #3): **committed**. `03c4e59` (A-T-SD's held retry, its set-up check and the doc fixes),
-   then these records. Started 15:36, `03c4e59` at 15:44; the simulator's 30 iterations and the bundle runs are taken
-   with the run's gate runs. Item 8 2(e): within item 2's estimate (1-1.5 h with shared close runs), no stop.
-   **Not run in run 11** (the run ended at its working budget): the gate set on HEAD (`--quick`, the release build,
-   the gates, coverage, Sync ×3, TSan, the iOS build, the simulator suite with A-T-SD's 30 iterations per argument,
-   the benchmarks). Next action at the close: `.build-s3f/c23/tools/gates23.sh` (written, not run), logs under
-   `.build-s3f/c23/gates/`.
-2. Step 2 (item 3, stage A): **not started**. Item 3 waits for item 3b, which is not appended, and the owner is
-   deciding whether the remaining C2 work stays (item 1c).
-3. Step 3 (item 3, stages B and C, each if triggered): not started.
-4. Step 4 (S3-R27's step 5, the APM answer turn; item 4): not started.
-5. Step 5 (S3-R27's step 6, the k = 2 and k = 4 shapes; item 4): not started.
-6. Step 6 (S3-R27's step 7: the kills, the three unreached lines, reqs #8's guard; item 4): not started.
-7. Step 7 (the records, item 9, the close): item 1c's record, N25's record and the S3-R28 record are **committed**
-   with step 1's records (below); the rest not started.
+- **Run 13** (started 17:20 on `9e9a500`, clean worktree; the rulings file re-read at 17:20 ends at the close ruling).
+  1. Point 5, S1: **in progress**. The test (`EngineLongPurgeTurnLogTests.swift`, two tests) is committed red first:
+     on `9e9a500`'s code the 11 ms case fails with 1 issue (`lines → []`) and the 10 ms case passes, 2/2
+     (`.build-s3f/c23/s1/red-run1.log`, `red-run2.log`, 17:31, 1-minute load 1.70). **Next action:** the line in
+     `performPurge`'s first turn (`EngineCommands.swift`), the test green 2/2, then S1's record under "Point 5".
+  2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: not started.
+  3. Point 6, the records: not started.
+  4. Point 7, the close: not started.
+- **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
+  `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
+  `486ee2a`, `8b252f2`, `06880a8`, `9e9a500`). It made no mutant run for the five and recorded none of the seven here;
+  point 6 does both. Its e1 mutant runs are in `.build-s3f/c23/mut-e1.txt` (logs in `.build-s3f/c23/mut/`), cut after
+  `p2-after-verdict-replay-rule`'s build.
+- **Item 5's steps, as the close ruling's point 1 leaves them:**
+  0. Step 0: closed by the close ruling. Its result is `verify.sh --quick` on HEAD (`be8804a`, whose code and tests
+     are `247e85b`'s; 16:03 to 16:11, the coverage run under `sim.lock`; `.build-s3f/c23/quick-head.log`): `VERIFY:
+     PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines; Transport 151, Sync 706 (`passed after
+     362.068 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104 (1-minute load 4.10 at the
+     start, 36.49 after the pre-build, 6.67 at the end). It replaced the run on `9aa337c` (15:51 to 16:01, `VERIFY:
+     PASS`, `step0-quick.log`). Not taken: the 'before' figures in `.build-s3f/c23/bench0` (item 3's five cases and
+     APM's probe, written, never run) and S3-R27 item 4's cases (never written).
+  1. Step 1 (item 2, correct #3): **committed** (`03c4e59`, then its records); the verification checks it (point 8).
+  2. Steps 2 and 3 (item 3, route C): not taken (point 1); item 3b is never appended.
+  3. Steps 4 and 5 (S3-R27's steps 5 and 6: APM's answer turn, item 4's shapes): not taken (point 1).
+  4. Step 6 (S3-R27's step 7): run 12's commits are in. Not taken (point 1): r2b and b22-no-run-owner, e1-R1's kill
+     table, the default-tuning probe and the three unreached lines (`EngineCommands.swift:1001`, `:1004`, `:1009` at
+     `9aa337c`). The mutant runs for run 12's committed tests are point 6's.
+  5. Step 7 (the records and the close): point 6 and point 7.
 
 ### Appended items (S3-R28 item 6)
 
@@ -7922,6 +7934,10 @@ worktree's HEAD with the first step that is not "committed". Each step's results
 - Item 1c amended (appended 15:55, N29; read at 16:02, after `be8804a`): taken at once. The known-risk record is
   amended to it on its own commit (correct #1 and #2 only, point 2's "Not covered", point 3's effect, the UNCONFIRMED
   suspects), and `verify.sh --quick` runs on HEAD (point 5.1), which replaces step 0's run on `9aa337c`.
+- Order for run 12 (appended 16:15, N30): taken by run 12 (S3-R27 step 7's kills and reqs #8's guard, `29dfb12` to
+  `9e9a500`), which the orchestrator stopped at 16:41.
+- The owner's close ruling (appended 17:12, N31): read by run 13 at 17:20, before anything else; it decides from run
+  13's first step (point 9's order).
 
 ### The named findings (S3-R28 item 7, as item 1c amends it)
 
