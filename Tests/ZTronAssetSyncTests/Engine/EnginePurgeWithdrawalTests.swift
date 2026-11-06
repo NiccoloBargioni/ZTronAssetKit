@@ -188,4 +188,64 @@ struct EnginePurgeWithdrawalTests {
         #expect(after.violations.isEmpty, "\(after.violations)")
         await Self.finish(s)
     }
+
+    /// What a purge never withdraws, joined or waiting for the follow (S3-R27 item 12.3): the lane and kind conditions
+    /// e2-A1.4 moved into `Job.withdrawPurged` and e2-A1.2 into `withdrawPurgedJoins`' predicate. W downloads for a user
+    /// waiter while v3's follow is owed; a user-lane group registers zz-u and a prefetch waiter asks for zz-p, then
+    /// `purge(.scope([zz-u, zz-p]))` arrives. Followed first, both joined jobs, and the purge leaves each job its
+    /// interest; behind the barrier both joins wait, the purge withdraws neither, and the drain joins them, as visited
+    /// first. Without the lane condition the group's interest or join would be withdrawn, and its member dropped; without
+    /// the kind condition, the waiter's.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-6: a purge keeps a user-lane group's and a prefetch waiter's interests, joined or waiting for the follow (S3-R27 item 12.3, F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func purgeKeepsUserLaneAndWaiterInterests(_ visit: LaneDropVisit) async throws {
+        typealias FollowBarrier = EngineSyncTests.FollowBarrier
+        let (s, _) = try await FollowBarrier.setUp(seed: 2_031_161)
+        let engine = s.engine
+        let uBytes = EngineFixture.bytes(2_031_163, count: 100_000)
+        let pBytes = EngineFixture.bytes(2_031_164, count: 100_000)
+        let wBytes = EngineFixture.bytes(2_031_165, count: 100_000)
+        let u = EngineHarness.onDemand("zz-u", uBytes)
+        let p = EngineHarness.onDemand("zz-p", pBytes)
+        let w = EngineHarness.onDemand("zz-w", wBytes)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(2_031_200) + [p, u, w], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        for (entry, bytes) in [(u, uBytes), (p, pBytes), (w, wBytes)] {
+            await s.harness.source.script(entry.transferID, [.hold, .stage(bytes)])
+        }
+        let wWaiter = Task { await engine.awaitAsset(w.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[w.transferID]?.state == .downloading }
+        }
+        try await EngineFollowBarrierTests.applyHeld([s.q] + FollowBarrier.fillers(2_031_300) + [p, u, w], tag: "v3-purge-keeps", s, visit: visit)
+        let group = try await engine.registerGroup([u.identifier], lane: .userInitiated).get()
+        let pWaiter = Task { await engine.awaitAsset(p.identifier, lane: .prefetch) }
+        if visit == .sweepFollowsFirst {
+            await engine.awaitCondition { FollowBarrier.joinWaits($0, u) && FollowBarrier.joinWaits($0, p) }
+        } else {
+            await engine.awaitCondition { engine in
+                engine.state.jobs[u.transferID]?.interests[group] != nil && engine.state.jobs[p.transferID]?.interests.values.contains { $0.kind == .waiter } == true
+            }
+        }
+        let purged = await engine.purge(.scope(.identifiers([u.identifier, p.identifier])))
+        #expect((try? purged.get()) != nil, "the purge completes: \(purged)")
+        if visit == .sweepFollowsFirst {
+            await engine.readForTests { $0.releaseFollowFollowUps() }
+        }
+        await engine.awaitCondition { !$0.followBarrier && !$0.state.drainFollowUpScheduled }
+        let after = await engine.readForTests { engine in
+            (
+                group: engine.state.groups[group]?.pending[u.identifier] == u.transferID && engine.state.jobs[u.transferID]?.interests[group] != nil,
+                waiter: engine.state.jobs[p.transferID]?.interests.values.contains { $0.kind == .waiter && $0.lane == .prefetch } == true
+            )
+        }
+        #expect(after.group, "the group still waits for zz-u, whose job holds its interest: \(after)")
+        #expect(after.waiter, "zz-p's job holds the prefetch waiter's interest: \(after)")
+        await engine.releaseGroup(group)
+        await EngineFollowBarrierTests.finishHeld(s)
+        _ = await pWaiter.value
+        _ = await wWaiter.value
+    }
 }
