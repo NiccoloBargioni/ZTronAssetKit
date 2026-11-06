@@ -343,3 +343,93 @@ extension EngineFollowBarrierTests {
         #expect(violations.isEmpty, "\(violations.prefix(3))")
     }
 }
+
+// MARK: d4 §3.6: a waiter whose removal replayed ahead of its owed re-route (b22-no-waiter-owner)
+
+/// d4 §3.6, with its review's M3 (Stage 3 close-out cycle 23, ruling S3-R28 item 4; S3-R27 item 5): `followedLane`'s
+/// owner check of an owed waiter item (`reaches(_:_:)`'s `.waiter` arm) decides only for an item whose waiter left
+/// through a removal the drain has already replayed: a removal still waiting puts its token in `withdrawn`, which is
+/// read first (rr21-T12's `.cancelled`). Swept first, a waiter cancelled behind the barrier before the commit keeps its
+/// interest on the job until its removal replays, so the commit owes its item, behind the removal.
+extension EngineFollowBarrierTests {
+    /// zz-y (P's, a prefetch waiter) is Y's content (24 bytes), which downloads; K0 maps zz-a1…zz-a4 and zz-a6 to Z's
+    /// content and only zz-a5 to Y's, and W5 is cancelled behind the barrier before O's commit (visited first the barrier
+    /// is down, so its interest goes at once and the commit owes no item of it: S3-R26 answer 1's citation, the state is
+    /// swept first only). One drain turn replays W5's removal, which spends no drain id, and zz-a1…zz-a4's items; zz-a5's
+    /// (swept first) and zz-a6's wait. Y then gets a 429 with Retry-After 60 s, above the user lane's 30 s cap. W5's item
+    /// counts for nothing, since its waiter left, so Y is prefetch work, as on a visit-first engine, where W5's interest
+    /// had left before the commit: the origin is throttled at the arrival, Y's retry serves P, and W1…W4 and W6, whose job
+    /// on Z is admitted only at the drain's end, behind the throttle, are answered `serverUnavailable` at once. Counted,
+    /// W5's item would make Y user work: `.exhausted`, no throttle, P `serverUnavailable`, and Z's bytes for the rest.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-5: an owed re-route whose waiter's removal replayed ahead of it counts for nothing toward a 429's lane (F-28, d4 §3.6)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func owedRerouteOfAWaiterRemovedAheadCountsForNothing(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_301
+        let yBytes = EngineFixture.bytes(seed + 5, count: 24)
+        let zBytes = EngineFixture.bytes(seed + 6, count: 20)
+        let y = EngineHarness.onDemand("zz-y", yBytes)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 6, extra: [y], tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = c.engine
+        let transfer = c.transfer
+        let yT = y.transferID
+        await c.s.harness.source.script(yT, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(60))), .stage(yBytes)])
+        let p = await Self.downloadingWaiter(y, c, lane: .prefetch)
+        let onZ = Self.movedOnto(zBytes, c)
+        let a5 = c.ids[4]
+        let k0 = [y] + onZ.filter { $0.identifier != a5 } + [EngineHarness.onDemand(a5.rawValue, yBytes)]
+        let zT = onZ[0].transferID
+        try #require(zT != yT && zT != transfer, "setup: K0 maps the ids to a content of their own")
+        await c.s.harness.source.script(zT, [.stage(zBytes), .stage(zBytes)])
+        // `oweThroughK0`'s steps, with W5 cancelled between K0's apply and O's commit.
+        let (units, releaser) = try await Self.holdPublications(of: [transfer], c.s, bulk: c.bulk)
+        var held = HeldUnits(bulk: c.bulk, kept: units, releaser: releaser)
+        try await Self.applyHeld(c.manifest(k0, round: 1), tag: "k0-removed-ahead-\(seed)", c.s, visit: visit)
+        c.w[4].cancel()
+        let w5 = await c.w[4].value
+        #expect(w5 == .failure(.cancelled), "W5 is answered at once (R-SYN-4): \(w5)")
+        let removed = await engine.readForTests { e in
+            (removals: e.state.eventsAfterFollow.filter { event in
+                if case .removal = event {
+                    return true
+                }
+                return false
+            }.count, interests: e.state.jobs[transfer]?.interests.count ?? -1)
+        }
+        if visit == .sweepFollowsFirst {
+            try #require(removed == (1, 7), "setup: W5's removal waits, and its interest stays on O's job (K and W1…W6): \(removed)")
+        } else {
+            try #require(removed == (0, 6), "setup: the barrier is down, so W5's interest left O's job at once and no removal waits: \(removed)")
+        }
+        await engine.readForTests { $0.holdDrainFollowUps() }
+        await held.release(units[0])
+        await engine.awaitCondition { $0.state.jobs[transfer] == nil }
+        let owed = await engine.readForTests { e in Self.owedBatches(e).map(\.items.count) }
+        try #require(owed == [visit == .sweepFollowsFirst ? 6 : 5], "setup: O's commit owes its re-routes as one batch, W5's swept first only: \(owed)")
+        // The held turns run one at a time until the drain's first turn has made items: swept first that turn runs at the
+        // follow's end, inside its last turn; visited first it is the first held turn.
+        var turns: [HeldTurn] = []
+        while await engine.readForTests({ e in Self.owedBatches(e).map(\.items.count) == owed }) {
+            turns.append(await Self.runOneHeldTurn(engine))
+        }
+        let left = await engine.readForTests { e in
+            (items: Self.owedBatches(e).flatMap { $0.items.elements.map(\.asset) }.sorted(), waiter: e.state.waiters.values.contains { $0.asset == a5 }, owed: e.followOwed)
+        }
+        let expected = visit == .sweepFollowsFirst ? [a5, c.ids[5]] : [c.ids[5]]
+        try #require(left.items == expected && !left.waiter && !left.owed, "setup: the drain's first turn replayed W5's removal and made zz-a1…zz-a4; zz-a5's item (swept first) and zz-a6's wait: \(left), turns \(turns)")
+        await c.s.harness.source.release(yT, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[yT]?.state != .downloading }
+        let throttled = await engine.readForTests { e in e.state.remote.flatMap { e.state.throttles[$0.originID] } != nil }
+        let layer = await Self.finishOwed(c, held: held, others: [p])
+        await Self.finishHeld(c.s)
+        #expect(throttled, "W5's item counts for nothing: Y is prefetch work, and its 429 throttles the origin at the arrival (visit-first): \(layer)")
+        #expect(Self.sizes([layer.others[0]]) == [24], "Y's retry serves P (visit-first): \(layer)")
+        for (index, answer) in layer.w.enumerated() where index != 4 {
+            if case .failure(.serverUnavailable) = answer {
+            } else {
+                Issue.record("W\(index + 1), on Z behind the throttled origin, is answered serverUnavailable at once (visit-first): \(answer); \(layer)")
+            }
+        }
+        #expect(layer.w[4] == .failure(.cancelled) && Self.sizes([layer.k]) == [16], "W5 keeps its cancellation and K gets O's bytes: \(layer)")
+        #expect(layer.violations.isEmpty, "\(layer.violations.prefix(3))")
+    }
+}
